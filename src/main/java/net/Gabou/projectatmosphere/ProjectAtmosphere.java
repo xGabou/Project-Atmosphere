@@ -1,0 +1,56 @@
+package net.Gabou.projectatmosphere;
+
+import net.Gabou.projectatmosphere.client.renderer.CloudRenderer;
+import net.Gabou.projectatmosphere.registry.EntityRegistrar;
+import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.EntityRenderersEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import software.bernie.geckolib.GeckoLib;
+
+@Mod(ProjectAtmosphere.MODID)
+@EventBusSubscriber(modid = ProjectAtmosphere.MODID)
+public class ProjectAtmosphere {
+    public static final String MODID = "projectatmosphere";
+    public static final Logger LOGGER = LogManager.getLogger(MODID);
+
+    public ProjectAtmosphere() {
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        GeckoLib.initialize();
+
+        EntityRegistrar.registerEntities(modEventBus);
+
+        modEventBus.addListener(this::setup);
+        modEventBus.addListener(this::clientSetup);
+    }
+
+    private void setup(final FMLCommonSetupEvent event) {
+        LOGGER.info("Setting up Project Atmosphere (Common)");
+    }
+
+    private void clientSetup(final FMLClientSetupEvent event) {
+        LOGGER.info("Setting up Project Atmosphere (Client)");
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        SpawnCloudCommand.register(event.getDispatcher());
+    }
+    @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID,bus = Mod.EventBusSubscriber.Bus.MOD,value = Dist.CLIENT)
+    public static class ClientModEvents {
+        @SubscribeEvent
+        public static void onClientSetup(final EntityRenderersEvent.RegisterRenderers event) {
+            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY.get(), CloudRenderer::new);
+
+        }
+    }
+}

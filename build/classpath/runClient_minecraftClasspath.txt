@@ -1,4 +1,4 @@
-C:\Users\PC GAB\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge\forge\1.20.1-47.4.0_mapped_official_1.20.1\forge-1.20.1-47.4.0_mapped_official_1.20.1.jar
+C:\Users\PC GAB\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge\forge\1.20.1-47.4.0_mapped_official_1.20.1\forge-1.20.1-47.4.0_mapped_official_1.20.1-recomp.jar
 C:\Users\PC GAB\.gradle\caches\forge_gradle\minecraft_repo\versions\1.20.1\client-extra.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\net.minecraftforge\fmlearlydisplay\1.20.1-47.4.0\5a0c2d1a65a422bd0e64548e58b70f4d011ef788\fmlearlydisplay-1.20.1-47.4.0.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\net.minecraftforge\javafmllanguage\1.20.1-47.4.0\f0c0b352173d0a378cbdcec9cfc4ba65899a721\javafmllanguage-1.20.1-47.4.0.jar
@@ -8,6 +8,10 @@ C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\net.minecraftforge\fmlcore\1.
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\net.minecraftforge\fmlloader\1.20.1-47.4.0\350292a3c597f65d130e48b6e419a2b21cba2ac1\fmlloader-1.20.1-47.4.0.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\net.minecraftforge\JarJarSelector\0.3.19\376cc9c8ea60720cf027c01fc033de915699801c\JarJarSelector-0.3.19.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\net.minecraftforge\JarJarMetadata\0.3.19\83feaa9b770e6ac0e96ee4fc23fa89325c5fe2\JarJarMetadata-0.3.19.jar
+C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\authlib\4.0.43\2ff9d747a77570a07a60d32ac77eb6162ad2a2d9\authlib-4.0.43.jar
+C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\datafixerupper\6.0.8\3ba4a30557a9b057760af4011f909ba619fc5125\datafixerupper-6.0.8.jar
+C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\patchy\2.2.10\da05971b07cbb379d002cf7eaec6a2048211fefc\patchy-2.2.10.jar
+C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\text2speech\1.17.9\3cad216e3a7f0c19b4b394388bc9ffc446f13b14\text2speech-1.17.9.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.google.guava\guava\31.1-jre\60458f877d055d0c9114d9e1a2efb737b4bc282c\guava-31.1-jre.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.google.code.findbugs\jsr305\3.0.2\25ea2e8b0c338a877313bd4672d3fe056ea78f0d\jsr305-3.0.2.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\ca.weblite\java-objc-bridge\1.1\1227f9e0666314f9de41477e3ec277e542ed7f7b\java-objc-bridge-1.1.jar
@@ -43,13 +47,9 @@ C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.github.oshi\oshi-core\6.2
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.google.code.gson\gson\2.10\dd9b193aef96e973d5a11ab13cd17430c2e4306b\gson-2.10.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.google.guava\failureaccess\1.0.1\1dcf1de382a0bf95a3d8b0849546c88bac1292c9\failureaccess-1.0.1.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.ibm.icu\icu4j\71.1\9e7d3304c23f9ba5cb71915f7cce23231a57a445\icu4j-71.1.jar
-C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\authlib\4.0.43\2ff9d747a77570a07a60d32ac77eb6162ad2a2d9\authlib-4.0.43.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\blocklist\1.0.10\5c685c5ffa94c4cd39496c7184c1d122e515ecef\blocklist-1.0.10.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\brigadier\1.1.8\5244ce82c3337bba4a196a3ce858bfaecc74404a\brigadier-1.1.8.jar
-C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\datafixerupper\6.0.8\3ba4a30557a9b057760af4011f909ba619fc5125\datafixerupper-6.0.8.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\logging\1.1.1\832b8e6674a9b325a5175a3a6267dfaf34c85139\logging-1.1.1.jar
-C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\patchy\2.2.10\da05971b07cbb379d002cf7eaec6a2048211fefc\patchy-2.2.10.jar
-C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\com.mojang\text2speech\1.17.9\3cad216e3a7f0c19b4b394388bc9ffc446f13b14\text2speech-1.17.9.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\org.apache.httpcomponents\httpclient\4.5.13\e5f6cae5ca7ecaac1ec2827a9e2d65ae2869cada\httpclient-4.5.13.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\commons-codec\commons-codec\1.15\49d94806b6e3dc933dacbd8acb0fdbab8ebd1e5d\commons-codec-1.15.jar
 C:\Users\PC GAB\.gradle\caches\modules-2\files-2.1\commons-io\commons-io\2.11.0\a2503f302b11ebde7ebc3df41daebe0e4eea3689\commons-io-2.11.0.jar
