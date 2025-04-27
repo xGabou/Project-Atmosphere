@@ -32,8 +32,7 @@ Built for performance, compatibility, and future expansion, Project Atmosphere b
 ---
 
 ## 📜 License
-All rights reserved.  
-You may not redistribute Project Atmosphere without permission.
+See Gabou's custom license
 
 ---
 
