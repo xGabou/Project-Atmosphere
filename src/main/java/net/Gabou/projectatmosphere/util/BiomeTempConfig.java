@@ -32,7 +32,7 @@ public class BiomeTempConfig {
     static {
         // 1) Populate every vanilla biome with the default range
         for (ResourceLocation id : ForgeRegistries.BIOMES.getKeys()) {
-            if ("minecraft".equals(id.getNamespace())) {
+            if (!("minecraft".equals(id.getNamespace()))) {
                 RANGES.put(id, DEFAULT);
             }
         }
