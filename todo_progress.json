@@ -1,0 +1,231 @@
+[
+  {
+    "title": "Cloud System",
+    "tasks": [
+      {
+        "description": "Implement GeckoLib CloudEntity",
+        "done": true
+      },
+      {
+        "description": "Add cloud variants: cumulus, cirrus, fog",
+        "done": false
+      },
+      {
+        "description": "Add wind drifting logic",
+        "done": false
+      },
+      {
+        "description": "Detect and merge cloud entities",
+        "done": false
+      },
+      {
+        "description": "Save merged state in NBT with original identity",
+        "done": false
+      },
+      {
+        "description": "Restore original clouds after split",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Fog System",
+    "tasks": [
+      {
+        "description": "Add morning fog when temperature \u003c 10°C",
+        "done": false
+      },
+      {
+        "description": "Customize fog by biome: jungle, swamp, plains",
+        "done": false
+      },
+      {
+        "description": "Fade fog after sunrise or player descent",
+        "done": false
+      },
+      {
+        "description": "Use safe Forge hook to override vanilla fog",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Shader Compatibility",
+    "tasks": [
+      {
+        "description": "Do not override sky renderer (retain shader support)",
+        "done": false
+      },
+      {
+        "description": "Add config option: cloudMode FULL | HYBRID | VANILLA",
+        "done": false
+      },
+      {
+        "description": "Ensure visual blend for vanilla + custom clouds",
+        "done": false
+      },
+      {
+        "description": "Test with Complementary, BSL, SEUS, Iris+Sodium",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Weather Manager",
+    "tasks": [
+      {
+        "description": "Create server-authoritative WeatherManager",
+        "done": false
+      },
+      {
+        "description": "Override vanilla rain/thunder states",
+        "done": false
+      },
+      {
+        "description": "Sync weather state to clients",
+        "done": false
+      },
+      {
+        "description": "Simulate 7-day forecast based on season + temperature",
+        "done": false
+      },
+      {
+        "description": "Forecast includes random ±10°C scaling",
+        "done": false
+      },
+      {
+        "description": "Final displayed temp varies ±3°C daily",
+        "done": false
+      },
+      {
+        "description": "Generate storms using season + wind + temperature",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Extreme Weather Events",
+    "tasks": [
+      {
+        "description": "Implement TornadoEvent (wind + suction)",
+        "done": false
+      },
+      {
+        "description": "Implement HurricaneEvent (wide-area wind + rain)",
+        "done": false
+      },
+      {
+        "description": "Implement SandstormEvent (reduced visibility + particles)",
+        "done": false
+      },
+      {
+        "description": "Implement SnowstormEvent with snow accumulation",
+        "done": false
+      },
+      {
+        "description": "Handle spring melt logic for snow_pile blocks",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Temperature System",
+    "tasks": [
+      {
+        "description": "Integrate Serene Seasons API",
+        "done": true
+      },
+      {
+        "description": "Add fallback temperature simulation if SS missing",
+        "done": false
+      },
+      {
+        "description": "Mixin to override temperature source if needed",
+        "done": false
+      },
+      {
+        "description": "Expose API to other mods for temp reading",
+        "done": false
+      },
+      {
+        "description": "Allow forecast-based temperature overrides",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Rain \u0026 Crops",
+    "tasks": [
+      {
+        "description": "Integrate with Farmer’s Delight: rain helps growth",
+        "done": false
+      },
+      {
+        "description": "Track rainfall per chunk",
+        "done": false
+      },
+      {
+        "description": "Convert dirt to corpse dirt if too much rain",
+        "done": false
+      },
+      {
+        "description": "Only affect uncovered farmland",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Config \u0026 Performance",
+    "tasks": [
+      {
+        "description": "Create projectatmosphere.toml config",
+        "done": false
+      },
+      {
+        "description": "Options: fog, cloud mode, forecast deviation, event toggle",
+        "done": false
+      },
+      {
+        "description": "Use patterns: Observer, Strategy, Factory",
+        "done": false
+      },
+      {
+        "description": "Avoid BlockEntities — use chunk managers",
+        "done": false
+      },
+      {
+        "description": "Memoize biome → weather lookup",
+        "done": false
+      },
+      {
+        "description": "Separate ClientWeatherHandler and ServerWeatherHandler",
+        "done": false
+      }
+    ]
+  },
+  {
+    "title": "Mod Compatibility",
+    "tasks": [
+      {
+        "description": "Farmer’s Delight",
+        "done": false
+      },
+      {
+        "description": "Naturalist",
+        "done": false
+      },
+      {
+        "description": "Immersive Weathering",
+        "done": false
+      },
+      {
+        "description": "Tough As Nails",
+        "done": false
+      },
+      {
+        "description": "Epic Fight",
+        "done": false
+      }
+    ]
+  }
+]
