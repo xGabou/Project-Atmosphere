@@ -1,11 +1,14 @@
-# IntelliJ project files
-/shelf/
-/workspace.xml
-
-# Build system
+# Gradle build cache (all versions)
 .gradle/
-**/build/
 **/.gradle/
+
+# Build output
+**/build/
+
+# IntelliJ project files
+*.iml
+.idea/
+.idea/modules/
 
 # Editor-based HTTP Client requests
 /httpRequests/
