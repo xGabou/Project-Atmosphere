@@ -1,10 +1,21 @@
-# Default ignored files
-/shelf/
-/workspace.xml
+# Gradle build cache (all versions)
+.gradle/
+**/.gradle/
+
+# Build output
+**/build/
+
+# IntelliJ project files
+*.iml
+.idea/
+.idea/modules/
+
 # Editor-based HTTP Client requests
 /httpRequests/
-# Environment-dependent path to Maven home directory
+
+# Maven-related
 /mavenHomeManager.xml
-# Datasource local storage ignored files
+
+# Datasource configs
 /dataSources/
-/dataSources.local.xml
+dataSources.local.xml
