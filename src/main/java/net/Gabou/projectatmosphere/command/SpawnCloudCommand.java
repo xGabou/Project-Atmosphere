@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.Gabou.projectatmosphere.util.SereneTempToCelcius;
+import net.Gabou.projectatmosphere.util.TemperatureForecast;
 import net.Gabou.projectatmosphere.util.TemperatureUtils;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -89,7 +90,7 @@ public class SpawnCloudCommand {
                     var10001[3] = time.getSeasonCycleTicks() % time.getDayDuration();
                     var10001[4] = time.getDayDuration();
                     BlockPos onPos = context.getSource().getPlayer().getOnPos();
-                    var tempCelcius = TemperatureUtils.getRealTemperature(level, onPos);
+                    var tempCelcius = TemperatureForecast.generateForecastAround(level, onPos, 500);
                     context.getSource().sendSuccess(
                             () -> Component.literal("Current temperature in celcius: " + tempCelcius),
                             false

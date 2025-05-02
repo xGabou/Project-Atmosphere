@@ -111,9 +111,8 @@ public class BiomeTempConfig {
  * Returns the [minC, maxC] range for this biome,
  * or a sensible default if none is specified.
  */
-public static Range getRange(Biome biome) {
-    ResourceLocation key = ForgeRegistries.BIOMES.getKey(biome);
-    if (key == null) return DEFAULT;
-    return RANGES.getOrDefault(key, DEFAULT);
+public static Range getRange(ResourceLocation biome) {;
+    if (biome == null) return DEFAULT;
+    return RANGES.getOrDefault(biome, DEFAULT);
 }
 }
