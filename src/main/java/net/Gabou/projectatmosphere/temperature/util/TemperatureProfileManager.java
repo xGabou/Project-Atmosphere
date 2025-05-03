@@ -31,6 +31,20 @@ public class TemperatureProfileManager {
         return DAILY.get(biome.toString());
     }
 
+    /** Clears the daily profile for a biome. */
+    static void clearDayProfile(ResourceLocation biome) {
+        DAILY.remove(biome.toString());
+    }
+    /** Clears the weekly forecast for a biome. */
+    static void clearWeeklyForecast(ResourceLocation biome) {
+        WEEKLY.remove(biome.toString());
+    }
+    /** Clears all cached data. */
+    public static void clearAll() {
+        DAILY.clear();
+        WEEKLY.clear();
+    }
+
     /**
      * Returns the temperature at this tick (0–23999) for a biome:
      *   – from the DAILY profile if present,

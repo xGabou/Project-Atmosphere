@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.temperature;
 
-import net.Gabou.projectatmosphere.temperature.command.TemperatureCommand;
+import net.Gabou.projectatmosphere.temperature.command.TemperatureCommands;
 import net.Gabou.projectatmosphere.temperature.event.SeasonTracker;
 import net.Gabou.projectatmosphere.temperature.event.TemperatureTickHandler;
 import net.Gabou.projectatmosphere.temperature.util.AsyncTemperatureService;
@@ -56,6 +56,6 @@ public class Temperature {
     }
     /** Phase 3: register the /temperature command */
     private static void onRegisterCommands(final RegisterCommandsEvent event) {
-        TemperatureCommand.register(event.getDispatcher());
+        TemperatureCommands.register(event.getDispatcher());
     }
 }

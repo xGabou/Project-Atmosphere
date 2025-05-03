@@ -16,7 +16,6 @@ public class TemperatureTickHandler {
 
         if (t == 21000L) {
             TemperatureManager.onMidnight(event.level);
-            SeasonTracker.tick(event.level);
         } else if (t == 9000L) {
             TemperatureManager.onPeakDay(event.level);
         }

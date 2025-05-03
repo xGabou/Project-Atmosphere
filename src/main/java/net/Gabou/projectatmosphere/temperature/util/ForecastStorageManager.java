@@ -74,4 +74,13 @@ public class ForecastStorageManager {
     public static Set<String> getAllBiomeKeys() {
         return new HashSet<>(cache.keySet());
     }
+
+    public static void clearCache() {
+        cache.clear();
+        try {
+            Files.deleteIfExists(SAVE_PATH);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

@@ -26,66 +26,6 @@ public class SpawnCloudCommand {
                     CloudSpawner.spawnCloudForPlayer(context.getSource().getPlayer(),level);
                     return 1;
                 }));
-        dispatcher.register(Commands.literal("getseason")
-                .requires(source -> source.hasPermission(2))
-                .executes(context -> {
-                    ServerLevel level = context.getSource().getLevel();
-                    var seasonData = SeasonHandler.getSeasonSavedData(level);
-                    SeasonTime time = new SeasonTime(seasonData.seasonCycleTicks);
-                    int subSeasonDuration = ModConfig.seasons.subSeasonDuration;
-                    Object[] var10001 = new Object[5];
-                    String var10004 = time.getSubSeason().toString();
-                    var10001[0] = Component.translatable("desc.sereneseasons." + var10004.toLowerCase(Locale.ROOT));
-                    var10001[1] = time.getDay() % subSeasonDuration + 1;
-                    var10001[2] = subSeasonDuration;
-                    var10001[3] = time.getSeasonCycleTicks() % time.getDayDuration();
-                    var10001[4] = time.getDayDuration();
-                    context.getSource().sendSuccess(
-                            () -> Component.literal("Current season: " + var10004.toString()),
-                            false
-                    );
-                    return 1;
-                }));
-        dispatcher.register(Commands.literal("gettemp")
-                .requires(source -> source.hasPermission(2))
-                .executes(context -> {
-                    ServerLevel level = context.getSource().getLevel();
-                    var seasonData = SeasonHandler.getSeasonSavedData(level);
-                    SeasonTime time = new SeasonTime(seasonData.seasonCycleTicks);
-                    int subSeasonDuration = ModConfig.seasons.subSeasonDuration;
-                    Object[] var10001 = new Object[5];
-                    String var10004 = time.getSubSeason().toString();
-                    var10001[0] = Component.translatable("desc.sereneseasons." + var10004.toLowerCase(Locale.ROOT));
-                    var10001[1] = time.getDay() % subSeasonDuration + 1;
-                    var10001[2] = subSeasonDuration;
-                    var10001[3] = time.getSeasonCycleTicks() % time.getDayDuration();
-                    var10001[4] = time.getDayDuration();
-                    BlockPos onPos = context.getSource().getPlayer().getOnPos();
-                    var temp = SeasonHooks.getBiomeTemperature(level, context.getSource().getLevel().getBiome(onPos), onPos);
-                    context.getSource().sendSuccess(
-                            () -> Component.literal("Current temperature: " + temp),
-                            false
-                    );
-                    var tempCelcius = SereneTempToCelcius.SereneTempToCelcius(temp);
-                    context.getSource().sendSuccess(
-                            () -> Component.literal("Current temperature in celcius: " + tempCelcius),
-                            false
-                    );
-
-                    return 1;
-                }));
-        dispatcher.register(Commands.literal("gt")
-                .requires(source -> source.hasPermission(2))
-                .executes(context -> {
-                    ServerLevel level = context.getSource().getLevel();
-                    BlockPos onPos = Objects.requireNonNull(context.getSource().getPlayer()).getOnPos();
-                    var tempCelcius = TemperatureForecast.generateForecastAround(level, onPos, 500);
-                    context.getSource().sendSuccess(
-                            () -> Component.literal("Current temperature in celcius: " + tempCelcius),
-                            false
-                    );
-                    return 1;
-                }));
 
     }
 }
