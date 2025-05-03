@@ -1,19 +1,17 @@
 package net.Gabou.projectatmosphere.temperature;
 
 import net.Gabou.projectatmosphere.temperature.command.TemperatureCommand;
+import net.Gabou.projectatmosphere.temperature.event.SeasonTracker;
 import net.Gabou.projectatmosphere.temperature.event.TemperatureTickHandler;
 import net.Gabou.projectatmosphere.temperature.util.AsyncTemperatureService;
 import net.Gabou.projectatmosphere.temperature.util.ForecastStorageManager;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
@@ -21,23 +19,23 @@ import net.minecraft.world.level.Level;
 
 public class Temperature {
 
+    public static void init(IEventBus modBus) {
 
-    /** Call once on your mod’s constructor (only if Sereneseasons is present). */
-    public static void init() {
-        var modBus = FMLJavaModLoadingContext.get().getModEventBus();
         // 1) Initialize the async executor
-        modBus.addListener(evt -> AsyncTemperatureService.init());
-        // 2) Dedicated server setup
+        modBus.addListener(Temperature::onCommonSetup);
+
 
         var fm = MinecraftForge.EVENT_BUS;
         // 3) Integrated (singleplayer) server start
         fm.addListener(Temperature::onServerStarting);
         // 4) Register /temperature commands
-        fm.addListener((RegisterCommandsEvent evt) -> TemperatureCommand.register(evt.getDispatcher()));
+        fm.addListener(Temperature::onRegisterCommands);
         // 5) Midnight tick → rebuild daily profiles
         fm.register(TemperatureTickHandler.class);
         // 6) Clean shutdown hook
         fm.addListener(Temperature::onServerStopping);
+        MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
+
     }
 
     private static void onServerStopping(ServerStoppingEvent event) {
@@ -45,6 +43,11 @@ public class Temperature {
         ForecastStorageManager.saveAll();
         // 2b-iv: Shutdown async services
         AsyncTemperatureService.shutdown();
+    }
+
+    /** Phase 1: initialize async services */
+    private static void onCommonSetup(final FMLCommonSetupEvent event) {
+        AsyncTemperatureService.init();
     }
 
     // 2b) Integrated (or dedicated) server start
@@ -57,9 +60,17 @@ public class Temperature {
         Level world = server.getLevel(Level.OVERWORLD);
         if (world == null) return;
         // 2b-ii: Generate + store new forecasts around world spawn, schedule daily profiles
-        BlockPos spawn = world.getSharedSpawnPos();
-        //TODO use a config value for the radius and use players position instead of spawn
-        TemperatureManager.init(world, spawn, /*radiusBlocks=*/250);
+// Replace `spawn` with player position if available, and read radius from config
+        ServerPlayer player = world.getServer().getPlayerList().getPlayers().stream().findFirst().orElse(null);
+        BlockPos center = (player != null) ? player.blockPosition() : world.getSharedSpawnPos();
+// TODO: Replace 250 with a configurable value via .toml config if needed
+        int radiusBlocks = 250;
+        TemperatureManager.init(world, center, radiusBlocks);
+
     }
 
+    /** Phase 3: register the /temperature command */
+    private static void onRegisterCommands(final RegisterCommandsEvent event) {
+        TemperatureCommand.register(event.getDispatcher());
+    }
 }

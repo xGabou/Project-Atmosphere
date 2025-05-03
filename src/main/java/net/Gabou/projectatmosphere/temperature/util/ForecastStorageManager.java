@@ -5,6 +5,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 
 public class ForecastStorageManager {
 
@@ -43,6 +44,22 @@ public class ForecastStorageManager {
     public static float[][] getForecast(ResourceLocation biome) {
         return cache.get(biome.toString());
     }
+
+    private static void removeForecast(ResourceLocation biome) {
+        cache.remove(biome.toString());
+    }
+    private static void clearCache() {
+        cache.clear();
+    }
+
+    static void clearCacheAndSave() {
+        clearCache();
+        saveAll();
+    }
+
+    public static Map<String, float[][]> getCache() {
+        return cache;
+    }
     // inside ForecastStorageManager
 
     /**
@@ -52,4 +69,7 @@ public class ForecastStorageManager {
         return new HashSet<>(cache.keySet());
     }
 
+    public static boolean hasForecast(Level world, ResourceLocation biome) {
+        return cache.containsKey(biome.toString());
+    }
 }

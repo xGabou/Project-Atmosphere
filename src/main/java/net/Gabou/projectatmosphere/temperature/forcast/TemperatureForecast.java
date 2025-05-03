@@ -39,11 +39,16 @@ public class TemperatureForecast {
         }
 
         // 2) Generate weekly forecast per biome, store in both local map & storage manager
-        for (ResourceLocation biome : foundBiomes) {
-            float[][] week = TemperatureUtils.generateWeekForecast(world, center, biome);
-            forecasts.put(biome, week);
-            ForecastStorageManager.putForecast(biome, week);
-        }
+
+            for (ResourceLocation biome : foundBiomes) {
+                if (ForecastStorageManager.hasForecast(world, biome)) {
+                    forecasts.put(biome, ForecastStorageManager.getForecast(biome));
+                } else {
+                    float[][] forecast = TemperatureUtils.generateWeekForecast(world, center, biome);
+                    forecasts.put(biome, forecast);// Store it for future access
+                }
+            }
+
 
 
         return forecasts;

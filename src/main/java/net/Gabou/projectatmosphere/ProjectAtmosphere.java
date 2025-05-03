@@ -29,9 +29,8 @@ public class ProjectAtmosphere {
     public ProjectAtmosphere() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         GeckoLib.initialize();
-
+        initTemperatureModule(modEventBus);
         EntityRegistrar.registerEntities(modEventBus);
-
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
     }
@@ -56,13 +55,13 @@ public class ProjectAtmosphere {
 
         }
     }
-    private void initTemperatureModule() {
+    private void initTemperatureModule(IEventBus modBus) {
         // Only run if Serene Seasons is installed
         if (!ModList.get().isLoaded("sereneseasons")) {
             LOGGER.info("Serene Seasons not found—skipping Temperature subsystem.");
             return;
         }
-        Temperature.init();
+        Temperature.init(modBus);
 
 
         LOGGER.info("Temperature subsystem initialized (Serene Seasons detected).");

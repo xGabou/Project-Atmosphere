@@ -42,11 +42,15 @@ public class TemperatureUtils {
 
     private static float getNighttimeTempModifier(float timeOfDay, ResourceLocation biome, Level world) {
         boolean isTropical = isTropicalBiome(biome, world);
-        if (timeOfDay >= 13000 && timeOfDay <= 23000) {
+
+        // Minecraft night runs from 18:00 (12000) to 6:00 (0), i.e., 12000–23999 and 0–5999
+        if (timeOfDay >= 12000 || timeOfDay < 6000) {
             return isTropical ? -1.0f : -3.5f;
         }
+
         return 0f;
     }
+
 
     public static boolean isTropicalBiome(ResourceLocation biomeId, Level level) {
         Registry<Biome> biomeRegistry = level.registryAccess().registryOrThrow(Registries.BIOME);

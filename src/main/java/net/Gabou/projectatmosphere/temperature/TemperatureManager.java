@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.temperature;
 
+import net.Gabou.projectatmosphere.temperature.event.SeasonTracker;
 import net.Gabou.projectatmosphere.temperature.forcast.TemperatureForecast;
 import net.Gabou.projectatmosphere.temperature.util.*;
 import net.minecraft.core.BlockPos;
@@ -11,22 +12,9 @@ import java.util.Map;
 
 public class TemperatureManager {
 
-    private static Map<ResourceLocation, float[][]> forecasts = new HashMap<>();
-    /**
-     * Set the forecasts map. This is used to set the forecasts after they are generated.
-     * @param forecasts The forecasts map to set.
-     */
-    public static void setForecasts(Map<ResourceLocation, float[][]> forecasts) {
-        TemperatureManager.forecasts = forecasts;
-    }
+    // Keep track of world-based day indices (0 to 6)
+    private static final Map<Integer, Integer> WEEKDAY_INDEX = new HashMap<>();
 
-    /**
-     * Get the forecasts map. This is used to get the forecasts for a given biome.
-     * @return The forecasts map.
-     */
-    public static Map<ResourceLocation, float[][]> getForecasts() {
-        return forecasts;
-    }
 
     /**
      * INITIAL SETUP (call this once, e.g. in your mod's setup or on player login):
@@ -35,11 +23,12 @@ public class TemperatureManager {
      * 3) Schedule the daily profile generator for next midnight
      */
     public static void init(Level world, BlockPos center, int radiusBlocks) {
+        SeasonTracker.tick(world);
         // 1) Load from disk (async)
         ForecastStorageManager.loadAll();
 
         // 2) Generate & cache weekly forecasts for surrounding biomes
-        setForecasts(TemperatureForecast.generateForecastAround(world, center, radiusBlocks));
+       TemperatureForecast.generateForecastAround(world, center, radiusBlocks);
 
         // (ForecastStorageManager.putForecast is already called inside generateForecastAround)
 
@@ -52,8 +41,17 @@ public class TemperatureManager {
      * Re-schedule the daily profile generation so that day-profiles are built for the new day.
      */
     public static void onMidnight(Level world) {
+        //if (!ProjectAtmosphereConfig.enableTemperatureSystem()) return;
+        SeasonTracker.tick(world);
         DailyProfileGenerator.scheduleGenerationForAllBiomes(world);
     }
+    public static void regenerateWeeklyForecast(Level world) {
+        BlockPos center = world.getSharedSpawnPos(); // or player position if needed
+        int radius = 250; // or from config
+        TemperatureForecast.generateForecastAround(world, center, radius);
+    }
+
+
 
     /**
      * REAL-TIME TEMPERATURE (use this everywhere you need the current temp):
@@ -71,5 +69,31 @@ public class TemperatureManager {
      */
     public static float[][] getWeeklyForecast(ResourceLocation biome) {
         return ForecastStorageManager.getForecast(biome);
+    }
+
+
+    /**
+     * Call this at 3:00 AM every day.
+     */
+    private static void advanceDay(Level world) {
+        int worldId = world.dimension().location().hashCode(); // world-specific ID
+        int current = WEEKDAY_INDEX.getOrDefault(worldId, 0);
+        int next = (current + 1) % 7;
+
+        WEEKDAY_INDEX.put(worldId, next);
+
+        if (next == 0) {
+            // It's the last day, regenerate forecast
+            regenerateWeeklyForecast(world);
+        }
+    }
+
+    public static int getDayIndex(Level world) {
+        int worldId = world.dimension().location().hashCode(); // world-specific ID
+        return WEEKDAY_INDEX.getOrDefault(worldId, 0);
+    }
+
+    public static void reset(Level world) {
+        WEEKDAY_INDEX.remove(world.dimension().location().hashCode());
     }
 }

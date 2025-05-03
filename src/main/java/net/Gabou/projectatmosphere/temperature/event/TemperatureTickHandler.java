@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.temperature.event;
 
 import net.Gabou.projectatmosphere.temperature.TemperatureManager;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -12,10 +13,11 @@ public class TemperatureTickHandler {
     @SubscribeEvent
     public static void onWorldTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.START) return;
-        // e.g. every 10 minutes (6000 ticks) update profiles if needed
-        long t = event.level.getDayTime() % 24000;
-        if (t == 0) {
-            // midnight reached: schedule next day profile re-gen
+        if (!(event.level instanceof ServerLevel world)) return;
+
+        long t = world.getDayTime() % 24000;
+
+        if (t == 21000) { // 3:00 AM
             TemperatureManager.onMidnight(event.level);
         }
     }
