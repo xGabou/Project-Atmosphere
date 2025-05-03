@@ -61,7 +61,7 @@ public class ProjectAtmosphere {
             LOGGER.info("Serene Seasons not found—skipping Temperature subsystem.");
             return;
         }
-        Temperature.init(modBus);
+        Temperature.init();
 
 
         LOGGER.info("Temperature subsystem initialized (Serene Seasons detected).");

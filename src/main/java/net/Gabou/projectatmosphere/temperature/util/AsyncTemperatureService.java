@@ -1,21 +1,26 @@
 package net.Gabou.projectatmosphere.temperature.util;
 
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class AsyncTemperatureService {
+
     private static final ExecutorService EXECUTOR =
-            Executors.newSingleThreadExecutor(r -> new Thread(r, "TempCalcThread"));
+            Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "TempCalcThread");
+                t.setDaemon(true);
+                return t;
+            });
 
     public static void init() {
-        // nothing yet
+        // no-op
     }
 
     public static void runAsync(Runnable task) {
         EXECUTOR.submit(task);
     }
-    /** Gracefully shuts down the executor */
+
     public static void shutdown() {
         EXECUTOR.shutdown();
-        // Or: EXECUTOR.shutdownNow(); if you need immediate interrupt
     }
 }

@@ -2,7 +2,7 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.Gabou.projectatmosphere.temperature.compat.SereneTempToCelcius;
-import net.Gabou.projectatmosphere.temperature.forcast.TemperatureForecast;
+import net.Gabou.projectatmosphere.temperature.forecast.TemperatureForecast;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
