@@ -1,11 +1,13 @@
-package net.Gabou.projectatmosphere.util;
+package net.Gabou.projectatmosphere.temperature.util;
 
+import net.Gabou.projectatmosphere.temperature.config.BiomeTempConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import sereneseasons.api.season.SeasonHelper;
 import sereneseasons.init.ModTags;
 import sereneseasons.season.SeasonHooks;
 
@@ -62,18 +64,44 @@ public class TemperatureUtils {
         return (hash % 200 - 100) / 100f * maxFluctuation;
     }
 
-    public static float[] generateWeekForecast(Level world, BlockPos chunkPos, ResourceLocation biome) {
-        float[] week = new float[7];
-        Random rand = new Random(chunkPos.asLong() ^ biome.hashCode() ^ Objects.requireNonNull(world.getServer()).getWorldData().worldGenOptions().seed());
+    public static float[][] generateWeekForecast(Level world, BlockPos chunkPos, ResourceLocation biomeId) {
+        float[][] week = new float[7][2]; // [day][0] = min (3am), [1] = max (3pm)
+
+        Random rand = new Random(chunkPos.asLong() ^ biomeId.hashCode() ^ Objects.requireNonNull(world.getServer()).getWorldData().worldGenOptions().seed());
 
         float baseTemp = SeasonHooks.getBiomeTemperature(world, world.getBiome(chunkPos), chunkPos);
-        float avg = getRealTemperature(biome, baseTemp, chunkPos, world);
+        float avg = toCelsiusSeaLevel(biomeId, baseTemp);
+
+        // --- Season macro-trend ---
+        float seasonProgress = SeasonHelper.getSeasonState(world).getSeasonCycleTicks() / (float) SeasonHelper.getSeasonState(world).getSeasonDuration(); // [0, 1]
+        float seasonalAmplitude = 10f; // ±10°C seasonal swing
+        float seasonalBias = (float) Math.sin(seasonProgress * Math.PI * 2); // one full wave per year
+        float seasonalShift = seasonalBias * seasonalAmplitude;
+        float seasonallyAdjustedAvg = avg + seasonalShift;
+
+        boolean isTropical = isTropicalBiome(biomeId, world);
+        BiomeTempConfig.DailyRange clamp = BiomeTempConfig.getClamp(biomeId);
 
         for (int i = 0; i < 7; i++) {
-            float fluctuation = (rand.nextFloat() * 12f) - 6f;
-            week[i] = avg + fluctuation;
+            // Daily fluctuation ±6°C around the seasonal average
+            float dailyNoise = (rand.nextFloat() * 12f) - 6f;
+            float dailyBase = seasonallyAdjustedAvg + dailyNoise;
+
+            // Day/night delta (tropics swing less)
+            float delta = isTropical ? 3f : 7f;
+            float minTemp = dailyBase - delta / 2f; // 3am
+            float maxTemp = dailyBase + delta / 2f; // 3pm
+
+            if (clamp != null) {
+                minTemp = Math.max(clamp.minMin(), Math.min(clamp.maxMin(), minTemp));
+                maxTemp = Math.max(clamp.minMax(), Math.min(clamp.maxMax(), maxTemp));
+            }
+
+            week[i][0] = minTemp;
+            week[i][1] = maxTemp;
         }
 
         return week;
     }
+
 }

@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.tools;
+package tools;
 
 import java.io.FileWriter;
 import java.io.IOException;

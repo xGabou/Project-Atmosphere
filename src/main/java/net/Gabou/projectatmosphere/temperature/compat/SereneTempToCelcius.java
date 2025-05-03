@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.util;
+package net.Gabou.projectatmosphere.temperature.compat;
 
 public class SereneTempToCelcius {
     private final static float maxTemp = 56f;   // Desert

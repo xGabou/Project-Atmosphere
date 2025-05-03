@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.tools;
+package tools;
 
 import javax.swing.*;
 import java.awt.*;
