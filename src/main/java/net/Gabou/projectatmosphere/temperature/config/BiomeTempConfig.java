@@ -41,78 +41,59 @@ public class BiomeTempConfig {
         // Overworld – Temperate & Humid Biomes
         // ─────────────────────────────────────────────────────────────────────
         putAllSeasons("plains",
-                new float[]{-15,   0,  15,   0},   new Range[]{
-                        new Range(-15f,  5f),  // winter
-                        new Range(  0f, 20f),  // spring
-                        new Range( 15f, 35f),  // summer
-                        new Range(  0f, 20f)   // autumn
+                new float[]{-10, 5, 20, 5}, new Range[]{
+                        new Range(-10f, 5f),
+                        new Range( 5f,18f),
+                        new Range(20f,35f),
+                        new Range( 5f,18f)
                 }, new DailyRange[]{
-                        new DailyRange(-20f, 10f, 25f, 40f),
-                        new DailyRange(-10f, 12f, 22f, 30f),
-                        new DailyRange(  5f, 18f, 28f, 40f),
-                        new DailyRange( -5f, 10f, 20f, 30f)
+                        new DailyRange(-25f, -5f,  3f,  4f),  // winter
+                        new DailyRange(  -10f,  8f, 14f, 19f),  // spring
+                        new DailyRange( 6f, 15f, 22f, 36f),  // summer
+                        new DailyRange(  0f,  9f, 14f, 25f)   // autumn
                 }
         );
-
-        // sunflower_plains same as plains
         mirrorBiome("sunflower_plains", "plains");
 
         putAllSeasons("forest",
-                new float[]{-10,   5,  15,   5},   new Range[]{
-                        new Range(-10f,  5f),
-                        new Range(  5f, 18f),
-                        new Range( 15f, 30f),
-                        new Range(  5f, 18f)
+                new float[]{-8, 6, 18, 6}, new Range[]{
+                        new Range(-8f, 4f),
+                        new Range( 6f,16f),
+                        new Range(18f,30f),
+                        new Range( 6f,16f)
                 }, new DailyRange[]{
-                        new DailyRange(-25f, -12f, -5f, 10f),
-                        new DailyRange(   -15f, -5f, 12f, 21f),
-                        new DailyRange(   5f, 15f, 21f, 32f),
-                        new DailyRange(   -7f, 5f, 14f, 23f)
+                        new DailyRange(-15f, -6f,  2f,  6f),
+                        new DailyRange( -2f,  8f, 18f, 24f),
+                        new DailyRange( 10f, 20f, 28f, 35f),
+                        new DailyRange(  2f, 10f, 20f, 26f)
                 }
         );
-
-        // flower_forest same as forest
-        mirrorBiome("flower_forest", "forest");
-        mirrorBiome("birch_forest", "forest");
-
-//        putAllSeasons("birch_forest",
-//                new float[]{-15,   4,  13,   4},   new Range[]{
-//                        new Range(-15f,  0f),
-//                        new Range(  4f, 15f),
-//                        new Range( 13f, 28f),
-//                        new Range(  4f, 15f)
-//                }, new DailyRange[]{
-//                        new DailyRange(-20f,  8f, 18f, 32f),
-//                        new DailyRange(-15f,  8f, 20f, 30f),
-//                        new DailyRange(-10f, 12f, 24f, 32f),
-//                        new DailyRange(-15f,  8f, 20f, 30f)
-//                }
-//        );
-
+        mirrorBiome("flower_forest",       "forest");
+        mirrorBiome("birch_forest",        "forest");
         mirrorBiome("old_growth_birch_forest", "forest");
 
         putAllSeasons("dark_forest",
-                new float[]{-10,   5,  15,   5},   new Range[]{
+                new float[]{-10, 5, 15, 5}, new Range[]{
                         new Range(-10f,  5f),
-                        new Range(  5f, 18f),
-                        new Range( 15f, 30f),
-                        new Range(  5f, 18f)
+                        new Range(  5f,18f),
+                        new Range( 15f,30f),
+                        new Range(  5f,18f)
                 }, new DailyRange[]{
-                        new DailyRange(-35f, -15f, -8f, 6f),
-                        new DailyRange(   -20f, -8f, 10f, 21f),
-                        new DailyRange(   5f, 18f, 28f, 35f),
-                        new DailyRange(   0f, 12f, 22f, 30f)
+                        new DailyRange(-20f, -8f,  0f,  6f),
+                        new DailyRange(-20f, -8f, 10f, 21f),
+                        new DailyRange(  5f, 18f, 28f, 35f),
+                        new DailyRange(  0f, 12f, 22f, 30f)
                 }
         );
 
         putAllSeasons("cherry_grove",
-                new float[]{-10,   0,  10,   0},   new Range[]{
-                        new Range(-10f,  5f),
-                        new Range(  0f, 15f),
-                        new Range( 10f, 25f),
-                        new Range(  0f, 15f)
+                new float[]{-10, 0, 10, 0}, new Range[]{
+                        new Range(-10f, 5f),
+                        new Range( 0f,15f),
+                        new Range(10f,25f),
+                        new Range( 0f,15f)
                 }, new DailyRange[]{
-                        new DailyRange(-15f,  5f, 18f, 28f),
+                        new DailyRange(-15f, -3f,  4f, 10f),
                         new DailyRange( -5f, 10f, 20f, 25f),
                         new DailyRange(  5f, 15f, 22f, 28f),
                         new DailyRange( -5f, 10f, 20f, 25f)
@@ -120,13 +101,13 @@ public class BiomeTempConfig {
         );
 
         putAllSeasons("swamp",
-                new float[]{ -5, 10, 20, 10},   new Range[]{
-                        new Range( -5f, 10f),
-                        new Range( 10f,22f),
-                        new Range( 20f,35f),
-                        new Range( 10f,22f)
+                new float[]{-5, 10, 20, 10}, new Range[]{
+                        new Range(-5f, 10f),
+                        new Range(10f,22f),
+                        new Range(20f,35f),
+                        new Range(10f,22f)
                 }, new DailyRange[]{
-                        new DailyRange( -8f,  5f, 15f, 25f),
+                        new DailyRange(-10f,  3f, 10f, 20f),
                         new DailyRange(  5f, 12f, 20f, 30f),
                         new DailyRange( 15f, 22f, 28f, 38f),
                         new DailyRange(  5f, 12f, 20f, 30f)
@@ -134,16 +115,16 @@ public class BiomeTempConfig {
         );
 
         putAllSeasons("meadow",
-                new float[]{-10,   0,  10,   0},   new Range[]{
-                        new Range(-10f,  5f),
-                        new Range(  0f, 15f),
-                        new Range( 10f,25f),
-                        new Range(  0f, 15f)
+                new float[]{-12, 2, 15, 2}, new Range[]{
+                        new Range(-12f, 3f),
+                        new Range( 2f,14f),
+                        new Range(15f,26f),
+                        new Range( 2f,14f)
                 }, new DailyRange[]{
-                        new DailyRange(-15f,  5f, 18f, 28f),
-                        new DailyRange( -5f,  8f, 20f, 28f),
-                        new DailyRange(  5f, 18f, 25f, 35f),
-                        new DailyRange( -5f,  8f, 20f, 28f)
+                        new DailyRange(-18f, -6f, 3f, 12f),
+                        new DailyRange( -3f,  6f,15f, 22f),
+                        new DailyRange(  7f, 16f,24f, 32f),
+                        new DailyRange( -2f,  7f,18f, 26f)
                 }
         );
 
@@ -151,193 +132,62 @@ public class BiomeTempConfig {
         // Overworld – Cold & Alpine Biomes
         // ─────────────────────────────────────────────────────────────────────
         putAllSeasons("taiga",
-                new float[]{-30, -10,   5, -10},   new Range[]{
-                        new Range(-30f, -5f),
-                        new Range(-10f, 10f),
-                        new Range(  5f, 20f),
-                        new Range(-10f, 10f)
+                new float[]{-25, -5, 10, -5}, new Range[]{
+                        new Range(-25f,-5f),
+                        new Range( -5f,10f),
+                        new Range( 10f,22f),
+                        new Range( -5f,10f)
                 }, new DailyRange[]{
-                        new DailyRange(-40f, -5f, 15f, 25f),
-                        new DailyRange(-20f,  0f, 18f, 25f),
-                        new DailyRange( -5f,  5f, 18f, 30f),
-                        new DailyRange(-20f,  0f, 18f, 25f)
+                        new DailyRange(-35f,-12f, 0f,  5f),
+                        new DailyRange(-15f, -2f,10f, 18f),
+                        new DailyRange(  5f, 12f,20f, 28f),
+                        new DailyRange(-10f,  0f,12f, 20f)
                 }
         );
         mirrorBiome("old_growth_spruce_taiga", "taiga");
         mirrorBiome("old_growth_pine_taiga",   "taiga");
-        mirrorBiome("snowy_taiga",        "taiga");
+        mirrorBiome("snowy_taiga",             "taiga");
 
-//        putAllSeasons("snowy_taiga",
-//                new float[]{-40, -20,   0, -20},   new Range[]{
-//                        new Range(-40f, -15f),
-//                        new Range(-20f,   0f),
-//                        new Range(  0f,  15f),
-//                        new Range(-20f,   5f)
-//                }, new DailyRange[]{
-//                        new DailyRange(-50f, -10f, 10f, 18f),
-//                        new DailyRange(-30f,  -5f, 10f, 18f),
-//                        new DailyRange(-10f,   0f, 12f, 20f),
-//                        new DailyRange(-30f,  -5f, 10f, 18f)
-//                }
-//        );
-
-//        putAllSeasons("grove",
-//                new float[]{-35, -15,  -5, -15},   new Range[]{
-//                        new Range(-35f, -15f),
-//                        new Range(-15f,   0f),
-//                        new Range( -5f,  10f),
-//                        new Range(-15f,   0f)
-//                }, new DailyRange[]{
-//                        new DailyRange(-45f, -10f,  5f, 15f),
-//                        new DailyRange(-25f,  -5f, 10f, 18f),
-//                        new DailyRange(-10f,   5f, 15f, 22f),
-//                        new DailyRange(-25f,  -5f, 10f, 18f)
-//                }
-//        );
-        mirrorBiome("snowy_plains", "plains");
-        mirrorBiome("grove","taiga");
-
-//        putAllSeasons("snowy_plains",
-//                new float[]{-40, -20,   0, -20},   new Range[]{
-//                        new Range(-40f, -20f),
-//                        new Range(-20f,   5f),
-//                        new Range(  0f,  12f),
-//                        new Range(-20f,   5f)
-//                }, new DailyRange[]{
-//                        new DailyRange(-50f, -15f,  5f, 15f),
-//                        new DailyRange(-30f, -10f,  8f, 12f),
-//                        new DailyRange( -5f,   5f, 10f, 20f),
-//                        new DailyRange(-30f, -10f,  5f, 15f)
-//                }
-//        );
+        putAllSeasons("snowy_plains",
+                new float[]{-35, -15, 5, -15}, new Range[]{
+                        new Range(-35f,-10f),
+                        new Range(-15f, 5f),
+                        new Range(  5f,15f),
+                        new Range(-15f, 5f)
+                }, new DailyRange[]{
+                        new DailyRange(-45f,-20f,-5f,  2f),
+                        new DailyRange(-25f, -5f, 8f, 14f),
+                        new DailyRange(  0f,  8f,14f, 20f),
+                        new DailyRange(-20f, -5f, 6f, 14f)
+                }
+        );
 
         putAllSeasons("ice_spikes",
-                new float[]{-50, -30,  -5, -30},   new Range[]{
-                        new Range(-50f, -30f),
-                        new Range(-30f,  -5f),
-                        new Range( -5f,   5f),
-                        new Range(-30f,   0f)
-                }, new DailyRange[]{
-                        new DailyRange(-55f, -20f,   0f,  5f),
-                        new DailyRange(-45f, -15f,   3f, 10f),
-                        new DailyRange(-20f,   0f,   8f, 15f),
-                        new DailyRange(-45f, -15f,   3f, 10f)
-                }
-        );
-
-        mirrorBiome("snowy_slopes","grove");
-//        putAllSeasons("snowy_slopes",
-//                new float[]{-40, -20,  -5, -20},   new Range[]{
-//                        new Range(-40f, -20f),
-//                        new Range(-20f,  -5f),
-//                        new Range( -5f,   5f),
-//                        new Range(-20f,   0f)
-//                }, new DailyRange[]{
-//                        new DailyRange(-50f, -15f,  0f,  8f),
-//                        new DailyRange(-30f, -10f,  5f, 12f),
-//                        new DailyRange(-10f,   0f, 10f, 20f),
-//                        new DailyRange(-30f, -10f,  5f, 12f)
-//                }
-//        );
-
-        putAllSeasons("frozen_peaks",
-                new float[]{-45, -25, -10, -25},   new Range[]{
-                        new Range(-45f, -25f),
-                        new Range(-25f, -10f),
-                        new Range(-10f,   0f),
-                        new Range(-25f,  -5f)
-                }, new DailyRange[]{
-                        new DailyRange(-55f, -20f,  -2f,  2f),
-                        new DailyRange(-35f, -15f,   0f,  5f),
-                        new DailyRange(-15f,  -5f,   3f, 10f),
-                        new DailyRange(-35f, -15f,   0f,  5f)
-                }
-        );
-
-        putAllSeasons("jagged_peaks",
-                new float[]{-50, -30, -15, -30},   new Range[]{
-                        new Range(-50f, -30f),
-                        new Range(-30f, -15f),
-                        new Range(-15f,  -2f),
-                        new Range(-30f,   5f)
-                }, new DailyRange[]{
-                        new DailyRange(-60f, -25f,  -5f,  0f),
-                        new DailyRange(-40f, -20f,  -2f,  3f),
-                        new DailyRange(-20f, -10f,   2f,  8f),
-                        new DailyRange(-40f, -20f,  -2f,  3f)
-                }
-        );
-
-        putAllSeasons("stony_peaks",
-                new float[]{ -5,   5,  10,   5},   new Range[]{
+                new float[]{-50, -30, -5, -30}, new Range[]{
+                        new Range(-50f,-30f),
+                        new Range(-30f, -5f),
                         new Range( -5f,  5f),
-                        new Range(  5f, 10f),
-                        new Range( 10f, 25f),
-                        new Range(  5f, 15f)
+                        new Range(-30f,  0f)
                 }, new DailyRange[]{
-                        new DailyRange(-10f,   8f, 18f, 28f),
-                        new DailyRange(  2f,  12f, 22f, 30f),
-                        new DailyRange(  5f,  18f, 28f, 35f),
-                        new DailyRange(  2f,  12f, 22f, 30f)
+                        new DailyRange(-55f,-25f, 0f,  5f),
+                        new DailyRange(-45f,-15f, 3f, 10f),
+                        new DailyRange(-20f,  0f, 8f, 15f),
+                        new DailyRange(-45f,-15f, 3f, 10f)
                 }
         );
+        mirrorBiome("snowy_slopes", "snowy_plains");
 
-        putAllSeasons("windswept_hills",
-                new float[]{-15,  -5,   5,  -5},   new Range[]{
-                        new Range(-15f,   0f),
-                        new Range( -5f,  10f),
-                        new Range(  5f, 20f),
-                        new Range( -5f,  10f)
+        putAllSeasons("grove",  // same as taiga
+                new float[]{-25, -5, 10, -5}, new Range[]{
+                        new Range(-25f,-5f),
+                        new Range( -5f,10f),
+                        new Range( 10f,22f),
+                        new Range( -5f,10f)
                 }, new DailyRange[]{
-                        new DailyRange(-20f,   0f, 15f, 25f),
-                        new DailyRange(-10f,   5f, 18f, 28f),
-                        new DailyRange(  5f,  15f, 25f, 35f),
-                        new DailyRange(-10f,   5f, 18f, 28f)
-                }
-        );
-        mirrorBiome("windswept_forest", "windswept_hills");
-        mirrorBiome("windswept_gravelly_hills", "windswept_hills");
-
-        putAllSeasons("beach",
-                new float[]{ -5,   8,  18,   8},   new Range[]{
-                        new Range( -5f, 10f),
-                        new Range(  8f, 20f),
-                        new Range( 18f, 30f),
-                        new Range(  8f, 20f)
-                }, new DailyRange[]{
-                        new DailyRange(-10f, 15f, 25f, 35f),
-                        new DailyRange(  5f, 18f, 28f, 35f),
-                        new DailyRange( 15f, 25f, 33f, 40f),
-                        new DailyRange(  5f, 18f, 28f, 35f)
-                }
-        );
-        mirrorBiome("snowy_beach", "beach");
-//
-//        putAllSeasons("snowy_beach",
-//                new float[]{-30,  -5,   0,  -5},   new Range[]{
-//                        new Range(-30f, -10f),
-//                        new Range(-10f,   5f),
-//                        new Range(  0f,  10f),
-//                        new Range(-10f,   5f)
-//                }, new DailyRange[]{
-//                        new DailyRange(-40f,  -5f,   5f, 12f),
-//                        new DailyRange(-20f,  -2f,   8f, 15f),
-//                        new DailyRange(  0f,   5f,  10f, 20f),
-//                        new DailyRange(-20f,  -2f,   8f, 15f)
-//                }
-//        );
-
-        putAllSeasons("stony_shore",
-                new float[]{ -5,   0,   5,   0},   new Range[]{
-                        new Range( -5f,  5f),
-                        new Range(  0f, 10f),
-                        new Range(  5f, 15f),
-                        new Range(  0f, 10f)
-                }, new DailyRange[]{
-                        new DailyRange(-10f,   2f, 12f, 18f),
-                        new DailyRange(  0f,   5f, 15f, 22f),
-                        new DailyRange(  5f,  12f, 20f, 28f),
-                        new DailyRange(  0f,   5f, 15f, 22f)
+                        new DailyRange(-35f,-12f, 0f,  5f),
+                        new DailyRange(-15f, -2f,10f, 18f),
+                        new DailyRange(  5f, 12f,20f, 28f),
+                        new DailyRange(-10f,  0f,12f, 20f)
                 }
         );
 
@@ -345,201 +195,226 @@ public class BiomeTempConfig {
         // Overworld – Warm & Arid Biomes
         // ─────────────────────────────────────────────────────────────────────
         putAllSeasons("jungle",
-                new float[]{ 20,  22,  25,  22},   new Range[]{
-                        new Range( 20f, 25f),
-                        new Range( 22f, 30f),
-                        new Range( 25f, 35f),
-                        new Range( 22f, 30f)
+                new float[]{20, 22, 25, 22}, new Range[]{
+                        new Range(20f,25f),
+                        new Range(22f,30f),
+                        new Range(25f,35f),
+                        new Range(22f,30f)
                 }, new DailyRange[]{
-                        new DailyRange( 18f, 25f, 30f, 38f),
-                        new DailyRange( 20f, 27f, 32f, 38f),
-                        new DailyRange( 22f, 30f, 35f, 42f),
-                        new DailyRange( 20f, 27f, 32f, 38f)
+                        new DailyRange(18f,25f,30f,38f),
+                        new DailyRange(20f,27f,32f,38f),
+                        new DailyRange(22f,30f,35f,42f),
+                        new DailyRange(20f,27f,32f,38f)
                 }
         );
         mirrorBiome("sparse_jungle", "jungle");
         mirrorBiome("bamboo_jungle", "jungle");
 
         putAllSeasons("desert",
-                new float[]{  5,  15,  30,  15},   new Range[]{
-                        new Range(  5f, 20f),
-                        new Range( 15f, 35f),
-                        new Range( 30f, 45f),
-                        new Range( 15f, 35f)
+                new float[]{5, 15, 30, 15}, new Range[]{
+                        new Range( 5f,20f),
+                        new Range(15f,35f),
+                        new Range(30f,45f),
+                        new Range(15f,35f)
                 }, new DailyRange[]{
-                        new DailyRange( -5f, 25f, 35f, 50f),
-                        new DailyRange(  0f, 28f, 38f,  50f),
-                        new DailyRange(  5f, 30f, 40f, 60f),
-                        new DailyRange(  0f, 28f, 38f,  50f)
+                        new DailyRange(-5f,25f,35f,50f),
+                        new DailyRange( 0f,28f,38f,50f),
+                        new DailyRange( 5f,30f,40f,60f),
+                        new DailyRange( 0f,28f,38f,50f)
                 }
         );
-
-        putAllSeasons("badlands",
-                new float[]{  0,  10,  25,  10},   new Range[]{
-                        new Range(  0f, 20f),
-                        new Range( 10f, 30f),
-                        new Range( 25f, 40f),
-                        new Range( 10f, 30f)
-                }, new DailyRange[]{
-                        new DailyRange( -5f, 20f, 32f, 45f),
-                        new DailyRange(  5f, 25f, 35f, 48f),
-                        new DailyRange( 15f, 30f, 42f, 55f),
-                        new DailyRange(  5f, 25f, 35f, 48f)
-                }
-        );
+        mirrorBiome("badlands", "desert");
         mirrorBiome("wooded_badlands", "badlands");
         mirrorBiome("eroded_badlands", "badlands");
 
         putAllSeasons("savanna",
-                new float[]{ 10,  15,  20,  15},   new Range[]{
-                        new Range( 10f, 25f),
-                        new Range( 15f, 30f),
-                        new Range( 20f, 40f),
-                        new Range( 15f, 30f)
+                new float[]{10,15,20,15}, new Range[]{
+                        new Range(10f,25f),
+                        new Range(15f,30f),
+                        new Range(20f,40f),
+                        new Range(15f,30f)
                 }, new DailyRange[]{
-                        new DailyRange(  5f, 25f, 32f, 42f),
-                        new DailyRange( 15f, 28f, 36f, 45f),
-                        new DailyRange( 20f, 32f, 40f, 50f),
-                        new DailyRange( 15f, 28f, 36f, 45f)
+                        new DailyRange( 5f,25f,32f,42f),
+                        new DailyRange(15f,28f,36f,45f),
+                        new DailyRange(20f,32f,40f,50f),
+                        new DailyRange(15f,28f,36f,45f)
                 }
         );
         mirrorBiome("savanna_plateau", "savanna");
-//        putAllSeasons("savanna_plateau",
-//                new float[]{  5,  12,  18,  12},   new Range[]{
-//                        new Range(  5f, 20f),
-//                        new Range( 12f, 28f),
-//                        new Range( 18f, 35f),
-//                        new Range( 12f, 28f)
-//                }, new DailyRange[]{
-//                        new DailyRange(  0f, 20f, 28f, 38f),
-//                        new DailyRange(  5f, 25f, 32f, 42f),
-//                        new DailyRange( 10f, 30f, 38f, 48f),
-//                        new DailyRange(  5f, 25f, 32f, 42f)
-//                }
-//        );
         mirrorBiome("windswept_savanna", "savanna");
-        mirrorBiome("mangrove_swamp",    "swamp");  // mangrove same basic clamp as swamp
+        mirrorBiome("mangrove_swamp",    "swamp");
 
         // ─────────────────────────────────────────────────────────────────────
-        // Overworld – Oceanic & Coastal Biomes
+        // Overworld – Oceanic & Coastal Biomes (separated)
         // ─────────────────────────────────────────────────────────────────────
-        putAllSeasons("ocean",
-                new float[]{  0,   5,  10,   5},   new Range[]{
-                        new Range(  0f, 10f),
-                        new Range(  5f, 15f),
-                        new Range( 10f, 20f),
-                        new Range(  5f, 15f)
+        putAllSeasons("frozen_ocean",
+                new float[]{-2, 2,  5,  2}, new Range[]{
+                        new Range(-2f,  2f),
+                        new Range( 2f,  8f),
+                        new Range( 5f, 12f),
+                        new Range( 2f,  8f)
                 }, new DailyRange[]{
-                        new DailyRange( -2f,  8f, 15f, 22f),
-                        new DailyRange(  0f, 10f, 18f, 25f),
-                        new DailyRange(  2f, 12f, 20f, 28f),
-                        new DailyRange(  0f, 10f, 18f, 25f)
+                        new DailyRange(-5f, -2f, 2f,  6f),
+                        new DailyRange( 0f,  2f, 5f, 10f),
+                        new DailyRange( 3f,  6f,10f, 15f),
+                        new DailyRange( 0f,  2f, 5f, 10f)
                 }
         );
-        mirrorBiome("lukewarm_ocean",      "ocean");
-        mirrorBiome("warm_ocean",          "ocean");
-        mirrorBiome("cold_ocean",          "ocean");
-        mirrorBiome("frozen_ocean",        "ocean");
+
+        putAllSeasons("cold_ocean",
+                new float[]{0,  5, 12, 5}, new Range[]{
+                        new Range(0f, 10f),
+                        new Range(5f, 15f),
+                        new Range(12f,20f),
+                        new Range(5f, 15f)
+                }, new DailyRange[]{
+                        new DailyRange(-2f, 0f, 6f, 12f),
+                        new DailyRange( 2f, 8f,15f, 20f),
+                        new DailyRange( 8f,12f,18f, 25f),
+                        new DailyRange( 2f, 8f,15f, 20f)
+                }
+        );
+
+        putAllSeasons("ocean",
+                new float[]{0, 5, 15, 5}, new Range[]{
+                        new Range(0f, 10f),
+                        new Range(5f, 15f),
+                        new Range(15f,25f),
+                        new Range(5f, 15f)
+                }, new DailyRange[]{
+                        new DailyRange(-2f, 5f,15f, 22f),
+                        new DailyRange( 0f,10f,18f, 25f),
+                        new DailyRange( 2f,12f,20f, 28f),
+                        new DailyRange( 0f,10f,18f, 25f)
+                }
+        );
+
+        putAllSeasons("lukewarm_ocean",
+                new float[]{2, 10,20,10}, new Range[]{
+                        new Range(2f,12f),
+                        new Range(10f,20f),
+                        new Range(20f,30f),
+                        new Range(10f,20f)
+                }, new DailyRange[]{
+                        new DailyRange( 0f, 6f,15f, 22f),
+                        new DailyRange( 5f,12f,18f, 28f),
+                        new DailyRange(10f,18f,25f, 32f),
+                        new DailyRange( 5f,12f,18f, 28f)
+                }
+        );
+
+        putAllSeasons("warm_ocean",
+                new float[]{5,12,25,12}, new Range[]{
+                        new Range(5f,15f),
+                        new Range(12f,25f),
+                        new Range(25f,35f),
+                        new Range(12f,25f)
+                }, new DailyRange[]{
+                        new DailyRange(2f,10f,20f,28f),
+                        new DailyRange(8f,18f,25f,32f),
+                        new DailyRange(18f,23f,30f,38f),
+                        new DailyRange(8f,18f,25f,32f)
+                }
+        );
+
+        mirrorBiome("deep_frozen_ocean",   "frozen_ocean");
+        mirrorBiome("deep_cold_ocean",     "cold_ocean");
         mirrorBiome("deep_ocean",          "ocean");
-        mirrorBiome("deep_lukewarm_ocean", "ocean");
-        mirrorBiome("deep_warm_ocean",     "ocean");
-        mirrorBiome("deep_cold_ocean",     "ocean");
-        mirrorBiome("deep_frozen_ocean",   "ocean");
+        mirrorBiome("deep_lukewarm_ocean", "lukewarm_ocean");
+        mirrorBiome("deep_warm_ocean",     "warm_ocean");
 
         putAllSeasons("river",
-                new float[]{ -5,   5,  18,   5},   new Range[]{
-                        new Range( -5f,  5f),
-                        new Range(  5f, 18f),
-                        new Range( 18f, 30f),
-                        new Range(  5f, 18f)
+                new float[]{-5, 5,18,5}, new Range[]{
+                        new Range(-5f, 5f),
+                        new Range( 5f,18f),
+                        new Range(18f,30f),
+                        new Range( 5f,18f)
                 }, new DailyRange[]{
-                        new DailyRange(-10f,  5f, 18f, 30f),
-                        new DailyRange(  0f,  8f, 20f, 32f),
-                        new DailyRange( 10f, 15f, 25f, 38f),
-                        new DailyRange(  0f,  8f, 20f, 32f)
+                        new DailyRange(-10f,  5f,18f, 30f),
+                        new DailyRange(  0f,  8f,20f, 32f),
+                        new DailyRange( 10f, 15f,25f, 38f),
+                        new DailyRange(  0f,  8f,20f, 32f)
                 }
         );
         mirrorBiome("frozen_river", "river");
 
         putAllSeasons("mushroom_fields",
-                new float[]{  5,  10,  15,  10},   new Range[]{
-                        new Range(  5f, 15f),
-                        new Range( 10f, 20f),
-                        new Range( 15f, 25f),
-                        new Range( 10f, 20f)
+                new float[]{5,10,15,10}, new Range[]{
+                        new Range(5f,15f),
+                        new Range(10f,20f),
+                        new Range(15f,25f),
+                        new Range(10f,20f)
                 }, new DailyRange[]{
-                        new DailyRange(  0f, 12f, 18f, 28f),
-                        new DailyRange(  5f, 14f, 20f, 30f),
-                        new DailyRange( 10f, 16f, 22f, 32f),
-                        new DailyRange(  5f, 14f, 20f, 30f)
+                        new DailyRange( 0f,12f,18f, 28f),
+                        new DailyRange( 5f,14f,20f, 30f),
+                        new DailyRange(10f,16f,22f, 32f),
+                        new DailyRange( 5f,14f,20f, 30f)
                 }
         );
         mirrorBiome("mushroom_field_shore", "mushroom_fields");
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Overworld – Underground Biomes
-        // ─────────────────────────────────────────────────────────────────────
         putAllSeasons("lush_caves",
-                new float[]{ 12,  14,  16,  14},   new Range[]{
-                        new Range( 12f, 15f),
-                        new Range( 14f, 18f),
-                        new Range( 15f, 20f),
-                        new Range( 14f, 18f)
+                new float[]{12,14,16,14}, new Range[]{
+                        new Range(12f,15f),
+                        new Range(14f,18f),
+                        new Range(15f,20f),
+                        new Range(14f,18f)
                 }, new DailyRange[]{
-                        new DailyRange(10f, 15f, 18f, 22f),
-                        new DailyRange(11f, 16f, 19f, 23f),
-                        new DailyRange(12f, 18f, 21f, 25f),
-                        new DailyRange(11f, 16f, 19f, 23f)
+                        new DailyRange(10f,15f,18f, 22f),
+                        new DailyRange(11f,16f,19f, 23f),
+                        new DailyRange(12f,18f,21f, 25f),
+                        new DailyRange(11f,16f,19f, 23f)
                 }
         );
 
         putAllSeasons("dripstone_caves",
-                new float[]{  8,  10,  12,  10},   new Range[]{
-                        new Range( 8f, 12f),
-                        new Range(10f, 15f),
-                        new Range(10f, 15f),
-                        new Range(10f, 15f)
+                new float[]{8,10,12,10}, new Range[]{
+                        new Range( 8f,12f),
+                        new Range(10f,15f),
+                        new Range(10f,15f),
+                        new Range(10f,15f)
                 }, new DailyRange[]{
-                        new DailyRange( 5f, 10f, 12f, 17f),
-                        new DailyRange( 6f, 11f, 13f, 18f),
-                        new DailyRange( 8f, 12f, 14f, 20f),
-                        new DailyRange( 6f, 11f, 13f, 18f)
+                        new DailyRange( 5f,10f,12f,17f),
+                        new DailyRange( 6f,11f,13f,18f),
+                        new DailyRange( 8f,12f,14f,20f),
+                        new DailyRange( 6f,11f,13f,18f)
                 }
         );
 
         putAllSeasons("deep_dark",
-                new float[]{  5,   7,  10,   7},   new Range[]{
-                        new Range(5f, 10f),
-                        new Range(7f, 10f),
-                        new Range(8f, 12f),
-                        new Range(7f, 10f)
+                new float[]{5,7,10,7}, new Range[]{
+                        new Range(5f,10f),
+                        new Range(7f,10f),
+                        new Range(8f,12f),
+                        new Range(7f,10f)
                 }, new DailyRange[]{
-                        new DailyRange(3f, 8f, 10f, 12f),
-                        new DailyRange(4f, 9f, 11f, 13f),
-                        new DailyRange(5f, 10f,12f, 14f),
-                        new DailyRange(4f, 9f, 11f, 13f)
+                        new DailyRange(3f, 8f,10f,12f),
+                        new DailyRange(4f, 9f,11f,13f),
+                        new DailyRange(5f,10f,12f,14f),
+                        new DailyRange(4f, 9f,11f,13f)
                 }
         );
 
         // ─────────────────────────────────────────────────────────────────────
         // Nether Biomes (no seasons – same all year)
         // ─────────────────────────────────────────────────────────────────────
-        putConstSeasons("nether_wastes",        new Range(45f,50f), new DailyRange(40f,45f,47f,52f));
-        putConstSeasons("basalt_deltas",        new Range(50f,55f), new DailyRange(45f,50f,53f,60f));
-        putConstSeasons("crimson_forest",       new Range(40f,45f), new DailyRange(35f,40f,43f,48f));
-        putConstSeasons("warped_forest",        new Range(30f,40f), new DailyRange(25f,32f,35f,45f));
-        putConstSeasons("soul_sand_valley",     new Range(35f,45f), new DailyRange(30f,38f,42f,50f));
+        putConstSeasons("nether_wastes",    new Range(45f,50f), new DailyRange(40f,45f,47f,60f));
+        putConstSeasons("basalt_deltas",    new Range(50f,55f), new DailyRange(45f,50f,55f,65f));
+        putConstSeasons("crimson_forest",   new Range(40f,45f), new DailyRange(35f,40f,43f,48f));
+        putConstSeasons("warped_forest",    new Range(30f,40f), new DailyRange(25f,32f,35f,45f));
+        putConstSeasons("soul_sand_valley", new Range(35f,45f), new DailyRange(30f,38f,42f,50f));
 
         // ─────────────────────────────────────────────────────────────────────
         // End Biomes (no seasons – same all year)
         // ─────────────────────────────────────────────────────────────────────
-        putConstSeasons("the_end",              new Range(5f,10f),   new DailyRange(0f,7f,8f,12f));
-        putConstSeasons("end_highlands",        new Range(5f,10f),   new DailyRange(0f,7f,8f,12f));
-        putConstSeasons("end_midlands",         new Range(5f,10f),   new DailyRange(0f,7f,8f,12f));
-        putConstSeasons("small_end_islands",    new Range(0f,5f),    new DailyRange(-5f,2f,4f,8f));
-        putConstSeasons("end_barrens",          new Range(0f,5f),    new DailyRange(-5f,2f,4f,8f));
-        putConstSeasons("the_void",             new Range(-273f,-273f), new DailyRange(-273f,-273f,-273f,-273f));
+        putConstSeasons("the_end",           new Range(5f,10f),    new DailyRange( 0f, 7f,  8f,12f));
+        putConstSeasons("end_highlands",     new Range(5f,10f),    new DailyRange( 0f, 7f,  8f,12f));
+        putConstSeasons("end_midlands",      new Range(5f,10f),    new DailyRange( 0f, 7f,  8f,12f));
+        putConstSeasons("small_end_islands", new Range(0f, 5f),    new DailyRange(-5f, 2f,  4f, 8f));
+        putConstSeasons("end_barrens",       new Range(0f, 5f),    new DailyRange(-5f, 2f,  4f, 8f));
+        putConstSeasons("the_void",          new Range(-273f,-273f), new DailyRange(-273f,-273f,-273f,-273f));
     }
+
 
     /** Helper: populate all four seasons for a single biome key. */
     private static void putAllSeasons(String biomeKey, float[] s, Range[] ranges, DailyRange[] clamps) {
