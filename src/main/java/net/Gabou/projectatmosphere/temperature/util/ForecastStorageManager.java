@@ -1,20 +1,54 @@
 package net.Gabou.projectatmosphere.temperature.util;
 
 import com.google.gson.*;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
+import static net.Gabou.projectatmosphere.temperature.Temperature.getPerWorldSavePath;
+
 public class ForecastStorageManager {
 
-    private static final Path SAVE_PATH = Paths.get("config", "projectatmosphere_forecasts.json");
+    /*
+     * This class is responsible for storing and retrieving temperature forecasts
+     * for different biomes. It uses a JSON file to save the data, and provides
+     * methods to load, save, and clear the cache.
+     */
+    // A map to store sample positions for biomes
+    private static final Map<String, BlockPos> samplePositions = new HashMap<>();
+    public static final String FILE_NAME = "projectatmosphere_forecasts.json";
+
+
+    /**
+     * Saves the sample position for a given biome.
+     * This method is used to store the position of a biome for future reference.
+     */
+    public static void saveSamplePosition(ResourceLocation biome, BlockPos pos) {
+        samplePositions.put(biome.toString(), pos);
+    }
+    /**
+     * Returns the sample position for a given biome.
+     * This method is used to retrieve the position of a biome.
+     */
+    public static BlockPos getSamplePosition(ResourceLocation biome) {
+        return samplePositions.get(biome.toString());
+    }
+
+
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Map<String, float[][]> cache = new HashMap<>();
 
-    public static void loadAll() {
+    /**
+     * Loads the temperature forecasts from the JSON file.
+     * This method is called asynchronously to avoid blocking the main thread.
+     */
+    public static void loadAll(ServerLevel world) {
         AsyncTemperatureService.runAsync(() -> {
+            Path SAVE_PATH = getPerWorldSavePath(world, FILE_NAME);
             if (!Files.exists(SAVE_PATH)) return;
             try (Reader r = Files.newBufferedReader(SAVE_PATH)) {
                 JsonObject root = GSON.fromJson(r, JsonObject.class);
@@ -35,7 +69,11 @@ public class ForecastStorageManager {
         });
     }
 
-    public static void saveAll() {
+    /**
+     * Saves the temperature forecasts to the JSON file.
+     * This method is called asynchronously to avoid blocking the main thread.
+     */
+    public static void saveAll(ServerLevel world) {
         AsyncTemperatureService.runAsync(() -> {
             JsonObject root = new JsonObject();
             cache.forEach((biome, week) -> {
@@ -48,9 +86,11 @@ public class ForecastStorageManager {
                 }
                 root.add(biome, arr);
             });
+
             try {
-                Files.createDirectories(SAVE_PATH.getParent());
-                try (Writer w = Files.newBufferedWriter(SAVE_PATH)) {
+                Path path = getPerWorldSavePath(world, FILE_NAME);
+                Files.createDirectories(path.getParent());
+                try (Writer w = Files.newBufferedWriter(path)) {
                     GSON.toJson(root, w);
                 }
             } catch (IOException ex) {
@@ -59,26 +99,48 @@ public class ForecastStorageManager {
         });
     }
 
+
+    /**
+     * Loads the temperature forecasts from the JSON file.
+     * This method is called synchronously to avoid blocking the main thread.
+     */
     public static boolean hasForecast(ResourceLocation biome) {
         return cache.containsKey(biome.toString());
     }
 
+    /**
+     * Returns the temperature forecast for a given biome.
+     * The forecast is a 7x2 array representing the min and max temperatures for each day of the week.
+     */
     public static float[][] getForecast(ResourceLocation biome) {
         return cache.get(biome.toString());
     }
 
+    /**
+     * Saves the temperature forecast for a given biome.
+     * The forecast is a 7x2 array representing the min and max temperatures for each day of the week.
+     */
     public static void saveForecast(ResourceLocation biome, float[][] week) {
         cache.put(biome.toString(), week);
     }
 
+    /**
+     * Returns a set of all biome keys in the cache.
+     * This method is used to get the list of biomes for which forecasts are available.
+     */
     public static Set<String> getAllBiomeKeys() {
         return new HashSet<>(cache.keySet());
     }
 
-    public static void clearCache() {
+    /**
+     * Clears the cache and deletes the JSON file.
+     * This method is called when the mod is unloaded or when the user wants to reset the forecasts.
+     */
+    public static void clearCache(ServerLevel world) {
         cache.clear();
+        samplePositions.clear();
         try {
-            Files.deleteIfExists(SAVE_PATH);
+            Files.deleteIfExists(getPerWorldSavePath(world, FILE_NAME));
         } catch (IOException e) {
             e.printStackTrace();
         }

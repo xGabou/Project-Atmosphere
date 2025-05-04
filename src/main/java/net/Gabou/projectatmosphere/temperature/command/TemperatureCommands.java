@@ -1,17 +1,14 @@
 package net.Gabou.projectatmosphere.temperature.command;
 
-import com.mojang.authlib.minecraft.client.MinecraftClient;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import net.Gabou.projectatmosphere.temperature.TemperatureManager;
+import net.Gabou.projectatmosphere.temperature.manager.TemperatureManager;
 import net.Gabou.projectatmosphere.temperature.forecast.TemperatureForecast;
-import net.minecraft.client.Minecraft;
+import net.Gabou.projectatmosphere.temperature.spike.SpikeManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.commands.synchronization.SuggestionProviders;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -24,7 +21,6 @@ import com.google.gson.GsonBuilder;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 public class TemperatureCommands {
@@ -135,7 +131,8 @@ public class TemperatureCommands {
                                             }
 
                                             CompletableFuture.runAsync(() -> {
-                                                var forecast = TemperatureForecast.generateForecastAround(level, player.blockPosition(), radius);
+                                                var forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), radius);
+
                                                 String formatted = TemperatureCommandHelper.formatForecastMap(forecast);
 
                                                 level.getServer().execute(() ->
@@ -150,7 +147,8 @@ public class TemperatureCommands {
                                     ServerLevel level = ctx.getSource().getLevel();
 
                                     CompletableFuture.runAsync(() -> {
-                                        var forecast = TemperatureForecast.generateForecastAround(level, player.blockPosition(), 100);
+                                        var forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), 100);
+
                                         String formatted = TemperatureCommandHelper.formatForecastMap(forecast);
 
                                         level.getServer().execute(() ->
@@ -175,7 +173,7 @@ public class TemperatureCommands {
                                             }
 
                                             CompletableFuture.runAsync(() -> {
-                                                Map<ResourceLocation, float[][]> forecast = TemperatureForecast.generateForecastAround(level, player.blockPosition(), radius);
+                                                Map<ResourceLocation, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), radius);
                                                 Gson gson = new GsonBuilder().setPrettyPrinting().create();
                                                 String json = gson.toJson(forecast);
 
@@ -191,7 +189,7 @@ public class TemperatureCommands {
                                     ServerLevel level = ctx.getSource().getLevel();
 
                                     CompletableFuture.runAsync(() -> {
-                                        Map<ResourceLocation, float[][]> forecast = TemperatureForecast.generateForecastAround(level, player.blockPosition(), 100);
+                                        Map<ResourceLocation, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), 100);
                                         Gson gson = new GsonBuilder().setPrettyPrinting().create();
                                         String json = gson.toJson(forecast);
 
@@ -208,29 +206,37 @@ public class TemperatureCommands {
                         .then(Commands.literal("regenerate")
                                 .requires(source -> source.hasPermission(2))
                                 .executes(ctx -> {
-                                    if(ctx.getSource().getPlayer() == null)
+                                    if (ctx.getSource().getPlayer() == null)
                                         ctx.getSource().sendFailure(Component.literal("§cThis command can only be run by a player."));
-                                    TemperatureManager.clearForecastCache(ctx.getSource().getLevel(), ctx.getSource().getPlayer().blockPosition());
+                                    TemperatureManager.clearForecastCache(ctx.getSource().getLevel());
                                     ctx.getSource().sendSuccess(() -> Component.literal("§aTemperature forecast cache has been cleared."), false);
+                                    return 1;
+                                }))
+                        .then(Commands.literal("resetSpikes")
+                                .requires(source -> source.hasPermission(2))
+                                .executes(ctx -> {
+                                    SpikeManager.clearSpikeCache(ctx.getSource().getLevel());
+                                    ctx.getSource().sendSuccess(() -> Component.literal("§Spike's cache has been cleared."), false);
                                     return 1;
                                 }))
                         // /temperature help
                         .then(Commands.literal("help")
                                 .executes(ctx -> {
                                     ctx.getSource().sendSuccess(() -> Component.literal("""
-                                            §6[Temperature Commands Help]
+                                                                         §6[Temperature Commands Help]
                                             
-                                            §e/temperature forecast §7– Weekly forecast for your current biome.
-                                            §e/temperature get <biome|current> §7– Current temperature at given biome and tick.
-                                            §e/temperature dayprofile §7– Hourly profile of today's temperature.
-                                            §e/temperature getseason §7– Current sub-season (Serene Seasons).
-                                            §e/temperature gettemp §7– Raw, Celsius, and computed real temperature.
-                                            §e/temperature gt §7– Real-time computed temperature around you (radius 500).
+                                            §e/temperature forecast §7– Show 7-day forecast for your current biome.
+                                            §e/temperature get <biome|current> §7– Display the current temperature at a specific biome and tick.
+                                            §e/temperature dayprofile §7– View the 240-point daily temperature curve.
+                                            §e/temperature getseason §7– Show the current Serene Seasons sub-season.
+                                            §e/temperature gettemp §7– Raw, Celsius, and real computed temperature.
+                                            §e/temperature gt §7– Real-time computed temperature from the forecast system.
                                             
-                                            §e/temperature testforecast [radius] §7– Generate and display a 7-day forecast in chat for all biomes in radius (1–300). Async, default: 100.
-                                            §e/temperature testforecastjson [radius] §7– Same as above, outputs in JSON. Use for radius > 300. Async-safe.
+                                            §e/temperature testforecast [radius] §7– Show forecast in chat (1–300). For debug/testing.
+                                            §e/temperature testforecastjson [radius] §7– Output JSON forecast, supports large radius (>300). Async-safe.
                                             
-                                            §e/temperature regenerate §7– Clear cached forecasts and force regeneration on next access.
+                                            §e/temperature regenerate §7– Clear forecast cache and regenerate missing data.
+                                            §e/temperature resetSpikes §7– Clear spike simulation state cache.
                                             """), false);
 
                                     return 1;

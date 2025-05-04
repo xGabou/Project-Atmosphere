@@ -3,20 +3,34 @@ package net.Gabou.projectatmosphere.temperature;
 import net.Gabou.projectatmosphere.temperature.command.TemperatureCommands;
 import net.Gabou.projectatmosphere.temperature.event.SeasonTracker;
 import net.Gabou.projectatmosphere.temperature.event.TemperatureTickHandler;
+import net.Gabou.projectatmosphere.temperature.manager.TemperatureManager;
+import net.Gabou.projectatmosphere.temperature.spike.SpikeStateStorage;
 import net.Gabou.projectatmosphere.temperature.util.AsyncTemperatureService;
 import net.Gabou.projectatmosphere.temperature.util.ForecastStorageManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLDedicatedServerSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
 
+import java.nio.file.Path;
+import java.util.Objects;
+
+@Mod.EventBusSubscriber(modid = "projectatmosphere")
 public class Temperature {
 
     /** Call once from your main mod if Serene Seasons is loaded */
@@ -24,7 +38,6 @@ public class Temperature {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         modBus.addListener(Temperature::onCommonSetup);
 
-        MinecraftForge.EVENT_BUS.addListener(Temperature::onServerStarting);
         MinecraftForge.EVENT_BUS.addListener(Temperature::onServerStopping);
         MinecraftForge.EVENT_BUS.addListener(Temperature::onRegisterCommands);
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
@@ -36,26 +49,56 @@ public class Temperature {
     }
 
 
-    private static void onServerStarting(ServerStartingEvent event) {
+    @SubscribeEvent
+    public static void onServerStarted(ServerStartedEvent event) {
         if (event.getServer().isDedicatedServer()) return;
         initTemperatureForServer(event.getServer());
     }
 
     private static void initTemperatureForServer(MinecraftServer server) {
-        Level world = server.getLevel(Level.OVERWORLD);
+        ServerLevel world = server.getLevel(Level.OVERWORLD);
         if (world == null) return;
-
-        ForecastStorageManager.loadAll();
+        loadData(world);
         BlockPos center = world.getSharedSpawnPos();
-        TemperatureManager.init(world, center, /*radius=*/250);
+        TemperatureManager.initTemperatureForServer(world, center);
+    }
+    @SubscribeEvent
+    public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && player.level() instanceof ServerLevel serverLevel) {
+            BlockPos pos = player.blockPosition();
+            TemperatureManager.onPlayerJoined(serverLevel, pos);
+        }
+    }
+
+
+    private static void loadData(ServerLevel world) {
+        ForecastStorageManager.loadAll(world);
+        SpikeStateStorage.loadAll(world);
     }
 
     private static void onServerStopping(ServerStoppingEvent event) {
-        ForecastStorageManager.saveAll();
+        saveData(event.getServer().overworld());
         AsyncTemperatureService.shutdown();
     }
+
+    private static void saveData(ServerLevel world) {
+        ForecastStorageManager.saveAll(world);
+        SpikeStateStorage.saveAll(world);
+    }
+
     /** Phase 3: register the /temperature command */
     private static void onRegisterCommands(final RegisterCommandsEvent event) {
         TemperatureCommands.register(event.getDispatcher());
     }
+    public static Path getPerWorldSavePath(ServerLevel world, String fileName) {
+        return world.getServer()
+                .getWorldPath(LevelResource.ROOT) // this gives saves/New World/
+                .resolve(world.dimension().location().getNamespace().equals("minecraft")
+                        ? world.dimension().location().getPath() // e.g., "DIM1", "DIM-1", or "overworld"
+                        : world.dimension().location().toString()) // handles custom dimensions
+                .resolve("data")
+                .resolve("projectatmosphere")
+                .resolve(fileName);
+    }
+
 }

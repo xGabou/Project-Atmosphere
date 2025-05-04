@@ -13,10 +13,14 @@ public class AsyncTemperatureService {
             });
 
     public static void init() {
-        // no-op
+        // No-op placeholder in case future initialization is needed
     }
 
     public static void runAsync(Runnable task) {
+        if (EXECUTOR.isShutdown()) {
+            System.err.println("AsyncTemperatureService is shut down! Task rejected: " + task);
+            return;
+        }
         EXECUTOR.submit(task);
     }
 

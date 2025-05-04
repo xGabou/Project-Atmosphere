@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.temperature.command;
 
-import net.Gabou.projectatmosphere.temperature.TemperatureManager;
+import net.Gabou.projectatmosphere.temperature.manager.TemperatureManager;
 import net.Gabou.projectatmosphere.temperature.compat.SereneTempToCelcius;
 import net.Gabou.projectatmosphere.temperature.forecast.TemperatureForecast;
 import net.Gabou.projectatmosphere.temperature.util.TemperatureGenerator;
