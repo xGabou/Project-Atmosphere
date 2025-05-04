@@ -52,6 +52,7 @@ public class AtmosphereManager {
         PressureModule.onServerStarted(world);
         HumidityModule.onServerStarted(world);
         WindModule.onServerStarted(world);
+        refreshUnifiedForecast(world);
     }
 
     public static void onPlayerJoined(ServerLevel world, ServerPlayer player) {
@@ -61,6 +62,7 @@ public class AtmosphereManager {
         PressureManager.onPlayerJoined(world, pos);
         HumidityManager.onPlayerJoined(world, pos);
         WindManager.onPlayerJoined(world, pos);
+        refreshUnifiedForecast(world);
     }
 
     public static void onPrecomputeProfiles(ServerLevel world) {
@@ -75,6 +77,7 @@ public class AtmosphereManager {
         PressureManager.onSwapProfiles(world);
         HumidityManager.onSwapProfiles(world);
         WindManager.onSwapProfiles(world);
+        refreshUnifiedForecast(world);
     }
 
     public static void onSeasonChange(ServerLevel world) {
