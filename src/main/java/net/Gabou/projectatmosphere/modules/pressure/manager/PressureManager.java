@@ -1,0 +1,71 @@
+// src/main/java/net/Gabou/projectatmosphere/modules/pressure/manager/PressureManager.java
+package net.Gabou.projectatmosphere.modules.pressure.manager;
+
+import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast;
+import net.Gabou.projectatmosphere.modules.pressure.util.DailyPressureGenerator;
+import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
+
+import java.util.Map;
+import java.util.Objects;
+
+public class PressureManager {
+    /** Radius (in blocks) used to scan for biomes */
+    public static final int radiusBlocks = 250;
+
+    private static BlockPos lastCenter;
+
+    /** Initialize weekly forecast & schedule daily curves */
+    public static void init(Level world, BlockPos center) {
+        lastCenter = center;
+        Map<ResourceLocation, double[]> raw = new PressureForecast().generateForecastAround(world, center, radiusBlocks);
+        if (raw.isEmpty()) {
+            Objects.requireNonNull(world.getServer())
+                    .sendSystemMessage(Component.literal(
+                            "CRITICAL ERROR: No biomes found for pressure forecast!"));
+            return;
+        }
+        // Store as [7][2] trivial min/max (identical endpoints)
+        raw.forEach((biome, week) -> {
+            if (!PressureProfileManager.hasWeeklyForecast(biome)) {
+                double[][] weekRange = new double[7][2];
+                for (int d = 0; d < 7; d++) {
+                    weekRange[d][0] = week[d];
+                    weekRange[d][1] = week[d];
+                }
+                PressureProfileManager.putWeeklyForecast(biome, weekRange);
+            }
+        });
+        DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world);
+    }
+
+    /** Called when a player (re)enters to regenerate missing forecasts around them */
+    public static void onPlayerJoined(Level world, BlockPos center) {
+        init(world, center);
+    }
+
+    /** Called at tick 18000 to precompute both today & tomorrow */
+    public static void onPrecomputeProfiles(Level world) {
+        DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world);
+    }
+
+    /** Called at tick 21000 (3 AM) to swap tomorrow→today, then precompute next tomorrow */
+    public static void onSwapProfiles(Level world) {
+        for (String key : PressureProfileManager.getAllBiomeKeys()) {
+            ResourceLocation biome = new ResourceLocation(key);
+            double[] tom = PressureProfileManager.getTomorrowProfile(biome);
+            if (tom != null) {
+                PressureProfileManager.putDayProfile(biome, tom);
+            }
+        }
+        DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world);
+    }
+
+    /** Clears all cached profiles (will regenerate on next init) */
+    public static void clearForecastCache() {
+        PressureProfileManager.clearAll();
+    }
+}

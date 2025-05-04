@@ -2,14 +2,19 @@ package net.Gabou.projectatmosphere.util;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
 public class AtmosphereUtils {
+
+
     public static Vec3 randomDrift(Random random, double speed) {
         double dx = (random.nextDouble() - 0.5) * speed;
         double dz = (random.nextDouble() - 0.5) * speed;
@@ -44,5 +49,22 @@ public class AtmosphereUtils {
                 }
             }
         }
+    }
+    public static Path getPerWorldSavePath(ServerLevel world, String fileName) {
+        return world.getServer()
+                .getWorldPath(LevelResource.ROOT) // this gives saves/New World/
+                .resolve(world.dimension().location().getNamespace().equals("minecraft")
+                        ? world.dimension().location().getPath() // e.g., "DIM1", "DIM-1", or "overworld"
+                        : world.dimension().location().toString()) // handles custom dimensions
+                .resolve("data")
+                .resolve("projectatmosphere")
+                .resolve(fileName);
+    }
+
+    public static Map<ResourceLocation, BlockPos> findBiomes(Level world, BlockPos center, int radiusBlocks) {
+        Map<ResourceLocation, BlockPos> biomeSamples = new java.util.HashMap<>();
+        Set<ResourceLocation> foundBiomes = new java.util.HashSet<>();
+        findBiomes(world, center, radiusBlocks, foundBiomes, biomeSamples);
+        return biomeSamples;
     }
 }

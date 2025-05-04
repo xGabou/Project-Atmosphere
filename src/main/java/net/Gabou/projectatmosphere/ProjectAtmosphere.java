@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere;
 
 import net.Gabou.projectatmosphere.client.renderer.CloudRenderer;
+import net.Gabou.projectatmosphere.modules.storm.StormModule;
 import net.Gabou.projectatmosphere.registry.EntityRegistrar;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -19,7 +20,7 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.bernie.geckolib.GeckoLib;
-import net.Gabou.projectatmosphere.temperature.Temperature;
+import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 
 @Mod(ProjectAtmosphere.MODID)
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
@@ -38,6 +39,7 @@ public class ProjectAtmosphere {
 
     private void initModules(IEventBus modEventBus) {
         isSereneLoaded();
+        AsyncAtmosphereService.init();
         initTemperatureModule(modEventBus);
         initPressionModule(modEventBus);
         initHumidityModule(modEventBus);
@@ -72,7 +74,7 @@ public class ProjectAtmosphere {
     }
     private void initTemperatureModule(IEventBus modBus) {
         // Only run if Serene Seasons is installed
-        Temperature.init(modBus);
+        TemperatureModule.init(modBus);
     }
 
     private static void sendInfo() {
@@ -82,15 +84,15 @@ public class ProjectAtmosphere {
 
     private void initPressionModule(IEventBus modBus) {
         // Only run if Serene Seasons is installed
-        Pression.init();
+        Pression.init(modBus);
     }
     private void initHumidityModule(IEventBus modBus) {
         // Only run if Serene Seasons is installed
-        Humidity.init();
+        Humidity.init(modBus);
     }
     private void initStormModule(IEventBus modBus) {
         // Only run if Serene Seasons is installed
-        Storm.init();
+        StormModule.init(modBus);
     }
     private static void isSereneLoaded() {
         if (!ModList.get().isLoaded("sereneseasons")) {
