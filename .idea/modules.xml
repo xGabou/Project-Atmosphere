@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/org.Gabou.project-atmosphere.main.iml" filepath="$PROJECT_DIR$/.idea/modules/org.Gabou.project-atmosphere.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/project-atmosphere.iml" filepath="$PROJECT_DIR$/.idea/modules/project-atmosphere.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/project-atmosphere.main.iml" filepath="$PROJECT_DIR$/.idea/modules/project-atmosphere.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/project-atmosphere.test.iml" filepath="$PROJECT_DIR$/.idea/modules/project-atmosphere.test.iml" />
     </modules>
