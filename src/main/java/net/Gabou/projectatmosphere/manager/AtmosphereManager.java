@@ -44,6 +44,7 @@ public class AtmosphereManager {
     {
         // Register commands here
         TemperatureModule.onRegisterCommands(event);
+        HumidityModule.onRegisterCommands(event);
         SpawnCloudCommand.register(event.getDispatcher());
         DebugAtmoCommand.register(event.getDispatcher());
     }

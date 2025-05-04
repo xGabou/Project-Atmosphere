@@ -21,7 +21,7 @@ import java.util.Objects;
 public class TemperatureManager{
 
 
-    private static final int DEFAULT_RADIUS = 150;
+    private static final int DEFAULT_RADIUS = 250;
     private static BlockPos lastCenter = BlockPos.ZERO;
 
     /** Called once on server startup to generate initial forecast around spawn. */

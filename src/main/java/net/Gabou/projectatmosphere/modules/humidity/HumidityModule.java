@@ -1,13 +1,18 @@
 package net.Gabou.projectatmosphere.modules.humidity;
 
+import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
+import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
+import net.Gabou.projectatmosphere.modules.humidity.Command.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
+import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -57,5 +62,9 @@ public class HumidityModule {
     }
 
     public static void onServerStarting(ServerLevel world, BlockPos center) {
+    }
+
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        HumidityCommand.register(event.getDispatcher());
     }
 }

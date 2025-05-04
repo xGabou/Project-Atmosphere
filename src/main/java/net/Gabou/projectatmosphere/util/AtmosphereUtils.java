@@ -51,11 +51,13 @@ public class AtmosphereUtils {
         }
     }
     public static Path getPerWorldSavePath(ServerLevel world, String fileName) {
+        String dimensionPath = world.dimension().location().getNamespace().equals("minecraft")
+                ? world.dimension().location().getPath()
+                : world.dimension().location().getNamespace() + "_" + world.dimension().location().getPath();
+
         return world.getServer()
-                .getWorldPath(LevelResource.ROOT) // this gives saves/New World/
-                .resolve(world.dimension().location().getNamespace().equals("minecraft")
-                        ? world.dimension().location().getPath() // e.g., "DIM1", "DIM-1", or "overworld"
-                        : world.dimension().location().toString()) // handles custom dimensions
+                .getWorldPath(LevelResource.ROOT)
+                .resolve(dimensionPath)
                 .resolve("data")
                 .resolve("projectatmosphere")
                 .resolve(fileName);
