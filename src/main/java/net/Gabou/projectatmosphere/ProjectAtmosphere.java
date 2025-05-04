@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere;
 
 import net.Gabou.projectatmosphere.client.renderer.CloudRenderer;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.modules.storm.StormModule;
 import net.Gabou.projectatmosphere.registry.EntityRegistrar;
@@ -16,7 +17,9 @@ import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -39,6 +42,8 @@ public class ProjectAtmosphere {
         GeckoLib.initialize();
         initModules();
         MinecraftForge.EVENT_BUS.addListener(this::onServerStarted);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
+
 
         EntityRegistrar.registerEntities(modEventBus);
         modEventBus.addListener(this::setup);
