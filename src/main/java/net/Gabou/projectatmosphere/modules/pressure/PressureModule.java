@@ -1,43 +1,60 @@
-// src/main/java/net/Gabou/projectatmosphere/modules/pressure/PressionModule.java
 package net.Gabou.projectatmosphere.modules.pressure;
 
-import net.Gabou.projectatmosphere.modules.core.BaseAtmosphereModule;
 import net.Gabou.projectatmosphere.modules.pressure.manager.PressureManager;
+import net.Gabou.projectatmosphere.modules.pressure.util.PressureStorageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 
-public class PressureModule extends BaseAtmosphereModule {
+@Mod.EventBusSubscriber(modid = "projectatmosphere")
+public class PressureModule {
     private static final int DEFAULT_RADIUS = PressureManager.radiusBlocks;
 
-    public PressureModule() {
-        super(DEFAULT_RADIUS);
+    public static void init() {
+
     }
 
-    @Override
-    protected void doInit(ServerLevel world, BlockPos center, int radius) {
-        PressureManager.init(world, center);
+
+    public static void onServerStarted(ServerLevel world) {
+
+        PressureStorageManager.loadAll(world);
+        PressureManager.init(world, world.getSharedSpawnPos());
     }
 
-    @Override
-    protected void doPrecompute(ServerLevel world) {
+    private static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent ev) {
+        if (ev.getEntity() instanceof ServerPlayer player
+                && player.level() instanceof ServerLevel lvl) {
+            PressureManager.onPlayerJoined(lvl, player.blockPosition());
+        }
+    }
+
+    public static void onServerStopping(ServerLevel event) {
+        ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
+        if (world != null) {
+            PressureStorageManager.saveAll(world);
+        }
+    }
+
+    public static void precompute(ServerLevel world) {
         PressureManager.onPrecomputeProfiles(world);
     }
 
-    @Override
-    protected void doSwap(ServerLevel world) {
+    public static void swap(ServerLevel world) {
         PressureManager.onSwapProfiles(world);
     }
 
-    @Override
-    protected void clearAll() {
+    public static void clear() {
         PressureManager.clearForecastCache();
     }
 
-
-    @Override
-    protected void runAsync(Runnable task) {
-        AsyncAtmosphereService.runPression(task);
+    public static void onServerStarting(ServerLevel world, BlockPos center) {
     }
 }

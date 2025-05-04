@@ -1,14 +1,19 @@
 package net.Gabou.projectatmosphere;
 
 import net.Gabou.projectatmosphere.client.renderer.CloudRenderer;
+import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.modules.storm.StormModule;
 import net.Gabou.projectatmosphere.registry.EntityRegistrar;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
@@ -31,25 +36,44 @@ public class ProjectAtmosphere {
     public ProjectAtmosphere() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         GeckoLib.initialize();
-        initModules(modEventBus);
+        initModules();
+        MinecraftForge.EVENT_BUS.addListener(this::onServerStarted);
+
         EntityRegistrar.registerEntities(modEventBus);
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
     }
 
-    private void initModules(IEventBus modEventBus) {
+    @SubscribeEvent
+    public static void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
+        ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
+        if (world != null) {
+            AtmosphereManager.onServerStarting(world);
+        }
+    }
+
+    private void onServerStarted(net.minecraftforge.event.server.ServerStartedEvent event) {
+        ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
+        if (world != null) {
+            AtmosphereManager.onServerStarted(world);
+        }
+    }
+
+
+    private void initModules() {
         isSereneLoaded();
         AsyncAtmosphereService.init();
-        initTemperatureModule(modEventBus);
-        initPressionModule(modEventBus);
-        initHumidityModule(modEventBus);
-        initStormModule(modEventBus);
+        AtmosphereManager.init();
         sendInfo();
     }
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         AsyncAtmosphereService.shutdown();
+        ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
+        if (world != null) {
+            AtmosphereManager.onServerStopping(world);
+        }
     }
 
     private void setup(final FMLCommonSetupEvent event) {
@@ -62,7 +86,7 @@ public class ProjectAtmosphere {
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-        SpawnCloudCommand.register(event.getDispatcher());
+        AtmosphereManager.onRegisterCommands(event);
     }
     @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID,bus = Mod.EventBusSubscriber.Bus.MOD,value = Dist.CLIENT)
     public static class ClientModEvents {
@@ -72,27 +96,8 @@ public class ProjectAtmosphere {
 
         }
     }
-    private void initTemperatureModule(IEventBus modBus) {
-        // Only run if Serene Seasons is installed
-        TemperatureModule.init(modBus);
-    }
-
     private static void sendInfo() {
         LOGGER.info("All modules subsystems have been initialized (Serene Seasons detected).");
-    }
-
-
-    private void initPressionModule(IEventBus modBus) {
-        // Only run if Serene Seasons is installed
-        Pression.init(modBus);
-    }
-    private void initHumidityModule(IEventBus modBus) {
-        // Only run if Serene Seasons is installed
-        Humidity.init(modBus);
-    }
-    private void initStormModule(IEventBus modBus) {
-        // Only run if Serene Seasons is installed
-        StormModule.init(modBus);
     }
     private static void isSereneLoaded() {
         if (!ModList.get().isLoaded("sereneseasons")) {

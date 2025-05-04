@@ -73,7 +73,7 @@ public class HumidityStorageManager  {
     /**
      * Write the entire cache out to disk as JSON.
      */
-    private static void saveAll(ServerLevel world) {
+    public static void saveAll(ServerLevel world) {
         Path savePath = AtmosphereUtils.getPerWorldSavePath(world, "humidity_forecasts.json");
         JsonObject root = new JsonObject();
 

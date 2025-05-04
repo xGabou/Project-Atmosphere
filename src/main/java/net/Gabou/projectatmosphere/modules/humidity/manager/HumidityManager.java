@@ -38,6 +38,15 @@ public class HumidityManager {
     public static void onPrecomputeProfiles(ServerLevel world) {
         DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
+    public static float getAverageHumidity(ResourceLocation biome, int dayIndex) {
+        float[][] forecast = getWeeklyForecast(biome);
+        if (forecast == null || forecast.length <= dayIndex) return 0.0f;
+
+        float min = forecast[dayIndex][0];
+        float max = forecast[dayIndex][1];
+        return (min + max) / 2.0f;
+    }
+
 
 
     /** Returns current real-time humidity % at this tick. */

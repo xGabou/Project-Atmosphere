@@ -1,50 +1,123 @@
-// src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java
 package net.Gabou.projectatmosphere.manager;
 
-import net.Gabou.projectatmosphere.modules.core.IAtmosphereModule;
+
+import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
+import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityModule;
+import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
+import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.pressure.PressureModule;
-import net.Gabou.projectatmosphere.modules.storm.StormModule;
+import net.Gabou.projectatmosphere.modules.pressure.manager.PressureManager;
+import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
 import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
+import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
+import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.modules.wind.WindModule;
+import net.Gabou.projectatmosphere.modules.wind.manager.WindManager;
+import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.event.RegisterCommandsEvent;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 public class AtmosphereManager {
-    private static final List<IAtmosphereModule> MODULES = List.of(
-            new TemperatureModule(),
-            new StormModule(),
-            new HumidityModule(),
-            new PressureModule()
-    );
+
+    /** Master map that holds forecast data for each biome */
+    private static final Map<ResourceLocation, BiomeForecast> FORECAST_MAP = new HashMap<>();
 
     public static void onServerStarting(ServerLevel world) {
-        BlockPos spawn = world.getSharedSpawnPos();
-        MODULES.forEach(mod -> mod.init(world, spawn));
+        BlockPos center = world.getSharedSpawnPos();
+
+        TemperatureModule.onServerStarting(world);
+        PressureModule.onServerStarting(world, center);
+        HumidityModule.onServerStarting(world, center);
+        WindModule.onServerStarting(world, center);
+
+        refreshUnifiedForecast(world);
+    }
+
+    public static void onRegisterCommands(final RegisterCommandsEvent event)
+    {
+        // Register commands here
+        TemperatureModule.onRegisterCommands(event);
+        SpawnCloudCommand.register(event.getDispatcher());
+        DebugAtmoCommand.register(event.getDispatcher());
+    }
+    public static void onServerStarted(ServerLevel world) {
+        TemperatureModule.onServerStarted(world);
+        PressureModule.onServerStarted(world);
+        HumidityModule.onServerStarted(world);
+        WindModule.onServerStarted(world);
     }
 
     public static void onPlayerJoined(ServerLevel world, ServerPlayer player) {
-        MODULES.forEach(mod -> mod.onPlayerJoined(world, player.blockPosition()));
+        BlockPos pos = player.blockPosition();
+
+        TemperatureManager.onPlayerJoined(world, pos);
+        PressureManager.onPlayerJoined(world, pos);
+        HumidityManager.onPlayerJoined(world, pos);
+        WindManager.onPlayerJoined(world, pos);
     }
 
     public static void onPrecomputeProfiles(ServerLevel world) {
-        MODULES.forEach(mod -> mod.onPrecomputeProfiles(world));
+        TemperatureManager.onPrecomputeProfiles(world);
+        PressureManager.onPrecomputeProfiles(world);
+        HumidityManager.onPrecomputeProfiles(world);
+        WindManager.onPrecomputeProfiles(world);
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        MODULES.forEach(mod -> mod.onSwapProfiles(world));
+        TemperatureManager.onSwapProfiles(world);
+        PressureManager.onSwapProfiles(world);
+        HumidityManager.onSwapProfiles(world);
+        WindManager.onSwapProfiles(world);
     }
 
     public static void onSeasonChange(ServerLevel world) {
-        BlockPos spawn = world.getSharedSpawnPos();
-        MODULES.forEach(mod -> mod.onSeasonChange(world, spawn));
+        TemperatureManager.onSeasonChange(world);  // Only temperature responds to season
+        refreshUnifiedForecast(world);
     }
-    public static <T extends IAtmosphereModule> T getModule(Class<T> type) {
-        return (T) MODULES.stream()
-                .filter(type::isInstance)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Module not found: " + type.getName()));
+
+    public static void refreshUnifiedForecast(ServerLevel world) {
+        FORECAST_MAP.clear();
+        for (String biome : TemperatureProfileManager.getAllBiomeKeys()) {
+            float[] temp = TemperatureProfileManager.getDayProfile(ResourceLocation.parse(biome));
+            float[] pressure = PressureProfileManager.getTodayProfile(ResourceLocation.parse(biome));
+            float[] humidity = HumidityProfileManager.getDayProfile(ResourceLocation.parse(biome));
+            float[] wind = WindProfileManager.getTodayProfile(ResourceLocation.parse(biome));
+
+            FORECAST_MAP.put(ResourceLocation.parse(biome), new BiomeForecast(temp, pressure, humidity, wind));
+
+        }
     }
+
+    public static BiomeForecast getForecast(ResourceLocation biome) {
+        return FORECAST_MAP.get(biome);
+    }
+
+    /** Optional: access to the full map */
+    public static Map<ResourceLocation, BiomeForecast> getAllForecasts() {
+        return FORECAST_MAP;
+    }
+
+    public static void onServerStopping(ServerLevel world) {
+        TemperatureModule.onServerStopping(world);
+        PressureModule.onServerStopping(world);
+        HumidityModule.onServerStopping(world);
+        WindModule.onServerStopping(world);
+    }
+
+    public static void init() {
+        TemperatureModule.init();
+        PressureModule.init();
+        HumidityModule.init();
+        WindModule.init();
+    }
+
+    /** Central record to unify today's weather-like forecast */
+    public static record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, float[] wind) {}
 }

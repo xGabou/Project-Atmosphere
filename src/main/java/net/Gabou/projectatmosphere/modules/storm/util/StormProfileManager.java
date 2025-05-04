@@ -22,6 +22,15 @@ public class StormProfileManager {
         return WEEKLY.get(id.toString());
     }
 
+    /** Returns today's storm intensity for a biome */
+    public static double getCurrentStormIntensity(ResourceLocation biome, long worldTick) {
+        double[] forecast = getWeeklyForecast(biome);
+        if (forecast.length == 0) return 0.0;
+
+        int dayIndex = (int)((worldTick / 24000L) % 7);
+        return forecast[Math.min(dayIndex, forecast.length - 1)];
+    }
+
     public static boolean hasDayProfile(ResourceLocation id) {
         return DAILY.containsKey(id.toString());
     }
@@ -35,6 +44,14 @@ public class StormProfileManager {
     public static void putTomorrowProfile(ResourceLocation id, double[] curve) {
         TOMORROW.put(id.toString(), curve);
     }
+
+    public static double[] getDayProfile(ResourceLocation id) {
+        return DAILY.get(id.toString());
+    }
+    public static double[] getTomorrowProfile(ResourceLocation id) {
+        return TOMORROW.get(id.toString());
+    }
+
 
     public static double getCurrentSpike(ResourceLocation biome, long tick) {
         double[] curve = DAILY.get(biome.toString());

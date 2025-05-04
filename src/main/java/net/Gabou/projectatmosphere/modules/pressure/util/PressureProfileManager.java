@@ -1,69 +1,52 @@
-// src/main/java/net/Gabou/projectatmosphere/modules/pressure/util/PressureProfileManager.java
 package net.Gabou.projectatmosphere.modules.pressure.util;
 
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class PressureProfileManager {
-    private static final Map<String, double[][]> WEEKLY  = new ConcurrentHashMap<>();
-    private static final Map<String, double[]>   TOMORROW = new ConcurrentHashMap<>();
-    private static final Map<String, double[]>   DAILY    = new ConcurrentHashMap<>();
 
-    public static void putWeeklyForecast(ResourceLocation biome, double[][] weekHpa) {
-        WEEKLY.put(biome.toString(), weekHpa);
+    private static final Map<ResourceLocation, float[][]> WEEKLY_FORECASTS = new HashMap<>();
+    private static final Map<ResourceLocation, float[]> TODAY_PROFILE = new HashMap<>();
+    private static final Map<ResourceLocation, float[]> TOMORROW_PROFILE = new HashMap<>();
+
+    public static void putWeeklyForecast(ResourceLocation biome, float[][] week) {
+        WEEKLY_FORECASTS.put(biome, week);
     }
-    public static double[][] getWeeklyForecast(ResourceLocation biome) {
-        return WEEKLY.get(biome.toString());
+
+    public static float[][] getWeeklyForecast(ResourceLocation biome) {
+        return WEEKLY_FORECASTS.getOrDefault(biome, new float[7][2]);
     }
+
+    public static void putDayProfile(ResourceLocation biome, float[] profile) {
+        TODAY_PROFILE.put(biome, profile);
+    }
+
+    public static void putTomorrowProfile(ResourceLocation biome, float[] profile) {
+        TOMORROW_PROFILE.put(biome, profile);
+    }
+
+    public static float[] getTodayProfile(ResourceLocation biome) {
+        return TODAY_PROFILE.get(biome);
+    }
+
+    public static float[] getTomorrowProfile(ResourceLocation biome) {
+        return TOMORROW_PROFILE.get(biome);
+    }
+
+
     public static boolean hasWeeklyForecast(ResourceLocation biome) {
-        return WEEKLY.containsKey(biome.toString());
-    }
-
-    public static void putTomorrowProfile(ResourceLocation biome, double[] profile) {
-        TOMORROW.put(biome.toString(), profile);
-    }
-    public static double[] getTomorrowProfile(ResourceLocation biome) {
-        return TOMORROW.get(biome.toString());
-    }
-    public static boolean hasTomorrowProfile(ResourceLocation biome) {
-        return TOMORROW.containsKey(biome.toString());
-    }
-
-    public static void putDayProfile(ResourceLocation biome, double[] profile) {
-        DAILY.put(biome.toString(), profile);
-    }
-    public static double[] getDayProfile(ResourceLocation biome) {
-        return DAILY.get(biome.toString());
-    }
-    public static boolean hasDayProfile(ResourceLocation biome) {
-        return DAILY.containsKey(biome.toString());
-    }
-
-    public static Set<String> getAllBiomeKeys() {
-        return DAILY.keySet();
+        return WEEKLY_FORECASTS.containsKey(biome);
     }
 
     public static void clearAll() {
-        WEEKLY.clear();
-        TOMORROW.clear();
-        DAILY.clear();
+        WEEKLY_FORECASTS.clear();
+        TODAY_PROFILE.clear();
+        TOMORROW_PROFILE.clear();
     }
 
-    /** Returns the instantaneous pressure at this tick, using daily if present else weekly midday. */
-    public static double getCurrentPressure(ResourceLocation biome, long tick) {
-        double[] day = DAILY.get(biome.toString());
-        if (day != null) {
-            int idx = (int)((tick % 24000L) / 100);
-            return day[idx];
-        }
-        double[][] week = WEEKLY.get(biome.toString());
-        if (week != null) {
-            int d = (int)((tick / 24000L) % 7);
-            return week[d][1];
-        }
-        return Double.NaN;
+    public static Iterable<String> getAllBiomeKeys() {
+        return WEEKLY_FORECASTS.keySet().stream().map(ResourceLocation::toString).toList();
     }
 }

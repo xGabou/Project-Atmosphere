@@ -21,7 +21,7 @@ public class PressureManager {
     /** Initialize weekly forecast & schedule daily curves */
     public static void init(Level world, BlockPos center) {
         lastCenter = center;
-        Map<ResourceLocation, double[]> raw = new PressureForecast().generateForecastAround(world, center, radiusBlocks);
+        Map<ResourceLocation, float[]> raw = new PressureForecast().generateForecastAround(world, center, radiusBlocks);
         if (raw.isEmpty()) {
             Objects.requireNonNull(world.getServer())
                     .sendSystemMessage(Component.literal(
@@ -31,7 +31,7 @@ public class PressureManager {
         // Store as [7][2] trivial min/max (identical endpoints)
         raw.forEach((biome, week) -> {
             if (!PressureProfileManager.hasWeeklyForecast(biome)) {
-                double[][] weekRange = new double[7][2];
+                float[][] weekRange = new float[7][2];
                 for (int d = 0; d < 7; d++) {
                     weekRange[d][0] = week[d];
                     weekRange[d][1] = week[d];
@@ -56,7 +56,7 @@ public class PressureManager {
     public static void onSwapProfiles(Level world) {
         for (String key : PressureProfileManager.getAllBiomeKeys()) {
             ResourceLocation biome = new ResourceLocation(key);
-            double[] tom = PressureProfileManager.getTomorrowProfile(biome);
+            float[] tom = PressureProfileManager.getTomorrowProfile(biome);
             if (tom != null) {
                 PressureProfileManager.putDayProfile(biome, tom);
             }

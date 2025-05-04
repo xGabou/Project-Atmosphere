@@ -18,7 +18,8 @@ import net.minecraft.network.chat.Component;
 import java.util.Map;
 import java.util.Objects;
 
-public class TemperatureManager implements TemperatureProvider {
+public class TemperatureManager{
+
 
     private static final int DEFAULT_RADIUS = 150;
     private static BlockPos lastCenter = BlockPos.ZERO;
@@ -27,6 +28,8 @@ public class TemperatureManager implements TemperatureProvider {
     public static void initTemperatureForServer(ServerLevel server, BlockPos spawn) {
         init(server, spawn);
     }
+
+
 
     /** Called when a player joins; triggers forecast generation around them. */
     public static void onPlayerJoined(ServerLevel world, BlockPos playerPos) {
@@ -101,8 +104,6 @@ public class TemperatureManager implements TemperatureProvider {
         }
     }
 
-    @Override
-    public float getTemperature(ServerLevel level, BlockPos pos) {
-        return 0;
-    }
+
+
 }
