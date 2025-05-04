@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.temperature.util;
 
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
@@ -15,7 +16,7 @@ public class DailyProfileGenerator {
 //        });
 //    }
     public static void scheduleGenerationForTodayAndTomorrow(Level world) {
-        AsyncTemperatureService.runAsync(() -> {
+        AsyncAtmosphereService.runAsync(AsyncAtmosphereService.Branch.TEMPERATURE,() -> {
             long now = world.getDayTime();
 
             for (String key : ForecastStorageManager.getAllBiomeKeys()) {

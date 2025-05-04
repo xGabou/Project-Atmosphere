@@ -3,10 +3,11 @@ package net.Gabou.projectatmosphere;
 import net.Gabou.projectatmosphere.client.renderer.CloudRenderer;
 import net.Gabou.projectatmosphere.registry.EntityRegistrar;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
-import net.minecraft.server.MinecraftServer;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
@@ -29,10 +30,24 @@ public class ProjectAtmosphere {
     public ProjectAtmosphere() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         GeckoLib.initialize();
-        initTemperatureModule(modEventBus);
+        initModules(modEventBus);
         EntityRegistrar.registerEntities(modEventBus);
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
+    }
+
+    private void initModules(IEventBus modEventBus) {
+        isSereneLoaded();
+        initTemperatureModule(modEventBus);
+        initPressionModule(modEventBus);
+        initHumidityModule(modEventBus);
+        initStormModule(modEventBus);
+        sendInfo();
+    }
+
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        AsyncAtmosphereService.shutdown();
     }
 
     private void setup(final FMLCommonSetupEvent event) {
@@ -57,13 +72,29 @@ public class ProjectAtmosphere {
     }
     private void initTemperatureModule(IEventBus modBus) {
         // Only run if Serene Seasons is installed
+        Temperature.init(modBus);
+    }
+
+    private static void sendInfo() {
+        LOGGER.info("All modules subsystems have been initialized (Serene Seasons detected).");
+    }
+
+
+    private void initPressionModule(IEventBus modBus) {
+        // Only run if Serene Seasons is installed
+        Pression.init();
+    }
+    private void initHumidityModule(IEventBus modBus) {
+        // Only run if Serene Seasons is installed
+        Humidity.init();
+    }
+    private void initStormModule(IEventBus modBus) {
+        // Only run if Serene Seasons is installed
+        Storm.init();
+    }
+    private static void isSereneLoaded() {
         if (!ModList.get().isLoaded("sereneseasons")) {
-            LOGGER.info("Serene Seasons not found—skipping Temperature subsystem.");
-            return;
+            LOGGER.info("Serene Seasons is not found—skipping all modules subsystems.");
         }
-        Temperature.init();
-
-
-        LOGGER.info("Temperature subsystem initialized (Serene Seasons detected).");
     }
 }

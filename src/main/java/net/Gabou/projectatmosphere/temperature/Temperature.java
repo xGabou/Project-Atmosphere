@@ -5,9 +5,8 @@ import net.Gabou.projectatmosphere.temperature.event.SeasonTracker;
 import net.Gabou.projectatmosphere.temperature.event.TemperatureTickHandler;
 import net.Gabou.projectatmosphere.temperature.manager.TemperatureManager;
 import net.Gabou.projectatmosphere.temperature.spike.SpikeStateStorage;
-import net.Gabou.projectatmosphere.temperature.util.AsyncTemperatureService;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.temperature.util.ForecastStorageManager;
-import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
@@ -15,27 +14,22 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
 
 import java.nio.file.Path;
-import java.util.Objects;
 
 @Mod.EventBusSubscriber(modid = "projectatmosphere")
 public class Temperature {
 
     /** Call once from your main mod if Serene Seasons is loaded */
-    public static void init() {
-        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+    public static void init(IEventBus modBus) {
         modBus.addListener(Temperature::onCommonSetup);
 
         MinecraftForge.EVENT_BUS.addListener(Temperature::onServerStopping);
@@ -45,7 +39,7 @@ public class Temperature {
     }
 
     private static void onCommonSetup(FMLCommonSetupEvent event) {
-        AsyncTemperatureService.init();
+        AsyncAtmosphereService.init();
     }
 
 
@@ -78,7 +72,7 @@ public class Temperature {
 
     private static void onServerStopping(ServerStoppingEvent event) {
         saveData(event.getServer().overworld());
-        AsyncTemperatureService.shutdown();
+
     }
 
     private static void saveData(ServerLevel world) {

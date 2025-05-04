@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.temperature.util;
 
 import com.google.gson.*;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -47,7 +48,7 @@ public class ForecastStorageManager {
      * This method is called asynchronously to avoid blocking the main thread.
      */
     public static void loadAll(ServerLevel world) {
-        AsyncTemperatureService.runAsync(() -> {
+        AsyncAtmosphereService.runAsync(AsyncAtmosphereService.Branch.TEMPERATURE,() -> {
             Path SAVE_PATH = getPerWorldSavePath(world, FILE_NAME);
             if (!Files.exists(SAVE_PATH)) return;
             try (Reader r = Files.newBufferedReader(SAVE_PATH)) {
@@ -74,7 +75,7 @@ public class ForecastStorageManager {
      * This method is called asynchronously to avoid blocking the main thread.
      */
     public static void saveAll(ServerLevel world) {
-        AsyncTemperatureService.runAsync(() -> {
+        AsyncAtmosphereService.runAsync(AsyncAtmosphereService.Branch.TEMPERATURE,() -> {
             JsonObject root = new JsonObject();
             cache.forEach((biome, week) -> {
                 JsonArray arr = new JsonArray();

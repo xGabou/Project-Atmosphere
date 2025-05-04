@@ -11,6 +11,8 @@ import net.minecraft.world.level.Level;
 
 import java.util.*;
 
+import static net.Gabou.projectatmosphere.util.AtmosphereUtils.findBiomes;
+
 public class TemperatureForecast {
 
     /**
@@ -72,20 +74,7 @@ public class TemperatureForecast {
         return result;
     }
 
-    private static void findBiomes(Level world, BlockPos center, int radiusBlocks, Set<ResourceLocation> foundBiomes, Map<ResourceLocation, BlockPos> biomeSamples) {
-        int step = 16;
 
-        for (int dx = -radiusBlocks; dx <= radiusBlocks; dx += step) {
-            for (int dz = -radiusBlocks; dz <= radiusBlocks; dz += step) {
-                BlockPos pos = center.offset(dx, 0, dz);
-                ResourceLocation biomeKey = world.getBiome(pos).unwrapKey().get().location();
-
-                if (foundBiomes.add(biomeKey)) {
-                    biomeSamples.put(biomeKey, pos); // Save a real sample position
-                }
-            }
-        }
-    }
 
 
 }

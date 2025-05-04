@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.temperature.spike;
 
 import com.google.gson.*;
-import net.Gabou.projectatmosphere.temperature.util.AsyncTemperatureService;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
@@ -18,7 +18,7 @@ public class SpikeStateStorage {
     public static final String FILE_NAME = "spike_data.json";
 
     public static void saveAll(ServerLevel world) {
-        AsyncTemperatureService.runAsync(() -> {
+        AsyncAtmosphereService.runAsync(AsyncAtmosphereService.Branch.TEMPERATURE,() -> {
             JsonObject root = new JsonObject();
 
             // Example for saving SpikeManager state
@@ -46,7 +46,7 @@ public class SpikeStateStorage {
 
 
     public static void loadAll(ServerLevel world) {
-        AsyncTemperatureService.runAsync(() -> {
+        AsyncAtmosphereService.runAsync(AsyncAtmosphereService.Branch.TEMPERATURE,() -> {
             Path SAVE_PATH = getPerWorldSavePath(world, FILE_NAME);
             if (!Files.exists(SAVE_PATH)) return;
 
@@ -70,7 +70,7 @@ public class SpikeStateStorage {
         });
     }
     public static void clearAll(ServerLevel world) {
-        AsyncTemperatureService.runAsync(() -> {
+        AsyncAtmosphereService.runAsync(AsyncAtmosphereService.Branch.TEMPERATURE,() -> {
             Path SAVE_PATH = getPerWorldSavePath(world, FILE_NAME);
             if (Files.exists(SAVE_PATH)) {
                 try {
