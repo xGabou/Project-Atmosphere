@@ -1,26 +1,44 @@
 // src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java
 package net.Gabou.projectatmosphere.util;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class AsyncAtmosphereService {
-    private static final ExecutorService TEMP_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+    private static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
+    private static final boolean LOW_CPU = CPU_COUNT < 6;
+
+    private static final ExecutorService SHARED_EXECUTOR = Executors.newFixedThreadPool(
+
+            Math.max(2, CPU_COUNT - 1),
+            r -> {
+                ProjectAtmosphere.LOGGER.info("Creating shared executor thread"+"\n Your CPU count is: " + CPU_COUNT + "\n Your CPU count is less than 6, so the shared executor will be used.");
+                Thread t = new Thread(r, "SharedCalcThread");
+                t.setDaemon(true);
+                return t;
+            });
+
+    private static final ExecutorService TEMP_EXECUTOR = LOW_CPU ? SHARED_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "TempCalcThread");
         t.setDaemon(true);
         return t;
     });
-    private static final ExecutorService HUMIDITY_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+
+    private static final ExecutorService HUMIDITY_EXECUTOR = LOW_CPU ? SHARED_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "HumidityCalcThread");
         t.setDaemon(true);
         return t;
     });
-    private static final ExecutorService STORM_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+
+    private static final ExecutorService STORM_EXECUTOR = LOW_CPU ? SHARED_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "StormCalcThread");
         t.setDaemon(true);
         return t;
     });
-    private static final ExecutorService PRESSION_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+
+    private static final ExecutorService PRESSION_EXECUTOR = LOW_CPU ? SHARED_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "PressionCalcThread");
         t.setDaemon(true);
         return t;
@@ -46,9 +64,13 @@ public class AsyncAtmosphereService {
     }
 
     public static void shutdown() {
-        TEMP_EXECUTOR.shutdown();
-        HUMIDITY_EXECUTOR.shutdown();
-        STORM_EXECUTOR.shutdown();
-        PRESSION_EXECUTOR.shutdown();
+        if (!LOW_CPU) {
+            TEMP_EXECUTOR.shutdown();
+            HUMIDITY_EXECUTOR.shutdown();
+            STORM_EXECUTOR.shutdown();
+            PRESSION_EXECUTOR.shutdown();
+        } else {
+            SHARED_EXECUTOR.shutdown();
+        }
     }
 }
