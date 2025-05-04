@@ -33,10 +33,9 @@ public class AtmosphereManager {
         BlockPos center = world.getSharedSpawnPos();
 
         TemperatureModule.onServerStarting(world);
-        PressureModule.onServerStarting(world, center);
         HumidityModule.onServerStarting(world, center);
+        PressureModule.onServerStarting(world, center);
         WindModule.onServerStarting(world, center);
-
         refreshUnifiedForecast(world);
     }
 
@@ -50,8 +49,8 @@ public class AtmosphereManager {
     }
     public static void onServerStarted(ServerLevel world) {
         TemperatureModule.onServerStarted(world);
-        PressureModule.onServerStarted(world);
         HumidityModule.onServerStarted(world);
+        PressureModule.onServerStarted(world);
         WindModule.onServerStarted(world);
         refreshUnifiedForecast(world);
     }
@@ -60,8 +59,8 @@ public class AtmosphereManager {
         BlockPos pos = player.blockPosition();
 
         TemperatureManager.onPlayerJoined(world, pos);
-        PressureManager.onPlayerJoined(world, pos);
         HumidityManager.onPlayerJoined(world, pos);
+        PressureManager.onPlayerJoined(world, pos);
         WindManager.onPlayerJoined(world, pos);
         refreshUnifiedForecast(world);
     }

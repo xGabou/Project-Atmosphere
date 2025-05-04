@@ -162,7 +162,7 @@ public class TemperatureGenerator {
         float absDiff = Math.abs(diff);
 
         // More tolerant: increase denominator to reduce strength
-        float strength = (float)(1.0 - Math.exp(-absDiff / 6.0)); // was /4.0
+        float strength = (float)(1.0 - Math.exp(-absDiff / 8.0)); // was /4.0
         strength = Math.min(strength, 0.7f);  // still cap at 70% pull
 
         return avg + diff * (1.0f - strength);
