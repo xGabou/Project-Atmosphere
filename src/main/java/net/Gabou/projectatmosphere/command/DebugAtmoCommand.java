@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -33,6 +34,28 @@ public class DebugAtmoCommand {
                                             return 1;
                                         })
                                 )
+                        )
+                        .then(Commands.literal("cpu")
+                                .executes(ctx -> {
+                                    int cores = Runtime.getRuntime().availableProcessors();
+                                    boolean forceShared = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get();
+                                    String mode;
+                                    if (forceShared || cores <= 6) {
+                                        mode = "Shared Executor (1 thread pool)";
+                                    } else if (cores <= 10) {
+                                        mode = "Two Executor Groups (shared in pairs)";
+                                    } else {
+                                        mode = "Four Separate Executors";
+                                    }
+
+                                    ctx.getSource().sendSuccess(() -> Component.literal(
+                                            "🧠 CPU Info\n" +
+                                                    "• Logical cores: " + cores + "\n" +
+                                                    "• Force shared (config): " + forceShared + "\n" +
+                                                    "• Current async mode: " + mode
+                                    ), false);
+                                    return 1;
+                                })
                         )
         );
     }
