@@ -1,27 +1,34 @@
 package net.Gabou.projectatmosphere.modules.storm.manager;
 
+import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.modules.storm.forecast.StormForecast;
 import net.Gabou.projectatmosphere.modules.storm.spike.StormSpikeManager;
 import net.Gabou.projectatmosphere.modules.storm.util.DailyStormGenerator;
 import net.Gabou.projectatmosphere.modules.storm.util.StormProfileManager;
+import net.Gabou.projectatmosphere.modules.storm.util.StormStorageManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.event.RegisterCommandsEvent;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+
 public class StormManager {
     private static BlockPos lastCenter;
-    public static final int radiusBlocks = 250;
 
-    public static void init(ServerLevel world, BlockPos center, int radius) {
+    public static void init(ServerLevel world, BlockPos center) {
         lastCenter = center;
 
         Map<ResourceLocation, double[]> forecasts =
-                StormForecast.generateStormForecastAround(world, lastCenter, radius);
+                StormForecast.generateStormForecastAround(world, lastCenter, DEFAULT_RADIUS);
 
         if (forecasts.isEmpty()) {
             Objects.requireNonNull(world.getServer())
@@ -41,7 +48,7 @@ public class StormManager {
     }
 
     public static void onPlayerJoined(ServerLevel world, BlockPos center) {
-        init(world, center, radiusBlocks);
+        init(world, center);
     }
 
     public static double getCurrentStormIntensity(ResourceLocation biome, long worldTick) {
@@ -67,20 +74,32 @@ public class StormManager {
         DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
-    public static void onSeasonChange(ServerLevel world, BlockPos center) {
-        regenerateForecast(world, center);
+    public static void onSeasonChange(ServerLevel world) {
+        onRegenerate(world, world.players());
     }
 
     public static double randomStormSpike(ResourceLocation biome, int d) {
         return StormSpikeManager.randomStormSpike(biome, d);
     }
 
-    private static void regenerateForecast(ServerLevel world, BlockPos center) {
+
+
+    public static void clearForecastCache(ServerLevel world) {
         StormProfileManager.clearAll();
-        init(world, center, radiusBlocks);
+        StormStorageManager.clearCache(world);
     }
 
-    public static void clearForecastCache() {
-        StormProfileManager.clearAll();
+    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
+        clearForecastCache(world);
+        init(world, world.getSharedSpawnPos());
+        for (Player player : players) {
+            BlockPos pos = player.blockPosition();
+            StormManager.onPlayerJoined(world, pos);
+        }
+
+    }
+    public static void onRegisterCommands(RegisterCommandsEvent event){
+        //StormCommand.register(event.getDispatcher());
+        SpawnCloudCommand.register(event.getDispatcher());
     }
 }

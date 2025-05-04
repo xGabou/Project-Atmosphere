@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
 import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
@@ -209,7 +210,8 @@ public class TemperatureCommands {
                                 .executes(ctx -> {
                                     if (ctx.getSource().getPlayer() == null)
                                         ctx.getSource().sendFailure(Component.literal("§cThis command can only be run by a player."));
-                                    TemperatureManager.clearForecastCache(ctx.getSource().getLevel());
+                                    AtmosphereManager.onRegenerate(ctx.getSource().getLevel());
+
                                     ctx.getSource().sendSuccess(() -> Component.literal("§aTemperature forecast cache has been cleared."), false);
                                     return 1;
                                 }))

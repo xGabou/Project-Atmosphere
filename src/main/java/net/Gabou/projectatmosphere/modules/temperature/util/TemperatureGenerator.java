@@ -184,10 +184,10 @@ public class TemperatureGenerator {
     private static float getNighttimeTempModifier(float timeOfDay, ResourceLocation biome, Level world) {
         // Night = [12000..23999] & [0..5999]
         if (timeOfDay >= 12000f || timeOfDay < 6000f) {
-            return isTropicalBiome(biome,world,-1.0f, -2.5f);
+            return isTropicalBiome(biome,world,-2.0f, -4f);
         }
         else{
-            return isTropicalBiome(biome,world,1.0f, 2.5f);
+            return isTropicalBiome(biome,world,2.0f, 4f);
         }
     }
 

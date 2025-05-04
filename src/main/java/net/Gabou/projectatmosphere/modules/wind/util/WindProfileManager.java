@@ -5,46 +5,42 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class WindProfileManager {
 
-    private static final Map<ResourceLocation, float[][]> WEEKLY = new HashMap<>();
-    private static final Map<ResourceLocation, float[]> TODAY = new HashMap<>();
-    private static final Map<ResourceLocation, float[]> TOMORROW = new HashMap<>();
+    private static final Map<String, float[][]> WEEKLY = new HashMap<>();
+    private static final Map<String, float[]> TODAY = new HashMap<>();
+    private static final Map<String, float[]> TOMORROW = new HashMap<>();
 
     public static void putWeeklyForecast(ResourceLocation biome, float[][] week) {
-        WEEKLY.put(biome, week);
+        WEEKLY.put(biome.toString(), week);
     }
 
     public static boolean hasWeeklyForecast(ResourceLocation biome) {
-        return WEEKLY.containsKey(biome);
+        return WEEKLY.containsKey(biome.toString());
     }
 
     public static float[][] getWeeklyForecast(ResourceLocation biome) {
-        return WEEKLY.getOrDefault(biome, new float[7][2]);
+        return WEEKLY.getOrDefault(biome.toString(), new float[7][2]);
     }
 
     public static void putDayProfile(ResourceLocation biome, float[] profile) {
-        TODAY.put(biome, profile);
+        TODAY.put(biome.toString(), profile);
     }
 
     public static void putTomorrowProfile(ResourceLocation biome, float[] profile) {
-        TOMORROW.put(biome, profile);
+        TOMORROW.put(biome.toString(), profile);
     }
 
     public static float[] getTodayProfile(ResourceLocation biome) {
-        return TODAY.get(biome);
+        return TODAY.get(biome.toString());
     }
 
     public static float[] getTomorrowProfile(ResourceLocation biome) {
-        return TOMORROW.get(biome);
+        return TOMORROW.get(biome.toString());
     }
 
-    public static void swapToTomorrow() {
-        TODAY.clear();
-        TODAY.putAll(TOMORROW);
-        TOMORROW.clear();
-    }
 
     public static float getCurrentWindSpeed(ResourceLocation biome, long worldTick) {
         float[] profile = getTodayProfile(biome);
@@ -58,8 +54,8 @@ public class WindProfileManager {
     }
 
     public static void generateTodayAndTomorrowProfiles(ServerLevel world) {
-        for (Map.Entry<ResourceLocation, float[][]> entry : WEEKLY.entrySet()) {
-            ResourceLocation biome = entry.getKey();
+        for (Map.Entry<String, float[][]> entry : WEEKLY.entrySet()) {
+            String biome = entry.getKey();
             float[][] week = entry.getValue();
 
             long day = world.getDayTime() / 24000L;
@@ -75,5 +71,9 @@ public class WindProfileManager {
         WEEKLY.clear();
         TODAY.clear();
         TOMORROW.clear();
+    }
+
+    public static Set<String> getAllBiomeKeys() {
+        return TODAY.keySet();
     }
 }

@@ -38,7 +38,7 @@ public class DebugAtmoCommand {
                         .then(Commands.literal("cpu")
                                 .executes(ctx -> {
                                     int cores = Runtime.getRuntime().availableProcessors();
-                                    boolean forceShared = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get();
+                                    boolean forceShared = /*AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get()*/false;
                                     String mode;
                                     if (forceShared || cores <= 6) {
                                         mode = "Shared Executor (1 thread pool)";

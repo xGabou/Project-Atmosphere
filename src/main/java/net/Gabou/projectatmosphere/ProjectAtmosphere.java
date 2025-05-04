@@ -20,6 +20,7 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -28,26 +29,25 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.bernie.geckolib.GeckoLib;
+import net.Gabou.projectatmosphere.event.*;
 import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 
 @Mod(ProjectAtmosphere.MODID)
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ProjectAtmosphere {
-    private static final int DEFAULT_RADIUS = 250;
+    public static final int DEFAULT_RADIUS = 250;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 
     public ProjectAtmosphere() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        //ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
         GeckoLib.initialize();
-        initModules();
-        MinecraftForge.EVENT_BUS.addListener(this::onServerStarted);
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
-
-
         EntityRegistrar.registerEntities(modEventBus);
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
+        MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
+        MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
     }
 
     @SubscribeEvent
@@ -58,17 +58,10 @@ public class ProjectAtmosphere {
         }
     }
 
-    private void onServerStarted(net.minecraftforge.event.server.ServerStartedEvent event) {
-        ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
-        if (world != null) {
-            AtmosphereManager.onServerStarted(world);
-        }
-    }
 
 
     private void initModules() {
         isSereneLoaded();
-        AsyncAtmosphereService.init();
         AtmosphereManager.init();
         sendInfo();
     }
@@ -82,9 +75,13 @@ public class ProjectAtmosphere {
         }
     }
 
-    private void setup(final FMLCommonSetupEvent event) {
+    private void setup(final FMLCommonSetupEvent  event) {
         LOGGER.info("Setting up Project Atmosphere (Common)");
-    }
+            AsyncAtmosphereService.init();
+            initModules();
+
+        }
+
 
     private void clientSetup(final FMLClientSetupEvent event) {
         LOGGER.info("Setting up Project Atmosphere (Client)");
@@ -92,7 +89,7 @@ public class ProjectAtmosphere {
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-        AtmosphereManager.onRegisterCommands(event);
+       AtmosphereManager.onRegisterCommands(event);
     }
     @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID,bus = Mod.EventBusSubscriber.Bus.MOD,value = Dist.CLIENT)
     public static class ClientModEvents {
@@ -102,6 +99,13 @@ public class ProjectAtmosphere {
 
         }
     }
+    @SubscribeEvent
+    public static void onConfigLoaded(ModConfigEvent event) {
+//        if (event.getConfig().getSpec() == AtmoCommonConfig.COMMON_SPEC) {
+//            ProjectAtmosphere.LOGGER.info("✔ Config loaded!");
+//        }
+    }
+
     private static void sendInfo() {
         LOGGER.info("All modules subsystems have been initialized (Serene Seasons detected).");
     }

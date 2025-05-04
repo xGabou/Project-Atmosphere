@@ -2,12 +2,12 @@ package net.Gabou.projectatmosphere.modules.storm;
 
 import net.Gabou.projectatmosphere.modules.storm.manager.StormManager;
 import net.Gabou.projectatmosphere.modules.storm.util.StormStorageManager;
-import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
@@ -15,42 +15,25 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+
 /**
  * Static utility module for storm management lifecycle.
  */
-@Mod.EventBusSubscriber(modid = "projectatmosphere")
 public class StormModule {
-    private static final int DEFAULT_RADIUS = StormManager.radiusBlocks;
 
-    public static void init(IEventBus modBus) {
-        modBus.addListener(StormModule::onCommonSetup);
-        MinecraftForge.EVENT_BUS.addListener(StormModule::onServerStarted);
-        MinecraftForge.EVENT_BUS.addListener(StormModule::onPlayerJoin);
-        MinecraftForge.EVENT_BUS.addListener(StormModule::onServerStopping);
+
+    public static void init() {
     }
 
-    private static void onCommonSetup(FMLCommonSetupEvent event) {
-        AsyncAtmosphereService.init();
-    }
 
-    private static void onServerStarted(ServerStartedEvent event) {
-        MinecraftServer server = event.getServer();
-        if (server.isDedicatedServer()) return;
-
-        ServerLevel world = server.getLevel(ServerLevel.OVERWORLD);
-        if (world == null) return;
-
+    public static void onServerStarting(ServerLevel world,BlockPos center) {
         StormStorageManager.loadAll(world);
-        BlockPos center = world.getSharedSpawnPos();
-        StormManager.init(world, center, DEFAULT_RADIUS);
+        StormManager.init(world, center);
     }
 
-    private static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent ev) {
-        if (ev.getEntity() instanceof ServerPlayer player
-                && player.level() instanceof ServerLevel lvl) {
-            BlockPos pos = player.blockPosition();
-            StormManager.onPlayerJoined(lvl, pos);
-        }
+    public static void onPlayerJoined(ServerLevel world, BlockPos pos) {
+            StormManager.onPlayerJoined(world, pos);
     }
 
     private static void onServerStopping(ServerStoppingEvent event) {
@@ -60,20 +43,26 @@ public class StormModule {
         }
     }
 
-    // Callable from commands or external systems
-    public static void clearForecastCache() {
-        StormManager.clearForecastCache();
+
+
+    public static void onRegenerate(ServerLevel world) {
+        StormManager.onRegenerate(world,world.players());
     }
 
-    public static void precompute(ServerLevel world) {
-        StormManager.onPrecomputeProfiles(world);
+    public static void onSeasonChange(ServerLevel world) {
+        StormManager.onSeasonChange(world);
     }
 
-    public static void swap(ServerLevel world) {
+    public static void onSwapProfiles(ServerLevel world) {
         StormManager.onSwapProfiles(world);
     }
 
-    public static void regenerate(ServerLevel world) {
-        StormManager.onSeasonChange(world, world.getSharedSpawnPos());
+    public static void onPrecomputeProfiles(ServerLevel world) {
+        StormManager.onPrecomputeProfiles(world);
     }
+
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        StormManager.onRegisterCommands(event);
+    }
+
 }

@@ -2,10 +2,15 @@ package net.Gabou.projectatmosphere.modules.wind.manager;
 
 import net.Gabou.projectatmosphere.modules.wind.forecast.WindForecast;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
+import net.Gabou.projectatmosphere.modules.wind.util.WindStorageManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.event.RegisterCommandsEvent;
 
+import java.util.List;
 import java.util.Map;
 
 public class WindManager {
@@ -42,12 +47,28 @@ public class WindManager {
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        WindProfileManager.swapToTomorrow();
+        for (String key : WindProfileManager.getAllBiomeKeys()) {
+            ResourceLocation biome = new ResourceLocation(key);
+            float[] tomorrow = WindProfileManager.getTomorrowProfile(biome);
+            if (tomorrow != null) {
+                WindProfileManager.putDayProfile(biome, tomorrow);
+            }
+        }
         WindProfileManager.generateTodayAndTomorrowProfiles(world);
     }
 
-    public static void clearForecastCache(ServerLevel world, BlockPos center) {
+
+    public static void onSeasonChange(ServerLevel world) {
+        onRegenerate(world, world.players());
+    }
+
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+
+    }
+
+    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
         WindProfileManager.clearAll();
-        init(world, center);
+        init(world, world.getSharedSpawnPos());
+
     }
 }

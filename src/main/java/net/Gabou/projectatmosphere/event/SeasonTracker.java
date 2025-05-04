@@ -1,5 +1,6 @@
-package net.Gabou.projectatmosphere.modules.temperature.event;
+package net.Gabou.projectatmosphere.event;
 
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -26,7 +27,7 @@ public class SeasonTracker {
             if (lastSeason != null && current != lastSeason) {
                 // Season changed
 
-                    TemperatureManager.onSeasonChange(world);
+                    AtmosphereManager.onSeasonChange(world);
 
             }
             lastSeason = current;

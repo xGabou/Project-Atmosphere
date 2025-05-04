@@ -2,28 +2,23 @@ package net.Gabou.projectatmosphere.manager;
 
 
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
-import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
+import net.Gabou.projectatmosphere.event.TemperatureTickHandler;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityModule;
-import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.pressure.PressureModule;
-import net.Gabou.projectatmosphere.modules.pressure.manager.PressureManager;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
+import net.Gabou.projectatmosphere.modules.storm.StormModule;
 import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.WindModule;
-import net.Gabou.projectatmosphere.modules.wind.manager.WindManager;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.RegisterCommandsEvent;
-
 import java.util.HashMap;
 import java.util.Map;
-
 public class AtmosphereManager {
 
     /** Master map that holds forecast data for each biome */
@@ -31,12 +26,12 @@ public class AtmosphereManager {
 
     public static void onServerStarting(ServerLevel world) {
         BlockPos center = world.getSharedSpawnPos();
-
-        TemperatureModule.onServerStarting(world);
+        TemperatureModule.onServerStarting(world,center);
         HumidityModule.onServerStarting(world, center);
         PressureModule.onServerStarting(world, center);
         WindModule.onServerStarting(world, center);
-        refreshUnifiedForecast(world);
+        StormModule.onServerStarting(world,center);
+        refreshUnifiedForecast();
     }
 
     public static void onRegisterCommands(final RegisterCommandsEvent event)
@@ -44,48 +39,57 @@ public class AtmosphereManager {
         // Register commands here
         TemperatureModule.onRegisterCommands(event);
         HumidityModule.onRegisterCommands(event);
-        SpawnCloudCommand.register(event.getDispatcher());
+        PressureModule.onRegisterCommands(event);
+        WindModule.onRegisterCommands(event);
+        StormModule.onRegisterCommands(event);
         DebugAtmoCommand.register(event.getDispatcher());
-    }
-    public static void onServerStarted(ServerLevel world) {
-        TemperatureModule.onServerStarted(world);
-        HumidityModule.onServerStarted(world);
-        PressureModule.onServerStarted(world);
-        WindModule.onServerStarted(world);
-        refreshUnifiedForecast(world);
     }
 
     public static void onPlayerJoined(ServerLevel world, ServerPlayer player) {
         BlockPos pos = player.blockPosition();
-
-        TemperatureManager.onPlayerJoined(world, pos);
-        HumidityManager.onPlayerJoined(world, pos);
-        PressureManager.onPlayerJoined(world, pos);
-        WindManager.onPlayerJoined(world, pos);
-        refreshUnifiedForecast(world);
+        TemperatureModule.onPlayerJoined(world, pos);
+        HumidityModule.onPlayerJoined(world, pos);
+        PressureModule.onPlayerJoined(world, pos);
+        WindModule.onPlayerJoined(world, pos);
+        StormModule.onPlayerJoined(world, pos);
+        refreshUnifiedForecast();
     }
 
     public static void onPrecomputeProfiles(ServerLevel world) {
-        TemperatureManager.onPrecomputeProfiles(world);
-        PressureManager.onPrecomputeProfiles(world);
-        HumidityManager.onPrecomputeProfiles(world);
-        WindManager.onPrecomputeProfiles(world);
+        TemperatureModule.onPrecomputeProfiles(world);
+        PressureModule.onPrecomputeProfiles(world);
+        HumidityModule.onPrecomputeProfiles(world);
+        WindModule.onPrecomputeProfiles(world);
+        StormModule.onPrecomputeProfiles(world);
+        refreshUnifiedForecast();
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        TemperatureManager.onSwapProfiles(world);
-        PressureManager.onSwapProfiles(world);
-        HumidityManager.onSwapProfiles(world);
-        WindManager.onSwapProfiles(world);
-        refreshUnifiedForecast(world);
+        TemperatureModule.onSwapProfiles(world);
+        PressureModule.onSwapProfiles(world);
+        HumidityModule.onSwapProfiles(world);
+        WindModule.onSwapProfiles(world);
+        StormModule.onSwapProfiles(world);
+        refreshUnifiedForecast();
+    }
+    public static void onRegenerate(ServerLevel world) {
+        TemperatureModule.onRegenerate(world);
+        PressureModule.onRegenerate(world);
+        HumidityModule.onRegenerate(world);
+        WindModule.onRegenerate(world);
+        StormModule.onRegenerate(world);
+        refreshUnifiedForecast();
     }
 
     public static void onSeasonChange(ServerLevel world) {
-        TemperatureManager.onSeasonChange(world);  // Only temperature responds to season
-        refreshUnifiedForecast(world);
+        TemperatureModule.onSeasonChange(world);  // Only temperature responds to season
+        PressureModule.onSeasonChange(world);
+        WindModule.onSeasonChange(world);
+        StormModule.onSeasonChange(world);
+        refreshUnifiedForecast();
     }
 
-    public static void refreshUnifiedForecast(ServerLevel world) {
+    public static void refreshUnifiedForecast() {
         FORECAST_MAP.clear();
         for (String biome : TemperatureProfileManager.getAllBiomeKeys()) {
             float[] temp = TemperatureProfileManager.getDayProfile(ResourceLocation.parse(biome));
@@ -119,6 +123,7 @@ public class AtmosphereManager {
         PressureModule.init();
         HumidityModule.init();
         WindModule.init();
+        StormModule.init();
     }
 
     /** Central record to unify today's weather-like forecast */

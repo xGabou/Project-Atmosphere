@@ -1,7 +1,8 @@
-package net.Gabou.projectatmosphere.modules.temperature.event;
+package net.Gabou.projectatmosphere.event;
 
 
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -15,9 +16,9 @@ public class TemperatureTickHandler {
         long t = event.level.getDayTime() % 24000L;
 
         if (t == 18000L) {
-            TemperatureManager.onPrecomputeProfiles(event.level);
+            AtmosphereManager.onPrecomputeProfiles((ServerLevel) event.level);
         } else if (t == 21000L) {
-            TemperatureManager.onSwapProfiles(event.level);
+            AtmosphereManager.onSwapProfiles((ServerLevel) event.level);
         }
     }
 }

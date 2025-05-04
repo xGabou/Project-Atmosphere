@@ -2,6 +2,9 @@ package net.Gabou.projectatmosphere.modules.temperature.manager;
 
 
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.modules.storm.manager.StormManager;
+import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
 import net.Gabou.projectatmosphere.modules.temperature.core.TemperatureProvider;
 import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
 import net.Gabou.projectatmosphere.modules.temperature.util.DailyProfileGenerator;
@@ -12,16 +15,20 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.network.chat.Component;
+import net.minecraftforge.event.RegisterCommandsEvent;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 
 public class TemperatureManager{
 
 
-    private static final int DEFAULT_RADIUS = 250;
     private static BlockPos lastCenter = BlockPos.ZERO;
 
     /** Called once on server startup to generate initial forecast around spawn. */
@@ -99,11 +106,21 @@ public class TemperatureManager{
 
     public static void onSeasonChange(ServerLevel world) {
         //TODO make sure we dont stack forecasts
-        for (ServerPlayer player : world.getServer().getPlayerList().getPlayers()) {
-            onPlayerJoined(world, player.blockPosition());
-        }
+        onRegenerate(world, world.players());
     }
 
 
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        TemperatureCommands.register(event.getDispatcher());
+    }
 
+    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
+        clearForecastCache(world);
+        init(world, world.getSharedSpawnPos());
+        for (Player player : players) {
+            BlockPos pos = player.blockPosition();
+            onPlayerJoined(world, pos);
+        }
+
+    }
 }

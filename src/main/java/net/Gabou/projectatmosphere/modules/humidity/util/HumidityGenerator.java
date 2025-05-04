@@ -14,7 +14,7 @@ public class HumidityGenerator {
     private static final double variationVap = 17.27f; //Constante de variation de vapeur (sans unités)
     private static final float celciusToKelvin = 273.3f; //Passer de celcius en Kelvin (°C)
 
-    private static final float boostMc = 10f;
+    private static final float boostMc = 50f;
 
     public static float[][] generateWeekForecast(Level world, BlockPos samplePos, ResourceLocation biomeId) {
         Biome biome = world.getBiome(samplePos).get();

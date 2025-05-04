@@ -17,15 +17,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static net.Gabou.projectatmosphere.util.AtmosphereUtils.getPerWorldSavePath;
+
 public class HumidityStorageManager  {
     private static final Gson GSON = new Gson();
     private static final Map<String, float[][]> cache = new ConcurrentHashMap<>();
+    public static final String FILE_NAME = "humidity_forecasts.json";
 
     /**
      * Load all saved weekly forecasts from disk into the in-memory cache.
      */
     public static void loadAll(ServerLevel world) {
-        Path savePath = AtmosphereUtils.getPerWorldSavePath(world, "humidity_forecasts.json");
+        Path savePath = AtmosphereUtils.getPerWorldSavePath(world, FILE_NAME);
         if (!Files.exists(savePath)) return;
 
         try (Reader reader = Files.newBufferedReader(savePath)) {
@@ -50,8 +53,10 @@ public class HumidityStorageManager  {
      * Save or update the weekly forecast for a single biome, persisting immediately.
      */
     public static void saveForecast(ServerLevel world, ResourceLocation biome, float[][] week) {
-        cache.put(biome.toString(), week);
         saveAll(world);
+    }
+    public static void putForecast(ResourceLocation biome, float[][] week) {
+        cache.put(biome.toString(), week);
     }
 
     public static boolean hasForecast(ResourceLocation biome) {
@@ -66,15 +71,21 @@ public class HumidityStorageManager  {
         return cache.keySet();
     }
 
-    public static void clearCache() {
+    public static void clearCache(ServerLevel world) {
         cache.clear();
+        //samplePositions.clear();
+        try {
+            Files.deleteIfExists(getPerWorldSavePath(world, FILE_NAME));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
      * Write the entire cache out to disk as JSON.
      */
     public static void saveAll(ServerLevel world) {
-        Path savePath = AtmosphereUtils.getPerWorldSavePath(world, "humidity_forecasts.json");
+        Path savePath = AtmosphereUtils.getPerWorldSavePath(world, FILE_NAME);
         JsonObject root = new JsonObject();
 
         for (var e : cache.entrySet()) {

@@ -19,12 +19,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static net.Gabou.projectatmosphere.util.AtmosphereUtils.getPerWorldSavePath;
+
 public class StormStorageManager {
     private static final Gson GSON = new Gson();
     private static final Map<String, double[]> cache = new ConcurrentHashMap<>();
+    public static final String FILE_NAME = "storm_forecasts.json";
 
     public static void loadAll(ServerLevel world) {
-        Path path = AtmosphereUtils.getPerWorldSavePath(world, "storm_forecasts.json");
+        Path path = AtmosphereUtils.getPerWorldSavePath(world, FILE_NAME);
         if (!Files.exists(path)) return;
         try (Reader reader = Files.newBufferedReader(path)) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
@@ -57,8 +60,13 @@ public class StormStorageManager {
         return cache.keySet();
     }
 
-    public static void clearCache() {
+    public static void clearCache(ServerLevel world) {
         cache.clear();
+        try {
+            Files.deleteIfExists(getPerWorldSavePath(world, FILE_NAME));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void saveSamplePosition(ResourceLocation biome, BlockPos pos) {
@@ -66,7 +74,7 @@ public class StormStorageManager {
     }
 
     public static void saveAll(ServerLevel world) {
-        Path path = AtmosphereUtils.getPerWorldSavePath(world, "storm_forecasts.json");
+        Path path = AtmosphereUtils.getPerWorldSavePath(world, FILE_NAME);
         JsonObject root = new JsonObject();
         for (var entry : cache.entrySet()) {
             JsonArray arr = new JsonArray();

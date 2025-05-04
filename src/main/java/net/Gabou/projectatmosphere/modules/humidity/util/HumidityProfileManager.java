@@ -42,20 +42,14 @@ public class HumidityProfileManager {
         return TOMORROW.get(id.toString());
     }
 
-    public static void swapTomorrowToToday() {
-        for (String key : WEEKLY.keySet()) {
-            float[] tom = TOMORROW.remove(key);
-            if (tom != null) DAILY.put(key, tom);
-        }
-    }
 
     public static float getCurrentHumidity(ResourceLocation biome, long tick) {
-        float[] day = DAILY.get(biome.toString());
+        float[] day = getDayProfile(biome);
         if (day != null) {
             int idx = (int)((tick % 24000L) / 100);
             return day[idx];
         }
-        float[][] week = WEEKLY.get(biome.toString());
+        float[][] week = getWeeklyForecast( biome);
         if (week != null) {
             int dayIndex = (int)((tick / 24000L) % 7);
             return week[dayIndex][1]; // midday fallback

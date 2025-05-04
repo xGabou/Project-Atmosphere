@@ -1,6 +1,7 @@
 // net/Gabou/projectatmosphere/humidity/manager/HumidityManager.java
 package net.Gabou.projectatmosphere.modules.humidity.manager;
 
+import net.Gabou.projectatmosphere.modules.humidity.Command.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.humidity.forecast.HumidityForecast;
 import net.Gabou.projectatmosphere.modules.humidity.util.DailyHumidityGenerator;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
@@ -8,8 +9,12 @@ import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.event.RegisterCommandsEvent;
 
+import java.util.List;
 import java.util.Map;
 
 public class HumidityManager {
@@ -60,15 +65,41 @@ public class HumidityManager {
     }
 
     /** Clears all cached humidity data and regenerates around center. */
-    public static void clearForecastCache(ServerLevel world, BlockPos center) {
-        HumidityStorageManager.clearCache();
+    public static void clearForecastCache(ServerLevel world) {
+        HumidityStorageManager.clearCache(world);
         HumidityProfileManager.clearAll();
-        init(world, center);
     }
 
     /** Swap tomorrow→today profiles at day boundary. */
     public static void onSwapProfiles(ServerLevel world) {
-        HumidityProfileManager.swapTomorrowToToday();
+        for (String key : HumidityProfileManager.getAllBiomeKeys()) {
+            ResourceLocation biome = new ResourceLocation(key);
+            float[] tomorrow = HumidityProfileManager.getTomorrowProfile(biome);
+            if (tomorrow != null) {
+                HumidityProfileManager.putDayProfile(biome, tomorrow);
+            }
+        }
+
+
         DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
+
+    public static void onSeasonChange(ServerLevel world) {
+    }
+
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        HumidityCommand.register(event.getDispatcher());
+    }
+
+    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
+
+            clearForecastCache(world);
+            init(world, world.getSharedSpawnPos());
+            for (Player player : players) {
+                BlockPos pos = player.blockPosition();
+                HumidityManager.onPlayerJoined(world, pos);
+            }
+
+        }
+
 }

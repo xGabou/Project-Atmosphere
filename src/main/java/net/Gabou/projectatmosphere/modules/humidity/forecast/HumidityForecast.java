@@ -38,7 +38,7 @@ public class HumidityForecast {
                 week = HumidityStorageManager.getForecast(biome);
             } else {
                 week = HumidityGenerator.generateWeekForecast(world, pos, biome);
-                HumidityStorageManager.saveForecast(world,biome, week);
+                HumidityStorageManager.putForecast(biome, week);
             }
             forecasts.put(biome, week);
         }
