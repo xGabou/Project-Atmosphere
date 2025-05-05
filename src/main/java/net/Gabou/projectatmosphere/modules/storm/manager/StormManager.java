@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.modules.storm.spike.StormSpikeManager;
 import net.Gabou.projectatmosphere.modules.storm.util.DailyStormGenerator;
 import net.Gabou.projectatmosphere.modules.storm.util.StormProfileManager;
 import net.Gabou.projectatmosphere.modules.storm.util.StormStorageManager;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -25,26 +26,29 @@ public class StormManager {
     private static BlockPos lastCenter;
 
     public static void init(ServerLevel world, BlockPos center) {
-        lastCenter = center;
+        AsyncAtmosphereService.runStorm(() -> {
+            lastCenter = center;
 
-        Map<ResourceLocation, double[]> forecasts =
-                StormForecast.generateStormForecastAround(world, lastCenter, DEFAULT_RADIUS);
+            Map<ResourceLocation, double[]> forecasts =
+                    StormForecast.generateStormForecastAround(world, lastCenter, DEFAULT_RADIUS);
 
-        if (forecasts.isEmpty()) {
-            Objects.requireNonNull(world.getServer())
-                    .sendSystemMessage(Component.literal(
-                            "WARNING: No biomes found for storm forecasting around " + center
-                    ));
-            return;
-        }
-
-        forecasts.forEach((biome, week) -> {
-            if (!StormProfileManager.hasWeeklyForecast(biome)) {
-                StormProfileManager.putWeeklyForecast(biome, week);
+            if (forecasts.isEmpty()) {
+                Objects.requireNonNull(world.getServer())
+                        .sendSystemMessage(Component.literal(
+                                "WARNING: No biomes found for storm forecasting around " + center
+                        ));
+                return;
             }
+
+            forecasts.forEach((biome, week) -> {
+                if (!StormProfileManager.hasWeeklyForecast(biome)) {
+                    StormProfileManager.putWeeklyForecast(biome, week);
+                }
+            });
+
+            DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
         });
 
-        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     public static void onPlayerJoined(ServerLevel world, BlockPos center) {
@@ -60,10 +64,12 @@ public class StormManager {
     }
 
     public static void onPrecomputeProfiles(Level world) {
-        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
+        AsyncAtmosphereService.runStorm(() ->
+        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world));
     }
 
     public static void onSwapProfiles(Level world) {
+        AsyncAtmosphereService.runStorm(() -> {
         for (String key : StormProfileManager.getAllBiomeKeys()) {
             ResourceLocation biome = new ResourceLocation(key);
             double[] tom = StormProfileManager.getTomorrowProfile(biome);
@@ -71,14 +77,14 @@ public class StormManager {
                 StormProfileManager.putDayProfile(biome, tom);
             }
         }
-        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
+        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);});
     }
 
     public static void onSeasonChange(ServerLevel world) {
         onRegenerate(world, world.players());
     }
 
-    public static double randomStormSpike(ResourceLocation biome, int d) {
+    public static float randomStormSpike(ResourceLocation biome, int d) {
         return StormSpikeManager.randomStormSpike(biome, d);
     }
 

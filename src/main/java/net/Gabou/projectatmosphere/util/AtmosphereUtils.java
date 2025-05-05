@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.util;
 
+import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -68,5 +69,19 @@ public class AtmosphereUtils {
         Set<ResourceLocation> foundBiomes = new java.util.HashSet<>();
         findBiomes(world, center, radiusBlocks, foundBiomes, biomeSamples);
         return biomeSamples;
+    }
+    public static JsonObject serializeBlockPos(BlockPos pos) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("x", pos.getX());
+        obj.addProperty("y", pos.getY());
+        obj.addProperty("z", pos.getZ());
+        return obj;
+    }
+
+    public static BlockPos deserializeBlockPos(JsonObject obj) {
+        int x = obj.get("x").getAsInt();
+        int y = obj.get("y").getAsInt();
+        int z = obj.get("z").getAsInt();
+        return new BlockPos(x, y, z);
     }
 }

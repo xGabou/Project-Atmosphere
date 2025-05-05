@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.pressure.util;
 
-import net.minecraft.resources.ResourceLocation;
+import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast.BiomeInstanceKey;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -8,46 +8,64 @@ import java.util.Set;
 
 public class PressureProfileManager {
 
-    private static final Map<String, float[][]> WEEKLY_FORECASTS = new HashMap<>();
-    private static final Map<String, float[]> TODAY_PROFILE = new HashMap<>();
-    private static final Map<String, float[]> TOMORROW_PROFILE = new HashMap<>();
+    private static final Map<BiomeInstanceKey, float[][]> WEEKLY = new HashMap<>();
+    private static final Map<BiomeInstanceKey, float[]> TODAY = new HashMap<>();
+    private static final Map<BiomeInstanceKey, float[]> TOMORROW = new HashMap<>();
 
-    public static void putWeeklyForecast(ResourceLocation biome, float[][] week) {
-        WEEKLY_FORECASTS.put(biome.toString(), week);
+    public static void putWeeklyForecast(BiomeInstanceKey key, float[][] week) {
+        WEEKLY.put(key, week);
     }
 
-    public static float[][] getWeeklyForecast(ResourceLocation biome) {
-        return WEEKLY_FORECASTS.getOrDefault(biome.toString(), new float[7][2]);
+    public static float[][] getWeeklyForecast(BiomeInstanceKey key) {
+        return WEEKLY.get(key);
     }
 
-    public static void putDayProfile(ResourceLocation biome, float[] profile) {
-        TODAY_PROFILE.put(biome.toString(), profile);
+    public static void removeWeeklyForecast(BiomeInstanceKey key) {
+        WEEKLY.remove(key);
     }
 
-    public static void putTomorrowProfile(ResourceLocation biome, float[] profile) {
-        TOMORROW_PROFILE.put(biome.toString(), profile);
+    public static void putDayProfile(BiomeInstanceKey key, float[] curve) {
+        TODAY.put(key, curve);
     }
 
-    public static float[] getTodayProfile(ResourceLocation biome) {
-        return TODAY_PROFILE.get(biome.toString());
+    public static float[] getTodayProfile(BiomeInstanceKey key) {
+        return TODAY.get(key);
     }
 
-    public static float[] getTomorrowProfile(ResourceLocation biome) {
-        return TOMORROW_PROFILE.get(biome.toString());
+    public static void removeDayProfile(BiomeInstanceKey key) {
+        TODAY.remove(key);
     }
 
+    public static void putTomorrowProfile(BiomeInstanceKey key, float[] curve) {
+        TOMORROW.put(key, curve);
+    }
 
-    public static boolean hasWeeklyForecast(ResourceLocation biome) {
-        return WEEKLY_FORECASTS.containsKey(biome.toString());
+    public static float[] getTomorrowProfile(BiomeInstanceKey key) {
+        return TOMORROW.get(key);
+    }
+
+    public static void removeTomorrowProfile(BiomeInstanceKey key) {
+        TOMORROW.remove(key);
+    }
+
+    public static boolean hasWeeklyForecast(BiomeInstanceKey key) {
+        return WEEKLY.containsKey(key);
+    }
+
+    public static Set<BiomeInstanceKey> getAllBiomeKeys() {
+        return WEEKLY.keySet();
+    }
+
+    public static void swapTomorrowToToday() {
+        for (BiomeInstanceKey key : WEEKLY.keySet()) {
+            float[] tom = TOMORROW.remove(key);
+            if (tom != null) TODAY.put(key, tom);
+        }
     }
 
     public static void clearAll() {
-        WEEKLY_FORECASTS.clear();
-        TODAY_PROFILE.clear();
-        TOMORROW_PROFILE.clear();
-    }
-
-    public static Set<String> getAllBiomeKeys() {
-        return TODAY_PROFILE.keySet();
+        WEEKLY.clear();
+        TODAY.clear();
+        TOMORROW.clear();
     }
 }

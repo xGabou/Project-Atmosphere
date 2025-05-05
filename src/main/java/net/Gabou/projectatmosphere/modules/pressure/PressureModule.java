@@ -29,7 +29,7 @@ public class PressureModule {
     public static void onServerStopping(ServerLevel event) {
         ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
         if (world != null) {
-            PressureStorageManager.saveAll(world);
+            PressureManager.onServerStopping(world);
         }
     }
 
@@ -57,5 +57,13 @@ public class PressureModule {
 
     public static void onSeasonChange(ServerLevel world) {
         PressureManager.onSeasonChange(world);
+    }
+
+    public static void tick(ServerLevel level) {
+        PressureManager.tickSystem( level);
+    }
+
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        PressureManager.updateForecastAround(world, center);
     }
 }

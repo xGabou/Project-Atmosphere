@@ -8,7 +8,6 @@ import net.minecraft.world.level.Level;
 public class DailyHumidityGenerator {
 
     public static void scheduleGenerationForTodayAndTomorrow(Level world) {
-        AsyncAtmosphereService.runHumidity(() -> {
             long now = world.getDayTime();
             int todayIndex = (int)((now / 24000L) % 7);
 
@@ -30,20 +29,28 @@ public class DailyHumidityGenerator {
                     HumidityProfileManager.putTomorrowProfile(biome, tomorrow);
                 }
             }
-        });
     }
 
     private static float[] buildDailyCurve(float[] minMax) {
-        // simple cosine‐based interpolation between minMax[0]→minMax[1]
         float min = minMax[0];
         float max = minMax[1];
         float[] curve = new float[240];
+
         for (int i = 0; i < 240; i++) {
-            // map i∈[0,239] to θ∈[0,π]
-            float θ = ((i / 239f) * (float)Math.PI);
-            float factor = (1 - (float)Math.cos(θ)) * 0.5f;
-            curve[i] = min + (max - min) * factor;
+            float t = i / 239f;
+            float factor;
+
+            if (t < 0.25f) {
+                factor = 1f - (float) Math.pow(t * 4f, 0.8); // steep morning drop
+            } else if (t < 0.75f) {
+                factor = 0.1f + 0.9f * (1f - (float) Math.sin(Math.PI * (t - 0.25f) / 0.5f)); // midday dry
+            } else {
+                factor = 0.1f + (float) Math.pow((t - 0.75f) * 4f, 0.8); // evening rise
+            }
+
+            curve[i] = min + (max - min) * (1f - factor);
         }
+
         return curve;
     }
 }

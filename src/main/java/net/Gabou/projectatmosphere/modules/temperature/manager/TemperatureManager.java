@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForec
 import net.Gabou.projectatmosphere.modules.temperature.util.DailyProfileGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -48,28 +49,31 @@ public class TemperatureManager{
      * If biomes near position have not been cached, they will be generated and persisted.
      */
     private static void init(ServerLevel world, BlockPos center) {
-        lastCenter = center;
+        AsyncAtmosphereService.runTemperature(() -> {
+            lastCenter = center;
 
-        Map<ResourceLocation, float[][]> forecasts =
-                TemperatureForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
+            Map<ResourceLocation, float[][]> forecasts =
+                    TemperatureForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
 
-        if (forecasts.isEmpty()) {
-            world.getServer().sendSystemMessage(Component.literal("""
+            if (forecasts.isEmpty()) {
+                world.getServer().sendSystemMessage(Component.literal("""
                 ⚠️ CRITICAL ERROR: No biomes found in the area!
                 Use /temperature regenerate to force a new forecast.
                 Or make sure you're in the Overworld.
             """));
-            return;
-        }
-
-        // Only store new forecasts that are not already present
-        forecasts.forEach((biome, week) -> {
-            if (!TemperatureProfileManager.hasWeeklyForecast(biome)) {
-                TemperatureProfileManager.putWeeklyForecast(biome, week);
+                return;
             }
+
+            // Only store new forecasts that are not already present
+            forecasts.forEach((biome, week) -> {
+                if (!TemperatureProfileManager.hasWeeklyForecast(biome)) {
+                    TemperatureProfileManager.putWeeklyForecast(biome, week);
+                }
+            });
+
+            DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
         });
 
-        DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     /** Clears the cached temperature profiles (weekly + daily). */
@@ -90,6 +94,7 @@ public class TemperatureManager{
     }
 
     public static void onSwapProfiles(Level world) {
+        AsyncAtmosphereService.runTemperature(() -> {
         for (String key : TemperatureProfileManager.getAllBiomeKeys()) {
             ResourceLocation biome = new ResourceLocation(key);
             float[] tomorrow = TemperatureProfileManager.getTomorrowProfile(biome);
@@ -98,10 +103,12 @@ public class TemperatureManager{
             }
         }
         DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
+        });
     }
 
     public static void onPrecomputeProfiles(Level world) {
-        DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
+        AsyncAtmosphereService.runTemperature(() ->DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world));
+
     }
 
     public static void onSeasonChange(ServerLevel world) {
@@ -122,5 +129,9 @@ public class TemperatureManager{
             onPlayerJoined(world, pos);
         }
 
+    }
+
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        init(world, center);
     }
 }

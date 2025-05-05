@@ -39,8 +39,8 @@ public class StormSpikeManager {
     }
 
     /** Returns a pseudo-random ±hPa spike for this biome/day. */
-    public static double randomStormSpike(ResourceLocation biome, int day) {
+    public static float randomStormSpike(ResourceLocation biome, int day) {
         // TODO: tie into your storm logic
-        return (Math.random() - 0.5) * 20.0;
+        return (float) ((Math.random() - 0.5f) * 20.0f);
     }
 }

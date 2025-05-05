@@ -65,4 +65,7 @@ public class StormModule {
         StormManager.onRegisterCommands(event);
     }
 
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+
+    }
 }

@@ -58,4 +58,8 @@ public class HumidityModule {
     public static void onRegenerate(ServerLevel world) {
         HumidityManager.onRegenerate(world, world.players());
     }
+
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        HumidityManager.updateForecastAround(world, center);
+    }
 }

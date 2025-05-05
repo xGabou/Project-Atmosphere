@@ -44,4 +44,8 @@ public class WindModule {
     public static void onRegenerate(ServerLevel world) {
         WindManager.onRegenerate(world, world.players());
     }
+
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+
+    }
 }

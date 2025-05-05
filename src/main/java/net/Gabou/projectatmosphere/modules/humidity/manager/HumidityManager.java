@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.modules.humidity.forecast.HumidityForecast;
 import net.Gabou.projectatmosphere.modules.humidity.util.DailyHumidityGenerator;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -22,26 +23,30 @@ public class HumidityManager {
 
     /** Called on server spawn or when regenerating around a player. */
     public static void init(ServerLevel world, BlockPos center) {
-        // 1) generate or load weekly forecasts
-        Map<ResourceLocation, float[][]> forecasts =
-                HumidityForecast.generateForecastAround(world, center, RADIUS);
+        AsyncAtmosphereService.runHumidity(() -> {
 
-        // 2) cache into profiles
-        forecasts.forEach((biome, week) -> {
-            if (!HumidityProfileManager.hasWeeklyForecast(biome)) {
-                HumidityProfileManager.putWeeklyForecast(biome, week);
-            }
+            // 2) generate or load weekly forecasts
+            Map<ResourceLocation, float[][]> forecasts =
+                    HumidityForecast.generateForecastAround(world, center, RADIUS);
+
+            // 3) cache into profiles
+            forecasts.forEach((biome, week) -> {
+                if (!HumidityProfileManager.hasWeeklyForecast(biome)) {
+                    HumidityProfileManager.putWeeklyForecast(biome, week);
+                }
+            });
+
+            // 4) schedule daily curve generation
+            DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
         });
-
-        // 3) schedule daily curve generation
-        DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     public static void onPlayerJoined(ServerLevel world, BlockPos center) {
         init(world, center);
     }
     public static void onPrecomputeProfiles(ServerLevel world) {
-        DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
+        AsyncAtmosphereService.runHumidity(() -> DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world));
+
     }
     public static float getAverageHumidity(ResourceLocation biome, int dayIndex) {
         float[][] forecast = getWeeklyForecast(biome);
@@ -72,6 +77,8 @@ public class HumidityManager {
 
     /** Swap tomorrow→today profiles at day boundary. */
     public static void onSwapProfiles(ServerLevel world) {
+
+        AsyncAtmosphereService.runHumidity(() -> {
         for (String key : HumidityProfileManager.getAllBiomeKeys()) {
             ResourceLocation biome = new ResourceLocation(key);
             float[] tomorrow = HumidityProfileManager.getTomorrowProfile(biome);
@@ -82,6 +89,7 @@ public class HumidityManager {
 
 
         DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
+        });
     }
 
     public static void onSeasonChange(ServerLevel world) {
@@ -102,4 +110,5 @@ public class HumidityManager {
 
         }
 
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {init(world, center);}
 }

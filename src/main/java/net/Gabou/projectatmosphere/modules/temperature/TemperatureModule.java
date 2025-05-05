@@ -66,4 +66,8 @@ public class TemperatureModule {
     public static void onRegenerate(ServerLevel world) {
         TemperatureManager.onRegenerate(world,world.players());
     }
+
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        TemperatureManager.updateForecastAround(world, center);
+    }
 }

@@ -6,6 +6,8 @@ import net.Gabou.projectatmosphere.event.TemperatureTickHandler;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityModule;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.pressure.PressureModule;
+
+import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
 import net.Gabou.projectatmosphere.modules.storm.StormModule;
 import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
@@ -33,6 +35,13 @@ public class AtmosphereManager {
         StormModule.onServerStarting(world,center);
         refreshUnifiedForecast();
     }
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        TemperatureModule.updateForecastAround(world, center);
+        HumidityModule.updateForecastAround(world, center);
+        PressureModule.updateForecastAround(world, center);
+        WindModule.updateForecastAround(world, center);
+        StormModule.updateForecastAround(world,center);
+    }
 
     public static void onRegisterCommands(final RegisterCommandsEvent event)
     {
@@ -57,8 +66,8 @@ public class AtmosphereManager {
 
     public static void onPrecomputeProfiles(ServerLevel world) {
         TemperatureModule.onPrecomputeProfiles(world);
-        PressureModule.onPrecomputeProfiles(world);
         HumidityModule.onPrecomputeProfiles(world);
+        PressureModule.onPrecomputeProfiles(world);
         WindModule.onPrecomputeProfiles(world);
         StormModule.onPrecomputeProfiles(world);
         refreshUnifiedForecast();
@@ -66,16 +75,16 @@ public class AtmosphereManager {
 
     public static void onSwapProfiles(ServerLevel world) {
         TemperatureModule.onSwapProfiles(world);
-        PressureModule.onSwapProfiles(world);
         HumidityModule.onSwapProfiles(world);
+        PressureModule.onSwapProfiles(world);
         WindModule.onSwapProfiles(world);
         StormModule.onSwapProfiles(world);
         refreshUnifiedForecast();
     }
     public static void onRegenerate(ServerLevel world) {
         TemperatureModule.onRegenerate(world);
-        PressureModule.onRegenerate(world);
         HumidityModule.onRegenerate(world);
+        PressureModule.onRegenerate(world);
         WindModule.onRegenerate(world);
         StormModule.onRegenerate(world);
         refreshUnifiedForecast();
@@ -83,6 +92,7 @@ public class AtmosphereManager {
 
     public static void onSeasonChange(ServerLevel world) {
         TemperatureModule.onSeasonChange(world);  // Only temperature responds to season
+        HumidityModule.onSeasonChange(world);
         PressureModule.onSeasonChange(world);
         WindModule.onSeasonChange(world);
         StormModule.onSeasonChange(world);
@@ -91,16 +101,17 @@ public class AtmosphereManager {
 
     public static void refreshUnifiedForecast() {
         FORECAST_MAP.clear();
-        for (String biome : TemperatureProfileManager.getAllBiomeKeys()) {
-            float[] temp = TemperatureProfileManager.getDayProfile(ResourceLocation.parse(biome));
-            float[] pressure = PressureProfileManager.getTodayProfile(ResourceLocation.parse(biome));
-            float[] humidity = HumidityProfileManager.getDayProfile(ResourceLocation.parse(biome));
-            float[] wind = WindProfileManager.getTodayProfile(ResourceLocation.parse(biome));
 
-            FORECAST_MAP.put(ResourceLocation.parse(biome), new BiomeForecast(temp, pressure, humidity, wind));
+        for (PressureForecast.BiomeInstanceKey key : PressureProfileManager.getAllBiomeKeys()) {
+            float[] temp = TemperatureProfileManager.getDayProfile(key.biomeType());
+            float[] pressure = PressureProfileManager.getTodayProfile(key);
+            float[] humidity = HumidityProfileManager.getDayProfile(key.biomeType());
+            float[] wind = WindProfileManager.getTodayProfile(key.biomeType());
 
+            FORECAST_MAP.put(key.biomeType(), new BiomeForecast(temp, pressure, humidity, wind));
         }
     }
+
 
     public static BiomeForecast getForecast(ResourceLocation biome) {
         return FORECAST_MAP.get(biome);
@@ -120,11 +131,16 @@ public class AtmosphereManager {
 
     public static void init() {
         TemperatureModule.init();
-        PressureModule.init();
         HumidityModule.init();
+        PressureModule.init();
         WindModule.init();
         StormModule.init();
     }
+
+    public static void tick(ServerLevel level) {
+        PressureModule.tick(level);
+    }
+
 
     /** Central record to unify today's weather-like forecast */
     public static record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, float[] wind) {}

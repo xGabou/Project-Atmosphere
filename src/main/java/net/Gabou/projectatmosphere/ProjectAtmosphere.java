@@ -9,10 +9,12 @@ import net.Gabou.projectatmosphere.registry.EntityRegistrar;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -35,7 +37,7 @@ import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 @Mod(ProjectAtmosphere.MODID)
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ProjectAtmosphere {
-    public static final int DEFAULT_RADIUS = 250;
+    public static final int DEFAULT_RADIUS = 500;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 
@@ -48,6 +50,8 @@ public class ProjectAtmosphere {
         modEventBus.addListener(this::clientSetup);
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
         MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
+        MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
+        MinecraftForge.EVENT_BUS.register(EventHandler.class);
     }
 
     @SubscribeEvent
@@ -90,6 +94,14 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
        AtmosphereManager.onRegisterCommands(event);
+    }
+
+    @SubscribeEvent
+    public static void onPlayerJoined(PlayerEvent.PlayerLoggedInEvent event) {
+        ServerLevel world = event.getEntity().getServer().getLevel(ServerLevel.OVERWORLD);
+        if (world != null && event.getEntity() instanceof ServerPlayer player) {
+            AtmosphereManager.onPlayerJoined(world, player);
+        }
     }
     @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID,bus = Mod.EventBusSubscriber.Bus.MOD,value = Dist.CLIENT)
     public static class ClientModEvents {
