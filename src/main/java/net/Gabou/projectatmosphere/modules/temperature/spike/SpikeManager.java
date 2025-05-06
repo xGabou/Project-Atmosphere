@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.modules.temperature.spike;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.ApplyOngoingSpikeCommand;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.ApplyRandomJoltCommand;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.StartNewSpikeCommand;
-import net.minecraft.resources.ResourceLocation;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.HashMap;
@@ -17,9 +17,9 @@ public class SpikeManager {
     private static final float RANDOM_JOLT_CHANCE = 0.10f;
     private static final float RANDOM_JOLT_MAX = 4.0f;
 
-    private static final Map<ResourceLocation, SpikeState> biomeSpikeStates = new HashMap<>();
+    private static final Map<BiomeInstanceKey, SpikeState> biomeSpikeStates = new HashMap<>();
 
-    public static float[][] applySpikeLogic(ResourceLocation biome, float[][] week) {
+    public static float[][] applySpikeLogic(BiomeInstanceKey biome, float[][] week) {
         SpikeState state = biomeSpikeStates.computeIfAbsent(biome, k -> new SpikeState());
 
         // Apply previous spike if still ongoing
@@ -52,11 +52,11 @@ public class SpikeManager {
     }
 
     // Used for saving and loading
-    public static Map<ResourceLocation, SpikeState> getAllStates() {
+    public static Map<BiomeInstanceKey, SpikeState> getAllStates() {
         return biomeSpikeStates;
     }
 
-    public static void setAllStates(Map<ResourceLocation, SpikeState> map) {
+    public static void setAllStates(Map<BiomeInstanceKey, SpikeState> map) {
         biomeSpikeStates.clear();
         biomeSpikeStates.putAll(map);
     }

@@ -1,15 +1,6 @@
 package net.Gabou.projectatmosphere.modules.temperature.spike;
 
-import net.minecraft.resources.ResourceLocation;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
-public class SpikeData {
-    public final ResourceLocation biome;
-    public final float[][] week;
-    public final SpikeState state;
-
-    public SpikeData(ResourceLocation biome, float[][] week, SpikeState state) {
-        this.biome = biome;
-        this.week = week;
-        this.state = state;
-    }
+public record SpikeData(BiomeInstanceKey biome, float[][] week, SpikeState state) {
 }

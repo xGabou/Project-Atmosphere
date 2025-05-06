@@ -2,6 +2,7 @@
 package net.Gabou.projectatmosphere.modules.humidity.util;
 
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -18,7 +19,9 @@ public class HumidityGenerator {
         return 6.112 * Math.exp((17.67 * T) / (T + 243.5));
     }
 
-    public static float[][] generateWeekForecast(ServerLevel world, BlockPos pos, ResourceLocation biomeId) {
+    public static float[][] generateWeekForecast(ServerLevel world, BiomeInstanceKey b) {
+        ResourceLocation biomeId = b.biomeType();
+        BlockPos pos = b.samplePos();
         long day = world.getDayTime() / 24000L;
         long seed = world.getSeed() ^ pos.asLong() ^ biomeId.hashCode() ^ day;
         Random rand = new Random(seed);
@@ -33,7 +36,7 @@ public class HumidityGenerator {
             baseRH = Math.max(baseRH, 75f);
         }
 
-        float[][] tempWeek = TemperatureProfileManager.getWeeklyForecast(biomeId);
+        float[][] tempWeek = TemperatureProfileManager.getWeeklyForecast(b);
         if (tempWeek == null) return new float[7][2];
 
         float[][] humWeek = new float[7][2];

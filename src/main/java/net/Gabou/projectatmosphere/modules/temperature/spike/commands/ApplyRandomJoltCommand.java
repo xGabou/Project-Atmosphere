@@ -18,9 +18,9 @@ public class ApplyRandomJoltCommand {
     public void execute() {
         int day = random.nextInt(7);
         float jolt = generateWeightedJolt(maxJolt);
-        data.week[day][0] += jolt;
-        data.week[day][1] += jolt;
-        smoothNeighbors(data.week, day, jolt);
+        data.week()[day][0] += jolt;
+        data.week()[day][1] += jolt;
+        smoothNeighbors(data.week(), day, jolt);
     }
 
     private float generateWeightedJolt(float max) {

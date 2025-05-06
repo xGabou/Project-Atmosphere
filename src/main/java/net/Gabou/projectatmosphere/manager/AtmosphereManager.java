@@ -14,6 +14,7 @@ import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.WindModule;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -102,11 +103,11 @@ public class AtmosphereManager {
     public static void refreshUnifiedForecast() {
         FORECAST_MAP.clear();
 
-        for (PressureForecast.BiomeInstanceKey key : PressureProfileManager.getAllBiomeKeys()) {
-            float[] temp = TemperatureProfileManager.getDayProfile(key.biomeType());
+        for (BiomeInstanceKey key : PressureProfileManager.getAllBiomeKeys()) {
+            float[] temp = TemperatureProfileManager.getDayProfile(key);
             float[] pressure = PressureProfileManager.getTodayProfile(key);
-            float[] humidity = HumidityProfileManager.getDayProfile(key.biomeType());
-            float[] wind = WindProfileManager.getTodayProfile(key.biomeType());
+            float[] humidity = HumidityProfileManager.getDayProfile(key);
+            float[] wind = WindProfileManager.getTodayProfile(key);
 
             FORECAST_MAP.put(key.biomeType(), new BiomeForecast(temp, pressure, humidity, wind));
         }

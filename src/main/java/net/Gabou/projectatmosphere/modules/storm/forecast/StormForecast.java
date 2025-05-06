@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.storm.forecast;
 import net.Gabou.projectatmosphere.modules.storm.util.StormStorageManager;
 import net.Gabou.projectatmosphere.modules.storm.util.StormGenerator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -10,6 +11,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class StormForecast {
 
@@ -17,27 +19,26 @@ public class StormForecast {
      * Generates or loads weekly storm forecasts around the center position.
      * Used on world load or precompute pass.
      */
-    public static Map<ResourceLocation, double[]> generateStormForecastAround(ServerLevel world,
+    public static Map<BiomeInstanceKey, float[]> generateStormForecastAround(ServerLevel world,
                                                                               BlockPos center,
                                                                               int radiusBlocks) {
-        if (!world.dimension().equals(Level.OVERWORLD)) return Map.of();
 
-        Map<ResourceLocation, BlockPos> samples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
-        Map<ResourceLocation, double[]> forecast = new HashMap<>();
+        Set<BiomeInstanceKey> samples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
+        Map<BiomeInstanceKey, float[]> forecast = new HashMap<>();
 
-        for (var entry : samples.entrySet()) {
-            ResourceLocation biome = entry.getKey();
-            BlockPos pos = entry.getValue();
+        for (var entry : samples) {
+            ResourceLocation biome = entry.biomeType();
+            BlockPos pos = entry.samplePos();
 
-            double[] week;
-            if (StormStorageManager.hasForecast(biome)) {
-                week = StormStorageManager.getForecast(biome);
+            float[] week;
+            if (StormStorageManager.hasForecast(entry)) {
+                week = StormStorageManager.getForecast(entry);
             } else {
                 week = StormGenerator.generateWeeklyStormProfile(world, pos, biome);
-                StormStorageManager.saveForecast(biome, week);
+                StormStorageManager.saveForecast(entry, week);
             }
 
-            forecast.put(biome, week);
+            forecast.put(entry, week);
         }
 
         return forecast;
@@ -47,17 +48,17 @@ public class StormForecast {
      * Same as above, but generates and returns values without saving.
      * Useful for temporary visualizations or comparisons.
      */
-    public static Map<ResourceLocation, double[]> generateTemporaryStormForecastAround(ServerLevel world,
+    public static Map<BiomeInstanceKey, float[]> generateTemporaryStormForecastAround(ServerLevel world,
                                                                                        BlockPos center,
                                                                                        int radiusBlocks) {
-        Map<ResourceLocation, BlockPos> samples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
-        Map<ResourceLocation, double[]> forecast = new HashMap<>();
+        Set<BiomeInstanceKey> samples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
+        Map<BiomeInstanceKey, float[]> forecast = new HashMap<>();
 
-        for (var entry : samples.entrySet()) {
-            ResourceLocation biome = entry.getKey();
-            BlockPos pos = entry.getValue();
-            double[] week = StormGenerator.generateWeeklyStormProfile(world, pos, biome);
-            forecast.put(biome, week);
+        for (var entry : samples) {
+            ResourceLocation biome = entry.biomeType();
+            BlockPos pos = entry.samplePos();
+            float[] week = StormGenerator.generateWeeklyStormProfile(world, pos, biome);
+            forecast.put(entry, week);
         }
 
         return forecast;

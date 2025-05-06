@@ -18,29 +18,29 @@ public class StormGenerator {
      * Generates a 7-day storm profile for a given biome and position.
      * Values range from 0.0 (no storm) to 1.0 (intense storm).
      */
-    public static double[] generateWeeklyStormProfile(ServerLevel world, BlockPos pos, ResourceLocation biome) {
-        double[] week = new double[7];
+    public static float[] generateWeeklyStormProfile(ServerLevel world, BlockPos pos, ResourceLocation biome) {
+        float[] week = new float[7];
 
         // Example logic: some randomness + pseudo-seasonal effect
         for (int i = 0; i < 7; i++) {
             // Base storm probability based on biome roughness or elevation (could be expanded)
-            double base = 0.2;
+            float base = 0.2f;
 
             // Random daily fluctuation
-            double fluctuation = 0.2 * (random.nextDouble() - 0.5);
+            float fluctuation = 0.2f * (random.nextFloat() - 0.5f);
 
             // Simulate occasional stronger storms
-            if (random.nextDouble() < 0.1) {
-                fluctuation += 0.5;
+            if (random.nextFloat() < 0.1f) {
+                fluctuation += 0.5f;
             }
 
-            week[i] = clamp(base + fluctuation, 0.0, 1.0);
+            week[i] = clamp(base + fluctuation, 0.0f, 1.0f);
         }
 
         return week;
     }
 
-    private static double clamp(double val, double min, double max) {
+    private static float clamp(float val, float min, float max) {
         return Math.max(min, Math.min(max, val));
     }
 }

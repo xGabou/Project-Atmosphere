@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.modules.pressure.util.PressureStorageManager;
 import net.Gabou.projectatmosphere.modules.pressure.util.DailyPressureGenerator;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureCurveGenerator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -18,6 +19,10 @@ import java.util.*;
  *  - Low‐detail (weekly only) via generateLowDetailForecast()
  *  - Inactive cleanup (every 6000 ticks) via cleanupInactiveBiomes()
  */
+
+
+
+//TODO transfer maps to PressureProfileManager
 public class PressureForecast {
 
     private static final Map<BiomeInstanceKey, float[][]> activeWeekly = new HashMap<>();
@@ -49,19 +54,15 @@ public class PressureForecast {
      * 4) Schedule daily curve generation
      */
     public static void generateFullForecast(ServerLevel world, BlockPos center, int radius) {
-        Map<ResourceLocation, BlockPos> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
+        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
         activeWeekly.clear();
 
         // Step 1 — Generate raw weekly pressure for each biome instance
-        for (var entry : biomeSamples.entrySet()) {
-            ResourceLocation biome = entry.getKey();
-            BlockPos sample = entry.getValue();
-            BiomeInstanceKey key = new BiomeInstanceKey(biome, sample);
-
-            float[][] week = PressureGenerator.generateWeekForecast(world, sample, biome);
-            PressureProfileManager.putWeeklyForecast(key, week);
-            PressureStorageManager.putForecast(key, week);
-            activeWeekly.put(key, week);
+        for (var entry : biomeSamples) {
+            float[][] week = PressureGenerator.generateWeekForecast(world,entry);
+            PressureProfileManager.putWeeklyForecast(entry, week);
+            PressureStorageManager.putForecast(entry, week);
+            activeWeekly.put(entry, week);
         }
 
         // Step 2 — Apply smoothing
@@ -92,20 +93,17 @@ public class PressureForecast {
      * Compute base weekly values only (no daily curves or smoothing).
      */
     public static void generateLowDetailForecast(ServerLevel world, BlockPos center, int radius) {
-        Map<ResourceLocation, BlockPos> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
+        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
 
-        for (var entry : biomeSamples.entrySet()) {
-            ResourceLocation biome = entry.getKey();
-            BlockPos sample = entry.getValue();
-            BiomeInstanceKey key = new BiomeInstanceKey(biome, sample);
+        for (var entry : biomeSamples) {
 
-            if (activeWeekly.containsKey(key) || inactiveWeekly.containsKey(key)) continue;
+            if (activeWeekly.containsKey(entry) || inactiveWeekly.containsKey(entry)) continue;
 
-            float[][] week = PressureGenerator.generateWeekForecast(world, sample, biome);
-            inactiveWeekly.put(key, week);
+            float[][] week = PressureGenerator.generateWeekForecast(world, entry);
+            inactiveWeekly.put(entry, week);
 
-            PressureProfileManager.putWeeklyForecast(key, week);
-            PressureStorageManager.putForecast(key, week);
+            PressureProfileManager.putWeeklyForecast(entry, week);
+            PressureStorageManager.putForecast(entry, week);
         }
     }
 
@@ -186,5 +184,5 @@ public class PressureForecast {
         }
     }
 
-    public record BiomeInstanceKey(ResourceLocation biomeType, BlockPos samplePos) {}
+
 }

@@ -1,75 +1,88 @@
 // net/Gabou/projectatmosphere/storm/util/StormProfileManager.java
 package net.Gabou.projectatmosphere.modules.storm.util;
 
-import net.minecraft.resources.ResourceLocation;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+
 
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class StormProfileManager {
-    private static final Map<String,double[]> WEEKLY  = new ConcurrentHashMap<>();
-    private static final Map<String,double[]> TOMORROW = new ConcurrentHashMap<>();
-    private static final Map<String,double[]> DAILY    = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey,float[]> WEEKLY  = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey,float[]> TOMORROW = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey,float[]> DAILY    = new ConcurrentHashMap<>();
 
-    public static boolean hasWeeklyForecast(ResourceLocation id) {
-        return WEEKLY.containsKey(id.toString());
+
+    public static void putWeeklyForecast(BiomeInstanceKey id, float[] week) {
+        WEEKLY.put(id, week);
     }
-    public static void putWeeklyForecast(ResourceLocation id, double[] week) {
-        WEEKLY.put(id.toString(), week);
-    }
-    public static double[] getWeeklyForecast(ResourceLocation id) {
-        return WEEKLY.get(id.toString());
+    public static float[] getWeeklyForecast(BiomeInstanceKey id) {
+        return AtmosphereUtils.getRightForecastForBiome1(id,WEEKLY);
     }
 
     /** Returns today's storm intensity for a biome */
-    public static double getCurrentStormIntensity(ResourceLocation biome, long worldTick) {
-        double[] forecast = getWeeklyForecast(biome);
-        if (forecast.length == 0) return 0.0;
+    public static float getCurrentStormIntensity(BiomeInstanceKey biome, long worldTick) {
+        float[] forecast = getWeeklyForecast(biome);
+        if (forecast.length == 0) return 0.0f;
 
         int dayIndex = (int)((worldTick / 24000L) % 7);
         return forecast[Math.min(dayIndex, forecast.length - 1)];
     }
 
-    public static boolean hasDayProfile(ResourceLocation id) {
-        return DAILY.containsKey(id.toString());
-    }
-    public static void putDayProfile(ResourceLocation id, double[] curve) {
-        DAILY.put(id.toString(), curve);
+
+    public static void putDayProfile(BiomeInstanceKey id, float[] curve) {
+        DAILY.put(id, curve);
     }
 
-    public static boolean hasTomorrowProfile(ResourceLocation id) {
-        return TOMORROW.containsKey(id.toString());
-    }
-    public static void putTomorrowProfile(ResourceLocation id, double[] curve) {
-        TOMORROW.put(id.toString(), curve);
-    }
-
-    public static double[] getDayProfile(ResourceLocation id) {
-        return DAILY.get(id.toString());
-    }
-    public static double[] getTomorrowProfile(ResourceLocation id) {
-        return TOMORROW.get(id.toString());
+    /** Returns true if the biome has a daily profile. */
+    public static boolean hasDayProfile(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, DAILY);
+        return resolved != null && DAILY.containsKey(resolved);
     }
 
+    /** Returns true if the biome has a tomorrow profile. */
+    public static boolean hasTomorrowProfile(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, TOMORROW);
+        return resolved != null && TOMORROW.containsKey(resolved);
+    }
 
-    public static double getCurrentSpike(ResourceLocation biome, long tick) {
-        double[] curve = DAILY.get(biome.toString());
+    /** Returns true if the biome has a weekly forecast. */
+    public static boolean hasWeeklyForecast(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, WEEKLY);
+        return resolved != null && WEEKLY.containsKey(resolved);
+    }
+
+    public static void putTomorrowProfile(BiomeInstanceKey id, float[] curve) {
+        TOMORROW.put(id, curve);
+    }
+
+    public static float[] getDayProfile(BiomeInstanceKey id) {
+        return AtmosphereUtils.getRightForecastForBiome1(id,DAILY);
+    }
+    public static float[] getTomorrowProfile(BiomeInstanceKey id) {
+        return AtmosphereUtils.getRightForecastForBiome1(id,TOMORROW);
+    }
+
+
+    public static float getCurrentSpike(BiomeInstanceKey biome, long tick) {
+        float[] curve = getDayProfile(biome);
         if (curve != null) {
             int idx = (int)((tick % 24000L) / 100);
             return curve[idx];
         }
-        double[] week = WEEKLY.get(biome.toString());
+        float[] week = getWeeklyForecast(biome);
         if (week != null) {
             int d = (int)((tick/24000L)%7);
             return week[d];
         }
-        return 0.0;
+        return 0.0f;
     }
 
     public static void swapTomorrowToToday() {
-        for (String key : WEEKLY.keySet()) {
-            double[] tom = TOMORROW.remove(key);
+        for (BiomeInstanceKey key : WEEKLY.keySet()) {
+            float[] tom = TOMORROW.remove(key);
             if (tom != null) DAILY.put(key, tom);
         }
     }
@@ -80,7 +93,7 @@ public class StormProfileManager {
         DAILY.clear();
     }
 
-    public static Set<String> getAllBiomeKeys() {
+    public static Set<BiomeInstanceKey> getAllBiomeKeys() {
         return WEEKLY.keySet();
     }
 }

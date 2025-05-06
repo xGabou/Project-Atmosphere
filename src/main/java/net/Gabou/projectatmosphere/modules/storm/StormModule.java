@@ -29,7 +29,7 @@ public class StormModule {
 
     public static void onServerStarting(ServerLevel world,BlockPos center) {
         StormStorageManager.loadAll(world);
-        StormManager.init(world, center);
+        //StormManager.init(world, center);
     }
 
     public static void onPlayerJoined(ServerLevel world, BlockPos pos) {

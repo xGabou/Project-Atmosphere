@@ -11,15 +11,15 @@ public class ApplyOngoingSpikeCommand {
     }
 
     public void execute() {
-        float mag = data.state.spikeMagnitude;
-        for (int i = 0; i < data.state.remainingSpikeDays; i++) {
-            int day = data.state.currentSpikeDay + i;
+        float mag = data.state().spikeMagnitude;
+        for (int i = 0; i < data.state().remainingSpikeDays; i++) {
+            int day = data.state().currentSpikeDay + i;
             if (day >= 7) break;
-            data.week[day][0] += mag;
-            data.week[day][1] += mag;
-            smoothNeighbors(data.week, day, mag / 2f);
+            data.week()[day][0] += mag;
+            data.week()[day][1] += mag;
+            smoothNeighbors(data.week(), day, mag / 2f);
         }
-        data.state.remainingSpikeDays = 0;
+        data.state().remainingSpikeDays = 0;
     }
 
     private void smoothNeighbors(float[][] week, int centerDay, float offset) {

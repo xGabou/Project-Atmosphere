@@ -1,49 +1,63 @@
 // src/main/java/net/Gabou/projectatmosphere/modules/humidity/util/HumidityProfileManager.java
 package net.Gabou.projectatmosphere.modules.humidity.util;
 
-import net.minecraft.resources.ResourceLocation;
+
+
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class HumidityProfileManager {
-    private static final Map<String, float[][]> WEEKLY = new ConcurrentHashMap<>();
-    private static final Map<String, float[]> TOMORROW = new ConcurrentHashMap<>();
-    private static final Map<String, float[]> DAILY = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey, float[][]> WEEKLY = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey, float[]> TOMORROW = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey, float[]> DAILY = new ConcurrentHashMap<>();
 
-    public static boolean hasWeeklyForecast(ResourceLocation id) {
-        return WEEKLY.containsKey(id.toString());
-    }
-    public static void putWeeklyForecast(ResourceLocation id, float[][] week) {
-        WEEKLY.put(id.toString(), week);
-    }
-    public static float[][] getWeeklyForecast(ResourceLocation id) {
-        return WEEKLY.get(id.toString());
-    }
 
-    public static boolean hasDayProfile(ResourceLocation id) {
-        return DAILY.containsKey(id.toString());
+    public static void putWeeklyForecast(BiomeInstanceKey id, float[][] week) {
+        WEEKLY.put(id, week);
     }
-    public static void putDayProfile(ResourceLocation id, float[] profile) {
-        DAILY.put(id.toString(), profile);
-    }
-    public static float[] getDayProfile(ResourceLocation id) {
-        return DAILY.get(id.toString());
-    }
-
-    public static boolean hasTomorrowProfile(ResourceLocation id) {
-        return TOMORROW.containsKey(id.toString());
-    }
-    public static void putTomorrowProfile(ResourceLocation id, float[] profile) {
-        TOMORROW.put(id.toString(), profile);
-    }
-    public static float[] getTomorrowProfile(ResourceLocation id) {
-        return TOMORROW.get(id.toString());
+    public static float[][] getWeeklyForecast(BiomeInstanceKey id) {
+        return AtmosphereUtils.getRightForecastForBiome(id, WEEKLY) ;
     }
 
 
-    public static float getCurrentHumidity(ResourceLocation biome, long tick) {
+    public static void putDayProfile(BiomeInstanceKey id, float[] profile) {
+        DAILY.put(id, profile);
+    }
+    public static float[] getDayProfile(BiomeInstanceKey id) {
+        return AtmosphereUtils.getRightForecastForBiome1(id, DAILY);
+    }
+
+    /** Returns true if the biome has a daily profile. */
+    public static boolean hasDayProfile(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, DAILY);
+        return resolved != null && DAILY.containsKey(resolved);
+    }
+
+    /** Returns true if the biome has a tomorrow profile. */
+    public static boolean hasTomorrowProfile(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, TOMORROW);
+        return resolved != null && TOMORROW.containsKey(resolved);
+    }
+
+    /** Returns true if the biome has a weekly forecast. */
+    public static boolean hasWeeklyForecast(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, WEEKLY);
+        return resolved != null && WEEKLY.containsKey(resolved);
+    }
+
+    public static void putTomorrowProfile(BiomeInstanceKey id, float[] profile) {
+        TOMORROW.put(id, profile);
+    }
+    public static float[] getTomorrowProfile(BiomeInstanceKey id) {
+        return AtmosphereUtils.getRightForecastForBiome1(id, TOMORROW);
+    }
+
+
+    public static float getCurrentHumidity(BiomeInstanceKey biome, long tick) {
         float[] day = getDayProfile(biome);
         if (day != null) {
             int idx = (int)((tick % 24000L) / 100);
@@ -57,7 +71,7 @@ public class HumidityProfileManager {
         return Float.NaN;
     }
 
-    public static Set<String> getAllBiomeKeys() {
+    public static Set<BiomeInstanceKey> getAllBiomeKeys() {
         return WEEKLY.keySet();
     }
 

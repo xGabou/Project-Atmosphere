@@ -2,6 +2,7 @@
 package net.Gabou.projectatmosphere.modules.humidity.util;
 
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
@@ -11,22 +12,20 @@ public class DailyHumidityGenerator {
             long now = world.getDayTime();
             int todayIndex = (int)((now / 24000L) % 7);
 
-            for (String key : HumidityStorageManager.getAllBiomeKeys()) {
-                ResourceLocation biome = new ResourceLocation(key);
-
-                boolean hasToday = HumidityProfileManager.hasDayProfile(biome);
-                boolean hasTomorrow = HumidityProfileManager.hasTomorrowProfile(biome);
+            for (BiomeInstanceKey key : HumidityStorageManager.getAllBiomeKeys()) {
+                boolean hasToday = HumidityProfileManager.hasDayProfile(key);
+                boolean hasTomorrow = HumidityProfileManager.hasTomorrowProfile(key);
                 if (hasToday && hasTomorrow) continue;
 
-                float[][] week = HumidityStorageManager.getForecast(biome);
+                float[][] week = HumidityStorageManager.getForecast(key);
 
                 if (!hasToday) {
                     float[] today = buildDailyCurve(week[todayIndex]);
-                    HumidityProfileManager.putDayProfile(biome, today);
+                    HumidityProfileManager.putDayProfile(key, today);
                 }
                 if (!hasTomorrow) {
                     float[] tomorrow = buildDailyCurve(week[(todayIndex + 1) % 7]);
-                    HumidityProfileManager.putTomorrowProfile(biome, tomorrow);
+                    HumidityProfileManager.putTomorrowProfile(key, tomorrow);
                 }
             }
     }

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.temperature.util;
 
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -27,7 +28,7 @@ public class TemperatureGenerator {
     private static final float LAPSE_RATE = -0.0065f;
 
     /** Returns the “current” temperature based on the precomputed day profile. */
-    public static float getRealTemperature(Level world, ResourceLocation biome, BlockPos pos) {
+    public static float getRealTemperature(Level world, BiomeInstanceKey biome, BlockPos pos) {
         long tick = world.getDayTime() % 24000L;
         return TemperatureProfileManager.getCurrentTemperature(biome, tick);
     }

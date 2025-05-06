@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.modules.temperature.util.DailyProfileGenerato
 import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -34,7 +35,7 @@ public class TemperatureManager{
 
     /** Called once on server startup to generate initial forecast around spawn. */
     public static void initTemperatureForServer(ServerLevel server, BlockPos spawn) {
-        init(server, spawn);
+        //init(server, spawn);
     }
 
 
@@ -52,7 +53,7 @@ public class TemperatureManager{
         AsyncAtmosphereService.runTemperature(() -> {
             lastCenter = center;
 
-            Map<ResourceLocation, float[][]> forecasts =
+            Map<BiomeInstanceKey, float[][]> forecasts =
                     TemperatureForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
 
             if (forecasts.isEmpty()) {
@@ -85,21 +86,20 @@ public class TemperatureManager{
     public static BlockPos getLastCenter() {
         return lastCenter;
     }
-    public static float getCurrentTemperature(ResourceLocation biome, long worldTick) {
+    public static float getCurrentTemperature(BiomeInstanceKey biome, long worldTick) {
         return TemperatureProfileManager.getCurrentTemperature(biome, worldTick);
     }
 
-    public static float[][] getWeeklyForecast(ResourceLocation biome) {
+    public static float[][] getWeeklyForecast(BiomeInstanceKey biome) {
         return TemperatureProfileManager.getWeeklyForecast(biome);
     }
 
     public static void onSwapProfiles(Level world) {
         AsyncAtmosphereService.runTemperature(() -> {
-        for (String key : TemperatureProfileManager.getAllBiomeKeys()) {
-            ResourceLocation biome = new ResourceLocation(key);
-            float[] tomorrow = TemperatureProfileManager.getTomorrowProfile(biome);
+        for (BiomeInstanceKey key : TemperatureProfileManager.getAllBiomeKeys()) {
+            float[] tomorrow = TemperatureProfileManager.getTomorrowProfile(key);
             if (tomorrow != null) {
-                TemperatureProfileManager.putDayProfile(biome, tomorrow);
+                TemperatureProfileManager.putDayProfile(key, tomorrow);
             }
         }
         DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
@@ -123,7 +123,7 @@ public class TemperatureManager{
 
     public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
         clearForecastCache(world);
-        init(world, world.getSharedSpawnPos());
+        //init(world, world.getSharedSpawnPos());
         for (Player player : players) {
             BlockPos pos = player.blockPosition();
             onPlayerJoined(world, pos);

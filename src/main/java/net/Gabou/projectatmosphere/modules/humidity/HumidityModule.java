@@ -45,7 +45,7 @@ public class HumidityModule {
 
     public static void onServerStarting(ServerLevel world, BlockPos center) {
         HumidityStorageManager.loadAll(world);
-        HumidityManager.init(world, center);
+       // HumidityManager.init(world, center);
     }
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {

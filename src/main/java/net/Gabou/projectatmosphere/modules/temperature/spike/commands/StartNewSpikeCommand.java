@@ -21,10 +21,10 @@ public class StartNewSpikeCommand {
 
         if (!isHeat) magnitude = -magnitude;
 
-        data.state.spikeMagnitude = magnitude;
-        data.state.remainingSpikeDays = duration;
-        data.state.currentSpikeDay = startDay;
-        data.state.daysSinceLastSpike = 0;
+        data.state().spikeMagnitude = magnitude;
+        data.state().remainingSpikeDays = duration;
+        data.state().currentSpikeDay = startDay;
+        data.state().daysSinceLastSpike = 0;
     }
 
     private float generateWeightedSpikeMagnitude() {

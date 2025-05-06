@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.modules.pressure.util;
 
-import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast.BiomeInstanceKey;
+
+
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,7 +20,7 @@ public class PressureProfileManager {
     }
 
     public static float[][] getWeeklyForecast(BiomeInstanceKey key) {
-        return WEEKLY.get(key);
+        return AtmosphereUtils.getRightForecastForBiome(key, WEEKLY);
     }
 
     public static void removeWeeklyForecast(BiomeInstanceKey key) {
@@ -29,7 +32,7 @@ public class PressureProfileManager {
     }
 
     public static float[] getTodayProfile(BiomeInstanceKey key) {
-        return TODAY.get(key);
+        return AtmosphereUtils.getRightForecastForBiome1(key, TODAY);
     }
 
     public static void removeDayProfile(BiomeInstanceKey key) {
@@ -41,16 +44,31 @@ public class PressureProfileManager {
     }
 
     public static float[] getTomorrowProfile(BiomeInstanceKey key) {
-        return TOMORROW.get(key);
+        return AtmosphereUtils.getRightForecastForBiome1(key, TOMORROW);
     }
 
     public static void removeTomorrowProfile(BiomeInstanceKey key) {
         TOMORROW.remove(key);
     }
 
-    public static boolean hasWeeklyForecast(BiomeInstanceKey key) {
-        return WEEKLY.containsKey(key);
+    /** Returns true if the biome has a daily profile. */
+    public static boolean hasDayProfile(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, TODAY);
+        return resolved != null && TODAY.containsKey(resolved);
     }
+
+    /** Returns true if the biome has a tomorrow profile. */
+    public static boolean hasTomorrowProfile(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, TOMORROW);
+        return resolved != null && TOMORROW.containsKey(resolved);
+    }
+
+    /** Returns true if the biome has a weekly forecast. */
+    public static boolean hasWeeklyForecast(BiomeInstanceKey biome) {
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(biome, WEEKLY);
+        return resolved != null && WEEKLY.containsKey(resolved);
+    }
+
 
     public static Set<BiomeInstanceKey> getAllBiomeKeys() {
         return WEEKLY.keySet();

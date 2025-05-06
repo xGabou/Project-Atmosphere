@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.wind.manager;
 import net.Gabou.projectatmosphere.modules.wind.forecast.WindForecast;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.util.WindStorageManager;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -18,7 +19,7 @@ public class WindManager {
     public static final int WIND_SPEED = 10;  // Default speed in m/s
 
     public static void init(ServerLevel world, BlockPos center) {
-        Map<ResourceLocation, float[][]> forecast =
+        Map<BiomeInstanceKey, float[][]> forecast =
                 WindForecast.generateForecastAround(world, center, 250);
 
         forecast.forEach((biome, week) -> {
@@ -34,11 +35,11 @@ public class WindManager {
         init(world, pos);
     }
 
-    public static float[][] getWeeklyForecast(ResourceLocation biome) {
+    public static float[][] getWeeklyForecast(BiomeInstanceKey biome) {
         return WindProfileManager.getWeeklyForecast(biome);
     }
 
-    public static float getCurrentWind(ResourceLocation biome, long worldTick) {
+    public static float getCurrentWind(BiomeInstanceKey biome, long worldTick) {
         return WindProfileManager.getCurrentWindSpeed(biome, worldTick);
     }
 
@@ -47,11 +48,10 @@ public class WindManager {
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        for (String key : WindProfileManager.getAllBiomeKeys()) {
-            ResourceLocation biome = new ResourceLocation(key);
-            float[] tomorrow = WindProfileManager.getTomorrowProfile(biome);
+        for (BiomeInstanceKey key : WindProfileManager.getAllBiomeKeys()) {
+            float[] tomorrow = WindProfileManager.getTomorrowProfile(key);
             if (tomorrow != null) {
-                WindProfileManager.putDayProfile(biome, tomorrow);
+                WindProfileManager.putDayProfile(key, tomorrow);
             }
         }
         WindProfileManager.generateTodayAndTomorrowProfiles(world);

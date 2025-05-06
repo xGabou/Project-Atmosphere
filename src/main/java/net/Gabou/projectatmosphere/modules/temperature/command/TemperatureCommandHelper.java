@@ -1,10 +1,12 @@
 package net.Gabou.projectatmosphere.modules.temperature.command;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
 import net.Gabou.projectatmosphere.modules.temperature.compat.SereneTempToCelcius;
 import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
@@ -25,18 +27,24 @@ public class TemperatureCommandHelper {
     /**
      * Get the resource location of the biome at the player’s current position.
      */
-    public static ResourceLocation getCurrentBiome(Player player) {
-        return player.level().getBiome(player.blockPosition()).unwrapKey().get().location();
+    public static BiomeInstanceKey getCurrentBiome(Player player) {
+        return new BiomeInstanceKey(player.level().getBiome(player.blockPosition()).unwrapKey().get().location(), player.blockPosition());
     }
 
     /**
      * Get the biome from a user-entered string or resolve "current" to the player's current biome.
      */
-    public static ResourceLocation resolveBiome(Player player, String biomeStr) {
+    public static BiomeInstanceKey resolveBiome(Player player, String biomeStr) {
+
         if (biomeStr.equalsIgnoreCase("current") || biomeStr.equalsIgnoreCase("currentbiome")) {
             return getCurrentBiome(player);
         }
-        return new ResourceLocation(biomeStr);
+        try {
+            return new BiomeInstanceKey(ResourceLocation.parse(biomeStr), player.blockPosition());
+        } catch (Exception e) {
+            ProjectAtmosphere.LOGGER.error("Invalid biome name: {}", biomeStr);
+            return null;
+        }
     }
 
     /**
@@ -49,21 +57,21 @@ public class TemperatureCommandHelper {
     /**
      * Get the current temperature of a biome at a given tick.
      */
-    public static float getTemperatureAt(ResourceLocation biome, long tick) {
+    public static float getTemperatureAt(BiomeInstanceKey biome, long tick) {
         return TemperatureManager.getCurrentTemperature(biome, tick);
     }
 
     /**
      * Return the weekly forecast matrix for a given biome.
      */
-    public static String getWeeklyForecast(ResourceLocation biome) {
+    public static String getWeeklyForecast(BiomeInstanceKey biome) {
         return weekForecastToString(biome,TemperatureManager.getWeeklyForecast(biome));
     }
 
     /**
      * Return the daily temperature profile (curve) for a given biome.
      */
-    public static float[] getDayProfile(ResourceLocation biome) {
+    public static float[] getDayProfile(BiomeInstanceKey biome) {
         return TemperatureProfileManager.getDayProfile(biome);
     }
 
@@ -97,7 +105,7 @@ public class TemperatureCommandHelper {
     /**
      * Get the final computed Celsius temperature used by the mod (includes time of day, fluctuations, etc).
      */
-    public static float getRealTemperature(ServerLevel level, ResourceLocation biome, BlockPos pos) {
+    public static float getRealTemperature(ServerLevel level, BiomeInstanceKey biome, BlockPos pos) {
         return TemperatureGenerator.getRealTemperature(level, biome, pos);
     }
 
@@ -108,21 +116,26 @@ public class TemperatureCommandHelper {
         return formatForecastMap(TemperatureForecast.generateForecastAround(level, pos, 500));
     }
 
-    public static String formatForecastMap(Map<ResourceLocation, float[][]> forecastMap) {
+
+
+    public static String formatForecastMap(Map<BiomeInstanceKey, float[][]> forecastMap) {
         StringBuilder sb = new StringBuilder("§6[Temperature Forecast per Biome]");
 
-        for (Map.Entry<ResourceLocation, float[][]> entry : forecastMap.entrySet()) {
-            ResourceLocation biome = entry.getKey();
+        for (Map.Entry<BiomeInstanceKey, float[][]> entry : forecastMap.entrySet()) {
+            BiomeInstanceKey key = entry.getKey();
             float[][] week = entry.getValue();
 
-            sb.append(weekForecastToString(biome, week));
+            sb.append(weekForecastToString(key, week));
         }
+
         return sb.toString();
     }
 
-    private static String weekForecastToString(ResourceLocation biome, float[][] week) {
+
+
+    private static String weekForecastToString(BiomeInstanceKey biome, float[][] week) {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n§e").append(biome).append(":");
+        sb.append("\n§e").append(biome.biomeType()).append(":");
 
         for (int day = 0; day < week.length; day++) {
             sb.append("\n  §7Day ").append(day + 1).append(" → ");

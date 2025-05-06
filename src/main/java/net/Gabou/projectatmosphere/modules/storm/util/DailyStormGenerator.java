@@ -3,35 +3,47 @@ package net.Gabou.projectatmosphere.modules.storm.util;
 
 import net.Gabou.projectatmosphere.modules.storm.spike.StormSpikeManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 
 public class DailyStormGenerator {
     public static void scheduleGenerationForTodayAndTomorrow(Level world) {
         AsyncAtmosphereService.runStorm(() -> {
             long now = world.getDayTime();
-            for (String key : StormProfileManager.getAllBiomeKeys()) {
-                ResourceLocation biome = new ResourceLocation(key);
-                boolean hasToday = StormProfileManager.hasDayProfile(biome);
-                boolean hasTomorrow = StormProfileManager.hasTomorrowProfile(biome);
+            for (BiomeInstanceKey key : StormProfileManager.getAllBiomeKeys()) {
+                boolean hasToday = StormProfileManager.hasDayProfile(key);
+                boolean hasTomorrow = StormProfileManager.hasTomorrowProfile(key);
                 if (hasToday && hasTomorrow) continue;
 
-                double[] week = StormSpikeManager.generateForecastAround(world, null, 0).get(biome);
+                float[] week = StormProfileManager.getWeeklyForecast(key);
                 int idx = (int)((now/24000L)%7);
                 if (!hasToday) {
-                    double[] today = buildDailyCurve(week[idx]);
-                    StormProfileManager.putDayProfile(biome, today);
+                    float[] today = buildDailyCurve(week[idx]);
+                    StormProfileManager.putDayProfile(key, today);
                 }
                 if (!hasTomorrow) {
-                    double[] tom = buildDailyCurve(week[(idx+1)%7]);
-                    StormProfileManager.putTomorrowProfile(biome, tom);
+                    float[] tom = buildDailyCurve(week[(idx+1)%7]);
+                    StormProfileManager.putTomorrowProfile(key, tom);
                 }
             }
         });
     }
 
-    private static double[] buildDailyCurve(double spike) {
-        // TODO: build 240-step curve peaking at spike
-        return new double[240];
+    private static float[] buildDailyCurve(float spike) {
+        float[] curve = new float[240];
+        int center = 120; // noon
+        float spread = 50f; // controls curve width
+
+        for (int i = 0; i < 240; i++) {
+            float x = i - center;
+            float gauss = (float) Math.exp(-x * x / (2 * spread * spread)); // normalized Gaussian
+            curve[i] = gauss * spike;
+        }
+
+        return curve;
     }
+
 }

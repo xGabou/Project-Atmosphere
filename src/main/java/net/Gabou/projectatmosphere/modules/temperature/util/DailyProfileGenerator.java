@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.modules.temperature.util;
 
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
@@ -19,28 +21,29 @@ public class DailyProfileGenerator {
         AsyncAtmosphereService.runTemperature(() -> {
             long now = world.getDayTime();
 
-            for (String key : ForecastStorageManager.getAllBiomeKeys()) {
-                ResourceLocation biome = new ResourceLocation(key);
+            for (BiomeInstanceKey key : ForecastStorageManager.getAllBiomeKeys()) {
+                ResourceLocation biome = key.biomeType();
+                BlockPos pos = key.samplePos();
 
-                boolean hasToday = TemperatureProfileManager.hasDayProfile(biome);
-                boolean hasTomorrow = TemperatureProfileManager.hasTomorrowProfile(biome);
+                boolean hasToday = TemperatureProfileManager.hasDayProfile(key);
+                boolean hasTomorrow = TemperatureProfileManager.hasTomorrowProfile(key);
 
                 if (hasToday && hasTomorrow)
                     continue; // Nothing to generate
 
-                float[] today = hasToday ? null : generateDayProfile(biome, world, now);
-                float[] tomorrow = hasTomorrow ? null : generateDayProfile(biome, world, now + 24000L);
+                float[] today = hasToday ? null : generateDayProfile(key, world, now);
+                float[] tomorrow = hasTomorrow ? null : generateDayProfile(key, world, now + 24000L);
 
                 if (!hasToday) {
                     if (today == null)
-                        throw new RuntimeException("Failed to generate today's profile for " + biome + " at tick " + now);
-                    TemperatureProfileManager.putDayProfile(biome, today);
+                        throw new RuntimeException("Failed to generate today's profile for " + biome + " at tick "+now +" with coords : " + pos);
+                    TemperatureProfileManager.putDayProfile(key, today);
                 }
 
                 if (!hasTomorrow) {
                     if (tomorrow == null)
-                        throw new RuntimeException("Failed to generate tomorrow's profile for " + biome + " at tick " + now);
-                    TemperatureProfileManager.putTomorrowProfile(biome, tomorrow);
+                        throw new RuntimeException("Failed to generate tomorrow's profile for " + biome + " at tick " + now+" with coords : " + pos);
+                    TemperatureProfileManager.putTomorrowProfile(key, tomorrow);
                 }
             }
         });
@@ -48,7 +51,7 @@ public class DailyProfileGenerator {
 
 
     private static float[] generateDayProfile(
-            ResourceLocation biome, Level world, long worldTick) {
+            BiomeInstanceKey biome, Level world, long worldTick) {
 
         float[][] week = ForecastStorageManager.getForecast(biome);
         if (week == null) return null;

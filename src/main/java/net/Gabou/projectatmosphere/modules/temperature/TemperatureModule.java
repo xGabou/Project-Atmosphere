@@ -27,7 +27,7 @@ public class TemperatureModule {
 
     public static void onServerStarting(ServerLevel world,BlockPos center) {
         loadData(world);
-        TemperatureManager.initTemperatureForServer(world, center);
+        //TemperatureManager.initTemperatureForServer(world, center);
     }
 
     public static void onPlayerJoined(ServerLevel serverLevel,BlockPos pos) {

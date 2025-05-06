@@ -2,8 +2,9 @@
 package net.Gabou.projectatmosphere.modules.pressure.util;
 
 import com.google.gson.*;
-import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.StorageUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -20,11 +21,12 @@ public class PressureStorageManager {
     private static final String FILE_NAME = "pressure_forecasts.json";
 
     public static boolean hasForecast(BiomeInstanceKey key) {
-        return CACHE.containsKey(key);
+        BiomeInstanceKey resolved = AtmosphereUtils.findNearestBiomeInstanceKey(key, CACHE);
+        return resolved != null && CACHE.containsKey(resolved);
     }
 
     public static float[][] getForecast(BiomeInstanceKey key) {
-        return CACHE.getOrDefault(key, new float[7][2]);
+        return AtmosphereUtils.getRightForecastForBiome(key, CACHE);
     }
 
     public static void putForecast(BiomeInstanceKey key, float[][] week) {
@@ -37,13 +39,12 @@ public class PressureStorageManager {
 
     public static void clearCache(ServerLevel world) {
         CACHE.clear();
-        try {
-            Files.deleteIfExists(getSavePath(world));
-        } catch (IOException ignored) {}
+        StorageUtils.clearCache(world, FILE_NAME);
     }
 
     public static void saveAll(ServerLevel world) {
         JsonObject root = new JsonObject();
+
         for (var entry : CACHE.entrySet()) {
             BiomeInstanceKey key = entry.getKey();
             float[][] week = entry.getValue();
@@ -56,12 +57,7 @@ public class PressureStorageManager {
                 arr.add(pair);
             }
 
-            JsonObject obj = new JsonObject();
-            obj.add("biome", new JsonPrimitive(key.biomeType().toString()));
-            obj.add("pos", AtmosphereUtils.serializeBlockPos(key.samplePos()));
-            obj.add("data", arr);
-
-            root.add(key.biomeType().toString() + "@" + key.samplePos().toShortString(), obj);
+            root.add(key.toString(), arr);
         }
 
         try {
@@ -75,6 +71,8 @@ public class PressureStorageManager {
         }
     }
 
+
+
     public static void loadAll(ServerLevel world) {
         Path p = getSavePath(world);
         if (!Files.exists(p)) return;
@@ -82,26 +80,25 @@ public class PressureStorageManager {
         try (Reader r = Files.newBufferedReader(p)) {
             JsonObject root = GSON.fromJson(r, JsonObject.class);
             for (var entry : root.entrySet()) {
-                JsonObject obj = entry.getValue().getAsJsonObject();
-                ResourceLocation biome = new ResourceLocation(obj.get("biome").getAsString());
-                BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());
+                BiomeInstanceKey key = BiomeInstanceKey.fromString(entry.getKey());
+                JsonArray arr = entry.getValue().getAsJsonArray();
 
-                JsonArray arr = obj.get("data").getAsJsonArray();
-                float[][] week = new float[7][2];
-                for (int i = 0; i < 7; i++) {
+                float[][] week = new float[arr.size()][2];
+                for (int i = 0; i < arr.size(); i++) {
                     JsonArray pair = arr.get(i).getAsJsonArray();
                     week[i][0] = pair.get(0).getAsFloat();
                     week[i][1] = pair.get(1).getAsFloat();
                 }
 
-                CACHE.put(new BiomeInstanceKey(biome, pos), week);
+                putForecast(key, week);
             }
         } catch (IOException ex) {
             ex.printStackTrace();
         }
     }
 
+
     private static Path getSavePath(ServerLevel world) {
-        return AtmosphereUtils.getPerWorldSavePath(world, FILE_NAME);
+        return StorageUtils.getPerWorldSavePath(world, FILE_NAME);
     }
 }

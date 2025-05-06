@@ -7,8 +7,8 @@ import net.Gabou.projectatmosphere.modules.humidity.util.DailyHumidityGenerator;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -26,7 +26,7 @@ public class HumidityManager {
         AsyncAtmosphereService.runHumidity(() -> {
 
             // 2) generate or load weekly forecasts
-            Map<ResourceLocation, float[][]> forecasts =
+            Map<BiomeInstanceKey, float[][]> forecasts =
                     HumidityForecast.generateForecastAround(world, center, RADIUS);
 
             // 3) cache into profiles
@@ -48,7 +48,7 @@ public class HumidityManager {
         AsyncAtmosphereService.runHumidity(() -> DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world));
 
     }
-    public static float getAverageHumidity(ResourceLocation biome, int dayIndex) {
+    public static float getAverageHumidity(BiomeInstanceKey biome, int dayIndex) {
         float[][] forecast = getWeeklyForecast(biome);
         if (forecast == null || forecast.length <= dayIndex) return 0.0f;
 
@@ -60,12 +60,12 @@ public class HumidityManager {
 
 
     /** Returns current real-time humidity % at this tick. */
-    public static float getCurrentHumidity(ResourceLocation biome, long worldTick) {
+    public static float getCurrentHumidity(BiomeInstanceKey biome, long worldTick) {
         return HumidityProfileManager.getCurrentHumidity(biome, worldTick);
     }
 
     /** Exposes the raw 7×2 weekly humidity forecast. */
-    public static float[][] getWeeklyForecast(ResourceLocation biome) {
+    public static float[][] getWeeklyForecast(BiomeInstanceKey biome) {
         return HumidityProfileManager.getWeeklyForecast(biome);
     }
 
@@ -79,11 +79,10 @@ public class HumidityManager {
     public static void onSwapProfiles(ServerLevel world) {
 
         AsyncAtmosphereService.runHumidity(() -> {
-        for (String key : HumidityProfileManager.getAllBiomeKeys()) {
-            ResourceLocation biome = new ResourceLocation(key);
-            float[] tomorrow = HumidityProfileManager.getTomorrowProfile(biome);
+        for (BiomeInstanceKey key : HumidityProfileManager.getAllBiomeKeys()) {
+            float[] tomorrow = HumidityProfileManager.getTomorrowProfile(key);
             if (tomorrow != null) {
-                HumidityProfileManager.putDayProfile(biome, tomorrow);
+                HumidityProfileManager.putDayProfile(key, tomorrow);
             }
         }
 

@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
 import net.Gabou.projectatmosphere.modules.storm.manager.StormManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.util.AtmosphericPhysics;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -16,7 +17,9 @@ import java.util.Random;
  * Generates a raw, biome‐isolated 7‐day [min,max] pressure forecast.
  */
 public class PressureGenerator {
-    public static float[][] generateWeekForecast(ServerLevel world, BlockPos pos, ResourceLocation biome) {
+    public static float[][] generateWeekForecast(ServerLevel world, BiomeInstanceKey key) {
+        ResourceLocation biome = key.biomeType();
+        BlockPos pos = key.samplePos();
         long day = world.getDayTime() / 24000L;
         long seed = world.getServer().getWorldData().worldGenOptions().seed()
                 ^ pos.asLong() ^ biome.hashCode() ^ day;
@@ -28,8 +31,8 @@ public class PressureGenerator {
         );
         float base = (float) P0;
 
-        float[][] tempWeek = TemperatureProfileManager.getWeeklyForecast(biome);
-        float[][] rhWeek = HumidityStorageManager.getForecast(biome);
+        float[][] tempWeek = TemperatureProfileManager.getWeeklyForecast(key);
+        float[][] rhWeek = HumidityStorageManager.getForecast(key);
         if (tempWeek == null || rhWeek == null) return new float[7][2];
 
         double[] densities = AtmosphericPhysics.computeAirDensity(tempWeek, rhWeek);
@@ -44,7 +47,7 @@ public class PressureGenerator {
             float densityModifier = (float)(densities[d] / referenceDensity);
             float deltaDensity = (densityModifier - 1f) * 30f; // Tune this multiplier
 
-            float spike = (float) StormManager.randomStormSpike(biome, d);
+            float spike = (float) StormManager.randomStormSpike(key, d);
 
             float center = base + deltaT + deltaDensity + spike;
 

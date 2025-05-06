@@ -4,6 +4,7 @@ package net.Gabou.projectatmosphere.modules.humidity.forecast;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityGenerator;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -11,36 +12,33 @@ import net.minecraft.world.level.Level;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class HumidityForecast {
 
     /**
      * Scans around center, loads cached or generates new weekly humidity forecasts.
      */
-    public static Map<ResourceLocation, float[][]> generateForecastAround(
+    public static Map<BiomeInstanceKey, float[][]> generateForecastAround(
             ServerLevel world, BlockPos center, int radiusBlocks) {
-        if (!world.dimension().equals(Level.OVERWORLD)) {
-            return Map.of();
-        }
-
         // findBiomes now returns a map of biome→samplePos
-        Map<ResourceLocation, BlockPos> samples =
+        Set<BiomeInstanceKey> samples =
                 AtmosphereUtils.findBiomes(world, center, radiusBlocks);
 
-        Map<ResourceLocation, float[][]> forecasts = new HashMap<>();
-        for (var entry : samples.entrySet()) {
-            ResourceLocation biome = entry.getKey();
-            BlockPos pos = entry.getValue();
+        Map<BiomeInstanceKey, float[][]> forecasts = new HashMap<>();
+        for (var entry : samples) {
+            ResourceLocation biome = entry.biomeType();
+            BlockPos pos = entry.samplePos();
 
 
             float[][] week;
-            if (HumidityStorageManager.hasForecast(biome)) {
-                week = HumidityStorageManager.getForecast(biome);
+            if (HumidityStorageManager.hasForecast(entry)) {
+                week = HumidityStorageManager.getForecast(entry);
             } else {
-                week = HumidityGenerator.generateWeekForecast(world, pos, biome);
-                HumidityStorageManager.putForecast(biome, week);
+                week = HumidityGenerator.generateWeekForecast(world, entry);
+                HumidityStorageManager.putForecast(entry, week);
             }
-            forecasts.put(biome, week);
+            forecasts.put(entry, week);
         }
         return forecasts;
     }
@@ -48,17 +46,17 @@ public class HumidityForecast {
     /**
      * Same as above, but generates without saving to storage.
      */
-    public static Map<ResourceLocation, float[][]> generateTemporaryForecastAround(
+    public static Map<BiomeInstanceKey, float[][]> generateTemporaryForecastAround(
             ServerLevel world, BlockPos center, int radiusBlocks) {
-        Map<ResourceLocation, BlockPos> samples =
+        Set<BiomeInstanceKey> samples =
                 AtmosphereUtils.findBiomes(world, center, radiusBlocks);
 
-        Map<ResourceLocation, float[][]> forecasts = new HashMap<>();
-        for (var entry : samples.entrySet()) {
-            ResourceLocation biome = entry.getKey();
-            BlockPos pos = entry.getValue();
-            float[][] week = HumidityGenerator.generateWeekForecast(world, pos, biome);
-            forecasts.put(biome, week);
+        Map<BiomeInstanceKey, float[][]> forecasts = new HashMap<>();
+        for (var entry : samples) {
+            ResourceLocation biome = entry.biomeType();
+            BlockPos pos = entry.samplePos();
+            float[][] week = HumidityGenerator.generateWeekForecast(world,entry);
+            forecasts.put(entry, week);
         }
         return forecasts;
     }

@@ -7,9 +7,9 @@ import net.Gabou.projectatmosphere.modules.storm.util.DailyStormGenerator;
 import net.Gabou.projectatmosphere.modules.storm.util.StormProfileManager;
 import net.Gabou.projectatmosphere.modules.storm.util.StormStorageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -29,7 +29,7 @@ public class StormManager {
         AsyncAtmosphereService.runStorm(() -> {
             lastCenter = center;
 
-            Map<ResourceLocation, double[]> forecasts =
+            Map<BiomeInstanceKey, float[]> forecasts =
                     StormForecast.generateStormForecastAround(world, lastCenter, DEFAULT_RADIUS);
 
             if (forecasts.isEmpty()) {
@@ -55,11 +55,11 @@ public class StormManager {
         init(world, center);
     }
 
-    public static double getCurrentStormIntensity(ResourceLocation biome, long worldTick) {
+    public static float getCurrentStormIntensity(BiomeInstanceKey biome, long worldTick) {
         return StormProfileManager.getCurrentStormIntensity(biome, worldTick);
     }
 
-    public static double[] getWeeklyForecast(ResourceLocation biome) {
+    public static float[] getWeeklyForecast(BiomeInstanceKey biome) {
         return StormProfileManager.getWeeklyForecast(biome);
     }
 
@@ -70,11 +70,10 @@ public class StormManager {
 
     public static void onSwapProfiles(Level world) {
         AsyncAtmosphereService.runStorm(() -> {
-        for (String key : StormProfileManager.getAllBiomeKeys()) {
-            ResourceLocation biome = new ResourceLocation(key);
-            double[] tom = StormProfileManager.getTomorrowProfile(biome);
+        for (BiomeInstanceKey key : StormProfileManager.getAllBiomeKeys()) {
+            float[] tom = StormProfileManager.getTomorrowProfile(key);
             if (tom != null) {
-                StormProfileManager.putDayProfile(biome, tom);
+                StormProfileManager.putDayProfile(key, tom);
             }
         }
         DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);});
@@ -84,7 +83,7 @@ public class StormManager {
         onRegenerate(world, world.players());
     }
 
-    public static float randomStormSpike(ResourceLocation biome, int d) {
+    public static float randomStormSpike(BiomeInstanceKey biome, int d) {
         return StormSpikeManager.randomStormSpike(biome, d);
     }
 

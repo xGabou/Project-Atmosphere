@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManage
 import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 //import net.Gabou.projectatmosphere.modules.temperature.spike.commands.SpikeCommands;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -46,7 +47,7 @@ public class TemperatureCommands {
                         .then(Commands.literal("forecast")
                                 .executes(ctx -> {
                                     Player player = ctx.getSource().getPlayerOrException();
-                                    ResourceLocation biome = TemperatureCommandHelper.getCurrentBiome(player);
+                                    BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
                                     String forecast = TemperatureCommandHelper.getWeeklyForecast(biome);
                                     ctx.getSource().sendSuccess(() -> Component.literal(forecast), false);
                                     return 1;
@@ -58,11 +59,11 @@ public class TemperatureCommands {
                                         .executes(ctx -> {
                                             Player player = ctx.getSource().getPlayerOrException();
                                             String biomeStr = StringArgumentType.getString(ctx, "biome");
-                                            ResourceLocation biome = TemperatureCommandHelper.resolveBiome(player, biomeStr);
+                                            BiomeInstanceKey biome = TemperatureCommandHelper.resolveBiome(player, biomeStr);
                                             long tick = TemperatureCommandHelper.getCurrentTick(ctx.getSource().getLevel());
                                             float temp = TemperatureCommandHelper.getTemperatureAt(biome, tick);
                                             ctx.getSource().sendSuccess(
-                                                    () -> Component.literal(biome + " @ tick " + tick + ": " +
+                                                    () -> Component.literal(biome.biomeType() + " @ tick " + tick + ": " +
                                                             String.format("%.2f°C", temp)), false);
                                             return 1;
                                         })))
@@ -70,7 +71,7 @@ public class TemperatureCommands {
                         .then(Commands.literal("dayprofile")
                                 .executes(ctx -> {
                                     Player player = ctx.getSource().getPlayerOrException();
-                                    ResourceLocation biome = TemperatureCommandHelper.getCurrentBiome(player);
+                                    BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
                                     float[] profile = TemperatureCommandHelper.getDayProfile(biome);
                                     ctx.getSource().sendSuccess(
                                             () -> Component.literal("Day profile: " +
@@ -96,7 +97,7 @@ public class TemperatureCommands {
                                     BlockPos pos = player.getOnPos();
 
                                     var biomeHolder = level.getBiome(pos);
-                                    ResourceLocation biomeId = biomeHolder.unwrapKey().get().location();
+                                    BiomeInstanceKey biomeId = new BiomeInstanceKey(biomeHolder.unwrapKey().get().location(),pos);
 
                                     float serene = TemperatureCommandHelper.getFinalBiomeTemperature(level, biomeHolder, pos);
                                     double celsius = TemperatureCommandHelper.convertToCelsius(serene);
@@ -175,7 +176,7 @@ public class TemperatureCommands {
                                             }
 
                                             CompletableFuture.runAsync(() -> {
-                                                Map<ResourceLocation, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), radius);
+                                                Map<BiomeInstanceKey, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), radius);
                                                 Gson gson = new GsonBuilder().setPrettyPrinting().create();
                                                 String json = gson.toJson(forecast);
 
@@ -191,7 +192,7 @@ public class TemperatureCommands {
                                     ServerLevel level = ctx.getSource().getLevel();
 
                                     CompletableFuture.runAsync(() -> {
-                                        Map<ResourceLocation, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), 100);
+                                        Map<BiomeInstanceKey, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), 100);
                                         Gson gson = new GsonBuilder().setPrettyPrinting().create();
                                         String json = gson.toJson(forecast);
 
