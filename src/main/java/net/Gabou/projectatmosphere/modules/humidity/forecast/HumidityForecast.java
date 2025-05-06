@@ -27,10 +27,6 @@ public class HumidityForecast {
 
         Map<BiomeInstanceKey, float[][]> forecasts = new HashMap<>();
         for (var entry : samples) {
-            ResourceLocation biome = entry.biomeType();
-            BlockPos pos = entry.samplePos();
-
-
             float[][] week;
             if (HumidityStorageManager.hasForecast(entry)) {
                 week = HumidityStorageManager.getForecast(entry);

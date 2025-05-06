@@ -37,7 +37,7 @@ import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 @Mod(ProjectAtmosphere.MODID)
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ProjectAtmosphere {
-    public static final int DEFAULT_RADIUS = 500;
+    public static final int DEFAULT_RADIUS = 100;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 

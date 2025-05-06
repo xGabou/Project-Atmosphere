@@ -37,11 +37,11 @@ public class AtmosphereManager {
         refreshUnifiedForecast();
     }
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        TemperatureModule.updateForecastAround(world, center);
-        HumidityModule.updateForecastAround(world, center);
-        PressureModule.updateForecastAround(world, center);
-        WindModule.updateForecastAround(world, center);
-        StormModule.updateForecastAround(world,center);
+//        TemperatureModule.updateForecastAround(world, center);
+//        HumidityModule.updateForecastAround(world, center);
+//        PressureModule.updateForecastAround(world, center);
+//        WindModule.updateForecastAround(world, center);
+//        StormModule.updateForecastAround(world,center);
     }
 
     public static void onRegisterCommands(final RegisterCommandsEvent event)

@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.temperature.config;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.EnumMap;
@@ -66,6 +67,13 @@ public class BiomeTempConfig {
                 new Range( 8f, 24f),
                 new Range(  -9f, 14f)
         });
+        putAllSeasons("beach", new Range[]{
+                new Range(-2f, 8f),
+                new Range(2f, 14f),
+                new Range(15f, 30f),
+                new Range(5f, 18f)
+        });
+
 
         putAllSeasons("cherry_grove", new Range[]{
                 new Range(-12f,  2f),
@@ -218,10 +226,20 @@ public class BiomeTempConfig {
                 new Range(8f, 12f),
                 new Range(7f, 10f)
         });
+        mirrorBiome("savanna_plateau",        "savanna");
+        mirrorBiome("stony_shore",            "beach");
+        mirrorBiome("snowy_beach",            "beach");
+        mirrorBiome("windswept_gravelly_hills", "taiga");       // terrain rocheux et froid
+        mirrorBiome("windswept_forest",       "taiga");
+        mirrorBiome("windswept_hills",        "taiga");
+        mirrorBiome("jagged_peaks",           "frozen_peaks");
+        mirrorBiome("stony_peaks",            "frozen_peaks");
+        mirrorBiome("grove",                  "snowy_slopes");
 
 
 
-    // ─────────────────────────────────────────────────────────────────────
+
+        // ─────────────────────────────────────────────────────────────────────
         // Nether (constant)
         // ─────────────────────────────────────────────────────────────────────
         putConstSeasons("nether_wastes",    new Range(45f,50f), new DailyRange(40f,45f,47f,52f));
@@ -284,6 +302,9 @@ public class BiomeTempConfig {
 
     /** Retrieve the min/max °C for a given biome and season. */
     public static Range getRange(ResourceLocation biome, Season season) {
+        if (!SEASON_RANGES.getOrDefault(season, Map.of()).containsKey(biome)) {
+            ProjectAtmosphere.LOGGER.warn("❌ No temperature range defined for biome {}", biome);
+        }
         return SEASON_RANGES.getOrDefault(season, Map.of())
                 .getOrDefault(biome, new Range(0f,0f));
     }
