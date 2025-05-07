@@ -11,7 +11,6 @@ import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 
 public class DailyStormGenerator {
     public static void scheduleGenerationForTodayAndTomorrow(Level world) {
-        AsyncAtmosphereService.runStorm(() -> {
             long now = world.getDayTime();
             for (BiomeInstanceKey key : StormProfileManager.getAllBiomeKeys()) {
                 boolean hasToday = StormProfileManager.hasDayProfile(key);
@@ -29,7 +28,6 @@ public class DailyStormGenerator {
                     StormProfileManager.putTomorrowProfile(key, tom);
                 }
             }
-        });
     }
 
     private static float[] buildDailyCurve(float spike) {

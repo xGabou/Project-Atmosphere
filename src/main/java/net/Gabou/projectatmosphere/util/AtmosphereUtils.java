@@ -2,14 +2,12 @@ package net.Gabou.projectatmosphere.util;
 
 import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
 public class AtmosphereUtils {
 
@@ -41,22 +39,26 @@ public class AtmosphereUtils {
         for (int dx = -radiusBlocks; dx <= radiusBlocks; dx += step) {
             for (int dz = -radiusBlocks; dz <= radiusBlocks; dz += step) {
                 BlockPos pos = center.offset(dx, 0, dz);
-                ResourceLocation biomeId = world.getBiome(pos).unwrapKey().get().location();
+                Optional<ResourceLocation> optionalKey = world.getBiome(pos).unwrapKey().map(ResourceKey::location);
 
-                if (foundBiomes.add(biomeId)) {
-                    biomeKeys.add(new BiomeInstanceKey(biomeId, pos));
+
+                if (optionalKey.isPresent()) {
+                    ResourceLocation biomeId = optionalKey.get();
+
+                    if (foundBiomes.add(biomeId)) {
+                        biomeKeys.add(new BiomeInstanceKey(biomeId, pos));
+                    }
                 }
             }
         }
-
     }
+
     /**
-     * Finds the nearest BiomeInstanceKey in the forecast map that matches the given biome type.
+     * Finds the nearest biome instance key in the forecast map that matches the given type.
      *
-     * @param biomeType   The biome type to match.
-     * @param targetPos   The target position to find the nearest key.
-     * @param forecastMap The map of BiomeInstanceKey to forecast data.
-     * @return The nearest BiomeInstanceKey that matches the given biome type, or null if none found.
+     * @param type        The biome instance key to match.
+     * @param forecastMap The map of biome instance keys to search in.
+     * @return The nearest matching biome instance key, or null if none found.
      */
     public static BiomeInstanceKey findNearestBiomeInstanceKey(
            BiomeInstanceKey type,

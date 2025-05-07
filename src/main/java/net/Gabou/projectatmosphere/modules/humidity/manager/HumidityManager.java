@@ -18,34 +18,32 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import java.util.List;
 import java.util.Map;
 
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
+
 public class HumidityManager {
-    public static final int RADIUS = 250;
 
     /** Called on server spawn or when regenerating around a player. */
     public static void init(ServerLevel world, BlockPos center) {
-        AsyncAtmosphereService.runHumidity(() -> {
 
-            // 2) generate or load weekly forecasts
-            Map<BiomeInstanceKey, float[][]> forecasts =
-                    HumidityForecast.generateForecastAround(world, center, RADIUS);
 
-            // 3) cache into profiles
-            forecasts.forEach((biome, week) -> {
-                if (!HumidityProfileManager.hasWeeklyForecast(biome)) {
-                    HumidityProfileManager.putWeeklyForecast(biome, week);
-                }
-            });
+            try {
+                // 2) generate or load weekly forecasts
+                 HumidityForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
 
-            // 4) schedule daily curve generation
-            DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
-        });
+                // 4) schedule daily curve generation
+                DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
+            } catch (Exception e) {
+                LOGGER.error("Failed to generate humidity forecast around " + center, e);
+            }
+
     }
 
     public static void onPlayerJoined(ServerLevel world, BlockPos center) {
         init(world, center);
     }
     public static void onPrecomputeProfiles(ServerLevel world) {
-        AsyncAtmosphereService.runHumidity(() -> DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world));
+     DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
 
     }
     public static float getAverageHumidity(BiomeInstanceKey biome, int dayIndex) {
@@ -78,7 +76,7 @@ public class HumidityManager {
     /** Swap tomorrow→today profiles at day boundary. */
     public static void onSwapProfiles(ServerLevel world) {
 
-        AsyncAtmosphereService.runHumidity(() -> {
+
         for (BiomeInstanceKey key : HumidityProfileManager.getAllBiomeKeys()) {
             float[] tomorrow = HumidityProfileManager.getTomorrowProfile(key);
             if (tomorrow != null) {
@@ -88,10 +86,12 @@ public class HumidityManager {
 
 
         DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
-        });
+
     }
 
     public static void onSeasonChange(ServerLevel world) {
+        //TODO make sure we dont stack forecasts
+        onRegenerate(world, world.players());
     }
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {
@@ -101,7 +101,6 @@ public class HumidityManager {
     public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
 
             clearForecastCache(world);
-            init(world, world.getSharedSpawnPos());
             for (Player player : players) {
                 BlockPos pos = player.blockPosition();
                 HumidityManager.onPlayerJoined(world, pos);

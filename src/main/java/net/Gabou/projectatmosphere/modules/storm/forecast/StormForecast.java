@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.storm.forecast;
 
+import net.Gabou.projectatmosphere.modules.storm.util.StormProfileManager;
 import net.Gabou.projectatmosphere.modules.storm.util.StormStorageManager;
 import net.Gabou.projectatmosphere.modules.storm.util.StormGenerator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -19,29 +20,27 @@ public class StormForecast {
      * Generates or loads weekly storm forecasts around the center position.
      * Used on world load or precompute pass.
      */
-    public static Map<BiomeInstanceKey, float[]> generateStormForecastAround(ServerLevel world,
+    public static void generateStormForecastAround(ServerLevel world,
                                                                               BlockPos center,
                                                                               int radiusBlocks) {
 
         Set<BiomeInstanceKey> samples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
-        Map<BiomeInstanceKey, float[]> forecast = new HashMap<>();
-
         for (var entry : samples) {
             ResourceLocation biome = entry.biomeType();
             BlockPos pos = entry.samplePos();
 
             float[] week;
             if (StormStorageManager.hasForecast(entry)) {
-                week = StormStorageManager.getForecast(entry);
+                StormProfileManager.putWeeklyForecast(entry,StormStorageManager.getForecast(entry));
             } else {
                 week = StormGenerator.generateWeeklyStormProfile(world, pos, biome);
                 StormStorageManager.saveForecast(entry, week);
+                StormProfileManager.putWeeklyForecast(entry, week);
             }
 
-            forecast.put(entry, week);
+
         }
 
-        return forecast;
     }
 
     /**

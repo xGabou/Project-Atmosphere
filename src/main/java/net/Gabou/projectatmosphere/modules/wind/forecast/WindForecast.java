@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.wind.forecast;
 
+import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.util.WindStorageManager;
 import net.Gabou.projectatmosphere.modules.wind.util.WindGenerator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -14,9 +15,8 @@ import java.util.Set;
 
 public class WindForecast {
 
-    public static Map<BiomeInstanceKey, float[][]> generateForecastAround(ServerLevel world, BlockPos center, int radius) {
+    public static void generateForecastAround(ServerLevel world, BlockPos center, int radius) {
         Set<BiomeInstanceKey> samples = AtmosphereUtils.findBiomes(world, center, radius);
-        Map<BiomeInstanceKey, float[][]> result = new HashMap<>();
 
         for (BiomeInstanceKey entry : samples) {
             ResourceLocation biome = entry.biomeType();
@@ -24,16 +24,16 @@ public class WindForecast {
 
             float[][] week;
             if (WindStorageManager.hasForecast(entry)) {
-                week = WindStorageManager.getForecast(entry);
+                WindProfileManager.putWeeklyForecast(entry,WindStorageManager.getForecast(entry));
             } else {
                 week = WindGenerator.generateWeeklyWindProfile(world, pos, biome);
                 WindStorageManager.saveForecast(entry, week);
+                WindProfileManager.putWeeklyForecast(entry, week);
             }
 
-            result.put(entry, week);
         }
 
-        return result;
+
     }
 
     public static Map<BiomeInstanceKey, float[][]> generateTemporaryForecastAround(ServerLevel world, BlockPos center, int radius) {

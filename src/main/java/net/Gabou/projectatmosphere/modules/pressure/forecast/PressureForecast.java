@@ -60,7 +60,6 @@ public class PressureForecast {
         // Step 1 — Generate raw weekly pressure for each biome instance
         for (var entry : biomeSamples) {
             float[][] week = PressureGenerator.generateWeekForecast(world,entry);
-            PressureProfileManager.putWeeklyForecast(entry, week);
             PressureStorageManager.putForecast(entry, week);
             activeWeekly.put(entry, week);
         }
@@ -83,6 +82,7 @@ public class PressureForecast {
                 }
             }
             activeWeekly.put(key, week);
+            PressureProfileManager.putWeeklyForecast(key, week);
         }
 
         // Step 4 — Generate daily pressure curves

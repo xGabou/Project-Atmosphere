@@ -12,24 +12,27 @@ public record BiomeInstanceKey(ResourceLocation biomeType, BlockPos samplePos) {
         return biomeType.toString() + "@" + samplePos.toShortString();
     }
 
-    public static BiomeInstanceKey fromString(String input) {
+    public static BiomeInstanceKey fromString(String s) {
         try {
-            String[] parts = input.split("@");
-            if (parts.length != 2) throw new IllegalArgumentException("Invalid format: missing '@' separator");
+            String[] parts = s.split("@");
+            if (parts.length != 2) throw new IllegalArgumentException("Invalid BiomeInstanceKey format: " + s);
 
             ResourceLocation biome = new ResourceLocation(parts[0]);
-            String[] posParts = parts[1].split("_");
+            String[] posParts = parts[1].split(",");
+
             if (posParts.length != 3) throw new IllegalArgumentException("Invalid position format");
 
-            int x = Integer.parseInt(posParts[0]);
-            int y = Integer.parseInt(posParts[1]);
-            int z = Integer.parseInt(posParts[2]);
+            int x = Integer.parseInt(posParts[0].trim());
+            int y = Integer.parseInt(posParts[1].trim());
+            int z = Integer.parseInt(posParts[2].trim());
 
             return new BiomeInstanceKey(biome, new BlockPos(x, y, z));
+
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid BiomeInstanceKey format: " + input, e);
+            throw new IllegalArgumentException("Invalid BiomeInstanceKey format: " + s, e);
         }
     }
+
     public static BiomeInstanceKey fromJson(JsonObject obj) {
         ResourceLocation biome = new ResourceLocation(obj.get("biome").getAsString());
         BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());

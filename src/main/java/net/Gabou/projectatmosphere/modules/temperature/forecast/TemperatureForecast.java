@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.temperature.forecast;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
+import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.modules.temperature.variation.VariationGenerator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -21,11 +22,10 @@ public class TemperatureForecast {
      * Scans a 500×500 area, uses cached forecasts when present,
      * otherwise generates and saves new weekly forecasts.
      */
-    public static Map<BiomeInstanceKey, float[][]> generateForecastAround(Level world, BlockPos center, int radiusBlocks) {
+    public static void generateForecastAround(Level world, BlockPos center, int radiusBlocks) {
 
 
         Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
-        Map<BiomeInstanceKey, float[][]> forecasts = new HashMap<>();
 
 
         // Step 2: Generate forecast for each biome based on its real sample position
@@ -35,19 +35,17 @@ public class TemperatureForecast {
 
 
             if (ForecastStorageManager.hasForecast(entry)) {
-                forecasts.put(entry, ForecastStorageManager.getForecast(entry));
+                TemperatureProfileManager.putWeeklyForecast(entry, ForecastStorageManager.getForecast(entry));
             } else {
                 float[][] week= SpikeManager.applySpikeLogic(entry,
                         VariationGenerator.applyVariationToWeek(
                         TemperatureGenerator.generateWeekForecast(world, pos, biome)));
-
-
-                forecasts.put(entry, week);
                 ForecastStorageManager.saveForecast(entry, week);
+                TemperatureProfileManager.putWeeklyForecast(entry, week);
             }
         }
 
-        return forecasts;
+
     }
 
     public static Map<BiomeInstanceKey, float[][]> generateTemporaryForecastAround(ServerLevel world, BlockPos center, int radius) {

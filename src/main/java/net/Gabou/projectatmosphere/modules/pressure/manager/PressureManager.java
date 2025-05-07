@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
 
 public class PressureManager {
 
@@ -32,9 +33,16 @@ public class PressureManager {
 
     /** Called on server spawn or when regenerating around a player. */
     public static void init(ServerLevel world, BlockPos center) {
-        AsyncAtmosphereService.runPression(()->
-            PressureForecast.generateFullForecast(world, center, DEFAULT_RADIUS)
-        );
+
+                {
+                    try {
+                        PressureForecast.generateFullForecast(world, center, DEFAULT_RADIUS);
+                    } catch (Exception e) {
+                        LOGGER.error("Failed to generate pressure forecast around " + center, e);
+                    }
+                }
+
+
 
     }
 
@@ -52,15 +60,14 @@ public class PressureManager {
 
     /** Called at tick 18000 to precompute both today & tomorrow */
     public static void onPrecomputeProfiles(Level world) {
-        AsyncAtmosphereService.runPression(()->
-        DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world));
+
+        DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     /** Called at tick 21000 (3 AM) to swap tomorrow→today, then precompute next tomorrow */
     public static void onSwapProfiles(Level world) {
-        AsyncAtmosphereService.runPression(()->{
         PressureProfileManager.swapTomorrowToToday();
-        DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world);});
+        DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     /** Clears all cached profiles (will regenerate on next init) */

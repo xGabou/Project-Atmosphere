@@ -21,33 +21,20 @@ import java.util.Map;
 import java.util.Objects;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
 
 public class StormManager {
-    private static BlockPos lastCenter;
 
     public static void init(ServerLevel world, BlockPos center) {
-        AsyncAtmosphereService.runStorm(() -> {
-            lastCenter = center;
 
-            Map<BiomeInstanceKey, float[]> forecasts =
-                    StormForecast.generateStormForecastAround(world, lastCenter, DEFAULT_RADIUS);
-
-            if (forecasts.isEmpty()) {
-                Objects.requireNonNull(world.getServer())
-                        .sendSystemMessage(Component.literal(
-                                "WARNING: No biomes found for storm forecasting around " + center
-                        ));
-                return;
-            }
-
-            forecasts.forEach((biome, week) -> {
-                if (!StormProfileManager.hasWeeklyForecast(biome)) {
-                    StormProfileManager.putWeeklyForecast(biome, week);
-                }
-            });
+            try {
+                    StormForecast.generateStormForecastAround(world, center, DEFAULT_RADIUS);
 
             DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
-        });
+            } catch (Exception e) {
+                LOGGER.error("Failed to generate storm forecast around " + center, e);
+            }
+
 
     }
 
@@ -64,19 +51,18 @@ public class StormManager {
     }
 
     public static void onPrecomputeProfiles(Level world) {
-        AsyncAtmosphereService.runStorm(() ->
-        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world));
+
+        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     public static void onSwapProfiles(Level world) {
-        AsyncAtmosphereService.runStorm(() -> {
         for (BiomeInstanceKey key : StormProfileManager.getAllBiomeKeys()) {
             float[] tom = StormProfileManager.getTomorrowProfile(key);
             if (tom != null) {
                 StormProfileManager.putDayProfile(key, tom);
             }
         }
-        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);});
+        DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     public static void onSeasonChange(ServerLevel world) {

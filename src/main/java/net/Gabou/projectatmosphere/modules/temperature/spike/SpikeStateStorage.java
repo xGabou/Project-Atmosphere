@@ -4,6 +4,7 @@ import com.google.gson.*;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.StorageUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -22,7 +23,6 @@ public class SpikeStateStorage {
     public static final String FILE_NAME = "spike_data.json";
 
     public static void saveAll(ServerLevel world) {
-        AsyncAtmosphereService.runTemperature(() -> {
             JsonObject root = new JsonObject();
 
             for (Map.Entry<BiomeInstanceKey, SpikeState> entry : SpikeManager.getAllStates().entrySet()) {
@@ -49,13 +49,13 @@ public class SpikeStateStorage {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        });
+
     }
 
 
 
     public static void loadAll(ServerLevel world) {
-        AsyncAtmosphereService.runTemperature(() -> {
+
             Path SAVE_PATH = getPerWorldSavePath(world, FILE_NAME);
             if (!Files.exists(SAVE_PATH)) return;
 
@@ -84,19 +84,12 @@ public class SpikeStateStorage {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        });
+
     }
 
     public static void clearAll(ServerLevel world) {
-        AsyncAtmosphereService.runTemperature(() -> {
-            Path SAVE_PATH = getPerWorldSavePath(world, FILE_NAME);
-            if (Files.exists(SAVE_PATH)) {
-                try {
-                    Files.delete(SAVE_PATH);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+
+        SpikeManager.clearSpikeCache( world );
+        StorageUtils.clearCache(world, FILE_NAME);
     }
 }

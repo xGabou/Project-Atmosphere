@@ -27,11 +27,9 @@ import java.util.Map;
 import java.util.Objects;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
 
 public class TemperatureManager{
-
-
-    private static BlockPos lastCenter = BlockPos.ZERO;
 
     /** Called once on server startup to generate initial forecast around spawn. */
     public static void initTemperatureForServer(ServerLevel server, BlockPos spawn) {
@@ -50,30 +48,15 @@ public class TemperatureManager{
      * If biomes near position have not been cached, they will be generated and persisted.
      */
     private static void init(ServerLevel world, BlockPos center) {
-        AsyncAtmosphereService.runTemperature(() -> {
-            lastCenter = center;
 
-            Map<BiomeInstanceKey, float[][]> forecasts =
-                    TemperatureForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
-
-            if (forecasts.isEmpty()) {
-                world.getServer().sendSystemMessage(Component.literal("""
-                ⚠️ CRITICAL ERROR: No biomes found in the area!
-                Use /temperature regenerate to force a new forecast.
-                Or make sure you're in the Overworld.
-            """));
-                return;
+            try {
+                TemperatureForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
+                DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
+                ProjectAtmosphere.LOGGER.info("[TempForecast] Generating full temperature forecast...");
+            } catch (Exception e) {
+                LOGGER.error("Failed to generate temperature forecast around " + center, e);
             }
 
-            // Only store new forecasts that are not already present
-            forecasts.forEach((biome, week) -> {
-                if (!TemperatureProfileManager.hasWeeklyForecast(biome)) {
-                    TemperatureProfileManager.putWeeklyForecast(biome, week);
-                }
-            });
-
-            DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
-        });
 
     }
 
@@ -81,10 +64,6 @@ public class TemperatureManager{
     public static void clearForecastCache(ServerLevel world) {
         TemperatureProfileManager.clearAll();
         ForecastStorageManager.clearCache(world);
-    }
-
-    public static BlockPos getLastCenter() {
-        return lastCenter;
     }
     public static float getCurrentTemperature(BiomeInstanceKey biome, long worldTick) {
         return TemperatureProfileManager.getCurrentTemperature(biome, worldTick);
@@ -95,7 +74,7 @@ public class TemperatureManager{
     }
 
     public static void onSwapProfiles(Level world) {
-        AsyncAtmosphereService.runTemperature(() -> {
+
         for (BiomeInstanceKey key : TemperatureProfileManager.getAllBiomeKeys()) {
             float[] tomorrow = TemperatureProfileManager.getTomorrowProfile(key);
             if (tomorrow != null) {
@@ -103,11 +82,11 @@ public class TemperatureManager{
             }
         }
         DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
-        });
+
     }
 
     public static void onPrecomputeProfiles(Level world) {
-        AsyncAtmosphereService.runTemperature(() ->DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world));
+ DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
 
     }
 

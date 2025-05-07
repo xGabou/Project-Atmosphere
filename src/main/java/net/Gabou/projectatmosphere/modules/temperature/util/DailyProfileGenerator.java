@@ -18,7 +18,6 @@ public class DailyProfileGenerator {
 //        });
 //    }
     public static void scheduleGenerationForTodayAndTomorrow(Level world) {
-        AsyncAtmosphereService.runTemperature(() -> {
             long now = world.getDayTime();
 
             for (BiomeInstanceKey key : ForecastStorageManager.getAllBiomeKeys()) {
@@ -46,7 +45,6 @@ public class DailyProfileGenerator {
                     TemperatureProfileManager.putTomorrowProfile(key, tomorrow);
                 }
             }
-        });
     }
 
 

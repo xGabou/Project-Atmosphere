@@ -113,7 +113,7 @@ public class TemperatureCommandHelper {
      * Forecast temperature based on surroundings (e.g., ahead of time).
      */
     public static String getForecastedTemperature(ServerLevel level, BlockPos pos) {
-        return formatForecastMap(TemperatureForecast.generateForecastAround(level, pos, 500));
+        return formatForecastMap(TemperatureForecast.generateTemporaryForecastAround(level, pos, 500));
     }
 
 

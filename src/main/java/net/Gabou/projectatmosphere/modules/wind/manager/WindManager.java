@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.wind.manager;
 import net.Gabou.projectatmosphere.modules.wind.forecast.WindForecast;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.util.WindStorageManager;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -14,21 +15,22 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import java.util.List;
 import java.util.Map;
 
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
+
 public class WindManager {
 
     public static final int WIND_SPEED = 10;  // Default speed in m/s
 
     public static void init(ServerLevel world, BlockPos center) {
-        Map<BiomeInstanceKey, float[][]> forecast =
-                WindForecast.generateForecastAround(world, center, 250);
 
-        forecast.forEach((biome, week) -> {
-            if (!WindProfileManager.hasWeeklyForecast(biome)) {
-                WindProfileManager.putWeeklyForecast(biome, week);
+            try {
+                WindForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
+                WindProfileManager.generateTodayAndTomorrowProfiles(world);
+            } catch (Exception e) {
+                LOGGER.error("Failed to generate wind forecast around " + center, e);
             }
-        });
 
-        WindProfileManager.generateTodayAndTomorrowProfiles(world);
     }
 
     public static void onPlayerJoined(ServerLevel world, BlockPos pos) {
@@ -44,17 +46,22 @@ public class WindManager {
     }
 
     public static void onPrecomputeProfiles(ServerLevel world) {
-        WindProfileManager.generateTodayAndTomorrowProfiles(world);
+
+            WindProfileManager.generateTodayAndTomorrowProfiles(world);
+
+
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        for (BiomeInstanceKey key : WindProfileManager.getAllBiomeKeys()) {
-            float[] tomorrow = WindProfileManager.getTomorrowProfile(key);
-            if (tomorrow != null) {
-                WindProfileManager.putDayProfile(key, tomorrow);
+
+            for (BiomeInstanceKey key : WindProfileManager.getAllBiomeKeys()) {
+                float[] tomorrow = WindProfileManager.getTomorrowProfile(key);
+                if (tomorrow != null) {
+                    WindProfileManager.putDayProfile(key, tomorrow);
+                }
             }
-        }
-        WindProfileManager.generateTodayAndTomorrowProfiles(world);
+            WindProfileManager.generateTodayAndTomorrowProfiles(world);
+
     }
 
 

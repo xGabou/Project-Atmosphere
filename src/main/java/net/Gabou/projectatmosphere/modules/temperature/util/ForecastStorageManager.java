@@ -45,7 +45,7 @@ public class ForecastStorageManager {
      * This method is called asynchronously to avoid blocking the main thread.
      */
     public static void loadAll(ServerLevel world) {
-        AsyncAtmosphereService.runTemperature(() -> {
+
             Path savePath = getPerWorldSavePath(world, FILE_NAME);
             if (!Files.exists(savePath)) return;
 
@@ -67,7 +67,6 @@ public class ForecastStorageManager {
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
-        });
     }
 
 
@@ -76,7 +75,6 @@ public class ForecastStorageManager {
      * This method is called asynchronously to avoid blocking the main thread.
      */
     public static void saveAll(ServerLevel world) {
-        AsyncAtmosphereService.runTemperature(() -> {
             JsonObject root = new JsonObject();
 
             for (var entry : cache.entrySet()) {
@@ -103,7 +101,6 @@ public class ForecastStorageManager {
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
-        });
     }
 
 
