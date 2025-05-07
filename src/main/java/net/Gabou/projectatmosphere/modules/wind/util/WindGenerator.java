@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.modules.wind.util;
 
+import net.Gabou.projectatmosphere.modules.pressure.util.PressureStorageManager;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -13,19 +15,25 @@ import java.util.Random;
 public class WindGenerator {
 
     private static final Random random = new Random();
+    private static final float valueConst = 1f;
+    private static final float variationStrenght = 2.0f;
 
-    public static float[][] generateWeeklyWindProfile(ServerLevel world, BlockPos pos, ResourceLocation biome) {
+    public static float[][] generateWeeklyWindProfile(ServerLevel world, BlockPos pos, ResourceLocation biome, BiomeInstanceKey entry) {
+
         float[][] forecast = new float[7][2];
-
+        float[][] pressureForecast = PressureStorageManager.getForecast(entry);
         for (int i = 0; i < 7; i++) {
-            float base = 4.0f + random.nextFloat() * 4.0f;     // Base between 4–8 m/s
-            float variation = random.nextFloat() * 2.0f;        // Random addition 0–2 m/s
+            float minPressure = pressureForecast[i][0];
+            float maxPressure = pressureForecast[i][1];
+            float altitude = pos.getY();
+            float altitudeFactor = (float) Math.log(1 + altitude / 10);
+            float baseSpeed = valueConst * (maxPressure - minPressure) * altitudeFactor;
+            float variation = random.nextFloat() * variationStrenght;
+            float minSpeed = baseSpeed - variation;
+            float maxSpeed = baseSpeed + variation;
 
-            float min = base;
-            float max = base + variation;
-
-            forecast[i][0] = min;
-            forecast[i][1] = max;
+            forecast[i][0] = minPressure;
+            forecast[i][1] = minSpeed;
         }
 
         return forecast;

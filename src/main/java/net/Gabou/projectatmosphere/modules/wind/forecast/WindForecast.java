@@ -16,9 +16,9 @@ import java.util.Set;
 public class WindForecast {
 
     public static void generateForecastAround(ServerLevel world, BlockPos center, int radius) {
-        Set<BiomeInstanceKey> samples = AtmosphereUtils.findBiomes(world, center, radius);
+        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
 
-        for (BiomeInstanceKey entry : samples) {
+        for (BiomeInstanceKey entry : biomeSamples) {
             ResourceLocation biome = entry.biomeType();
             BlockPos pos = entry.samplePos();
 
@@ -26,7 +26,7 @@ public class WindForecast {
             if (WindStorageManager.hasForecast(entry)) {
                 WindProfileManager.putWeeklyForecast(entry,WindStorageManager.getForecast(entry));
             } else {
-                week = WindGenerator.generateWeeklyWindProfile(world, pos, biome);
+                week = WindGenerator.generateWeeklyWindProfile(world, pos, biome, entry);
                 WindStorageManager.saveForecast(entry, week);
                 WindProfileManager.putWeeklyForecast(entry, week);
             }
@@ -43,7 +43,7 @@ public class WindForecast {
         for (BiomeInstanceKey entry : samples) {
             ResourceLocation biome = entry.biomeType();
             BlockPos pos = entry.samplePos();
-            float[][] week = WindGenerator.generateWeeklyWindProfile(world, pos, biome);
+            float[][] week = WindGenerator.generateWeeklyWindProfile(world, pos, biome, entry);
             result.put(entry, week);
         }
 

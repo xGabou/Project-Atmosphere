@@ -57,7 +57,6 @@ public class PressureForecast {
         Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
         activeWeekly.clear();
 
-        // Step 1 — Generate raw weekly pressure for each biome instance
         for (var entry : biomeSamples) {
             float[][] week = PressureGenerator.generateWeekForecast(world,entry);
             PressureStorageManager.putForecast(entry, week);

@@ -2,6 +2,8 @@
 package net.Gabou.projectatmosphere.modules.pressure.manager;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.modules.humidity.Command.HumidityCommand;
+import net.Gabou.projectatmosphere.modules.pressure.Command.PressureCommand;
 import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast;
 import net.Gabou.projectatmosphere.modules.pressure.util.DailyPressureGenerator;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
@@ -15,6 +17,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.event.RegisterCommandsEvent;
 
 import java.util.List;
 import java.util.Map;
@@ -91,6 +94,10 @@ public class PressureManager {
             }
 
 
+    }
+
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        PressureCommand.register(event.getDispatcher());
     }
 
     public static void updateForecastAround(ServerLevel world, BlockPos center) {

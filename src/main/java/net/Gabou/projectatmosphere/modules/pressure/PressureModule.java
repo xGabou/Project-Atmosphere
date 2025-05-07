@@ -36,12 +36,10 @@ public class PressureModule {
 
     public static void onServerStarting(ServerLevel world, BlockPos center) {
         PressureStorageManager.loadAll(world);
-        //PressureManager.init(world, center);
+        PressureManager.init(world, center);
     }
-
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-
-        //PressureManager.onRegisterCommands(event);
+        PressureManager.onRegisterCommands(event);
     }
     public static void onSwapProfiles(ServerLevel world) {
         PressureManager.onSwapProfiles(world);

@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.modules.wind.manager;
 
+import net.Gabou.projectatmosphere.modules.humidity.Command.HumidityCommand;
+import net.Gabou.projectatmosphere.modules.wind.Command.WindCommand;
 import net.Gabou.projectatmosphere.modules.wind.forecast.WindForecast;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.util.WindStorageManager;
@@ -26,7 +28,7 @@ public class WindManager {
 
             try {
                 WindForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
-                WindProfileManager.generateTodayAndTomorrowProfiles(world);
+                //WindProfileManager.generateTodayAndTomorrowProfiles(world);
             } catch (Exception e) {
                 LOGGER.error("Failed to generate wind forecast around " + center, e);
             }
@@ -70,9 +72,8 @@ public class WindManager {
     }
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-
+        WindCommand.register(event.getDispatcher());
     }
-
     public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
         WindProfileManager.clearAll();
         init(world, world.getSharedSpawnPos());
