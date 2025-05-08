@@ -90,6 +90,12 @@ public class AtmosphereUtils {
     ) {
         return forecastMap.get(findNearestBiomeInstanceKey(biome, forecastMap));
     }
+    public static float getRightForecastForBiome2(
+            BiomeInstanceKey biome,
+            Map<BiomeInstanceKey, Float> forecastMap
+    ) {
+        return forecastMap.get(findNearestBiomeInstanceKey(biome, forecastMap));
+    }
 
     /** Finds all biomes within a square area around the center position.
      * The area is defined by the radius in blocks.
@@ -115,9 +121,9 @@ public class AtmosphereUtils {
      */
     public static JsonObject serializeBlockPos(BlockPos pos) {
         JsonObject obj = new JsonObject();
-        obj.addProperty("x", pos.getX());
-        obj.addProperty("y", pos.getY());
-        obj.addProperty("z", pos.getZ());
+        obj.addProperty("x", String.valueOf(pos.getX()));
+        obj.addProperty("y", String.valueOf(pos.getY()));
+        obj.addProperty("z", String.valueOf(pos.getZ()));
         return obj;
     }
 

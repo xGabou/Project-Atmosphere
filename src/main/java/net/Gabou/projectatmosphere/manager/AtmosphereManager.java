@@ -124,7 +124,7 @@ public class AtmosphereManager {
             float[] temp = TemperatureProfileManager.getDayProfile(key);
             float[] pressure = PressureProfileManager.getTodayProfile(key);
             float[] humidity = HumidityProfileManager.getDayProfile(key);
-            float[] wind = WindProfileManager.getTodayProfile(key);
+            float wind = WindProfileManager.getTodayProfile(key);
 
             FORECAST_MAP.put(key.biomeType(), new BiomeForecast(temp, pressure, humidity, wind));
         }
@@ -166,5 +166,5 @@ public class AtmosphereManager {
 
 
     /** Central record to unify today's weather-like forecast */
-    public static record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, float[] wind) {}
+    public static record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, float wind) {}
 }

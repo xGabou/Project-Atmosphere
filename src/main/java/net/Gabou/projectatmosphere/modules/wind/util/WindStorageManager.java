@@ -25,7 +25,7 @@ import static net.Gabou.projectatmosphere.util.StorageUtils.getPerWorldSavePath;
 public class WindStorageManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Map<BiomeInstanceKey, float[][]> CACHE = new HashMap<>();
+    private static final Map<BiomeInstanceKey, float[]> CACHE = new HashMap<>();
     private static final String FILE_NAME = "wind_forecasts.json";
 
     public static boolean hasForecast(BiomeInstanceKey biome) {
@@ -33,11 +33,11 @@ public class WindStorageManager {
         return key != null && CACHE.containsKey(key);
     }
 
-    public static float[][] getForecast(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome(biome,CACHE);
+    public static float[] getForecast(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome1(biome,CACHE);
     }
 
-    public static void saveForecast(BiomeInstanceKey biome, float[][] week) {
+    public static void saveForecast(BiomeInstanceKey biome, float[] week) {
         CACHE.put(biome, week);
     }
 
@@ -56,10 +56,9 @@ public class WindStorageManager {
             obj.add("pos", AtmosphereUtils.serializeBlockPos(biomeKey.samplePos()));
 
             JsonArray arr = new JsonArray();
-            for (float[] day : week) {
+            for (float day : week) {
                 JsonArray pair = new JsonArray();
-                pair.add(String.valueOf(day[0])); // min
-                pair.add(String.valueOf(day[1])); // max
+                pair.add(String.valueOf(day)); // min
                 arr.add(pair);
             }
 
@@ -94,11 +93,10 @@ public class WindStorageManager {
                 BiomeInstanceKey key = new BiomeInstanceKey(biomeId, pos);
 
                 JsonArray arr = obj.getAsJsonArray("week");
-                float[][] week = new float[7][2];
+                float[]week = new float[7];
                 for (int i = 0; i < 7; i++) {
                     JsonArray pair = arr.get(i).getAsJsonArray();
-                    week[i][0] = pair.get(0).getAsFloat();
-                    week[i][1] = pair.get(1).getAsFloat();
+                    week[i] = pair.get(0).getAsFloat();
                 }
 
                 CACHE.put(key, week);

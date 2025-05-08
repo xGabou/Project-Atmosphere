@@ -10,11 +10,11 @@ import java.util.Set;
 
 public class WindProfileManager {
 
-    private static final Map<BiomeInstanceKey, float[][]> WEEKLY = new HashMap<>();
-    private static final Map<BiomeInstanceKey, float[]> TODAY = new HashMap<>();
-    private static final Map<BiomeInstanceKey, float[]> TOMORROW = new HashMap<>();
+    private static final Map<BiomeInstanceKey, float[]> WEEKLY = new HashMap<>();
+    private static final Map<BiomeInstanceKey, Float> TODAY = new HashMap<>();
+    private static final Map<BiomeInstanceKey, Float> TOMORROW = new HashMap<>();
 
-    public static void putWeeklyForecast(BiomeInstanceKey biome, float[][] week) {
+    public static void putWeeklyForecast(BiomeInstanceKey biome, float[] week) {
         WEEKLY.put(biome, week);
     }
 
@@ -37,42 +37,38 @@ public class WindProfileManager {
         return resolved != null && WEEKLY.containsKey(resolved);
     }
 
-    public static float[][] getWeeklyForecast(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome(biome,WEEKLY);
+    public static float[] getWeeklyForecast(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome1(biome,WEEKLY);
     }
 
-    public static void putDayProfile(BiomeInstanceKey biome, float[] profile) {
+    public static void putDayProfile(BiomeInstanceKey biome, Float profile) {
         TODAY.put(biome, profile);
     }
 
-    public static void putTomorrowProfile(BiomeInstanceKey biome, float[] profile) {
+    public static void putTomorrowProfile(BiomeInstanceKey biome, Float profile) {
         TOMORROW.put(biome, profile);
     }
 
-    public static float[] getTodayProfile(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome1(biome,TODAY);
+    public static float getTodayProfile(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome2(biome,TODAY);
     }
 
-    public static float[] getTomorrowProfile(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome1(biome,TOMORROW);
+    public static float getTomorrowProfile(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome2(biome,TOMORROW);
     }
 
 
     public static float getCurrentWindSpeed(BiomeInstanceKey biome, long worldTick) {
-        float[] profile = getTodayProfile(biome);
-        if (profile == null) return 0f;
+        float profile = getTodayProfile(biome);
 
-        float min = profile[0];
-        float max = profile[1];
         float t = (worldTick % 24000L) / 24000f;  // 0 → 1 over a full Minecraft day
-
-        return min + (max - min) * t;
+        return profile +  profile * t;
     }
 
     public static void generateTodayAndTomorrowProfiles(ServerLevel world) {
-        for (Map.Entry<BiomeInstanceKey, float[][]> entry : WEEKLY.entrySet()) {
+        for (Map.Entry<BiomeInstanceKey, float[]> entry : WEEKLY.entrySet()) {
             BiomeInstanceKey biome = entry.getKey();
-            float[][] week = entry.getValue();
+            float[] week = entry.getValue();
 
             long day = world.getDayTime() / 24000L;
             int todayIndex = (int)(day % 7);

@@ -1,6 +1,8 @@
 // src/main/java/net/Gabou/projectatmosphere/util/AtmosphericPhysics.java
 package net.Gabou.projectatmosphere.util;
 
+import net.minecraft.resources.ResourceLocation;
+
 public class AtmosphericPhysics {
 
     private static final double Rd = 287.05;   // J/(kg·K) for dry air
@@ -35,4 +37,26 @@ public class AtmosphericPhysics {
 
         return density;
     }
+    public static float computeBarometricPressure(float seaLevelPressure, float altitude, float tempCelsius) {
+        double T = tempCelsius + 273.15;
+        return (float) (seaLevelPressure * Math.pow(1.0 - 0.0065 * altitude / T, 5.257));
+    }
+    public static float computeSolarFactor(long gameTime) {
+        float angle = (gameTime % 24000L) / 24000f * 2f * (float) Math.PI;
+        return Math.max(0f, (float) Math.sin(angle)); // 0 la nuit, 1 à midi
+    }
+    public static float getAlbedo(ResourceLocation biome) {
+        String path = biome.getPath();
+        if (path.contains("snow") || path.contains("ice")) return 0.9f;
+        if (path.contains("desert") || path.contains("beach")) return 0.6f;
+        if (path.contains("forest")) return 0.15f;
+        return 0.25f; // herbe ou standard
+    }
+    public static float adjustTempWithEvaporation(float tempCelsius, float humidity) {
+        return tempCelsius - (humidity / 100f) * 2.0f; // humidité = air moins chaud ressenti
+    }
+
+
+
+
 }
