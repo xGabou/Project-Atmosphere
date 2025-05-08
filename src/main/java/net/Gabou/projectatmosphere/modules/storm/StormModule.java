@@ -27,7 +27,7 @@ public class StormModule {
     }
 
 
-    public static void onServerStarting(ServerLevel world,BlockPos center) {
+    public static void onServerStarting(ServerLevel world) {
         StormStorageManager.loadAll(world);
         //StormManager.init(world, center);
     }

@@ -43,7 +43,7 @@ public class HumidityModule {
         HumidityManager.onSeasonChange(world);
     }
 
-    public static void onServerStarting(ServerLevel world, BlockPos center) {
+    public static void onServerStarting(ServerLevel world) {
         HumidityStorageManager.loadAll(world);
        // HumidityManager.init(world, center);
     }

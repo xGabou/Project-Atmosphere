@@ -30,13 +30,11 @@ public class AtmosphereManager {
 
     public static void onServerStarting(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-            BlockPos center = world.getSharedSpawnPos();
-            TemperatureModule.onServerStarting(world,center);
-            HumidityModule.onServerStarting(world, center);
-            PressureModule.onServerStarting(world, center);
-            WindModule.onServerStarting(world, center);
-            StormModule.onServerStarting(world,center);
-            StormModule.onServerStarting(world,center);
+            TemperatureModule.onServerStarting(world);
+            HumidityModule.onServerStarting(world);
+            PressureModule.onServerStarting(world);
+            WindModule.onServerStarting(world);
+            StormModule.onServerStarting(world);
             refreshUnifiedForecast();
         });
 

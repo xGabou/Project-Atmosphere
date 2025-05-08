@@ -20,9 +20,8 @@ public class WindModule {
             WindStorageManager.saveAll(world);
         }
     }
-    public static void onServerStarting(ServerLevel world, BlockPos center) {
+    public static void onServerStarting(ServerLevel world) {
         WindStorageManager.loadAll(world);
-        WindManager.init(world, center);
     }
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {

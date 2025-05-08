@@ -34,9 +34,8 @@ public class PressureModule {
     }
 
 
-    public static void onServerStarting(ServerLevel world, BlockPos center) {
+    public static void onServerStarting(ServerLevel world) {
         PressureStorageManager.loadAll(world);
-        PressureManager.init(world, center);
     }
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         PressureManager.onRegisterCommands(event);

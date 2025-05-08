@@ -4,6 +4,7 @@ import com.google.gson.*;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.StorageUtils;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
@@ -15,6 +16,8 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+
+import static net.Gabou.projectatmosphere.util.StorageUtils.getPerWorldSavePath;
 
 /**
  * Static storage system for 7-day float[2] wind forecasts per biome.
@@ -45,12 +48,66 @@ public class WindStorageManager {
     }
 
     public static void saveAll(ServerLevel world) {
-        StorageUtils.saveAll(world,CACHE, FILE_NAME,GSON);
+        JsonObject root = new JsonObject();
+
+        CACHE.forEach((biomeKey, week) -> {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("biome", biomeKey.biomeType().toString());
+            obj.add("pos", AtmosphereUtils.serializeBlockPos(biomeKey.samplePos()));
+
+            JsonArray arr = new JsonArray();
+            for (float[] day : week) {
+                JsonArray pair = new JsonArray();
+                pair.add(String.valueOf(day[0])); // min
+                pair.add(String.valueOf(day[1])); // max
+                arr.add(pair);
+            }
+
+            obj.add("week", arr);
+            root.add(biomeKey.toString(), obj);
+        });
+
+        try {
+            Path path = getPerWorldSavePath(world, FILE_NAME);
+            Files.createDirectories(path.getParent());
+            try (Writer writer = Files.newBufferedWriter(path)) {
+                GSON.toJson(root, writer);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void loadAll(ServerLevel world) {
-        StorageUtils.loadAll(world,CACHE, FILE_NAME,GSON);
+        Path path = getPerWorldSavePath(world, FILE_NAME);
+        if (!Files.exists(path)) return;
+
+        CACHE.clear();
+
+        try (Reader reader = Files.newBufferedReader(path)) {
+            JsonObject root = GSON.fromJson(reader, JsonObject.class);
+            for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
+                JsonObject obj = entry.getValue().getAsJsonObject();
+
+                ResourceLocation biomeId = new ResourceLocation(obj.get("biome").getAsString());
+                BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());
+                BiomeInstanceKey key = new BiomeInstanceKey(biomeId, pos);
+
+                JsonArray arr = obj.getAsJsonArray("week");
+                float[][] week = new float[7][2];
+                for (int i = 0; i < 7; i++) {
+                    JsonArray pair = arr.get(i).getAsJsonArray();
+                    week[i][0] = pair.get(0).getAsFloat();
+                    week[i][1] = pair.get(1).getAsFloat();
+                }
+
+                CACHE.put(key, week);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
 
     public static Set<BiomeInstanceKey> getAllBiomeKeys() {
         return CACHE.keySet();
