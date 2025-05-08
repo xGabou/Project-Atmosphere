@@ -39,7 +39,7 @@ public class WindManager {
         init(world, pos);
     }
 
-    public static float[][] getWeeklyForecast(BiomeInstanceKey biome) {
+    public static float[] getWeeklyForecast(BiomeInstanceKey biome) {
         return WindProfileManager.getWeeklyForecast(biome);
     }
 
@@ -57,8 +57,8 @@ public class WindManager {
     public static void onSwapProfiles(ServerLevel world) {
 
             for (BiomeInstanceKey key : WindProfileManager.getAllBiomeKeys()) {
-                float[] tomorrow = WindProfileManager.getTomorrowProfile(key);
-                if (tomorrow != null) {
+                if (WindProfileManager.hasTomorrowProfile(key)) {
+                    Float tomorrow = (Float) WindProfileManager.getTomorrowProfile(key);
                     WindProfileManager.putDayProfile(key, tomorrow);
                 }
             }

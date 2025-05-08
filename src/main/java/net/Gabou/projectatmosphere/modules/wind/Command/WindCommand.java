@@ -22,8 +22,8 @@ public class WindCommand {
                             BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
 
                             // Get the weekly forecast based on the biome
-                            float[][] forecastArr = WindProfileManager.getWeeklyForecast(biome);
-                            String forecast = Arrays.deepToString(forecastArr);
+                            float[] forecastArr = WindProfileManager.getWeeklyForecast(biome);
+                            String forecast = Arrays.toString(forecastArr);
 
                             // Send the forecast to the player
                             ctx.getSource().sendSuccess(() -> Component.literal(forecast), false);

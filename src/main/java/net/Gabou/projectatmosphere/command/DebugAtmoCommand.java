@@ -29,7 +29,7 @@ public class DebugAtmoCommand {
                                                             "\n  🌡 Temp:     [" + format(forecast.temperature()) + "]" +
                                                             "\n  🧪 Pressure: [" + format(forecast.pressure()) + "]" +
                                                             "\n  💧 Humidity: [" + format(forecast.humidity()) + "]" +
-                                                            "\n  🌬 Wind:     [" + format(forecast.wind()) + "]"
+                                                            "\n  🌬 Wind:     [" + forecast.wind() + "]"
                                                     ), false);
                                             return 1;
                                         })
