@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.modules.storm.manager.StormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
 import net.Gabou.projectatmosphere.modules.temperature.core.TemperatureProvider;
 import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
+import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeStateStorage;
 import net.Gabou.projectatmosphere.modules.temperature.util.DailyProfileGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
@@ -58,6 +59,10 @@ public class TemperatureManager{
             }
 
 
+    }
+    public static void onServerStopping(ServerLevel world) {
+        ForecastStorageManager.saveAll(world);
+        SpikeStateStorage.saveAll(world);
     }
 
     /** Clears the cached temperature profiles (weekly + daily). */

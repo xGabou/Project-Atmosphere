@@ -49,8 +49,7 @@ public class TemperatureModule {
     }
 
     private static void saveData(ServerLevel world) {
-        ForecastStorageManager.saveAll(world);
-        SpikeStateStorage.saveAll(world);
+
     }
 
     /** Phase 3: register the /temperature command */

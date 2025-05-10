@@ -93,4 +93,8 @@ public class StormManager {
         //StormCommand.register(event.getDispatcher());
         SpawnCloudCommand.register(event.getDispatcher());
     }
+
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        init(world, center);
+    }
 }

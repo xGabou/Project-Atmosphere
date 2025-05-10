@@ -66,7 +66,6 @@ public class ProjectAtmosphere {
 
     private void initModules() {
         isSereneLoaded();
-        AtmosphereManager.init();
         sendInfo();
     }
 

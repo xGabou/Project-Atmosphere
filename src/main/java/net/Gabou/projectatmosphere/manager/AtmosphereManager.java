@@ -3,17 +3,26 @@ package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.event.TemperatureTickHandler;
-import net.Gabou.projectatmosphere.modules.humidity.HumidityModule;
+import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
+import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
 import net.Gabou.projectatmosphere.modules.pressure.PressureModule;
 
 import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
+import net.Gabou.projectatmosphere.modules.pressure.util.PressureStorageManager;
 import net.Gabou.projectatmosphere.modules.storm.StormModule;
+import net.Gabou.projectatmosphere.modules.storm.util.StormStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
+import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.WindModule;
+import net.Gabou.projectatmosphere.modules.wind.manager.WindManager;
+import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
+import net.Gabou.projectatmosphere.modules.pressure.manager.PressureManager;
+import net.Gabou.projectatmosphere.modules.storm.manager.StormManager;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
+import net.Gabou.projectatmosphere.modules.wind.util.WindStorageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -30,11 +39,11 @@ public class AtmosphereManager {
 
     public static void onServerStarting(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-            TemperatureModule.onServerStarting(world);
-            HumidityModule.onServerStarting(world);
-            PressureModule.onServerStarting(world);
-            WindModule.onServerStarting(world);
-            StormModule.onServerStarting(world);
+            ForecastStorageManager.loadAll(world);
+            HumidityStorageManager.loadAll(world);
+            PressureStorageManager.loadAll(world);
+            WindStorageManager.loadAll(world);
+            StormStorageManager.loadAll(world);
             refreshUnifiedForecast();
         });
 
@@ -42,11 +51,11 @@ public class AtmosphereManager {
     }
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
         AsyncAtmosphereService.runWeather(() -> {;
-        TemperatureModule.updateForecastAround(world, center);
-            HumidityModule.updateForecastAround(world, center);
-            PressureModule.updateForecastAround(world, center);
-            WindModule.updateForecastAround(world, center);
-            StormModule.updateForecastAround(world,center);
+        TemperatureManager.updateForecastAround(world, center);
+            HumidityManager.updateForecastAround(world, center);
+            PressureManager.updateForecastAround(world, center);
+            WindManager.updateForecastAround(world, center);
+            StormManager.updateForecastAround(world,center);
             refreshUnifiedForecast();
         });
     }
@@ -54,65 +63,65 @@ public class AtmosphereManager {
     public static void onRegisterCommands(final RegisterCommandsEvent event)
     {
         // Register commands here
-        TemperatureModule.onRegisterCommands(event);
-        HumidityModule.onRegisterCommands(event);
-        PressureModule.onRegisterCommands(event);
-        WindModule.onRegisterCommands(event);
-        StormModule.onRegisterCommands(event);
+        TemperatureManager.onRegisterCommands(event);
+        HumidityManager.onRegisterCommands(event);
+        PressureManager.onRegisterCommands(event);
+        WindManager.onRegisterCommands(event);
+        StormManager.onRegisterCommands(event);
         DebugAtmoCommand.register(event.getDispatcher());
     }
 
     public static void onPlayerJoined(ServerLevel world, ServerPlayer player) {
         AsyncAtmosphereService.runWeather(() -> {;
             BlockPos pos = player.blockPosition();
-        TemperatureModule.onPlayerJoined(world, pos);
-        HumidityModule.onPlayerJoined(world, pos);
-            PressureModule.onPlayerJoined(world, pos);
-            WindModule.onPlayerJoined(world, pos);
-            StormModule.onPlayerJoined(world, pos);
+        TemperatureManager.onPlayerJoined(world, pos);
+        HumidityManager.onPlayerJoined(world, pos);
+            PressureManager.onPlayerJoined(world, pos);
+            WindManager.onPlayerJoined(world, pos);
+            StormManager.onPlayerJoined(world, pos);
             refreshUnifiedForecast();
         });
     }
 
     public static void onPrecomputeProfiles(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-        TemperatureModule.onPrecomputeProfiles(world);
-        HumidityModule.onPrecomputeProfiles(world);
-        PressureModule.onPrecomputeProfiles(world);
-        WindModule.onPrecomputeProfiles(world);
-        StormModule.onPrecomputeProfiles(world);
+        TemperatureManager.onPrecomputeProfiles(world);
+        HumidityManager.onPrecomputeProfiles(world);
+        PressureManager.onPrecomputeProfiles(world);
+        WindManager.onPrecomputeProfiles(world);
+        StormManager.onPrecomputeProfiles(world);
         refreshUnifiedForecast();
         });
     }
 
     public static void onSwapProfiles(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-        TemperatureModule.onSwapProfiles(world);
-        HumidityModule.onSwapProfiles(world);
-        PressureModule.onSwapProfiles(world);
-        WindModule.onSwapProfiles(world);
-        StormModule.onSwapProfiles(world);
+        TemperatureManager.onSwapProfiles(world);
+        HumidityManager.onSwapProfiles(world);
+        PressureManager.onSwapProfiles(world);
+        WindManager.onSwapProfiles(world);
+        StormManager.onSwapProfiles(world);
         refreshUnifiedForecast();
         });
     }
     public static void onRegenerate(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-        TemperatureModule.onRegenerate(world);
-        HumidityModule.onRegenerate(world);
-        PressureModule.onRegenerate(world);
-        WindModule.onRegenerate(world);
-        StormModule.onRegenerate(world);
+        TemperatureManager.onRegenerate(world,world.players());
+        HumidityManager.onRegenerate(world,world.players());
+        PressureManager.onRegenerate(world,world.players());
+        WindManager.onRegenerate(world,world.players());
+        StormManager.onRegenerate(world,world.players());
         refreshUnifiedForecast();
         });
     }
 
     public static void onSeasonChange(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-        TemperatureModule.onSeasonChange(world);  // Only temperature responds to season
-        HumidityModule.onSeasonChange(world);
-        PressureModule.onSeasonChange(world);
-        WindModule.onSeasonChange(world);
-        StormModule.onSeasonChange(world);
+        TemperatureManager.onSeasonChange(world);  // Only temperature responds to season
+        HumidityManager.onSeasonChange(world);
+        PressureManager.onSeasonChange(world);
+        WindManager.onSeasonChange(world);
+        StormManager.onSeasonChange(world);
         refreshUnifiedForecast();
         });
     }
@@ -141,30 +150,19 @@ public class AtmosphereManager {
     }
 
     public static void onServerStopping(ServerLevel world) {
-        TemperatureModule.onServerStopping(world);
-        HumidityModule.onServerStopping(world);
-        PressureModule.onServerStopping(world);
-        WindModule.onServerStopping(world);
-    }
-
-    public static void init() {
-        AsyncAtmosphereService.runWeather(() -> {
-        TemperatureModule.init();
-        HumidityModule.init();
-        PressureModule.init();
-        WindModule.init();
-        StormModule.init();
-        refreshUnifiedForecast();
-        });
+        TemperatureManager.onServerStopping(world);
+        HumidityManager.onServerStopping(world);
+        PressureManager.onServerStopping(world);
+        WindManager.onServerStopping(world);
     }
 
     public static void tick(ServerLevel level) {
         AsyncAtmosphereService.runWeather(() -> {
-            PressureModule.tick(level);
+            PressureManager.tickSystem(level);
         });
     }
 
 
     /** Central record to unify today's weather-like forecast */
-    public static record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, float wind) {}
+    public record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, float wind) {}
 }

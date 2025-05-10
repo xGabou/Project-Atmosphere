@@ -79,4 +79,12 @@ public class WindManager {
         init(world, world.getSharedSpawnPos());
 
     }
+
+    public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        init(world, center);
+    }
+
+    public static void onServerStopping(ServerLevel world) {
+        WindStorageManager.saveAll(world);
+    }
 }
