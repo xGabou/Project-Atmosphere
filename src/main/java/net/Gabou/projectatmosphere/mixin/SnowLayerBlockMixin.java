@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.mixin;
 
+import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -21,7 +23,7 @@ public abstract class SnowLayerBlockMixin extends Block {
 
     @Inject(method = "randomTick", at = @At("HEAD"))
     private void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
-        float temp = TemperatureManager.getRealTemperature(level, pos);
+        float temp = TemperatureProfileManager.getCurrentTemperature(new BiomeInstanceKey(level.getBiome(pos).unwrapKey().get().location(), pos),level.getDayTime());
         if (temp > 0.0f) {
             level.removeBlock(pos, false);
         }
