@@ -18,15 +18,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Block.class)
 public class SnowBlockGenericMixin {
 
-    @Inject(method = "randomTick", at = @At("HEAD"))
-    private void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
-        if (state.is(Blocks.SNOW_BLOCK)) {
-
-            float temp = TemperatureProfileManager.getCurrentTemperature(new BiomeInstanceKey(level.getBiome(pos).unwrapKey().get().location(), pos),level.getDayTime());
-            if (temp > 0.0f) {
-                level.removeBlock(pos, false);
-                ci.cancel();
-            }
-        }
-    }
+//    @Inject(method = "randomTick", at = @At("HEAD"))
+//    private void onRandomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
+//        if (state.is(Blocks.SNOW_BLOCK)) {
+//
+//            float temp = TemperatureProfileManager.getCurrentTemperature(new BiomeInstanceKey(level.getBiome(pos).unwrapKey().get().location(), pos),level.getDayTime());
+//            if (temp > 0.0f) {
+//                level.removeBlock(pos, false);
+//                ci.cancel();
+//            }
+//        }
+//    }
 }

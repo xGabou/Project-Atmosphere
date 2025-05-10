@@ -6,7 +6,7 @@ import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 
 public class CloudModel extends DefaultedEntityGeoModel {
     public CloudModel() {
-        super(new ResourceLocation(ProjectAtmosphere.MODID, "cloud"),false);
+        super(new ResourceLocation(ProjectAtmosphere.MODID, "smallnormalclouds1"),false);
     }
 
 }

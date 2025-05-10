@@ -89,6 +89,7 @@ dependencies {
     implementation fg.deobf("curse.maven:serene-seasons-291874:6398227")
     implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
     implementation fg.deobf("curse.maven:pretty-rain-1163800:6347977")
+    implementation fg.deobf("curse.maven:cloth-config-348521:5729105")
 }
 
 tasks.named('processResources', ProcessResources).configure {
