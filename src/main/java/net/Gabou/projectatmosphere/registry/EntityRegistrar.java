@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.entity.CloudEntity;
+import net.Gabou.projectatmosphere.entity.SmallNormalCloud1Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -15,13 +16,19 @@ public class EntityRegistrar {
 
     public static final RegistryObject<EntityType<CloudEntity>> CLOUD_ENTITY = ENTITIES.register(
             "cloud_entity",
-            () -> EntityType.Builder.<CloudEntity>of(CloudEntity::new, MobCategory.MISC)
+            () -> EntityType.Builder.of(CloudEntity::new, MobCategory.MISC)
                     .sized(2.0f, 1.0f)
                     .setUpdateInterval(20)
                     .build("cloud_entity")
     );
 
-    public static final RegistryObject<EntityType<>>
+    public static final RegistryObject<EntityType<SmallNormalCloud1Entity>> SMALL_NORMAL_CLOUD_1_ENTITY = ENTITIES.register(
+            "small_normal_cloud_1_entity",
+            () -> EntityType.Builder.of(SmallNormalCloud1Entity::new, MobCategory.MISC)
+                    .sized(2.0f, 1.0f)
+                    .setUpdateInterval(20)
+                    .build("small_normal_cloud_1_entity")
+    );
 
     public static void registerEntities(IEventBus eventBus) {
         ENTITIES.register(eventBus);

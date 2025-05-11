@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.Gabou.projectatmosphere.mixin",
+  "compatibilityLevel": "JAVA_16",
+  "mixins": [
+    "SnowLayerBlockMixin",
+    "WeatherCommandMixin"
+  ],
+  "client": [
+    "OptionsMixin",
+    "VideoSettingsScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

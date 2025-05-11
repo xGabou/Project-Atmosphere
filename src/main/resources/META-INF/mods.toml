@@ -39,7 +39,14 @@ side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "geckolib"
-mandatory = false
+mandatory = true
 versionRange = "*"
 ordering = "AFTER"
+side = "CLIENT"
+
+
+[[dependencies."${mod_id}"]]
+modId = "particlerain"
+mandatory = true
+versionRange = "*"
 side = "CLIENT"

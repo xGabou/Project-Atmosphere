@@ -4,13 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Refactor snow block handling: comment out temperature-based block removal logic and add cloth-config dependency">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/model/SmallNormalCloud1Model.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/renderer/SmallNormalCloud1Renderer.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/entity/SmallNormalCloud1Entity.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Add SmallNormalCloud1 entity and renderer: implement cloud entity behavior and rendering logic">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/WeatherHandler.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/VideoSettingsScreenMixin.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/WeatherCommandMixin.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/model/CloudModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/model/CloudModel.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/EntityRegistrar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/EntityRegistrar.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -330,8 +332,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.25410.109" />
-        <option value="bundled-js-predefined-d6986cc7102b-6a121458b545-JavaScript-IU-251.25410.109" />
+        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.25410.129" />
+        <option value="bundled-js-predefined-d6986cc7102b-6a121458b545-JavaScript-IU-251.25410.129" />
       </set>
     </attachedChunks>
   </component>
@@ -367,6 +369,8 @@
       <workItem from="1746748400883" duration="1305000" />
       <workItem from="1746849757068" duration="620000" />
       <workItem from="1746897461894" duration="10011000" />
+      <workItem from="1746925421749" duration="848000" />
+      <workItem from="1746985803142" duration="1159000" />
     </task>
     <task id="LOCAL-00001" summary="Initial">
       <option name="closed" value="true" />
@@ -672,7 +676,15 @@
       <option name="project" value="LOCAL" />
       <updated>1746901418117</updated>
     </task>
-    <option name="localTasksCounter" value="39" />
+    <task id="LOCAL-00039" summary="Add SmallNormalCloud1 entity and renderer: implement cloud entity behavior and rendering logic">
+      <option name="closed" value="true" />
+      <created>1746926845948</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1746926845948</updated>
+    </task>
+    <option name="localTasksCounter" value="40" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -691,7 +703,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor temperature handling in BiomeTempConfig and TemperatureUtils; add TemperatureForecast for weekly biome forecasts" />
     <MESSAGE value="Implement temperature management system with async processing; add daily and weekly forecast generation" />
     <MESSAGE value="Add season tracking and cache management for temperature forecasts; refactor initialization and update logic" />
     <MESSAGE value="Refactor temperature management and improve async processing; enhance forecast generation and storage" />
@@ -716,7 +727,8 @@
     <MESSAGE value="Refactor atmosphere management: streamline module initialization and add storage management" />
     <MESSAGE value="Refactor snow block temperature handling: update temperature retrieval method for accuracy" />
     <MESSAGE value="Refactor snow block handling: comment out temperature-based block removal logic and add cloth-config dependency" />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor snow block handling: comment out temperature-based block removal logic and add cloth-config dependency" />
+    <MESSAGE value="Add SmallNormalCloud1 entity and renderer: implement cloud entity behavior and rendering logic" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add SmallNormalCloud1 entity and renderer: implement cloud entity behavior and rendering logic" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

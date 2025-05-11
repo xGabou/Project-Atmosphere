@@ -108,7 +108,7 @@ public class ProjectAtmosphere {
         @SubscribeEvent
         public static void onClientSetup(final EntityRenderersEvent.RegisterRenderers event) {
             event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY.get(), CloudRenderer::new);
-            event.registerEntityRenderer(EntityRegistrar.SMALLNORMALCLOUD_ENTITY.get(), SmallNormalCloud1Renderer::new);
+            event.registerEntityRenderer(EntityRegistrar.SMALL_NORMAL_CLOUD_1_ENTITY.get(), SmallNormalCloud1Renderer::new);
 
         }
     }
