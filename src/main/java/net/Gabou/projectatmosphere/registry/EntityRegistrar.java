@@ -21,6 +21,8 @@ public class EntityRegistrar {
                     .build("cloud_entity")
     );
 
+    public static final RegistryObject<EntityType<>>
+
     public static void registerEntities(IEventBus eventBus) {
         ENTITIES.register(eventBus);
     }

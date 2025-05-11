@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere;
 
 import net.Gabou.projectatmosphere.client.renderer.CloudRenderer;
+import net.Gabou.projectatmosphere.client.renderer.SmallNormalCloud1Renderer;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -107,6 +108,7 @@ public class ProjectAtmosphere {
         @SubscribeEvent
         public static void onClientSetup(final EntityRenderersEvent.RegisterRenderers event) {
             event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY.get(), CloudRenderer::new);
+            event.registerEntityRenderer(EntityRegistrar.SMALLNORMALCLOUD_ENTITY.get(), SmallNormalCloud1Renderer::new);
 
         }
     }
