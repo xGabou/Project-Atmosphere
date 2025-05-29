@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.entity.CloudEntity;
+import net.Gabou.projectatmosphere.entity.SmallNormalCloud1Entity;
 import net.Gabou.projectatmosphere.registry.EntityRegistrar;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
@@ -85,8 +86,19 @@ public class CloudSpawner {
         CloudEntity cloud = new CloudEntity(type, level);
         cloud.setPos(x, cloudY, z);
         level.addFreshEntity(cloud);
-
+        cloud.setSize(1.5f);
         ProjectAtmosphere.LOGGER.info("Spawned cloud for player " + player.getName().getString() + " at " + x + ", " + cloudY + ", " + z);
+
+
+        x = player.getX() + (level.random.nextDouble() - 0.5) * radiusBlocks;
+        z = player.getZ() + (level.random.nextDouble() - 0.5) * radiusBlocks;
+        EntityType<SmallNormalCloud1Entity> type2 = EntityRegistrar.SMALL_NORMAL_CLOUD_1_ENTITY.get();
+        SmallNormalCloud1Entity cloud2 = new SmallNormalCloud1Entity(type2, level);
+        cloud2.setPos(x, cloudY, z);
+        cloud2.setSize(3.5f);
+        level.addFreshEntity(cloud2);
+        ProjectAtmosphere.LOGGER.info("Spawned cloud for player " + player.getName().getString() + " at " + x + ", " + cloudY + ", " + z);
+
     }
 
     private static int getRadiusBlocks(ServerLevel level) {

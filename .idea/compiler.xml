@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <option name="outRefMapFile" value="build/classes/java/main/projectatmosphere.refmap.json" />
+        <option name="reobfSrgFile" value="H:\Project-Atmosphere\build/tmp/reobf/SRG.srg" />
+        <processorPath useClasspath="false">
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.spongepowered/mixin/0.8.5/6d1c8bf4c28e697f472a83bd6add76ec4951734/mixin-0.8.5-processor.jar" />
+        </processorPath>
+        <module name="project-atmosphere.main" />
+      </profile>
+    </annotationProcessing>
     <bytecodeTargetLevel target="17" />
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="project-atmosphere" options="-AoutRefMapFile=build/classes/java/main/projectatmosphere.refmap.json -AreobfSrgFile=H:\Project-Atmosphere\build/tmp/reobf/SRG.srg" />
+      <module name="project-atmosphere.main" options="-AoutRefMapFile=build/classes/java/main/projectatmosphere.refmap.json -AreobfSrgFile=H:\Project-Atmosphere\build/tmp/reobf/SRG.srg" />
+      <module name="project-atmosphere.test" options="-AoutRefMapFile=build/classes/java/main/projectatmosphere.refmap.json -AreobfSrgFile=H:\Project-Atmosphere\build/tmp/reobf/SRG.srg" />
+    </option>
   </component>
 </project>

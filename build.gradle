@@ -1,6 +1,7 @@
 plugins {
     id 'idea'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
+    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 
@@ -11,6 +12,7 @@ base {
     archivesName = mod_id
 }
 
+
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(17)
 }
@@ -18,7 +20,12 @@ java {
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
     copyIdeResources = true
+    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 
+    mixin {
+        add sourceSets.main, "projectatmosphere.refmap.json" // ⬅️ same as in mixins.json
+        config 'projectatmosphere.mixins.json' // ⬅️ same as in mixins.json
+    }
     runs {
         configureEach {
             workingDirectory project.file('run')
@@ -34,11 +41,14 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
+            args "--mixin.config=projectatmosphere.mixins.json"
         }
 
         server {
             property 'forge.enabledGameTestNamespaces', mod_id
             args '--nogui'
+            args "--mixin.config=projectatmosphere.mixins.json"
+
         }
 
         gameTestServer {
@@ -74,6 +84,7 @@ repositories {
 }
 
 dependencies {
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 //    implementation name: 'mangomultiblock-1.20.1-1.2.0' // without the .jar extension
     implementation fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
@@ -105,6 +116,8 @@ tasks.named('processResources', ProcessResources).configure {
             mod_version: mod_version,
             mod_authors: mod_authors,
             mod_description: mod_description,
+            mod_logo_file: logo_file,
+            mod_mixins: mod_mixins,
     ]
     inputs.properties replaceProps
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
@@ -129,4 +142,11 @@ tasks.named('jar', Jar).configure {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += [
+            "-AoutRefMapFile=build/classes/java/main/projectatmosphere.refmap.json",
+            "-AreobfSrgFile=${buildDir}/tmp/reobf/SRG.srg"
+    ]
 }

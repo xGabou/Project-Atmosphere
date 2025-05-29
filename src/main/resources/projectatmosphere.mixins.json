@@ -1,6 +1,7 @@
 {
   "required": true,
   "minVersion": "0.8",
+  "refmap": "projectatmosphere.refmap.json",
   "package": "net.Gabou.projectatmosphere.mixin",
   "compatibilityLevel": "JAVA_16",
   "mixins": [
@@ -8,7 +9,6 @@
     "WeatherCommandMixin"
   ],
   "client": [
-    "OptionsMixin",
     "VideoSettingsScreenMixin"
   ],
   "injectors": {
