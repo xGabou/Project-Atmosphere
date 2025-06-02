@@ -63,6 +63,7 @@ public class TemperatureManager{
     public static void onServerStopping(ServerLevel world) {
         ForecastStorageManager.saveAll(world);
         SpikeStateStorage.saveAll(world);
+        clearForecastCache(world);
     }
 
     /** Clears the cached temperature profiles (weekly + daily). */

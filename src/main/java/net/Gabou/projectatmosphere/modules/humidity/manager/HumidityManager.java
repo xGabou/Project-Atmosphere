@@ -113,5 +113,6 @@ public class HumidityManager {
     public static void onServerStopping(ServerLevel world) {
         // Save all humidity data to disk
         HumidityStorageManager.saveAll(world);
+        clearForecastCache(world);
     }
 }

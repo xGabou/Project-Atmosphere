@@ -66,7 +66,7 @@ public class WindGenerator {
             float speed = dP * 3.2f * tempFactor * humidityFactor * densityFactor * biomeFactor * altitudeFactor * SPEED_SCALING;
 
             // Clamp to reasonable base values (in m/s)
-            baseWind[d] = Math.max(6f, Math.min(speed, 50f)); // ~21.6–79.2 km/h
+            baseWind[d] = Math.max(6f, /*Math.min(speed, 50f)*/ speed); // ~21.6–79.2 km/h
         }
 
         return baseWind;

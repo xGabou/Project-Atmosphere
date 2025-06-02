@@ -32,6 +32,7 @@ public class PressureManager {
 
     public static void onServerStopping(ServerLevel world) {
         PressureStorageManager.saveAll(world);
+        clearForecastCache(world);
     }
 
     /** Called on server spawn or when regenerating around a player. */

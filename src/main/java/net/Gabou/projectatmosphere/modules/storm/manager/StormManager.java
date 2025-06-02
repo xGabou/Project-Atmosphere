@@ -37,6 +37,10 @@ public class StormManager {
 
 
     }
+    public static void onServerStopping(ServerLevel world) {
+        StormStorageManager.saveAll(world);
+        clearForecastCache(world);
+    }
 
     public static void onPlayerJoined(ServerLevel world, BlockPos center) {
         init(world, center);

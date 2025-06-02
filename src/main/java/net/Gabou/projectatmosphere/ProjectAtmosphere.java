@@ -58,6 +58,7 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
         ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
+        AsyncAtmosphereService.init();
         if (world != null) {
             AtmosphereManager.onServerStarting(world);
         }
@@ -81,7 +82,6 @@ public class ProjectAtmosphere {
 
     private void setup(final FMLCommonSetupEvent  event) {
         LOGGER.info("Setting up Project Atmosphere (Common)");
-            AsyncAtmosphereService.init();
             initModules();
 
         }

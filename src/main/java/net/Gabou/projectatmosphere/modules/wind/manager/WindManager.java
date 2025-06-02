@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.modules.wind.manager;
 
 import net.Gabou.projectatmosphere.modules.humidity.Command.HumidityCommand;
+import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
+import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.modules.wind.Command.WindCommand;
 import net.Gabou.projectatmosphere.modules.wind.forecast.WindForecast;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
@@ -75,8 +77,11 @@ public class WindManager {
         WindCommand.register(event.getDispatcher());
     }
     public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
-        WindProfileManager.clearAll();
-        init(world, world.getSharedSpawnPos());
+        clearForecastCache(world);
+        for (Player player : players) {
+            BlockPos pos = player.blockPosition();
+            onPlayerJoined(world, pos);
+        }
 
     }
 
@@ -86,5 +91,11 @@ public class WindManager {
 
     public static void onServerStopping(ServerLevel world) {
         WindStorageManager.saveAll(world);
+        clearForecastCache(world);
+
+    }
+    public static void clearForecastCache(ServerLevel world) {
+        WindProfileManager.clearAll();
+        WindStorageManager.clearCache(world);
     }
 }

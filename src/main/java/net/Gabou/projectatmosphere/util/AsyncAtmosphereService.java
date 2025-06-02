@@ -132,5 +132,7 @@ public class AsyncAtmosphereService {
         if (STORM_EXECUTOR != null && STORM_EXECUTOR != SHARED_EXECUTOR && STORM_EXECUTOR != GROUP_B_EXECUTOR) STORM_EXECUTOR.shutdown();
         if (PRESSURE_EXECUTOR != null && PRESSURE_EXECUTOR != SHARED_EXECUTOR && PRESSURE_EXECUTOR != GROUP_B_EXECUTOR) PRESSURE_EXECUTOR.shutdown();
         if (WEATHER_EXECUTOR != null) WEATHER_EXECUTOR.shutdown();
+
+        initialized = false;
     }
 }
