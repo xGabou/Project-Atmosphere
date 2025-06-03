@@ -56,9 +56,9 @@ public class PressureModule {
         PressureManager.onSeasonChange(world);
     }
 
-    public static void tick(ServerLevel level) {
-        PressureManager.tickSystem( level);
-    }
+//    public static void tick(ServerLevel level) {
+//        PressureManager.tickSystem( level);
+//    }
 
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
         PressureManager.updateForecastAround(world, center);

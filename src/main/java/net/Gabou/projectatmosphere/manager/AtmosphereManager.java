@@ -157,9 +157,9 @@ public class AtmosphereManager {
     }
 
     public static void tick(ServerLevel level) {
-        AsyncAtmosphereService.runWeather(() -> {
-            PressureManager.tickSystem(level);
-        });
+//        AsyncAtmosphereService.runWeather(() -> {
+//            PressureManager.tickSystem(level);
+//        });
     }
 
 

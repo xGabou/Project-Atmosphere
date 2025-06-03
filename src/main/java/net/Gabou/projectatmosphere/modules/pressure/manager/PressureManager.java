@@ -51,9 +51,9 @@ public class PressureManager {
     }
 
 
-    public static void tickSystem(ServerLevel world) {
-        PressureForecast.cleanupInactiveBiomes(world,DEFAULT_RADIUS);
-    }
+//    public static void tickSystem(ServerLevel world) {
+//        PressureForecast.cleanupInactiveBiomes(world,DEFAULT_RADIUS);
+//    }
 
 
 

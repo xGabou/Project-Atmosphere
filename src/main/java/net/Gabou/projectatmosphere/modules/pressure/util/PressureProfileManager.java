@@ -22,6 +22,10 @@ public class PressureProfileManager {
     public static float[][] getWeeklyForecast(BiomeInstanceKey key) {
         return AtmosphereUtils.getRightForecastForBiome(key, WEEKLY);
     }
+    public static Set<Map.Entry<BiomeInstanceKey, float[][]>> getWeeklyEntrySet() {
+        return WEEKLY.entrySet();
+    }
+
 
     public static void removeWeeklyForecast(BiomeInstanceKey key) {
         WEEKLY.remove(key);

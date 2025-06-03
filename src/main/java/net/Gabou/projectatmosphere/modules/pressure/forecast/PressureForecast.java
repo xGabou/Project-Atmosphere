@@ -25,23 +25,23 @@ import java.util.*;
 //TODO transfer maps to PressureProfileManager
 public class PressureForecast {
 
-    private static final Map<BiomeInstanceKey, float[][]> activeWeekly = new HashMap<>();
-    private static final Map<BiomeInstanceKey, float[][]> inactiveWeekly = new HashMap<>();
+//    private static final Map<BiomeInstanceKey, float[][]> activeWeekly = new HashMap<>();
+//    private static final Map<BiomeInstanceKey, float[][]> inactiveWeekly = new HashMap<>();
 
 
-    public static Map<BiomeInstanceKey, float[][]> getActiveWeekly() {
-        return activeWeekly;
-    }
+//    public static Map<BiomeInstanceKey, float[][]> getActiveWeekly() {
+//        return activeWeekly;
+//    }
 
-    public static float[][] getWeeklyForecast(ResourceLocation biome, BlockPos samplePos) {
-        BiomeInstanceKey key = new BiomeInstanceKey(biome, samplePos);
-        if (activeWeekly.containsKey(key)) {
-            return activeWeekly.get(key);
-        } else if (inactiveWeekly.containsKey(key)) {
-            return inactiveWeekly.get(key);
-        }
-        return null;
-    }
+//    public static float[][] getWeeklyForecast(ResourceLocation biome, BlockPos samplePos) {
+//        BiomeInstanceKey key = new BiomeInstanceKey(biome, samplePos);
+//        if (activeWeekly.containsKey(key)) {
+//            return activeWeekly.get(key);
+//        } else if (inactiveWeekly.containsKey(key)) {
+//            return inactiveWeekly.get(key);
+//        }
+//        return null;
+//    }
 
     // diffusion parameters
     private static final int DIFFUSION_RADIUS = 200; // blocks
@@ -55,22 +55,35 @@ public class PressureForecast {
      */
     public static void generateFullForecast(ServerLevel world, BlockPos center, int radius) {
         Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
-        activeWeekly.clear();
+
+        Map<BiomeInstanceKey, float[][]> freshWeeks = new HashMap<>();
 
         for (var entry : biomeSamples) {
-            float[][] week = PressureGenerator.generateWeekForecast(world,entry);
-            PressureStorageManager.putForecast(entry, week);
-            activeWeekly.put(entry, week);
+            float[][] week;
+
+            if (PressureStorageManager.hasForecast(entry)) {
+                week = PressureStorageManager.getForecast(entry);
+            } else {
+                week = PressureGenerator.generateWeekForecast(world, entry);
+                PressureStorageManager.putForecast(entry, week);
+            }
+
+            freshWeeks.put(entry, week);
         }
 
-        // Step 2 — Apply smoothing
+        // Inject fresh data into ProfileManager temporarily for diffusion access
+        for (var e : freshWeeks.entrySet()) {
+            PressureProfileManager.putWeeklyForecast(e.getKey(), e.getValue());
+        }
+
+        // Step 2 — Apply smoothing (neighborhood diffusion)
         diffuseAll();
 
-        for (var entry : activeWeekly.entrySet()) {
+        // Step 3 — 3-day smoothing + finalize
+        for (var entry : PressureProfileManager.getWeeklyEntrySet()) {
             BiomeInstanceKey key = entry.getKey();
             float[][] week = entry.getValue();
 
-            // Smooth each day using a 3-day weighted average
             for (int d = 0; d < 7; d++) {
                 float[] prev = (d > 0) ? week[d - 1] : week[d];
                 float[] curr = week[d];
@@ -80,72 +93,81 @@ public class PressureForecast {
                     curr[i] = (prev[i] + 2 * curr[i] + next[i]) / 4f;
                 }
             }
-            activeWeekly.put(key, week);
+
+            // ✅ Save finalized result
             PressureProfileManager.putWeeklyForecast(key, week);
         }
 
-        // Step 4 — Generate daily pressure curves
+        // Step 4 — Schedule daily curve generation
         DailyPressureGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
     /**
      * Compute base weekly values only (no daily curves or smoothing).
      */
-    public static void generateLowDetailForecast(ServerLevel world, BlockPos center, int radius) {
-        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
-
-        for (var entry : biomeSamples) {
-
-            if (activeWeekly.containsKey(entry) || inactiveWeekly.containsKey(entry)) continue;
-
-            float[][] week = PressureGenerator.generateWeekForecast(world, entry);
-            inactiveWeekly.put(entry, week);
-
-            PressureProfileManager.putWeeklyForecast(entry, week);
-            PressureStorageManager.putForecast(entry, week);
-        }
-    }
+//    public static void generateLowDetailForecast(ServerLevel world, BlockPos center, int radius) {
+//        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
+//
+//        for (var entry : biomeSamples) {
+//
+//            if (activeWeekly.containsKey(entry) || inactiveWeekly.containsKey(entry)) continue;
+//
+//            float[][] week = PressureGenerator.generateWeekForecast(world, entry);
+//            inactiveWeekly.put(entry, week);
+//
+//            PressureProfileManager.putWeeklyForecast(entry, week);
+//            PressureStorageManager.putForecast(entry, week);
+//        }
+//    }
 
     /**
      * Called every 6000 ticks (~4x per day). Deactivates unused biome samples.
      */
-    public static void cleanupInactiveBiomes(ServerLevel world, int radius) {
-        long now = world.getDayTime();
-        int todayIdx = (int) ((now / 24000) % 7);
-        int tomorrowIdx = (todayIdx + 1) % 7;
-
-        Iterator<BiomeInstanceKey> it = activeWeekly.keySet().iterator();
-        while (it.hasNext()) {
-            BiomeInstanceKey key = it.next();
-            BlockPos pos = key.samplePos();
-
-            boolean nearby = world.players().stream()
-                    .anyMatch(p -> p.blockPosition().distSqr(pos) <= radius * radius);
-
-            if (!nearby) {
-                float[][] week = activeWeekly.get(key);
-
-                float[] today = PressureCurveGenerator.buildDailyCurve(week[todayIdx]);
-                float[] tom = PressureCurveGenerator.buildDailyCurve(week[tomorrowIdx]);
-
-                // Save final daily curves
-                PressureProfileManager.putDayProfile(key, today);
-                PressureProfileManager.putTomorrowProfile(key, tom);
-
-                // Clean memory
-                it.remove();
-                inactiveWeekly.put(key, week);
-                PressureProfileManager.removeWeeklyForecast(key);
-                PressureProfileManager.removeDayProfile(key);
-                PressureProfileManager.removeTomorrowProfile(key);
-            }
-        }
-    }
+//    public static void cleanupInactiveBiomes(ServerLevel world, int radius) {
+//        long now = world.getDayTime();
+//        int todayIdx = (int) ((now / 24000) % 7);
+//        int tomorrowIdx = (todayIdx + 1) % 7;
+//
+//        Iterator<BiomeInstanceKey> it = activeWeekly.keySet().iterator();
+//        while (it.hasNext()) {
+//            BiomeInstanceKey key = it.next();
+//            BlockPos pos = key.samplePos();
+//
+//            boolean nearby = world.players().stream()
+//                    .anyMatch(p -> p.blockPosition().distSqr(pos) <= radius * radius);
+//
+//            if (!nearby) {
+//                float[][] week = activeWeekly.get(key);
+//
+//                float[] today = PressureCurveGenerator.buildDailyCurve(week[todayIdx]);
+//                float[] tom = PressureCurveGenerator.buildDailyCurve(week[tomorrowIdx]);
+//
+//                // Save final daily curves
+//                PressureProfileManager.putDayProfile(key, today);
+//                PressureProfileManager.putTomorrowProfile(key, tom);
+//
+//                // Clean memory
+//                it.remove();
+//                inactiveWeekly.put(key, week);
+//                PressureProfileManager.removeWeeklyForecast(key);
+//                PressureProfileManager.removeDayProfile(key);
+//                PressureProfileManager.removeTomorrowProfile(key);
+//            }
+//        }
+//    }
 
     /** Smooth all entries in `activeWeekly` against neighbors */
     private static void diffuseAll() {
-        var original = new HashMap<>(activeWeekly);
         long threshold = DIFFUSION_RADIUS * DIFFUSION_RADIUS;
+
+        // Copy the current weekly forecasts for safe iteration
+        Map<BiomeInstanceKey, float[][]> original = new HashMap<>();
+        for (var entry : PressureProfileManager.getWeeklyEntrySet()) {
+            original.put(entry.getKey(), entry.getValue());
+        }
+
+        // Diffused results will be stored here temporarily
+        Map<BiomeInstanceKey, float[][]> smoothed = new HashMap<>();
 
         for (var entry : original.entrySet()) {
             BiomeInstanceKey key = entry.getKey();
@@ -161,7 +183,7 @@ public class PressureForecast {
             }
 
             if (neighbors.isEmpty()) {
-                activeWeekly.put(key, week);
+                smoothed.put(key, week);
                 continue;
             }
 
@@ -179,9 +201,15 @@ public class PressureForecast {
                 }
             }
 
-            activeWeekly.put(key, smooth);
+            smoothed.put(key, smooth);
+        }
+
+        // Commit smoothed results
+        for (var entry : smoothed.entrySet()) {
+            PressureProfileManager.putWeeklyForecast(entry.getKey(), entry.getValue());
         }
     }
+
 
 
 }

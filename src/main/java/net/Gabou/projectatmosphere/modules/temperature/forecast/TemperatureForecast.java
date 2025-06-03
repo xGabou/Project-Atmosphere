@@ -18,6 +18,7 @@ import static net.Gabou.projectatmosphere.util.AtmosphereUtils.findBiomes;
 
 public class TemperatureForecast {
 
+
     /**
      * Scans a 500×500 area, uses cached forecasts when present,
      * otherwise generates and saves new weekly forecasts.

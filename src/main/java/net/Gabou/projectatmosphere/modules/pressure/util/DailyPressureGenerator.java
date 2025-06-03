@@ -14,14 +14,12 @@ import net.minecraft.world.level.Level;
 public class DailyPressureGenerator {
     public static void scheduleGenerationForTodayAndTomorrow(Level world) {
             long now = world.getDayTime();
-            for (var key : PressureForecast.getActiveWeekly().keySet()) {
-                ResourceLocation biome = key.biomeType();
-                BlockPos pos = key.samplePos();
+            for (var key : PressureProfileManager.getAllBiomeKeys()) {
                 boolean hasToday = PressureProfileManager.getTodayProfile(key) != null;
                 boolean hasTom   = PressureProfileManager.getTomorrowProfile(key) != null;
                 if (hasToday && hasTom) continue;
 
-                float[][] week = PressureForecast.getWeeklyForecast(biome,pos);
+                float[][] week = PressureProfileManager.getWeeklyForecast(key);
                 if (week == null) continue;
 
                 if (!hasToday) {
