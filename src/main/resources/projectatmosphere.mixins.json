@@ -5,8 +5,6 @@
   "package": "net.Gabou.projectatmosphere.mixin",
   "compatibilityLevel": "JAVA_16",
   "mixins": [
-    "SnowLayerBlockMixin",
-    "WeatherCommandMixin"
   ],
   "client": [
     "VideoSettingsScreenMixin"

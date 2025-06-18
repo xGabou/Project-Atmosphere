@@ -90,4 +90,21 @@ public class PressureProfileManager {
         TODAY.clear();
         TOMORROW.clear();
     }
+    public static float getCurrentPressure(BiomeInstanceKey biome, long tick) {
+        float[] day = getTodayProfile(biome); // Optional: if you have a daily curve
+        if (day != null) {
+            int idx = (int)((tick % 24000L) / 100);
+            return day[idx];
+        }
+
+        float[][] week = getWeeklyForecast(biome);
+        if (week != null) {
+            int dayIndex = (int)((tick / 24000L) % 7);
+            // Midday approximation: average of min/max pressure for that day
+            return (week[dayIndex][0] + week[dayIndex][1]) * 0.5f;
+        }
+
+        return Float.NaN;
+    }
+
 }

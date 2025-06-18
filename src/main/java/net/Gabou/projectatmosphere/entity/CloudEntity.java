@@ -21,12 +21,13 @@ import software.bernie.geckolib.util.RenderUtils;
 
 public class CloudEntity extends Entity implements GeoAnimatable {
     private static final EntityDataAccessor<Float> SIZE = SynchedEntityData.defineId(CloudEntity.class, EntityDataSerializers.FLOAT);
-    private static final float DEFAULT_SIZE = 1.0f;
+    private static final float DEFAULT_SIZE = 10.0f;
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     public CloudEntity(EntityType<? extends CloudEntity> type, Level level) {
         super(type, level);
         this.noPhysics = true;
+        this.setSize(DEFAULT_SIZE*this.getSize());
     }
 
     @Override

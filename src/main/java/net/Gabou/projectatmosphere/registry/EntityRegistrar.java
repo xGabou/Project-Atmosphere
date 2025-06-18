@@ -21,6 +21,41 @@ public class EntityRegistrar {
                     .setUpdateInterval(20)
                     .build("cloud_entity")
     );
+    public static final RegistryObject<EntityType<CloudEntity>> CLOUD_ENTITY1 = ENTITIES.register(
+            "cloud1_entity",
+            () -> EntityType.Builder.of(CloudEntity::new, MobCategory.MISC)
+                    .sized(2.0f, 1.0f)
+                    .setUpdateInterval(20)
+                    .build("cloud1_entity")
+    );
+    public static final RegistryObject<EntityType<CloudEntity>> CLOUD_ENTITY2 = ENTITIES.register(
+            "cloud2_entity",
+            () -> EntityType.Builder.of(CloudEntity::new, MobCategory.MISC)
+                    .sized(2.0f, 1.0f)
+                    .setUpdateInterval(20)
+                    .build("cloud2_entity")
+    );
+    public static final RegistryObject<EntityType<CloudEntity>> CLOUD_ENTITY3 = ENTITIES.register(
+            "cloud3_entity",
+            () -> EntityType.Builder.of(CloudEntity::new, MobCategory.MISC)
+                    .sized(2.0f, 1.0f)
+                    .setUpdateInterval(20)
+                    .build("cloud3_entity")
+    );
+    public static final RegistryObject<EntityType<CloudEntity>> CLOUD_ENTITY4 = ENTITIES.register(
+            "cloud4_entity",
+            () -> EntityType.Builder.of(CloudEntity::new, MobCategory.MISC)
+                    .sized(2.0f, 1.0f)
+                    .setUpdateInterval(20)
+                    .build("cloud4_entity")
+    );
+    public static final RegistryObject<EntityType<CloudEntity>> CLOUD_ENTITY5 = ENTITIES.register(
+            "cloud5_entity",
+            () -> EntityType.Builder.of(CloudEntity::new, MobCategory.MISC)
+                    .sized(2.0f, 1.0f)
+                    .setUpdateInterval(20)
+                    .build("cloud5_entity")
+    );
 
     public static final RegistryObject<EntityType<SmallNormalCloud1Entity>> SMALL_NORMAL_CLOUD_1_ENTITY = ENTITIES.register(
             "small_normal_cloud_1_entity",

@@ -154,6 +154,7 @@ public class AtmosphereManager {
         HumidityManager.onServerStopping(world);
         PressureManager.onServerStopping(world);
         WindManager.onServerStopping(world);
+        StormManager.onServerStopping(world);
     }
 
     public static void tick(ServerLevel level) {

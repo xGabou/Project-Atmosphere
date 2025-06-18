@@ -29,7 +29,7 @@ public class WindGenerator {
         float[][] selfTemp = TemperatureProfileManager.getWeeklyForecast(selfKey);
         float[][] selfHumidity = HumidityProfileManager.getWeeklyForecast(selfKey);
 
-        Set<BiomeInstanceKey> neighbors = AtmosphereUtils.findBiomes(world, center, 120);
+        Set<BiomeInstanceKey> neighbors = PressureProfileManager.getAllBiomeKeys();
         float altitude = center.getY();
         float biomeFactor = getBiomeWindModifier(biome);
         double[] airDensity = AtmosphericPhysics.computeAirDensity(selfTemp, selfHumidity);
@@ -54,19 +54,15 @@ public class WindGenerator {
 
             Pavg /= count;
             float dP = Math.abs(Pavg - Pself); // pressure gradient in hPa
-
-            float Tavg = (selfTemp[d][0] + selfTemp[d][1]) * 0.5f;
-            float RHavg = (selfHumidity[d][0] + selfHumidity[d][1]) * 0.5f;
-            float tempFactor = 1.0f + Tavg / 40f; // 0.8 to 1.3
-            float humidityFactor = 1.0f + (RHavg - 50f) / 200f;
             float densityFactor = (float) (airDensity[d] / 1.225f); // standard = 1.0
 
             float altitudeFactor = (float) Math.log(1 + altitude / 10f);
 
-            float speed = dP * 3.2f * tempFactor * humidityFactor * densityFactor * biomeFactor * altitudeFactor * SPEED_SCALING;
+            //En m/s
+            float speed = (float) Math.sqrt(2*(dP)/densityFactor) * biomeFactor * altitudeFactor * SPEED_SCALING;
 
             // Clamp to reasonable base values (in m/s)
-            baseWind[d] = Math.max(6f, /*Math.min(speed, 50f)*/ speed); // ~21.6–79.2 km/h
+            baseWind[d] = Math.max(1.2f, /*Math.min(speed, 50f)*/ speed); // ~21.6–79.2 km/h
         }
 
         return baseWind;

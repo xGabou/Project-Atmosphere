@@ -52,3 +52,9 @@ modId = "particlerain"
 mandatory = true
 versionRange = "*"
 side = "CLIENT"
+
+[[dependencies."${mod_id}"]]
+modId = "sereneseasonsextended"
+mandatory = true
+versionRange = "*"
+side = "BOTH"

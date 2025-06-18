@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere;
 
-import net.Gabou.projectatmosphere.client.renderer.CloudRenderer;
+import net.Gabou.projectatmosphere.client.renderer.*;
 import net.Gabou.projectatmosphere.client.renderer.SmallNormalCloud1Renderer;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -43,6 +43,7 @@ public class ProjectAtmosphere {
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 
     public ProjectAtmosphere() {
+        LOGGER.info("Project Atmosphere is loading!");
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         //ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
         GeckoLib.initialize();
@@ -108,6 +109,11 @@ public class ProjectAtmosphere {
         @SubscribeEvent
         public static void onClientSetup(final EntityRenderersEvent.RegisterRenderers event) {
             event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY.get(), CloudRenderer::new);
+            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY1.get(), CloudRenderer1::new);
+            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY2.get(), CloudRenderer2::new);
+            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY3.get(), CloudRenderer3::new);
+            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY4.get(), CloudRenderer4::new);
+            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY5.get(), CloudRenderer5::new);
             event.registerEntityRenderer(EntityRegistrar.SMALL_NORMAL_CLOUD_1_ENTITY.get(), SmallNormalCloud1Renderer::new);
 
         }

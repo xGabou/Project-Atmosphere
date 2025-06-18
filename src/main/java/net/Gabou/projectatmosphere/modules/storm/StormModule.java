@@ -36,12 +36,6 @@ public class StormModule {
             StormManager.onPlayerJoined(world, pos);
     }
 
-    private static void onServerStopping(ServerStoppingEvent event) {
-        ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
-        if (world != null) {
-            StormStorageManager.saveAll(world);
-        }
-    }
 
 
 

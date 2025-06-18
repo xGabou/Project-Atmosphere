@@ -3,19 +3,26 @@ package net.Gabou.projectatmosphere.manager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.entity.CloudEntity;
 import net.Gabou.projectatmosphere.entity.SmallNormalCloud1Entity;
+import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
+import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
+import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
+import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.registry.EntityRegistrar;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
 
 import java.util.List;
+import java.util.Set;
 
 public class CloudSpawner {
     private static final int SPAWN_INTERVAL_TICKS = 20 * 15; // Every 15 seconds
     private static long lastSpawnTick = 0;
     private static final int cloudY = 190; // Fixed Y coordinate for cloud spawn
-    private static final int CLOUDS_PER_PLAYER = 30; // How many clouds per player
+    private static final int CLOUDS_PER_PLAYER = 30; // How many clouds per playerz
+    private static final float SEA_LEVEL_PRESSURE = 1013.25f; // hPa, standard sea level pressure
 
     /**
      * Attempts to spawn clouds in the given level based on the spawn chance.
@@ -32,17 +39,18 @@ public class CloudSpawner {
         float spawnChance = WeatherManager.getCloudSpawnChance(level);
         if (level.random.nextFloat() <= spawnChance) {
             spawnCloudsForAllPlayers(level);
-        }
+
     }
     /**
      * Spawns a cloud for the given player in the specified level.
      *
      * @param player The player for whom the cloud will be spawned.
-     * @param level The server level where the cloud will be spawned.
+     * @param level  The server level where the cloud will be spawned.
      */
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
-        spawnCloud(level, player,getRadiusBlocks(level));
+        spawnCloud(level, player, getRadiusBlocks(level));
     }
+
     /**
      * Spawns clouds for all players in the given level.
      *
@@ -56,18 +64,20 @@ public class CloudSpawner {
         }
 
         for (ServerPlayer player : players) {
+            float spawnChance = calculateCloudSpawnChance(level,player);
             final int radiusBlocks = getRadiusBlocks(level);
+                for (int i = 0; i < CLOUDS_PER_PLAYER*spawnChance; i++) {
+                    spawnCloud(level, player, radiusBlocks);
+                }
 
-            for (int i = 0; i < CLOUDS_PER_PLAYER; i++) {
-                spawnCloud(level, player, radiusBlocks);
-            }
         }
     }
+
     /**
      * Spawns a cloud entity at a random position around the player.
      *
-     * @param level The server level where the cloud will be spawned.
-     * @param player The player around whom the cloud will be spawned.
+     * @param level        The server level where the cloud will be spawned.
+     * @param player       The player around whom the cloud will be spawned.
      * @param radiusBlocks The radius in blocks within which to spawn the cloud.
      */
 

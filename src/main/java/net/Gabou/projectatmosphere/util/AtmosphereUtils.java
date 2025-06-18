@@ -52,7 +52,7 @@ public class AtmosphereUtils {
             }
         }
     }
-
+//TODO check if it's returning the right biome
     /**
      * Finds the nearest biome instance key in the forecast map that matches the given type.
      *
@@ -74,6 +74,7 @@ public class AtmosphereUtils {
 
             double dist = key.samplePos().distSqr(targetPos);
             if (dist < closestDistance) {
+
                 closestDistance = dist;
                 closestKey = key;
             }

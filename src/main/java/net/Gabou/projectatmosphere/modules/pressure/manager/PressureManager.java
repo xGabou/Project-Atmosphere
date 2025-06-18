@@ -88,7 +88,6 @@ public class PressureManager {
 
     public static void onRegenerate(ServerLevel world, List< ServerPlayer > players) {
             clearForecastCache(world);
-            init(world, world.getSharedSpawnPos());
             for (Player player : players) {
                 BlockPos pos = player.blockPosition();
                 PressureManager.onPlayerJoined(world, pos);

@@ -12,9 +12,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(WeatherCommand.class)
 public class WeatherCommandMixin {
 
-    @Inject(method = "register", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "register", at = @At("HEAD"))
     private static void onRegister(CommandDispatcher<CommandSourceStack> p_139167_, CallbackInfo ci) {
         // Cancel the command registration
-        ci.cancel();
+        //ci.cancel();
     }
 }

@@ -86,11 +86,11 @@ repositories {
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-//    implementation name: 'mangomultiblock-1.20.1-1.2.0' // without the .jar extension
     implementation fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
     implementation("com.eliotlash.mclib:mclib:20")
     implementation fg.deobf("maven.modrinth:midnightlib:1.4.2-forge")
-    implementation fg.deobf("curse.maven:tough-as-nails-246391:5815863")
+    implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.2")
+    // Local dependency, ensure the file exists in the libs directory
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:15.8.2.26")
