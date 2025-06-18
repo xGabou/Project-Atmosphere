@@ -20,7 +20,7 @@ import java.util.Set;
 public class WindGenerator {
 
     private static final Random random = new Random();
-    private static final float SPEED_SCALING = 3.0f;
+    private static final float SPEED_SCALING = 1.0f;
     private static final float VARIATION_STRENGTH = 2.0f;
 
     public static float[] generateBaseWindWeek(ServerLevel world, BlockPos center, ResourceLocation biome, BiomeInstanceKey selfKey) {

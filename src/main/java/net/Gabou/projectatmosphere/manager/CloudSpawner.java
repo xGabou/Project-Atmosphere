@@ -36,11 +36,24 @@ public class CloudSpawner {
         }
         lastSpawnTick = gameTime;
 
-        float spawnChance = WeatherManager.getCloudSpawnChance(level);
-        if (level.random.nextFloat() <= spawnChance) {
+        //float spawnChance = WeatherManager.getCloudSpawnChance(level); A RETIRER SI LA NOUVELLE MARCHE
             spawnCloudsForAllPlayers(level);
 
     }
+
+    private static float calculateCloudSpawnChance(ServerLevel level,ServerPlayer player) {
+        long dayTime = level.getDayTime();
+        float cloudSpawnChance = -1;
+
+        BiomeInstanceKey key = new BiomeInstanceKey(level.getBiome(player.blockPosition()).unwrapKey().get().location(), player.blockPosition());
+        float pression = PressureProfileManager.getCurrentPressure(key, dayTime);
+        float humidity = HumidityProfileManager.getCurrentHumidity(key, dayTime);
+        float temp = TemperatureProfileManager.getCurrentTemperature(key, dayTime);
+        cloudSpawnChance = (float) ((humidity / 100) + ((SEA_LEVEL_PRESSURE - pression) / 100) + (1.0 - Math.abs(temp - 15) / 40.0));
+
+        return cloudSpawnChance;
+    }
+
     /**
      * Spawns a cloud for the given player in the specified level.
      *
