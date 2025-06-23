@@ -4,11 +4,11 @@
     "tasks": [
       {
         "description": "Implement GeckoLib CloudEntity",
-        "done": true
+        "done": false
       },
       {
         "description": "Add cloud variants: cumulus, cirrus, fog",
-        "done": false
+        "done": true
       },
       {
         "description": "Add wind drifting logic",
@@ -33,19 +33,19 @@
     "tasks": [
       {
         "description": "Add morning fog when temperature \u003c 10°C",
-        "done": false
+        "done": true
       },
       {
         "description": "Customize fog by biome: jungle, swamp, plains",
-        "done": false
+        "done": true
       },
       {
         "description": "Fade fog after sunrise or player descent",
-        "done": false
+        "done": true
       },
       {
         "description": "Use safe Forge hook to override vanilla fog",
-        "done": false
+        "done": true
       }
     ]
   },
@@ -75,7 +75,7 @@
     "tasks": [
       {
         "description": "Create server-authoritative WeatherManager",
-        "done": false
+        "done": true
       },
       {
         "description": "Override vanilla rain/thunder states",
@@ -83,23 +83,23 @@
       },
       {
         "description": "Sync weather state to clients",
-        "done": false
+        "done": true
       },
       {
         "description": "Simulate 7-day forecast based on season + temperature",
-        "done": false
+        "done": true
       },
       {
         "description": "Forecast includes random ±10°C scaling",
-        "done": false
+        "done": true
       },
       {
         "description": "Final displayed temp varies ±3°C daily",
-        "done": false
+        "done": true
       },
       {
         "description": "Generate storms using season + wind + temperature",
-        "done": false
+        "done": true
       }
     ]
   },
@@ -124,7 +124,7 @@
       },
       {
         "description": "Handle spring melt logic for snow_pile blocks",
-        "done": false
+        "done": true
       }
     ]
   },
@@ -195,7 +195,7 @@
       },
       {
         "description": "Memoize biome → weather lookup",
-        "done": false
+        "done": true
       },
       {
         "description": "Separate ClientWeatherHandler and ServerWeatherHandler",
