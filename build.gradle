@@ -90,8 +90,6 @@ repositories {
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation("com.eliotlash.mclib:mclib:20")
-    implementation fg.deobf("maven.modrinth:midnightlib:1.4.2-forge")
     implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.3")
     implementation fg.deobf("dev.nonamecrackers2:simpleclouds-1.20.1:0.7")
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
@@ -104,7 +102,7 @@ dependencies {
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:15.8.2.26")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:15.8.2.26")
     runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:15.8.2.26")
-    implementation fg.deobf("curse.maven:jade-324717:6271651")
+    runtimeOnly( fg.deobf("curse.maven:jade-324717:6271651"))
     implementation fg.deobf("curse.maven:serene-seasons-291874:6398227")
     implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
     implementation fg.deobf("curse.maven:pretty-rain-1163800:6347977")
