@@ -111,7 +111,10 @@ public class ForecastStorageManager {
      */
     public static boolean hasForecast(BiomeInstanceKey biome) {
         BiomeInstanceKey key = AtmosphereUtils.findNearestBiomeInstanceKey(biome, cache);
-        return key!=null && cache.containsKey(key);
+        if (key == null) {
+            return false; // No matching biome found
+        }
+        return cache.containsKey(key);
     }
 
     /**

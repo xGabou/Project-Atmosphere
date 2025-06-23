@@ -23,10 +23,10 @@ public class TemperatureForecast {
      * Scans a 500×500 area, uses cached forecasts when present,
      * otherwise generates and saves new weekly forecasts.
      */
-    public static void generateForecastAround(Level world, BlockPos center, int radiusBlocks) {
+    public static void generateForecastAround(Level world,  Set<BiomeInstanceKey> biomeSamples) {
 
 
-        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
+
 
 
         // Step 2: Generate forecast for each biome based on its real sample position

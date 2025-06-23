@@ -1,5 +1,9 @@
 package net.Gabou.projectatmosphere.manager;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
@@ -9,11 +13,15 @@ import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManag
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.WeatherSampler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
+import org.joml.Vector2i;
 
 import java.util.List;
+import java.util.Set;
 
 public class SimpleCloudSpawner {
     // Constante pour l'intervalle de spawn des nuages en ticks.
@@ -32,12 +40,32 @@ public class SimpleCloudSpawner {
             return;
         }
         LAST_SPAWN_TICK = gameTime;
-        for (BiomeInstanceKey key : ForecastStorageManager.getAllBiomeKeys()) {
-            long dayTime = serverLevel.getDayTime();
-            spawnSimpleClouds(key, dayTime,serverLevel);
+        ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
+        CloudGenerator generator = cloudManager.getCloudGenerator();
+
+        for (SpawnRegion region : generator.getSpawnRegions()) {
+            Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInRegion(region, serverLevel);
+            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, serverLevel, serverLevel.getDayTime());
+
+            if (stats == null) continue;
+            SimpleCloudsCompat.spawnCloudInBiome(
+                    CloudLibrary.getCloudIdFromSeverity(
+                            determineCloudSeverity(
+                                    stats.temperature(), stats.humidity(), stats.pressure(),
+                                    calculateDewPoint(stats.temperature(), stats.humidity()))),
+                    new BiomeInstanceKey(
+                            stats.dominantBiome(),
+                            getRandomPosInRegion(region,RandomSource.create(),
+                                    serverLevel)), serverLevel);
         }
 
+
     }
+    public static BlockPos getRandomPosInRegion(SpawnRegion region, RandomSource random, ServerLevel level) {
+        Vector2i vec = SpawnRegion.getRandomPointInRegion(region, random);
+        return new BlockPos(vec.x, level.getSeaLevel(), vec.y);
+    }
+
 
     // Méthode pour spawn des nuages simples dans le niveau serveur.
     public static void spawnSimpleClouds(BiomeInstanceKey key, long dayTime,ServerLevel serverLevel) {
@@ -86,7 +114,12 @@ public class SimpleCloudSpawner {
         SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",new BiomeInstanceKey(level.getBiome(player.blockPosition()).unwrapKey().get().location(),player.blockPosition()), level);
     }
 
-    public static void onPlayerJoined(ServerLevel world, BlockPos pos) {
-       spawnSimpleClouds(AtmosphereUtils.findNearestBiomeInstanceKey(new BiomeInstanceKey(world.getBiome(pos).unwrapKey().get().location(),pos), TemperatureProfileManager.getDayProfile()),world.getDayTime(),world);
+    public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        long dayTime = world.getDayTime();
+
+        for (BiomeInstanceKey key : biomeSamples) {
+            spawnSimpleClouds(key, dayTime, world);
+        }
     }
+
 }

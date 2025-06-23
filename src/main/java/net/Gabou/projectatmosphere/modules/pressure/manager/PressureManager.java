@@ -24,6 +24,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
@@ -38,13 +39,13 @@ public class PressureManager {
     }
 
     /** Called on server spawn or when regenerating around a player. */
-    public static void init(ServerLevel world, BlockPos center) {
+    public static void init(ServerLevel world,Set<BiomeInstanceKey> biomeSamples) {
 
                 {
                     try {
-                        PressureForecast.generateFullForecast(world, center, DEFAULT_RADIUS);
+                        PressureForecast.generateFullForecast(world, biomeSamples);
                     } catch (Exception e) {
-                        LOGGER.error("Failed to generate pressure forecast around " + center, e);
+                        LOGGER.error("Failed to generate pressure forecast around ", e);
                     }
                 }
 
@@ -60,8 +61,8 @@ public class PressureManager {
 
 
     /** Called when a player (re)enters to regenerate missing forecasts around them */
-    public static void onPlayerJoined(ServerLevel world, BlockPos center) {
-        init(world, center);
+    public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        init(world,biomeSamples);
     }
 
     /** Called at tick 18000 to precompute both today & tomorrow */
@@ -83,17 +84,12 @@ public class PressureManager {
         PressureStorageManager.clearCache(world);
     }
 
-    public static void onSeasonChange(ServerLevel world) {
-        onRegenerate(world, world.players());
 
-    }
 
-    public static void onRegenerate(ServerLevel world, List< ServerPlayer > players) {
+    public static void onRegenerate(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {
             clearForecastCache(world);
-            for (Player player : players) {
-                BlockPos pos = player.blockPosition();
-                PressureManager.onPlayerJoined(world, pos);
-            }
+            PressureManager.onPlayerJoined(world, biomeSamples);
+
 
 
     }
@@ -105,7 +101,7 @@ public class PressureManager {
         PressureCommand.register(event.getDispatcher());
     }
 
-    public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        init(world, center);
+    public static void updateForecastAround(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
 }

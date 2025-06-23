@@ -20,11 +20,8 @@ public class HumidityForecast {
      * Scans around center, loads cached or generates new weekly humidity forecasts.
      */
     public static void generateForecastAround(
-            ServerLevel world, BlockPos center, int radiusBlocks) {
-        // findBiomes now returns a map of biome→samplePos
-        Set<BiomeInstanceKey> samples =
-                AtmosphereUtils.findBiomes(world, center, radiusBlocks);
-        for (var entry : samples) {
+            ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        for (var entry : biomeSamples) {
             float[][] week;
             if (HumidityStorageManager.hasForecast(entry)) {
                 HumidityProfileManager.putWeeklyForecast(entry,HumidityStorageManager.getForecast(entry));

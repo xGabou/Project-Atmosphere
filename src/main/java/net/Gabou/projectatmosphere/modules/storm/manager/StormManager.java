@@ -19,20 +19,21 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
 
 public class StormManager {
 
-    public static void init(ServerLevel world, BlockPos center) {
+    public static void init(ServerLevel world,Set<BiomeInstanceKey> biomeSamples) {
 
             try {
-                    StormForecast.generateStormForecastAround(world, center, DEFAULT_RADIUS);
+                    StormForecast.generateStormForecastAround(world, biomeSamples);
 
             DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
             } catch (Exception e) {
-                LOGGER.error("Failed to generate storm forecast around " + center, e);
+                LOGGER.error("Failed to generate storm forecast around ", e);
             }
 
 
@@ -42,8 +43,8 @@ public class StormManager {
         clearForecastCache(world);
     }
 
-    public static void onPlayerJoined(ServerLevel world, BlockPos center) {
-        init(world, center);
+    public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
 
     public static float getCurrentStormIntensity(BiomeInstanceKey biome, long worldTick) {
@@ -69,9 +70,6 @@ public class StormManager {
         DailyStormGenerator.scheduleGenerationForTodayAndTomorrow(world);
     }
 
-    public static void onSeasonChange(ServerLevel world) {
-        onRegenerate(world, world.players());
-    }
 
     public static float randomStormSpike(BiomeInstanceKey biome, int d) {
         return StormSpikeManager.randomStormSpike(biome, d);
@@ -84,13 +82,10 @@ public class StormManager {
         StormStorageManager.clearCache(world);
     }
 
-    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
+    public static void onRegenerate(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {
         clearForecastCache(world);
-        init(world, world.getSharedSpawnPos());
-        for (Player player : players) {
-            BlockPos pos = player.blockPosition();
-            StormManager.onPlayerJoined(world, pos);
-        }
+        StormManager.onPlayerJoined(world, biomeSamples);
+
 
     }
     public static void onRegisterCommands(RegisterCommandsEvent event){
@@ -98,7 +93,7 @@ public class StormManager {
         SpawnCloudCommand.register(event.getDispatcher());
     }
 
-    public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        init(world, center);
+    public static void updateForecastAround(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
 }

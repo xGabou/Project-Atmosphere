@@ -53,9 +53,7 @@ public class PressureForecast {
      * 3) Persist into ProfileManager & StorageManager
      * 4) Schedule daily curve generation
      */
-    public static void generateFullForecast(ServerLevel world, BlockPos center, int radius) {
-        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
-
+    public static void generateFullForecast(ServerLevel world,Set<BiomeInstanceKey> biomeSamples) {
         Map<BiomeInstanceKey, float[][]> freshWeeks = new HashMap<>();
 
         for (var entry : biomeSamples) {

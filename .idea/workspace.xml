@@ -5,38 +5,32 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Add SimpleClouds compatibility and refactor cloud spawning logic: implement SimpleCloudSpawner and CloudLibrary for enhanced cloud management">
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherSampler.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/SpawnCloudCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/SpawnCloudCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/VideoSettingsScreenMixin.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/WeatherCommandMixin.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/Command/HumidityCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/Command/HumidityCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/animation/entity/cloud.animation.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/entity/cloudentity.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/geo/entity/cloud.geo.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/geo/entity/cloud1.geo.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/geo/entity/cloud2.geo.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/geo/entity/cloud3.geo.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/geo/entity/cloud4.geo.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/geo/entity/cloud5.geo.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/geo/entity/smallnormalclouds1.geo.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/en_us.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/entity/cloud.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/Blanc1_7.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/ExtremeGris6_7.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/Gris4_7.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/Noir7_7.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/ToucheDeGris2_7.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/TresGris5_7.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/UnPeuGris3_7.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/cloud.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/entity/smallnormalclouds1.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/HumidityModule.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/forecast/HumidityForecast.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/forecast/HumidityForecast.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/manager/HumidityManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/manager/HumidityManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/pressure/PressureModule.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/pressure/forecast/PressureForecast.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/pressure/forecast/PressureForecast.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/pressure/manager/PressureManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/pressure/manager/PressureManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/StormModule.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/forecast/StormForecast.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/forecast/StormForecast.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/manager/StormManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/manager/StormManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/TemperatureModule.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/forecast/TemperatureForecast.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/forecast/TemperatureForecast.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/manager/TemperatureManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/manager/TemperatureManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/ForecastStorageManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/ForecastStorageManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindModule.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/forecast/WindForecast.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/forecast/WindForecast.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/manager/WindManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/manager/WindManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -164,46 +158,46 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Gradle.Build Project-Atmosphere.executor": "Run",
-    "Gradle.Download Sources.executor": "Run",
-    "Gradle.H:/Project-Atmosphere [createMcpToSrg].executor": "Run",
-    "Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor": "Run",
-    "Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor": "Debug",
-    "Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.bullshit.main()].executor": "Debug",
-    "Gradle.Project-Atmosphere [:prepareRunClientCompile].executor": "Run",
-    "Gradle.Project-Atmosphere [build].executor": "Run",
-    "Gradle.Project-Atmosphere [clean].executor": "Debug",
-    "Gradle.Project-Atmosphere [createMcpToSrg].executor": "Run",
-    "Gradle.Project-Atmosphere [genIntellijRuns].executor": "Debug",
-    "Gradle.Project-Atmosphere [runClient].executor": "Debug",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "extract.method.default.visibility": "private",
-    "git-widget-placeholder": "master",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "H:/Project-Atmosphere/libs",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Modules",
-    "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0",
-    "settings.editor.selected.configurable": "reference.idesettings.debugger.capture",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Gradle.Build Project-Atmosphere.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Download Sources.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.H:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.bullshit.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [:prepareRunClientCompile].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [clean].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [runClient].executor&quot;: &quot;Debug&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;extract.method.default.visibility&quot;: &quot;private&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;H:/Project-Atmosphere/libs&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.idesettings.debugger.capture&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "ChangesTree.GroupingKeys": [
-      "module",
-      "repository"
+  &quot;keyToStringList&quot;: {
+    &quot;ChangesTree.GroupingKeys&quot;: [
+      &quot;module&quot;,
+      &quot;repository&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="H:\Project-Atmosphere\libs" />
@@ -368,7 +362,7 @@
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" value="--debug" />
+        <option name="scriptParameters" value="" />
         <option name="taskDescriptions">
           <list />
         </option>
@@ -472,6 +466,8 @@
       <workItem from="1750366680996" duration="609000" />
       <workItem from="1750422560351" duration="853000" />
       <workItem from="1750626952207" duration="14505000" />
+      <workItem from="1750687316956" duration="4081000" />
+      <workItem from="1750692314814" duration="3086000" />
     </task>
     <task id="LOCAL-00001" summary="Initial">
       <option name="closed" value="true" />
@@ -881,13 +877,8 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java</url>
-          <line>106</line>
+          <line>105</line>
           <option name="timeStamp" value="92" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java</url>
-          <line>143</line>
-          <option name="timeStamp" value="99" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/StormModule.java</url>
@@ -903,6 +894,16 @@
           <url>jar://$PROJECT_DIR$/libs/SereneSeasonsExtended-1.20.1-1.0.2.jar!/com/Gabou/sereneseasonsextended/features/SnowBlockReplacer.class</url>
           <line>55</line>
           <option name="timeStamp" value="112" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java</url>
+          <line>162</line>
+          <option name="timeStamp" value="120" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java</url>
+          <line>154</line>
+          <option name="timeStamp" value="125" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />

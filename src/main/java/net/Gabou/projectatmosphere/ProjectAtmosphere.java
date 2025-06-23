@@ -30,12 +30,11 @@ import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.event.*;
-import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 
 @Mod(ProjectAtmosphere.MODID)
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ProjectAtmosphere {
-    public static final int DEFAULT_RADIUS = 100;
+    public static final int DEFAULT_RADIUS = 500;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 

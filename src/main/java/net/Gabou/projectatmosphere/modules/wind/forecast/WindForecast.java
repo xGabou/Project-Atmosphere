@@ -15,9 +15,7 @@ import java.util.Set;
 
 public class WindForecast {
 
-    public static void generateForecastAround(ServerLevel world, BlockPos center, int radius) {
-        Set<BiomeInstanceKey> biomeSamples = AtmosphereUtils.findBiomes(world, center, radius);
-
+    public static void generateForecastAround(ServerLevel world,Set<BiomeInstanceKey> biomeSamples) {
         for (BiomeInstanceKey entry : biomeSamples) {
             ResourceLocation biome = entry.biomeType();
             BlockPos pos = entry.samplePos();

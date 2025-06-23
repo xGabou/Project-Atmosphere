@@ -26,6 +26,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
@@ -40,22 +41,22 @@ public class TemperatureManager{
 
 
     /** Called when a player joins; triggers forecast generation around them. */
-    public static void onPlayerJoined(ServerLevel world, BlockPos playerPos) {
-        init(world, playerPos);
+    public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
 
     /**
      * Central forecast generation method.
      * If biomes near position have not been cached, they will be generated and persisted.
      */
-    private static void init(ServerLevel world, BlockPos center) {
+    private static void init(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
 
             try {
-                TemperatureForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
+                TemperatureForecast.generateForecastAround(world,biomeSamples);
                 DailyProfileGenerator.scheduleGenerationForTodayAndTomorrow(world);
                 ProjectAtmosphere.LOGGER.info("[TempForecast] Generating full temperature forecast...");
             } catch (Exception e) {
-                LOGGER.error("Failed to generate temperature forecast around " + center, e);
+                LOGGER.error("Failed to generate temperature forecast around ", e);
             }
 
 
@@ -96,27 +97,21 @@ public class TemperatureManager{
 
     }
 
-    public static void onSeasonChange(ServerLevel world) {
-        //TODO make sure we dont stack forecasts
-        onRegenerate(world, world.players());
-    }
+
 
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         TemperatureCommands.register(event.getDispatcher());
     }
 
-    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
+    public static void onRegenerate(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
         clearForecastCache(world);
-        //init(world, world.getSharedSpawnPos());
-        for (Player player : players) {
-            BlockPos pos = player.blockPosition();
-            onPlayerJoined(world, pos);
-        }
+        onPlayerJoined(world, biomeSamples);
+
 
     }
 
-    public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        init(world, center);
+    public static void updateForecastAround(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
 }

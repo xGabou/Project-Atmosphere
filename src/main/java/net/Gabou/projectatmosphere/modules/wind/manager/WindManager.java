@@ -18,6 +18,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
@@ -26,19 +27,19 @@ public class WindManager {
 
     public static final int WIND_SPEED = 10;  // Default speed in m/s
 
-    public static void init(ServerLevel world, BlockPos center) {
+    public static void init(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
 
             try {
-                WindForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
-                //WindProfileManager.generateTodayAndTomorrowProfiles(world);
+                WindForecast.generateForecastAround(world,biomeSamples);
+                WindProfileManager.generateTodayAndTomorrowProfiles(world);
             } catch (Exception e) {
-                LOGGER.error("Failed to generate wind forecast around " + center, e);
+                LOGGER.error("Failed to generate wind forecast around ", e);
             }
 
     }
 
-    public static void onPlayerJoined(ServerLevel world, BlockPos pos) {
-        init(world, pos);
+    public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
 
     public static float[] getWeeklyForecast(BiomeInstanceKey biome) {
@@ -69,24 +70,20 @@ public class WindManager {
     }
 
 
-    public static void onSeasonChange(ServerLevel world) {
-        onRegenerate(world, world.players());
-    }
+
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         WindCommand.register(event.getDispatcher());
     }
-    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
+    public static void onRegenerate(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {
         clearForecastCache(world);
-        for (Player player : players) {
-            BlockPos pos = player.blockPosition();
-            onPlayerJoined(world, pos);
-        }
+        onPlayerJoined(world, biomeSamples);
+
 
     }
 
-    public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        init(world, center);
+    public static void updateForecastAround(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
 
     public static void onServerStopping(ServerLevel world) {

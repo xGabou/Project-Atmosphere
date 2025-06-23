@@ -20,12 +20,8 @@ public class StormForecast {
      * Generates or loads weekly storm forecasts around the center position.
      * Used on world load or precompute pass.
      */
-    public static void generateStormForecastAround(ServerLevel world,
-                                                                              BlockPos center,
-                                                                              int radiusBlocks) {
-
-        Set<BiomeInstanceKey> samples = AtmosphereUtils.findBiomes(world, center, radiusBlocks);
-        for (var entry : samples) {
+    public static void generateStormForecastAround(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        for (var entry : biomeSamples) {
             ResourceLocation biome = entry.biomeType();
             BlockPos pos = entry.samplePos();
 

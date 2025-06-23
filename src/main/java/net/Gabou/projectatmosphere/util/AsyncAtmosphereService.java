@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.util;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -113,9 +114,14 @@ public class AsyncAtmosphereService {
     }
 
     // Unified weather runner
-    public static void runWeather(Runnable task) {
-        if (WEATHER_EXECUTOR != null && !WEATHER_EXECUTOR.isShutdown()) WEATHER_EXECUTOR.submit(task);
+    public static CompletableFuture<Void> runWeather(Runnable task) {
+        if (WEATHER_EXECUTOR != null && !WEATHER_EXECUTOR.isShutdown()) {
+            return CompletableFuture.runAsync(task, WEATHER_EXECUTOR);
+        } else {
+            return CompletableFuture.failedFuture(new IllegalStateException("Weather executor not available."));
+        }
     }
+
 
     // Shared executor if needed externally
     public static void runShared(Runnable task) {

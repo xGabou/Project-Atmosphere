@@ -53,6 +53,7 @@ public class AtmosphereUtils {
         }
     }
 //TODO check if it's returning the right biome
+
     /**
      * Finds the nearest biome instance key in the forecast map that matches the given type.
      *
@@ -61,9 +62,14 @@ public class AtmosphereUtils {
      * @return The nearest matching biome instance key, or null if none found.
      */
     public static BiomeInstanceKey findNearestBiomeInstanceKey(
-           BiomeInstanceKey type,
+            BiomeInstanceKey type,
             Map<BiomeInstanceKey, ?> forecastMap
     ) {
+        // ✅ Direct hit: return immediately if key already exists
+        if (forecastMap.containsKey(type)) {
+            return type;
+        }
+
         BiomeInstanceKey closestKey = null;
         double closestDistance = Double.MAX_VALUE;
         ResourceLocation biomeType = type.biomeType();
@@ -74,23 +80,29 @@ public class AtmosphereUtils {
 
             double dist = key.samplePos().distSqr(targetPos);
             if (dist < closestDistance) {
-
                 closestDistance = dist;
                 closestKey = key;
             }
         }
 
+        if (closestKey == null) {
+            System.err.println("[Atmosphere] No matching biome found for " + biomeType + " at " + targetPos);
+        }
+
         return closestKey;
     }
+
     public static float[][] getRightForecastForBiome(BiomeInstanceKey biome, Map<BiomeInstanceKey, float[][]> forecastMap) {
         return forecastMap.get(findNearestBiomeInstanceKey(biome, forecastMap));
     }
+
     public static float[] getRightForecastForBiome1(
             BiomeInstanceKey biome,
             Map<BiomeInstanceKey, float[]> forecastMap
     ) {
         return forecastMap.get(findNearestBiomeInstanceKey(biome, forecastMap));
     }
+
     public static float getRightForecastForBiome2(
             BiomeInstanceKey biome,
             Map<BiomeInstanceKey, Float> forecastMap
@@ -98,7 +110,8 @@ public class AtmosphereUtils {
         return forecastMap.get(findNearestBiomeInstanceKey(biome, forecastMap));
     }
 
-    /** Finds all biomes within a square area around the center position.
+    /**
+     * Finds all biomes within a square area around the center position.
      * The area is defined by the radius in blocks.
      * The method uses a step of 16 blocks to sample the biomes.
      *

@@ -17,6 +17,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
@@ -24,23 +25,23 @@ import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
 public class HumidityManager {
 
     /** Called on server spawn or when regenerating around a player. */
-    public static void init(ServerLevel world, BlockPos center) {
+    public static void init(ServerLevel world,Set<BiomeInstanceKey> biomeSamples) {
 
 
             try {
                 // 2) generate or load weekly forecasts
-                 HumidityForecast.generateForecastAround(world, center, DEFAULT_RADIUS);
+                 HumidityForecast.generateForecastAround(world, biomeSamples);
 
                 // 4) schedule daily curve generation
                 DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
             } catch (Exception e) {
-                LOGGER.error("Failed to generate humidity forecast around " + center, e);
+                LOGGER.error("Failed to generate humidity forecast around ", e);
             }
 
     }
 
-    public static void onPlayerJoined(ServerLevel world, BlockPos center) {
-        init(world, center);
+    public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
+        init(world, biomeSamples);
     }
     public static void onPrecomputeProfiles(ServerLevel world) {
      DailyHumidityGenerator.scheduleGenerationForTodayAndTomorrow(world);
@@ -89,26 +90,20 @@ public class HumidityManager {
 
     }
 
-    public static void onSeasonChange(ServerLevel world) {
-        //TODO make sure we dont stack forecasts
-        onRegenerate(world, world.players());
-    }
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         HumidityCommand.register(event.getDispatcher());
     }
 
-    public static void onRegenerate(ServerLevel world, List<ServerPlayer> players) {
+    public static void onRegenerate(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {
 
             clearForecastCache(world);
-            for (Player player : players) {
-                BlockPos pos = player.blockPosition();
-                HumidityManager.onPlayerJoined(world, pos);
-            }
+            HumidityManager.onPlayerJoined(world, biomeSamples);
+
 
         }
 
-    public static void updateForecastAround(ServerLevel world, BlockPos center) {init(world, center);}
+    public static void updateForecastAround(ServerLevel world,  Set<BiomeInstanceKey> biomeSamples) {init(world, biomeSamples);}
 
     public static void onServerStopping(ServerLevel world) {
         // Save all humidity data to disk
