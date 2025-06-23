@@ -1,12 +1,9 @@
 package net.Gabou.projectatmosphere;
 
-import net.Gabou.projectatmosphere.client.renderer.*;
-import net.Gabou.projectatmosphere.client.renderer.SmallNormalCloud1Renderer;
+
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-import net.Gabou.projectatmosphere.modules.storm.StormModule;
-import net.Gabou.projectatmosphere.registry.EntityRegistrar;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.server.level.ServerLevel;
@@ -31,7 +28,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import software.bernie.geckolib.GeckoLib;
 import net.Gabou.projectatmosphere.event.*;
 import net.Gabou.projectatmosphere.modules.temperature.TemperatureModule;
 
@@ -46,8 +42,6 @@ public class ProjectAtmosphere {
         LOGGER.info("Project Atmosphere is loading!");
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         //ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
-        GeckoLib.initialize();
-        EntityRegistrar.registerEntities(modEventBus);
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
@@ -102,20 +96,6 @@ public class ProjectAtmosphere {
         ServerLevel world = event.getEntity().getServer().getLevel(ServerLevel.OVERWORLD);
         if (world != null && event.getEntity() instanceof ServerPlayer player) {
             AtmosphereManager.onPlayerJoined(world, player);
-        }
-    }
-    @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID,bus = Mod.EventBusSubscriber.Bus.MOD,value = Dist.CLIENT)
-    public static class ClientModEvents {
-        @SubscribeEvent
-        public static void onClientSetup(final EntityRenderersEvent.RegisterRenderers event) {
-            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY.get(), CloudRenderer::new);
-            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY1.get(), CloudRenderer1::new);
-            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY2.get(), CloudRenderer2::new);
-            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY3.get(), CloudRenderer3::new);
-            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY4.get(), CloudRenderer4::new);
-            event.registerEntityRenderer(EntityRegistrar.CLOUD_ENTITY5.get(), CloudRenderer5::new);
-            event.registerEntityRenderer(EntityRegistrar.SMALL_NORMAL_CLOUD_1_ENTITY.get(), SmallNormalCloud1Renderer::new);
-
         }
     }
     @SubscribeEvent

@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.pressure.manager;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.humidity.Command.HumidityCommand;
+import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.pressure.Command.PressureCommand;
 import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast;
 import net.Gabou.projectatmosphere.modules.pressure.util.DailyPressureGenerator;
@@ -10,6 +11,7 @@ import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureStorageManager;
 import net.Gabou.projectatmosphere.modules.storm.manager.StormManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -94,6 +96,9 @@ public class PressureManager {
             }
 
 
+    }
+    public static float getCurrentPressure(BiomeInstanceKey biome, long worldTick) {
+        return PressureProfileManager.getCurrentPressure(biome, worldTick);
     }
 
     public static void onRegisterCommands(RegisterCommandsEvent event) {

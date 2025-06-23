@@ -56,5 +56,10 @@
       <option name="name" value="ParchmentMC" />
       <option name="url" value="https://maven.parchmentmc.org/" />
     </remote-repository>
+    <remote-repository>
+      <option name="id" value="nonamecrackers2Maven" />
+      <option name="name" value="nonamecrackers2Maven" />
+      <option name="url" value="https://maven.nonamecrackers2.dev/releases" />
+    </remote-repository>
   </component>
 </project>

@@ -80,16 +80,24 @@ repositories {
         }
     }
     maven { url = "https://api.modrinth.com/maven" }
+    maven {
+        name "nonamecrackers2Maven"
+        url "https://maven.nonamecrackers2.dev/releases"
+    }
     flatDir { dir 'libs' }
 }
 
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
     implementation("com.eliotlash.mclib:mclib:20")
     implementation fg.deobf("maven.modrinth:midnightlib:1.4.2-forge")
-    implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.2")
+    implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.3")
+    implementation name: 'simpleclouds-0.7+1.20.1-forge'
+    implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
+    implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
+
+
     // Local dependency, ensure the file exists in the libs directory
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
