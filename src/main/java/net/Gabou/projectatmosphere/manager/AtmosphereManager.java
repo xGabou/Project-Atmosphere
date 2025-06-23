@@ -79,6 +79,7 @@ public class AtmosphereManager {
             PressureManager.onPlayerJoined(world, pos);
             WindManager.onPlayerJoined(world, pos);
             StormManager.onPlayerJoined(world, pos);
+            SimpleCloudSpawner.onPlayerJoined(world, pos);
             refreshUnifiedForecast();
         });
     }

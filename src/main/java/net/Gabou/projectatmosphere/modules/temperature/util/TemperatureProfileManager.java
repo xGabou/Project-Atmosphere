@@ -83,6 +83,10 @@ public class TemperatureProfileManager {
         WEEKLY.clear();
     }
 
+    public static Map<BiomeInstanceKey, float[]> getDayProfile() {
+        return DAILY;
+    }
+
 
     public static Set<BiomeInstanceKey> getAllBiomeKeys() {
         return DAILY.keySet();

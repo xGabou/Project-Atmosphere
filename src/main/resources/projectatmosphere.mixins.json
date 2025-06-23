@@ -1,14 +1,10 @@
 {
   "required": true,
-  "minVersion": "0.8",
-  "refmap": "projectatmosphere.refmap.json",
   "package": "net.Gabou.projectatmosphere.mixin",
-  "compatibilityLevel": "JAVA_16",
-  "mixins": [
-  ],
-  "client": [
-    "VideoSettingsScreenMixin"
-  ],
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "projectatmosphere.refmap.json",
+  "mixins": [],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }

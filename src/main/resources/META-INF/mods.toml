@@ -9,7 +9,7 @@ displayName = "${mod_name}"
 authors = "${mod_authors}"
 description = '''${mod_description}'''
 logoFile = "${mod_logo_file}"
-mixins = "${mod_mixins}"
+mixinConfig = "${mod_mixins}"
 displayTest = "IGNORE_ALL_VERSION"
 
 [[dependencies."${mod_id}"]]
@@ -40,12 +40,6 @@ versionRange = "*"
 ordering = "AFTER"
 side = "BOTH"
 
-[[dependencies."${mod_id}"]]
-modId = "geckolib"
-mandatory = true
-versionRange = "*"
-ordering = "AFTER"
-side = "CLIENT"
 
 [[dependencies."${mod_id}"]]
 modId = "particlerain"

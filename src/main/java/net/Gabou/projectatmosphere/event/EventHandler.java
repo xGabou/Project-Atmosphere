@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.event;
 
-import net.Gabou.projectatmosphere.manager.CloudSpawner;
+
+import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;

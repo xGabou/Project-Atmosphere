@@ -41,13 +41,13 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
-            args "--mixin.config=projectatmosphere.mixins.json"
+            args "--mixin.debug=true"
+
         }
 
         server {
             property 'forge.enabledGameTestNamespaces', mod_id
             args '--nogui'
-            args "--mixin.config=projectatmosphere.mixins.json"
 
         }
 
@@ -62,7 +62,8 @@ minecraft {
     }
 }
 
-sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+
 
 repositories {
     maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
@@ -93,7 +94,7 @@ dependencies {
     implementation("com.eliotlash.mclib:mclib:20")
     implementation fg.deobf("maven.modrinth:midnightlib:1.4.2-forge")
     implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.3")
-    implementation name: 'simpleclouds-0.7+1.20.1-forge'
+    implementation fg.deobf("dev.nonamecrackers2:simpleclouds-1.20.1:0.7")
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
     implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
 
@@ -158,3 +159,5 @@ tasks.withType(JavaCompile).configureEach {
             "-AreobfSrgFile=${buildDir}/tmp/reobf/SRG.srg"
     ]
 }
+
+

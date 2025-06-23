@@ -6,8 +6,12 @@ import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
 import net.Gabou.projectatmosphere.modules.pressure.manager.PressureManager;
 import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
+import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
 
@@ -76,5 +80,13 @@ public class SimpleCloudSpawner {
         // Scale into [1–7] index
         int severity = Math.round(instability * 7);
         return Math.max(1, Math.min(7, severity));
+    }
+
+    public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
+        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",new BiomeInstanceKey(level.getBiome(player.blockPosition()).unwrapKey().get().location(),player.blockPosition()), level);
+    }
+
+    public static void onPlayerJoined(ServerLevel world, BlockPos pos) {
+       spawnSimpleClouds(AtmosphereUtils.findNearestBiomeInstanceKey(new BiomeInstanceKey(world.getBiome(pos).unwrapKey().get().location(),pos), TemperatureProfileManager.getDayProfile()),world.getDayTime(),world);
     }
 }

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere;
 
 
+import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -54,6 +55,7 @@ public class ProjectAtmosphere {
     public static void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
         ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
         AsyncAtmosphereService.init();
+        SimpleCloudsHooks.setExternalWeatherControl(true);
         if (world != null) {
             AtmosphereManager.onServerStarting(world);
         }
@@ -70,6 +72,7 @@ public class ProjectAtmosphere {
     public static void onServerStopping(ServerStoppingEvent event) {
         AsyncAtmosphereService.shutdown();
         ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
+
         if (world != null) {
             AtmosphereManager.onServerStopping(world);
         }
