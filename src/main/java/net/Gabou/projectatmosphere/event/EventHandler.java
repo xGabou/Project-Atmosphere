@@ -19,6 +19,7 @@ public class EventHandler {
         if (!event.level.isClientSide && event.phase == TickEvent.Phase.END) {
             if (event.level instanceof ServerLevel serverLevel) {
                 SimpleCloudSpawner.trySpawnClouds(serverLevel);
+                
             }
         }
     }

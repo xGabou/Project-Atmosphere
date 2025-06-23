@@ -29,10 +29,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.RegisterCommandsEvent;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -55,6 +53,11 @@ public class AtmosphereManager {
         biomeSamples.clear();
     }
 
+    private static List<BlockPos> allCenterOfMap = new ArrayList<>();
+
+    public static List<BlockPos> getAllCenterOfMap() {
+        return allCenterOfMap;
+    }
 
     public static void onServerStarting(ServerLevel world) {
        AsyncAtmosphereService.runWeather(() -> {
@@ -69,6 +72,7 @@ public class AtmosphereManager {
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
         AsyncAtmosphereService.runWeather(() -> {;
             biomeSamples.addAll(AtmosphereUtils.findBiomes(world, center, DEFAULT_RADIUS));
+            allCenterOfMap.add(center);
             TemperatureManager.updateForecastAround(world, biomeSamples);
             PressureManager.updateForecastAround(world, biomeSamples);
             HumidityManager.updateForecastAround(world, biomeSamples);
@@ -92,6 +96,7 @@ public class AtmosphereManager {
     public static void onPlayerJoined(ServerLevel world, ServerPlayer player) {
         AsyncAtmosphereService.runWeather(() -> {;
             BlockPos pos = player.blockPosition();
+            allCenterOfMap.add(pos);
             biomeSamples.addAll(AtmosphereUtils.findBiomes(world, pos, DEFAULT_RADIUS));
             TemperatureManager.onPlayerJoined(world,biomeSamples);
             HumidityManager.onPlayerJoined(world,biomeSamples);
@@ -129,6 +134,7 @@ public class AtmosphereManager {
             clearBiomeSamples();
             for (ServerPlayer player : world.players()) {
                 BlockPos pos = player.blockPosition();
+                allCenterOfMap.add(pos);
                 biomeSamples.addAll(AtmosphereUtils.findBiomes(world, pos, DEFAULT_RADIUS));
                 TemperatureManager.onRegenerate(world, biomeSamples);
                 HumidityManager.onRegenerate(world, biomeSamples);

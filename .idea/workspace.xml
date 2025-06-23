@@ -4,9 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Refactor weather management: update AsyncAtmosphereService and AtmosphereManager to use CompletableFuture for asynchronous tasks and streamline biome sample handling">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -196,7 +196,7 @@
       <recent name="net.Gabou.projectatmosphere.event" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
     <configuration name="bullshit" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="net.Gabou.projectatmosphere.tools.bullshit" />
       <module name="project-atmosphere.main" />
@@ -379,10 +379,10 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [clean]" />
         <item itemvalue="Gradle.Project-Atmosphere [genIntellijRuns]" />
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Application.bullshit" />
       </list>
     </recent_temporary>
@@ -443,7 +443,7 @@
       <workItem from="1750422560351" duration="853000" />
       <workItem from="1750626952207" duration="14505000" />
       <workItem from="1750687316956" duration="4081000" />
-      <workItem from="1750692314814" duration="3891000" />
+      <workItem from="1750692314814" duration="5260000" />
     </task>
     <task id="LOCAL-00001" summary="Initial">
       <option name="closed" value="true" />
@@ -805,7 +805,15 @@
       <option name="project" value="LOCAL" />
       <updated>1750695638959</updated>
     </task>
-    <option name="localTasksCounter" value="46" />
+    <task id="LOCAL-00046" summary="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly">
+      <option name="closed" value="true" />
+      <created>1750696590665</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1750696590665</updated>
+    </task>
+    <option name="localTasksCounter" value="47" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -824,7 +832,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Update biome temperature configurations; adjust seasonal ranges and daily temperature limits" />
     <MESSAGE value="Refactor biome temperature configurations; streamline seasonal ranges and enhance daily clamp derivation" />
     <MESSAGE value="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations" />
     <MESSAGE value="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations&#10;&#10;&#10;Need to transform back into static" />
@@ -849,7 +856,8 @@
     <MESSAGE value="Refactor pressure management logic: streamline forecast handling and remove unused code" />
     <MESSAGE value="Add SimpleClouds compatibility and refactor cloud spawning logic: implement SimpleCloudSpawner and CloudLibrary for enhanced cloud management" />
     <MESSAGE value="Refactor weather management: update AsyncAtmosphereService and AtmosphereManager to use CompletableFuture for asynchronous tasks and streamline biome sample handling" />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor weather management: update AsyncAtmosphereService and AtmosphereManager to use CompletableFuture for asynchronous tasks and streamline biome sample handling" />
+    <MESSAGE value="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly" />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

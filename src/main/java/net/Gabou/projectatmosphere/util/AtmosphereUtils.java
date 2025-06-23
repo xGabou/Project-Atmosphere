@@ -86,7 +86,7 @@ public class AtmosphereUtils {
         }
 
         if (closestKey == null) {
-            System.err.println("[Atmosphere] No matching biome found for " + biomeType + " at " + targetPos);
+            System.err.println("[Atmosphere] No matching biome found for " + biomeType + " at " + targetPos + forecastMap);
         }
 
         return closestKey;

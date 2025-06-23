@@ -1,40 +1,58 @@
 package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 
 public class DebugAtmoCommand {
+    private static int sendForecast(CommandContext<CommandSourceStack> ctx, ResourceLocation biome) {
+        var forecast = AtmosphereManager.getForecast(biome);
+        if (forecast == null) {
+            ctx.getSource().sendFailure(Component.literal("No forecast found for biome: " + biome));
+            return 0;
+        }
 
+        ctx.getSource().sendSuccess(() ->
+                Component.literal("Biome: " + biome +
+                        "\n  🌡 Temp:     [" + format(forecast.temperature()) + "]" +
+                        "\n  🧪 Pressure: [" + format(forecast.pressure()) + "]" +
+                        "\n  💧 Humidity: [" + format(forecast.humidity()) + "]" +
+                        "\n  🌬 Wind:     [" + forecast.wind() + "]"
+                ), false);
+        return 1;
+    }
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("weatherdebug")
                         .then(Commands.literal("forecast")
+                                .executes(ctx -> {
+                                    // Use the executor's current biome
+                                    ServerLevel world = ctx.getSource().getLevel();
+                                    BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
+                                    ResourceLocation biome = world.registryAccess()
+                                            .registryOrThrow(Registries.BIOME)
+                                            .getKey(world.getBiome(pos).value());
+
+                                    return sendForecast(ctx, biome);
+                                })
                                 .then(Commands.argument("biome", ResourceLocationArgument.id())
                                         .executes(ctx -> {
                                             ResourceLocation biome = ResourceLocationArgument.getId(ctx, "biome");
-                                            var forecast = AtmosphereManager.getForecast(biome);
-                                            if (forecast == null) {
-                                                ctx.getSource().sendFailure(Component.literal("No forecast found for biome: " + biome));
-                                                return 0;
-                                            }
-
-                                            ctx.getSource().sendSuccess(() ->
-                                                    Component.literal("Biome: " + biome +
-                                                            "\n  🌡 Temp:     [" + format(forecast.temperature()) + "]" +
-                                                            "\n  🧪 Pressure: [" + format(forecast.pressure()) + "]" +
-                                                            "\n  💧 Humidity: [" + format(forecast.humidity()) + "]" +
-                                                            "\n  🌬 Wind:     [" + forecast.wind() + "]"
-                                                    ), false);
-                                            return 1;
+                                            return sendForecast(ctx, biome);
                                         })
                                 )
                         )
+
                         .then(Commands.literal("cpu")
                                 .executes(ctx -> {
                                     int cores = Runtime.getRuntime().availableProcessors();
@@ -57,10 +75,29 @@ public class DebugAtmoCommand {
                                     return 1;
                                 })
                         )
+                        .then(Commands.argument("violence", ResourceLocationArgument.id())
+                                .executes(ctx -> {
+                                        int violence = SimpleCloudSpawner.getCurrentViolence();
+                                        if(violence==0) {
+                                        ctx.getSource().sendFailure(Component.literal("No violence detected  "));
+                                        return 0;
+                                    }
+
+                                    ctx.getSource().sendSuccess(() ->
+                                            Component.literal("Violence is: " + violence +
+                                                    "\n CloudViolence:     [" +violence + "]"
+                                            ), false);
+                                    return 1;
+                                })
+                        )
+
         );
     }
 
     private static String format(float[] arr) {
         return String.format("%.1f, %.1f", arr[0], arr[1]);
     }
+
+
 }
+

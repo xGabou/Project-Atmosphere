@@ -25,6 +25,7 @@ public class WindForecast {
                 WindProfileManager.putWeeklyForecast(entry,WindStorageManager.getForecast(entry));
             } else {
                 week = WindGenerator.generateBaseWindWeek(world, pos, biome, entry);
+
                 WindStorageManager.saveForecast(entry, week);
                 WindProfileManager.putWeeklyForecast(entry, week);
             }

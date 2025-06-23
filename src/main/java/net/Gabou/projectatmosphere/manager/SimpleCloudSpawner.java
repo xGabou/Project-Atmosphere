@@ -32,6 +32,17 @@ public class SimpleCloudSpawner {
     // Pression moyenne en hPa (niveau de la mer)
     private static float PRESSION_MOYENNE = 1013.25f;
 
+    private static int currentViolence = 0;
+
+    public static int getCurrentViolence() {
+        return currentViolence;
+    }
+    private static int setViolence(int violence) {
+        if (violence < 0 || violence > 7) {
+            throw new IllegalArgumentException("Violence must be between 0 and 7");
+        }
+        return violence;
+    }
 
     // Méthode pour essayer de spawn des nuages dans le niveau serveur si l'intervalle de temps est respecté.
     public static void trySpawnClouds(ServerLevel serverLevel) {
@@ -76,7 +87,8 @@ public class SimpleCloudSpawner {
 
         float dewPoint = calculateDewPoint(temperature, humidity); //Point de rosée en Celsius
 
-        SimpleCloudsCompat.spawnCloudInBiome(CloudLibrary.getCloudIdFromSeverity(determineCloudSeverity(temperature, humidity, pressure, dewPoint)), key,serverLevel);
+        currentViolence = determineCloudSeverity(temperature, humidity, pressure, dewPoint);
+        SimpleCloudsCompat.spawnCloudInBiome(CloudLibrary.getCloudIdFromSeverity(currentViolence), key,serverLevel);
 
     }
 

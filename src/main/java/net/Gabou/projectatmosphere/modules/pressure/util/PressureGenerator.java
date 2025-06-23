@@ -17,6 +17,8 @@ import java.util.Random;
  * Generates a raw, biome‐isolated 7‐day [min,max] pressure forecast.
  */
 public class PressureGenerator {
+
+    public static final float PRESSION_MOYENNE = 1013.25f; // hPa, average sea level pressure
     public static float[][] generateWeekForecast(ServerLevel world, BiomeInstanceKey key) {
         ResourceLocation biome = key.biomeType();
         BlockPos pos = key.samplePos();
@@ -25,7 +27,7 @@ public class PressureGenerator {
                 ^ pos.asLong() ^ biome.hashCode() ^ day;
         Random rand = new Random(seed);
 
-        double P0 = 1013.25 * Math.pow(
+        double P0 = PRESSION_MOYENNE * Math.pow( //Pression 0 en hpa
                 1.0 - 0.0065 * pos.getY() / 288.15,
                 9.80665 / (287.05 * 0.0065)
         );
