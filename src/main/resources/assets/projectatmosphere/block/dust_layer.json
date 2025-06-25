@@ -1,0 +1,7 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "particle": "projectatmosphere:block/dust",
+    "layer": "projectatmosphere:block/dust"
+  }
+}

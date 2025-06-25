@@ -1,0 +1,41 @@
+{
+    "parent": "block/block",
+    "textures": {
+        "particle": "projectatmosphere:block/dust",
+        "layer": "projectatmosphere:block/dust"
+    },
+    "elements": [
+        {
+            "from": [
+                0,
+                0,
+                0
+            ],
+            "to": [
+                16,
+                8,
+                16
+            ],
+            "faces": {
+                "up": {
+                    "texture": "#layer"
+                },
+                "down": {
+                    "texture": "#layer"
+                },
+                "north": {
+                    "texture": "#layer"
+                },
+                "south": {
+                    "texture": "#layer"
+                },
+                "west": {
+                    "texture": "#layer"
+                },
+                "east": {
+                    "texture": "#layer"
+                }
+            }
+        }
+    ]
+}
