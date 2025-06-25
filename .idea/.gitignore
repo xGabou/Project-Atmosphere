@@ -19,3 +19,4 @@
 # Datasource configs
 /dataSources/
 dataSources.local.xml
+/workspace.xml
