@@ -1,3 +1,4 @@
 {
-  "item.projectatmosphere.thermometer" : "Thermometer"
+  "item.projectatmosphere.thermometer" : "Thermometer",
+  "item.projectatmosphere.barometer" : "Barometer"
 }

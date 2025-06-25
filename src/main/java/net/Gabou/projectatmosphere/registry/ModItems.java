@@ -13,6 +13,9 @@ public class ModItems {
     public static final RegistryObject<Item> THERMOMETRE = ITEMS.register("thermometer",
             () -> new Item(new Item.Properties()));
 
+    public static final RegistryObject<Item> BAROMETER = ITEMS.register("barometer",
+            () -> new Item(new Item.Properties()));
+
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
     }
