@@ -4,16 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="changed simpleclouds-1.20.1-0.7.jar">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/ModItems.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/en_us.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/thermometer.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-    </list>
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Début du thermomètre" />
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -414,31 +405,7 @@
       <workItem from="1750687316956" duration="4081000" />
       <workItem from="1750692314814" duration="9956000" />
       <workItem from="1750806272192" duration="658000" />
-      <workItem from="1750808295737" duration="2024000" />
-    </task>
-    <task id="LOCAL-00001" summary="Initial">
-      <option name="closed" value="true" />
-      <created>1745712732843</created>
-      <option name="number" value="00001" />
-      <option name="presentableId" value="LOCAL-00001" />
-      <option name="project" value="LOCAL" />
-      <updated>1745712732843</updated>
-    </task>
-    <task id="LOCAL-00002" summary="Add cloud entity and related systems for weather overhaul">
-      <option name="closed" value="true" />
-      <created>1745722435938</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
-      <option name="project" value="LOCAL" />
-      <updated>1745722435938</updated>
-    </task>
-    <task id="LOCAL-00003" summary="Add cloud entity and related systems for weather overhaul">
-      <option name="closed" value="true" />
-      <created>1745934881795</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
-      <option name="project" value="LOCAL" />
-      <updated>1745934881795</updated>
+      <workItem from="1750808295737" duration="2354000" />
     </task>
     <task id="LOCAL-00004" summary="Add serene seasons dependency to build.gradle">
       <option name="closed" value="true" />
@@ -800,7 +767,39 @@
       <option name="project" value="LOCAL" />
       <updated>1750705851494</updated>
     </task>
-    <option name="localTasksCounter" value="49" />
+    <task id="LOCAL-00049" summary="Début du thermomètre">
+      <option name="closed" value="true" />
+      <created>1750810615805</created>
+      <option name="number" value="00049" />
+      <option name="presentableId" value="LOCAL-00049" />
+      <option name="project" value="LOCAL" />
+      <updated>1750810615805</updated>
+    </task>
+    <task id="LOCAL-00050" summary="Début du thermomètre">
+      <option name="closed" value="true" />
+      <created>1750810631443</created>
+      <option name="number" value="00050" />
+      <option name="presentableId" value="LOCAL-00050" />
+      <option name="project" value="LOCAL" />
+      <updated>1750810631444</updated>
+    </task>
+    <task id="LOCAL-00051" summary="Début du thermomètre">
+      <option name="closed" value="true" />
+      <created>1750810657521</created>
+      <option name="number" value="00051" />
+      <option name="presentableId" value="LOCAL-00051" />
+      <option name="project" value="LOCAL" />
+      <updated>1750810657521</updated>
+    </task>
+    <task id="LOCAL-00052" summary="Début du thermomètre">
+      <option name="closed" value="true" />
+      <created>1750810661461</created>
+      <option name="number" value="00052" />
+      <option name="presentableId" value="LOCAL-00052" />
+      <option name="project" value="LOCAL" />
+      <updated>1750810661461</updated>
+    </task>
+    <option name="localTasksCounter" value="53" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -819,7 +818,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations&#10;&#10;&#10;Need to transform back into static" />
     <MESSAGE value="Refactor atmosphere modules; ensure pressure and humidity modules are initialized consistently on server start and player join" />
     <MESSAGE value="Refactor AsyncAtmosphereService; optimize executor management for low CPU environments by introducing a shared executor" />
     <MESSAGE value="Refactor AsyncAtmosphereService and AtmoCommonConfig; enhance executor management based on CPU count and introduce configuration for shared executor usage" />
@@ -844,7 +842,8 @@
     <MESSAGE value="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly" />
     <MESSAGE value="Enhance cloud spawning and debugging: implement violence tracking in SimpleCloudSpawner and add command for current violence status" />
     <MESSAGE value="changed simpleclouds-1.20.1-0.7.jar" />
-    <option name="LAST_COMMIT_MESSAGE" value="changed simpleclouds-1.20.1-0.7.jar" />
+    <MESSAGE value="Début du thermomètre" />
+    <option name="LAST_COMMIT_MESSAGE" value="Début du thermomètre" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
