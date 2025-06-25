@@ -80,7 +80,6 @@ public class ProjectAtmosphere {
             if (world != null) {
                 AtmosphereManager.onPlayerLogout(world, player);
             }
-            event.accept(ModItems.BAROMETER);
         }
     }
 
