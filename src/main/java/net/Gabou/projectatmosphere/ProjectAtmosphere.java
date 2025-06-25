@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere;
 
 
 import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
+import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.items.ModItems;
@@ -53,6 +54,7 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
+        SimpleCloudsConstants.SPAWN_RADIUS = DEFAULT_RADIUS;
     }
 
     @SubscribeEvent
