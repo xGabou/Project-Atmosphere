@@ -15,46 +15,50 @@ public class WindLeafParticle extends TextureSheetParticle {
                                SpriteSet sprites) {
         super(world, x, y, z, xSpeed, ySpeed, zSpeed);
         this.sprites = sprites;
-        this.gravity = 0.01f;
-        this.friction = 0.9f;
+
+        // Light gravity and high friction = floaty
+        this.gravity = 0.002f;
+        this.friction = 0.98f;
+
         this.xd = xSpeed;
-        this.yd = ySpeed;
+        this.yd = ySpeed * 0.3f + (random.nextFloat() * 0.02f); // gentle updraft
         this.zd = zSpeed;
 
-        // Random lifetime between 40-70 ticks (2–3.5 seconds)
-        double vMag = Math.sqrt(this.xd * this.xd + this.zd * this.zd);
-        if (vMag > 0) {
-            // #ticks needed = distance / speedPerTick
-            this.lifetime = (int) Math.ceil(DESIRED_TRAVEL_BLOCKS / vMag);
-        } else {
-            // fallback if somehow vx=0
-            this.lifetime = 200; // ~10 sec
-        }
-
-        // optional: add a bit of random jitter (+/- 10%)
-        int jitter = (int)(this.lifetime * 0.1);
-        this.lifetime += this.random.nextInt(jitter * 2 + 1) - jitter;
-
-        // size, initial sprite, etc…
-        float size = 0.08f + this.random.nextFloat() * 0.05f;
-        this.setSize(size, size);
+        this.lifetime = 200; // exactly 10 seconds
+        this.setSize(0.1f, 0.1f);
         this.setSpriteFromAge(sprites);
+
+        // Allow slow rotation
+        this.roll = random.nextFloat() * (float)Math.PI * 2.0f; // random initial rotation
+        this.oRoll = this.roll;
     }
+
 
     @Override
     public void tick() {
         super.tick();
-        // Animate particle sprite (if animated textures used)
-        this.setSpriteFromAge(sprites);
 
-        // Gentle downward drift adjustment (if desired)
-        this.yd -= 0.002;
+        // Smooth rolling rotation (you can randomize the factor)
+        this.oRoll = this.roll;
+        this.roll += 0.02f + random.nextFloat() * 0.01f; // 0.02–0.03 rad/tick
 
-        // Optional fade-out at end-of-life
-        if (this.age > this.lifetime * 0.7) {
-            this.alpha = 1.0F - (float)(this.age - (this.lifetime * 0.7)) / (this.lifetime * 0.3F);
+        // Optional: slight vertical jitter to simulate lift
+        if (this.age % 5 == 0) {
+            this.yd += (random.nextFloat() - 0.5f) * 0.003f;
+        }
+
+        // Optional: fade out smoothly (alpha)
+        if (this.age > this.lifetime - 40) {
+            this.alpha = (this.lifetime - this.age) / 40.0f;
         }
     }
+    @Override
+    public float getQuadSize(float partialTicks) {
+        float flutter = (float) Math.sin((this.age + partialTicks) * 0.2f) * 0.1f;
+        return super.getQuadSize(partialTicks) + flutter;
+    }
+
+
 
     @Override
     public ParticleRenderType getRenderType() {

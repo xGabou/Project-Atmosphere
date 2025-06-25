@@ -49,9 +49,9 @@ public class ClientTickHandler {
             // Spawn behind the player relative to wind direction
             // Spawn at least 20 blocks away, up to 25 blocks, with a small sideways spread
             double minDist = 20.0;
-            double maxDist = 35.0;
+            double maxDist = 100.0;
             double distance = minDist + mc.level.random.nextDouble() * (maxDist - minDist);
-            double lateralRange = 3.0;
+            double lateralRange = 10.0;
             double lateral = (mc.level.random.nextDouble() * 2.0 - 1.0) * lateralRange;
 
             // perp vector to wind dir
@@ -64,6 +64,7 @@ public class ClientTickHandler {
 
 
             // Particle velocity following the wind
+            speed *= 0.2F;
             double vx = dx * speed;
             double vy = 0.03;
             double vz = dz * speed;

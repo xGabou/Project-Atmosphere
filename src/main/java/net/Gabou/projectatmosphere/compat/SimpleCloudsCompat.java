@@ -11,6 +11,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.ClientSyncLock;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -24,7 +25,7 @@ import java.util.Optional;
 
 public class SimpleCloudsCompat {
 
-    public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level) {
+    public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level,WindVector windVector) {
 
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(level);
         CloudGenerator generator = cloudManager.getCloudGenerator();
@@ -57,7 +58,7 @@ public class SimpleCloudsCompat {
                                 key,                              // your existing BiomeInstanceKey
                                 level,
                                 rand,
-                                new Vec2(playerX, playerZ),
+                                windVector,
                                 generator
                         )
         );
@@ -75,10 +76,12 @@ public class SimpleCloudsCompat {
             BiomeInstanceKey biomeKey,
             ServerLevel level,
             RandomSource random,
-            Vec2 playerPos, CloudGenerator generator
+            WindVector wind,
+            CloudGenerator generator
     ) {
         float x = biomeKey.samplePos().getX();
         float z = biomeKey.samplePos().getZ();
+        float windAngleRad =wind.angleRadians();
 
         // Avoid overlapping with existing clouds (same logic)
         for (CloudRegion region : generator.getClouds()) {
@@ -87,20 +90,17 @@ public class SimpleCloudsCompat {
                 return Optional.empty();
             }
         }
+        float dx = (float) Math.sin(windAngleRad);
+        float dz = (float) Math.cos(windAngleRad);
+        Vec2 direction = new Vec2(dx, dz).normalized();
 
-        // Compute direction
-        float deltaAdj = info.movesToPlayer() ? 0.1F : 1.0F;
-        float deltaX = (playerPos.x - x) * (1.0F + random.nextFloat() * deltaAdj);
-        float deltaZ = (playerPos.y - z) * (1.0F + random.nextFloat() * deltaAdj);
-        float rotation = (float) Math.atan2(deltaX, deltaZ) + (float) Math.PI;
+// Optional: rotation for animation
+        float rotation = windAngleRad + (float) Math.PI;
 
-        Vec2 direction = (random.nextInt(5) == 0)
-                ? new Vec2(random.nextFloat() * 2.0F - 1.0F, random.nextFloat() * 2.0F - 1.0F).normalized()
-                : new Vec2(deltaX, deltaZ).normalized();
 
         // Optionally override cloud attributes based on biome here
         float radius = info.determineRadius(random);
-        float speed = info.determineSpeed(random);
+        float speed = info.determineSpeed(random) + wind.speed() * 0.1F; // Add wind speed influence
         float acceleration = 0.01F;
         int duration = info.determineExistTicks(random);
         int growTicks = info.determineGrowTicks(random);
