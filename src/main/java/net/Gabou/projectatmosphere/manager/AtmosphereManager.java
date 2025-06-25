@@ -2,12 +2,10 @@ package net.Gabou.projectatmosphere.manager;
 
 
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
-import net.Gabou.projectatmosphere.event.TemperatureTickHandler;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
-import net.Gabou.projectatmosphere.modules.pressure.forecast.PressureForecast;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureProfileManager;
 import net.Gabou.projectatmosphere.modules.pressure.util.PressureStorageManager;
 
@@ -32,20 +30,39 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.RegisterCommandsEvent;
 
 
-
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 
 import static net.Gabou.projectatmosphere.ProjectAtmosphere.DEFAULT_RADIUS;
+
 public class AtmosphereManager {
 
-    /** Master map that holds forecast data for each biome */
+    /**
+     * Master map that holds forecast data for each biome
+     */
     private static final Map<ResourceLocation, BiomeForecast> FORECAST_MAP = new HashMap<>();
 
     private static final Set<BiomeInstanceKey> biomeSamples = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Map to track player readiness for weather data
+     * Key: Player UUID, Value: CompletableFuture that completes when the player is ready
+     */
+    private static final Map<UUID, CompletableFuture<Void>> playerReadyMap = new ConcurrentHashMap<>();
+
+    public static void onPlayerLogout(ServerLevel world, ServerPlayer player) {
+        playerReadyMap.remove(player.getUUID());
+//        AsyncAtmosphereService.runWeather(() -> {
+//            TemperatureManager.onPlayerLogout(player);
+//            HumidityManager.onPlayerLogout(player);
+//            PressureManager.onPlayerLogout(player);
+//            WindManager.onPlayerLogout(player);
+//            StormManager.onPlayerLogout(player);
+//        });
+    }
 
 
     public static Set<BiomeInstanceKey> getBiomeSamples() {
@@ -56,14 +73,15 @@ public class AtmosphereManager {
         biomeSamples.clear();
     }
 
-    private static List<BlockPos> allCenterOfMap = new ArrayList<>();
+    private static final List<BlockPos> allCenterOfMap = new ArrayList<>();
 
     public static List<BlockPos> getAllCenterOfMap() {
         return allCenterOfMap;
     }
 
     public static void onServerStarting(ServerLevel world) {
-       AsyncAtmosphereService.runWeather(() -> {
+        playerReadyMap.clear();
+        AsyncAtmosphereService.runWeather(() -> {
             ForecastStorageManager.loadAll(world);
             HumidityStorageManager.loadAll(world);
             PressureStorageManager.loadAll(world);
@@ -72,8 +90,10 @@ public class AtmosphereManager {
             refreshUnifiedForecast(biomeSamples);
         });
     }
+
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        AsyncAtmosphereService.runWeather(() -> {;
+        AsyncAtmosphereService.runWeather(() -> {
+            ;
             biomeSamples.addAll(AtmosphereUtils.findBiomes(world, center, DEFAULT_RADIUS));
             allCenterOfMap.add(center);
             TemperatureManager.updateForecastAround(world, biomeSamples);
@@ -85,8 +105,7 @@ public class AtmosphereManager {
         });
     }
 
-    public static void onRegisterCommands(final RegisterCommandsEvent event)
-    {
+    public static void onRegisterCommands(final RegisterCommandsEvent event) {
         // Register commands here
         TemperatureManager.onRegisterCommands(event);
         HumidityManager.onRegisterCommands(event);
@@ -96,42 +115,59 @@ public class AtmosphereManager {
         DebugAtmoCommand.register(event.getDispatcher());
     }
 
-    public static void onPlayerJoined(ServerLevel world, ServerPlayer player) {
-        AsyncAtmosphereService.runWeather(() -> {;
-            BlockPos pos = player.blockPosition();
-            allCenterOfMap.add(pos);
-            biomeSamples.addAll(AtmosphereUtils.findBiomes(world, pos, DEFAULT_RADIUS));
-            TemperatureManager.onPlayerJoined(world,biomeSamples);
-            HumidityManager.onPlayerJoined(world,biomeSamples);
+
+
+    public static void onPlayerLogin(ServerLevel world, ServerPlayer player) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        playerReadyMap.put(player.getUUID(), future);
+        //On enleve le async car on veut que le joueur soit prêt avant de continuer
+           biomeSamples.addAll(AtmosphereUtils.findBiomes(world, player.blockPosition(), DEFAULT_RADIUS));
+
+            TemperatureManager.onPlayerJoined(world, biomeSamples);
+            HumidityManager.onPlayerJoined(world, biomeSamples);
             PressureManager.onPlayerJoined(world, biomeSamples);
             WindManager.onPlayerJoined(world, biomeSamples);
             StormManager.onPlayerJoined(world, biomeSamples);
             SimpleCloudSpawner.onPlayerJoined(world, biomeSamples);
             refreshUnifiedForecast(biomeSamples);
-        });
+
+            future.complete(null); // ✅ débloque le login
+
+
     }
+
+
+    public static CompletableFuture<Void> getPlayerReadyFuture(ServerPlayer player) {
+        return playerReadyMap.computeIfAbsent(player.getUUID(), uuid -> new CompletableFuture<>());
+    }
+    public static boolean isPlayerReady(UUID uuid) {
+        CompletableFuture<Void> future = playerReadyMap.get(uuid);
+        return future != null && future.isDone();
+    }
+
 
     public static void onPrecomputeProfiles(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-        TemperatureManager.onPrecomputeProfiles(world);
-        HumidityManager.onPrecomputeProfiles(world);
-        PressureManager.onPrecomputeProfiles(world);
-        WindManager.onPrecomputeProfiles(world);
-        StormManager.onPrecomputeProfiles(world);
-        refreshUnifiedForecast(biomeSamples);
+            TemperatureManager.onPrecomputeProfiles(world);
+            HumidityManager.onPrecomputeProfiles(world);
+            PressureManager.onPrecomputeProfiles(world);
+            WindManager.onPrecomputeProfiles(world);
+            StormManager.onPrecomputeProfiles(world);
+            refreshUnifiedForecast(biomeSamples);
         });
     }
 
     public static void onSwapProfiles(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
-        TemperatureManager.onSwapProfiles(world);
-        HumidityManager.onSwapProfiles(world);
-        PressureManager.onSwapProfiles(world);
-        WindManager.onSwapProfiles(world);
-        StormManager.onSwapProfiles(world);
-        refreshUnifiedForecast(biomeSamples);
+            TemperatureManager.onSwapProfiles(world);
+            HumidityManager.onSwapProfiles(world);
+            PressureManager.onSwapProfiles(world);
+            WindManager.onSwapProfiles(world);
+            StormManager.onSwapProfiles(world);
+            refreshUnifiedForecast(biomeSamples);
         });
     }
+
     public static void onRegenerate(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
             clearBiomeSamples();
@@ -161,18 +197,19 @@ public class AtmosphereManager {
             float[] temp = TemperatureProfileManager.getDayProfile(key);
             float[] pressure = PressureProfileManager.getTodayProfile(key);
             float[] humidity = HumidityProfileManager.getDayProfile(key);
-           WindVector wind = WindProfileManager.getTodayProfile(key);
+            WindVector wind = WindProfileManager.getTodayProfile(key);
             FORECAST_MAP.put(key.biomeType(), new BiomeForecast(temp, pressure, humidity, wind));
         }
     }
 
 
-
     public static BiomeForecast getForecast(ResourceLocation biome) {
-         return FORECAST_MAP.get(biome);
+        return FORECAST_MAP.get(biome);
     }
 
-    /** Optional: access to the full map */
+    /**
+     * Optional: access to the full map
+     */
     public static Map<ResourceLocation, BiomeForecast> getAllForecasts() {
         return FORECAST_MAP;
     }
@@ -183,6 +220,7 @@ public class AtmosphereManager {
         PressureManager.onServerStopping(world);
         WindManager.onServerStopping(world);
         StormManager.onServerStopping(world);
+        playerReadyMap.clear();
     }
 
     public static void tick(ServerLevel level) {
@@ -192,6 +230,9 @@ public class AtmosphereManager {
     }
 
 
-    /** Central record to unify today's weather-like forecast */
-    public record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, WindVector wind) {}
+    /**
+     * Central record to unify today's weather-like forecast
+     */
+    public record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, WindVector wind) {
+    }
 }

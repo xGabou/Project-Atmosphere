@@ -90,7 +90,14 @@ public class AtmosphereUtils {
         }
 
         if (nearest == null) {
-            System.err.println("[Atmosphere] No nearby biome sample of type " + biomeType + " within 600 blocks of " + pos);
+            minDistSqr = Double.MAX_VALUE;
+            for (BiomeInstanceKey b : matchingType) {
+                double dist = b.samplePos().distSqr(pos);
+                if (dist < minDistSqr) {
+                    minDistSqr = dist;
+                    nearest   = b;
+                }
+            }
         }
 
         return nearest;

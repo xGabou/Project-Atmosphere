@@ -12,7 +12,7 @@ public class ModTabs {
     public static final DeferredRegister<CreativeModeTab> REGISTRY
             = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, ProjectAtmosphere.MODID);
 
-    public static final RegistryObject<CreativeModeTab> BUTCHERFURNITURE = REGISTRY.register(
+    public static final RegistryObject<CreativeModeTab> PROJECTATMO = REGISTRY.register(
             "thermometer",  // Changed registry name
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("item.projectatmosphere.thermometer"))

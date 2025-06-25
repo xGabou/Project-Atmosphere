@@ -2,25 +2,31 @@ package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.particles.WindLeafParticle;
-import net.minecraft.client.particle.ParticleProvider;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.RegistryObject;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class ModClient {
 
     @SubscribeEvent
     public static void onRegisterParticles(RegisterParticleProvidersEvent event) {
-        event.registerSpriteSet(ModParticles.TRIANGLE_VERT.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.TRIANGLE_ORANGE.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.TRIANGLE_JAUNE.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.ROUND_VERT.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.ROUND_ORANGE.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.ROUND_JAUNE.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.HEART_VERT.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.HEART_ORANGE.get(), WindLeafParticle.Provider::new);
-        event.registerSpriteSet(ModParticles.HEART_JAUNE.get(), WindLeafParticle.Provider::new);
+        register(event, ModParticles.TRIANGLE_VERT);
+        register(event, ModParticles.TRIANGLE_JAUNE);
+        register(event, ModParticles.TRIANGLE_ORANGE);
+        register(event, ModParticles.ROUND_VERT);
+        register(event, ModParticles.ROUND_JAUNE);
+        register(event, ModParticles.ROUND_ORANGE);
+        register(event, ModParticles.HEART_VERT);
+        register(event, ModParticles.HEART_JAUNE);
+        register(event, ModParticles.HEART_ORANGE);
+    }
+
+    private static void register(RegisterParticleProvidersEvent event, RegistryObject<SimpleParticleType> particleType) {
+        event.registerSpriteSet(particleType.get(), WindLeafParticle.Provider::new);
     }
 }

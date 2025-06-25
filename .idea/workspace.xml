@@ -4,10 +4,36 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Update project configuration and resources: adjust thermometer format version, modify texture mappings, and enhance .gitignore">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModTabs.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Début du thermomètre">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientSyncLock.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/Balai.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/LoginDataGate.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SyncBiomeDataLoginPacket.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModNetworking.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/ParticleAtlasDebugger.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_jaune.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_orange.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_vert.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_jaune.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_orange.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_vert.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_jaune.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_orange.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_vert.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/ModItems.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModItems.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindLeafParticle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindLeafParticle.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModItems.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModItems.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModTabs.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModTabs.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/wind_leaf.json" beforeDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -122,7 +148,7 @@
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/xGabou/Project-Atmosphere.git&quot;,
-    &quot;accountId&quot;: &quot;66ff5c05-f610-45d8-a96e-a0e394bb2a2e&quot;
+    &quot;accountId&quot;: &quot;1255f6b1-d7c5-4ebe-ab87-7e588bf44264&quot;
   }
 }</component>
   <component name="ProblemsViewState">
@@ -148,7 +174,7 @@
     "Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.bullshit.main()].executor": "Debug",
     "Gradle.Project-Atmosphere [:prepareRunClientCompile].executor": "Run",
     "Gradle.Project-Atmosphere [build].executor": "Debug",
-    "Gradle.Project-Atmosphere [clean].executor": "Run",
+    "Gradle.Project-Atmosphere [clean].executor": "Debug",
     "Gradle.Project-Atmosphere [createMcpToSrg].executor": "Run",
     "Gradle.Project-Atmosphere [genIntellijRuns].executor": "Debug",
     "Gradle.Project-Atmosphere [runClient].executor": "Debug",
@@ -160,15 +186,15 @@
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "H:/Project-Atmosphere/libs",
+    "last_opened_file_path": "H:/Project-Atmosphere/src/main/resources/assets/projectatmosphere/particles",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Modules",
+    "project.structure.last.edited": "SDKs",
     "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0",
+    "project.structure.side.proportion": "0.6172414",
     "settings.editor.selected.configurable": "reference.idesettings.debugger.capture",
     "vue.rearranger.settings.migration": "true"
   },
@@ -181,11 +207,11 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\particles" />
       <recent name="H:\Project-Atmosphere\libs" />
       <recent name="H:\Project-Atmosphere\src\main\resources" />
       <recent name="H:\Project-Atmosphere\.idea" />
       <recent name="H:\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\modules\wind" />
-      <recent name="H:\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere\storm" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\geo\entity" />
@@ -395,8 +421,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.26094.121" />
-        <option value="bundled-js-predefined-d6986cc7102b-b26f3e71634d-JavaScript-IU-251.26094.121" />
+        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.25410.129" />
+        <option value="bundled-js-predefined-d6986cc7102b-6a121458b545-JavaScript-IU-251.25410.129" />
       </set>
     </attachedChunks>
   </component>
@@ -451,6 +477,15 @@
       <workItem from="1750692314814" duration="9956000" />
       <workItem from="1750806272192" duration="658000" />
       <workItem from="1750808295737" duration="2354000" />
+      <workItem from="1750860550729" duration="12718000" />
+    </task>
+    <task id="LOCAL-00004" summary="Add serene seasons dependency to build.gradle">
+      <option name="closed" value="true" />
+      <created>1745944902255</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1745944902255</updated>
     </task>
     <task id="LOCAL-00005" summary="Add serene seasons dependency to build.gradle">
       <option name="closed" value="true" />
@@ -836,15 +871,7 @@
       <option name="project" value="LOCAL" />
       <updated>1750810661461</updated>
     </task>
-    <task id="LOCAL-00053" summary="Update project configuration and resources: adjust thermometer format version, modify texture mappings, and enhance .gitignore">
-      <option name="closed" value="true" />
-      <created>1750812779738</created>
-      <option name="number" value="00053" />
-      <option name="presentableId" value="LOCAL-00053" />
-      <option name="project" value="LOCAL" />
-      <updated>1750812779739</updated>
-    </task>
-    <option name="localTasksCounter" value="54" />
+    <option name="localTasksCounter" value="53" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -863,6 +890,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <MESSAGE value="Refactor atmosphere modules; ensure pressure and humidity modules are initialized consistently on server start and player join" />
     <MESSAGE value="Refactor AsyncAtmosphereService; optimize executor management for low CPU environments by introducing a shared executor" />
     <MESSAGE value="Refactor AsyncAtmosphereService and AtmoCommonConfig; enhance executor management based on CPU count and introduce configuration for shared executor usage" />
     <MESSAGE value="Add CPU info command to DebugAtmoCommand; display logical cores and executor mode based on configuration" />
@@ -887,8 +915,7 @@
     <MESSAGE value="Enhance cloud spawning and debugging: implement violence tracking in SimpleCloudSpawner and add command for current violence status" />
     <MESSAGE value="changed simpleclouds-1.20.1-0.7.jar" />
     <MESSAGE value="Début du thermomètre" />
-    <MESSAGE value="Update project configuration and resources: adjust thermometer format version, modify texture mappings, and enhance .gitignore" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update project configuration and resources: adjust thermometer format version, modify texture mappings, and enhance .gitignore" />
+    <option name="LAST_COMMIT_MESSAGE" value="Début du thermomètre" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -897,11 +924,6 @@
           <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/tough-as-nails-246391/5815863_mapped_official_1.20.1/tough-as-nails-246391-5815863_mapped_official_1.20.1.jar!/toughasnails/temperature/TemperatureHelperImpl.class</url>
           <line>61</line>
           <option name="timeStamp" value="3" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java</url>
-          <line>105</line>
-          <option name="timeStamp" value="92" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/StormModule.java</url>
@@ -920,13 +942,18 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java</url>
-          <line>168</line>
+          <line>204</line>
           <option name="timeStamp" value="120" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/dev/nonamecrackers2/simpleclouds-1.20.1/0.7_mapped_official_1.20.1/simpleclouds-1.20.1-0.7_mapped_official_1.20.1.jar!/dev/nonamecrackers2/simpleclouds/common/cloud/spawning/CloudGenerator.class</url>
-          <line>160</line>
-          <option name="timeStamp" value="126" />
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/forecast/WindForecast.java</url>
+          <line>23</line>
+          <option name="timeStamp" value="151" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModClient.java</url>
+          <line>31</line>
+          <option name="timeStamp" value="166" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />
@@ -941,6 +968,11 @@
         </breakpoint>
       </default-breakpoints>
     </breakpoint-manager>
+    <pin-to-top-manager>
+      <pinned-members>
+        <PinnedItemInfo parentTag="dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion" memberName="cloudTypeId" />
+      </pinned-members>
+    </pin-to-top-manager>
     <watches-manager>
       <configuration name="GradleRunConfiguration">
         <watch expression="TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(Minecraft.getInstance().level,Minecraft.getInstance().player.getOnPos())" language="JAVA" custom="toughasnails.temperature.TemperatureHelperImpl,net.minecraft.client.Minecraft,toughasnails.block.TemperatureGaugeBlock" />

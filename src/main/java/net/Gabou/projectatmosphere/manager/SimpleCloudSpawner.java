@@ -66,20 +66,23 @@ public class SimpleCloudSpawner {
         // Step 2: Sample weather per region
         for (Map.Entry<SpawnRegion, List<BiomeInstanceKey>> entry : byRegion.entrySet()) {
             List<BiomeInstanceKey> regionKeys = entry.getValue();
+            if(regionKeys.size() > 4) {return;}
             WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(new HashSet<>(regionKeys), serverLevel, serverLevel.getDayTime());
 
             if (stats == null) continue;
 
+            BiomeInstanceKey dominantKey = new BiomeInstanceKey(stats.dominantBiome(), getRandomPosInRegion(entry.getKey(), RandomSource.create(), serverLevel));
+
+            if(generator.getCloudAtPosition(dominantKey.samplePos().getX(), dominantKey.samplePos().getZ())!= null) {
+                continue; // Skip if the position is invalid (0,0)
+            }
             SimpleCloudsCompat.spawnCloudInBiome(
                     CloudLibrary.getCloudIdFromSeverity(
                             determineCloudSeverity(
                                     stats.temperature(), stats.humidity(), stats.pressure(),
                                     calculateDewPoint(stats.temperature(), stats.humidity()))
-                    ),
-                    new BiomeInstanceKey(
-                            stats.dominantBiome(),
-                            getRandomPosInRegion(entry.getKey(), RandomSource.create(), serverLevel)
-                    ),
+                    ),dominantKey
+                  ,
                     serverLevel
             );
         }

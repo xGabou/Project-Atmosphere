@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.items.Balai;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
@@ -15,6 +16,10 @@ public class ModItems {
 
     public static final RegistryObject<Item> BAROMETER = ITEMS.register("barometer",
             () -> new Item(new Item.Properties()));
+
+    public static final RegistryObject<Item> BALAI = ITEMS.register("balai",
+            () -> new Balai(new Item.Properties()));
+
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);

@@ -12,6 +12,7 @@ public class AsyncAtmosphereService {
     private static ExecutorService TEMP_EXECUTOR, HUMIDITY_EXECUTOR, STORM_EXECUTOR, PRESSURE_EXECUTOR;
     private static ExecutorService SHARED_EXECUTOR, GROUP_A_EXECUTOR, GROUP_B_EXECUTOR;
     private static ExecutorService WEATHER_EXECUTOR;
+    private static ExecutorService CLIENT_EXECUTOR;
 
     private static boolean initialized = false;
 
@@ -94,6 +95,12 @@ public class AsyncAtmosphereService {
             t.setDaemon(false);
             return t;
         });
+        CLIENT_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+            ProjectAtmosphere.LOGGER.info("⛅ Creating CLIENT orchestrator executor (ordered full forecast)");
+            Thread t = new Thread(r, "ClientManagerThread");
+            t.setDaemon(false);
+            return t;
+        });
     }
 
     // Per-module executors
@@ -121,6 +128,9 @@ public class AsyncAtmosphereService {
             return CompletableFuture.failedFuture(new IllegalStateException("Weather executor not available."));
         }
     }
+    public static void runClient(Runnable task) {
+        if (PRESSURE_EXECUTOR != null && !PRESSURE_EXECUTOR.isShutdown()) PRESSURE_EXECUTOR.submit(task);
+    }
 
 
     // Shared executor if needed externally
@@ -138,6 +148,7 @@ public class AsyncAtmosphereService {
         if (STORM_EXECUTOR != null && STORM_EXECUTOR != SHARED_EXECUTOR && STORM_EXECUTOR != GROUP_B_EXECUTOR) STORM_EXECUTOR.shutdown();
         if (PRESSURE_EXECUTOR != null && PRESSURE_EXECUTOR != SHARED_EXECUTOR && PRESSURE_EXECUTOR != GROUP_B_EXECUTOR) PRESSURE_EXECUTOR.shutdown();
         if (WEATHER_EXECUTOR != null) WEATHER_EXECUTOR.shutdown();
+        if( CLIENT_EXECUTOR != null) CLIENT_EXECUTOR.shutdown();
 
         initialized = false;
     }

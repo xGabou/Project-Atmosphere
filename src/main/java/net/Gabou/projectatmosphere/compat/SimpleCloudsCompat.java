@@ -10,6 +10,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.client.ClientSyncLock;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -28,6 +29,12 @@ public class SimpleCloudsCompat {
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(level);
         CloudGenerator generator = cloudManager.getCloudGenerator();
         CloudSpawningConfig config = generator.getSpawnConfig().get();
+
+        if(!ClientSyncLock.isReady())
+        {
+            System.out.println("[Atmosphere] SimpleClouds is not ready yet, cannot spawn cloud: " + cloudId);
+            return;
+        }
 
         ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID,cloudId);
         CloudSpawningConfig.Info info = config.getWeightInfo(rl);
