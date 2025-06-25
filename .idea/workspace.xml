@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Début du thermomètre" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Début du thermomètre">
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/thermometer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/thermometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/thermometer.json" afterDir="false" />
+    </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -405,15 +409,7 @@
       <workItem from="1750687316956" duration="4081000" />
       <workItem from="1750692314814" duration="9956000" />
       <workItem from="1750806272192" duration="658000" />
-      <workItem from="1750808295737" duration="2354000" />
-    </task>
-    <task id="LOCAL-00004" summary="Add serene seasons dependency to build.gradle">
-      <option name="closed" value="true" />
-      <created>1745944902255</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1745944902255</updated>
+      <workItem from="1750808295737" duration="4049000" />
     </task>
     <task id="LOCAL-00005" summary="Add serene seasons dependency to build.gradle">
       <option name="closed" value="true" />
@@ -799,7 +795,15 @@
       <option name="project" value="LOCAL" />
       <updated>1750810661461</updated>
     </task>
-    <option name="localTasksCounter" value="53" />
+    <task id="LOCAL-00053" summary="Début du thermomètre">
+      <option name="closed" value="true" />
+      <created>1750810696524</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
+      <option name="project" value="LOCAL" />
+      <updated>1750810696524</updated>
+    </task>
+    <option name="localTasksCounter" value="54" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

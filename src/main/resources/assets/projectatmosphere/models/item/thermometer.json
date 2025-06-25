@@ -2,10 +2,10 @@
 	"format_version": "1.21.6",
 	"credit": "Made with Blockbench",
 	"textures": {
-		"0": "block/glass",
-		"1": "block/glass2",
-		"3": "block/merc2",
-		"4": "block/texture",
+		"0": "projectatmosphere:item/texturevitre1",
+		"1": "projectatmosphere:item/texturevitre2",
+		"3": "projectatmosphere:item/texturemercure2",
+		"4": "projectatmosphere:item/texturemercure1",
 		"particle": "block/glass"
 	},
 	"elements": [
@@ -74,8 +74,8 @@
 			"scale": [0.5, 0.5, 0.5]
 		},
 		"firstperson_righthand": {
-			"rotation": [-16.75, 0, 0],
-			"translation": [3.5, 4, 0]
+			"rotation": [0, 0, 0],
+			"translation": [0, 0, 0]
 		},
 		"ground": {
 			"translation": [1, 0, 0]
