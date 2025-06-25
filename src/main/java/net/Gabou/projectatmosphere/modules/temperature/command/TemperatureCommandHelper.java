@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.modules.temperature.compat.SereneTempToCelciu
 import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -28,7 +29,7 @@ public class TemperatureCommandHelper {
      * Get the resource location of the biome at the player’s current position.
      */
     public static BiomeInstanceKey getCurrentBiome(Player player) {
-        return new BiomeInstanceKey(player.level().getBiome(player.blockPosition()).unwrapKey().get().location(), player.blockPosition());
+        return new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(),player.level()), player.blockPosition());
     }
 
     /**

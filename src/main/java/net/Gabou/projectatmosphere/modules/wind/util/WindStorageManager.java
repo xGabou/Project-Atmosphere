@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.wind.util;
 
 import com.google.gson.*;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.StorageUtils;
@@ -19,32 +20,28 @@ import java.util.Set;
 
 import static net.Gabou.projectatmosphere.util.StorageUtils.getPerWorldSavePath;
 
-/**
- * Static storage system for 7-day float[2] wind forecasts per biome.
- */
 public class WindStorageManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Map<BiomeInstanceKey, float[]> CACHE = new HashMap<>();
+    private static final Map<BiomeInstanceKey, WindVector[]> CACHE = new HashMap<>();
     private static final String FILE_NAME = "wind_forecasts.json";
 
     public static boolean hasForecast(BiomeInstanceKey biome) {
-        BiomeInstanceKey key = AtmosphereUtils.findNearestBiomeInstanceKey(biome,CACHE);
+        BiomeInstanceKey key = AtmosphereUtils.findNearestBiomeInstanceKey(biome, CACHE);
         return key != null && CACHE.containsKey(key);
     }
 
-    public static float[] getForecast(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome1(biome,CACHE);
+    public static WindVector[] getForecast(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome4(biome, CACHE);
     }
 
-    public static void saveForecast(BiomeInstanceKey biome, float[] week) {
+    public static void saveForecast(BiomeInstanceKey biome, WindVector[] week) {
         CACHE.put(biome, week);
     }
 
     public static void clearCache(ServerLevel world) {
         CACHE.clear();
-        StorageUtils.clearCache(world,FILE_NAME);
-
+        StorageUtils.clearCache(world, FILE_NAME);
     }
 
     public static void saveAll(ServerLevel world) {
@@ -56,9 +53,10 @@ public class WindStorageManager {
             obj.add("pos", AtmosphereUtils.serializeBlockPos(biomeKey.samplePos()));
 
             JsonArray arr = new JsonArray();
-            for (float day : week) {
+            for (WindVector day : week) {
                 JsonArray pair = new JsonArray();
-                pair.add(String.valueOf(day)); // min
+                pair.add(day.speed());
+                pair.add(day.angleRadians());
                 arr.add(pair);
             }
 
@@ -93,22 +91,22 @@ public class WindStorageManager {
                 BiomeInstanceKey key = new BiomeInstanceKey(biomeId, pos);
 
                 JsonArray arr = obj.getAsJsonArray("week");
-                float[]week = new float[7];
+                WindVector[] week = new WindVector[7];
                 for (int i = 0; i < 7; i++) {
                     JsonArray pair = arr.get(i).getAsJsonArray();
-                    week[i] = pair.get(0).getAsFloat();
+                    float speed = pair.get(0).getAsFloat();
+                    float angle = pair.get(1).getAsFloat();
+                    week[i] = new WindVector(speed, angle);
                 }
 
                 CACHE.put(key, week);
             }
-        } catch (IOException e) {
+        } catch (IOException | IllegalStateException e) {
             e.printStackTrace();
         }
     }
 
-
     public static Set<BiomeInstanceKey> getAllBiomeKeys() {
         return CACHE.keySet();
     }
-    
 }

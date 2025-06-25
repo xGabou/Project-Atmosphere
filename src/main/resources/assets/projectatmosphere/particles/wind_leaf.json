@@ -1,0 +1,13 @@
+{
+  "textures": [
+    "projectatmosphere:particle/triangle_vert",
+    "projectatmosphere:particle/triangle_orange",
+    "projectatmosphere:particle/triangle_jaune",
+    "projectatmosphere:particle/round_vert",
+    "projectatmosphere:particle/round_orange",
+    "projectatmosphere:particle/round_jaune",
+    "projectatmosphere:particle/heart_vert",
+    "projectatmosphere:particle/heart_orange",
+    "projectatmosphere:particle/heart_jaune"
+  ]
+}

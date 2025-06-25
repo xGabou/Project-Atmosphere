@@ -3,29 +3,23 @@ package net.Gabou.projectatmosphere;
 
 import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
-import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.items.ModItems;
+import net.Gabou.projectatmosphere.client.ClientTickHandler;
+import net.Gabou.projectatmosphere.registry.ModItems;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
+import net.Gabou.projectatmosphere.registry.ModParticles;
+import net.Gabou.projectatmosphere.registry.ModTabs;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -54,7 +48,10 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
+        MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
         SimpleCloudsConstants.SPAWN_RADIUS = DEFAULT_RADIUS;
+        ModTabs.REGISTRY.register(modEventBus);
+        ModParticles.register(modEventBus);
     }
 
     @SubscribeEvent

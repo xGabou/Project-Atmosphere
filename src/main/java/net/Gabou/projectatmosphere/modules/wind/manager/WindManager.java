@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.wind.manager;
 
+import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.Command.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
@@ -42,12 +43,12 @@ public class WindManager {
         init(world, biomeSamples);
     }
 
-    public static float[] getWeeklyForecast(BiomeInstanceKey biome) {
+    public static WindVector[] getWeeklyForecast(BiomeInstanceKey biome) {
         return WindProfileManager.getWeeklyForecast(biome);
     }
 
-    public static float getCurrentWind(BiomeInstanceKey biome, long worldTick) {
-        return WindProfileManager.getCurrentWindSpeed(biome, worldTick);
+    public static WindVector getCurrentWind(BiomeInstanceKey biome, long worldTick) {
+        return WindProfileManager.getCurrentWind(biome, worldTick);
     }
 
     public static void onPrecomputeProfiles(ServerLevel world) {
@@ -61,7 +62,7 @@ public class WindManager {
 
             for (BiomeInstanceKey key : WindProfileManager.getAllBiomeKeys()) {
                 if (WindProfileManager.hasTomorrowProfile(key)) {
-                    Float tomorrow = (Float) WindProfileManager.getTomorrowProfile(key);
+                    WindVector tomorrow = WindProfileManager.getTomorrowProfile(key);
                     WindProfileManager.putDayProfile(key, tomorrow);
                 }
             }
@@ -95,4 +96,6 @@ public class WindManager {
         WindProfileManager.clearAll();
         WindStorageManager.clearCache(world);
     }
+
+
 }

@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.items;
+package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.world.item.Item;

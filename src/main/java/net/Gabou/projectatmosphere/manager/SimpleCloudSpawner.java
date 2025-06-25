@@ -20,12 +20,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import org.joml.Vector2i;
 
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class SimpleCloudSpawner {
     // Constante pour l'intervalle de spawn des nuages en ticks.
-    private static final int SPAWN_INTERVAL_TICKS = 1000; // 50 secondes (20 ticks par seconde)
+    private static final int SPAWN_INTERVAL_TICKS = 24000; // 50 secondes (20 ticks par seconde)
     // Dernier tick de spawn pour éviter les spawns trop fréquents.
     private static long LAST_SPAWN_TICK = 0;
 
@@ -45,33 +44,47 @@ public class SimpleCloudSpawner {
     }
 
     // Méthode pour essayer de spawn des nuages dans le niveau serveur si l'intervalle de temps est respecté.
-    public static void trySpawnClouds(ServerLevel serverLevel) {
-        long gameTime = serverLevel.getGameTime();
-        if (gameTime - LAST_SPAWN_TICK < SPAWN_INTERVAL_TICKS) {
-            return;
-        }
-        LAST_SPAWN_TICK = gameTime;
-        ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
-        CloudGenerator generator = cloudManager.getCloudGenerator();
+    public static void trySpawnClouds(ServerLevel serverLevel, CloudGenerator generator) {
 
-        for (SpawnRegion region : generator.getSpawnRegions()) {
-            Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInRegion(region, serverLevel);
-            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, serverLevel, serverLevel.getDayTime());
+
+        // Step 1: Start from ALL known biome keys, not regions
+        Set<BiomeInstanceKey> allBiomeKeys = AtmosphereManager.getBiomeSamples(); // You must already store this
+        Map<SpawnRegion, List<BiomeInstanceKey>> byRegion = new HashMap<>();
+
+        for (BiomeInstanceKey key : allBiomeKeys) {
+            BlockPos pos = key.samplePos();
+
+            for (SpawnRegion region : generator.getSpawnRegions()) {
+                // Check if the biome position falls inside the region bounds
+                if (region.includesPoint(pos.getX(), pos.getZ())) {
+                    byRegion.computeIfAbsent(region, r -> new ArrayList<>()).add(key);
+                    break; // Exit inner loop once matched
+                }
+            }
+        }
+
+        // Step 2: Sample weather per region
+        for (Map.Entry<SpawnRegion, List<BiomeInstanceKey>> entry : byRegion.entrySet()) {
+            List<BiomeInstanceKey> regionKeys = entry.getValue();
+            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(new HashSet<>(regionKeys), serverLevel, serverLevel.getDayTime());
 
             if (stats == null) continue;
+
             SimpleCloudsCompat.spawnCloudInBiome(
                     CloudLibrary.getCloudIdFromSeverity(
                             determineCloudSeverity(
                                     stats.temperature(), stats.humidity(), stats.pressure(),
-                                    calculateDewPoint(stats.temperature(), stats.humidity()))),
+                                    calculateDewPoint(stats.temperature(), stats.humidity()))
+                    ),
                     new BiomeInstanceKey(
                             stats.dominantBiome(),
-                            getRandomPosInRegion(region,RandomSource.create(),
-                                    serverLevel)), serverLevel);
+                            getRandomPosInRegion(entry.getKey(), RandomSource.create(), serverLevel)
+                    ),
+                    serverLevel
+            );
         }
-
-
     }
+
     public static BlockPos getRandomPosInRegion(SpawnRegion region, RandomSource random, ServerLevel level) {
         Vector2i vec = SpawnRegion.getRandomPointInRegion(region, random);
         return new BlockPos(vec.x, level.getSeaLevel(), vec.y);

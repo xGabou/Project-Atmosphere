@@ -18,8 +18,13 @@ public class EventHandler {
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (!event.level.isClientSide && event.phase == TickEvent.Phase.END) {
             if (event.level instanceof ServerLevel serverLevel) {
-                SimpleCloudSpawner.trySpawnClouds(serverLevel);
-                
+                ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
+                CloudGenerator generator = cloudManager.getCloudGenerator();
+                if(generator.getTicksTillNextGen()<= 0)
+                {
+                    SimpleCloudSpawner.trySpawnClouds(serverLevel,generator);
+                }
+
             }
         }
     }

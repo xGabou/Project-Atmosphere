@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.wind.Command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
@@ -22,7 +23,7 @@ public class WindCommand {
                             BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
 
                             // Get the weekly forecast based on the biome
-                            float[] forecastArr = WindProfileManager.getWeeklyForecast(biome);
+                            WindVector[] forecastArr = WindProfileManager.getWeeklyForecast(biome);
                             String forecast = Arrays.toString(forecastArr);
 
                             // Send the forecast to the player

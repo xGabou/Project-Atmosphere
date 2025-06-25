@@ -1,8 +1,11 @@
 package net.Gabou.projectatmosphere.modules.wind.util;
 
+import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.wind.manager.WindManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
+import org.antlr.v4.runtime.misc.Triple;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -10,11 +13,12 @@ import java.util.Set;
 
 public class WindProfileManager {
 
-    private static final Map<BiomeInstanceKey, float[]> WEEKLY = new HashMap<>();
-    private static final Map<BiomeInstanceKey, Float> TODAY = new HashMap<>();
-    private static final Map<BiomeInstanceKey, Float> TOMORROW = new HashMap<>();
+    private static final Map<BiomeInstanceKey, WindVector[]> WEEKLY = new HashMap<>();
+    private static final Map<BiomeInstanceKey, WindVector> TODAY = new HashMap<>();
+    private static final Map<BiomeInstanceKey, WindVector> TOMORROW = new HashMap<>();
 
-    public static void putWeeklyForecast(BiomeInstanceKey biome, float[] week) {
+
+    public static void putWeeklyForecast(BiomeInstanceKey biome, WindVector[] week) {
         WEEKLY.put(biome, week);
     }
 
@@ -37,38 +41,46 @@ public class WindProfileManager {
         return resolved != null && WEEKLY.containsKey(resolved);
     }
 
-    public static float[] getWeeklyForecast(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome1(biome,WEEKLY);
-    }
 
-    public static void putDayProfile(BiomeInstanceKey biome, Float profile) {
+    public static void putDayProfile(BiomeInstanceKey biome, WindVector profile) {
         TODAY.put(biome, profile);
     }
 
-    public static void putTomorrowProfile(BiomeInstanceKey biome, Float profile) {
+    public static void putTomorrowProfile(BiomeInstanceKey biome, WindVector profile) {
         TOMORROW.put(biome, profile);
     }
 
-    public static float getTodayProfile(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome2(biome,TODAY);
+    public static WindVector getTodayProfile(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome3(biome,TODAY);
     }
 
-    public static float getTomorrowProfile(BiomeInstanceKey biome) {
-        return AtmosphereUtils.getRightForecastForBiome2(biome,TOMORROW);
+    public static WindVector getTomorrowProfile(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome3(biome,TOMORROW);
+    }
+    public static WindVector[] getWeeklyForecast(BiomeInstanceKey biome) {
+        return AtmosphereUtils.getRightForecastForBiome4(biome, WEEKLY);
     }
 
 
-    public static float getCurrentWindSpeed(BiomeInstanceKey biome, long worldTick) {
-        float profile = getTodayProfile(biome);
 
-        float t = (worldTick % 24000L) / 24000f;  // 0 → 1 over a full Minecraft day
-        return profile +  profile * t;
+
+    public static WindVector getCurrentWind(BiomeInstanceKey biome, long worldTick) {
+        WindVector today = getTodayProfile(biome);
+        WindVector tomorrow = getTomorrowProfile(biome);
+
+        float t = (worldTick % 24000L) / 24000f;
+
+        float interpSpeed = today.speed() + (tomorrow.speed() - today.speed()) * t;
+        float interpAngle = today.angleRadians() + (tomorrow.angleRadians() - today.angleRadians()) * t;
+
+        return new WindVector(interpSpeed, interpAngle);
     }
+
 
     public static void generateTodayAndTomorrowProfiles(ServerLevel world) {
-        for (Map.Entry<BiomeInstanceKey, float[]> entry : WEEKLY.entrySet()) {
+        for (Map.Entry<BiomeInstanceKey, WindVector[]> entry : WEEKLY.entrySet()) {
             BiomeInstanceKey biome = entry.getKey();
-            float[] week = entry.getValue();
+            WindVector[] week = entry.getValue();
 
             long day = world.getDayTime() / 24000L;
             int todayIndex = (int)(day % 7);
@@ -79,6 +91,7 @@ public class WindProfileManager {
         }
     }
 
+
     public static void clearAll() {
         WEEKLY.clear();
         TODAY.clear();
@@ -88,4 +101,5 @@ public class WindProfileManager {
     public static Set<BiomeInstanceKey> getAllBiomeKeys() {
         return TODAY.keySet();
     }
+
 }

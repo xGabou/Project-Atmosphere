@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.event.TemperatureTickHandler;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityProfileManager;
 import net.Gabou.projectatmosphere.modules.humidity.util.HumidityStorageManager;
@@ -29,6 +30,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.RegisterCommandsEvent;
+
+
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -158,7 +161,7 @@ public class AtmosphereManager {
             float[] temp = TemperatureProfileManager.getDayProfile(key);
             float[] pressure = PressureProfileManager.getTodayProfile(key);
             float[] humidity = HumidityProfileManager.getDayProfile(key);
-            float wind = WindProfileManager.getTodayProfile(key);
+           WindVector wind = WindProfileManager.getTodayProfile(key);
             FORECAST_MAP.put(key.biomeType(), new BiomeForecast(temp, pressure, humidity, wind));
         }
     }
@@ -190,5 +193,5 @@ public class AtmosphereManager {
 
 
     /** Central record to unify today's weather-like forecast */
-    public record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, float wind) {}
+    public record BiomeForecast(float[] temperature, float[] pressure, float[] humidity, WindVector wind) {}
 }
