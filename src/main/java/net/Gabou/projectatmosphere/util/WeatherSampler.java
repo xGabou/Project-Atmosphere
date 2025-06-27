@@ -10,10 +10,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class WeatherSampler {
 
@@ -57,13 +55,17 @@ public class WeatherSampler {
         if (count == 0) return null;
 
         // Determine dominant biome
-        ResourceLocation dominantBiome = biomeFreq.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(keys.iterator().next().biomeType());
+        BiomeInstanceKey dominantKey = keys.stream()
+                .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType))
+                .entrySet()
+                .stream()
+                .max(Map.Entry.comparingByValue(Comparator.comparingInt(List::size)))
+                .map(entry -> entry.getValue().get(0)) // get first BiomeInstanceKey in the most common group
+                .orElse(keys.iterator().next());
 
-        return new WeatherStats(totalHumidity / count, totalTemp / count, totalPressure / count,totalWind.divide(count), dominantBiome);
+
+        return new WeatherStats(totalHumidity / count, totalTemp / count, totalPressure / count,totalWind.divide(count), dominantKey.biomeType(),dominantKey.samplePos());
     }
 
-    public record WeatherStats(float humidity, float temperature, float pressure,WindVector windVector ,ResourceLocation dominantBiome) {}
+    public record WeatherStats(float humidity, float temperature, float pressure,WindVector windVector ,ResourceLocation dominantBiome,BlockPos pos) {}
 }

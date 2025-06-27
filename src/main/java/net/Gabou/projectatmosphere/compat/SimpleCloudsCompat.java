@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.compat;
 import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
 import dev.nonamecrackers2.simpleclouds.api.common.cloud.spawning.SpawnInfo;
 import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
+import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
@@ -21,11 +22,12 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.Vec2;
 import org.joml.Vector2f;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 public class SimpleCloudsCompat {
 
-    public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level,WindVector windVector) {
+    public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level,@Nullable CloudRegion dummy,WindVector windVector) {
 
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(level);
         CloudGenerator generator = cloudManager.getCloudGenerator();
@@ -50,28 +52,31 @@ public class SimpleCloudsCompat {
 
         float px = x; // simulated player
         float pz = z;
-
-        Optional<CloudRegion> region = generator.spawnCloud(() -> info, 1, config.getMaxRegions(), level,
-                (spawnInfo, playerX, playerZ, realX, realZ, rand, grow) ->
-                        spawnCloudInBiome(
-                                spawnInfo,
-                                key,                              // your existing BiomeInstanceKey
-                                level,
-                                rand,
-                                windVector,
-                                generator
-                        )
-        );
-
-
-
+        Optional<CloudRegion> region;
+        if(dummy != null) {
+             region = generator.spawnCloud(() -> info, 1, config.getMaxRegions(), level,
+                    (spawnInfo, playerX, playerZ, realX, realZ, rand, grow) ->
+                            regionDummy(dummy)
+            );
+        }
+        else {
+             region = generator.spawnCloud(() -> info, 1, config.getMaxRegions(), level,
+                    (spawnInfo, playerX, playerZ, realX, realZ, rand, grow) ->
+                            createRegion(spawnInfo,key,level,rand,windVector,generator)
+            );
+        }
 
         region.ifPresentOrElse(r ->
                         System.out.println("[Atmosphere] Spawned " + cloudId + " at " + x + ", " + z + " in " + key.biomeType()),
                 () -> System.out.println("[Atmosphere] Failed to spawn " + cloudId + " in " + key.biomeType())
         );
     }
-    public static Optional<CloudRegion> spawnCloudInBiome(
+    public static Optional<CloudRegion> regionDummy(CloudRegion region) {
+        return  Optional.of(region);
+    }
+
+
+    public static Optional<CloudRegion> createRegion(
             SpawnInfo info,
             BiomeInstanceKey biomeKey,
             ServerLevel level,
@@ -82,47 +87,25 @@ public class SimpleCloudsCompat {
         float x = biomeKey.samplePos().getX();
         float z = biomeKey.samplePos().getZ();
         float windAngleRad =wind.angleRadians();
-
-        // Avoid overlapping with existing clouds (same logic)
-        for (CloudRegion region : generator.getClouds()) {
-            float dist = Vector2f.distance(x, z, region.getWorldX(), region.getWorldZ()) - region.getWorldRadius();
-            if (dist <= 500.0F) {
-                return Optional.empty();
-            }
-        }
         float dx = (float) Math.sin(windAngleRad);
         float dz = (float) Math.cos(windAngleRad);
         Vec2 direction = new Vec2(dx, dz).normalized();
-
-// Optional: rotation for animation
         float rotation = windAngleRad + (float) Math.PI;
 
 
-        // Optionally override cloud attributes based on biome here
-        float radius = info.determineRadius(random);
-        float speed = info.determineSpeed(random) + wind.speed() * 0.1F; // Add wind speed influence
-        float acceleration = 0.01F;
-        int duration = info.determineExistTicks(random);
-        int growTicks = info.determineGrowTicks(random);
-        float stretch = info.determineStretchFactor(random);
-
         // Return new region
-        CloudRegion region = new CloudRegion(
-                info.cloudType(),
-                direction,
-                speed,
-                acceleration,
-                x / 8.0F,
-                z / 8.0F,
-                radius / 8.0F,
-                rotation,
-                stretch,
-                duration,
-                growTicks,
-                info.orderWeight()
-        );
+        Optional<CloudRegion> region = generator.createRegion(info,10,10,x,z,random,true);
+        if(region.isEmpty()) {
+            return Optional.empty();
+        }
+        CloudRegion cloudRegion = region.get();
+        cloudRegion.setMovementDirection(direction);
+        cloudRegion.setRotation(rotation);
+        cloudRegion.setMaxSpeed(cloudRegion.getMaxSpeed()+wind.speed()*0.01F);
+        float acc = cloudRegion.getAccelerationFactor();
+        cloudRegion.setAccelerationFactor(acc* wind.speed()+acc);
 
-        return Optional.of(region);
+        return Optional.of(cloudRegion);
     }
 
 
