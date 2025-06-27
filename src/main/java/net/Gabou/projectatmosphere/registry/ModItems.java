@@ -4,7 +4,9 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.items.Balai;
 import net.Gabou.projectatmosphere.items.Barometre;
 import net.Gabou.projectatmosphere.items.Thermometre;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -26,5 +28,11 @@ public class ModItems {
 
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
+    }
+
+    public static final RegistryObject<Item> DUST = blockUtilities(ModBlocks.DUST);
+
+    private static RegistryObject<Item> blockUtilities(RegistryObject<Block> block) {
+        return ITEMS.register(block.getId().getPath(), () -> new BlockItem(block.get(), new Item.Properties()));
     }
 }

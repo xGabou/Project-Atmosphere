@@ -4,13 +4,9 @@ package net.Gabou.projectatmosphere;
 import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
-import net.Gabou.projectatmosphere.network.LoginDataGate;
 import net.Gabou.projectatmosphere.network.SyncBiomeDataLoginPacket;
-import net.Gabou.projectatmosphere.registry.ModItems;
+import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-import net.Gabou.projectatmosphere.registry.ModNetworking;
-import net.Gabou.projectatmosphere.registry.ModParticles;
-import net.Gabou.projectatmosphere.registry.ModTabs;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -59,6 +55,7 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
         SimpleCloudsConstants.SPAWN_RADIUS = DEFAULT_RADIUS;
         ModTabs.REGISTRY.register(modEventBus);
+        ModBlocks.REGISTRY.register(modEventBus);
         ModNetworking.register();
         ModParticles.register(modEventBus);
     }

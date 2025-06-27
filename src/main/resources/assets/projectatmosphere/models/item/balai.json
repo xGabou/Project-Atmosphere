@@ -2,9 +2,9 @@
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
 	"textures": {
-		"1": "C:/Users/PC GAB/Downloads/f2f02d78-7221-49bb-a169-7fd107aca350",
+		"1": "projectatmosphere:item/manche",
 		"2": "projectatmosphere:item/paille",
-		"particle": "C:/Users/PC GAB/Downloads/f2f02d78-7221-49bb-a169-7fd107aca350"
+		"particle": "projectatmosphere:item/manche"
 	},
 	"elements": [
 		{
@@ -166,20 +166,20 @@
 	],
 	"display": {
 		"thirdperson_righthand": {
-			"rotation": [42, 0, 0],
-			"translation": [0, -6.75, -4.25]
+			"rotation": [51, -5, 4],
+			"translation": [0.75, -6.75, -5.75]
 		},
 		"thirdperson_lefthand": {
-			"rotation": [46, 0, 0],
-			"translation": [0, -6.25, -3]
+			"rotation": [51, -5, 4],
+			"translation": [0.75, -6.75, -5.75]
 		},
 		"firstperson_righthand": {
-			"rotation": [8, 0, 0],
-			"translation": [0, -8.25, 0]
+			"rotation": [8, 116, 0],
+			"translation": [0, -2.5, 0]
 		},
 		"firstperson_lefthand": {
-			"rotation": [3, 0, 0],
-			"translation": [-0.25, -9, 0]
+			"rotation": [8, 116, 0],
+			"translation": [0, -2.5, 0]
 		},
 		"ground": {
 			"translation": [0, 4.25, 0]

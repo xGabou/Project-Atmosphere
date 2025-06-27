@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.util.RandomSource;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -17,6 +18,8 @@ import static net.Gabou.projectatmosphere.util.AtmosphereUtils.getSeasonalLeafPa
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ClientTickHandler {
+
+    private static RandomSource random;
 
     private static int tickCounter = 0;
 
@@ -30,7 +33,9 @@ public class ClientTickHandler {
         AsyncAtmosphereService.runClient(() -> {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
-
+        if(random == null){
+            random = mc.level.random;
+        }
         BlockPos pos = mc.player.blockPosition();
         BiomeInstanceKey key = AtmosphereUtils.findNearestBiomeInstanceKeyWithNoMap(
                 AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
@@ -59,7 +64,7 @@ public class ClientTickHandler {
             double perpZ = dx;
 
             double spawnX = pos.getX() + 0.5 - dx * distance + perpX * lateral;
-            double spawnY = pos.getY() + 1.5 + (mc.level.random.nextDouble() - 0.5) * 0.5;
+            double spawnY = pos.getY() + 1.5 + (random.nextDouble() - 0.5) * 0.5;
             double spawnZ = pos.getZ() + 0.5 - dz * distance + perpZ * lateral;
 
 
