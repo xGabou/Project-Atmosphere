@@ -1,46 +1,100 @@
 package net.Gabou.projectatmosphere.modules.storm.util;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.Random;
 
-/**
- * Generator for 7-day storm profiles for a given biome.
- * Values can represent storm intensity, from 0 (clear) to 1 (severe storm).
- */
 public class StormGenerator {
 
-    private static final Random random = new Random();
+    private static final float DEFAULT_MIN = 0.0f;
+    private static final float DEFAULT_MAX = 1.0f;
 
     /**
-     * Generates a 7-day storm profile for a given biome and position.
-     * Values range from 0.0 (no storm) to 1.0 (intense storm).
+     * Returns a 7-day storm profile, each day having [min, max] chance.
      */
-    public static float[] generateWeeklyStormProfile(ServerLevel world, BlockPos pos, ResourceLocation biome) {
-        float[] week = new float[7];
+    public static float[][] generateWeeklyStormProfile(
+            BiomeInstanceKey biome, ServerLevel level,
+            float[][] temperature,
+            float[][] humidity,
+            float[][] pressure,
+            WindVector[] wind
+    ) {
+        float[][] stormWeek = new float[7][2];
+        BlockPos pos = biome.samplePos();
 
-        // Example logic: some randomness + pseudo-seasonal effect
-        for (int i = 0; i < 7; i++) {
-            // Base storm probability based on biome roughness or elevation (could be expanded)
-            float base = 0.2f;
+        for (int day = 0; day < 7; day++) {
+            float stormScore = 0f;
 
-            // Random daily fluctuation
-            float fluctuation = 0.2f * (random.nextFloat() - 0.5f);
+            float tempAvg = (temperature[day][0] + temperature[day][1]) / 2f;
+            float tempDelta = temperature[day][1] - temperature[day][0];
 
-            // Simulate occasional stronger storms
-            if (random.nextFloat() < 0.1f) {
-                fluctuation += 0.5f;
-            }
+            float rhAvg = (humidity[day][0] + humidity[day][1]) / 2f;
+            float pressureAvg = (pressure[day][0] + pressure[day][1]) / 2f;
 
-            week[i] = clamp(base + fluctuation, 0.0f, 1.0f);
+            float windStrength = (wind != null && wind.length > day) ? wind[day].speed() : 0f;
+
+            // --- Base scoring ---
+            if (pressureAvg < 1000f) stormScore += 0.3f;
+            if (pressureAvg < 990f) stormScore += 0.2f;
+            if (rhAvg > 0.8f) stormScore += 0.2f;
+            if (tempDelta > 10f) stormScore += 0.15f;
+            if (windStrength > 12f) stormScore += 0.1f;
+
+            // --- Seasonal adjustment ---
+            float seasonalMultiplier = getSeasonalStormMultiplier(level, pos);
+            stormScore *= seasonalMultiplier;
+
+            // --- Noise ---
+            long seed = ProjectAtmosphere.seed ^ pos.asLong() ^ biome.hashCode() ^ day;
+            Random rand = new Random(seed);
+            stormScore += (rand.nextFloat() - 0.5f) * 0.1f;
+
+            // --- Min/Max clamping ---
+            float min = getSeasonalStormMin(level, pos);
+            float max = getSeasonalStormMax(level, pos);
+            stormWeek[day][0] = min;
+            stormWeek[day][1] = clamp(stormScore, min, max);
         }
 
-        return week;
+        return stormWeek;
     }
 
     private static float clamp(float val, float min, float max) {
         return Math.max(min, Math.min(max, val));
+    }
+
+    private static float getSeasonalStormMultiplier(ServerLevel level, BlockPos pos) {
+        int season = (int)((level.getDayTime() / 24000L) % 4);
+        return switch (season) {
+            case 0 -> 1.0f;  // Spring
+            case 1 -> 1.3f;  // Summer
+            case 2 -> 1.5f;  // Fall
+            case 3 -> 0.7f;  // Winter
+            default -> 1.0f;
+        };
+    }
+
+    private static float getSeasonalStormMin(ServerLevel level, BlockPos pos) {
+        int season = (int)((level.getDayTime() / 24000L) % 4);
+        return switch (season) {
+            case 1 -> 0.15f;
+            case 2 -> 0.10f;
+            case 3 -> 0.0f;
+            default -> 0.05f;
+        };
+    }
+
+    private static float getSeasonalStormMax(ServerLevel level, BlockPos pos) {
+        int season = (int)((level.getDayTime() / 24000L) % 4);
+        return switch (season) {
+            case 1 -> 1.2f;
+            case 2 -> 1.0f;
+            case 3 -> 0.6f;
+            default -> 0.9f;
+        };
     }
 }

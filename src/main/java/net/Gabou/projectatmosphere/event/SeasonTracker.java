@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.event;
 
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.event.TickEvent;
@@ -15,7 +14,7 @@ public class SeasonTracker {
 
     private static Season lastSeason = null;
 
-    @SubscribeEvent
+    //@SubscribeEvent
     public static void onWorldTick(TickEvent.LevelTickEvent event) {
         try {
             if (event.phase != TickEvent.Phase.END || event.level.isClientSide) return;

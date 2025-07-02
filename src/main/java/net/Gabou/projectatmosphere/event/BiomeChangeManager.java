@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.event;
 
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -18,36 +19,27 @@ import java.util.UUID;
 
 @Mod.EventBusSubscriber
 public class BiomeChangeManager {
-    // track each player’s last biome
     private static final Map<UUID, ResourceLocation> lastBiome = new HashMap<>();
-    private static final int RUN_INTERVAL_TICKS = 500;
+    private static final int RUN_INTERVAL_TICKS = 2000;
+    private static final int MIN_DISTANCE_BETWEEN_CENTERS = 5000;
 
-    /** initialize when they join */
-    @SubscribeEvent
-    public static void onLogin(PlayerLoggedInEvent ev) {
-        if (!(ev.getEntity() instanceof ServerPlayer player)) return;
-        ResourceLocation biomeKey = getBiomeKeyAt(player);
-        lastBiome.put(player.getUUID(), biomeKey);
-    }
-
-    /** on each tick, check if they’ve moved into a new biome */
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent ev) {
         if (ev.phase != TickEvent.Phase.END) return;
         if (!(ev.player instanceof ServerPlayer player)) return;
-        if(player.level().isClientSide) return;
+        if (player.level().isClientSide) return;
+
         long t = player.serverLevel().getDayTime() % 24000L;
         if (t % RUN_INTERVAL_TICKS != 0) return;
 
+        UUID uuid = player.getUUID();
+        ResourceLocation nowBiome = getBiomeKeyAt(player);
+        ResourceLocation last = lastBiome.get(uuid);
 
-        ResourceLocation prev = lastBiome.get(player.getUUID());
-        ResourceLocation now  = getBiomeKeyAt(player);
-        if (prev == null || !now.equals(prev)) {
-            // they’ve changed biomes!
-            lastBiome.put(player.getUUID(), now);
-            onBiomeChanged(player, prev, now);
+        if (last == null || !last.equals(nowBiome)) {
+            lastBiome.put(uuid, nowBiome);
+            onBiomeChanged(player, last, nowBiome); // decision to regen is now inside
         }
-
     }
 
     private static ResourceLocation getBiomeKeyAt(ServerPlayer p) {
@@ -56,19 +48,22 @@ public class BiomeChangeManager {
                 .getBiome(pos)
                 .unwrapKey()
                 .map(ResourceKey::location)
-                .orElse(new ResourceLocation("minecraft","plains"));
+                .orElse(new ResourceLocation("minecraft", "plains"));
     }
 
-    /** your callback: do whatever you need when biome changes */
     private static void onBiomeChanged(ServerPlayer player, ResourceLocation oldBiome, ResourceLocation newBiome) {
-        // e.g. reload low-detail forecast around them:
-        // PressureForecast.generateLowDetailForecast(player.getLevel(), player.blockPosition(), YOUR_RADIUS);
-        // PressureForecast.deactivateFarthestBiome(player.getLevel());
-        AtmosphereManager.updateForecastAround(player.serverLevel(), player.blockPosition());
-        player.sendSystemMessage(
-                net.minecraft.network.chat.Component.literal(
-                        "You moved from " + oldBiome + " → " + newBiome
-                )
-        );
+        UUID uuid = player.getUUID();
+        BlockPos currentPos = player.blockPosition();
+        BlockPos originalCenter = ForecastDataStorage.playerData.get(uuid);
+
+        // only trigger update if the player moved far from original forecast center
+        if (originalCenter == null || originalCenter.distManhattan(currentPos) > MIN_DISTANCE_BETWEEN_CENTERS) {
+            ForecastDataStorage.playerData.put(uuid, currentPos); // update center
+            AtmosphereManager.updateForecastAround(player.serverLevel(), currentPos);
+
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                    "[Atmosphere] Moved >5000 blocks. Forecast regenerated."
+            ));
+        }
     }
 }

@@ -4,7 +4,11 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
+import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastType;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
@@ -15,8 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
 public class DebugAtmoCommand {
-    private static int sendForecast(CommandContext<CommandSourceStack> ctx, ResourceLocation biome) {
-        var forecast = AtmosphereManager.getForecast(biome);
+    private static int sendForecast(CommandContext<CommandSourceStack> ctx, BiomeForecast forecast, ResourceLocation biome) {
         if (forecast == null) {
             ctx.getSource().sendFailure(Component.literal("No forecast found for biome: " + biome));
             return 0;
@@ -24,10 +27,10 @@ public class DebugAtmoCommand {
 
         ctx.getSource().sendSuccess(() ->
                 Component.literal("Biome: " + biome +
-                        "\n  🌡 Temp:     [" + format(forecast.temperature()) + "]" +
-                        "\n  🧪 Pressure: [" + format(forecast.pressure()) + "]" +
-                        "\n  💧 Humidity: [" + format(forecast.humidity()) + "]" +
-                        "\n  🌬 Wind:     [" + forecast.wind() + "]"
+                        "\n  🌡 Temp:     [" + format(forecast.getTemperatureDay()) + "]" +
+                        "\n  🧪 Pressure: [" + format(forecast.getPressureDay()) + "]" +
+                        "\n  💧 Humidity: [" + format(forecast.getHumidityDay()) + "]" +
+                        "\n  🌬 Wind:     [" + forecast.getWindDay() + "]"
                 ), false);
         return 1;
     }
@@ -42,13 +45,17 @@ public class DebugAtmoCommand {
                                     ResourceLocation biome = world.registryAccess()
                                             .registryOrThrow(Registries.BIOME)
                                             .getKey(world.getBiome(pos).value());
+                                   BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
 
-                                    return sendForecast(ctx, biome);
+                                    return sendForecast(ctx,forecast, biome);
                                 })
                                 .then(Commands.argument("biome", ResourceLocationArgument.id())
                                         .executes(ctx -> {
                                             ResourceLocation biome = ResourceLocationArgument.getId(ctx, "biome");
-                                            return sendForecast(ctx, biome);
+                                            BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
+                                            BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
+
+                                            return sendForecast(ctx,forecast, biome);
                                         })
                                 )
                         )

@@ -1,4 +1,10 @@
 {
-  "item.projectatmosphere.thermometer" : "Thermometer",
-  "item.projectatmosphere.barometer" : "Barometer"
+  "item.projectatmosphere.thermometer": "Thermometer",
+  "item.projectatmosphere.barometer": "Barometer",
+  "item.projectatmosphere.balai_bois": "Wooden Broom",
+  "item.projectatmosphere.balai_pierre": "Stone Broom",
+  "item.projectatmosphere.balai_fer": "Iron Broom",
+  "item.projectatmosphere.balai_diamant": "Diamond Broom",
+  "item.projectatmosphere.balai_netherite": "Netherite Broom",
+  "block.projectatmosphere.dust": "Dust"
 }

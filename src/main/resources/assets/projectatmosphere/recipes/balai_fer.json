@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "S",
+    "H",
+    "H"
+  ],
+  "key": {
+    "S": { "item": "minecraft:iron_ingot" },
+    "H": { "item": "minecraft:wheat" }
+  },
+  "result": { "item": "projectatmosphere:balai_fer" }
+}

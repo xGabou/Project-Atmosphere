@@ -1,11 +1,12 @@
 package net.Gabou.projectatmosphere.modules.temperature.command;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
+
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.compat.SereneTempToCelcius;
-import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
+
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
-import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -59,21 +60,21 @@ public class TemperatureCommandHelper {
      * Get the current temperature of a biome at a given tick.
      */
     public static float getTemperatureAt(BiomeInstanceKey biome, long tick) {
-        return TemperatureManager.getCurrentTemperature(biome, tick);
+        return ForecastGenerator.getTemperatureValue(biome, tick);
     }
 
     /**
      * Return the weekly forecast matrix for a given biome.
      */
     public static String getWeeklyForecast(BiomeInstanceKey biome) {
-        return weekForecastToString(biome,TemperatureManager.getWeeklyForecast(biome));
+        return weekForecastToString(biome,ForecastGenerator.getForecast(biome).getTemperature());
     }
 
     /**
      * Return the daily temperature profile (curve) for a given biome.
      */
     public static float[] getDayProfile(BiomeInstanceKey biome) {
-        return TemperatureProfileManager.getDayProfile(biome);
+        return ForecastGenerator.getForecastMap().get(biome).getTemperatureDay();
     }
 
     /**
@@ -107,16 +108,8 @@ public class TemperatureCommandHelper {
      * Get the final computed Celsius temperature used by the mod (includes time of day, fluctuations, etc).
      */
     public static float getRealTemperature(ServerLevel level, BiomeInstanceKey biome, BlockPos pos) {
-        return TemperatureGenerator.getRealTemperature(level, biome, pos);
+        return ForecastGenerator.getTemperatureValue(biome, level.getDayTime());
     }
-
-    /**
-     * Forecast temperature based on surroundings (e.g., ahead of time).
-     */
-    public static String getForecastedTemperature(ServerLevel level, BlockPos pos) {
-        return formatForecastMap(TemperatureForecast.generateTemporaryForecastAround(level, pos, 500));
-    }
-
 
 
     public static String formatForecastMap(Map<BiomeInstanceKey, float[][]> forecastMap) {

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "S",
+    "H",
+    "H"
+  ],
+  "key": {
+    "S": { "item": "minecraft:cobblestone" },
+    "H": { "item": "minecraft:wheat" }
+  },
+  "result": { "item": "projectatmosphere:balai_pierre" }
+}

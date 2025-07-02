@@ -1,0 +1,10 @@
+{
+  "item.projectatmosphere.thermometer": "Thermomètre",
+  "item.projectatmosphere.barometer": "Baromètre",
+  "item.projectatmosphere.balai_bois": "Balai en bois",
+  "item.projectatmosphere.balai_pierre": "Balai en pierre",
+  "item.projectatmosphere.balai_fer": "Balai en fer",
+  "item.projectatmosphere.balai_diamant": "Balai en diamant",
+  "item.projectatmosphere.balai_netherite": "Balai en netherite",
+  "block.projectatmosphere.dust": "Poussière"
+}

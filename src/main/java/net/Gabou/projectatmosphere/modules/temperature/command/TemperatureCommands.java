@@ -5,8 +5,6 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
-import net.Gabou.projectatmosphere.modules.temperature.forecast.TemperatureForecast;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 //import net.Gabou.projectatmosphere.modules.temperature.spike.commands.SpikeCommands;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -108,101 +106,6 @@ public class TemperatureCommands {
                                     ctx.getSource().sendSuccess(() -> Component.literal("Current temperature in Celsius: " + realTemp), false);
                                     return 1;
                                 }))
-                        // /temperature gt
-                        .then(Commands.literal("gt")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(ctx -> {
-                                    ServerLevel level = ctx.getSource().getLevel();
-                                    Player player = ctx.getSource().getPlayerOrException();
-                                    BlockPos pos = player.getOnPos();
-
-                                    String forecasted = TemperatureCommandHelper.getForecastedTemperature(level, pos);
-                                    ctx.getSource().sendSuccess(() -> Component.literal(forecasted), false);
-                                    return 1;
-                                }))
-                        .then(Commands.literal("testforecast")
-                                .requires(source -> source.hasPermission(2))
-                                .then(Commands.argument("radius", IntegerArgumentType.integer(1))
-                                        .executes(ctx -> {
-                                            Player player = ctx.getSource().getPlayerOrException();
-                                            ServerLevel level = ctx.getSource().getLevel();
-                                            int radius = IntegerArgumentType.getInteger(ctx, "radius");
-
-                                            if (radius > 300) {
-                                                ctx.getSource().sendFailure(Component.literal("§cRadius too large. Please use §e/temperature testforecastjson " + radius + " §cfor large forecasts."));
-                                                return 0;
-                                            }
-
-                                            CompletableFuture.runAsync(() -> {
-                                                var forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), radius);
-
-                                                String formatted = TemperatureCommandHelper.formatForecastMap(forecast);
-
-                                                level.getServer().execute(() ->
-                                                        ctx.getSource().sendSuccess(() -> Component.literal(formatted), false)
-                                                );
-                                            });
-
-                                            return 1;
-                                        }))
-                                .executes(ctx -> {
-                                    Player player = ctx.getSource().getPlayerOrException();
-                                    ServerLevel level = ctx.getSource().getLevel();
-
-                                    CompletableFuture.runAsync(() -> {
-                                        var forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), 100);
-
-                                        String formatted = TemperatureCommandHelper.formatForecastMap(forecast);
-
-                                        level.getServer().execute(() ->
-                                                ctx.getSource().sendSuccess(() -> Component.literal(formatted), false)
-                                        );
-                                    });
-
-                                    return 1;
-                                }))
-
-
-                        .then(Commands.literal("testforecastjson")
-                                .requires(source -> source.hasPermission(2))
-                                .then(Commands.argument("radius", IntegerArgumentType.integer(1))
-                                        .executes(ctx -> {
-                                            Player player = ctx.getSource().getPlayerOrException();
-                                            ServerLevel level = ctx.getSource().getLevel();
-                                            int radius = IntegerArgumentType.getInteger(ctx, "radius");
-
-                                            if (radius > 10000) {
-                                                ctx.getSource().sendSystemMessage(Component.literal("§eRadius exceeding 10000, this may take a while."));
-                                            }
-
-                                            CompletableFuture.runAsync(() -> {
-                                                Map<BiomeInstanceKey, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), radius);
-                                                Gson gson = new GsonBuilder().setPrettyPrinting().create();
-                                                String json = gson.toJson(forecast);
-
-                                                level.getServer().execute(() ->
-                                                        ctx.getSource().sendSuccess(() -> Component.literal("§aForecast (JSON):\n" + json), false)
-                                                );
-                                            });
-
-                                            return 1;
-                                        }))
-                                .executes(ctx -> {
-                                    Player player = ctx.getSource().getPlayerOrException();
-                                    ServerLevel level = ctx.getSource().getLevel();
-
-                                    CompletableFuture.runAsync(() -> {
-                                        Map<BiomeInstanceKey, float[][]> forecast = TemperatureForecast.generateTemporaryForecastAround(level, player.blockPosition(), 100);
-                                        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-                                        String json = gson.toJson(forecast);
-
-                                        level.getServer().execute(() ->
-                                                ctx.getSource().sendSuccess(() -> Component.literal("§aForecast (JSON):\n" + json), false)
-                                        );
-                                    });
-
-                                    return 1;
-                                }))
 
 
 // /temperature regenerate
@@ -234,10 +137,6 @@ public class TemperatureCommands {
                                             §e/temperature dayprofile §7– View the 240-point daily temperature curve.
                                             §e/temperature getseason §7– Show the current Serene Seasons sub-season.
                                             §e/temperature gettemp §7– Raw, Celsius, and real computed temperature.
-                                            §e/temperature gt §7– Real-time computed temperature from the forecast system.
-                                            
-                                            §e/temperature testforecast [radius] §7– Show forecast in chat (1–300). For debug/testing.
-                                            §e/temperature testforecastjson [radius] §7– Output JSON forecast, supports large radius (>300). Async-safe.
                                             
                                             §e/temperature regenerate §7– Clear forecast cache and regenerate missing data.
                                             §e/temperature resetSpikes §7– Clear spike simulation state cache.

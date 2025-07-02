@@ -1,8 +1,8 @@
 package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.wind.util.WindProfileManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -41,7 +41,7 @@ public class ClientTickHandler {
                 AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
         if (key == null) return;
 
-        WindVector wind = WindProfileManager.getCurrentWind(key, mc.level.getDayTime());
+        WindVector wind = ForecastGenerator.getWindValue(key);
         float speed = wind.speed();
         if (speed < 2.0f) return;
 

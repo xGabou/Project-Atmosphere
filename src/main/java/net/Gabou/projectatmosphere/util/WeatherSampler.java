@@ -1,11 +1,9 @@
 package net.Gabou.projectatmosphere.util;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
-import net.Gabou.projectatmosphere.modules.pressure.manager.PressureManager;
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
-import net.Gabou.projectatmosphere.modules.wind.manager.WindManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -31,23 +29,71 @@ public class WeatherSampler {
         }
         return keys;
     }
+    public static Set<BiomeInstanceKey> sampleBiomesInArea(int centerX, int centerZ, int radius, ServerLevel level) {
+        Set<BiomeInstanceKey> result = new HashSet<>();
+        int step = 24;
+        int radiusSq = radius * radius;
+
+        for (int dx = -radius; dx <= radius; dx += step) {
+            for (int dz = -radius; dz <= radius; dz += step) {
+                if (dx * dx + dz * dz > radiusSq)
+                    continue;
+
+                BlockPos pos = new BlockPos(centerX + dx, level.getSeaLevel(), centerZ + dz);
+
+                level.getBiome(pos).unwrapKey().ifPresent(biomeKey -> {
+                    ResourceLocation biomeId = biomeKey.location();
+
+                    // Try to find existing BiomeInstanceKey for this biomeId that is closest to this sample pos
+                    BiomeInstanceKey bestMatch = null;
+                    double bestDistSq = Double.MAX_VALUE;
+
+                    for (BiomeInstanceKey known : ForecastGenerator.getBiomeSamples()) {
+                        if (known.biomeType().equals(biomeId)) {
+                            double distSq = known.samplePos().distSqr(pos);
+                            if (distSq < bestDistSq) {
+                                bestDistSq = distSq;
+                                bestMatch = known;
+                            }
+                        }
+                    }
+
+                    if (bestMatch != null) {
+                        result.add(bestMatch); // use canonical sample
+                    } else {
+                        result.add(new BiomeInstanceKey(biomeId, pos)); // fallback to new one
+                    }
+                });
+            }
+        }
+
+        return result;
+    }
+
+
+
+
+
 
     public static WeatherStats computeWeatherStats(Set<BiomeInstanceKey> keys, ServerLevel level, long tick) {
-        float totalHumidity = 0, totalTemp = 0, totalPressure = 0;
+        float totalHumidity = 0, totalTemp = 0, totalPressure = 0,
+                totalStormChance = 0;
         WindVector totalWind = new WindVector(0, 0);
         int count = 0;
         Map<ResourceLocation, Integer> biomeFreq = new HashMap<>();
 
         for (BiomeInstanceKey key : keys) {
-            float humidity = HumidityManager.getCurrentHumidity(key, tick);
-            float temperature = TemperatureManager.getCurrentTemperature(key, tick);
-            float pressure = PressureManager.getCurrentPressure(key, tick);
-            WindVector wind = WindManager.getCurrentWind(key, tick);
+            float humidity = ForecastGenerator.getHumidityValue(key, tick);
+            float temperature = ForecastGenerator.getTemperatureValue(key, tick);
+            float pressure = ForecastGenerator.getPressureValue(key, tick);
+            float stormChanceValue = ForecastGenerator.getStormChanceValue(key,tick);
+            WindVector wind = ForecastGenerator.getWindValue(key);
 
             totalHumidity += humidity;
             totalTemp += temperature;
             totalPressure += pressure;
             totalWind = totalWind.add(wind);
+            totalStormChance += stormChanceValue;
             biomeFreq.merge(key.biomeType(), 1, Integer::sum);
             count++;
         }
@@ -64,8 +110,8 @@ public class WeatherSampler {
                 .orElse(keys.iterator().next());
 
 
-        return new WeatherStats(totalHumidity / count, totalTemp / count, totalPressure / count,totalWind.divide(count), dominantKey.biomeType(),dominantKey.samplePos());
+        return new WeatherStats(totalHumidity / count, totalTemp / count, totalPressure / count,totalWind.divide(count), dominantKey.biomeType(),dominantKey.samplePos(),totalStormChance/ count);
     }
 
-    public record WeatherStats(float humidity, float temperature, float pressure,WindVector windVector ,ResourceLocation dominantBiome,BlockPos pos) {}
+    public record WeatherStats(float humidity, float temperature, float pressure,WindVector windVector ,ResourceLocation dominantBiome,BlockPos pos,float stormChance) {}
 }

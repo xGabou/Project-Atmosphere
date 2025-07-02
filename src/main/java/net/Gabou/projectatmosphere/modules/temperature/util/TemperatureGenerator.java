@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.temperature.util;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -16,6 +17,7 @@ import sereneseasons.season.SeasonTime;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
 
 
+import javax.annotation.Nullable;
 import java.util.Objects;
 import java.util.Random;
 
@@ -28,23 +30,19 @@ public class TemperatureGenerator {
     private static final float SEA_LEVEL = 63f;
     private static final float LAPSE_RATE = -0.0065f;
 
-    /** Returns the “current” temperature based on the precomputed day profile. */
-    public static float getRealTemperature(Level world, BiomeInstanceKey biome, BlockPos pos) {
-        long tick = world.getDayTime() % 24000L;
-        return TemperatureProfileManager.getCurrentTemperature(biome, tick);
-    }
-
     /** Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM), with noise & season. */
     public static float[][] generateWeekForecast(Level world, BlockPos chunkPos, ResourceLocation biomeId) {
         ProjectAtmosphere.LOGGER.info("[TempForecast] Starting Generating full temperature forecast...");
-
         float[][] week = new float[7][2];
         long seed = chunkPos.asLong() ^ biomeId.hashCode() ^
-                Objects.requireNonNull(world.getServer()).getWorldData().worldGenOptions().seed();
+                ProjectAtmosphere.seed;
         Random rand = new Random(seed);
 
 
-
+        if(world==null) // if world is null, we cannot generate a forecast
+        {
+            world = Minecraft.getInstance().level;
+        }
         // look up the current Sereneseasons primary season
         int cycleTicks = SeasonHelper.getSeasonState(world).getSeasonCycleTicks();
         long seasonDuration = SeasonHelper.getSeasonState(world).getSeasonDuration();

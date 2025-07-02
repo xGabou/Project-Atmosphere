@@ -1,8 +1,7 @@
 package net.Gabou.projectatmosphere.items;
 
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
-import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -21,7 +20,7 @@ public class Thermometre extends Item {
     public InteractionResultHolder<ItemStack> use(Level serverWorld, Player player, InteractionHand hand){
         ItemStack itemStack = player.getItemInHand(hand);
         if (serverWorld.isClientSide) {
-            double temp = TemperatureManager.getCurrentTemperature(
+            double temp = ForecastGenerator.getTemperatureValue(
                     AtmosphereUtils.findNearestBiomeInstanceKeyWithNoMap(
                             AtmosphereUtils.getBiomeLocation(player.blockPosition(), serverWorld),
                             player.blockPosition()

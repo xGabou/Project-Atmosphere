@@ -1,22 +1,13 @@
 package net.Gabou.projectatmosphere.manager;
 
 import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
-import dev.nonamecrackers2.simpleclouds.api.common.cloud.spawning.SpawnInfo;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.humidity.manager.HumidityManager;
-import net.Gabou.projectatmosphere.modules.pressure.manager.PressureManager;
-import net.Gabou.projectatmosphere.modules.temperature.manager.TemperatureManager;
-import net.Gabou.projectatmosphere.modules.temperature.util.ForecastStorageManager;
-import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureProfileManager;
-import net.Gabou.projectatmosphere.modules.wind.manager.WindManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
@@ -25,11 +16,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.phys.Vec2;
+import net.minecraft.util.valueproviders.BiasedToBottomInt;
 import org.joml.Vector2i;
 
 import java.util.*;
+
+import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MAX_RADIUS;
+import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MIN_RADIUS;
 
 public class SimpleCloudSpawner {
     // Constante pour l'intervalle de spawn des nuages en ticks.
@@ -61,7 +54,7 @@ public class SimpleCloudSpawner {
 
     // Méthode pour essayer de spawn des nuages dans le niveau serveur si l'intervalle de temps est respecté.
     public static void trySpawnClouds(ServerLevel serverLevel, CloudGenerator generator) {
-        Set<BiomeInstanceKey> allBiomeKeys = AtmosphereManager.getBiomeSamples();
+        Set<BiomeInstanceKey> allBiomeKeys = ForecastGenerator.getBiomeSamples();
         List<SpawnRegion> spawnRegions = generator.getSpawnRegions();
         RandomSource random = RandomSource.create();
 
@@ -80,55 +73,50 @@ public class SimpleCloudSpawner {
                 continue;
             }
 
-            // 3. Find all BiomeInstanceKeys within the radius around this biome
-            float regionRadius = generator.getRegionRadius(); // or use fixed 10, 10
-            List<BiomeInstanceKey> regionKeys = allBiomeKeys.stream()
-                    .filter(biomeKey -> biomeKey.samplePos().distSqr(pos) <= regionRadius * regionRadius)
-                    .toList();
+            // 3. Sample surrounding biomes within a region radius
+            int radius = BiasedToBottomInt.of(MIN_RADIUS,MAX_RADIUS).sample(random) ;
+            Set<BiomeInstanceKey> nearbyKeys = WeatherSampler.sampleBiomesInArea(pos.getX(), pos.getZ(), radius, serverLevel);
 
-            if (regionKeys.isEmpty()) continue;
+            // 4. Compute WeatherStats or fallback to average
+            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(nearbyKeys, serverLevel, serverLevel.getGameTime());
+            if (stats == null) {
+                continue;
+            }
 
-            // 4. Compute weather stats
-            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(
-                    new HashSet<>(regionKeys), serverLevel, serverLevel.getDayTime()
-            );
-            if (stats == null) continue;
+            // 5. Determine cloud type based on weather conditions
             String cloudId = CloudLibrary.getCloudIdFromSeverity(
-
                     determineCloudSeverity(
                             stats.temperature(),
                             stats.humidity(),
                             stats.pressure(),
-                            calculateDewPoint(stats.temperature(), stats.humidity())
-                    ));
-            // 5. Build SpawnInfo
+                            calculateDewPoint(stats.temperature(), stats.humidity()),stats.stormChance()
+                    )
+            );
+
+            // 6. Retrieve cloud spawn config
             CloudSpawningConfig config = generator.getSpawnConfig().get();
-            ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID,cloudId);
+            ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
             CloudSpawningConfig.Info info = config.getWeightInfo(rl);
 
-            // 6. Try creating a CloudRegion
-
-                    Optional<CloudRegion> temp = SimpleCloudsCompat.createRegion(
+            // 7. Create region (or skip if not valid)
+            Optional<CloudRegion> regionOpt = SimpleCloudsCompat.createRegion(
                     info, key, serverLevel, random, stats.windVector(), generator
             );
-            if(temp.isPresent())
-            {
-                continue;
-            }
-            CloudRegion cloudRegion = temp.get();
+            if (regionOpt.isEmpty()) continue;
 
-            // 7. Generate dominant key with weather-chosen biome and position
-            BiomeInstanceKey dominantKey = new BiomeInstanceKey(
-                    stats.dominantBiome(), stats.pos()
-            );
+            CloudRegion region = regionOpt.get();
 
-            // 8. Spawn cloud
-            SimpleCloudsCompat.spawnCloudInBiome(cloudId
-                    ,
+            // 8. Use dominant biome key with center of region
+            BiomeInstanceKey dominantKey = new BiomeInstanceKey(stats.dominantBiome(), stats.pos());
+
+            // 9. Spawn cloud
+            SimpleCloudsCompat.spawnCloudInBiome(
+                    cloudId,
                     dominantKey,
                     serverLevel,
-                    cloudRegion,
-                    stats.windVector()
+                    region,
+                    stats.windVector(),
+                    false
             );
         }
     }
@@ -146,20 +134,21 @@ public class SimpleCloudSpawner {
     // Méthode pour spawn des nuages simples dans le niveau serveur.
     public static void spawnSimpleClouds(BiomeInstanceKey key, long dayTime,ServerLevel serverLevel) {
 
-        float temperature = TemperatureManager.getCurrentTemperature(key, dayTime); //En celcius
-        float humidity = HumidityManager.getCurrentHumidity(key, dayTime); //En pourcentage
-        float pressure = PressureManager.getCurrentPressure(key, dayTime); //En hPa ou mb
-        WindVector wind = WindManager.getCurrentWind(key, dayTime);
+        float temperature = ForecastOrchestrator.getCurrentTemperature(key, dayTime); //En celcius
+        float humidity = ForecastOrchestrator.getCurrentHumidity(key, dayTime); //En pourcentage
+        float pressure = ForecastOrchestrator.getCurrentPressure(key, dayTime); //En hPa ou mb
+        WindVector wind = ForecastOrchestrator.getCurrentWind(key);
+        float stormChance = ForecastOrchestrator.getCurrentStormChance(key,dayTime); //En pourcentage
 
         float dewPoint = calculateDewPoint(temperature, humidity); //Point de rosée en Celsius
 
-        currentViolence = determineCloudSeverity(temperature, humidity, pressure, dewPoint);
-        SimpleCloudsCompat.spawnCloudInBiome(CloudLibrary.getCloudIdFromSeverity(currentViolence), key,serverLevel,null,wind);
+        currentViolence = determineCloudSeverity(temperature, humidity, pressure, dewPoint,stormChance);
+        SimpleCloudsCompat.spawnCloudInBiome(CloudLibrary.getCloudIdFromSeverity(currentViolence), key,serverLevel,null,wind,true);
 
     }
 
 
-    private static float calculateDewPoint(float temperature, float humidity) {
+    public static float calculateDewPoint(float temperature, float humidity) {
         // Formule de calcul du point de rosée (dewPoint) de la formule d'August-Roche-Magnus
         final float ACONST = 17.62f;
         final float BCONST = 243.12f;
@@ -167,7 +156,7 @@ public class SimpleCloudSpawner {
         float result = (ACONST * temperature) / (BCONST + temperature) + (float) Math.log(humidity / 100.0f);
         return (BCONST * result) / (ACONST - result);
     }
-    public static int determineCloudSeverity(float temperature, float humidity, float pressure,float dewPoint) {
+    public static int determineCloudSeverity(float temperature, float humidity, float pressure,float dewPoint,float stormChance) {
 
         float dewGap = temperature - dewPoint; //Plus de dewGap est petit -> Plus il y a de nuages
         float pressureFactor = 1.0f - (pressure / PRESSION_MOYENNE);
@@ -182,13 +171,13 @@ public class SimpleCloudSpawner {
                         (humidityFactor * HUMIDITY_MODIFIER) +
                         (tempIdealness * TEMPERATURE_MODIFIER);
 
-        int severity = Math.round(instability);
+        int severity = Math.round(instability+stormChance);
         return Math.max(1, Math.min(7, severity));
     }
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
         BiomeInstanceKey key = AtmosphereUtils.findNearestBiomeInstanceKeyWithNoMap(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),player.blockPosition());
-        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",key, level,null,WindManager.getCurrentWind(key, level.getDayTime()));
+        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",key, level,null,ForecastOrchestrator.getCurrentWind(key),false);
     }
 
     public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {

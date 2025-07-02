@@ -4,6 +4,7 @@ package net.Gabou.projectatmosphere;
 import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.network.SyncBiomeDataLoginPacket;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -37,7 +38,10 @@ import java.util.Objects;
 @Mod(ProjectAtmosphere.MODID)
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ProjectAtmosphere {
-    public static final int DEFAULT_RADIUS = 2000;
+
+    public static final float DEFAULT_REGION_RADIUS = 700F; // Default radius for region generation
+    public static final int DEFAULT_RADIUS = 1000;
+    public static long seed;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 
@@ -53,7 +57,6 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
         MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
-        SimpleCloudsConstants.SPAWN_RADIUS = DEFAULT_RADIUS;
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);
         ModNetworking.register();
@@ -66,7 +69,9 @@ public class ProjectAtmosphere {
         AsyncAtmosphereService.init();
         SimpleCloudsHooks.setExternalWeatherControl(true);
         if (world != null) {
+            SimpleCloudsCompat.init(world);
             AtmosphereManager.onServerStarting(world);
+            seed = world.getSeed();
         }
     }
 
@@ -92,6 +97,7 @@ public class ProjectAtmosphere {
 
         if (world != null) {
             AtmosphereManager.onServerStopping(world);
+            seed = 0; // Reset the seed when the server stops
         }
     }
 
@@ -122,8 +128,8 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
-        AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
+        LOGGER.info("Player logged in!");
+       AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
 //        LoginDataGate.sendBiomeSyncPacketIfReady(player.getServer(), player);
         // Lance la logique async → quand prête, libère le client
 
