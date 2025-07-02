@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere;
 
 
+import dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI;
 import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
@@ -67,7 +68,6 @@ public class ProjectAtmosphere {
     public static void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
         ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
         AsyncAtmosphereService.init();
-        SimpleCloudsHooks.setExternalWeatherControl(true);
         if (world != null) {
             SimpleCloudsCompat.init(world);
             AtmosphereManager.onServerStarting(world);
@@ -101,11 +101,14 @@ public class ProjectAtmosphere {
         }
     }
 
-    private void setup(final FMLCommonSetupEvent  event) {
+    private void setup(final FMLCommonSetupEvent event) {
         LOGGER.info("Setting up Project Atmosphere (Common)");
-            initModules();
+        initModules();
+        event.enqueueWork(() -> {
+            SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
+        });
 
-        }
+    }
 
 
     private void clientSetup(final FMLClientSetupEvent event) {
@@ -114,10 +117,10 @@ public class ProjectAtmosphere {
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
-       AtmosphereManager.onRegisterCommands(event);
+        AtmosphereManager.onRegisterCommands(event);
     }
 
-//    @SubscribeEvent
+    //    @SubscribeEvent
 //    public static void onEntityJoin(EntityJoinLevelEvent event) {
 //        if (!(event.getEntity() instanceof ServerPlayer player)) return;
 //        ServerLevel world = Objects.requireNonNull(event.getEntity().getServer()).getLevel(ServerLevel.OVERWORLD);
@@ -129,7 +132,7 @@ public class ProjectAtmosphere {
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         LOGGER.info("Player logged in!");
-       AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
+        AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
 //        LoginDataGate.sendBiomeSyncPacketIfReady(player.getServer(), player);
         // Lance la logique async → quand prête, libère le client
 
@@ -145,13 +148,12 @@ public class ProjectAtmosphere {
     private static void sendInfo() {
         LOGGER.info("All modules subsystems have been initialized (Serene Seasons detected).");
     }
+
     private static void isSereneLoaded() {
         if (!ModList.get().isLoaded("sereneseasons")) {
             LOGGER.info("Serene Seasons is not found—skipping all modules subsystems.");
         }
     }
-
-
 
 
 }
