@@ -136,10 +136,5 @@ public class ForecastOrchestrator {
     }
 
 
-    /**
-     * Get all forecasts
-     */
-    public static Map<BiomeInstanceKey, BiomeForecast> getForecastMap() {
-        return ForecastGenerator.getForecastMap();
-    }
+
 }

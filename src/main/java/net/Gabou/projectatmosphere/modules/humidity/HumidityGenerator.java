@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.humidity;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -37,7 +38,7 @@ public class HumidityGenerator {
             baseRH = Math.max(baseRH, 75f);
         }
 
-        float[][] tempWeek = ForecastGenerator.getForecastMap().get(b).getTemperature();
+        float[][] tempWeek = ForecastGenerator.getClosestValidForecast(b, ForecastType.TEMPERATURE).getTemperature();
         if (tempWeek == null) return new float[7][2];
 
         float[][] humWeek = new float[7][2];

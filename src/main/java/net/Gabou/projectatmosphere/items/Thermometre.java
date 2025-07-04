@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.items;
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -21,7 +22,7 @@ public class Thermometre extends Item {
         ItemStack itemStack = player.getItemInHand(hand);
         if (serverWorld.isClientSide) {
             double temp = ForecastGenerator.getTemperatureValue(
-                    AtmosphereUtils.findNearestBiomeInstanceKeyWithNoMap(
+                   new BiomeInstanceKey(
                             AtmosphereUtils.getBiomeLocation(player.blockPosition(), serverWorld),
                             player.blockPosition()
                     ),

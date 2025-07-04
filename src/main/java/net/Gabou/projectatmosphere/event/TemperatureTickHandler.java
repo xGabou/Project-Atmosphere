@@ -12,7 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 public class TemperatureTickHandler {
     private static final int RUN_INTERVAL_TICKS = 6000;
 
-    //@SubscribeEvent
+    @SubscribeEvent
     public static void onWorldTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.START || event.level.isClientSide) return;
         long t = event.level.getDayTime() % 24000L;

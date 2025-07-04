@@ -37,7 +37,7 @@ public class ClientTickHandler {
             random = mc.level.random;
         }
         BlockPos pos = mc.player.blockPosition();
-        BiomeInstanceKey key = AtmosphereUtils.findNearestBiomeInstanceKeyWithNoMap(
+        BiomeInstanceKey key = new BiomeInstanceKey(
                 AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
         if (key == null) return;
 

@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.core;
 
-import java.util.List;
+import net.minecraft.resources.ResourceLocation;
 
 public class CloudLibrary {
 
@@ -14,6 +14,20 @@ public class CloudLibrary {
             case 2 -> "small_cumulus";
             default -> "itty_bitty";
         };
+    }
+    public static int getSeverityFromCloudId(String id) {
+        return switch (id) {
+            case "cumulonimbus" -> 7;
+            case "nimbostratus" -> 6;
+            case "stratocumulus" -> 5;
+            case "stratus" -> 4;
+            case "cumulus" -> 3;
+            case "small_cumulus" -> 2;
+            default -> 1; // for "itty_bitty" or unknown
+        };
+    }
+    public static int getSeverityFromRessourceLocation(ResourceLocation id) {
+        return getSeverityFromCloudId(id.getPath());
     }
 
 }

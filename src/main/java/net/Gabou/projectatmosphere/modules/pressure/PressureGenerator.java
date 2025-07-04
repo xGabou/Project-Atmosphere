@@ -3,6 +3,8 @@ package net.Gabou.projectatmosphere.modules.pressure;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.util.AtmosphericPhysics;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -33,8 +35,9 @@ public class PressureGenerator {
         );
         float base = (float) P0;
 
-        float[][] tempWeek = ForecastGenerator.getForecastMap().get(key).getTemperature();
-        float[][] rhWeek = ForecastGenerator.getForecastMap().get(key).getHumidity();
+        BiomeForecast biomeForecast = ForecastGenerator.getClosestValidForecast(key, ForecastType.TEMPERATURE);
+        float[][] tempWeek = biomeForecast.getTemperature();
+        float[][] rhWeek = biomeForecast.getHumidity();
         if (tempWeek == null || rhWeek == null) return new float[7][2];
 
         double[] densities = AtmosphericPhysics.computeAirDensity(tempWeek, rhWeek);

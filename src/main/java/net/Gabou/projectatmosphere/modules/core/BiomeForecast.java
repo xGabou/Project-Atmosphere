@@ -22,6 +22,10 @@ public class BiomeForecast {
     private float[] stormChanceTomorrow;
 
     private WindVector windTomorrow;
+
+
+    private boolean legendaryFlag = false;
+    private boolean toughAsNailsFlag = false;
     public BiomeForecast() {
     }
 
@@ -162,5 +166,23 @@ public class BiomeForecast {
             default -> false;
         };
     }
+
+    public boolean isLegendaryFlag() {
+        return legendaryFlag;
+    }
+
+    public void setLegendaryFlag(boolean legendaryFlag) {
+        this.legendaryFlag = legendaryFlag;
+    }
+
+    public boolean isToughAsNailsFlag() {
+        return toughAsNailsFlag;
+    }
+
+    public void setToughAsNailsFlag(boolean toughAsNailsFlag) {
+        this.toughAsNailsFlag = toughAsNailsFlag;
+    }
+
+
 
 }

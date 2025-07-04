@@ -1,40 +1,27 @@
 package net.Gabou.projectatmosphere.event;
 
-import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import glitchcore.event.EventManager;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import sereneseasons.api.season.Season;
-import sereneseasons.api.season.SeasonHelper;
+import sereneseasons.api.season.SeasonChangedEvent;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 
-@Mod.EventBusSubscriber
 public class SeasonTracker {
 
-    private static Season lastSeason = null;
-
-    //@SubscribeEvent
-    public static void onWorldTick(TickEvent.LevelTickEvent event) {
-        try {
-            if (event.phase != TickEvent.Phase.END || event.level.isClientSide) return;
-            ServerLevel world = event.level.getServer().overworld();
-            if (!world.dimension().equals(Level.OVERWORLD)) return;
-            Season current = SeasonHelper.getSeasonState(world).getSubSeason().getSeason();
-
-
-            if (lastSeason != null && current != lastSeason) {
-                // Season changed
-
-                    AtmosphereManager.onSeasonChange(world);
-
+    public static void register() {
+        EventManager.addListener((SeasonChangedEvent.Standard event) -> {
+            if (event.getLevel() instanceof ServerLevel serverLevel) {
+                if (event.getNewSeason().getSeason() != event.getPrevSeason().getSeason()) {
+                    AtmosphereManager.onSeasonChange(serverLevel);
+                }
             }
-            lastSeason = current;
-        } catch (Exception e) {
-            // Handle the case where the server is not initialized yet
-            // This can happen if the event is triggered before the server is fully set up
-            System.err.println("Server not initialized yet: " + e.getMessage());
-        }
+        });
 
+        EventManager.addListener((SeasonChangedEvent.Tropical event) -> {
+            if (event.getLevel() instanceof ServerLevel serverLevel) {
+                if (event.getNewSeason() != event.getPrevSeason()) {
+                    AtmosphereManager.onSeasonChange(serverLevel);
+                }
+            }
+        });
     }
 }

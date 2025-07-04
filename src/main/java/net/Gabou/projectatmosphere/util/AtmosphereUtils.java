@@ -23,46 +23,6 @@ import sereneseasons.api.season.SeasonHelper;
 import java.util.*;
 
 public class AtmosphereUtils {
-        public static BiomeInstanceKey findNearestBiomeInstanceKeyWithNoMap(
-            ResourceLocation biomeType,
-            BlockPos pos
-    ) {
-        // Step 1: Filter all biome samples by type
-        List<BiomeInstanceKey> matchingType = ForecastGenerator.getBiomeSamples().stream()
-                .filter(b -> b.biomeType().equals(biomeType))
-                .toList();
-
-        if (matchingType.isEmpty()) {
-            System.err.println("[Atmosphere] No biome samples found for type: " + biomeType);
-            return null;
-        }
-
-        // Step 2: From these, find the nearest within 600 blocks
-        BiomeInstanceKey nearest = null;
-        double minDistSqr = 360000.0; // 600 blocks squared
-
-        for (BiomeInstanceKey b : matchingType) {
-            double dist = b.samplePos().distSqr(pos);
-            if (dist < minDistSqr) {
-                minDistSqr = dist;
-                nearest = b;
-            }
-        }
-
-        if (nearest == null) {
-            minDistSqr = Double.MAX_VALUE;
-            for (BiomeInstanceKey b : matchingType) {
-                double dist = b.samplePos().distSqr(pos);
-                if (dist < minDistSqr) {
-                    minDistSqr = dist;
-                    nearest = b;
-                }
-            }
-        }
-
-        return nearest;
-    }
-
 
     /**
      * Serialize a BlockPos to a JsonObject.
@@ -93,6 +53,10 @@ public class AtmosphereUtils {
 
     public static ResourceLocation getBiomeLocation(BlockPos pos, Level world) {
         return world.getBiome(pos).unwrapKey().get().location();
+    }
+
+    public static BiomeInstanceKey getBiomeKey(Level world, BlockPos pos) {
+        return new BiomeInstanceKey(getBiomeLocation(pos, world), pos);
     }
 
     public static SimpleParticleType getSeasonalLeafParticle(ClientLevel level, BlockPos pos, RandomSource random) {

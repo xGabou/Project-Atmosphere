@@ -4,8 +4,11 @@ package net.Gabou.projectatmosphere;
 import dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI;
 import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
+import glitchcore.core.GlitchCore;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
+import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.network.SyncBiomeDataLoginPacket;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -41,7 +44,8 @@ import java.util.Objects;
 public class ProjectAtmosphere {
 
     public static final float DEFAULT_REGION_RADIUS = 700F; // Default radius for region generation
-    public static final int DEFAULT_RADIUS = 1000;
+
+    public static final int DEFAULT_RADIUS = 10000;
     public static long seed;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
@@ -49,7 +53,10 @@ public class ProjectAtmosphere {
     public ProjectAtmosphere() {
         LOGGER.info("Project Atmosphere is loading!");
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        CompatHandler.init();
         ModItems.register(modEventBus);
+        SimpleCloudsConstants.SPAWN_RADIUS = Math.round(DEFAULT_RADIUS / DEFAULT_REGION_RADIUS* SimpleCloudsConstants.CLOUD_SCALE* ForecastGenerator.MAX_POSITIONS_PER_BIOME);
+
         //ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
@@ -107,6 +114,7 @@ public class ProjectAtmosphere {
         event.enqueueWork(() -> {
             SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
         });
+        SeasonTracker.register();
 
     }
 

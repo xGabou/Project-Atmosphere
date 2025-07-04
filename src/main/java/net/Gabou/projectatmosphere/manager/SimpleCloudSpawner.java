@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.manager;
 
 import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
+import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
@@ -15,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.BiasedToBottomInt;
 import org.joml.Vector2i;
@@ -53,73 +55,82 @@ public class SimpleCloudSpawner {
     }
 
     // Méthode pour essayer de spawn des nuages dans le niveau serveur si l'intervalle de temps est respecté.
-    public static void trySpawnClouds(ServerLevel serverLevel, CloudGenerator generator) {
-        Set<BiomeInstanceKey> allBiomeKeys = ForecastGenerator.getBiomeSamples();
+    public static void trySpawnClouds(ServerLevel level, CloudGenerator generator) {
         List<SpawnRegion> spawnRegions = generator.getSpawnRegions();
         RandomSource random = RandomSource.create();
+        CloudSpawningConfig config = generator.getSpawnConfig().get();
 
-        for (BiomeInstanceKey key : allBiomeKeys) {
-            BlockPos pos = key.samplePos();
+        // 1. Determine how many new regions we can spawn
+        int currentCount = generator.getClouds().size();
+        int maxRegions = config.getMaxInitialRegions();
+        int remaining = maxRegions - currentCount;
+        if (remaining <= 0) return;
 
-            // 1. Skip if already inside a CloudRegion
-            if (generator.getCloudAtPosition(pos.getX(), pos.getZ()) != null) {
-                continue;
+        int toSpawn = Mth.clamp(BiasedToBottomInt.of(1, 5).sample(random), 1, remaining); // spawn 1–5 clouds or up to the limit
+
+        for (int i = 0; i < toSpawn; i++) {
+            if (spawnRegions.isEmpty()) {
+                System.out.println("[Atmosphere] No spawn regions available");
+                return;
             }
 
-            // 2. Skip if not inside any SpawnRegion
-            boolean isInSpawnRegion = spawnRegions.stream()
-                    .anyMatch(region -> region.includesPoint(pos.getX(), pos.getZ()));
-            if (!isInSpawnRegion) {
-                continue;
-            }
+            // 2. Pick a random region and a point inside it
+            SpawnRegion region = spawnRegions.get(random.nextInt(spawnRegions.size()));
+            int radius = BiasedToBottomInt.of(MIN_RADIUS, MAX_RADIUS).sample(random);
+            Vector2i point = SpawnRegion.getRandomPointInRegion(region, random);
 
-            // 3. Sample surrounding biomes within a region radius
-            int radius = BiasedToBottomInt.of(MIN_RADIUS,MAX_RADIUS).sample(random) ;
-            Set<BiomeInstanceKey> nearbyKeys = WeatherSampler.sampleBiomesInArea(pos.getX(), pos.getZ(), radius, serverLevel);
+            // 3. Weather sampling for surrounding biomes
+            Set<BiomeInstanceKey> sample = WeatherSampler.sampleBiomesInArea(point.x, point.y, radius, level);
+            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sample, level, level.getGameTime());
+            if (stats == null) continue;
 
-            // 4. Compute WeatherStats or fallback to average
-            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(nearbyKeys, serverLevel, serverLevel.getGameTime());
-            if (stats == null) {
-                continue;
-            }
-
-            // 5. Determine cloud type based on weather conditions
+            // 4. Determine cloud ID
             String cloudId = CloudLibrary.getCloudIdFromSeverity(
                     determineCloudSeverity(
                             stats.temperature(),
                             stats.humidity(),
                             stats.pressure(),
-                            calculateDewPoint(stats.temperature(), stats.humidity()),stats.stormChance()
+                            calculateDewPoint(stats.temperature(), stats.humidity()),
+                            stats.stormChance()
                     )
             );
 
-            // 6. Retrieve cloud spawn config
-            CloudSpawningConfig config = generator.getSpawnConfig().get();
             ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
             CloudSpawningConfig.Info info = config.getWeightInfo(rl);
+            if (info == null) {
+                System.out.println("[Atmosphere] Unknown cloud type: " + cloudId);
+                continue;
+            }
 
-            // 7. Create region (or skip if not valid)
-            Optional<CloudRegion> regionOpt = SimpleCloudsCompat.createRegion(
-                    info, key, serverLevel, random, stats.windVector(), generator
+            // 5. Create dummy region for size control
+            Optional<CloudRegion> dummyOpt = SimpleCloudsCompat.createRegion(
+                    info,
+                    new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
+                    level,
+                    random,
+                    stats.windVector(),
+                    generator
             );
-            if (regionOpt.isEmpty()) continue;
 
-            CloudRegion region = regionOpt.get();
+            if (dummyOpt.isEmpty()) continue;
 
-            // 8. Use dominant biome key with center of region
-            BiomeInstanceKey dominantKey = new BiomeInstanceKey(stats.dominantBiome(), stats.pos());
+            CloudRegion dummy = dummyOpt.get();
+            dummy.setRadius(radius);
 
-            // 9. Spawn cloud
+            // 6. Spawn cloud with weather-based region
             SimpleCloudsCompat.spawnCloudInBiome(
                     cloudId,
-                    dominantKey,
-                    serverLevel,
-                    region,
+                    new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
+                    level,
+                    dummy,
                     stats.windVector(),
                     false
             );
+
+            if (generator.getClouds().size() >= maxRegions) return;
         }
     }
+
 
 
 
@@ -171,12 +182,12 @@ public class SimpleCloudSpawner {
                         (humidityFactor * HUMIDITY_MODIFIER) +
                         (tempIdealness * TEMPERATURE_MODIFIER);
 
-        int severity = Math.round(instability+stormChance);
+        int severity = Math.round(instability*stormChance);
         return Math.max(1, Math.min(7, severity));
     }
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
-        BiomeInstanceKey key = AtmosphereUtils.findNearestBiomeInstanceKeyWithNoMap(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),player.blockPosition());
+        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),player.blockPosition());
         SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",key, level,null,ForecastOrchestrator.getCurrentWind(key),false);
     }
 

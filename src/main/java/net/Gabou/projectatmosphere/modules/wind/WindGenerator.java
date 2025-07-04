@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.util.*;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.minecraft.core.BlockPos;
@@ -18,9 +20,10 @@ public class WindGenerator {
         ResourceLocation biome = selfKey.biomeType();
         WindVector[] result = new WindVector[7];
 
-        float[][] selfPressure = ForecastGenerator.getForecastMap().get(selfKey).getPressure();
-        float[][] selfTemp = ForecastGenerator.getForecastMap().get(selfKey).getTemperature();
-        float[][] selfHumidity = ForecastGenerator.getForecastMap().get(selfKey).getHumidity();
+        BiomeForecast biomeForecast = ForecastGenerator.getClosestValidForecast(selfKey, ForecastType.PRESSURE);
+        float[][] selfPressure = biomeForecast.getPressure();
+        float[][] selfTemp = biomeForecast.getTemperature();
+        float[][] selfHumidity = biomeForecast.getHumidity();
         Set<BiomeInstanceKey> neighbors = ForecastGenerator.getBiomeSamples();
 
         float altitude = center.getY();
@@ -34,7 +37,7 @@ public class WindGenerator {
             Vec2 windVector = new Vec2(0, 0);
 
             for (BiomeInstanceKey key : neighbors) {
-                float[][] p = ForecastGenerator.getForecastMap().get(key).getPressure();
+                float[][] p = ForecastGenerator.getClosestValidForecast(key, ForecastType.PRESSURE).getPressure();
                 if (p != null) {
                     float Pn = (p[d][0] + p[d][1]) * 0.5f;
                     Pavg += Pn;

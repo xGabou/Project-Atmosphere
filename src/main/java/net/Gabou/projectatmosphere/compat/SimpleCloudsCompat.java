@@ -68,32 +68,19 @@ public class SimpleCloudsCompat {
         }
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawning cloud: " + cloudId);
         List<SpawnRegion> Region = generator.getSpawnRegions();
-        if (Region.isEmpty()) {
-            System.out.println("[Atmosphere] No spawn region found – scheduling retry");
-
-            CloudSpawnScheduler.schedule(cloudId, level, () -> {
-                System.out.println("[Atmosphere] Retrying cloud spawn for " + cloudId);
-                SimpleCloudSpawner.trySpawnClouds(level, generator);
-            }, 20); // retry in 20 ticks
-
-            return;
-        }
         SpawnRegion targetRegion = Region.iterator().next();
 
 
         float x = targetRegion.x() + 0.5F;
         float z = targetRegion.z() + 0.5F;
-
-        float px = x; // simulated player
-        float pz = z;
         Optional<CloudRegion> region;
         if (dummy != null) {
-            region = generator.spawnCloud(() -> info, 1, spawnConfig.getMaxRegions(), level,
+            region = generator.spawnCloud(() -> info, spawnConfig.getSpawnInterval().sample(random), spawnConfig.getMaxRegions(), level,
                     (spawnInfo, playerX, playerZ, realX, realZ, rand, grow) ->
                             regionDummy(dummy)
             );
         } else {
-            region = generator.spawnCloud(() -> info, 1, spawnConfig.getMaxRegions(), level,
+            region = generator.spawnCloud(() -> info, spawnConfig.getSpawnInterval().sample(random), spawnConfig.getMaxRegions(), level,
                     (spawnInfo, playerX, playerZ, realX, realZ, rand, grow) ->
                             createRegion(spawnInfo, key, level, rand, windVector, generator)
             );

@@ -21,7 +21,7 @@ import java.util.UUID;
 public class BiomeChangeManager {
     private static final Map<UUID, ResourceLocation> lastBiome = new HashMap<>();
     private static final int RUN_INTERVAL_TICKS = 2000;
-    private static final int MIN_DISTANCE_BETWEEN_CENTERS = 5000;
+    private static final int MIN_DISTANCE_BETWEEN_CENTERS = 6000;
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent ev) {

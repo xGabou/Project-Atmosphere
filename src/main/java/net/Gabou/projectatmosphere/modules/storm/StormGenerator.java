@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.modules.storm.util;
+package net.Gabou.projectatmosphere.modules.storm;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -56,11 +56,20 @@ public class StormGenerator {
             // --- Min/Max clamping ---
             float min = getSeasonalStormMin(level, pos);
             float max = getSeasonalStormMax(level, pos);
-            stormWeek[day][0] = min;
-            stormWeek[day][1] = clamp(stormScore, min, max);
+            stormWeek[day][0] = min+1;
+            stormWeek[day][1] = clamp(stormScore, min, max)+1;
         }
 
         return stormWeek;
+//        return new float[][] {
+//            {7,7}, // Placeholder for the first day
+//            {7,7}, // Placeholder for the second day
+//            {7,7}, // Placeholder for the third day
+//            {7,7}, // Placeholder for the fourth day
+//            {7,7}, // Placeholder for the fifth day
+//            {7,7}, // Placeholder for the sixth day
+//            {7,7}  // Placeholder for the seventh day
+        //};
     }
 
     private static float clamp(float val, float min, float max) {
