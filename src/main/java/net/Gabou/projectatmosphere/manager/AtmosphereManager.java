@@ -88,7 +88,6 @@ public class AtmosphereManager {
         UUID uuid = player.getUUID();
         playerReadyMap.put(uuid, future);
         ForecastOrchestrator.onPlayerLogin(player, world);
-        SimpleCloudsCompat.doInitialGenWithWeather(player.blockPosition().getX(),player.blockPosition().getZ(),world);
         future.complete(null); // ✅ débloque le login
 
 

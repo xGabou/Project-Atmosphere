@@ -3,20 +3,25 @@ package net.Gabou.projectatmosphere.client;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.RandomSource;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import sereneseasons.api.season.Season;
+import sereneseasons.api.season.SeasonHelper;
 
-import static net.Gabou.projectatmosphere.util.AtmosphereUtils.getSeasonalLeafParticle;
+import java.util.List;
 
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
+@OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
 public class ClientTickHandler {
 
     private static RandomSource random;
@@ -77,5 +82,30 @@ public class ClientTickHandler {
             mc.level.addParticle(particle, spawnX, spawnY, spawnZ, vx, vy, vz);
         }
         });
+    }
+    public static SimpleParticleType getSeasonalLeafParticle(ClientLevel level, BlockPos pos, RandomSource random) {
+        Season season = getCurrentSeason(level, pos);
+
+        List<SimpleParticleType> candidates = switch (season) {
+            case AUTUMN -> List.of(
+                    ModParticles.TRIANGLE_ORANGE.get(),
+                    ModParticles.TRIANGLE_JAUNE.get(),
+                    ModParticles.ROUND_ORANGE.get(),
+                    ModParticles.ROUND_JAUNE.get(),
+                    ModParticles.HEART_ORANGE.get(),
+                    ModParticles.HEART_JAUNE.get()
+            );
+            case SPRING, SUMMER -> List.of(
+                    ModParticles.TRIANGLE_VERT.get(),
+                    ModParticles.ROUND_VERT.get(),
+                    ModParticles.HEART_VERT.get()
+            );
+            default -> List.of(); // WINTER or null = no leaves
+        };
+
+        return candidates.isEmpty() ? null : candidates.get(random.nextInt(candidates.size()));
+    }
+    public static Season getCurrentSeason(ClientLevel level, BlockPos pos) {
+        return SeasonHelper.getSeasonState(level).getSeason();
     }
 }

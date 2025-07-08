@@ -5,24 +5,25 @@ import dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI;
 import dev.nonamecrackers2.simpleclouds.common.api.SimpleCloudsHooks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import glitchcore.core.GlitchCore;
-import net.Gabou.projectatmosphere.client.ClientTickHandler;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
-import net.Gabou.projectatmosphere.network.SyncBiomeDataLoginPacket;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
@@ -53,29 +54,37 @@ public class ProjectAtmosphere {
     public ProjectAtmosphere() {
         LOGGER.info("Project Atmosphere is loading!");
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+
         CompatHandler.init();
         ModItems.register(modEventBus);
-        SimpleCloudsConstants.SPAWN_RADIUS = Math.round(DEFAULT_RADIUS / DEFAULT_REGION_RADIUS* SimpleCloudsConstants.CLOUD_SCALE* ForecastGenerator.MAX_POSITIONS_PER_BIOME);
 
-        //ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
+        SimpleCloudsConstants.SPAWN_RADIUS = Math.round(
+                DEFAULT_RADIUS / DEFAULT_REGION_RADIUS *
+                        SimpleCloudsConstants.CLOUD_SCALE *
+                        ForecastGenerator.MAX_POSITIONS_PER_BIOME
+        );
+
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
+
+        // Register COMMON-side handlers
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
         MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
-        MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
+
+
+        ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);
-        ModNetworking.register();
-        ModParticles.register(modEventBus);
     }
 
+
     @SubscribeEvent
-    public static void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
+    public static void onServerStarting(ServerStartingEvent event) {
         ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
         AsyncAtmosphereService.init();
-        if (world != null) {
+        if (world != null&& !world.isClientSide) {
             SimpleCloudsCompat.init(world);
             AtmosphereManager.onServerStarting(world);
             seed = world.getSeed();
@@ -121,6 +130,7 @@ public class ProjectAtmosphere {
 
     private void clientSetup(final FMLClientSetupEvent event) {
         LOGGER.info("Setting up Project Atmosphere (Client)");
+        ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS);
     }
 
     @SubscribeEvent

@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.modules.temperature.util;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -37,12 +36,6 @@ public class TemperatureGenerator {
         long seed = chunkPos.asLong() ^ biomeId.hashCode() ^
                 ProjectAtmosphere.seed;
         Random rand = new Random(seed);
-
-
-        if(world==null) // if world is null, we cannot generate a forecast
-        {
-            world = Minecraft.getInstance().level;
-        }
         // look up the current Sereneseasons primary season
         int cycleTicks = SeasonHelper.getSeasonState(world).getSeasonCycleTicks();
         long seasonDuration = SeasonHelper.getSeasonState(world).getSeasonDuration();

@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.manager;
 
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -54,7 +55,7 @@ public class ForecastOrchestrator {
 
             if (shouldGenerate) {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
-                ForecastGenerator.generateForecastForRegion(playerPos, level);
+                SimpleCloudsCompat.doInitialGenWithWeather(player.blockPosition().getX(),player.blockPosition().getZ(),level);
             }
         }
     }

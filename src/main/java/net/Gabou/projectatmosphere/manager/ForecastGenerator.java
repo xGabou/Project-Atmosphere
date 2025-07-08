@@ -18,6 +18,7 @@ import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
 import sfiomn.legendarysurvivaloverhaul.api.temperature.TemperatureUtil;
 
@@ -33,6 +34,7 @@ public class ForecastGenerator {
     private static final int SAMPLE_STEP = 256;
 
     public static final int MAX_POSITIONS_PER_BIOME;
+
 
     static {
         if (CompatHandler.isLegendaryModLoaded || CompatHandler.isToughAsNailsLoaded) {
@@ -467,7 +469,7 @@ public class ForecastGenerator {
             if (dist < minDistSame) {
                 minDistSame = dist;
                 closestSame = forecast;
-                if (dist < 128) break; // early exit for near-perfect match
+                if (dist < SAMPLE_STEP*2) break; // early exit for near-perfect match
             }
         }
 

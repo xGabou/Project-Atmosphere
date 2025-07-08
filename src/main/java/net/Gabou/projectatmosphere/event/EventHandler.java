@@ -6,7 +6,6 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
-import net.Gabou.projectatmosphere.client.ClientSyncLock;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
@@ -29,6 +28,8 @@ public class EventHandler {
 
     private static int tickCounter = 0;
 
+    private static int ticksSinceLastCloudSpawn = 0;
+
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.level.isClientSide || !(event.level instanceof ServerLevel serverLevel)) {
@@ -41,16 +42,15 @@ public class EventHandler {
             return;
         }
 
+
         ServerPlayer player = serverLevel.players().get(0);
-        if (!ClientSyncLock.isPlayerReady(player.getUUID())) {
-            return;
-        }
 
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
         CloudGenerator generator = cloudManager.getCloudGenerator();
 
-        if (generator.getTicksTillNextGen() <= 0) {
+        if (generator.getTicksTillNextGen() <= 0 && ticksSinceLastCloudSpawn % 1000 == 0) {
             SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
+            ticksSinceLastCloudSpawn = 0;
         }
 
         if (tickCounter % MIN_TICKS_BETWEEN_DUST_SPAWN == 0) {
@@ -71,7 +71,7 @@ public class EventHandler {
 
 
         }
-
+        ticksSinceLastCloudSpawn++;
         tickCounter++;
     }
 }

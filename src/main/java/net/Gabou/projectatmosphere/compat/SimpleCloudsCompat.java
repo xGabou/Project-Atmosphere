@@ -10,12 +10,10 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.client.ClientSyncLock;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.util.CloudSpawnScheduler;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -51,10 +49,12 @@ public class SimpleCloudsCompat {
         spawnConfig = generator.getSpawnConfig().get();
     }
 
-    public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector, Boolean isInit) {
+    public static boolean isInit = false;
+
+    public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
 
 
-        if (!isInit && !ClientSyncLock.isReady()) {
+        if (!isInit) {
             System.out.println("[Atmosphere] SimpleClouds is not ready yet, cannot spawn cloud: " + cloudId);
             return;
         }
@@ -181,11 +181,13 @@ public class SimpleCloudsCompat {
                 cloudFormation.ifPresent(cf -> {
                     cf.setRadius(sharedRadius); // Force la même taille
                     generator.addCloud(cf, CloudGenerator.Order.USE_WEIGHT);
+                    isInit = true;
                 });
 
                 break;
             }
         }
+        isInit = !generator.getClouds().isEmpty();
     }
 
 

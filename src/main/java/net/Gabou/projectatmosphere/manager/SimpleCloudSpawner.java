@@ -123,8 +123,7 @@ public class SimpleCloudSpawner {
                     new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
                     level,
                     dummy,
-                    stats.windVector(),
-                    false
+                    stats.windVector()
             );
 
             if (generator.getClouds().size() >= maxRegions) return;
@@ -154,7 +153,7 @@ public class SimpleCloudSpawner {
         float dewPoint = calculateDewPoint(temperature, humidity); //Point de rosée en Celsius
 
         currentViolence = determineCloudSeverity(temperature, humidity, pressure, dewPoint,stormChance);
-        SimpleCloudsCompat.spawnCloudInBiome(CloudLibrary.getCloudIdFromSeverity(currentViolence), key,serverLevel,null,wind,true);
+        SimpleCloudsCompat.spawnCloudInBiome(CloudLibrary.getCloudIdFromSeverity(currentViolence), key,serverLevel,null,wind);
 
     }
 
@@ -188,7 +187,7 @@ public class SimpleCloudSpawner {
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),player.blockPosition());
-        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",key, level,null,ForecastOrchestrator.getCurrentWind(key),false);
+        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",key, level,null,ForecastOrchestrator.getCurrentWind(key));
     }
 
     public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {

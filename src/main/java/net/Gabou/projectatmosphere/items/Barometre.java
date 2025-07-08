@@ -27,7 +27,7 @@ public class Barometre extends Item {
                     serverWorld.getDayTime()
             );
 
-            String msg = "Current pressure: " + String.format("%.1f°C", temp);
+            String msg = "Current pressure: " + String.format("%.1fhPa", temp);
             HUDOverlayRenderer.showTemperatureOverlay(msg);
         }
 
