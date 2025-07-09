@@ -187,7 +187,6 @@ public class SimpleCloudsCompat {
                 break;
             }
         }
-        isInit = !generator.getClouds().isEmpty();
     }
 
 

@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.client;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -34,6 +35,7 @@ public class ClientTickHandler {
         if (event.phase != TickEvent.Phase.END) return;
         if (!ClientSyncLock.isReady()) return;
         tickCounter++;
+        TornadoManager.tick();
         if (tickCounter % 40 != 0) return; // Run every 20 ticks (1 second)
         AsyncAtmosphereService.runClient(() -> {
         Minecraft mc = Minecraft.getInstance();

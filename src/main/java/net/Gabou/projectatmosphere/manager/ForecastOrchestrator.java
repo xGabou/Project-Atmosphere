@@ -55,9 +55,10 @@ public class ForecastOrchestrator {
 
             if (shouldGenerate) {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
-                SimpleCloudsCompat.doInitialGenWithWeather(player.blockPosition().getX(),player.blockPosition().getZ(),level);
+                SimpleCloudsCompat.doInitialGenWithWeather(player.blockPosition().getX(), player.blockPosition().getZ(), level);
             }
         }
+        else SimpleCloudsCompat.isInit = true;
     }
 
     /**
