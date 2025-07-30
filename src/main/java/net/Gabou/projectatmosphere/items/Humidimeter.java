@@ -13,31 +13,30 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-public class Thermometre extends Item {
-    public Thermometre(Properties p_41383_) {
-        super(p_41383_);
+public class Humidimeter extends Item {
+    public Humidimeter(Properties properties) {
+        super(properties);
     }
 
     @Override
-    public InteractionResultHolder<ItemStack> use(Level serverWorld, Player player, InteractionHand hand){
-        ItemStack itemStack = player.getItemInHand(hand);
-        if (serverWorld.isClientSide) {
+    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (level.isClientSide) {
             BiomeInstanceKey key = new BiomeInstanceKey(
-                    AtmosphereUtils.getBiomeLocation(player.blockPosition(), serverWorld),
+                    AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                     player.blockPosition()
             );
 
             String msg;
             if (ForecastGenerator.hasForecast(key)) {
-                float temp = ForecastOrchestrator.getCurrentTemperature(key, serverWorld.getDayTime());
-                msg = "Current temperature: " + String.format("%.1f°C", temp);
+                float humidity = ForecastOrchestrator.getCurrentHumidity(key, level.getDayTime());
+                msg = "Current humidity: " + String.format("%.1f%%", humidity);
             } else {
-                ProjectAtmosphere.LOGGER.warn("Missing temperature data for biome {} at {}", key.biomeType(), key.samplePos());
-                msg = "Temperature: Loading...";
+                ProjectAtmosphere.LOGGER.warn("Missing humidity data for biome {} at {}", key.biomeType(), key.samplePos());
+                msg = "Humidity: Loading...";
             }
             HUDOverlayRenderer.showTemperatureOverlay(msg);
         }
-
-        return InteractionResultHolder.success(itemStack);
+        return InteractionResultHolder.success(stack);
     }
 }

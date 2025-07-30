@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.registry;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.items.Balai;
 import net.Gabou.projectatmosphere.items.Barometre;
+import net.Gabou.projectatmosphere.items.Humidimeter;
 import net.Gabou.projectatmosphere.items.Thermometre;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.BlockItem;
@@ -23,6 +24,10 @@ public class ModItems {
 
     public static final RegistryObject<Item> BAROMETER = ITEMS.register("barometer",
             () -> new Barometre(new Item.Properties()));
+
+    public static final RegistryObject<Item> HUMIDIMETER = ITEMS.register("humidimeter",
+            () -> new Humidimeter(new Item.Properties()
+                    .stacksTo(1)));
 
     public static final RegistryObject<Item> WOOD_BALAI = ITEMS.register("balai_bois",
             () -> new Balai(
