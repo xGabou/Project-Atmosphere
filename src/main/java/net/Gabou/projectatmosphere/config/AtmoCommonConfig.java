@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 
 public class AtmoCommonConfig {
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
+    public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -25,6 +27,14 @@ public class AtmoCommonConfig {
         FORCE_SHARED_EXECUTOR = builder
                 .comment("Force use of shared executor for all async tasks, regardless of CPU count")
                 .define("forceSharedExecutor", false);
+        builder.pop();
+        builder.push("storms");
+        ENABLE_STORM_DEBRIS = builder
+                .comment("Enable random debris spawning during storms")
+                .define("enableStormDebris", true);
+        MAX_STORM_DEBRIS_PER_CHUNK = builder
+                .comment("Maximum number of storm debris items allowed per chunk")
+                .defineInRange("maxStormDebrisPerChunk", 100, 0, Integer.MAX_VALUE);
         builder.pop();
         COMMON_SPEC = builder.build();
     }
