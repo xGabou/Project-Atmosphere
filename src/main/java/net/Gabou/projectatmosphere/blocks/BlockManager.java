@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.blocks;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.registry.ModBlocks;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
@@ -98,7 +99,11 @@ public class BlockManager {
 
 
     public static void spawnCochonnerie(ServerLevel level, BlockPos centerPos) {
-        final int ENTITY_THRESHOLD = 50;
+        if (!AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
+            return;
+        }
+
+        int ENTITY_THRESHOLD = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
 
         // Get bounding box of the chunk containing centerPos
         ChunkPos chunkPos = new ChunkPos(centerPos);
@@ -110,13 +115,18 @@ public class BlockManager {
         // Count item entities inside the chunk
         long itemCount = level.getEntitiesOfClass(ItemEntity.class, chunkBox).size();
 
-        if (itemCount > ENTITY_THRESHOLD) {
+        if (itemCount >= ENTITY_THRESHOLD) {
             System.out.println("[Atmosphere] Skipping debris spawn — too many items in chunk at " + chunkPos);
             return;
         }
 
         RandomSource random = level.getRandom();
         int debrisCount = 3 + random.nextInt(5);
+        int allowedSpawn = Math.max(0, ENTITY_THRESHOLD - (int) itemCount);
+        if (allowedSpawn <= 0) {
+            return;
+        }
+        debrisCount = Math.min(debrisCount, allowedSpawn);
 
         for (int i = 0; i < debrisCount; i++) {
             double dx = centerPos.getX() + random.nextGaussian() * 5;
