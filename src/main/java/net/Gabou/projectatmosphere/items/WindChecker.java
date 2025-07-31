@@ -27,15 +27,8 @@ public class WindChecker extends Item {
                     AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                     player.blockPosition()
             );
-
-            String msg;
-            if (ForecastGenerator.hasForecast(key)) {
-                WindVector wind = ForecastOrchestrator.getCurrentWind(key);
-                msg = "Wind: " + String.format("%.1fm/s at %.0f°", wind.speed(), Math.toDegrees(wind.angleRadians()));
-            } else {
-                ProjectAtmosphere.LOGGER.warn("Missing wind data for biome {} at {}", key.biomeType(), key.samplePos());
-                msg = "Wind: Loading...";
-            }
+            WindVector wind = ForecastOrchestrator.getCurrentWind(key);
+            String msg = "Wind: " + String.format("%.1fm/s at %.0f°", wind.speed(), Math.toDegrees(wind.angleRadians()));
             HUDOverlayRenderer.showTemperatureOverlay(msg);
         }
         return InteractionResultHolder.success(stack);

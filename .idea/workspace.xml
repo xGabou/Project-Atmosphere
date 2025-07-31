@@ -4,10 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/program/tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/program/tornado.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/program/tornado.vsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/Humidimeter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/Humidimeter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/Thermometre.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/Thermometre.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/WindChecker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/WindChecker.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -522,15 +524,7 @@
       <workItem from="1751633110684" duration="15360000" />
       <workItem from="1751824658903" duration="11221000" />
       <workItem from="1752014069355" duration="7850000" />
-      <workItem from="1753999694836" duration="319000" />
-    </task>
-    <task id="LOCAL-00012" summary="Implement temperature management system with async processing; add daily and weekly forecast generation">
-      <option name="closed" value="true" />
-      <created>1746232820522</created>
-      <option name="number" value="00012" />
-      <option name="presentableId" value="LOCAL-00012" />
-      <option name="project" value="LOCAL" />
-      <updated>1746232820522</updated>
+      <workItem from="1753999694836" duration="1079000" />
     </task>
     <task id="LOCAL-00013" summary="Add season tracking and cache management for temperature forecasts; refactor initialization and update logic">
       <option name="closed" value="true" />
@@ -916,7 +910,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753999778188</updated>
     </task>
-    <option name="localTasksCounter" value="61" />
+    <task id="LOCAL-00061" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
+      <option name="closed" value="true" />
+      <created>1754000326121</created>
+      <option name="number" value="00061" />
+      <option name="presentableId" value="LOCAL-00061" />
+      <option name="project" value="LOCAL" />
+      <updated>1754000326121</updated>
+    </task>
+    <option name="localTasksCounter" value="62" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -935,7 +937,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Add pressure forecasting modules; implement pressure generation, storage, and management for biome-specific forecasts" />
     <MESSAGE value="Refactor biome handling; replace ResourceLocation with BiomeInstanceKey for improved data management across modules" />
     <MESSAGE value="Add SPDX license identifier to gradlew and gradlew.bat" />
     <MESSAGE value="Refactor atmosphere modules: remove unused parameters and streamline server starting methods" />
@@ -960,7 +961,8 @@
     <MESSAGE value="Refactor and enhance weather forecasting system; rename files, add new forecast data structures, and implement crafting recipes for new items&#10;&#10;&#10;&#10;&#10;New system now one generator and refactored the logic behind the biome generation." />
     <MESSAGE value="Refactor build configuration and enhance cloud integration; update dependencies and streamline setup logic for weather control" />
     <MESSAGE value="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling" />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling" />
+    <MESSAGE value="Refactor shader file structure; move tornado shaders to core directory and update workspace settings" />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactor shader file structure; move tornado shaders to core directory and update workspace settings" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1002,8 +1004,18 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java</url>
-          <line>481</line>
+          <line>478</line>
           <option name="timeStamp" value="219" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java</url>
+          <line>27</line>
+          <option name="timeStamp" value="228" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/TornadoMesh.java</url>
+          <line>77</line>
+          <option name="timeStamp" value="229" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />

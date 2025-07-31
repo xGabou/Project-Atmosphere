@@ -26,17 +26,14 @@ public class Humidimeter extends Item {
                     AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                     player.blockPosition()
             );
-
-            String msg;
-            if (ForecastGenerator.hasForecast(key)) {
-                float humidity = ForecastOrchestrator.getCurrentHumidity(key, level.getDayTime());
-                msg = "Current humidity: " + String.format("%.1f%%", humidity);
-            } else {
-                ProjectAtmosphere.LOGGER.warn("Missing humidity data for biome {} at {}", key.biomeType(), key.samplePos());
-                msg = "Humidity: Loading...";
-            }
-            HUDOverlayRenderer.showTemperatureOverlay(msg);
+            float humidity = ForecastOrchestrator.getCurrentHumidity(key, level.getDayTime());
+            String msg = "Current humidity: " + String.format("%.1f%%", humidity);
+            if (humidity < 0.01) {
+            ProjectAtmosphere.LOGGER.warn("Missing humidity data for biome {} at {}", key.biomeType(), key.samplePos());
+            msg = "Humidity: Loading...";
         }
-        return InteractionResultHolder.success(stack);
+        HUDOverlayRenderer.showTemperatureOverlay(msg);
     }
+        return InteractionResultHolder.success(stack);
+}
 }

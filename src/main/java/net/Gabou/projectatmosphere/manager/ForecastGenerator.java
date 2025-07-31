@@ -393,9 +393,6 @@ public class ForecastGenerator {
         return FORECAST_MAP.get(key);
     }
 
-    public static boolean hasForecast(BiomeInstanceKey key) {
-        return FORECAST_MAP.containsKey(key);
-    }
 
     public static float getHumidityValue(BiomeInstanceKey key, long tick) {
         BiomeForecast forecast = getClosestValidForecast(key, ForecastType.HUMIDITY);

@@ -19,7 +19,7 @@ public class Thermometre extends Item {
     }
 
     @Override
-    public InteractionResultHolder<ItemStack> use(Level serverWorld, Player player, InteractionHand hand){
+    public InteractionResultHolder<ItemStack> use(Level serverWorld, Player player, InteractionHand hand) {
         ItemStack itemStack = player.getItemInHand(hand);
         if (serverWorld.isClientSide) {
             BiomeInstanceKey key = new BiomeInstanceKey(
@@ -27,14 +27,9 @@ public class Thermometre extends Item {
                     player.blockPosition()
             );
 
-            String msg;
-            if (ForecastGenerator.hasForecast(key)) {
-                float temp = ForecastOrchestrator.getCurrentTemperature(key, serverWorld.getDayTime());
-                msg = "Current temperature: " + String.format("%.1f°C", temp);
-            } else {
-                ProjectAtmosphere.LOGGER.warn("Missing temperature data for biome {} at {}", key.biomeType(), key.samplePos());
-                msg = "Temperature: Loading...";
-            }
+
+            float temp = ForecastOrchestrator.getCurrentTemperature(key, serverWorld.getDayTime());
+            String msg = "Current temperature: " + String.format("%.1f°C", temp);
             HUDOverlayRenderer.showTemperatureOverlay(msg);
         }
 
