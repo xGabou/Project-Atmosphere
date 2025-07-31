@@ -7,5 +7,7 @@
   "item.projectatmosphere.balai_fer": "Iron Broom",
   "item.projectatmosphere.balai_diamant": "Diamond Broom",
   "item.projectatmosphere.balai_netherite": "Netherite Broom",
-  "block.projectatmosphere.dust": "Dust"
+  "block.projectatmosphere.dust": "Dust",
+  "item.projectatmosphere.wind_checker": "Wind Checker"
 }
+

@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.items.Balai;
 import net.Gabou.projectatmosphere.items.Barometre;
 import net.Gabou.projectatmosphere.items.Humidimeter;
 import net.Gabou.projectatmosphere.items.Thermometre;
+import net.Gabou.projectatmosphere.items.WindChecker;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -27,6 +28,10 @@ public class ModItems {
 
     public static final RegistryObject<Item> HUMIDIMETER = ITEMS.register("humidimeter",
             () -> new Humidimeter(new Item.Properties()
+                    .stacksTo(1)));
+
+    public static final RegistryObject<Item> WIND_CHECKER = ITEMS.register("wind_checker",
+            () -> new WindChecker(new Item.Properties()
                     .stacksTo(1)));
 
     public static final RegistryObject<Item> WOOD_BALAI = ITEMS.register("balai_bois",
