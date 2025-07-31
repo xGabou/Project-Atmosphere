@@ -129,7 +129,9 @@ public class AsyncAtmosphereService {
         }
     }
     public static void runClient(Runnable task) {
-        if (PRESSURE_EXECUTOR != null && !PRESSURE_EXECUTOR.isShutdown()) PRESSURE_EXECUTOR.submit(task);
+        if (CLIENT_EXECUTOR != null && !CLIENT_EXECUTOR.isShutdown()) {
+            CLIENT_EXECUTOR.submit(task);
+        }
     }
 
 
