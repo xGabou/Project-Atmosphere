@@ -11,6 +11,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.network.PacketDistributor;
+import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
 
 @Mod.EventBusSubscriber
 public class TornadoCommand {
@@ -27,8 +30,10 @@ public class TornadoCommand {
                     var wind = ForecastOrchestrator.getCurrentWind(key);
                     SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
 
-                    // Spawn tornado visually (not bound to cloud instance ID — that would require deeper reflection)
+                    // Spawn tornado visually and sync with clients
                     TornadoManager.spawn(player.position(), 2.5f, wind);
+                    NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(),
+                            new SpawnTornadoPacket(player.position(), 2.5f, wind));
 
                     ctx.getSource().sendSuccess(
                             () -> Component.literal("🌪️ Tornado + ☁️ Cumulonimbus spawned."), true);

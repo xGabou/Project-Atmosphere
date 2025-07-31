@@ -37,6 +37,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.network.NetworkDirection;
+import net.Gabou.projectatmosphere.network.NetworkHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.event.*;
@@ -62,6 +63,7 @@ public class ProjectAtmosphere {
 
         CompatHandler.init();
         ModItems.register(modEventBus);
+        NetworkHandler.init();
 
         SimpleCloudsConstants.SPAWN_RADIUS = Math.round(
                 DEFAULT_RADIUS / DEFAULT_REGION_RADIUS *
