@@ -13,3 +13,15 @@ This repository hosts **Project Atmosphere**, a Minecraft Forge 1.20.1 mod writt
 - No test suite exists yet.
 - Build with **JDK 17**. Ensure the PATH and `java` command reference JDK 17 before running Gradle.
 
+## Environment Setup
+- Install `apt-utils` to prevent debconf warnings:
+  ```bash
+  sudo apt-get update && sudo apt-get install -y apt-utils
+  ```
+- Install the JDK 17 package if it isn't present:
+  ```bash
+  sudo apt-get install -y openjdk-17-jdk
+  sudo dpkg --configure -a
+  ```
+- Set `java` and `javac` to the OpenJDK 17 binaries via `update-alternatives` and ensure they appear first in `PATH` when building.
+
