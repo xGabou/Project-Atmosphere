@@ -47,18 +47,22 @@ public class ForecastOrchestrator {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
 
-        // Check if already known
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
-            // Check if far from all known centers
-            boolean shouldGenerate = ForecastDataStorage.playerData.values().stream()
-                    .allMatch(center -> center.distManhattan(playerPos) >= MIN_DISTANCE_BETWEEN_CENTERS);
+            boolean shouldGenerate = true;
+            for (BlockPos center : ForecastDataStorage.playerData.values()) {
+                if (center.distManhattan(playerPos) < MIN_DISTANCE_BETWEEN_CENTERS) {
+                    shouldGenerate = false;
+                    break;
+                }
+            }
 
             if (shouldGenerate) {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
-                SimpleCloudsCompat.doInitialGenWithWeather(player.blockPosition().getX(), player.blockPosition().getZ(), level);
+                SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
+        } else {
+            SimpleCloudsCompat.isInit = true;
         }
-        else SimpleCloudsCompat.isInit = true;
     }
 
     /**

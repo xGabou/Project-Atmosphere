@@ -84,13 +84,14 @@ public class AtmosphereManager {
 
 
     public static void onPlayerLogin(ServerLevel world, ServerPlayer player) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
         UUID uuid = player.getUUID();
+        CompletableFuture<Void> future = new CompletableFuture<>();
         playerReadyMap.put(uuid, future);
-        ForecastOrchestrator.onPlayerLogin(player, world);
-        future.complete(null); // ✅ débloque le login
 
-
+        world.getServer().execute(() -> {
+            ForecastOrchestrator.onPlayerLogin(player, world);
+            future.complete(null);
+        });
     }
 
 
