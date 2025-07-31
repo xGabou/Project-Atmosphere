@@ -280,6 +280,8 @@ public class ForecastGenerator {
         computeAverageStormChance();
         // 8. Génération courbes journalières
         DailyForecastGenerator.scheduleAll(level, FORECAST_MAP);
+        // Recompute averages now that daily profiles are available
+        computeAverageForecastsByBiomeType();
         long end = System.nanoTime(); // End timer
         long durationMs = (end - start) / 1_000_000;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast region generation took " + durationMs + " ms.");
