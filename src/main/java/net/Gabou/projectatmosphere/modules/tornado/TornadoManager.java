@@ -12,6 +12,7 @@ import java.util.List;
 
 public class TornadoManager {
     private static final List<TornadoInstance> ACTIVE_TORNADOES = new ArrayList<>();
+    private static float shaderTime = 0.0f;
 
     public static void spawn(Vec3 pos, float radius) {
         ACTIVE_TORNADOES.add(new TornadoInstance(pos, radius));
@@ -21,9 +22,14 @@ public class TornadoManager {
         return ACTIVE_TORNADOES;
     }
 
+    public static float getShaderTime() {
+        return shaderTime;
+    }
+
     public static void tick() {
         // Remove tornados after 20 seconds
         ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 20);
+        shaderTime += 0.05f;
     }
 
 }

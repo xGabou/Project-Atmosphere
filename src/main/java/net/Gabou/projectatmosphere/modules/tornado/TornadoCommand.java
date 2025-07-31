@@ -20,21 +20,28 @@ import net.minecraftforge.fml.common.Mod;
 public class TornadoCommand {
     @SubscribeEvent
     public static void register(RegisterCommandsEvent event) {
-        event.getDispatcher().register(
-                Commands.literal("spawnTornado")
-                        .requires(source -> source.hasPermission(2))
-                        .executes(ctx -> {
-                            ServerPlayer player = ctx.getSource().getPlayerOrException();
-                            ServerLevel level = player.serverLevel();
-                            BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),player.blockPosition());
-                            SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus",key, level,null, ForecastOrchestrator.getCurrentWind(key));
+        var baseCommand = Commands.literal("spawnTornado")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    ServerLevel level = player.serverLevel();
+                    BiomeInstanceKey key = new BiomeInstanceKey(
+                            AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
+                            player.blockPosition());
+                    SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null,
+                            ForecastOrchestrator.getCurrentWind(key));
 
-                            // Spawn tornado visually (not bound to cloud instance ID — that would require deeper reflection)
-                            TornadoManager.spawn(player.position(), 2.5f);  // adjust radius if needed
+                    // Spawn tornado visually (not bound to cloud instance ID — that would require deeper reflection)
+                    TornadoManager.spawn(player.position(), 2.5f);  // adjust radius if needed
 
-                            ctx.getSource().sendSuccess(() -> Component.literal("🌪️ Tornado + ☁️ Cumulonimbus spawned."), true);
-                            return 1;
-                        })
-        );
+                    ctx.getSource().sendSuccess(
+                            () -> Component.literal("🌪️ Tornado + ☁️ Cumulonimbus spawned."), true);
+                    return 1;
+                });
+
+        event.getDispatcher().register(baseCommand);
+        event.getDispatcher().register(Commands.literal("spawntornadoes")
+                .requires(source -> source.hasPermission(2))
+                .executes(baseCommand.getCommand()));
     }
 }
