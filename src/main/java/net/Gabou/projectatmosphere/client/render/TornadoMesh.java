@@ -74,5 +74,21 @@ public class TornadoMesh {
         tesselator.end();
     }
 
+    public static void drawCone() {
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder buffer = tesselator.getBuilder();
+
+        buffer.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION);
+        int segments = 20;
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) (i * Math.PI * 2.0 / segments);
+            float x = (float) Math.cos(angle);
+            float z = (float) Math.sin(angle);
+            buffer.vertex(x, 0, z).endVertex();
+            buffer.vertex(0, 1.5f, 0).endVertex();
+        }
+        tesselator.end();
+    }
+
 }
 

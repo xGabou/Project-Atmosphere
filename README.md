@@ -41,8 +41,9 @@
   - All core systems are chunk-based and independently extensible.
 
 - **🧪 Developer & Debug Tools**
-  - `/weatherdebug` to inspect live forecasts, force spikes, test biome data.
-  - `/temperature`, `/humidity`, `/pressure` commands for diagnostics.
+- `/weatherdebug` to inspect live forecasts, force spikes, test biome data.
+- `/temperature`, `/humidity`, `/pressure` commands for diagnostics.
+- `/spawntornadoes` to manually create a test tornado for shader debugging.
 
 ---
 
