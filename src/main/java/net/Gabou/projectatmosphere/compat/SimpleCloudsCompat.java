@@ -55,7 +55,7 @@ public class SimpleCloudsCompat {
 
 
         if (!isInit) {
-            System.out.println("[Atmosphere] SimpleClouds is not ready yet, cannot spawn cloud: " + cloudId);
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] SimpleClouds is not ready yet, cannot spawn cloud: {}", cloudId);
             return;
         }
 
@@ -63,7 +63,7 @@ public class SimpleCloudsCompat {
         ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
         CloudSpawningConfig.Info info = spawnConfig.getWeightInfo(rl);
         if (info == null) {
-            System.out.println("[Atmosphere] Unknown cloud type: " + cloudId);
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Unknown cloud type: {}", cloudId);
             return;
         }
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawning cloud: " + cloudId);
@@ -86,9 +86,9 @@ public class SimpleCloudsCompat {
             );
         }
 
-        region.ifPresentOrElse(r ->
-                        System.out.println("[Atmosphere] Spawned " + cloudId + " at " + x + ", " + z + " in " + key.biomeType()),
-                () -> System.out.println("[Atmosphere] Failed to spawn " + cloudId + " in " + key.biomeType())
+        region.ifPresentOrElse(
+                r -> ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawned {} at {}, {} in {}", cloudId, x, z, key.biomeType()),
+                () -> ProjectAtmosphere.LOGGER.warn("[Atmosphere] Failed to spawn {} in {}", cloudId, key.biomeType())
         );
     }
 

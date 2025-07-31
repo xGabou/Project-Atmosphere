@@ -17,7 +17,7 @@ public class SimpleCloudsEventListener {
     public static void onCloudRegionSpawn(CloudRegionNaturallySpawnEvent event) {
         Level level = event.getLevel();
         ScAPICloudRegion region = event.getCloudRegion();
-        System.out.println("[Atmosphere] Cloud region spawned naturally at " + region.getPosX() + ", " + region.getPosZ());
+        ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getPosX(), region.getPosZ());
     }
 
     public static void onCloudRegionRemoved(CloudRegionRemovedEvent event) {
@@ -31,7 +31,7 @@ public class SimpleCloudsEventListener {
         if (reason == CloudRegionRemovedEvent.Reason.MANUALLY) {
             SimpleCloudsCompat.doInitialGenWithWeather((int) region.getPosX(),(int) region.getPosZ(), (ServerLevel) event.getLevel());
         } else {
-            System.out.println("[Atmosphere] Cloud region removed for reason: " + reason);
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region removed for reason: {}", reason);
         }
     }
 

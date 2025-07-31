@@ -161,7 +161,6 @@
     "Gradle.H:/Project-Atmosphere [createMcpToSrg].executor": "Run",
     "Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor": "Run",
     "Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor": "Debug",
-    "Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.bullshit.main()].executor": "Debug",
     "Gradle.Project-Atmosphere [:prepareRunClientCompile].executor": "Run",
     "Gradle.Project-Atmosphere [build].executor": "Run",
     "Gradle.Project-Atmosphere [clean].executor": "Debug",
@@ -226,8 +225,6 @@
     </key>
   </component>
   <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
-    <configuration name="bullshit" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
-      <option name="MAIN_CLASS_NAME" value="net.Gabou.projectatmosphere.tools.bullshit" />
       <module name="project-atmosphere.main" />
       <extension name="coverage">
         <pattern>

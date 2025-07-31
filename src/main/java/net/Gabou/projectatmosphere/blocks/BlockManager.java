@@ -116,7 +116,7 @@ public class BlockManager {
         long itemCount = level.getEntitiesOfClass(ItemEntity.class, chunkBox).size();
 
         if (itemCount >= ENTITY_THRESHOLD) {
-            System.out.println("[Atmosphere] Skipping debris spawn — too many items in chunk at " + chunkPos);
+            ProjectAtmosphere.LOGGER.debug("[Atmosphere] Skipping debris spawn — too many items in chunk at {}", chunkPos);
             return;
         }
 

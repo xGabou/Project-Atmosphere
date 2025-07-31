@@ -70,7 +70,7 @@ public class SimpleCloudSpawner {
 
         for (int i = 0; i < toSpawn; i++) {
             if (spawnRegions.isEmpty()) {
-                System.out.println("[Atmosphere] No spawn regions available");
+                ProjectAtmosphere.LOGGER.warn("[Atmosphere] No spawn regions available");
                 return;
             }
 
@@ -98,7 +98,7 @@ public class SimpleCloudSpawner {
             ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
             CloudSpawningConfig.Info info = config.getWeightInfo(rl);
             if (info == null) {
-                System.out.println("[Atmosphere] Unknown cloud type: " + cloudId);
+                ProjectAtmosphere.LOGGER.warn("[Atmosphere] Unknown cloud type: {}", cloudId);
                 continue;
             }
 

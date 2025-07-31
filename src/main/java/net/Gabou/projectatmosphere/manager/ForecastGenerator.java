@@ -18,7 +18,6 @@ import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
 import sfiomn.legendarysurvivaloverhaul.api.temperature.TemperatureUtil;
 
