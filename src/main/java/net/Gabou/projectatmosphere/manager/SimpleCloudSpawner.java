@@ -6,6 +6,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;

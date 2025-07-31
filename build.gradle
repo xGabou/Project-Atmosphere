@@ -91,7 +91,7 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.3")
-    implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.1+1.20.1-forge")
+    implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.2+1.20.1-forge")
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
     implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
     compileOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))

@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.blocks;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.registry.ModBlocks;
