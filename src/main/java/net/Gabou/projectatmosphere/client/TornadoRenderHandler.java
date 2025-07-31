@@ -28,12 +28,13 @@ public class TornadoRenderHandler {
             Vec3 camPos = camera.getPosition();
             poseStack.translate(tornado.position.x - camPos.x, tornado.position.y - camPos.y, tornado.position.z - camPos.z);
 
-            // optional: scale based on radius
+            poseStack.mulPose(com.mojang.math.Axis.YP.rotation((float) tornado.wind.angleRadians()));
+            poseStack.mulPose(com.mojang.math.Axis.YP.rotation(TornadoManager.getShaderTime()));
+
             poseStack.scale(tornado.radius, tornado.radius, tornado.radius);
 
-            // apply transformation
             RenderSystem.applyModelViewMatrix();
-            TornadoMesh.drawTestTriangle(); // instead of drawInstanced
+            TornadoMesh.drawCone();
             poseStack.popPose();
         }
     }
