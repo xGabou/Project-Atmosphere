@@ -7,8 +7,12 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 
-@Mod.EventBusSubscriber(value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID,
+        value = Dist.CLIENT,
+        bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class ClientRenderHook {
 
     @SubscribeEvent
@@ -17,6 +21,11 @@ public class ClientRenderHook {
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
+
+        ProjectAtmosphere.LOGGER.debug("ClientRenderHook:onRenderLevel stage={}" +
+                ", activeTornadoes={}",
+                event.getStage(),
+                TornadoManager.getActiveTornadoes().size());
 
         PoseStack poseStack = event.getPoseStack();
         Camera camera = event.getCamera();
