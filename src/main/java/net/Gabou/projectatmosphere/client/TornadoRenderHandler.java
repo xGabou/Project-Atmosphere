@@ -4,8 +4,8 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.client.render.TornadoMesh;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Camera;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.world.phys.Vec3;
@@ -22,6 +22,9 @@ public class TornadoRenderHandler {
         var timeUniform = shader.getUniform("Time");
         if (timeUniform != null)
             timeUniform.set(TornadoManager.getShaderTime());
+
+        int count = TornadoManager.getActiveTornadoes().size();
+        ProjectAtmosphere.LOGGER.debug("TornadoRenderHandler: rendering {} tornado(es)", count);
 
         for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
             poseStack.pushPose();
