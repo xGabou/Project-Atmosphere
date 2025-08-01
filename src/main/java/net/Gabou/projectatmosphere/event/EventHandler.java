@@ -24,7 +24,9 @@ import static net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER;
 public class EventHandler {
 
     private static final int MIN_TICKS_BETWEEN_DUST_SPAWN = 5000;
-    private static final int MIN_TICKS_BETWEEN_TEMPESTA = 1000;
+    // Increase delay between tempest effects to reduce how often
+    // cochonerie (debris) spawns
+    private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
 
     private static int tickCounter = 0;
 

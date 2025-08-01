@@ -34,7 +34,7 @@ public class AtmoCommonConfig {
                 .define("enableStormDebris", true);
         MAX_STORM_DEBRIS_PER_CHUNK = builder
                 .comment("Maximum number of storm debris items allowed per chunk")
-                .defineInRange("maxStormDebrisPerChunk", 100, 0, Integer.MAX_VALUE);
+                .defineInRange("maxStormDebrisPerChunk", 30, 0, Integer.MAX_VALUE);
         builder.pop();
         COMMON_SPEC = builder.build();
     }
