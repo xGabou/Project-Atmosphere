@@ -58,8 +58,12 @@ public class BlockManager {
 
             BlockPos dustPos = new BlockPos(x, y, z);
             BlockState state = level.getBlockState(dustPos);
+            BlockState ground = level.getBlockState(dustPos.below());
 
-            if ((state.isAir() || state.is(Blocks.SNOW)) &&
+            boolean validGround = ground.is(BlockTags.DIRT) || ground.is(Blocks.SAND) ||
+                    ground.is(Blocks.RED_SAND) || ground.is(Blocks.GRAVEL);
+
+            if ((state.isAir() || state.is(Blocks.SNOW)) && validGround &&
                     BlockPos.betweenClosedStream(dustPos.offset(-4, -1, -4), dustPos.offset(4, 1, 4))
                             .filter(pos -> level.getBlockState(pos).is(ModBlocks.DUST.get()))
                             .count() < 6)
@@ -190,12 +194,18 @@ public class BlockManager {
                         }
 
                         if (random.nextInt(dustChance) == 0 && level.isEmptyBlock(mutablePos)) {
-                            long nearbyDust = BlockPos.betweenClosedStream(mutablePos.offset(-3, -1, -3), mutablePos.offset(3, 1, 3))
-                                    .filter(p -> level.getBlockState(p).is(ModBlocks.DUST.get()))
-                                    .count();
+                            BlockState ground = level.getBlockState(mutablePos.below());
+                            boolean validGround = ground.is(BlockTags.DIRT) || ground.is(Blocks.SAND) ||
+                                    ground.is(Blocks.RED_SAND) || ground.is(Blocks.GRAVEL);
 
-                            if (nearbyDust < 6) {
-                                level.setBlockAndUpdate(mutablePos.immutable(), ModBlocks.DUST.get().defaultBlockState());
+                            if (validGround) {
+                                long nearbyDust = BlockPos.betweenClosedStream(mutablePos.offset(-3, -1, -3), mutablePos.offset(3, 1, 3))
+                                        .filter(p -> level.getBlockState(p).is(ModBlocks.DUST.get()))
+                                        .count();
+
+                                if (nearbyDust < 6) {
+                                    level.setBlockAndUpdate(mutablePos.immutable(), ModBlocks.DUST.get().defaultBlockState());
+                                }
                             }
                         }
                     });
