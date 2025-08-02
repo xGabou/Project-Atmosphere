@@ -17,7 +17,7 @@ public record BiomeInstanceKey(ResourceLocation biomeType, BlockPos samplePos) {
             String[] parts = s.split("@");
             if (parts.length != 2) throw new IllegalArgumentException("Invalid BiomeInstanceKey format: " + s);
 
-            ResourceLocation biome = new ResourceLocation(parts[0]);
+            ResourceLocation biome = ResourceLocation.parse(parts[0]);
             String[] posParts = parts[1].split(",");
 
             if (posParts.length != 3) throw new IllegalArgumentException("Invalid position format");
@@ -34,7 +34,7 @@ public record BiomeInstanceKey(ResourceLocation biomeType, BlockPos samplePos) {
     }
 
     public static BiomeInstanceKey fromJson(JsonObject obj) {
-        ResourceLocation biome = new ResourceLocation(obj.get("biome").getAsString());
+        ResourceLocation biome = ResourceLocation.parse(obj.get("biome").getAsString());
         BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());
         return new BiomeInstanceKey(biome, pos);
     }

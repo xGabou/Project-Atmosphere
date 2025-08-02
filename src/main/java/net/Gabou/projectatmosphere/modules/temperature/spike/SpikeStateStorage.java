@@ -66,7 +66,7 @@ public class SpikeStateStorage {
                 for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
                     JsonObject obj = entry.getValue().getAsJsonObject();
 
-                    ResourceLocation biome = new ResourceLocation(obj.get("biome").getAsString());
+                    ResourceLocation biome = ResourceLocation.parse(obj.get("biome").getAsString());
                     BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());
 
                     BiomeInstanceKey key = new BiomeInstanceKey(biome, pos);

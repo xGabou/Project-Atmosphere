@@ -19,7 +19,7 @@ public class TornadoShaders {
     @SubscribeEvent
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
         ShaderInstance shader = new ShaderInstance(event.getResourceProvider(),
-                new ResourceLocation(ProjectAtmosphere.MODID, "tornado"), DefaultVertexFormat.POSITION);
+                ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "tornado"), DefaultVertexFormat.POSITION);
         event.registerShader(shader, s -> tornadoShader = s);
     }
 
