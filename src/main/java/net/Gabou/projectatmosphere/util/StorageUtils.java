@@ -24,7 +24,7 @@ public class StorageUtils {
                 JsonObject root = gson.fromJson(r, JsonObject.class);
                 for (var entry : root.entrySet()) {
                     JsonObject obj = entry.getValue().getAsJsonObject();
-                    ResourceLocation biome = new ResourceLocation(obj.get("biome").getAsString());
+                    ResourceLocation biome = ResourceLocation.parse(obj.get("biome").getAsString());
                     BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());
                     JsonArray arr = obj.get("data").getAsJsonArray();
                     float[][] week = new float[7][2];
@@ -46,7 +46,7 @@ public class StorageUtils {
             JsonObject root = gson.fromJson(r, JsonObject.class);
             for (var entry : root.entrySet()) {
                 JsonObject obj = entry.getValue().getAsJsonObject();
-                ResourceLocation biome = new ResourceLocation(obj.get("biome").getAsString());
+                ResourceLocation biome = ResourceLocation.parse(obj.get("biome").getAsString());
                 BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());
                 JsonArray arr = obj.get("data").getAsJsonArray();
                 float[] week = new float[7];

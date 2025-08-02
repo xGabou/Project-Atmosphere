@@ -48,7 +48,7 @@ public class BiomeChangeManager {
                 .getBiome(pos)
                 .unwrapKey()
                 .map(ResourceKey::location)
-                .orElse(new ResourceLocation("minecraft", "plains"));
+                .orElse(ResourceLocation.fromNamespaceAndPath("minecraft", "plains"));
     }
 
     private static void onBiomeChanged(ServerPlayer player, ResourceLocation oldBiome, ResourceLocation newBiome) {
