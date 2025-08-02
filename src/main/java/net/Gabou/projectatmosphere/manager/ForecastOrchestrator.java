@@ -134,7 +134,7 @@ public class ForecastOrchestrator {
      * Get wind for any biome
      */
     public static WindVector getCurrentWind(BiomeInstanceKey key) {
-        return ForecastGenerator.getWindValue(key);
+         return ForecastGenerator.getWindValue(key);
     }
 
     public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {

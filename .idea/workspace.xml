@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -180,7 +180,7 @@
       <recent name="net.Gabou.projectatmosphere.event" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -448,8 +448,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
         <item itemvalue="Python.dust" />
@@ -529,14 +529,6 @@
       <workItem from="1752014069355" duration="7850000" />
       <workItem from="1753999694836" duration="2799000" />
       <workItem from="1754055608188" duration="360000" />
-    </task>
-    <task id="LOCAL-00014" summary="Refactor temperature management and improve async processing; enhance forecast generation and storage">
-      <option name="closed" value="true" />
-      <created>1746240234792</created>
-      <option name="number" value="00014" />
-      <option name="presentableId" value="LOCAL-00014" />
-      <option name="project" value="LOCAL" />
-      <updated>1746240234792</updated>
     </task>
     <task id="LOCAL-00015" summary="Refactor temperature command system; enhance command registration and add cache management for forecasts&#10;&#10;Not done yet">
       <option name="closed" value="true" />
@@ -922,7 +914,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754001044490</updated>
     </task>
-    <option name="localTasksCounter" value="63" />
+    <task id="LOCAL-00063" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
+      <option name="closed" value="true" />
+      <created>1754056556273</created>
+      <option name="number" value="00063" />
+      <option name="presentableId" value="LOCAL-00063" />
+      <option name="project" value="LOCAL" />
+      <updated>1754056556274</updated>
+    </task>
+    <option name="localTasksCounter" value="64" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1010,11 +1010,6 @@
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java</url>
           <line>480</line>
           <option name="timeStamp" value="219" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/WindChecker.java</url>
-          <line>29</line>
-          <option name="timeStamp" value="232" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />
