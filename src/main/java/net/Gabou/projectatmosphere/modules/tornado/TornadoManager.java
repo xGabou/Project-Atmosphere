@@ -15,7 +15,7 @@ public class TornadoManager {
     }
 
     public static void spawn(Vec3 pos, float radius) {
-        spawn(pos, radius, new WindVector(0, 0));
+        spawn(pos, radius, WindVector.fromBase(0, 0));
     }
 
     public static List<TornadoInstance> getActiveTornadoes() {
@@ -30,7 +30,7 @@ public class TornadoManager {
         // Remove tornados after 20 seconds
         ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 20);
         for (TornadoInstance tornado : ACTIVE_TORNADOES) {
-            float speed = tornado.wind.speed() * 0.05f;
+            float speed = tornado.wind.baseSpeed() * 0.05f;
             tornado.position = tornado.position.add(
                     Math.cos(tornado.wind.angleRadians()) * speed,
                     0,

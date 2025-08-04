@@ -8,6 +8,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -22,12 +23,14 @@ public class TornadoCommand {
         var baseCommand = Commands.literal("spawnTornado")
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
+
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     ServerLevel level = player.serverLevel();
+                    if (!level.dimension().equals(Level.OVERWORLD)) return 0;
                     BiomeInstanceKey key = new BiomeInstanceKey(
                             AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                             player.blockPosition());
-                    var wind = ForecastOrchestrator.getCurrentWind(key);
+                    var wind = ForecastOrchestrator.getCurrentWind(key,level.getGameTime());
                     SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
 
                     // Spawn tornado visually and sync with clients

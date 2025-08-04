@@ -13,12 +13,14 @@ public class SpawnTornadoPacket {
     private final float radius;
     private final float speed;
     private final float angle;
+    private final float gust;
 
     public SpawnTornadoPacket(Vec3 pos, float radius, WindVector wind) {
         this.pos = pos;
         this.radius = radius;
-        this.speed = wind.speed();
+        this.speed = wind.baseSpeed();
         this.angle = wind.angleRadians();
+        this.gust = wind.gustSpeed();
     }
 
     public SpawnTornadoPacket(FriendlyByteBuf buf) {
@@ -26,6 +28,7 @@ public class SpawnTornadoPacket {
         this.radius = buf.readFloat();
         this.speed = buf.readFloat();
         this.angle = buf.readFloat();
+        this.gust = buf.readFloat();
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -35,6 +38,7 @@ public class SpawnTornadoPacket {
         buf.writeFloat(radius);
         buf.writeFloat(speed);
         buf.writeFloat(angle);
+        buf.writeFloat(gust);
     }
 
     public static SpawnTornadoPacket decode(FriendlyByteBuf buf) {
@@ -43,7 +47,7 @@ public class SpawnTornadoPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            TornadoManager.spawn(pos, radius, new WindVector(speed, angle));
+            TornadoManager.spawn(pos, radius, new WindVector(speed, angle, gust));
         });
         ctx.get().setPacketHandled(true);
     }

@@ -142,22 +142,6 @@ public class SimpleCloudSpawner {
     }
 
 
-    // Méthode pour spawn des nuages simples dans le niveau serveur.
-    public static void spawnSimpleClouds(BiomeInstanceKey key, long dayTime,ServerLevel serverLevel) {
-
-        float temperature = ForecastOrchestrator.getCurrentTemperature(key, dayTime); //En celcius
-        float humidity = ForecastOrchestrator.getCurrentHumidity(key, dayTime); //En pourcentage
-        float pressure = ForecastOrchestrator.getCurrentPressure(key, dayTime); //En hPa ou mb
-        WindVector wind = ForecastOrchestrator.getCurrentWind(key);
-        float stormChance = ForecastOrchestrator.getCurrentStormChance(key,dayTime); //En pourcentage
-
-        float dewPoint = calculateDewPoint(temperature, humidity); //Point de rosée en Celsius
-
-        currentViolence = determineCloudSeverity(temperature, humidity, pressure, dewPoint,stormChance);
-        SimpleCloudsCompat.spawnCloudInBiome(CloudLibrary.getCloudIdFromSeverity(currentViolence), key,serverLevel,null,wind);
-
-    }
-
 
     public static float calculateDewPoint(float temperature, float humidity) {
         // Formule de calcul du point de rosée (dewPoint) de la formule d'August-Roche-Magnus
@@ -188,15 +172,8 @@ public class SimpleCloudSpawner {
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),player.blockPosition());
-        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",key, level,null,ForecastOrchestrator.getCurrentWind(key));
+        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty",key, level,null,ForecastOrchestrator.getCurrentWind(key,level.getGameTime()));
     }
 
-    public static void onPlayerJoined(ServerLevel world, Set<BiomeInstanceKey> biomeSamples) {
-        long dayTime = world.getDayTime();
-
-        for (BiomeInstanceKey key : biomeSamples) {
-            spawnSimpleClouds(key, dayTime, world);
-        }
-    }
 
 }

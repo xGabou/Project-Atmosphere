@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.blocks;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.registry.ModBlocks;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -39,8 +40,8 @@ public class BlockManager {
      */
     public static void spawnDust(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
-        WindVector windVector = ForecastGenerator.getWindValue(AtmosphereUtils.getBiomeKey(level, centerPos));
-        float windStrength = windVector.speed();
+        WindVector windVector = ForecastOrchestrator.getCurrentWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
+        float windStrength = windVector.baseSpeed();
         int maxSpawn = Math.min(10, (int)(windStrength * 8));
 
         for (int i = 0; i < maxSpawn; i++) {

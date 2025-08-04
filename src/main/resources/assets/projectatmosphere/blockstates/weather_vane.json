@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "projectatmosphere:block/weather_vane" },
+    "facing=south": { "model": "projectatmosphere:block/weather_vane", "y": 180 },
+    "facing=west": { "model": "projectatmosphere:block/weather_vane", "y": 270 },
+    "facing=east": { "model": "projectatmosphere:block/weather_vane", "y": 90 }
+  }
+}

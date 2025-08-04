@@ -1,11 +1,7 @@
 package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.items.Balai;
-import net.Gabou.projectatmosphere.items.Barometre;
-import net.Gabou.projectatmosphere.items.Humidimeter;
-import net.Gabou.projectatmosphere.items.Thermometre;
-import net.Gabou.projectatmosphere.items.WindChecker;
+import net.Gabou.projectatmosphere.items.*;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -15,24 +11,24 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
+import sfiomn.legendarysurvivaloverhaul.common.items.ThermometerItem;
 
 public class ModItems {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ProjectAtmosphere.MODID);
 
-    public static final RegistryObject<Item> THERMOMETRE = ITEMS.register("thermometer",
-            () -> new Thermometre(new Item.Properties()
-                    .stacksTo(1)));
+    public static final RegistryObject<Item> WEATHER_VANE = blockUtilities(ModBlocks.WEATHER_VANE);
+    public static final RegistryObject<Item> THERMOMETER = ITEMS.register("thermometer_block", () ->
+            new Thermometre(ModBlocks.THERMOMETER_BLOCK.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> ANEMOMETER = ITEMS.register("anemometer",
+            () -> new Anemometer(ModBlocks.ANEMOMETER.get(), new Item.Properties()));
 
     public static final RegistryObject<Item> BAROMETER = ITEMS.register("barometer",
-            () -> new Barometre(new Item.Properties()));
+            () -> new Barometre(ModBlocks.BAROMETER_BLOCK.get(), new Item.Properties()));
+    public static final RegistryObject<Item> HUMIDIMETER = ITEMS.register("humidimeter_block",
+            () -> new Humidimeter(ModBlocks.HUMIDIMETER_BLOCK.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> HUMIDIMETER = ITEMS.register("humidimeter",
-            () -> new Humidimeter(new Item.Properties()
-                    .stacksTo(1)));
 
-    public static final RegistryObject<Item> WIND_CHECKER = ITEMS.register("wind_checker",
-            () -> new WindChecker(new Item.Properties()
-                    .stacksTo(1)));
 
     public static final RegistryObject<Item> WOOD_BALAI = ITEMS.register("balai_bois",
             () -> new Balai(

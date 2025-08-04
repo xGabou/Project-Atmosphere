@@ -1,13 +1,12 @@
-package net.Gabou.projectatmosphere.items;
+package net.Gabou.projectatmosphere.blocks;
 
 import net.Gabou.projectatmosphere.util.InstrumentUtils;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 
-public class Barometre extends InstrumentBlockItem {
-    public Barometre(Block block, Properties properties) {
-        super(block, properties);
+public class BarometreBlock extends InstrumentBlock {
+    public BarometreBlock(Properties properties) {
+        super(properties);
     }
 
     @Override
@@ -15,4 +14,3 @@ public class Barometre extends InstrumentBlockItem {
         InstrumentUtils.displayPressure(level, player);
     }
 }
-

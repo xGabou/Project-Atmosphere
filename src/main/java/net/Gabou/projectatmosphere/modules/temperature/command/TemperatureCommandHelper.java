@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.temperature.command;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.temperature.compat.SereneTempToCelcius;
 
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
@@ -60,7 +61,7 @@ public class TemperatureCommandHelper {
      * Get the current temperature of a biome at a given tick.
      */
     public static float getTemperatureAt(BiomeInstanceKey biome, long tick) {
-        return ForecastGenerator.getTemperatureValue(biome, tick);
+        return ForecastOrchestrator.getCurrentTemperature(biome, tick);
     }
 
     /**
@@ -108,7 +109,7 @@ public class TemperatureCommandHelper {
      * Get the final computed Celsius temperature used by the mod (includes time of day, fluctuations, etc).
      */
     public static float getRealTemperature(ServerLevel level, BiomeInstanceKey biome, BlockPos pos) {
-        return ForecastGenerator.getTemperatureValue(biome, level.getDayTime());
+        return ForecastOrchestrator.getCurrentTemperature(biome, level.getDayTime());
     }
 
 

@@ -52,3 +52,11 @@ modId = "sereneseasonsextended"
 mandatory = true
 versionRange = "*"
 side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "sandstorm"
+mandatory = true
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+

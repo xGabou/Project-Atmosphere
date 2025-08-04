@@ -2,7 +2,7 @@ package net.Gabou.projectatmosphere.registry;
 
 import com.mojang.logging.LogUtils;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.blocks.DustLayerBlock;
+import net.Gabou.projectatmosphere.blocks.*;
 import net.minecraft.client.resources.model.Material;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -28,4 +28,44 @@ public class ModBlocks {
                     .pushReaction(PushReaction.DESTROY)
                     .isViewBlocking((state, getter, pos) -> false)
             ));
+    public static final RegistryObject<Block> WEATHER_VANE = REGISTRY.register("weather_vane", () ->
+            new WeatherVaneBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(0.5f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
+    public static final RegistryObject<Block> ANEMOMETER = REGISTRY.register("anemometer", () ->
+            new AnemometerBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(0.5f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
+    public static final RegistryObject<Block> THERMOMETER_BLOCK = REGISTRY.register("thermometer_block", () ->
+            new ThermometerBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(0.5f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
+    public static final RegistryObject<Block> BAROMETER_BLOCK = REGISTRY.register("barometer_block", () ->
+            new BarometreBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(0.5f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
+    public static final RegistryObject<Block> HUMIDIMETER_BLOCK = REGISTRY.register("humidimeter_block", () ->
+            new HumidimeterBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(0.5f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
 }

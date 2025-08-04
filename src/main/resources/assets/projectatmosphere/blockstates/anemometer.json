@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "projectatmosphere:block/anemometer" },
+    "facing=south": { "model": "projectatmosphere:block/anemometer", "y": 180 },
+    "facing=west": { "model": "projectatmosphere:block/anemometer", "y": 270 },
+    "facing=east": { "model": "projectatmosphere:block/anemometer", "y": 90 }
+  }
+}

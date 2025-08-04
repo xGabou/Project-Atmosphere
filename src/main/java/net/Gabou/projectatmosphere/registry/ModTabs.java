@@ -16,7 +16,7 @@ public class ModTabs {
             "thermometer",  // Changed registry name
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("item.projectatmosphere.thermometer"))
-                    .icon(() -> new ItemStack(ModItems.THERMOMETRE.get()))
+                    .icon(() -> new ItemStack(ModItems.THERMOMETER.get()))
                     .displayItems((parameters, output) -> {
                         ModItems.ITEMS.getEntries().forEach(entry -> {
                             output.accept(new ItemStack(entry.get()));

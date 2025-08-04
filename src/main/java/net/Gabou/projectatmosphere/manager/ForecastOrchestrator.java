@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -178,8 +179,8 @@ public class ForecastOrchestrator {
     /**
      * Get wind for any biome
      */
-    public static WindVector getCurrentWind(BiomeInstanceKey key) {
-         return ForecastGenerator.getWindValue(key);
+    public static WindVector getCurrentWind(BiomeInstanceKey key,long tick) {
+         return ForecastGenerator.getWindValue(key, tick);
     }
 
     public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {

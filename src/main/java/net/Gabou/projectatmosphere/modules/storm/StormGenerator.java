@@ -35,7 +35,7 @@ public class StormGenerator {
             float rhAvg = (humidity[day][0] + humidity[day][1]) / 2f;
             float pressureAvg = (pressure[day][0] + pressure[day][1]) / 2f;
 
-            float windStrength = (wind != null && wind.length > day) ? wind[day].speed() : 0f;
+            float windStrength = (wind != null && wind.length > day) ? wind[day].baseSpeed() : 0f;
 
             // --- Base scoring ---
             if (pressureAvg < 1000f) stormScore += 0.3f;

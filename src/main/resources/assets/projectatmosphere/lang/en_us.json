@@ -8,6 +8,10 @@
   "item.projectatmosphere.balai_diamant": "Diamond Broom",
   "item.projectatmosphere.balai_netherite": "Netherite Broom",
   "block.projectatmosphere.dust": "Dust",
-  "item.projectatmosphere.wind_checker": "Wind Checker"
+  "block.projectatmosphere.weather_vane": "Weather Vane",
+  "block.projectatmosphere.anemometer": "Anemometer",
+  "block.projectatmosphere.thermometer_block": "Thermometer",
+  "block.projectatmosphere.barometer_block": "Barometer",
+  "block.projectatmosphere.humidimeter_block": "Hygrometer"
 }
 

@@ -1,14 +1,13 @@
-package net.Gabou.projectatmosphere.items;
-
+package net.Gabou.projectatmosphere.blocks;
 
 import net.Gabou.projectatmosphere.util.InstrumentUtils;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockBehaviour.Properties;
 
-public class Humidimeter extends InstrumentBlockItem {
-    public Humidimeter(Block block, Properties properties) {
-        super(block, properties);
+public class HumidimeterBlock extends InstrumentBlock {
+    public HumidimeterBlock(Properties properties) {
+        super(properties);
     }
 
     @Override
@@ -16,4 +15,3 @@ public class Humidimeter extends InstrumentBlockItem {
         InstrumentUtils.displayHumidity(level, player);
     }
 }
-

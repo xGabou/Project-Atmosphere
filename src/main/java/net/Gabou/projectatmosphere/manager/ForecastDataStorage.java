@@ -178,8 +178,9 @@ public class ForecastDataStorage {
         if (winds == null) return array;
         for (WindVector wind : winds) {
             JsonObject obj = new JsonObject();
-            obj.addProperty("speed", wind.speed());
+            obj.addProperty("speed", wind.baseSpeed());
             obj.addProperty("angle", wind.angleRadians());
+            obj.addProperty("gustSpeed", wind.gustSpeed());
             array.add(obj);
         }
         return array;
@@ -192,7 +193,8 @@ public class ForecastDataStorage {
             JsonObject obj = arr.get(i).getAsJsonObject();
             float speed = obj.get("speed").getAsFloat();
             float angle = obj.get("angle").getAsFloat();
-            winds[i] = new WindVector(speed, angle);
+            float gustSpeed = obj.get("gustSpeed").getAsFloat();
+            winds[i] = new WindVector(speed, angle,gustSpeed);
         }
         return winds;
     }

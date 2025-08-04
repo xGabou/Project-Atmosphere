@@ -17,11 +17,13 @@ import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.variation.VariationGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
+import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import sfiomn.legendarysurvivaloverhaul.api.temperature.TemperatureUtil;
 
 import java.util.*;
@@ -43,9 +45,14 @@ public class ForecastGenerator {
     }
 
 
-    private static final float SANDSTORM_WIND_THRESHOLD = 20f;  // Example, adjust
-    private static final float SANDSTORM_HUMIDITY_THRESHOLD = 40f;
-    private static final float SANDSTORM_PRESSURE_THRESHOLD = 1000f;
+    private static final float SANDSTORM_WIND_THRESHOLD_BASE = 10f;
+    private static final float SANDSTORM_WIND_THRESHOLD_MIN = 6f;
+
+    private static final float SANDSTORM_HUMIDITY_THRESHOLD_BASE = 20f;
+    private static final float SANDSTORM_HUMIDITY_THRESHOLD_MAX = 35f;
+
+    private static final float SANDSTORM_PRESSURE_THRESHOLD_BASE = 1005f;
+    private static final float SANDSTORM_PRESSURE_THRESHOLD_MAX = 1015f;
 
 
     public static final int MAX_POSITIONS_PER_BIOME;
@@ -86,7 +93,7 @@ public class ForecastGenerator {
 
     static final Map<BiomeInstanceKey, BiomeForecast> FORECAST_MAP = new ConcurrentHashMap<>();
 
-    public static void computeAverageForecastsByBiomeType() {
+    private static void computeAverageForecastsByBiomeType() {
         computeAverageTemperature();
         computeAverageHumidity();
         computeAveragePressure();
@@ -94,7 +101,7 @@ public class ForecastGenerator {
         computeAverageStormChance();
     }
 
-    public static void computeAverageTemperature() {
+    private static void computeAverageTemperature() {
         Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
 
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
@@ -120,7 +127,7 @@ public class ForecastGenerator {
         return grouped;
     }
 
-    public static void computeAverageStormChance() {
+    private static void computeAverageStormChance() {
         Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
 
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
@@ -135,7 +142,7 @@ public class ForecastGenerator {
         }
     }
 
-    public static void computeAverageWind() {
+    private static void computeAverageWind() {
         Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
 
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
@@ -150,7 +157,7 @@ public class ForecastGenerator {
         }
     }
 
-    public static void computeAveragePressure() {
+    private static void computeAveragePressure() {
         Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
 
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
@@ -165,7 +172,7 @@ public class ForecastGenerator {
         }
     }
 
-    public static void computeAverageHumidity() {
+    private static void computeAverageHumidity() {
         Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
 
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
@@ -181,16 +188,36 @@ public class ForecastGenerator {
     }
 
 
-    private static boolean shouldTriggerSandstorm(BiomeInstanceKey key, float[][] humidity, float[][] pressure, WindVector wind) {
+    private static float interpolate(float base, float minOrMax, float chanceMax) {
+        float t = Mth.clamp(chanceMax - 1.0f, 0f, 1f); // stormChance max in [1.0, 2.0]
+        return base - t * (base - minOrMax);
+    }
+
+
+    private static boolean shouldTriggerSandstorm(
+            BiomeInstanceKey key,
+            float[][] humidity,
+            float[][] pressure,
+            WindVector wind,
+            float[] stormChance // expects [min, max]
+    ) {
         if (!SANDSTORM_BIOMES.contains(key.biomeType())) return false;
+        if (stormChance == null || stormChance.length < 2) return false;
 
-        float todayHumidityMin = humidity[0][0]; // today = index 0, min = [0]
-        float todayPressureMin = pressure[0][0]; // same
-        float windSpeed = wind != null ? wind.speed() : 0;
+        float chanceMax = stormChance[1];
 
-        boolean dryEnough = todayHumidityMin < SANDSTORM_HUMIDITY_THRESHOLD;
-        boolean windyEnough = windSpeed > SANDSTORM_WIND_THRESHOLD;
-        boolean unstablePressure = todayPressureMin < SANDSTORM_PRESSURE_THRESHOLD;
+        float todayHumidityMin = humidity[0][0];
+        float todayPressureMin = pressure[0][0];
+        float windSpeed = wind.gustSpeed();
+
+        // Dynamically interpolate thresholds
+        float humidityThreshold = interpolate(SANDSTORM_HUMIDITY_THRESHOLD_BASE, SANDSTORM_HUMIDITY_THRESHOLD_MAX, chanceMax);
+        float pressureThreshold = interpolate(SANDSTORM_PRESSURE_THRESHOLD_BASE, SANDSTORM_PRESSURE_THRESHOLD_MAX, chanceMax);
+        float windThreshold = interpolate(SANDSTORM_WIND_THRESHOLD_BASE, SANDSTORM_WIND_THRESHOLD_MIN, chanceMax);
+
+        boolean dryEnough = todayHumidityMin < humidityThreshold;
+        boolean windyEnough = windSpeed > windThreshold;
+        boolean unstablePressure = todayPressureMin < pressureThreshold;
 
         return dryEnough && windyEnough && unstablePressure;
     }
@@ -205,13 +232,12 @@ public class ForecastGenerator {
     }
 
 
-
     static void clearBiomeSamples() {
         biomeSamples.clear();
     }
 
 
-    public static void generateForecastForSavedRegion(ServerLevel level) {
+    static void generateForecastForSavedRegion(ServerLevel level) {
         dailyAndSand(level);
     }
 
@@ -228,7 +254,8 @@ public class ForecastGenerator {
                         entry.getKey(),
                         entry.getValue().getHumidity(),
                         entry.getValue().getPressure(),
-                        entry.getValue().getWind()[0]
+                        entry.getValue().getWind()[0],
+                        entry.getValue().getStormChance()[0]
                 ))
                 .forEach(entry -> {
                     BiomeInstanceKey key = entry.getKey();
@@ -276,7 +303,7 @@ public class ForecastGenerator {
      * @param center The center position of the region to sample.
      * @param level  The server level where the region is located.
      */
-    public static void generateForecastForRegion(BlockPos center, ServerLevel level) {
+    static void generateForecastForRegion(BlockPos center, ServerLevel level) {
         long start = System.nanoTime(); // Start timer
 
         for (int dx = -RADIUS; dx <= RADIUS; dx += SAMPLE_STEP) {
@@ -399,9 +426,13 @@ public class ForecastGenerator {
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast region generation took " + durationMs + " ms.");
     }
 
-    public static void tickSandstormScheduler(ServerLevel level) {
+    private static int tickCounter = 0;
+
+    static void tickSandstormScheduler(ServerLevel level) {
+
         if (scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
-            SandStormAPI.startSandstorm(scheduledStormPhase);
+            SandStormAPI.startSandstorm(scheduledStormPhase, scheduledStormBiome);
+
 
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
                     scheduledStormBiome.biomeType(), scheduledStormPhase);
@@ -410,6 +441,21 @@ public class ForecastGenerator {
             scheduledStormTime = -1L;
             scheduledStormPhase = null;
         }
+        if (SandStormAPI.isSandstormActive() && tickCounter % 50 == 0) {
+            AsyncAtmosphereService.runStorm(() -> {
+                var sandStorms = SandStormAPI.getScheduledStormBiome();
+                for (BiomeInstanceKey biome : sandStorms) {
+
+                    SandStormAPI.blowSandInBiome(level,
+                            biome,
+                            getWindValue(biome, level.getDayTime()));
+
+                }
+            });
+            tickCounter = 0;
+
+        }
+        tickCounter++;
     }
 
     private static float[][] generateStorm(BiomeInstanceKey key, ServerLevel level, float[][] temperature, float[][] humidity, float[][] pressure, WindVector[] wind) {
@@ -508,11 +554,11 @@ public class ForecastGenerator {
         }
     }
 
-    public static void clearForecasts() {
+    static void clearForecasts() {
         FORECAST_MAP.clear();
     }
 
-    public static void putForecast(BiomeInstanceKey key, BiomeForecast forecast) {
+    static void putForecast(BiomeInstanceKey key, BiomeForecast forecast) {
         FORECAST_MAP.put(key, forecast);
     }
 
@@ -521,7 +567,7 @@ public class ForecastGenerator {
     }
 
 
-    public static float getHumidityValue(BiomeInstanceKey key, long tick) {
+    static float getHumidityValue(BiomeInstanceKey key, long tick) {
         BiomeForecast forecast = getClosestValidForecast(key, ForecastType.HUMIDITY);
         if (forecast == null) return 0.0f;
 
@@ -530,7 +576,7 @@ public class ForecastGenerator {
         return curve[Math.min(minuteOfDay, curve.length - 1)];
     }
 
-    public static float getTemperatureValue(BiomeInstanceKey key, long tick) {
+    static float getTemperatureValue(BiomeInstanceKey key, long tick) {
         BiomeForecast forecast = getClosestValidForecast(key, ForecastType.TEMPERATURE);
         if (forecast == null) return 0.0f;
 
@@ -539,7 +585,7 @@ public class ForecastGenerator {
         return curve[Math.min(minuteOfDay, curve.length - 1)];
     }
 
-    public static float getStormChanceValue(BiomeInstanceKey key, long tick) {
+    static float getStormChanceValue(BiomeInstanceKey key, long tick) {
         BiomeForecast forecast = getClosestValidForecast(key, ForecastType.STORM);
         if (forecast == null) return 0.0f;
         float[] curve = forecast.getStormChanceDay();
@@ -547,7 +593,7 @@ public class ForecastGenerator {
         return curve[Math.min(minuteOfDay, curve.length - 1)];
     }
 
-    public static float getPressureValue(BiomeInstanceKey key, long tick) {
+    static float getPressureValue(BiomeInstanceKey key, long tick) {
         BiomeForecast forecast = getClosestValidForecast(key, ForecastType.PRESSURE);
         if (forecast == null) return 0.0f;
 
@@ -556,12 +602,17 @@ public class ForecastGenerator {
         return curve[Math.min(minuteOfDay, curve.length - 1)];
     }
 
-    public static WindVector getWindValue(BiomeInstanceKey key) {
+    static WindVector getWindValue(BiomeInstanceKey key, long worldTime) {
         BiomeForecast forecast = getClosestValidForecast(key, ForecastType.WIND);
-        if (forecast == null) return new WindVector(0, 0);
+        if (forecast == null) return WindVector.fromBase(0, 0);
 
-        WindVector wind = forecast.getWindDay();
-        return wind != null ? wind : new WindVector(0, 0);
+        WindVector original = forecast.getWindDay();
+        if (original == null) return WindVector.fromBase(0, 0);
+
+        // Choose speed based on gust state
+        float speed = WindMath.getEffectiveWindSpeed(original, worldTime);
+
+        return new WindVector(speed, original.angleRadians(), original.gustSpeed());
     }
 
 
@@ -618,7 +669,7 @@ public class ForecastGenerator {
     }
 
 
-    public static void swapToTomorrow() {
+    static void swapToTomorrow() {
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeForecast forecast = entry.getValue();
 
@@ -677,7 +728,7 @@ public class ForecastGenerator {
             rotated[i] = original[i + 1];
         }
 
-        rotated[len - 1] = new WindVector(0, 0); // or null if you want to regenerate
+        rotated[len - 1] = WindVector.fromBase(0, 0); // or null if you want to regenerate
         return rotated;
     }
 
@@ -731,20 +782,24 @@ public class ForecastGenerator {
     }
 
     private static WindVector averageWind(List<BiomeForecast> forecasts, Function<BiomeForecast, WindVector> extractor) {
-        if (forecasts.isEmpty()) return new WindVector(0, 0);
+        if (forecasts.isEmpty()) return WindVector.fromBase(0, 0);
 
         float sumX = 0;
         float sumZ = 0;
+        float sumGust = 0;
+
 
         for (BiomeForecast f : forecasts) {
             WindVector wind = f.getWindDay();
             if (wind == null) continue;
 
             float angle = wind.angleRadians();
-            float speed = wind.speed();
+            float speed = wind.baseSpeed();
 
             sumX += speed * (float) Math.cos(angle);
             sumZ += speed * (float) Math.sin(angle);
+            sumGust += wind.gustSpeed();
+
         }
 
         int size = forecasts.size();
@@ -753,34 +808,39 @@ public class ForecastGenerator {
 
         float avgSpeed = (float) Math.sqrt(avgX * avgX + avgZ * avgZ);
         float avgAngle = (float) Math.atan2(avgZ, avgX);
+        float avgGust = sumGust / size;
 
-        return new WindVector(avgSpeed, avgAngle);
+        return new WindVector(avgSpeed, avgAngle, avgGust);
     }
 
     private static WindVector[] averageWindWeek(List<BiomeForecast> forecasts, Function<BiomeForecast, WindVector[]> extractor) {
         WindVector[] result = new WindVector[7];
+
         if (forecasts.isEmpty()) {
-            Arrays.fill(result, new WindVector(0, 0));
+            Arrays.fill(result, WindVector.fromBase(0, 0));
             return result;
         }
 
         for (int day = 0; day < 7; day++) {
             float sumX = 0f;
             float sumZ = 0f;
+            float sumGust = 0f;
             int count = 0;
 
             for (BiomeForecast forecast : forecasts) {
-                WindVector[] windWeek = forecast.getWind();
+                WindVector[] windWeek = extractor.apply(forecast); // <- uses extractor properly
                 if (windWeek == null || windWeek.length != 7) continue;
 
                 WindVector wind = windWeek[day];
                 if (wind == null) continue;
 
-                float speed = wind.speed();
+                float speed = wind.baseSpeed();
                 float angle = wind.angleRadians();
+                float gust = wind.gustSpeed();
 
-                sumX += (float) (speed * Math.cos(angle));
-                sumZ += (float) (speed * Math.sin(angle));
+                sumX += speed * (float) Math.cos(angle);
+                sumZ += speed * (float) Math.sin(angle);
+                sumGust += gust;
                 count++;
             }
 
@@ -789,17 +849,19 @@ public class ForecastGenerator {
                 float avgZ = sumZ / count;
                 float avgSpeed = (float) Math.sqrt(avgX * avgX + avgZ * avgZ);
                 float avgAngle = (float) Math.atan2(avgZ, avgX);
-                result[day] = new WindVector(avgSpeed, avgAngle);
+                float avgGust = sumGust / count;
+                result[day] = new WindVector(avgSpeed, avgAngle, avgGust);
             } else {
-                result[day] = new WindVector(0, 0); // fallback
+                result[day] = WindVector.fromBase(0, 0);
             }
         }
 
         return result;
     }
 
+
     private static SandstormPhase computeStormPhase(BiomeForecast forecast) {
-        float wind = forecast.getWind()[0].speed();
+        float wind = forecast.getWind()[0].baseSpeed();
         float pressure = forecast.getPressure()[0][0];
         float humidity = forecast.getHumidity()[0][0];
 
@@ -809,5 +871,22 @@ public class ForecastGenerator {
         if (wind > 20) return SandstormPhase.PHASE_2;
         return SandstormPhase.PHASE_1;
     }
+
+    public static float getEffectiveWindSpeed(WindVector vector, long worldTime) {
+        // gust appears every ~600 ticks (30s) for 200 ticks
+        long gustCycle = (worldTime + 37) % 600;
+        if (gustCycle < 200) {
+            return vector.gustSpeed(); // during gust
+        } else {
+            return vector.baseSpeed(); // normal
+        }
+    }
+
+    public static float getSmoothGustedSpeed(WindVector vector, long worldTime) {
+        float gustWave = (float) Math.sin((worldTime % 1000) / 100.0);
+        float gustFactor = 0.5f + 0.5f * gustWave; // [0,1]
+        return vector.baseSpeed() + (vector.gustSpeed() - vector.baseSpeed()) * gustFactor;
+    }
+
 
 }

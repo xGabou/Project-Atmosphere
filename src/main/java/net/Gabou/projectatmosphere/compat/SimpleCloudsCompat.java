@@ -122,9 +122,9 @@ public class SimpleCloudsCompat {
         CloudRegion cloudRegion = region.get();
         cloudRegion.setMovementDirection(direction);
         cloudRegion.setRotation(rotation);
-        cloudRegion.setMaxSpeed(cloudRegion.getMaxSpeed() + wind.speed() * 0.01F);
+        cloudRegion.setMaxSpeed(cloudRegion.getMaxSpeed() + wind.baseSpeed() * 0.01F);
         float acc = cloudRegion.getAccelerationFactor();
-        cloudRegion.setAccelerationFactor(acc * wind.speed() + acc);
+        cloudRegion.setAccelerationFactor(acc * wind.baseSpeed() + acc);
         cloudRegion.setRadius(ProjectAtmosphere.DEFAULT_REGION_RADIUS);
 
         return Optional.of(cloudRegion);

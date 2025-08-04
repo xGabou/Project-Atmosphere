@@ -16,6 +16,10 @@ import java.util.Random;
 public class HumidityGenerator {
 
     private static final float CELSIUS_TO_KELVIN = 273.15f;
+    public static final float MAX_HUMIDITY = 100f;
+    public static final float MIN_HUMIDITY_TROPICAL_BIOME = 75f;
+    public static final float MIN_VANILLA_TEMP_TROPICAL_BIOME = 1.8f;
+    public static final float MIN_HUMIDITY_DESERT_BIOME = 5f;
 
 //    /**
 //     * Saturation vapor pressure (Magnus–Tetens) in hPa.
@@ -35,13 +39,13 @@ public class HumidityGenerator {
         Random rand = new Random(seed);
 
         Biome biome = world.getBiome(pos).get();
-        float baseRH = biome.getModifiedClimateSettings().downfall() * 100f;
+        float baseRH = biome.getModifiedClimateSettings().downfall() * MAX_HUMIDITY;
 
         // Clamp RH for desert and tropical biomes
         if (!biome.getModifiedClimateSettings().hasPrecipitation()) {
-            baseRH = Math.max(5f, Math.min(baseRH, 15f));  // for arid
-        } else if (biome.getBaseTemperature() > 1.8f) {
-            baseRH = Math.max(baseRH, 80f);
+            baseRH = MIN_HUMIDITY_DESERT_BIOME;  // for arid
+        } else if (biome.getBaseTemperature() > MIN_VANILLA_TEMP_TROPICAL_BIOME) {
+            baseRH = Math.max(baseRH, MIN_HUMIDITY_TROPICAL_BIOME);
         }
 
         float[][] tempWeek = ForecastGenerator.getClosestValidForecast(b, ForecastType.TEMPERATURE).getTemperature();
@@ -55,8 +59,8 @@ public class HumidityGenerator {
 
             float humiditySwing = Math.min(20f, deltaT * 2.5f); // up to ±10%
 
-            float finalMin = Math.max(5f, baseRH - humiditySwing * 0.5f);
-            float finalMax = Math.max(5f, baseRH + humiditySwing * 0.5f);
+            float finalMin = Math.max(MIN_HUMIDITY_DESERT_BIOME, baseRH - humiditySwing * 0.5f);
+            float finalMax = Math.max(MIN_HUMIDITY_DESERT_BIOME, baseRH + humiditySwing * 0.5f);
 
 
             float noise = 2f * (rand.nextFloat() - 0.5f);
@@ -64,8 +68,8 @@ public class HumidityGenerator {
             finalMax += noise;
 
 
-            humWeek[d][0] = Math.max(0f, Math.min(finalMin, 100f));
-            humWeek[d][1] = Math.max(0f, Math.min(finalMax, 100f));
+            humWeek[d][0] = Math.max(0f, Math.min(finalMin, MAX_HUMIDITY));
+            humWeek[d][1] = Math.max(0f, Math.min(finalMax, MAX_HUMIDITY));
 
         }
 

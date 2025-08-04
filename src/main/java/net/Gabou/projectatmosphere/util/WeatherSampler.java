@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.util;
 
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -77,16 +78,16 @@ public class WeatherSampler {
     public static WeatherStats computeWeatherStats(Set<BiomeInstanceKey> keys, ServerLevel level, long tick) {
         float totalHumidity = 0, totalTemp = 0, totalPressure = 0,
                 totalStormChance = 0;
-        WindVector totalWind = new WindVector(0, 0);
+        WindVector totalWind = WindVector.fromBase(0, 0);
         int count = 0;
         Map<ResourceLocation, Integer> biomeFreq = new HashMap<>();
 
         for (BiomeInstanceKey key : keys) {
-            float humidity = ForecastGenerator.getHumidityValue(key, tick);
-            float temperature = ForecastGenerator.getTemperatureValue(key, tick);
-            float pressure = ForecastGenerator.getPressureValue(key, tick);
-            float stormChanceValue = ForecastGenerator.getStormChanceValue(key,tick);
-            WindVector wind = ForecastGenerator.getWindValue(key);
+            float humidity = ForecastOrchestrator.getCurrentHumidity(key, tick);
+            float temperature = ForecastOrchestrator.getCurrentTemperature(key, tick);
+            float pressure = ForecastOrchestrator.getCurrentPressure(key, tick);
+            float stormChanceValue = ForecastOrchestrator.getCurrentStormChance(key,tick);
+            WindVector wind = ForecastOrchestrator.getCurrentWind(key, tick);
 
             totalHumidity += humidity;
             totalTemp += temperature;
