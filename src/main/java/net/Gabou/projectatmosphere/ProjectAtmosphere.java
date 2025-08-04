@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.TickCounter;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -78,6 +79,9 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
+
+        MinecraftForge.EVENT_BUS.addListener(TickCounter::onServerTick);
+
 
 
         ModParticles.register(modEventBus);

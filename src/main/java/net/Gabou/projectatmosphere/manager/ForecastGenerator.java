@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.manager;
 
+import com.BreadRes.desertstormwarming.logic.SandstormPhase;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
@@ -10,11 +11,13 @@ import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityGenerator;
 import net.Gabou.projectatmosphere.modules.pressure.PressureGenerator;
+import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
 import net.Gabou.projectatmosphere.modules.storm.StormGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.variation.VariationGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -31,8 +34,35 @@ public class ForecastGenerator {
     private static final int DIFFUSION_RADIUS = 200; // blocks
     private static final float DIFFUSION_RATE = 0.1f;
     private static final int SAMPLE_STEP = 256;
+    private static BiomeInstanceKey scheduledStormBiome = null;
+    private static SandstormPhase scheduledStormPhase = null;
+    private static long scheduledStormTime = -1L; // in world ticks
+
+    public static BiomeInstanceKey getScheduledSandstormBiome() {
+        return scheduledStormBiome;
+    }
+
+
+    private static final float SANDSTORM_WIND_THRESHOLD = 20f;  // Example, adjust
+    private static final float SANDSTORM_HUMIDITY_THRESHOLD = 40f;
+    private static final float SANDSTORM_PRESSURE_THRESHOLD = 1000f;
+
 
     public static final int MAX_POSITIONS_PER_BIOME;
+
+    private static final Set<ResourceLocation> SANDSTORM_BIOMES = Set.of(
+            ResourceLocation.fromNamespaceAndPath("minecraft", "desert"),
+            ResourceLocation.fromNamespaceAndPath("minecraft", "badlands")
+    );
+    private static final Set<BiomeInstanceKey> SANDSTORM_FORECASTS = ConcurrentHashMap.newKeySet();
+
+    public static Set<BiomeInstanceKey> getSandstormForecasts() {
+        return Collections.unmodifiableSet(SANDSTORM_FORECASTS);
+    }
+
+    private static void clearSandstormForecasts() {
+        SANDSTORM_FORECASTS.clear();
+    }
 
 
     static {
@@ -78,6 +108,7 @@ public class ForecastGenerator {
             avg.setTemperatureTomorrow(averageDay(list, BiomeForecast::getTemperatureTomorrow));
         }
     }
+
     private static Map<ResourceLocation, List<BiomeForecast>> groupForecastsByBiome() {
         Map<ResourceLocation, List<BiomeForecast>> grouped = new HashMap<>();
 
@@ -150,6 +181,19 @@ public class ForecastGenerator {
     }
 
 
+    private static boolean shouldTriggerSandstorm(BiomeInstanceKey key, float[][] humidity, float[][] pressure, WindVector wind) {
+        if (!SANDSTORM_BIOMES.contains(key.biomeType())) return false;
+
+        float todayHumidityMin = humidity[0][0]; // today = index 0, min = [0]
+        float todayPressureMin = pressure[0][0]; // same
+        float windSpeed = wind != null ? wind.speed() : 0;
+
+        boolean dryEnough = todayHumidityMin < SANDSTORM_HUMIDITY_THRESHOLD;
+        boolean windyEnough = windSpeed > SANDSTORM_WIND_THRESHOLD;
+        boolean unstablePressure = todayPressureMin < SANDSTORM_PRESSURE_THRESHOLD;
+
+        return dryEnough && windyEnough && unstablePressure;
+    }
 
 
     public static BiomeForecast getAverageForecast(ResourceLocation biomeType) {
@@ -160,10 +204,78 @@ public class ForecastGenerator {
         return biomeSamples;
     }
 
+
+
     static void clearBiomeSamples() {
         biomeSamples.clear();
     }
 
+
+    public static void generateForecastForSavedRegion(ServerLevel level) {
+        dailyAndSand(level);
+    }
+
+    private static void dailyAndSand(ServerLevel level) {
+        clearSandstormForecasts();
+
+        FORECAST_MAP.entrySet().stream()
+                .filter(entry -> SANDSTORM_BIOMES.contains(entry.getKey().biomeType()))
+                .filter(entry -> {
+                    BiomeForecast f = entry.getValue();
+                    return f.getHumidity() != null && f.getPressure() != null && f.getWind() != null;
+                })
+                .filter(entry -> shouldTriggerSandstorm(
+                        entry.getKey(),
+                        entry.getValue().getHumidity(),
+                        entry.getValue().getPressure(),
+                        entry.getValue().getWind()[0]
+                ))
+                .forEach(entry -> {
+                    BiomeInstanceKey key = entry.getKey();
+                    entry.getValue().setSandstormExpected(true);
+                    SANDSTORM_FORECASTS.add(key);
+                });
+
+
+        // 10. Génération courbes journalières
+        DailyForecastGenerator.scheduleAll(level, FORECAST_MAP);
+        // Recompute averages now that daily profiles are available
+        computeAverageForecastsByBiomeType();
+
+        AsyncAtmosphereService.runStorm(() -> {
+                    if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty()) {
+                        BiomeInstanceKey selected = SANDSTORM_FORECASTS.stream()
+                                .skip(level.random.nextInt(SANDSTORM_FORECASTS.size()))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (selected != null) {
+                            BiomeForecast forecast = FORECAST_MAP.get(selected);
+                            if (forecast != null) {
+                                long baseTime = (level.getDayTime() / 24000L) * 24000L;
+                                long randomOffset = 1000 + level.random.nextInt(9000); // Between 0.5–5 min into the day
+
+                                scheduledStormBiome = selected;
+                                scheduledStormPhase = computeStormPhase(forecast);
+                                scheduledStormTime = baseTime + randomOffset;
+
+                                ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in biome {} (phase: {})",
+                                        scheduledStormTime, selected.biomeType(), scheduledStormPhase);
+                            }
+                        }
+                    }
+                }
+        );
+    }
+
+    /**
+     * Generates a weekly forecast for the specified region centered at the given position.
+     * This method samples biomes in a square area around the center and generates forecasts
+     * based on the sampled biomes.
+     *
+     * @param center The center position of the region to sample.
+     * @param level  The server level where the region is located.
+     */
     public static void generateForecastForRegion(BlockPos center, ServerLevel level) {
         long start = System.nanoTime(); // Start timer
 
@@ -278,13 +390,26 @@ public class ForecastGenerator {
             entry.getValue().setStormChance(generateStorm(entry.getKey(), level, entry.getValue().getTemperature(), entry.getValue().getHumidity(), entry.getValue().getPressure(), entry.getValue().getWind()));
         }
         computeAverageStormChance();
-        // 8. Génération courbes journalières
-        DailyForecastGenerator.scheduleAll(level, FORECAST_MAP);
-        // Recompute averages now that daily profiles are available
-        computeAverageForecastsByBiomeType();
+        // 9. Check for sandstorm conditions
+        dailyAndSand(level);
+
+
         long end = System.nanoTime(); // End timer
         long durationMs = (end - start) / 1_000_000;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast region generation took " + durationMs + " ms.");
+    }
+
+    public static void tickSandstormScheduler(ServerLevel level) {
+        if (scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
+            SandStormAPI.startSandstorm(scheduledStormPhase);
+
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
+                    scheduledStormBiome.biomeType(), scheduledStormPhase);
+
+            scheduledStormBiome = null;
+            scheduledStormTime = -1L;
+            scheduledStormPhase = null;
+        }
     }
 
     private static float[][] generateStorm(BiomeInstanceKey key, ServerLevel level, float[][] temperature, float[][] humidity, float[][] pressure, WindVector[] wind) {
@@ -467,7 +592,7 @@ public class ForecastGenerator {
             if (dist < minDistSame) {
                 minDistSame = dist;
                 closestSame = forecast;
-                if (dist < SAMPLE_STEP*2) break; // early exit for near-perfect match
+                if (dist < SAMPLE_STEP * 2) break; // early exit for near-perfect match
             }
         }
 
@@ -497,31 +622,65 @@ public class ForecastGenerator {
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeForecast forecast = entry.getValue();
 
-            // Temperature
+            // 1. Rotate raw 7-day data forward
+            forecast.setTemperature(rotateWeek(forecast.getTemperature()));
+            forecast.setHumidity(rotateWeek(forecast.getHumidity()));
+            forecast.setPressure(rotateWeek(forecast.getPressure()));
+            forecast.setStormChance(rotateWeek(forecast.getStormChance()));
+            forecast.setWind(rotateWindWeek(forecast.getWind()));
+
+            // 2. Shift daily interpolations
             if (forecast.getTemperatureTomorrow() != null) {
                 forecast.setTemperatureDay(forecast.getTemperatureTomorrow());
             }
 
-            // Humidity
             if (forecast.getHumidityTomorrow() != null) {
                 forecast.setHumidityDay(forecast.getHumidityTomorrow());
             }
 
-            // Pressure
             if (forecast.getPressureTomorrow() != null) {
                 forecast.setPressureDay(forecast.getPressureTomorrow());
             }
 
-            // Wind
-            if (forecast.getWindTomorrow() != null) {
-                forecast.setWindDay(forecast.getWindTomorrow());
-            }
-            // Storm chance
             if (forecast.getStormChanceTomorrow() != null) {
                 forecast.setStormChanceDay(forecast.getStormChanceTomorrow());
             }
+
+            if (forecast.getWindTomorrow() != null) {
+                forecast.setWindDay(forecast.getWindTomorrow());
+            }
         }
     }
+
+    private static float[][] rotateWeek(float[][] original) {
+        if (original == null || original.length < 2) return original;
+
+        int len = original.length;
+        float[][] rotated = new float[len][2];
+
+        for (int i = 0; i < len - 1; i++) {
+            rotated[i] = original[i + 1];
+        }
+
+        // Optionally reset the last day
+        rotated[len - 1] = new float[]{0f, 0f}; // or reuse previous, or regenerate on demand
+        return rotated;
+    }
+
+    private static WindVector[] rotateWindWeek(WindVector[] original) {
+        if (original == null || original.length < 2) return original;
+
+        int len = original.length;
+        WindVector[] rotated = new WindVector[len];
+
+        for (int i = 0; i < len - 1; i++) {
+            rotated[i] = original[i + 1];
+        }
+
+        rotated[len - 1] = new WindVector(0, 0); // or null if you want to regenerate
+        return rotated;
+    }
+
 
     private static float[][] averageWeek(List<BiomeForecast> forecasts, java.util.function.Function<BiomeForecast, float[][]> extractor) {
         int days = 7, cols = 2;
@@ -639,5 +798,16 @@ public class ForecastGenerator {
         return result;
     }
 
+    private static SandstormPhase computeStormPhase(BiomeForecast forecast) {
+        float wind = forecast.getWind()[0].speed();
+        float pressure = forecast.getPressure()[0][0];
+        float humidity = forecast.getHumidity()[0][0];
+
+        if (wind > 35 && pressure < 980 && humidity < 0.15f) return SandstormPhase.PHASE_5;
+        if (wind > 30) return SandstormPhase.PHASE_4;
+        if (wind > 25) return SandstormPhase.PHASE_3;
+        if (wind > 20) return SandstormPhase.PHASE_2;
+        return SandstormPhase.PHASE_1;
+    }
 
 }

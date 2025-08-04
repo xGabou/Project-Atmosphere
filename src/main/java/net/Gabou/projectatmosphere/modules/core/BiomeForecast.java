@@ -23,6 +23,7 @@ public class BiomeForecast {
 
     private WindVector windTomorrow;
 
+    private boolean sandstormExpected;
 
     private boolean legendaryFlag = false;
     private boolean toughAsNailsFlag = false;
@@ -181,6 +182,16 @@ public class BiomeForecast {
 
     public void setToughAsNailsFlag(boolean toughAsNailsFlag) {
         this.toughAsNailsFlag = toughAsNailsFlag;
+    }
+
+
+
+    public void setSandstormExpected(boolean value) {
+        this.sandstormExpected = value;
+    }
+
+    public boolean isSandstormExpected() {
+        return sandstormExpected;
     }
 
 

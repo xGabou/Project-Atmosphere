@@ -34,6 +34,7 @@ public class ClientTickHandler {
 
         if (event.phase != TickEvent.Phase.END) return;
         if (!ClientSyncLock.isReady()) return;
+        if (Minecraft.getInstance().isPaused()) return;
         tickCounter++;
         TornadoManager.tick();
         if (tickCounter % 40 != 0) return; // Run every 20 ticks (1 second)

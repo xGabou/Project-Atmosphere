@@ -109,7 +109,7 @@ public class AtmosphereManager {
         });
     }
 
-    public static void onRegenerate(ServerLevel world) {
+    public static void   onRegenerate(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
             ForecastGenerator.clearBiomeSamples();
             for (ServerPlayer player : world.players()) {
@@ -128,6 +128,7 @@ public class AtmosphereManager {
 
 
     public static void tick(ServerLevel level) {
+        ForecastOrchestrator.tick(level);
     }
 
 

@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.registry.ModBlocks;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -25,6 +26,7 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class BlockManager {
 
@@ -58,16 +60,23 @@ public class BlockManager {
 
             BlockPos dustPos = new BlockPos(x, y, z);
             BlockState state = level.getBlockState(dustPos);
+            BlockState groundState = level.getBlockState(dustPos.below());
 
-            if ((state.isAir() || state.is(Blocks.SNOW)) &&
+            boolean validGround = groundState.is(Blocks.DIRT) ||
+                    groundState.is(Blocks.SAND) ||
+                    groundState.is(Blocks.GRAVEL);
+
+            if (validGround &&
+                    (state.isAir() || state.is(Blocks.SNOW)) &&
                     BlockPos.betweenClosedStream(dustPos.offset(-4, -1, -4), dustPos.offset(4, 1, 4))
                             .filter(pos -> level.getBlockState(pos).is(ModBlocks.DUST.get()))
                             .count() < 6)
             {
-                level.setBlockAndUpdate(dustPos, ModBlocks.DUST.get().defaultBlockState());
+                 level.setBlockAndUpdate(dustPos, ModBlocks.DUST.get().defaultBlockState());
             }
         }
     }
+
 
 
 
@@ -167,8 +176,8 @@ public class BlockManager {
         AsyncAtmosphereService.runStorm(() -> {
             RandomSource random = level.getRandom();
             int step = radius >= 1000 ? 32 : (radius >= 500 ? 16 : 8);
-            int dustChance = 6;
-            int debrisChance = 4;
+            int dustChance = 10;
+            int debrisChance = 20;
 
             List<Runnable> mainThreadTasks = new ArrayList<>();
             BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
@@ -181,26 +190,31 @@ public class BlockManager {
                     // Delay the heightmap and world logic until we're back on the main thread
                     BlockPos posXZ = new BlockPos(x, 0, z);
 
+                    AtomicInteger dustSpawned = new AtomicInteger(0);
+                    AtomicInteger debrisSpawned = new AtomicInteger(0);
+
                     mainThreadTasks.add(() -> {
                         int y = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, posXZ).getY();
                         mutablePos.set(x, y, z);
 
-                        if (random.nextInt(debrisChance) == 0) {
+                        if (debrisSpawned.get() < 30 && random.nextInt(debrisChance) == 0) {
                             BlockManager.spawnCochonnerie(level, mutablePos.immutable());
+                            debrisSpawned.incrementAndGet();
+                            DelayedTaskScheduler.schedule(6000, () -> debrisSpawned.updateAndGet(v -> Math.max(0, v - 1)));
                         }
 
-                        if (random.nextInt(dustChance) == 0 && level.isEmptyBlock(mutablePos)) {
-                            long nearbyDust = BlockPos.betweenClosedStream(mutablePos.offset(-3, -1, -3), mutablePos.offset(3, 1, 3))
-                                    .filter(p -> level.getBlockState(p).is(ModBlocks.DUST.get()))
-                                    .count();
-
-                            if (nearbyDust < 6) {
-                                level.setBlockAndUpdate(mutablePos.immutable(), ModBlocks.DUST.get().defaultBlockState());
-                            }
+                        if (dustSpawned.get() < 8 && random.nextInt(dustChance) == 0) {
+                            BlockManager.spawnDust(level, mutablePos.immutable());
+                            dustSpawned.incrementAndGet();
+                            DelayedTaskScheduler.schedule(2000, () -> dustSpawned.updateAndGet(v -> Math.max(0, v - 1)));
                         }
+
                     });
+
+
                 }
             }
+
 
             // Schedule batched execution on the main thread
             int batchSize = 100;

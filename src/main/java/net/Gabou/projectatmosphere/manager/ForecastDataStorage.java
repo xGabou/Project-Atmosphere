@@ -22,6 +22,8 @@ public class ForecastDataStorage {
     private static final String FILE_NAME = "forecast_centers.json";
     private static final String FORECAST_FILE = "biome_forecasts.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static boolean hasForecastData;
+    private static boolean hasCenterData;
 
     public static final Map<UUID, BlockPos> playerData = new ConcurrentHashMap<>();
 
@@ -34,6 +36,13 @@ public class ForecastDataStorage {
     public static void loadAll(ServerLevel world) {
         loadPlayerCenters(world);
         loadForecastMap(world);
+    }
+
+    public static boolean  hasForecastData() {
+        return hasForecastData;
+    }
+    public static boolean hasCenterData() {
+        return hasCenterData;
     }
 
     private static void savePlayerCenters(ServerLevel world) {
@@ -62,6 +71,7 @@ public class ForecastDataStorage {
     private static void loadPlayerCenters(ServerLevel world) {
         Path path = getSavePath(world, FILE_NAME);
         if (!Files.exists(path)) return;
+        hasCenterData= Files.exists(StorageUtils.getPerWorldSavePath(world, "forecast_centers.json"));
 
         try (Reader r = Files.newBufferedReader(path)) {
             JsonObject root = GSON.fromJson(r, JsonObject.class);
@@ -111,6 +121,7 @@ public class ForecastDataStorage {
     private static void loadForecastMap(ServerLevel world) {
         Path path = getSavePath(world, FORECAST_FILE);
         if (!Files.exists(path)) return;
+        hasForecastData = Files.exists(StorageUtils.getPerWorldSavePath(world, "biome_forecasts.json"));
 
         try (Reader r = Files.newBufferedReader(path)) {
             JsonObject root = GSON.fromJson(r, JsonObject.class);

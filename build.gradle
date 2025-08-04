@@ -98,6 +98,7 @@ dependencies {
     compileOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
 
     implementation fg.deobf("curse.maven:desert-storms-1312888:6836227")
+    implementation fg.deobf("curse.maven:lodestone-616457:6213794")
 
     //runtimeOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
     //runtimeOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))

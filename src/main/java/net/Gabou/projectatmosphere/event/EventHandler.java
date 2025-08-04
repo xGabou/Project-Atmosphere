@@ -49,7 +49,7 @@ public class EventHandler {
 
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
         CloudGenerator generator = cloudManager.getCloudGenerator();
-
+        AtmosphereManager.tick(serverLevel);
         if (generator.getTicksTillNextGen() <= 0 && ticksSinceLastCloudSpawn % 1000 == 0) {
             SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
             ticksSinceLastCloudSpawn = 0;
