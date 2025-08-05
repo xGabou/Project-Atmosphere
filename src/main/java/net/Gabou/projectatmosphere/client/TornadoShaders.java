@@ -14,16 +14,14 @@ import java.util.Objects;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class TornadoShaders {
-    private static ShaderInstance tornadoShader;
+
 
     @SubscribeEvent
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
         ShaderInstance shader = new ShaderInstance(event.getResourceProvider(),
                 ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "tornado"), DefaultVertexFormat.POSITION);
-        event.registerShader(shader, s -> tornadoShader = s);
+        event.registerShader(shader, s -> MyShaders.TORNADO = s);
     }
 
-    public static ShaderInstance getTornadoShader() {
-        return Objects.requireNonNull(tornadoShader, "Tornado shader not initialized yet");
-    }
+
 }

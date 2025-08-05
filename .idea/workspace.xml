@@ -4,29 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support">
-      <change afterPath="$PROJECT_DIR$/libs/SereneSeasonsExtended-1.20.1-1.0.6.jar" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Enhance tornado simulation with blending effects and animation adjustments">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/MyShaders.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/HudRenderTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/SereneSeasonsExtended-1.20.1-1.0.3.jar" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/libs/simpleclouds-1.20.1-0.7.1.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/TemperatureTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/TemperatureTickHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastDataStorage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastDataStorage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/TemperatureGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/TemperatureGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/anemometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/anemometer.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoShaders.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoShaders.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -195,6 +179,8 @@
       <recent name="net.Gabou.projectatmosphere.util.StorageUtils" />
     </key>
     <key name="CopyClassDialog.RECENTS_KEY">
+      <recent name="net.Gabou.projectatmosphere.client.render" />
+      <recent name="net.Gabou.projectatmosphere.client" />
       <recent name="net.Gabou.projectatmosphere.client.renderer" />
       <recent name="net.Gabou.projectatmosphere.entity" />
       <recent name="net.Gabou.projectatmosphere.event" />
@@ -553,23 +539,7 @@
       <workItem from="1754262902500" duration="7944000" />
       <workItem from="1754309025704" duration="20016000" />
       <workItem from="1754348659993" duration="26000" />
-      <workItem from="1754406072034" duration="4923000" />
-    </task>
-    <task id="LOCAL-00018" summary="Update biome temperature configurations; adjust seasonal ranges and daily temperature limits">
-      <option name="closed" value="true" />
-      <created>1746332105998</created>
-      <option name="number" value="00018" />
-      <option name="presentableId" value="LOCAL-00018" />
-      <option name="project" value="LOCAL" />
-      <updated>1746332105998</updated>
-    </task>
-    <task id="LOCAL-00019" summary="Refactor biome temperature configurations; streamline seasonal ranges and enhance daily clamp derivation">
-      <option name="closed" value="true" />
-      <created>1746332878793</created>
-      <option name="number" value="00019" />
-      <option name="presentableId" value="LOCAL-00019" />
-      <option name="project" value="LOCAL" />
-      <updated>1746332878793</updated>
+      <workItem from="1754406072034" duration="10506000" />
     </task>
     <task id="LOCAL-00020" summary="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations">
       <option name="closed" value="true" />
@@ -947,7 +917,23 @@
       <option name="project" value="LOCAL" />
       <updated>1754325436193</updated>
     </task>
-    <option name="localTasksCounter" value="67" />
+    <task id="LOCAL-00067" summary="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support">
+      <option name="closed" value="true" />
+      <created>1754419245043</created>
+      <option name="number" value="00067" />
+      <option name="presentableId" value="LOCAL-00067" />
+      <option name="project" value="LOCAL" />
+      <updated>1754419245043</updated>
+    </task>
+    <task id="LOCAL-00068" summary="Enhance tornado simulation with blending effects and animation adjustments">
+      <option name="closed" value="true" />
+      <created>1754419251830</created>
+      <option name="number" value="00068" />
+      <option name="presentableId" value="LOCAL-00068" />
+      <option name="project" value="LOCAL" />
+      <updated>1754419251830</updated>
+    </task>
+    <option name="localTasksCounter" value="69" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -966,7 +952,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor wind forecast modules: simplify data structures and enhance forecast calculations" />
     <MESSAGE value="Refactor atmosphere management: streamline module initialization and add storage management" />
     <MESSAGE value="Refactor snow block temperature handling: update temperature retrieval method for accuracy" />
     <MESSAGE value="Refactor snow block handling: comment out temperature-based block removal logic and add cloth-config dependency" />
@@ -991,7 +976,8 @@
     <MESSAGE value="Add desert storms dependency and update workspace settings" />
     <MESSAGE value="Add sandstorm management features and integrate delayed task scheduling" />
     <MESSAGE value="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support" />
+    <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
+    <option name="LAST_COMMIT_MESSAGE" value="Enhance tornado simulation with blending effects and animation adjustments" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
