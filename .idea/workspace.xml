@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Enhance tornado rendering with shader integration and improved animation effects">
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -534,15 +534,7 @@
       <workItem from="1754262902500" duration="7944000" />
       <workItem from="1754309025704" duration="20016000" />
       <workItem from="1754348659993" duration="26000" />
-      <workItem from="1754406072034" duration="10849000" />
-    </task>
-    <task id="LOCAL-00021" summary="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations&#10;&#10;&#10;Need to transform back into static">
-      <option name="closed" value="true" />
-      <created>1746344190997</created>
-      <option name="number" value="00021" />
-      <option name="presentableId" value="LOCAL-00021" />
-      <option name="project" value="LOCAL" />
-      <updated>1746344190997</updated>
+      <workItem from="1754406072034" duration="11184000" />
     </task>
     <task id="LOCAL-00022" summary="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations&#10;&#10;&#10;Need to transform back into static">
       <option name="closed" value="true" />
@@ -928,7 +920,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754432272776</updated>
     </task>
-    <option name="localTasksCounter" value="70" />
+    <task id="LOCAL-00070" summary="Enhance tornado rendering with shader integration and improved animation effects">
+      <option name="closed" value="true" />
+      <created>1754432731625</created>
+      <option name="number" value="00070" />
+      <option name="presentableId" value="LOCAL-00070" />
+      <option name="project" value="LOCAL" />
+      <updated>1754432731625</updated>
+    </task>
+    <option name="localTasksCounter" value="71" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
