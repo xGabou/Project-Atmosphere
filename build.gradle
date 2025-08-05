@@ -21,10 +21,10 @@ minecraft {
     copyIdeResources = true
     accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 
-    mixin {
-        add sourceSets.main, "projectatmosphere.refmap.json" // ⬅️ same as in mixins.json
-        config 'projectatmosphere.mixins.json' // ⬅️ same as in mixins.json
-    }
+//    mixin {
+//        add sourceSets.main, "projectatmosphere.refmap.json" // ⬅️ same as in mixins.json
+//        config 'projectatmosphere.mixins.json' // ⬅️ same as in mixins.json
+//    }
     runs {
         configureEach {
             workingDirectory project.file('run')
@@ -90,13 +90,14 @@ repositories {
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.3")
+    implementation fg.deobf("com.Gabou:SereneSeasonsExtended-1.20.1:1.0.6")
     implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.2+1.20.1-forge")
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
     implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
     compileOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
     compileOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
-
+    implementation fg.deobf("curse.maven:betterdays-895618:5877548")
+    implementation fg.deobf("curse.maven:spectrelib-993948:5217603")
     implementation fg.deobf("curse.maven:desert-storms-1312888:6836227")
     implementation fg.deobf("curse.maven:lodestone-616457:6213794")
 

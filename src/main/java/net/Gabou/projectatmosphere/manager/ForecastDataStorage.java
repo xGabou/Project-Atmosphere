@@ -33,6 +33,20 @@ public class ForecastDataStorage {
         saveForecastMap(world);
     }
 
+    public static void clearAll(ServerLevel world) {
+        playerData.clear();
+        hasForecastData = false;
+        hasCenterData = false;
+
+        // Remove files
+        try {
+            Files.deleteIfExists(getSavePath(world, FILE_NAME));
+            Files.deleteIfExists(getSavePath(world, FORECAST_FILE));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void loadAll(ServerLevel world) {
         loadPlayerCenters(world);
         loadForecastMap(world);
@@ -163,15 +177,41 @@ public class ForecastDataStorage {
         return array;
     }
 
+    /**
+     * Deserializes a week array from a JsonArray.
+     * Returns float[entryCount][2]. If a pair is missing values, defaults to 0f.
+     * Logs a warning if data is malformed.
+     */
     private static float[][] deserializeWeek(JsonArray arr) {
-        float[][] week = new float[arr.size()][2];
+        float[][] week = new float[arr == null ? 0 : arr.size()][2];
+        if (arr == null) return week;
         for (int i = 0; i < arr.size(); i++) {
-            JsonArray pair = arr.get(i).getAsJsonArray();
-            week[i][0] = pair.get(0).getAsFloat();
-            week[i][1] = pair.get(1).getAsFloat();
+            JsonElement e = arr.get(i);
+            if (e == null || !e.isJsonArray()) {
+                System.err.println("[ProjectAtmosphere] Warning: Week entry at index " + i + " is not an array. Defaulted to 0.");
+                week[i][0] = 0f;
+                week[i][1] = 0f;
+                continue;
+            }
+            JsonArray pair = e.getAsJsonArray();
+            week[i][0] = (pair.size() > 0 && !pair.get(0).isJsonNull()) ? getAsFloatSafe(pair.get(0)) : 0f;
+            week[i][1] = (pair.size() > 1 && !pair.get(1).isJsonNull()) ? getAsFloatSafe(pair.get(1)) : 0f;
+            if (pair.size() < 2) {
+                System.err.println("[ProjectAtmosphere] Warning: Week entry at index " + i + " missing value(s). Defaulted to 0.");
+            }
         }
         return week;
     }
+
+    // Utility: safe float extraction
+    private static float getAsFloatSafe(JsonElement e) {
+        try {
+            return e.getAsFloat();
+        } catch (Exception ex) {
+            return 0f;
+        }
+    }
+
 
     private static JsonArray serializeWinds(WindVector[] winds) {
         JsonArray array = new JsonArray();
@@ -187,16 +227,34 @@ public class ForecastDataStorage {
     }
 
 
+    /**
+     * Deserializes a WindVector array from a JsonArray.
+     * If a value is missing, defaults to 0f and logs a warning.
+     */
     private static WindVector[] deserializeWinds(JsonArray arr) {
-        WindVector[] winds = new WindVector[arr.size()];
+        WindVector[] winds = new WindVector[arr == null ? 0 : arr.size()];
+        if (arr == null) return winds;
         for (int i = 0; i < arr.size(); i++) {
-            JsonObject obj = arr.get(i).getAsJsonObject();
-            float speed = obj.get("speed").getAsFloat();
-            float angle = obj.get("angle").getAsFloat();
-            float gustSpeed = obj.get("gustSpeed").getAsFloat();
-            winds[i] = new WindVector(speed, angle,gustSpeed);
+            JsonElement e = arr.get(i);
+            if (e == null || !e.isJsonObject()) {
+                System.err.println("[ProjectAtmosphere] Warning: Wind entry at index " + i + " is not an object. Defaulted to zero wind.");
+                winds[i] = new WindVector(0f, 0f, 0f);
+                continue;
+            }
+            JsonObject obj = e.getAsJsonObject();
+            float speed = obj.has("speed") && !obj.get("speed").isJsonNull() ? getAsFloatSafe(obj.get("speed")) : 0f;
+            float angle = obj.has("angle") && !obj.get("angle").isJsonNull() ? getAsFloatSafe(obj.get("angle")) : 0f;
+            float gustSpeed = obj.has("gustSpeed") && !obj.get("gustSpeed").isJsonNull() ? getAsFloatSafe(obj.get("gustSpeed")) : 0f;
+
+            if (!obj.has("speed") || !obj.has("angle") || !obj.has("gustSpeed")) {
+                System.err.println("[ProjectAtmosphere] Warning: Wind entry missing field(s) at index " + i + ". Defaulted to 0.");
+            }
+
+            winds[i] = new WindVector(speed, angle, gustSpeed);
         }
         return winds;
     }
+
+
 
 }

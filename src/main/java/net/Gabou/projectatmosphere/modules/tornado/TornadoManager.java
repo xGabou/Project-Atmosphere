@@ -28,7 +28,7 @@ public class TornadoManager {
 
     public static void tick() {
         // Remove tornados after 20 seconds
-        ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 20);
+        ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 60);
         for (TornadoInstance tornado : ACTIVE_TORNADOES) {
             float speed = tornado.wind.baseSpeed() * 0.05f;
             tornado.position = tornado.position.add(

@@ -1,12 +1,17 @@
 package net.Gabou.projectatmosphere.event;
 
+import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
@@ -23,6 +28,8 @@ public class BiomeChangeManager {
     private static final int RUN_INTERVAL_TICKS = 2000;
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = 6000;
 
+
+
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent ev) {
         if (ev.phase != TickEvent.Phase.END) return;
@@ -35,6 +42,14 @@ public class BiomeChangeManager {
         UUID uuid = player.getUUID();
         ResourceLocation nowBiome = getBiomeKeyAt(player);
         ResourceLocation last = lastBiome.get(uuid);
+        if(!ForecastGenerator.SANDSTORM_BIOMES.contains(nowBiome)) {
+            if(SandStormAPI.isSandstormActive()) {
+                for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
+                    Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(),null);
+                }
+
+            }
+        }
 
         if (last == null || !last.equals(nowBiome)) {
             lastBiome.put(uuid, nowBiome);

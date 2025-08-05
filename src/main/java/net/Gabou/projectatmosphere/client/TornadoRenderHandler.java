@@ -19,25 +19,45 @@ public class TornadoRenderHandler {
 
         ShaderInstance shader = TornadoShaders.getTornadoShader();
         RenderSystem.setShader(() -> shader);
+
+        shader.apply(); // VERY important to bind the shader before setting uniforms
+
+        var modelViewMat = shader.getUniform("ModelViewMat");
+        if (modelViewMat != null)
+            modelViewMat.set(poseStack.last().pose());
+
+        var projMat = shader.getUniform("ProjMat");
+        if (projMat != null)
+            projMat.set(RenderSystem.getProjectionMatrix());
+
         var timeUniform = shader.getUniform("Time");
         if (timeUniform != null)
             timeUniform.set(TornadoManager.getShaderTime());
 
+        RenderSystem.enableDepthTest();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+
+
         for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
+// 1st rendering block: fixed at (0, 80, 0), scaled 10×
             poseStack.pushPose();
             Vec3 camPos = camera.getPosition();
-            poseStack.translate(tornado.position.x - camPos.x, tornado.position.y - camPos.y, tornado.position.z - camPos.z);
-
-            poseStack.mulPose(com.mojang.math.Axis.YP.rotation((float) tornado.wind.angleRadians()));
-            poseStack.mulPose(com.mojang.math.Axis.YP.rotation(TornadoManager.getShaderTime()));
-
-            poseStack.scale(tornado.radius, tornado.radius, tornado.radius);
-
+            poseStack.translate(40, -40, 40);
+            poseStack.scale(10, 10, 10);
             RenderSystem.applyModelViewMatrix();
             TornadoMesh.drawCone();
             poseStack.popPose();
+
+// 2nd rendering block: no translation, no scaling — invisible
+            RenderSystem.applyModelViewMatrix();
+            TornadoMesh.drawCone();
+
+
         }
     }
+
+
 
 }
 

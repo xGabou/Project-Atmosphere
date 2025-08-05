@@ -21,8 +21,5 @@ public class TemperatureTickHandler {
             AtmosphereManager.onSwapProfiles((ServerLevel) event.level);
         }
 
-        if (t % RUN_INTERVAL_TICKS == 0) {
-            AtmosphereManager.tick((ServerLevel) event.level);
-        }
     }
 }

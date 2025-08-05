@@ -30,6 +30,10 @@ public class SandStormAPI {
     private SandStormAPI() {
         // Prevent instantiation
     }
+
+    public static SandstormPhase getSandstormPhase() {
+       return SandstormManager.getPhase();
+    }
     private static final List<BiomeInstanceKey> scheduledStormBiome = new ArrayList<>();
 
     public static List<BiomeInstanceKey> getScheduledStormBiome() {

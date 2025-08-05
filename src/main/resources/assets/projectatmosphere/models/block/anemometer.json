@@ -1,6 +1,121 @@
 {
-  "parent": "block/cube_all",
-  "textures": {
-    "all": "projectatmosphere:block/anemometer"
-  }
+	"format_version": "1.21.6",
+	"credit": "Made with Blockbench",
+	"parent": "block/block",
+	"textures": {
+		"base": "projectatmosphere:block/anemometer_base",
+		"rod": "projectatmosphere:block/anemometer_rod",
+		"cup": "projectatmosphere:block/anemometer_cup",
+		"vane": "projectatmosphere:block/anemometer_vane"
+	},
+	"elements": [
+		{
+			"from": [7, 0, 7],
+			"to": [9, 2, 9],
+			"faces": {
+				"north": {"uv": [2, 3, 14, 13], "texture": "#base"},
+				"east": {"uv": [2, 3, 14, 13], "texture": "#base"},
+				"south": {"uv": [2, 3, 14, 13], "texture": "#base"},
+				"west": {"uv": [2, 3, 14, 13], "texture": "#base"},
+				"up": {"uv": [2, 3, 14, 13], "texture": "#base"},
+				"down": {"uv": [2, 3, 14, 13], "texture": "#base"}
+			}
+		},
+		{
+			"from": [7.75, 2, 7.75],
+			"to": [8.25, 12, 8.25],
+			"faces": {
+				"north": {"uv": [7.75, 4, 8.25, 14], "texture": "#rod"},
+				"east": {"uv": [7.75, 4, 8.25, 14], "texture": "#rod"},
+				"south": {"uv": [7.75, 4, 8.25, 14], "texture": "#rod"},
+				"west": {"uv": [7.75, 4, 8.25, 14], "texture": "#rod"},
+				"up": {"uv": [7.75, 7.75, 8.25, 8.25], "texture": "#rod"},
+				"down": {"uv": [7.75, 7.75, 8.25, 8.25], "texture": "#rod"}
+			}
+		},
+		{
+			"from": [5, 11.5, 7.75],
+			"to": [11, 12.5, 8.25],
+			"faces": {
+				"north": {"uv": [5, 3.5, 11, 4.5], "texture": "#rod"},
+				"east": {"uv": [7.75, 3.5, 8.25, 4.5], "texture": "#rod"},
+				"south": {"uv": [5, 3.5, 11, 4.5], "texture": "#rod"},
+				"west": {"uv": [7.75, 3.5, 8.25, 4.5], "texture": "#rod"},
+				"up": {"uv": [5, 7.75, 11, 8.25], "texture": "#rod"},
+				"down": {"uv": [5, 7.75, 11, 8.25], "texture": "#rod"}
+			}
+		},
+		{
+			"from": [7.75, 11.5, 5],
+			"to": [8.25, 12.5, 11],
+			"faces": {
+				"north": {"uv": [7.75, 3.5, 8.25, 4.5], "texture": "#rod"},
+				"east": {"uv": [5, 3.5, 11, 4.5], "texture": "#rod"},
+				"south": {"uv": [7.75, 3.5, 8.25, 4.5], "texture": "#rod"},
+				"west": {"uv": [5, 3.5, 11, 4.5], "texture": "#rod"},
+				"up": {"uv": [7.75, 5, 8.25, 11], "texture": "#rod"},
+				"down": {"uv": [7.75, 5, 8.25, 11], "texture": "#rod"}
+			}
+		},
+		{
+			"from": [10, 11.25, 7],
+			"to": [11, 12.75, 9],
+			"faces": {
+				"north": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
+				"east": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"south": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
+				"west": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"up": {"uv": [10, 7, 11, 9], "texture": "#cup"},
+				"down": {"uv": [10, 7, 11, 9], "texture": "#cup"}
+			}
+		},
+		{
+			"from": [5, 11.25, 7],
+			"to": [6, 12.75, 9],
+			"faces": {
+				"north": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
+				"east": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"south": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
+				"west": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"up": {"uv": [5, 7, 6, 9], "texture": "#cup"},
+				"down": {"uv": [5, 7, 6, 9], "texture": "#cup"}
+			}
+		},
+		{
+			"from": [7, 11.25, 5],
+			"to": [9, 12.75, 6],
+			"faces": {
+				"north": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"east": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
+				"south": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"west": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
+				"up": {"uv": [7, 5, 9, 6], "texture": "#cup"},
+				"down": {"uv": [7, 10, 9, 11], "texture": "#cup"}
+			}
+		},
+		{
+			"from": [7, 11.25, 10],
+			"to": [9, 12.75, 11],
+			"faces": {
+				"north": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"east": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
+				"south": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
+				"west": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
+				"up": {"uv": [7, 10, 9, 11], "texture": "#cup"},
+				"down": {"uv": [7, 5, 9, 6], "texture": "#cup"}
+			}
+		},
+		{
+			"from": [7.95, 11, 3.5],
+			"to": [8.1, 13, 5],
+			"faces": {
+				"north": {"uv": [5.26563, 2.73438, 6.26563, 4.73438], "texture": "#vane"},
+				"east": {"uv": [13.07813, 2.71875, 2.95313, 12.59375], "texture": "#vane"},
+				"south": {"uv": [3.125, 3.45313, 4.125, 5.45313], "texture": "#vane"},
+				"west": {"uv": [2.96875, 2.78125, 13.04688, 12.5625], "texture": "#vane"},
+				"up": {"uv": [6.65625, 3.14063, 7.65625, 4.64063], "texture": "#vane"},
+				"down": {"uv": [4.14063, 10.6875, 5.14063, 12.1875], "texture": "#vane"}
+			}
+		}
+	]
 }

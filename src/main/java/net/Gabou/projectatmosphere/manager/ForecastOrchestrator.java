@@ -31,8 +31,18 @@ public class ForecastOrchestrator {
 
         // If both files exist, we assume the data is already loaded
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
-            ForecastGenerator.generateForecastForSavedRegion(level);
-            return true;
+            try {
+                ForecastGenerator.generateForecastForSavedRegion(level);
+                return true;
+            }
+            catch (Exception e) {
+                ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
+                // If loading fails, we clear the data and regenerate
+                ForecastDataStorage.clearAll(level);
+                ForecastGenerator.clearForecasts();
+                ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
+                return true;
+            }
         }
 
         // If not, generate forecast for all known centers or default to spawn

@@ -31,7 +31,6 @@ public class TemperatureGenerator {
 
     /** Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM), with noise & season. */
     public static float[][] generateWeekForecast(Level world, BlockPos chunkPos, ResourceLocation biomeId) {
-        ProjectAtmosphere.LOGGER.info("[TempForecast] Starting Generating full temperature forecast...");
         float[][] week = new float[7][2];
         long seed = chunkPos.asLong() ^ biomeId.hashCode() ^
                 ProjectAtmosphere.seed;

@@ -57,7 +57,7 @@ public class ForecastGenerator {
 
     public static final int MAX_POSITIONS_PER_BIOME;
 
-    private static final Set<ResourceLocation> SANDSTORM_BIOMES = Set.of(
+    public static final Set<ResourceLocation> SANDSTORM_BIOMES = Set.of(
             ResourceLocation.fromNamespaceAndPath("minecraft", "desert"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "badlands")
     );
@@ -556,6 +556,15 @@ public class ForecastGenerator {
 
     static void clearForecasts() {
         FORECAST_MAP.clear();
+        biomeSamples.clear();
+        biomeSampleCounts.clear();
+        AVERAGE_FORECASTS.clear();
+        clearSandstormForecasts();
+        scheduledStormBiome = null;
+        scheduledStormPhase = null;
+        scheduledStormTime = -1L;
+        tickCounter = 0;
+        ProjectAtmosphere.LOGGER.info("[Atmosphere] Cleared all forecasts and samples.");
     }
 
     static void putForecast(BiomeInstanceKey key, BiomeForecast forecast) {
