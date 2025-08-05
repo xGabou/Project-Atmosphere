@@ -2,7 +2,11 @@ package net.Gabou.projectatmosphere.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
+import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
+import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
+import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.client.Camera;
@@ -30,7 +34,7 @@ public class ClientRenderHook {
     @SubscribeEvent
     public static void onRender(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
-
+        if(Minecraft.getInstance().level ==null) return;
         PoseStack poseStack = event.getPoseStack();
         Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
         Vec3 camPos = camera.getPosition();
@@ -44,7 +48,7 @@ public class ClientRenderHook {
         poseStack.translate(-camPos.x, -camPos.y, -camPos.z); // world-relative positioning
 
         for (TornadoInstance tornado : tornadoes) {
-            TornadoRenderHandler.renderTornado(poseStack, tornado.position.x, tornado.position.y, tornado.position.z);
+            TornadoRenderHandler.renderTornado(poseStack, tornado.position.x, Minecraft.getInstance().level.getSeaLevel(), tornado.position.z);
         }
 
         poseStack.popPose();

@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
+import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.client.render.TornadoMesh;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.minecraft.client.Camera;
@@ -75,7 +76,7 @@ public static void renderTornado(PoseStack stack, double x, double y, double z) 
     int rings = 30;
     float baseRadius = 8f;
     float topRadius = 1.5f;
-    float height = 40f;
+    float height = SimpleCloudsConfig.CLIENT.cloudHeight.get() * 0.5f;
 
     for (int i = 0; i < rings; i++) {
         float y0 = i * (height / rings);
