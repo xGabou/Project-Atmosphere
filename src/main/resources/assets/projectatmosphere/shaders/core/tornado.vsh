@@ -7,8 +7,7 @@ uniform mat4 ProjMat;
 uniform float Time;
 
 void main() {
-    float angle = Position.y * 2.0 + Time;
-    float radius = length(Position.xz);
-    vec3 pos = vec3(cos(angle) * radius, Position.y, sin(angle) * radius);
-    gl_Position = ProjMat * ModelViewMat * vec4(pos, 1.0);
+    vec3 animatedPos = Position;
+    animatedPos.y += sin(Time * 3.0) * 0.1;
+    gl_Position = ProjMat * ModelViewMat * vec4(animatedPos, 1.0);
 }
