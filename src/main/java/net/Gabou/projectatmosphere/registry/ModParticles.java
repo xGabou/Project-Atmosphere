@@ -1,8 +1,10 @@
 package net.Gabou.projectatmosphere.registry;
 
-import net.minecraft.core.registries.Registries;
+import com.mojang.serialization.Codec;
+import net.Gabou.projectatmosphere.particles.DebrisParticleData;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.core.registries.Registries;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegistryObject;
@@ -34,6 +36,14 @@ public class ModParticles {
             PARTICLES.register("heart_orange", () -> new SimpleParticleType(true));
     public static final RegistryObject<SimpleParticleType> HEART_JAUNE =
             PARTICLES.register("heart_jaune", () -> new SimpleParticleType(true));
+
+    public static final RegistryObject<ParticleType<DebrisParticleData>> DEBRIS =
+            PARTICLES.register("debris", () -> new ParticleType<DebrisParticleData>(true, DebrisParticleData.DESERIALIZER) {
+                @Override
+                public Codec<DebrisParticleData> codec() {
+                    return DebrisParticleData.CODEC;
+                }
+            });
 
     public static void register(IEventBus bus) {
         PARTICLES.register(bus);

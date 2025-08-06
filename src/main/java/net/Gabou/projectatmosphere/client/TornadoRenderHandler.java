@@ -5,10 +5,12 @@ import com.mojang.blaze3d.vertex.*;
 import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.client.render.TornadoMesh;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.particles.DebrisParticleData;
 import net.minecraft.client.Camera;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.world.phys.Vec3;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import org.joml.Matrix4f;
 
 public class TornadoRenderHandler {
@@ -108,6 +110,18 @@ public static void renderTornado(PoseStack stack, double x, double y, double z) 
     RenderSystem.disableBlend();
     stack.popPose();
 }
+
+
+    public static void spawnDebrisParticles(TornadoInstance tornado, ClientLevel level) {
+        for (int i = 0; i < 10; i++) {
+            double radius = 2.5 + level.random.nextDouble() * 2.0;
+            double height = level.random.nextDouble() * 10.0;
+            float angularSpeed = 5f;
+
+            level.addParticle(new DebrisParticleData(tornado, radius, height, angularSpeed),
+                    tornado.position.x, tornado.position.y, tornado.position.z, 0, 0.01, 0);
+        }
+    }
 
 
 
