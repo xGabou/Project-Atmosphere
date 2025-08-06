@@ -57,4 +57,18 @@ public class InstrumentUtils {
         String msg = "Current pressure: " + String.format("%.1fhPa", pressure);
         HUDOverlayRenderer.showTemperatureOverlay(msg);
     }
+
+    public static void displayStorm(Level level, Player player) {
+        if (!level.isClientSide) return;
+
+        String msg;
+        if (level.isThundering()) {
+            msg = "Storm detected!";
+        } else if (level.isRaining()) {
+            msg = "Rain detected.";
+        } else {
+            msg = "Skies clear.";
+        }
+        HUDOverlayRenderer.showTemperatureOverlay(msg);
+    }
 }

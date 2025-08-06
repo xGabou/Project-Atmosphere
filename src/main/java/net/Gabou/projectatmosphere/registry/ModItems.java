@@ -28,6 +28,9 @@ public class ModItems {
     public static final RegistryObject<Item> HUMIDIMETER = ITEMS.register("humidimeter_block",
             () -> new Humidimeter(ModBlocks.HUMIDIMETER_BLOCK.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> WEATHER_RADAR = ITEMS.register("weather_radar",
+            () -> new WeatherRadarItem(new Item.Properties()));
+
 
 
     public static final RegistryObject<Item> WOOD_BALAI = ITEMS.register("balai_bois",
