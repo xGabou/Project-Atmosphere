@@ -63,14 +63,30 @@ public static void renderTornado(PoseStack stack, double x, double y, double z) 
     stack.translate(x, y, z);
     Matrix4f matrix = stack.last().pose();
 
-    RenderSystem.setShader(() -> MyShaders.TORNADO);
+    ShaderInstance shader = MyShaders.TORNADO;
+    RenderSystem.setShader(() -> shader);
+    shader.apply();
+
+    var modelView = shader.getUniform("ModelViewMat");
+    if (modelView != null) {
+        modelView.set(matrix);
+    }
+    var projMat = shader.getUniform("ProjMat");
+    if (projMat != null) {
+        projMat.set(RenderSystem.getProjectionMatrix());
+    }
+    var timeUniform = shader.getUniform("Time");
+    if (timeUniform != null) {
+        timeUniform.set(TornadoManager.getShaderTime());
+    }
+
     RenderSystem.enableBlend();
     RenderSystem.defaultBlendFunc();
     RenderSystem.disableCull(); // See both sides
 
     Tesselator tess = Tesselator.getInstance();
     BufferBuilder buffer = tess.getBuilder();
-    buffer.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION);
+    buffer.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION_TEX);
 
     int segments = 64;
     int rings = 30;
@@ -90,14 +106,15 @@ public static void renderTornado(PoseStack stack, double x, double y, double z) 
 
         for (int j = 0; j <= segments; j++) {
             float angle = (float) (2 * Math.PI * j / segments);
+            float u = j / (float) segments;
 
             float x0 = (float) (radius0 * Math.cos(angle + twist0));
             float z0 = (float) (radius0 * Math.sin(angle + twist0));
             float x1 = (float) (radius1 * Math.cos(angle + twist1));
             float z1 = (float) (radius1 * Math.sin(angle + twist1));
 
-            buffer.vertex(matrix, x0, y0, z0).endVertex();
-            buffer.vertex(matrix, x1, y1, z1).endVertex();
+            buffer.vertex(matrix, x0, y0, z0).uv(u, y0 / height).endVertex();
+            buffer.vertex(matrix, x1, y1, z1).uv(u, y1 / height).endVertex();
         }
     }
 

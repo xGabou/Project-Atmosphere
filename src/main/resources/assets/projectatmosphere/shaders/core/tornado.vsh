@@ -1,13 +1,15 @@
 #version 150
 
 in vec3 Position;
+in vec2 UV0;
 
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform float Time;
 
+out vec2 texCoord;
+
 void main() {
-    vec3 animatedPos = Position;
-    animatedPos.y += sin(Time * 3.0) * 0.1; // subtle vertical wave
-    gl_Position = ProjMat * ModelViewMat * vec4(animatedPos, 1.0);
+    texCoord = UV0;
+    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
 }
