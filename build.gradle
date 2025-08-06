@@ -21,10 +21,10 @@ minecraft {
     copyIdeResources = true
     accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 
-//    mixin {
-//        add sourceSets.main, "projectatmosphere.refmap.json" // ⬅️ same as in mixins.json
-//        config 'projectatmosphere.mixins.json' // ⬅️ same as in mixins.json
-//    }
+    mixin {
+        add sourceSets.main, "projectatmosphere.refmap.json" // ⬅️ same as in mixins.json
+        config 'projectatmosphere.mixins.json' // ⬅️ same as in mixins.json
+    }
     runs {
         configureEach {
             workingDirectory project.file('run')
