@@ -1,9 +1,11 @@
 package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.client.TornadoRenderHandler;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
@@ -41,9 +43,14 @@ public class ClientTickHandler {
 
         tickCounter++;
         TornadoManager.tick();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level != null && mc.level.getGameTime() % 2 == 0) {
+            for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
+                TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
+            }
+        }
         if (tickCounter % 40 != 0) return; // Run every 20 ticks (1 second)
         AsyncAtmosphereService.runClient(() -> {
-            Minecraft mc = Minecraft.getInstance();
             if (mc.level == null || mc.player == null) return;
             if (random == null) {
                 random = mc.level.random;
