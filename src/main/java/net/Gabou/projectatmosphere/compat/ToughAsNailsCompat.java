@@ -3,11 +3,9 @@ package net.Gabou.projectatmosphere.compat;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraftforge.fml.ModList;
-import toughasnails.api.temperature.TemperatureHelper;
 import toughasnails.api.temperature.TemperatureLevel;
+import toughasnails.temperature.TemperatureHelperImpl;
 
 public class ToughAsNailsCompat {
 
@@ -20,7 +18,7 @@ public class ToughAsNailsCompat {
      */
     public static float[][] injectForecastForTAN(BiomeInstanceKey key, ServerLevel level) {
         BlockPos sample = key.samplePos();
-        TemperatureLevel band = TemperatureHelper.getTemperatureAtPos(level, sample);
+        TemperatureLevel band = TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(level, sample);
         float baseTemp = mapBandToTemperature(band);
         return generateMinMaxCurve(baseTemp, level.getRandom());
     }
