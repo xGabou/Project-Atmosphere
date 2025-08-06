@@ -1,7 +1,8 @@
 package net.Gabou.projectatmosphere.items;
 
 import net.Gabou.projectatmosphere.blocks.InstrumentReader;
-import net.Gabou.projectatmosphere.util.InstrumentUtils;
+import net.Gabou.projectatmosphere.client.screen.WeatherRadarScreen;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
@@ -27,6 +28,6 @@ public class WeatherRadarItem extends Item implements InstrumentReader {
 
     @Override
     public void display(Level level, Player player) {
-        InstrumentUtils.displayStorm(level, player);
+        Minecraft.getInstance().setScreen(new WeatherRadarScreen(player));
     }
 }
