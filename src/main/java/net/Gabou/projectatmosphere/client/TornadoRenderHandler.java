@@ -17,6 +17,9 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import static org.lwjgl.opengl.GL11C.GL_BACK;
+import static org.lwjgl.opengl.GL11C.glCullFace;
+
 public class TornadoRenderHandler {
 
     private static final ResourceLocation NOISE_TEXTURE =
@@ -342,6 +345,97 @@ public class TornadoRenderHandler {
             level.addParticle(new DebrisParticleData(tornado, radius, height, angularSpeed),
                     tornado.position.x, tornado.position.y, tornado.position.z, 0, 0.01, 0);
         }
+    }
+    public static void renderTornadoVolume(PoseStack poseStack,
+                                           Vec3 center,
+                                           Vec3 halfExtents,
+                                           float twistSpeed) {
+        ShaderInstance sh = MyShaders.BOX_TORNADO;
+        if (sh == null) return;
+
+        RenderSystem.setShader(() -> sh);
+        sh.apply();
+
+        // camera pos
+        Uniform dbg = sh.getUniform("DebugBox");
+        if (dbg != null) dbg.set(1.0f);  // show red overlay
+        Vec3 cam = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        sh.getUniform("CameraPos").set((float)cam.x, (float)cam.y, (float)cam.z);
+
+        // matrices
+
+        // box bounds in world space
+        Vec3 min = center.subtract(halfExtents);
+        Vec3 max = center.add(halfExtents);
+        sh.getUniform("BoxMin").set((float)min.x, (float)min.y, (float)min.z);
+        sh.getUniform("BoxMax").set((float)max.x, (float)max.y, (float)max.z);
+
+        // tornado params
+        sh.getUniform("Time").set(TornadoManager.getShaderTime());
+        sh.getUniform("TwistSpeed").set(twistSpeed);
+        sh.getUniform("BaseRadius").set(8f);
+        sh.getUniform("TopRadius").set(1.5f);
+        sh.getUniform("Height").set((float)SimpleCloudsConfig.CLIENT.cloudHeight.get());
+        sh.getUniform("DustIntensity").set(0.5f);
+
+
+        // state for volumes
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthMask(false);
+        RenderSystem.enableCull();
+        glCullFace(GL_BACK);  // keep front faces (normal case)
+
+
+        // emit cube vertices in world space
+        float x0 = (float)min.x, y0 = (float)min.y, z0 = (float)min.z;
+        float x1 = (float)max.x, y1 = (float)max.y, z1 = (float)max.z;
+
+        Tesselator t = Tesselator.getInstance();
+        BufferBuilder b = t.getBuilder();
+        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
+
+        // +X
+        b.vertex(x1,y0,z0).endVertex(); b.vertex(x1,y0,z1).endVertex();
+        b.vertex(x1,y1,z1).endVertex(); b.vertex(x1,y1,z0).endVertex();
+        // -X
+        b.vertex(x0,y0,z1).endVertex(); b.vertex(x0,y0,z0).endVertex();
+        b.vertex(x0,y1,z0).endVertex(); b.vertex(x0,y1,z1).endVertex();
+        // +Y
+        b.vertex(x0,y1,z0).endVertex(); b.vertex(x1,y1,z0).endVertex();
+        b.vertex(x1,y1,z1).endVertex(); b.vertex(x0,y1,z1).endVertex();
+        // -Y
+        b.vertex(x0,y0,z1).endVertex(); b.vertex(x1,y0,z1).endVertex();
+        b.vertex(x1,y0,z0).endVertex(); b.vertex(x0,y0,z0).endVertex();
+        // +Z
+        b.vertex(x0,y0,z1).endVertex(); b.vertex(x1,y0,z1).endVertex();
+        b.vertex(x1,y1,z1).endVertex(); b.vertex(x0,y1,z1).endVertex();
+        // -Z
+        b.vertex(x1,y0,z0).endVertex(); b.vertex(x0,y0,z0).endVertex();
+        b.vertex(x0,y1,z0).endVertex(); b.vertex(x1,y1,z0).endVertex();
+
+        t.end();
+
+        RenderSystem.depthMask(true);
+    }
+
+
+
+
+    public static Matrix4f getInverseViewProjection() {
+        // Grab the current projection and model-view from RenderSystem
+        Matrix4f proj = RenderSystem.getProjectionMatrix();
+        Matrix4f view = RenderSystem.getModelViewMatrix();
+
+        // Compose P * V
+        Matrix4f viewProj = new Matrix4f(proj);
+        viewProj.mul(view);
+
+        // Invert it in place
+        viewProj.invert();
+
+        return viewProj;
     }
 
 

@@ -1,0 +1,21 @@
+{
+  "vertex":   "projectatmosphere:box",
+  "fragment": "projectatmosphere:box_tornado",
+  "attributes": ["Position"],
+  "uniforms": [
+    { "name":"CameraPos",    "type":"float", "count":3, "values":[0,0,0] },
+    { "name":"BoxMin",       "type":"float", "count":3, "values":[-1,-1,-1] },
+    { "name":"BoxMax",       "type":"float", "count":3, "values":[ 1, 1, 1] },
+    { "name": "DebugBox", "type": "float", "count": 1, "values": [0.0] },
+    { "name":"Time",         "type":"float","count":1,"values":[0] },
+    { "name":"TwistSpeed",   "type":"float","count":1,"values":[1] },
+    { "name":"BaseRadius",   "type":"float","count":1,"values":[8] },
+    { "name":"TopRadius",    "type":"float","count":1,"values":[1.5] },
+    { "name":"Height",       "type":"float","count":1,"values":[100] },
+    { "name":"DustIntensity","type":"float","count":1,"values":[0.5] }
+  ],
+  "blend": { "func":"add","srcrgb":"srcalpha","dstrgb":"1-srcalpha" },
+  "depthTest":"lequal",
+  "depthWrite": false,
+  "cull":"back"
+}

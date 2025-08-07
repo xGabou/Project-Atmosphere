@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
@@ -51,6 +52,7 @@ public class ClientRenderHook {
                         level,camera,Minecraft.getInstance()
 
                 );
+                //TornadoRenderHandler.renderTornadoVolume(poseStack, tornado.position, new Vec3(12, SimpleCloudsConfig.CLIENT.cloudHeight.get() /2.0, 12),tornado.getTwist());
             }
             catch (Exception e){
                 ProjectAtmosphere.LOGGER.error("Error rendering tornado at position: " + tornado.position, e);

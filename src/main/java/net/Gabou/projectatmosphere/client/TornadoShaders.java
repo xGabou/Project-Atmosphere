@@ -10,7 +10,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.io.IOException;
-import java.util.Objects;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class TornadoShaders {
@@ -21,6 +20,9 @@ public class TornadoShaders {
         ShaderInstance shader = new ShaderInstance(event.getResourceProvider(),
                 ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "tornado"), DefaultVertexFormat.POSITION_TEX);
         event.registerShader(shader, s -> MyShaders.TORNADO = s);
+        ShaderInstance shader1 = new ShaderInstance(event.getResourceProvider(),
+                ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "box_tornado"), DefaultVertexFormat.POSITION_TEX);
+        event.registerShader(shader1, s -> MyShaders.BOX_TORNADO = s);
     }
 
 
