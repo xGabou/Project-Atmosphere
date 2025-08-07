@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.client;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
-import net.Gabou.projectatmosphere.client.render.TornadoMesh;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
@@ -173,6 +172,7 @@ public class TornadoRenderHandler {
     public static void renderTornado(PoseStack stack, double x, double y, double z, float twistSpeed) {
         ShaderInstance shader = MyShaders.TORNADO;
         if (shader == null) return;
+        RenderSystem.setShader(() -> shader);
 
         stack.pushPose();
         stack.translate(x, y, z);
