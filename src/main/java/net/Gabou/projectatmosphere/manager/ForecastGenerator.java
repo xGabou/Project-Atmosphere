@@ -74,7 +74,7 @@ public class ForecastGenerator {
 
     static {
         if (CompatHandler.isLegendaryModLoaded || CompatHandler.isToughAsNailsLoaded) {
-            MAX_POSITIONS_PER_BIOME = 10;
+            MAX_POSITIONS_PER_BIOME = 15;
         } else {
             MAX_POSITIONS_PER_BIOME = 40;
         }
