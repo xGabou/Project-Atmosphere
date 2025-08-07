@@ -1,0 +1,34 @@
+{
+  "targets": [
+    "clouds",
+    "final"
+  ],
+  "passes": [
+    {
+      "name": "pmweather:clouds",
+      "intarget": "minecraft:main",
+      "outtarget": "clouds",
+      "auxtargets":[
+        {"name": "DepthSampler", "id": "minecraft:main:depth"},
+        {"name": "NoiseSampler", "id": "pmweather/noise", "width": 512, "height": 512, "bilinear": true},
+        {"name": "NoiseSamplerX", "id": "pmweather/noisex", "width": 512, "height": 512, "bilinear": true},
+        {"name": "NoiseSamplerY", "id": "pmweather/noisey", "width": 512, "height": 512, "bilinear": true},
+        {"name": "NoiseSamplerZ", "id": "pmweather/noisez", "width": 512, "height": 512, "bilinear": true}
+      ]
+    },
+    {
+      "name": "pmweather:blur",
+      "intarget": "minecraft:main",
+      "outtarget": "final",
+      "auxtargets":[
+        {"name": "DepthSampler", "id": "minecraft:main:depth"},
+        {"name": "CloudSampler", "id": "clouds"}
+      ]
+    },
+    {
+      "name": "blit",
+      "intarget": "final",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}
