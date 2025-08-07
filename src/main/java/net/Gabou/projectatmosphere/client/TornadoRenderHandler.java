@@ -12,6 +12,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -181,139 +182,155 @@ public class TornadoRenderHandler {
 //    RenderSystem.disableBlend();
 //    stack.popPose();
 //}
-    public static void renderTornado(PoseStack stack, double x, double y, double z, float twistSpeed,Camera camera, ClientLevel level) {
+    public static void renderTornado(PoseStack stack, double tornadoX, double tornadoY, double tornadoZ, float twistSpeed, ClientLevel level, Camera camera, Minecraft minecraft) {
         ShaderInstance shader = MyShaders.TORNADO;
         if (shader == null) return;
         RenderSystem.setShader(() -> shader);
 
+        int segments = 64;
+        int rings = 64;
+        float baseRadius = 8f;
+        float topRadius = 1.5f;
+        float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
         stack.pushPose();
-        Matrix4f modelMat = new Matrix4f().translation((float)x, (float)y, (float)z);
-        Matrix4f viewMat = RenderSystem.getModelViewMatrix(); // camera
-        Matrix4f projMat = RenderSystem.getProjectionMatrix();
+        stack.translate(tornadoX, tornadoY, tornadoZ);
+
+        Matrix4f matrix = stack.last().pose();
         shader.apply();
 
-        var model = shader.getUniform("ModelMat");
-        if (model != null) model.set(modelMat);
+        var modelView = shader.getUniform("ModelViewMat");
+        if (modelView != null) modelView.set(matrix);
 
-        var view = shader.getUniform("ViewMat");
-        if (view != null) view.set(viewMat);
-
-        var proj = shader.getUniform("ProjMat");
-        if (proj != null) proj.set(projMat);
+        var projMat = shader.getUniform("ProjMat");
+        if (projMat != null) projMat.set(RenderSystem.getProjectionMatrix());
 
         var timeUniform = shader.getUniform("Time");
         if (timeUniform != null) timeUniform.set(TornadoManager.getShaderTime());
 
         var twistUniform = shader.getUniform("TwistSpeed");
         if (twistUniform != null) twistUniform.set(twistSpeed);
+        // Geometry uniforms
+        var baseRadiusUniform = shader.getUniform("BaseRadius");
+        if (baseRadiusUniform != null) baseRadiusUniform.set(baseRadius);
+
+        var topRadiusUniform = shader.getUniform("TopRadius");
+        if (topRadiusUniform != null) topRadiusUniform.set(topRadius);
+
+        var heightUniform = shader.getUniform("Height");
+        if (heightUniform != null) heightUniform.set(height);
+
+// Tornado profile & flow uniforms
+        var dustUniform = shader.getUniform("DustIntensity");
+        if (dustUniform != null) dustUniform.set(0.5f); // tweak as needed
+
+        var coreUniform = shader.getUniform("CoreTightness");
+        if (coreUniform != null) coreUniform.set(0.5f); // tweak as needed
+
+        var flowIntensity = shader.getUniform("FlowIntensity");
+        if (flowIntensity != null) flowIntensity.set(0.2f); // tweak as needed
+
+// Lighting + sky
+
+
+// Sky color
+        float partialTicks = minecraft.getFrameTime();
+        float sunAngle = level.getTimeOfDay(partialTicks); // value from 0.0 to 1.0
+        float angle = sunAngle * ((float) Math.PI * 2.0F);
+
+
+        float xLight = Mth.cos(angle);
+        float yLight = Mth.sin(angle); // sun rises from -1 to 1 over the day
+        float zLight = 0.2f;           // slightly tilted forward
+
+
+        float length = Mth.sqrt(xLight * xLight + yLight * yLight + zLight * zLight);
+        xLight /= length;
+        yLight /= length;
+        zLight /= length;
+
+
+        var lightX = shader.getUniform("LightDirX");
+        var lightY = shader.getUniform("LightDirY");
+        var lightZ = shader.getUniform("LightDirZ");
+
+        if (lightX != null) lightX.set(xLight);
+        if (lightY != null) lightY.set(yLight);
+        if (lightZ != null) lightZ.set(zLight);
+        Vec3 skyVec3 = level.getSkyColor(camera.getPosition(), partialTicks);
+
+        float r = (float) skyVec3.x;
+        float g = (float) skyVec3.y;
+        float b = (float) skyVec3.z;
+
+        Uniform uSkyR = shader.getUniform("SkyColorR");
+        Uniform uSkyG = shader.getUniform("SkyColorG");
+        Uniform uSkyB = shader.getUniform("SkyColorB");
+
+        if (uSkyR != null) uSkyR.set(r);
+        if (uSkyG != null) uSkyG.set(g);
+        if (uSkyB != null) uSkyB.set(b);
+
 
         RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
         // bind flow & normal
         RenderSystem.setShaderTexture(1, FLOWMAP_TEXTURE);
         RenderSystem.setShaderTexture(2, NORMALMAP_TEXTURE);
         RenderSystem.setShaderTexture(3, NOISE_TEXTURE);
-        float partialTicks = Minecraft.getInstance().getFrameTime();
-        Vec3 skyVec3 = level.getSkyColor(camera.getPosition(), partialTicks);
-        Vector3f skyColor = new Vector3f((float) skyVec3.x, (float) skyVec3.y, (float) skyVec3.z);
-        Uniform uSkyColor = shader.getUniform("SkyColor");
-        if (uSkyColor != null) {
-            uSkyColor.set(new float[]{ skyColor.x(), skyColor.y(), skyColor.z() });
-        }
-    // set sampler indices if needed (MC shaders usually infer by bind order)
-    // but to be safe:
-        var flowUni = shader.getUniform("FlowMap");
-        var normalUni = shader.getUniform("NormalMap");
-        var noiseUni = shader.getUniform("NoiseMap");
-        if (flowUni != null) flowUni.set(1);
-        if (normalUni != null) normalUni.set(2);
-        if (noiseUni != null) noiseUni.set(3);
-
-    // set our new tunables
-        var flowIntUni = shader.getUniform("FlowIntensity");
-        if (flowIntUni != null) flowIntUni.set(0.2f);
-        var lightDirUni = shader.getUniform("LightDir");
-        if (lightDirUni != null) lightDirUni.set(new float[]{0.5f, 1.0f, 0.2f});
-
-        Uniform smokeUni = shader.getUniform("smokeUni");
-        if (smokeUni != null) smokeUni.set(0);
-        int segments = 64;
-        int rings = 30;
-        float baseRadius = 8f;
-        float topRadius = 1.5f;
-        float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
-
-// 1) Shape parameters (must match your JSON defaults or tweak here)
-        var baseRadUni = shader.getUniform("BaseRadius");
-        if (baseRadUni != null) baseRadUni.set(baseRadius);
-        var topRadUni  = shader.getUniform("TopRadius");
-        if (topRadUni  != null) topRadUni.set(topRadius);
-        var heightUni  = shader.getUniform("Height");
-        if (heightUni  != null) heightUni.set(height);
-
-// 2) Dust & core
-        var dustUni = shader.getUniform("DustIntensity");
-        if (dustUni != null) dustUni.set(0.5f);         // or your desired value
-        var coreUni = shader.getUniform("CoreTightness");
-        if (coreUni != null) coreUni.set(0.5f);         // or your desired value
-
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
+        RenderSystem.enableDepthTest(); // Critical
+        RenderSystem.depthMask(true);  // Allow writing to depth buffer
+
 
         Tesselator tess = Tesselator.getInstance();
         BufferBuilder buffer = tess.getBuilder();
         buffer.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX);
 
 
+        for (int i = rings - 1; i >= 0; i--) {
+            float y0 = i * (height / rings);
+            float y1 = (i + 1) * (height / rings);
 
-//        for (int i = rings - 1; i >= 0; i--) {
-//            float y0 = i * (height / rings);
-//            float y1 = (i + 1) * (height / rings);
-//
-//            float radius0 = baseRadius - (baseRadius - topRadius) * (i / (float) rings);
-//            float radius1 = baseRadius - (baseRadius - topRadius) * ((i + 1f) / rings);
-//
-//            for (int j = 0; j < segments; j++) {
-//                float u0 = j / (float) segments;
-//                float u1 = (j + 1f) / (float) segments;
-//                float angle0 = (float) (2 * Math.PI * u0);
-//                float angle1 = (float) (2 * Math.PI * u1);
-//
-//                float x00 = (float) (radius0 * Math.cos(angle0));
-//                float z00 = (float) (radius0 * Math.sin(angle0));
-//                float x01 = (float) (radius0 * Math.cos(angle1));
-//                float z01 = (float) (radius0 * Math.sin(angle1));
-//                float x10 = (float) (radius1 * Math.cos(angle0));
-//                float z10 = (float) (radius1 * Math.sin(angle0));
-//                float x11 = (float) (radius1 * Math.cos(angle1));
-//                float z11 = (float) (radius1 * Math.sin(angle1));
-//
-//                float v0 = y0 / height;
-//                float v1 = y1 / height;
-//
-//                buffer.vertex( x00, y0, z00).uv(u0, v0).endVertex();
-//                buffer.vertex( x10, y1, z10).uv(u0, v1).endVertex();
-//                buffer.vertex( x11, y1, z11).uv(u1, v1).endVertex();
-//
-//                buffer.vertex(x00, y0, z00).uv(u0, v0).endVertex();
-//                buffer.vertex( x11, y1, z11).uv(u1, v1).endVertex();
-//                buffer.vertex( x01, y0, z01).uv(u1, v0).endVertex();
-//            }
-//        }
-        buffer.vertex(0, 100, 0).uv(0, 0).endVertex();
-        buffer.vertex(10, 100, 0).uv(1, 0).endVertex();
-        buffer.vertex(10, 110, 0).uv(1, 1).endVertex();
 
-        buffer.vertex(0, 100, 0).uv(0, 0).endVertex();
-        buffer.vertex(10, 110, 0).uv(1, 1).endVertex();
-        buffer.vertex(0, 110, 0).uv(0, 1).endVertex();
+            float radius0 = baseRadius - (baseRadius - topRadius) * (i / (float) rings);
+            float radius1 = baseRadius - (baseRadius - topRadius) * ((i + 1f) / rings);
+
+            for (int j = 0; j < segments; j++) {
+                float u0 = j / (float) segments;
+                float u1 = (j + 1f) / (float) segments;
+                float angle0 = (float) (2 * Math.PI * u0);
+                float angle1 = (float) (2 * Math.PI * u1);
+
+                float x00 = (float) (radius0 * Math.cos(angle0));
+                float z00 = (float) (radius0 * Math.sin(angle0));
+                float x01 = (float) (radius0 * Math.cos(angle1));
+                float z01 = (float) (radius0 * Math.sin(angle1));
+                float x10 = (float) (radius1 * Math.cos(angle0));
+                float z10 = (float) (radius1 * Math.sin(angle0));
+                float x11 = (float) (radius1 * Math.cos(angle1));
+                float z11 = (float) (radius1 * Math.sin(angle1));
+
+                float epsilon = 0.0001f;
+                float v0 = (y0 + epsilon) / height;
+                float v1 = (y1 - epsilon) / height;
+
+
+                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
+                buffer.vertex(matrix, x10, y1, z10).uv(u0, v1).endVertex();
+                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
+
+                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
+                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
+                buffer.vertex(matrix, x01, y0, z01).uv(u1, v0).endVertex();
+            }
+        }
 
         tess.end();
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         stack.popPose();
     }
-
 
     public static void spawnDebrisParticles(TornadoInstance tornado, ClientLevel level) {
         for (int i = 0; i < 10; i++) {
