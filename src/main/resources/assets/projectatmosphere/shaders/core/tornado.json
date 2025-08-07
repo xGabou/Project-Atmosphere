@@ -1,19 +1,37 @@
 {
-  "vertex": "projectatmosphere:tornado",
+  "vertex":   "projectatmosphere:tornado",
   "fragment": "projectatmosphere:tornado",
-  "attributes": ["Position", "UV0"],
+  "attributes": ["Position","UV0"],
   "samplers": [
-    {"name": "Sampler0"}
+    { "name": "smokeUni" },
+    { "name": "FlowMap" },
+    { "name": "NormalMap" },
+    { "name": "NoiseMap" }
+
   ],
   "uniforms": [
-    {"name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0, 0.0,0.0,1.0,0.0, 0.0,0.0,0.0,1.0]},
+    {"name": "ModelMat", "type": "matrix4x4", "count": 16, "values": [1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0, 0.0,0.0,1.0,0.0, 0.0,0.0,0.0,1.0]},
+    {"name": "ViewMat", "type": "matrix4x4", "count": 16, "values": [1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0, 0.0,0.0,1.0,0.0, 0.0,0.0,0.0,1.0]},
     {"name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0, 0.0,0.0,1.0,0.0, 0.0,0.0,0.0,1.0]},
     {"name": "Time", "type": "float", "count": 1, "values": [0.0]},
-    {"name": "TwistSpeed", "type": "float", "count": 1, "values": [1.0]}
+    {"name": "TwistSpeed", "type": "float", "count": 1, "values": [1.0]},
+    { "name":"BaseRadius",   "type":"float",   "count":1, "values":[0.2] },
+    { "name":"TopRadius",    "type":"float",   "count":1, "values":[3.0] },
+    { "name":"Height",       "type":"float",   "count":1, "values":[100.0] },
+    { "name":"DustIntensity","type":"float",   "count":1, "values":[0.5] },
+    { "name":"CoreTightness","type":"float",   "count":1, "values":[0.5] },
+    { "name":"FlowIntensity","type":"float",   "count":1, "values":[0.2] },
+    { "name":"LightDir",  "type":"float","count":3, "values":[0.5,1.0,0.2] },
+    { "name":"SkyColor",  "type":"float","count":3, "values":[0.1,0.1,0.12] },
+    { "name": "smokeUni", "type": "int", "count": 1, "values": [0] },
+    { "name": "FlowMap",   "type": "int", "count": 1, "values": [1] },
+    { "name": "NormalMap", "type": "int", "count": 1, "values": [2] },
+    { "name": "NoiseMap",  "type": "int", "count": 1, "values": [3] }
+
   ],
   "blend": {
-    "func": "add",
-    "srcrgb": "srcalpha",
-    "dstrgb": "1-srcalpha"
+    "func":"add",
+    "srcrgb":"srcalpha",
+    "dstrgb":"1-srcalpha"
   }
 }

@@ -9,6 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -31,10 +32,11 @@ public class TornadoCommand {
                             AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                             player.blockPosition());
                     var wind = ForecastOrchestrator.getCurrentWind(key,level.getGameTime());
-                   SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
+                   //SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
 
+                    Vec3 playerPos = player.position();
                     // Spawn tornado visually and sync with clients
-                    TornadoManager.spawn(player.position(), 2.5f, wind);
+                    TornadoManager.spawn(new Vec3(playerPos.x,level.getSeaLevel(),playerPos.z), 2.5f, wind);
                     NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(),
                             new SpawnTornadoPacket(player.position(), 2.5f, wind));
 

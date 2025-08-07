@@ -14,6 +14,7 @@ public class TornadoInstance {
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind) {
         this.position = position;
+
         this.radius = radius;
         this.wind = wind;
         this.spawnTime = System.currentTimeMillis();
