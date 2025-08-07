@@ -10,10 +10,14 @@ import net.Gabou.projectatmosphere.particles.DebrisParticleData;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
 public class TornadoRenderHandler {
+
+    private static final ResourceLocation TORNADO_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/tornado.png");
 
 //    public static void renderTornadoess(PoseStack poseStack, Camera camera) {
 //        TornadoMesh.init();
@@ -50,7 +54,8 @@ public class TornadoRenderHandler {
 //            TornadoMesh.drawCone();
 //            poseStack.popPose();
 //
-//// 2nd rendering block: no translation, no scaling — invisible
+
+    /// / 2nd rendering block: no translation, no scaling — invisible
 //            RenderSystem.applyModelViewMatrix();
 //            TornadoMesh.drawCone();
 //
@@ -58,75 +63,196 @@ public class TornadoRenderHandler {
 //        }
 //    }
 
-public static void renderTornado(PoseStack stack, double x, double y, double z) {
-    if (MyShaders.TORNADO == null) return;
+//public static void renderTornado(PoseStack stack, double x, double y, double z) {
+//    if (MyShaders.TORNADO == null) return;
+//
+//    stack.pushPose();
+//    stack.translate(x, y, z);
+//    Matrix4f matrix = stack.last().pose();
+//
+//    ShaderInstance shader = MyShaders.TORNADO;
+//    RenderSystem.setShader(() -> shader);
+//    shader.apply();
+//
+//    var modelView = shader.getUniform("ModelViewMat");
+//    if (modelView != null) modelView.set(matrix);
+//
+//    var projMat = shader.getUniform("ProjMat");
+//    if (projMat != null) projMat.set(RenderSystem.getProjectionMatrix());
+//
+//    var timeUniform = shader.getUniform("Time");
+//    if (timeUniform != null) timeUniform.set(TornadoManager.getShaderTime());
+//
+//    RenderSystem.enableBlend();
+//    RenderSystem.defaultBlendFunc();
+//    RenderSystem.disableCull(); // Still useful for full visibility
+//
+//    Tesselator tess = Tesselator.getInstance();
+//    BufferBuilder buffer = tess.getBuilder();
+//    buffer.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX);
+//
+//    int segments = 64;
+//    int rings = 30;
+//    float baseRadius = 8f;
+//    float topRadius = 1.5f;
+//    float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
+//
+//    float twistSpeed = TornadoManager.getShaderTime() * 1.5f;
+//
+//    for (int i = rings - 1; i >= 0; i--) { // render top → bottom
+//        float y0 = i * (height / rings);
+//        float y1 = (i + 1) * (height / rings);
+//
+//        float radius0 = baseRadius - (baseRadius - topRadius) * (i / (float) rings);
+//        float radius1 = baseRadius - (baseRadius - topRadius) * ((i + 1f) / rings);
+//
+//        float twist0 = twistSpeed + i * 0.2f;
+//        float twist1 = twistSpeed + (i + 1f) * 0.2f;
+//
+//        for (int j = 0; j < segments; j++) {
+//            float u0 = j / (float) segments;
+//            float u1 = (j + 1 == segments) ? 1f : (j + 1) / (float) segments;
+//
+//            float angle0 = (float) (2 * Math.PI * j / segments);
+//            float angle1 = (j + 1 == segments) ? 0f : (float) (2 * Math.PI * (j + 1) / segments);
+//
+//
+//            float x00 = (float) (radius0 * Math.cos(angle0 + twist0));
+//            float z00 = (float) (radius0 * Math.sin(angle0 + twist0));
+//            float x01 = (float) (radius0 * Math.cos(angle1 + twist0));
+//            float z01 = (float) (radius0 * Math.sin(angle1 + twist0));
+//            float x10 = (float) (radius1 * Math.cos(angle0 + twist1));
+//            float z10 = (float) (radius1 * Math.sin(angle0 + twist1));
+//            float x11 = (float) (radius1 * Math.cos(angle1 + twist1));
+//            float z11 = (float) (radius1 * Math.sin(angle1 + twist1));
+//
+//            // Triangle 1 (bottom-left, top-left, top-right)
+//            buffer.vertex(matrix, x00, y0, z00).uv(u0, y0 / height).endVertex();
+//            buffer.vertex(matrix, x10, y1, z10).uv(u0, y1 / height).endVertex();
+//            buffer.vertex(matrix, x11, y1, z11).uv(u1, y1 / height).endVertex();
+//
+//            // Triangle 2 (bottom-left, top-right, bottom-right)
+//            buffer.vertex(matrix, x00, y0, z00).uv(u0, y0 / height).endVertex();
+//            buffer.vertex(matrix, x11, y1, z11).uv(u1, y1 / height).endVertex();
+//            buffer.vertex(matrix, x01, y0, z01).uv(u1, y0 / height).endVertex();
+//        }
+//        // Close the last ring segment (wrap j = segments to j = 0)
+//        {
+//            float u0 = 1f;
+//            float u1 = 0f;
+//
+//            float angle0 = (float) (2 * Math.PI);
+//            float angle1 = 0f;
+//
+//            float x00 = (float) (radius0 * Math.cos(angle0 + twist0));
+//            float z00 = (float) (radius0 * Math.sin(angle0 + twist0));
+//            float x01 = (float) (radius0 * Math.cos(angle1 + twist0));
+//            float z01 = (float) (radius0 * Math.sin(angle1 + twist0));
+//            float x10 = (float) (radius1 * Math.cos(angle0 + twist1));
+//            float z10 = (float) (radius1 * Math.sin(angle0 + twist1));
+//            float x11 = (float) (radius1 * Math.cos(angle1 + twist1));
+//            float z11 = (float) (radius1 * Math.sin(angle1 + twist1));
+//
+//            buffer.vertex(matrix, x00, y0, z00).uv(u0, y0 / height).endVertex();
+//            buffer.vertex(matrix, x10, y1, z10).uv(u0, y1 / height).endVertex();
+//            buffer.vertex(matrix, x11, y1, z11).uv(u1, y1 / height).endVertex();
+//
+//            buffer.vertex(matrix, x00, y0, z00).uv(u0, y0 / height).endVertex();
+//            buffer.vertex(matrix, x11, y1, z11).uv(u1, y1 / height).endVertex();
+//            buffer.vertex(matrix, x01, y0, z01).uv(u1, y0 / height).endVertex();
+//        }
+//
+//    }
+//
+//
+//    RenderSystem.applyModelViewMatrix();
+//    tess.end();
+//
+//    RenderSystem.enableCull();
+//    RenderSystem.disableBlend();
+//    stack.popPose();
+//}
+    public static void renderTornado(PoseStack stack, double x, double y, double z, float twistSpeed) {
+        ShaderInstance shader = MyShaders.TORNADO;
+        if (shader == null) return;
 
-    stack.pushPose();
-    stack.translate(x, y, z);
-    Matrix4f matrix = stack.last().pose();
+        stack.pushPose();
+        stack.translate(x, y, z);
 
-    ShaderInstance shader = MyShaders.TORNADO;
-    RenderSystem.setShader(() -> shader);
-    shader.apply();
+        Matrix4f matrix = stack.last().pose();
+        shader.apply();
 
-    var modelView = shader.getUniform("ModelViewMat");
-    if (modelView != null) {
-        modelView.set(matrix);
-    }
-    var projMat = shader.getUniform("ProjMat");
-    if (projMat != null) {
-        projMat.set(RenderSystem.getProjectionMatrix());
-    }
-    var timeUniform = shader.getUniform("Time");
-    if (timeUniform != null) {
-        timeUniform.set(TornadoManager.getShaderTime());
-    }
+        var modelView = shader.getUniform("ModelViewMat");
+        if (modelView != null) modelView.set(matrix);
 
-    RenderSystem.enableBlend();
-    RenderSystem.defaultBlendFunc();
-    RenderSystem.disableCull(); // See both sides
+        var projMat = shader.getUniform("ProjMat");
+        if (projMat != null) projMat.set(RenderSystem.getProjectionMatrix());
 
-    Tesselator tess = Tesselator.getInstance();
-    BufferBuilder buffer = tess.getBuilder();
-    buffer.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION_TEX);
+        var timeUniform = shader.getUniform("Time");
+        if (timeUniform != null) timeUniform.set(TornadoManager.getShaderTime());
 
-    int segments = 64;
-    int rings = 30;
-    float baseRadius = 8f;
-    float topRadius = 1.5f;
-    float height = SimpleCloudsConfig.CLIENT.cloudHeight.get() * 0.5f;
+        RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
 
-    for (int i = 0; i < rings; i++) {
-        float y0 = i * (height / rings);
-        float y1 = (i + 1) * (height / rings);
+        Tesselator tess = Tesselator.getInstance();
+        BufferBuilder buffer = tess.getBuilder();
+        buffer.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX);
 
-        float radius0 = baseRadius - (baseRadius - topRadius) * (i / (float) rings);
-        float radius1 = baseRadius - (baseRadius - topRadius) * ((i + 1f) / rings);
+        int segments = 64;
+        int rings = 30;
+        float baseRadius = 8f;
+        float topRadius = 1.5f;
+        float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
+        twistSpeed /= 150f;
 
-        float twist0 = i * 0.5f; // Twist factor (radians)
-        float twist1 = (i + 1) * 0.5f;
+        for (int i = rings - 1; i >= 0; i--) {
+            float y0 = i * (height / rings);
+            float y1 = (i + 1) * (height / rings);
 
-        for (int j = 0; j <= segments; j++) {
-            float angle = (float) (2 * Math.PI * j / segments);
-            float u = j / (float) segments;
+            float radius0 = baseRadius - (baseRadius - topRadius) * (i / (float) rings);
+            float radius1 = baseRadius - (baseRadius - topRadius) * ((i + 1f) / rings);
 
-            float x0 = (float) (radius0 * Math.cos(angle + twist0));
-            float z0 = (float) (radius0 * Math.sin(angle + twist0));
-            float x1 = (float) (radius1 * Math.cos(angle + twist1));
-            float z1 = (float) (radius1 * Math.sin(angle + twist1));
+            float twist0 = twistSpeed + i * 0.2f;
+            float twist1 = twistSpeed + (i + 1f) * 0.2f;
 
-            buffer.vertex(matrix, x0, y0, z0).uv(u, y0 / height).endVertex();
-            buffer.vertex(matrix, x1, y1, z1).uv(u, y1 / height).endVertex();
+            for (int j = 0; j < segments; j++) {
+                float u0 = j / (float) segments;
+                float u1 = (j + 1f) / (float) segments;
+                float angle0 = (float) (2 * Math.PI * u0);
+                float angle1 = (float) (2 * Math.PI * u1);
+
+                float x00 = (float) (radius0 * Math.cos(angle0 + twist0));
+                float z00 = (float) (radius0 * Math.sin(angle0 + twist0));
+                float x01 = (float) (radius0 * Math.cos(angle1 + twist0));
+                float z01 = (float) (radius0 * Math.sin(angle1 + twist0));
+                float x10 = (float) (radius1 * Math.cos(angle0 + twist1));
+                float z10 = (float) (radius1 * Math.sin(angle0 + twist1));
+                float x11 = (float) (radius1 * Math.cos(angle1 + twist1));
+                float z11 = (float) (radius1 * Math.sin(angle1 + twist1));
+
+                float v0 = y0 / height;
+                float v1 = y1 / height;
+
+                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
+                buffer.vertex(matrix, x10, y1, z10).uv(u0, v1).endVertex();
+                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
+
+                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
+                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
+                buffer.vertex(matrix, x01, y0, z01).uv(u1, v0).endVertex();
+            }
         }
+
+        tess.end();
+        RenderSystem.enableCull();
+        RenderSystem.disableBlend();
+        stack.popPose();
     }
 
-    RenderSystem.applyModelViewMatrix();
-    tess.end();
 
-    RenderSystem.enableCull();
-    RenderSystem.disableBlend();
-    stack.popPose();
-}
+
 
 
     public static void spawnDebrisParticles(TornadoInstance tornado, ClientLevel level) {
@@ -139,7 +265,6 @@ public static void renderTornado(PoseStack stack, double x, double y, double z) 
                     tornado.position.x, tornado.position.y, tornado.position.z, 0, 0.01, 0);
         }
     }
-
 
 
 }

@@ -4,10 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="fix: correct temperature caching and add debris particle configuration">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CachedTemperatureUtilMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CachedTemperatureUtilMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/debris.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/debris.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -109,63 +112,63 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Downloaded.Files.Path.Enabled&quot;: &quot;false&quot;,
-    &quot;Gradle.Build Project-Atmosphere.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Download Sources.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.H:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor&quot;: &quot;Debug&quot;,
-    &quot;Gradle.Project-Atmosphere [:prepareRunClientCompile].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [build].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [clean].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Debug&quot;,
-    &quot;Gradle.Project-Atmosphere [runClient].executor&quot;: &quot;Debug&quot;,
-    &quot;Gradle.Project-Atmosphere [runGameTestServer].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [runServer].executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;Repository.Attach.Annotations&quot;: &quot;false&quot;,
-    &quot;Repository.Attach.JavaDocs&quot;: &quot;false&quot;,
-    &quot;Repository.Attach.Sources&quot;: &quot;false&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;extract.method.default.visibility&quot;: &quot;private&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/libs&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.6172414&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Downloaded.Files.Path.Enabled": "false",
+    "Gradle.Build Project-Atmosphere.executor": "Run",
+    "Gradle.Download Sources.executor": "Run",
+    "Gradle.H:/Project-Atmosphere [createMcpToSrg].executor": "Run",
+    "Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor": "Run",
+    "Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor": "Debug",
+    "Gradle.Project-Atmosphere [:prepareRunClientCompile].executor": "Run",
+    "Gradle.Project-Atmosphere [build].executor": "Run",
+    "Gradle.Project-Atmosphere [clean].executor": "Run",
+    "Gradle.Project-Atmosphere [createMcpToSrg].executor": "Run",
+    "Gradle.Project-Atmosphere [genIntellijRuns].executor": "Debug",
+    "Gradle.Project-Atmosphere [runClient].executor": "Debug",
+    "Gradle.Project-Atmosphere [runGameTestServer].executor": "Run",
+    "Gradle.Project-Atmosphere [runServer].executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Repository.Attach.Annotations": "false",
+    "Repository.Attach.JavaDocs": "false",
+    "Repository.Attach.Sources": "false",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "extract.method.default.visibility": "private",
+    "git-widget-placeholder": "master",
+    "ignore.virus.scanning.warn.message": "true",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "G:/Project-Atmosphere/build/resources/main/assets/projectatmosphere/textures/effects",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.6172414",
+    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;ChangesTree.GroupingKeys&quot;: [
-      &quot;module&quot;,
-      &quot;repository&quot;
+  "keyToStringList": {
+    "ChangesTree.GroupingKeys": [
+      "module",
+      "repository"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
       <recent name="net.Gabou.projectatmosphere.blocks" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\build\resources\main\assets\projectatmosphere\textures\effects" />
       <recent name="G:\Project-Atmosphere\libs" />
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\recipes" />
       <recent name="H:\Project-Atmosphere\libs" />
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\particles" />
-      <recent name="H:\Project-Atmosphere\src\main\resources" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\geo\entity" />
@@ -539,15 +542,7 @@
       <workItem from="1754406072034" duration="11184000" />
       <workItem from="1754432824043" duration="583000" />
       <workItem from="1754519607203" duration="1874000" />
-      <workItem from="1754526256444" duration="2148000" />
-    </task>
-    <task id="LOCAL-00023" summary="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations&#10;&#10;&#10;Need to transform back into static">
-      <option name="closed" value="true" />
-      <created>1746347834768</created>
-      <option name="number" value="00023" />
-      <option name="presentableId" value="LOCAL-00023" />
-      <option name="project" value="LOCAL" />
-      <updated>1746347834768</updated>
+      <workItem from="1754526256444" duration="8912000" />
     </task>
     <task id="LOCAL-00024" summary="Refactor atmosphere modules; ensure pressure and humidity modules are initialized consistently on server start and player join">
       <option name="closed" value="true" />
@@ -933,7 +928,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754432873863</updated>
     </task>
-    <option name="localTasksCounter" value="72" />
+    <task id="LOCAL-00072" summary="fix: correct temperature caching and add debris particle configuration">
+      <option name="closed" value="true" />
+      <created>1754529467816</created>
+      <option name="number" value="00072" />
+      <option name="presentableId" value="LOCAL-00072" />
+      <option name="project" value="LOCAL" />
+      <updated>1754529467817</updated>
+    </task>
+    <option name="localTasksCounter" value="73" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -952,7 +955,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor snow block handling: comment out temperature-based block removal logic and add cloth-config dependency" />
     <MESSAGE value="Add SmallNormalCloud1 entity and renderer: implement cloud entity behavior and rendering logic" />
     <MESSAGE value="Update .gitignore: add entries for IDE shelf and build output files" />
     <MESSAGE value="Add mixin support and update project configuration: implement cloud entity spawning and temperature management" />
@@ -977,7 +979,8 @@
     <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
     <MESSAGE value="Enhance tornado rendering with shader integration and improved animation effects" />
     <MESSAGE value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
+    <MESSAGE value="fix: correct temperature caching and add debris particle configuration" />
+    <option name="LAST_COMMIT_MESSAGE" value="fix: correct temperature caching and add debris particle configuration" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1001,11 +1004,6 @@
           <url>jar://$PROJECT_DIR$/libs/SereneSeasonsExtended-1.20.1-1.0.2.jar!/com/Gabou/sereneseasonsextended/features/SnowBlockReplacer.class</url>
           <line>55</line>
           <option name="timeStamp" value="112" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModClient.java</url>
-          <line>33</line>
-          <option name="timeStamp" value="166" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/items/Balai.java</url>
@@ -1048,6 +1046,7 @@
       <configuration name="GradleRunConfiguration">
         <watch expression="TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(Minecraft.getInstance().level,Minecraft.getInstance().player.getOnPos())" language="JAVA" custom="toughasnails.temperature.TemperatureHelperImpl,net.minecraft.client.Minecraft,toughasnails.block.TemperatureGaugeBlock" />
         <watch expression="((java.util.ArrayList)((ServerCloudGenerator)SimpleCloudsCompat.generator).clouds).get(0)" custom="dev.nonamecrackers2.simpleclouds.common.cloud.spawning.ServerCloudGenerator,java.util.ArrayList" />
+        <watch expression="shader.uniforms" />
       </configuration>
     </watches-manager>
   </component>

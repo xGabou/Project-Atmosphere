@@ -12,6 +12,8 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -34,24 +36,43 @@ public class ClientRenderHook {
     @SubscribeEvent
     public static void onRender(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
-        if(Minecraft.getInstance().level ==null) return;
+        if (Minecraft.getInstance().level == null) return;
+
         PoseStack poseStack = event.getPoseStack();
         Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
         Vec3 camPos = camera.getPosition();
 
-        // Get active tornadoes from your manager
-        List<TornadoInstance> tornadoes = TornadoManager.getActiveTornadoes(); // You must implement this if not already
-
+        List<TornadoInstance> tornadoes = TornadoManager.getActiveTornadoes();
         if (tornadoes.isEmpty()) return;
 
+        ShaderInstance shader = MyShaders.TORNADO;
+        if (shader == null) return;
+
+        RenderSystem.setShader(() -> shader);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
+
         poseStack.pushPose();
-        poseStack.translate(-camPos.x, -camPos.y, -camPos.z); // world-relative positioning
+        poseStack.translate(-camPos.x, -camPos.y, -camPos.z);
 
         for (TornadoInstance tornado : tornadoes) {
-            TornadoRenderHandler.renderTornado(poseStack, tornado.position.x, Minecraft.getInstance().level.getSeaLevel(), tornado.position.z);
+            poseStack.pushPose();
+            TornadoRenderHandler.renderTornado(
+                    poseStack,
+                    tornado.position.x,
+                    Minecraft.getInstance().level.getSeaLevel(),
+                    tornado.position.z,
+                    tornado.getTwist()
+            );
+            poseStack.popPose();
         }
 
         poseStack.popPose();
+        RenderSystem.disableBlend();
+        RenderSystem.enableCull();
     }
+
+
 
 }
