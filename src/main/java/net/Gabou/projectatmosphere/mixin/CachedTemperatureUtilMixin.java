@@ -37,6 +37,7 @@ public class CachedTemperatureUtilMixin {
     @Inject(method = "getWorldTemperature", at = @At("RETURN"))
     private static void projectatmosphere$storeCached(Level level, BlockPos pos, CallbackInfoReturnable<Float> cir) {
         Long2FloatMap map = CACHE.computeIfAbsent(level.dimension(), d -> new Long2FloatOpenHashMap());
-        map.put(pos.asLong(), cir.getReturnValue());
+        map.put(pos.asLong(), cir.getReturnValue().floatValue());
+
     }
 }

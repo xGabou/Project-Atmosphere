@@ -6,14 +6,19 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.particles.DebrisParticle;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.locale.Language;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
+import net.minecraftforge.client.event.TextureStitchEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -163,6 +168,7 @@ public class ProjectAtmosphere {
         // Lance la logique async → quand prête, libère le client
 
     }
+
 
     @SubscribeEvent
     public static void onConfigLoaded(ModConfigEvent event) {

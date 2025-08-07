@@ -4,8 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Enhance tornado rendering with shader integration and improved animation effects">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CachedTemperatureUtilMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CachedTemperatureUtilMixin.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -117,7 +119,7 @@
     &quot;Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor&quot;: &quot;Debug&quot;,
     &quot;Gradle.Project-Atmosphere [:prepareRunClientCompile].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [build].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [clean].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [clean].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Debug&quot;,
     &quot;Gradle.Project-Atmosphere [runClient].executor&quot;: &quot;Debug&quot;,
@@ -450,8 +452,8 @@
     <recent_temporary>
       <list>
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [clean]" />
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
       </list>
@@ -460,8 +462,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.26927.53" />
-        <option value="bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-IU-251.26927.53" />
+        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.27812.49" />
+        <option value="bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-IU-251.27812.49" />
       </set>
     </attachedChunks>
   </component>
@@ -535,14 +537,9 @@
       <workItem from="1754309025704" duration="20016000" />
       <workItem from="1754348659993" duration="26000" />
       <workItem from="1754406072034" duration="11184000" />
-    </task>
-    <task id="LOCAL-00022" summary="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations&#10;&#10;&#10;Need to transform back into static">
-      <option name="closed" value="true" />
-      <created>1746347482452</created>
-      <option name="number" value="00022" />
-      <option name="presentableId" value="LOCAL-00022" />
-      <option name="project" value="LOCAL" />
-      <updated>1746347482452</updated>
+      <workItem from="1754432824043" duration="583000" />
+      <workItem from="1754519607203" duration="1874000" />
+      <workItem from="1754526256444" duration="2148000" />
     </task>
     <task id="LOCAL-00023" summary="Refactor temperature service; rename to AsyncAtmosphereService and enhance thread management for humidity, pressure, and storm calculations&#10;&#10;&#10;Need to transform back into static">
       <option name="closed" value="true" />
@@ -928,7 +925,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754432731625</updated>
     </task>
-    <option name="localTasksCounter" value="71" />
+    <task id="LOCAL-00071" summary="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml">
+      <option name="closed" value="true" />
+      <created>1754432873863</created>
+      <option name="number" value="00071" />
+      <option name="presentableId" value="LOCAL-00071" />
+      <option name="project" value="LOCAL" />
+      <updated>1754432873863</updated>
+    </task>
+    <option name="localTasksCounter" value="72" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -947,7 +952,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor snow block temperature handling: update temperature retrieval method for accuracy" />
     <MESSAGE value="Refactor snow block handling: comment out temperature-based block removal logic and add cloth-config dependency" />
     <MESSAGE value="Add SmallNormalCloud1 entity and renderer: implement cloud entity behavior and rendering logic" />
     <MESSAGE value="Update .gitignore: add entries for IDE shelf and build output files" />
@@ -972,7 +976,8 @@
     <MESSAGE value="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support" />
     <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
     <MESSAGE value="Enhance tornado rendering with shader integration and improved animation effects" />
-    <option name="LAST_COMMIT_MESSAGE" value="Enhance tornado rendering with shader integration and improved animation effects" />
+    <MESSAGE value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -999,7 +1004,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModClient.java</url>
-          <line>31</line>
+          <line>33</line>
           <option name="timeStamp" value="166" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
