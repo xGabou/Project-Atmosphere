@@ -7,11 +7,9 @@ import net.Gabou.projectatmosphere.client.render.TornadoMesh;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
-import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
 public class TornadoRenderHandler {
@@ -191,6 +189,9 @@ public class TornadoRenderHandler {
         var timeUniform = shader.getUniform("Time");
         if (timeUniform != null) timeUniform.set(TornadoManager.getShaderTime());
 
+        var twistUniform = shader.getUniform("TwistSpeed");
+        if (twistUniform != null) twistUniform.set(twistSpeed);
+
         RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -205,7 +206,6 @@ public class TornadoRenderHandler {
         float baseRadius = 8f;
         float topRadius = 1.5f;
         float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
-        twistSpeed /= 150f;
 
         for (int i = rings - 1; i >= 0; i--) {
             float y0 = i * (height / rings);
@@ -214,23 +214,20 @@ public class TornadoRenderHandler {
             float radius0 = baseRadius - (baseRadius - topRadius) * (i / (float) rings);
             float radius1 = baseRadius - (baseRadius - topRadius) * ((i + 1f) / rings);
 
-            float twist0 = twistSpeed + i * 0.2f;
-            float twist1 = twistSpeed + (i + 1f) * 0.2f;
-
             for (int j = 0; j < segments; j++) {
                 float u0 = j / (float) segments;
                 float u1 = (j + 1f) / (float) segments;
                 float angle0 = (float) (2 * Math.PI * u0);
                 float angle1 = (float) (2 * Math.PI * u1);
 
-                float x00 = (float) (radius0 * Math.cos(angle0 + twist0));
-                float z00 = (float) (radius0 * Math.sin(angle0 + twist0));
-                float x01 = (float) (radius0 * Math.cos(angle1 + twist0));
-                float z01 = (float) (radius0 * Math.sin(angle1 + twist0));
-                float x10 = (float) (radius1 * Math.cos(angle0 + twist1));
-                float z10 = (float) (radius1 * Math.sin(angle0 + twist1));
-                float x11 = (float) (radius1 * Math.cos(angle1 + twist1));
-                float z11 = (float) (radius1 * Math.sin(angle1 + twist1));
+                float x00 = (float) (radius0 * Math.cos(angle0));
+                float z00 = (float) (radius0 * Math.sin(angle0));
+                float x01 = (float) (radius0 * Math.cos(angle1));
+                float z01 = (float) (radius0 * Math.sin(angle1));
+                float x10 = (float) (radius1 * Math.cos(angle0));
+                float z10 = (float) (radius1 * Math.sin(angle0));
+                float x11 = (float) (radius1 * Math.cos(angle1));
+                float z11 = (float) (radius1 * Math.sin(angle1));
 
                 float v0 = y0 / height;
                 float v1 = y1 / height;
@@ -257,8 +254,9 @@ public class TornadoRenderHandler {
 
     public static void spawnDebrisParticles(TornadoInstance tornado, ClientLevel level) {
         for (int i = 0; i < 10; i++) {
-            double radius = 2.5 + level.random.nextDouble() * 2.0;
-            double height = level.random.nextDouble() * 10.0;
+            double maxRadius = 8.0;
+            double radius = Math.sqrt(level.random.nextDouble()) * maxRadius;
+            double height = level.random.nextDouble() * SimpleCloudsConfig.CLIENT.cloudHeight.get();
             float angularSpeed = 5f;
 
             level.addParticle(new DebrisParticleData(tornado, radius, height, angularSpeed),
