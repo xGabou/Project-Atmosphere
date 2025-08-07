@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance tornado rendering with shader effects and improved twist animation">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add shader support for cloud rendering and implement noise functions" />
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -135,7 +133,7 @@
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "G:/Project-Atmosphere/build/resources/main/assets/projectatmosphere/textures/effects",
+    "last_opened_file_path": "G:/Project-Atmosphere",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -159,11 +157,11 @@
       <recent name="net.Gabou.projectatmosphere.blocks" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere" />
       <recent name="G:\Project-Atmosphere\build\resources\main\assets\projectatmosphere\textures\effects" />
       <recent name="G:\Project-Atmosphere\libs" />
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\recipes" />
       <recent name="H:\Project-Atmosphere\libs" />
-      <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\particles" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\geo\entity" />
@@ -537,15 +535,7 @@
       <workItem from="1754406072034" duration="11184000" />
       <workItem from="1754432824043" duration="583000" />
       <workItem from="1754519607203" duration="1874000" />
-      <workItem from="1754526256444" duration="9234000" />
-    </task>
-    <task id="LOCAL-00025" summary="Refactor AsyncAtmosphereService; optimize executor management for low CPU environments by introducing a shared executor">
-      <option name="closed" value="true" />
-      <created>1746381374810</created>
-      <option name="number" value="00025" />
-      <option name="presentableId" value="LOCAL-00025" />
-      <option name="project" value="LOCAL" />
-      <updated>1746381374810</updated>
+      <workItem from="1754526256444" duration="9537000" />
     </task>
     <task id="LOCAL-00026" summary="Refactor AsyncAtmosphereService and AtmoCommonConfig; enhance executor management based on CPU count and introduce configuration for shared executor usage">
       <option name="closed" value="true" />
@@ -931,7 +921,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754538209933</updated>
     </task>
-    <option name="localTasksCounter" value="74" />
+    <task id="LOCAL-00074" summary="feat: add shader support for cloud rendering and implement noise functions">
+      <option name="closed" value="true" />
+      <created>1754538661405</created>
+      <option name="number" value="00074" />
+      <option name="presentableId" value="LOCAL-00074" />
+      <option name="project" value="LOCAL" />
+      <updated>1754538661405</updated>
+    </task>
+    <option name="localTasksCounter" value="75" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -950,7 +948,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Update .gitignore: add entries for IDE shelf and build output files" />
     <MESSAGE value="Add mixin support and update project configuration: implement cloud entity spawning and temperature management" />
     <MESSAGE value="Refactor pressure management logic: streamline forecast handling and remove unused code" />
     <MESSAGE value="Add SimpleClouds compatibility and refactor cloud spawning logic: implement SimpleCloudSpawner and CloudLibrary for enhanced cloud management" />
@@ -975,7 +972,8 @@
     <MESSAGE value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
     <MESSAGE value="fix: correct temperature caching and add debris particle configuration" />
     <MESSAGE value="feat: enhance tornado rendering with shader effects and improved twist animation" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance tornado rendering with shader effects and improved twist animation" />
+    <MESSAGE value="feat: add shader support for cloud rendering and implement noise functions" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add shader support for cloud rendering and implement noise functions" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
