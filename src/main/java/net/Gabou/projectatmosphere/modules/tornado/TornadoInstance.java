@@ -1,9 +1,15 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -42,18 +48,35 @@ public class TornadoInstance {
     }
 
     /**
-     * Called each tick from tornado manager to handle sound & destruction
+     * Called each tick from tornado manager. Server handles demolition,
+     * client relies on separate rendering logic.
      */
     public void tick(Level level) {
-        long now = System.currentTimeMillis();
+        if (level.isClientSide) {
+            return;
+        }
 
+        long now = System.currentTimeMillis();
         if (now - lastDemolitionCheck >= demolitionIntervalMs) {
             lastDemolitionCheck = now;
-
-            // Sound effect
             playDemolitionSound(level);
+            demolishBlocks((ServerLevel) level);
+        }
+    }
 
-            // Future: Add block destruction, particles, debris here
+    private void demolishBlocks(ServerLevel level) {
+        BlockPos center = BlockPos.containing(position);
+        int intRadius = Mth.ceil(radius);
+        for (BlockPos pos : BlockPos.betweenClosed(
+                center.offset(-intRadius, -1, -intRadius),
+                center.offset(intRadius, intRadius, intRadius))) {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)) {
+                level.destroyBlock(pos, false);
+                level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),
+                        pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                        5, 0.2, 0.2, 0.2, 0.05);
+            }
         }
     }
 
