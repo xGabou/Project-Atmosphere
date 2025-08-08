@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -26,15 +27,16 @@ public class TornadoManager {
         return shaderTime;
     }
 
-    public static void tick() {
+    public static void tick(Level level) {
         // Remove tornados after 20 seconds
-        ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 60);
+        ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 600);
         for (TornadoInstance tornado : ACTIVE_TORNADOES) {
             float speed = tornado.wind.baseSpeed() * 0.05f;
             tornado.position = tornado.position.add(
                     Math.cos(tornado.wind.angleRadians()) * speed,
                     0,
                     Math.sin(tornado.wind.angleRadians()) * speed);
+            tornado.tick(level);
         }
         shaderTime += 0.05f;
     }

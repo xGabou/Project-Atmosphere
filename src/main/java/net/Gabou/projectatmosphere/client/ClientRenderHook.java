@@ -49,7 +49,7 @@ public class ClientRenderHook {
                         Minecraft.getInstance().level.getSeaLevel(),
                         tornado.position.z,
                         tornado.getTwist(),
-                        level,camera,Minecraft.getInstance()
+                        level,camera,Minecraft.getInstance(),tornado
 
                 );
                 //TornadoRenderHandler.renderTornadoVolume(poseStack, tornado.position, new Vec3(12, SimpleCloudsConfig.CLIENT.cloudHeight.get() /2.0, 12),tornado.getTwist());

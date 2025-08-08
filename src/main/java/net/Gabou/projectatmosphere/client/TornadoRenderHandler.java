@@ -4,9 +4,11 @@ import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -16,6 +18,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+
+import java.util.Random;
 
 import static org.lwjgl.opengl.GL11C.GL_BACK;
 import static org.lwjgl.opengl.GL11C.glCullFace;
@@ -185,15 +189,15 @@ public class TornadoRenderHandler {
 //    RenderSystem.disableBlend();
 //    stack.popPose();
 //}
-    public static void renderTornado(PoseStack stack, double tornadoX, double tornadoY, double tornadoZ, float twistSpeed, ClientLevel level, Camera camera, Minecraft minecraft) {
+    public static void renderTornado(PoseStack stack, double tornadoX, double tornadoY, double tornadoZ, float twistSpeed, ClientLevel level, Camera camera, Minecraft minecraft,TornadoInstance tornado) {
         ShaderInstance shader = MyShaders.TORNADO;
         if (shader == null) return;
         RenderSystem.setShader(() -> shader);
 
         int segments = 64;
-        int rings = 64;
-        float baseRadius = 8f;
-        float topRadius = 1.5f;
+        int rings = 128;
+        float baseRadius = 10f;//global radius scale
+        float topRadius = 10f; //how pointy the top is more = pointier
         float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
         stack.pushPose();
         stack.translate(tornadoX, tornadoY, tornadoZ);
@@ -224,7 +228,7 @@ public class TornadoRenderHandler {
 
 // Tornado profile & flow uniforms
         var dustUniform = shader.getUniform("DustIntensity");
-        if (dustUniform != null) dustUniform.set(0.5f); // tweak as needed
+        if (dustUniform != null) dustUniform.set(0.2F); // tweak as needed
 
         var coreUniform = shader.getUniform("CoreTightness");
         if (coreUniform != null) coreUniform.set(0.5f); // tweak as needed
@@ -291,43 +295,115 @@ public class TornadoRenderHandler {
         buffer.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX);
 
 
+        float windSpeed =  tornado.wind.gustSpeed();  // float
+        float windAngleDeg = tornado.wind.angleRadians();
+        float windAngleRad = (float) Math.toRadians(windAngleDeg); // Convert to radians
+
+        double windX = Math.cos(windAngleRad) * windSpeed;
+        double windZ = Math.sin(windAngleRad) * windSpeed;
+
+        Vec3 horizontalWind = new Vec3(windX, 0, windZ);
+
+
+        Random rand = new Random(1337); // Or make it deterministic per tick
+
         for (int i = rings - 1; i >= 0; i--) {
             float y0 = i * (height / rings);
             float y1 = (i + 1) * (height / rings);
 
+            float t0 = i / (float) rings;
+            float t1 = (i + 1f) / rings;
 
-            float radius0 = baseRadius - (baseRadius - topRadius) * (i / (float) rings);
-            float radius1 = baseRadius - (baseRadius - topRadius) * ((i + 1f) / rings);
+            // Entonnoir incurvé
+            float shaped0 = (float) Math.pow(t0, 0.6);
+            float shaped1 = (float) Math.pow(t1, 0.6);
+            float baseR0 = topRadius + (baseRadius - topRadius) * shaped0;
+            float baseR1 = topRadius + (baseRadius - topRadius) * shaped1;
+
+            // Oscillation verticale + pseudo-bruit
+            float oscFreq = 4f;
+            float oscAmp = 0.6f;
+            float noiseAmp = 0f;
+
+            float radius0 = baseR0
+                    + (float) Math.sin(t0 * Math.PI * oscFreq) * oscAmp
+                    + (rand.nextFloat() - 0.5f) * 2f * noiseAmp;
+
+            float radius1 = baseR1
+                    + (float) Math.sin(t1 * Math.PI * oscFreq) * oscAmp
+                    + (rand.nextFloat() - 0.5f) * 2f * noiseAmp;
 
             for (int j = 0; j < segments; j++) {
                 float u0 = j / (float) segments;
-                float u1 = (j + 1f) / (float) segments;
-                float angle0 = (float) (2 * Math.PI * u0);
-                float angle1 = (float) (2 * Math.PI * u1);
+                float u1 = (j + 1f) / segments;
 
-                float x00 = (float) (radius0 * Math.cos(angle0));
-                float z00 = (float) (radius0 * Math.sin(angle0));
-                float x01 = (float) (radius0 * Math.cos(angle1));
-                float z01 = (float) (radius0 * Math.sin(angle1));
-                float x10 = (float) (radius1 * Math.cos(angle0));
-                float z10 = (float) (radius1 * Math.sin(angle0));
-                float x11 = (float) (radius1 * Math.cos(angle1));
-                float z11 = (float) (radius1 * Math.sin(angle1));
+                final float U_EPS = 1e-6f;
+                float u0s = (j == 0) ? (u0 + U_EPS) : u0;
+                float u1s = (j == segments - 1) ? (1f - U_EPS) : u1;
+
+                float twist = (float) (Math.PI * 3.5); // rotations
+                float angleOffset0 = twist * (1 - t0);
+                float angleOffset1 = twist * (1 - t1);
+
+                float angle0_0 = (float) (2 * Math.PI * u0 + angleOffset0);
+                float angle0_1 = (float) (2 * Math.PI * u1 + angleOffset0);
+                float angle1_0 = (float) (2 * Math.PI * u0 + angleOffset1);
+                float angle1_1 = (float) (2 * Math.PI * u1 + angleOffset1);
+
+                // Position sans wiggle
+                float x00 = radius0 * (float) Math.cos(angle0_0);
+                float z00 = radius0 * (float) Math.sin(angle0_0);
+                float x01 = radius0 * (float) Math.cos(angle0_1);
+                float z01 = radius0 * (float) Math.sin(angle0_1);
+                float x10 = radius1 * (float) Math.cos(angle1_0);
+                float z10 = radius1 * (float) Math.sin(angle1_0);
+                float x11 = radius1 * (float) Math.cos(angle1_1);
+                float z11 = radius1 * (float) Math.sin(angle1_1);
+
+                // Wiggle (horizontal shift)
+                float wiggleFreq = 5f;
+                float wiggleAmp = 0.5f;
+
+                x00 += Math.sin(y0 * 0.1f + angle0_0 * wiggleFreq) * wiggleAmp;
+                z00 += Math.cos(y0 * 0.1f + angle0_0 * wiggleFreq) * wiggleAmp;
+                x01 += Math.sin(y0 * 0.1f + angle0_1 * wiggleFreq) * wiggleAmp;
+                z01 += Math.cos(y0 * 0.1f + angle0_1 * wiggleFreq) * wiggleAmp;
+                x10 += Math.sin(y1 * 0.1f + angle1_0 * wiggleFreq) * wiggleAmp;
+                z10 += Math.cos(y1 * 0.1f + angle1_0 * wiggleFreq) * wiggleAmp;
+                x11 += Math.sin(y1 * 0.1f + angle1_1 * wiggleFreq) * wiggleAmp;
+                z11 += Math.cos(y1 * 0.1f + angle1_1 * wiggleFreq) * wiggleAmp;
 
                 float epsilon = 0.0001f;
                 float v0 = (y0 + epsilon) / height;
                 float v1 = (y1 - epsilon) / height;
+                // Tornado bend offset (progressive based on height)
+                float bendScale = 1.5f;
+                float bendFactor0 = (y0 / height) * bendScale * windSpeed;
+                float bendFactor1 = (y1 / height) * bendScale * windSpeed;
+
+                float offsetX0 = (float) horizontalWind.x * bendFactor0;
+                float offsetZ0 = (float) horizontalWind.z * bendFactor0;
+                float offsetX1 = (float) horizontalWind.x * bendFactor1;
+                float offsetZ1 = (float) horizontalWind.z * bendFactor1;
+
+                x00 += offsetX0; z00 += offsetZ0;
+                x01 += offsetX0; z01 += offsetZ0;
+                x10 += offsetX1; z10 += offsetZ1;
+                x11 += offsetX1; z11 += offsetZ1;
 
 
-                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
-                buffer.vertex(matrix, x10, y1, z10).uv(u0, v1).endVertex();
-                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
+                buffer.vertex(matrix, x00, y0, z00).uv(u0s, v0).endVertex();
+                buffer.vertex(matrix, x10, y1, z10).uv(u0s, v1).endVertex();
+                buffer.vertex(matrix, x11, y1, z11).uv(u1s, v1).endVertex();
 
-                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
-                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
-                buffer.vertex(matrix, x01, y0, z01).uv(u1, v0).endVertex();
+                buffer.vertex(matrix, x00, y0, z00).uv(u0s, v0).endVertex();
+                buffer.vertex(matrix, x11, y1, z11).uv(u1s, v1).endVertex();
+                buffer.vertex(matrix, x01, y0, z01).uv(u1s, v0).endVertex();
             }
         }
+
+
+
 
         tess.end();
         RenderSystem.enableCull();

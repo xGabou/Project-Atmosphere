@@ -42,7 +42,7 @@ public class ClientTickHandler {
         if (Minecraft.getInstance().isPaused()) return;
 
         tickCounter++;
-        TornadoManager.tick();
+        TornadoManager.tick(Minecraft.getInstance().level);
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && mc.level.getGameTime() % 2 == 0) {
             for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {

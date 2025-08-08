@@ -65,7 +65,7 @@ float verticalFade(float y) {
 
 vec2 buildSwirlUV(float angle, float y, vec2 offset) {
     vec2 uv;
-    uv.x = fract(angle / (2.0 * PI));
+    uv.x = mod(angle / (2.0 * PI), 1.0);
     uv.y = y;
     uv += offset * 0.01;
     return uv;
@@ -119,7 +119,7 @@ void main() {
     float alpha = base.a * verticalFade(height);
     alpha *= mix(0.8, 1.0, texture(NoiseMap, swirlUV * 4.0).r);
     alpha *= 0.7 + n2 * 0.3;
-    alpha = clamp(alpha * coreFalloff, 0.5, 1.0);
+    alpha = clamp(alpha * coreFalloff, 0.8, 1.0);
 
     fragColor = vec4(color, alpha);
 }

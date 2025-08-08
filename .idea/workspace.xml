@@ -5,15 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance tornado rendering with improved shader parameters and error handling">
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box.vsh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.fsh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/MyShaders.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/MyShaders.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoShaders.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoShaders.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -496,15 +492,7 @@
       <workItem from="1754432824043" duration="583000" />
       <workItem from="1754519607203" duration="1874000" />
       <workItem from="1754526256444" duration="10365000" />
-      <workItem from="1754585274973" duration="21298000" />
-    </task>
-    <task id="LOCAL-00031" summary="Add pressure forecasting modules; implement pressure generation, storage, and management for biome-specific forecasts">
-      <option name="closed" value="true" />
-      <created>1746420219153</created>
-      <option name="number" value="00031" />
-      <option name="presentableId" value="LOCAL-00031" />
-      <option name="project" value="LOCAL" />
-      <updated>1746420219153</updated>
+      <workItem from="1754585274973" duration="24678000" />
     </task>
     <task id="LOCAL-00032" summary="Refactor biome handling; replace ResourceLocation with BiomeInstanceKey for improved data management across modules">
       <option name="closed" value="true" />
@@ -890,7 +878,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754604869573</updated>
     </task>
-    <option name="localTasksCounter" value="80" />
+    <task id="LOCAL-00080" summary="feat: add box tornado shader and rendering support with density calculations">
+      <option name="closed" value="true" />
+      <created>1754608515885</created>
+      <option name="number" value="00080" />
+      <option name="presentableId" value="LOCAL-00080" />
+      <option name="project" value="LOCAL" />
+      <updated>1754608515885</updated>
+    </task>
+    <option name="localTasksCounter" value="81" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
