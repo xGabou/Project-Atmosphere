@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -28,12 +29,12 @@ public class TornadoCommand {
                             AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                             player.blockPosition());
                     var wind = ForecastOrchestrator.getCurrentWind(key,level.getGameTime());
-                   //SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
+                   SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
 
                     Vec3 playerPos = player.position();
                     TornadoManager.spawnServer(level,
                             new Vec3(playerPos.x, level.getSeaLevel(), playerPos.z),
-                            2.5f,
+                            10f,
                             wind);
 
                     ctx.getSource().sendSuccess(
