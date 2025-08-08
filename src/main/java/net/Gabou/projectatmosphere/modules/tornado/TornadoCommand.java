@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -13,9 +12,6 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
-import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
 
 @Mod.EventBusSubscriber
 public class TornadoCommand {
@@ -35,10 +31,10 @@ public class TornadoCommand {
                    //SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
 
                     Vec3 playerPos = player.position();
-                    // Spawn tornado visually and sync with clients
-                    TornadoManager.spawn(new Vec3(playerPos.x,level.getSeaLevel(),playerPos.z), 2.5f, wind);
-                    NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(),
-                            new SpawnTornadoPacket(player.position(), 2.5f, wind));
+                    TornadoManager.spawnServer(level,
+                            new Vec3(playerPos.x, level.getSeaLevel(), playerPos.z),
+                            2.5f,
+                            wind);
 
                     ctx.getSource().sendSuccess(
                             () -> Component.literal("🌪️ Tornado + ☁️ Cumulonimbus spawned."), true);
