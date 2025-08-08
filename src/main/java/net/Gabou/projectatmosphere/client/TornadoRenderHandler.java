@@ -35,6 +35,8 @@ public class TornadoRenderHandler {
     private static final ResourceLocation NORMALMAP_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/tornado_normal.png");
 
+    private static final float SPAWN_DESCENT_DURATION = 5.0f; // seconds for funnel to reach ground
+
 
 //    public static void renderTornadoess(PoseStack poseStack, Camera camera) {
 //        TornadoMesh.init();
@@ -305,14 +307,23 @@ public class TornadoRenderHandler {
         Vec3 horizontalWind = new Vec3(windX, 0, windZ);
 
 
+        float spawnProgress = Mth.clamp(tornado.getLifetimeSeconds() / SPAWN_DESCENT_DURATION, 0f, 1f);
+        float cutoffY = height * (1.0f - spawnProgress);
+
         Random rand = new Random(1337); // Or make it deterministic per tick
 
         for (int i = rings - 1; i >= 0; i--) {
             float y0 = i * (height / rings);
             float y1 = (i + 1) * (height / rings);
+            if (y1 < cutoffY) {
+                break;
+            }
+            if (y0 < cutoffY) {
+                y0 = cutoffY;
+            }
 
-            float t0 = i / (float) rings;
-            float t1 = (i + 1f) / rings;
+            float t0 = y0 / height;
+            float t1 = y1 / height;
 
             // Entonnoir incurvé
             float shaped0 = (float) Math.pow(t0, 0.6);
