@@ -74,8 +74,8 @@ public class TornadoInstance {
         BlockPos center = BlockPos.containing(position);
         int intRadius = Mth.ceil(radius);
         for (BlockPos pos : BlockPos.betweenClosed(
-                center.offset(-intRadius - 5, -1, -intRadius - 5),
-                center.offset(intRadius + 5, intRadius, intRadius + 5))) {
+                center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, -1, -intRadius - DEBRIS_RANGE_EXTENSION),
+                center.offset(intRadius + DEBRIS_RANGE_EXTENSION, intRadius, intRadius + DEBRIS_RANGE_EXTENSION))) {
             BlockState state = level.getBlockState(pos);
             double distSq = pos.distSqr(center);
             if (state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)) {
