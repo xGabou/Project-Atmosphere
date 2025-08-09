@@ -37,7 +37,7 @@ public class AtmoCommonConfig {
                 .comment("Maximum number of storm debris items allowed per chunk")
                 .defineInRange("maxStormDebrisPerChunk", 30, 0, Integer.MAX_VALUE);
         AUTO_REPAIR_GLASS = builder
-                .comment("Automatically repair tornado-damaged glass after 5 minutes if undamaged")
+                .comment("Automatically repair tornado-damaged glass after 5 minutes of no new damage")
                 .define("autoRepairGlass", true);
         builder.pop();
         COMMON_SPEC = builder.build();
