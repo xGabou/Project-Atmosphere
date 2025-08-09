@@ -16,8 +16,6 @@ public class GlassDamageManager {
 
     private static final Map<BlockPos, GlassState> GLASS_STATE = new HashMap<>();
     private static final int MAX_DAMAGE = 3;
-    private static final long REPAIR_DELAY_MS = 5 * 60 * 1000L; // 5 minutes
-
     public static void damageGlass(ServerLevel level, BlockPos pos, BlockState state) {
         GlassState glass = GLASS_STATE.computeIfAbsent(pos.immutable(), p -> new GlassState(state));
         glass.damage++;
