@@ -29,7 +29,7 @@ public class ForecastOrchestrator {
     public static boolean onServerStart(ServerLevel level) {
         ForecastDataStorage.loadAll(level);
 
-        // If both files exist, we assume the data is already loaded
+        
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
             try {
                 ForecastGenerator.generateForecastForSavedRegion(level);
@@ -37,7 +37,7 @@ public class ForecastOrchestrator {
             }
             catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
-                // If loading fails, we clear the data and regenerate
+                
                 ForecastDataStorage.clearAll(level);
                 ForecastGenerator.clearForecasts();
                 ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
@@ -45,7 +45,7 @@ public class ForecastOrchestrator {
             }
         }
 
-        // If not, generate forecast for all known centers or default to spawn
+        
         if (!ForecastDataStorage.playerData.isEmpty()) {
             for (BlockPos pos : ForecastDataStorage.playerData.values()) {
                 ForecastGenerator.generateForecastForRegion(pos, level);
@@ -120,7 +120,7 @@ public class ForecastOrchestrator {
     public static void onSwapDay(ServerLevel level) {
         boolean needsRegen = false;
 
-        // Check if any forecast is missing critical weekly data
+        
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
             BiomeForecast forecast = entry.getValue();
 
@@ -137,13 +137,13 @@ public class ForecastOrchestrator {
         }
 
         if (needsRegen || ForecastGenerator.getForecastMap().isEmpty()) {
-            // Use spawn position as region center
+            
             BlockPos spawn = level.getSharedSpawnPos();
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing or invalid. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
         }
 
-        // Rotate forecasts and rebuild daily curves
+        
         ForecastGenerator.swapToTomorrow();
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
     }
@@ -158,10 +158,10 @@ public class ForecastOrchestrator {
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
     }
 
-//    /** Called when Forge registers commands */
-//    public static void onRegisterCommands(RegisterCommandsEvent event) {
-//        ForecastDebugCommands.register(event.getDispatcher());
-//    }
+
+
+
+
 
 
 

@@ -12,7 +12,7 @@ public class AtmoApi {
     private static final AtmoApi INSTANCE = new AtmoApi();
 
     private AtmoApi() {
-        // Internal constructor to enforce singleton pattern
+        
     }
 
     /**
@@ -30,7 +30,7 @@ public class AtmoApi {
      * @return The BiomeForecast for that position
      */
     public BiomeForecast getWeatherForecast(ServerLevel level, BlockPos pos) {
-        // Placeholder for real implementation
+        
         return null;
     }
 
@@ -41,7 +41,7 @@ public class AtmoApi {
      * @return A WeatherSnapshot representing current conditions (to be defined)
      */
     public Object getCurrentWeather(ServerLevel level, BlockPos pos) {
-        // Placeholder for real implementation
+        
         return null;
     }
 
@@ -52,7 +52,7 @@ public class AtmoApi {
      * @return An object representing alerts (to be defined)
      */
     public Object getWeatherAlerts(ServerLevel level, BlockPos pos) {
-        // Placeholder for real implementation
+        
         return null;
     }
 
@@ -63,7 +63,7 @@ public class AtmoApi {
      * @return Historical data object (to be defined)
      */
     public Object getWeatherHistory(ServerLevel level, BlockPos pos) {
-        // Placeholder for real implementation
+        
         return null;
     }
 }

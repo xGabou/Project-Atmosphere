@@ -45,7 +45,7 @@ public class TodoPrinter {
         Scanner scanner = new Scanner(System.in);
         List<Section> sections = new ArrayList<>();
 
-        // ☁️ Cloud System
+        
         Section clouds = new Section("☁️ Cloud System");
         clouds.add("Implement GeckoLib CloudEntity");
         clouds.add("Add cloud variants: cumulus, cirrus, fog");
@@ -55,7 +55,7 @@ public class TodoPrinter {
         clouds.add("Restore original clouds after split");
         sections.add(clouds);
 
-        // 🌫️ Fog System
+        
         Section fog = new Section("🌫️ Fog System");
         fog.add("Add morning fog when temperature < 10°C");
         fog.add("Customize fog by biome: jungle, swamp, plains");
@@ -63,7 +63,7 @@ public class TodoPrinter {
         fog.add("Use safe Forge hook to override vanilla fog");
         sections.add(fog);
 
-        // 🧪 Shader Compatibility
+        
         Section shader = new Section("🧪 Shader Compatibility");
         shader.add("Do not override sky renderer (retain shader support)");
         shader.add("Add config option: cloudMode FULL | HYBRID | VANILLA");
@@ -71,7 +71,7 @@ public class TodoPrinter {
         shader.add("Test with Complementary, BSL, SEUS, Iris+Sodium");
         sections.add(shader);
 
-        // 🌦️ Weather Manager
+        
         Section weather = new Section("🌦️ Weather Manager");
         weather.add("Create server-authoritative WeatherManager");
         weather.add("Override vanilla rain/thunder states");
@@ -82,7 +82,7 @@ public class TodoPrinter {
         weather.add("Generate storms using season + wind + temperature");
         sections.add(weather);
 
-        // 🌪️ Extreme Weather Events
+        
         Section extreme = new Section("🌪️ Extreme Weather Events");
         extreme.add("Implement TornadoEvent (wind + suction)");
         extreme.add("Implement HurricaneEvent (wide-area wind + rain)");
@@ -91,7 +91,7 @@ public class TodoPrinter {
         extreme.add("Handle spring melt logic for snow_pile blocks");
         sections.add(extreme);
 
-        // 🌡️ Temperature System
+        
         Section temp = new Section("🌡️ Temperature System");
         temp.add("Integrate Serene Seasons API");
         temp.add("Add fallback temperature simulation if SS missing");
@@ -100,7 +100,7 @@ public class TodoPrinter {
         temp.add("Allow forecast-based temperature overrides");
         sections.add(temp);
 
-        // 🌾 Rain & Crops
+        
         Section rain = new Section("🌾 Rain & Crops");
         rain.add("Integrate with Farmer’s Delight: rain helps growth");
         rain.add("Track rainfall per chunk");
@@ -108,7 +108,7 @@ public class TodoPrinter {
         rain.add("Only affect uncovered farmland");
         sections.add(rain);
 
-        // ⚙️ Config & Performance
+        
         Section config = new Section("⚙️ Config & Performance");
         config.add("Create projectatmosphere.toml config");
         config.add("Options: fog, cloud mode, forecast deviation, event toggle");
@@ -118,7 +118,7 @@ public class TodoPrinter {
         config.add("Separate ClientWeatherHandler and ServerWeatherHandler");
         sections.add(config);
 
-        // 🧩 Mod Compatibility
+        
         Section compat = new Section("🧩 Mod Compatibility");
         compat.add("Farmer’s Delight");
         compat.add("Naturalist");
@@ -127,7 +127,7 @@ public class TodoPrinter {
         compat.add("Epic Fight");
         sections.add(compat);
 
-        // Main interaction loop
+        
         while (true) {
             System.out.println("\n==== Project Atmosphere TODO ====");
             for (int i = 0; i < sections.size(); i++) {
@@ -151,9 +151,9 @@ public class TodoPrinter {
             }
         }
 
-        // Save to file
+        
         System.out.print("Enter filename to save as (e.g., ProjectAtmosphereTODO.md): ");
-        scanner.nextLine();  // consume leftover newline
+        scanner.nextLine();  
         String filename = scanner.nextLine();
 
         try (FileWriter writer = new FileWriter(filename)) {

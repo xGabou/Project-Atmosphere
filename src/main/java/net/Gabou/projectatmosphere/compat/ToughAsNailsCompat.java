@@ -27,7 +27,7 @@ public class ToughAsNailsCompat {
         float[][] result = new float[7][2];
 
         for (int i = 0; i < 7; i++) {
-            float swing = DAILY_SWING * (float) Math.sin((i / 6.0F) * Math.PI); // swing peaks mid-week
+            float swing = DAILY_SWING * (float) Math.sin((i / 6.0F) * Math.PI); 
             float min = (float) (base - swing / 2 + random.nextGaussian() * DAILY_JITTER);
             float max = (float) (base + swing / 2 + random.nextGaussian() * DAILY_JITTER);
 

@@ -21,9 +21,9 @@ public class TornadoInstance {
     public final float radius;
     public final WindVector wind;
 
-    private float angularSpeed = 0.15f; // ~0.15 rad/tick
+    private float angularSpeed = 0.15f; 
     private long lastDemolitionCheck = 0L;
-    private final long demolitionIntervalMs = 1000L; // Check every 1 sec
+    private final long demolitionIntervalMs = 1000L; 
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind) {
         this(position, radius, wind, 0.15f);
@@ -87,8 +87,8 @@ public class TornadoInstance {
                 center.getX(), center.getY(), center.getZ(),
                 SoundEvents.GENERIC_EXPLODE,
                 SoundSource.WEATHER,
-                2.0f, // Volume
-                0.5f + level.getRandom().nextFloat() * 0.4f, // Pitch variation
+                2.0f, 
+                0.5f + level.getRandom().nextFloat() * 0.4f, 
                 false
         );
     }

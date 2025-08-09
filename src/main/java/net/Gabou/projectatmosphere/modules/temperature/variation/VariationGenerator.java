@@ -21,15 +21,15 @@ public class VariationGenerator {
         }
 
 
-        // Apply local fluctuations to each day
+        
         for (int i = 0; i < 7; i++) {
-            if (RANDOM.nextFloat() < 0.9f) { // 90% chance to apply natural variation
+            if (RANDOM.nextFloat() < 0.9f) { 
                 float delta = getNaturalDailyVariation();
 
                 newWeek[i][0] += delta;
                 newWeek[i][1] += delta;
 
-                // Smooth neighbors slightly
+                
                 if (i > 0) {
                     newWeek[i - 1][0] += delta * 0.3f;
                     newWeek[i - 1][1] += delta * 0.3f;

@@ -6,7 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
-//import net.Gabou.projectatmosphere.modules.temperature.spike.commands.SpikeCommands;
+
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -41,7 +41,7 @@ public class TemperatureCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("temperature")
-                        // /temperature forecast
+                        
                         .then(Commands.literal("forecast")
                                 .executes(ctx -> {
                                     Player player = ctx.getSource().getPlayerOrException();
@@ -50,7 +50,7 @@ public class TemperatureCommands {
                                     ctx.getSource().sendSuccess(() -> Component.literal(forecast), false);
                                     return 1;
                                 }))
-                        // /temperature get <biome>
+                        
                         .then(Commands.literal("get")
                                 .then(Commands.argument("biome", StringArgumentType.word())
                                         .suggests(BIOME_SUGGESTIONS)
@@ -65,7 +65,7 @@ public class TemperatureCommands {
                                                             String.format("%.2f°C", temp)), false);
                                             return 1;
                                         })))
-                        // /temperature dayprofile
+                        
                         .then(Commands.literal("dayprofile")
                                 .executes(ctx -> {
                                     Player player = ctx.getSource().getPlayerOrException();
@@ -76,7 +76,7 @@ public class TemperatureCommands {
                                                     java.util.Arrays.toString(profile)), false);
                                     return 1;
                                 }))
-                        // /temperature getseason
+                        
                         .then(Commands.literal("getseason")
                                 .requires(source -> source.hasPermission(2))
                                 .executes(ctx -> {
@@ -86,7 +86,7 @@ public class TemperatureCommands {
                                             () -> Component.literal("Current season: " + subSeason), false);
                                     return 1;
                                 }))
-                        // /temperature gettemp
+                        
                         .then(Commands.literal("gettemp")
                                 .requires(source -> source.hasPermission(2))
                                 .executes(ctx -> {
@@ -108,7 +108,7 @@ public class TemperatureCommands {
                                 }))
 
 
-// /temperature regenerate
+
                         .then(Commands.literal("regenerate")
                                 .requires(source -> source.hasPermission(2))
                                 .executes(ctx -> {
@@ -126,7 +126,7 @@ public class TemperatureCommands {
                                     ctx.getSource().sendSuccess(() -> Component.literal("§Spike's cache has been cleared."), false);
                                     return 1;
                                 }))
-                        // /temperature help
+                        
                         .then(Commands.literal("help")
                                 .executes(ctx -> {
                                     ctx.getSource().sendSuccess(() -> Component.literal("""

@@ -29,7 +29,7 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
         );
     }
 
-    // Optional: Convenience constructor for cases without gust
+    
     public static WindVector fromBase(float baseSpeed, float angleRadians) {
         return new WindVector(baseSpeed, angleRadians, baseSpeed);
     }

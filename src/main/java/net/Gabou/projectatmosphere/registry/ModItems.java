@@ -39,7 +39,7 @@ public class ModItems {
                     -2.8f,
                     Tiers.WOOD,
                     BlockTags.DIRT,
-                    new Item.Properties().durability(159) // bois ~ bois sword
+                    new Item.Properties().durability(159) 
             )
     );
 

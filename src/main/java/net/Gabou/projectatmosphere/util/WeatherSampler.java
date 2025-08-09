@@ -44,7 +44,7 @@ public class WeatherSampler {
                 level.getBiome(pos).unwrapKey().ifPresent(biomeKey -> {
                     ResourceLocation biomeId = biomeKey.location();
 
-                    // Try to find existing BiomeInstanceKey for this biomeId that is closest to this sample pos
+                    
                     BiomeInstanceKey bestMatch = null;
                     double bestDistSq = Double.MAX_VALUE;
 
@@ -59,9 +59,9 @@ public class WeatherSampler {
                     }
 
                     if (bestMatch != null) {
-                        result.add(bestMatch); // use canonical sample
+                        result.add(bestMatch); 
                     } else {
-                        result.add(new BiomeInstanceKey(biomeId, pos)); // fallback to new one
+                        result.add(new BiomeInstanceKey(biomeId, pos)); 
                     }
                 });
             }
@@ -100,13 +100,13 @@ public class WeatherSampler {
 
         if (count == 0) return null;
 
-        // Determine dominant biome
+        
         BiomeInstanceKey dominantKey = keys.stream()
                 .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType))
                 .entrySet()
                 .stream()
                 .max(Map.Entry.comparingByValue(Comparator.comparingInt(List::size)))
-                .map(entry -> entry.getValue().get(0)) // get first BiomeInstanceKey in the most common group
+                .map(entry -> entry.getValue().get(0)) 
                 .orElse(keys.iterator().next());
 
 

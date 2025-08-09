@@ -39,7 +39,7 @@ public class DebugAtmoCommand {
                 Commands.literal("weatherdebug")
                         .then(Commands.literal("forecast")
                                 .executes(ctx -> {
-                                    // Use the executor's current biome
+                                    
                                     ServerLevel world = ctx.getSource().getLevel();
                                     BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
                                     ResourceLocation biome = world.registryAccess()
@@ -63,7 +63,7 @@ public class DebugAtmoCommand {
                         .then(Commands.literal("cpu")
                                 .executes(ctx -> {
                                     int cores = Runtime.getRuntime().availableProcessors();
-                                    boolean forceShared = /*AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get()*/false;
+                                    boolean forceShared = false;
                                     String mode;
                                     if (forceShared || cores <= 6) {
                                         mode = "Shared Executor (1 thread pool)";

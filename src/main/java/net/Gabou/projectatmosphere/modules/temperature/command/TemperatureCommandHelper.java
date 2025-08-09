@@ -93,7 +93,7 @@ public class TemperatureCommandHelper {
     public static float getFinalBiomeTemperature(Level level, Holder<Biome> biomeHolder, BlockPos pos) {
         return ModConfig.seasons.isDimensionWhitelisted(level.dimension())
                 && !biomeHolder.is(sereneseasons.init.ModTags.Biomes.BLACKLISTED_BIOMES)
-                ? SeasonHooks.getBiomeTemperature(level, biomeHolder, pos)  // Tu peux wrapper ça aussi si tu veux.
+                ? SeasonHooks.getBiomeTemperature(level, biomeHolder, pos)  
                 : biomeHolder.value().getBaseTemperature();
     }
 
@@ -136,7 +136,7 @@ public class TemperatureCommandHelper {
             sb.append("\n  §7Day ").append(day + 1).append(" → ");
             float[] profile = week[day];
 
-            // Format each value with 1 decimal
+            
             for (int i = 0; i < profile.length; i++) {
                 sb.append(String.format(Locale.US, "%.1f°C", profile[i]));
                 if (i < profile.length - 1) sb.append(", ");

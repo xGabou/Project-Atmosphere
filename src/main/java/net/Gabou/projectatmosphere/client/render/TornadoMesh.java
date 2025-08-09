@@ -18,9 +18,9 @@ public class TornadoMesh {
     private static int vbo = -1;
 
     public static void init() {
-        if (vao != -1) return; // already initialized
+        if (vao != -1) return; 
 
-        // Vertex buffer with a single point at origin
+        
         FloatBuffer vertexData = BufferUtils.createFloatBuffer(3);
         vertexData.put(0f).put(0f).put(0f).flip();
 
@@ -30,27 +30,27 @@ public class TornadoMesh {
 
         vao = GL30.glGenVertexArrays();
         GL30.glBindVertexArray(vao);
-        GL20.glEnableVertexAttribArray(0); // Location 0
+        GL20.glEnableVertexAttribArray(0); 
         GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 12, 0);
-        GL30.glBindVertexArray(0); // unbind
+        GL30.glBindVertexArray(0); 
     }
 
     public static void drawInstanced(int count) {
         GL30.glBindVertexArray(vao);
-        GL31.glDrawArraysInstanced(GL11.GL_POINTS, 0, 1, count); // draw 1 point, instanced `count` times
+        GL31.glDrawArraysInstanced(GL11.GL_POINTS, 0, 1, count); 
         GL30.glBindVertexArray(0);
     }
 
     public static int uploadTornadoSSBO(Vec3 pos, float radius, int count) {
-        ByteBuffer buf = BufferUtils.createByteBuffer(6 * 4 * count); // 6 fields * 4 bytes per entry
+        ByteBuffer buf = BufferUtils.createByteBuffer(6 * 4 * count); 
 
         for (int i = 0; i < count; i++) {
-            buf.putInt(i); // side ID (0–19)
+            buf.putInt(i); 
             buf.putFloat((float) pos.x);
             buf.putFloat((float) pos.y);
             buf.putFloat((float) pos.z);
             buf.putFloat(radius);
-            buf.putFloat(1.0f); // brightness
+            buf.putFloat(1.0f); 
         }
 
         buf.flip();

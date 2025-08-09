@@ -37,23 +37,23 @@ public class StormGenerator {
 
             float windStrength = (wind != null && wind.length > day) ? wind[day].baseSpeed() : 0f;
 
-            // --- Base scoring ---
+            
             if (pressureAvg < 1000f) stormScore += 0.3f;
             if (pressureAvg < 990f) stormScore += 0.2f;
             if (rhAvg > 0.8f) stormScore += 0.2f;
             if (tempDelta > 10f) stormScore += 0.15f;
             if (windStrength > 12f) stormScore += 0.1f;
 
-            // --- Seasonal adjustment ---
+            
             float seasonalMultiplier = getSeasonalStormMultiplier(level, pos);
             stormScore *= seasonalMultiplier;
 
-            // --- Noise ---
+            
             long seed = ProjectAtmosphere.seed ^ pos.asLong() ^ biome.hashCode() ^ day;
             Random rand = new Random(seed);
             stormScore += (rand.nextFloat() - 0.5f) * 0.1f;
 
-            // --- Min/Max clamping ---
+            
             float min = getSeasonalStormMin(level, pos);
             float max = getSeasonalStormMax(level, pos);
             stormWeek[day][0] = min+1;
@@ -61,15 +61,15 @@ public class StormGenerator {
         }
 
         return stormWeek;
-//        return new float[][] {
-//            {7,7}, // Placeholder for the first day
-//            {7,7}, // Placeholder for the second day
-//            {7,7}, // Placeholder for the third day
-//            {7,7}, // Placeholder for the fourth day
-//            {7,7}, // Placeholder for the fifth day
-//            {7,7}, // Placeholder for the sixth day
-//            {7,7}  // Placeholder for the seventh day
-        //};
+
+
+
+
+
+
+
+
+        
     }
 
     private static float clamp(float val, float min, float max) {
@@ -79,10 +79,10 @@ public class StormGenerator {
     private static float getSeasonalStormMultiplier(ServerLevel level, BlockPos pos) {
         int season = (int)((level.getDayTime() / 24000L) % 4);
         return switch (season) {
-            case 0 -> 1.0f;  // Spring
-            case 1 -> 1.3f;  // Summer
-            case 2 -> 1.5f;  // Fall
-            case 3 -> 0.7f;  // Winter
+            case 0 -> 1.0f;  
+            case 1 -> 1.3f;  
+            case 2 -> 1.5f;  
+            case 3 -> 0.7f;  
             default -> 1.0f;
         };
     }

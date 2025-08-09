@@ -1,4 +1,4 @@
-// src/main/java/net/Gabou/projectatmosphere/modules/humidity/util/HumidityGenerator.java
+
 package net.Gabou.projectatmosphere.modules.humidity;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
@@ -21,12 +21,12 @@ public class HumidityGenerator {
     public static final float MIN_VANILLA_TEMP_TROPICAL_BIOME = 1.8f;
     public static final float MIN_HUMIDITY_DESERT_BIOME = 5f;
 
-//    /**
-//     * Saturation vapor pressure (Magnus–Tetens) in hPa.
-//     */
-//    private static double satVaporPressure(float T) {
-//        return 6.112 * Math.exp((17.67 * T) / (T + 243.5));
-//    }
+
+
+
+
+
+
 
     public static float[][] generateWeekForecast(Level world, BiomeInstanceKey b) {
         ResourceLocation biomeId = b.biomeType();
@@ -41,9 +41,9 @@ public class HumidityGenerator {
         Biome biome = world.getBiome(pos).get();
         float baseRH = biome.getModifiedClimateSettings().downfall() * MAX_HUMIDITY;
 
-        // Clamp RH for desert and tropical biomes
+        
         if (!biome.getModifiedClimateSettings().hasPrecipitation()) {
-            baseRH = MIN_HUMIDITY_DESERT_BIOME;  // for arid
+            baseRH = MIN_HUMIDITY_DESERT_BIOME;  
         } else if (biome.getBaseTemperature() > MIN_VANILLA_TEMP_TROPICAL_BIOME) {
             baseRH = Math.max(baseRH, MIN_HUMIDITY_TROPICAL_BIOME);
         }
@@ -57,7 +57,7 @@ public class HumidityGenerator {
             float Tmax = tempWeek[d][1];
             float deltaT = Tmax - Tmin;
 
-            float humiditySwing = Math.min(20f, deltaT * 2.5f); // up to ±10%
+            float humiditySwing = Math.min(20f, deltaT * 2.5f); 
 
             float finalMin = Math.max(MIN_HUMIDITY_DESERT_BIOME, baseRH - humiditySwing * 0.5f);
             float finalMax = Math.max(MIN_HUMIDITY_DESERT_BIOME, baseRH + humiditySwing * 0.5f);

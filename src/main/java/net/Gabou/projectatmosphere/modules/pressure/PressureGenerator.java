@@ -1,4 +1,4 @@
-// PressureGenerator.java
+
 package net.Gabou.projectatmosphere.modules.pressure;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
@@ -19,7 +19,7 @@ import java.util.Random;
  */
 public class PressureGenerator {
 
-    public static final float PRESSION_MOYENNE = 1013.25f; // hPa, average sea level pressure
+    public static final float PRESSION_MOYENNE = 1013.25f; 
     public static float[][] generateWeekForecast(Level world, BiomeInstanceKey key) {
 
         ResourceLocation biome = key.biomeType();
@@ -29,7 +29,7 @@ public class PressureGenerator {
                 ^ pos.asLong() ^ biome.hashCode() ^ day;
         Random rand = new Random(seed);
 
-        double P0 = PRESSION_MOYENNE * Math.pow( //Pression 0 en hpa
+        double P0 = PRESSION_MOYENNE * Math.pow( 
                 1.0 - 0.0065 * pos.getY() / 288.15,
                 9.80665 / (287.05 * 0.0065)
         );
@@ -41,16 +41,16 @@ public class PressureGenerator {
         if (tempWeek == null || rhWeek == null) return new float[7][2];
 
         double[] densities = AtmosphericPhysics.computeAirDensity(tempWeek, rhWeek);
-        double referenceDensity = 1.225; // kg/m³ at sea level, 15°C
+        double referenceDensity = 1.225; 
 
         float[][] week = new float[7][2];
         for (int d = 0; d < 7; d++) {
             float Tavg = (tempWeek[d][0] + tempWeek[d][1]) * 0.5f;
             float deltaT = -0.5f * (Tavg - 15f);
 
-            // NEW: accurate air density adjustment
+            
             float densityModifier = (float)(densities[d] / referenceDensity);
-            float deltaDensity = (densityModifier - 1f) * 30f; // Tune this multiplier
+            float deltaDensity = (densityModifier - 1f) * 30f; 
 
             float center = base + deltaT + deltaDensity;
 

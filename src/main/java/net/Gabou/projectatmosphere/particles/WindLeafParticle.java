@@ -16,20 +16,20 @@ public class WindLeafParticle extends TextureSheetParticle {
         super(world, x, y, z, xSpeed, ySpeed, zSpeed);
         this.sprites = sprites;
 
-        // Light gravity and high friction = floaty
+        
         this.gravity = 0.002f;
         this.friction = 0.98f;
 
         this.xd = xSpeed;
-        this.yd = ySpeed * 0.3f + (random.nextFloat() * 0.02f); // gentle updraft
+        this.yd = ySpeed * 0.3f + (random.nextFloat() * 0.02f); 
         this.zd = zSpeed;
 
-        this.lifetime = 200; // exactly 10 seconds
+        this.lifetime = 200; 
         this.setSize(0.1f, 0.1f);
         this.setSpriteFromAge(sprites);
 
-        // Allow slow rotation
-        this.roll = random.nextFloat() * (float)Math.PI * 2.0f; // random initial rotation
+        
+        this.roll = random.nextFloat() * (float)Math.PI * 2.0f; 
         this.oRoll = this.roll;
     }
 
@@ -38,16 +38,16 @@ public class WindLeafParticle extends TextureSheetParticle {
     public void tick() {
         super.tick();
 
-        // Smooth rolling rotation (you can randomize the factor)
+        
         this.oRoll = this.roll;
-        this.roll += 0.02f + random.nextFloat() * 0.01f; // 0.02–0.03 rad/tick
+        this.roll += 0.02f + random.nextFloat() * 0.01f; 
 
-        // Optional: slight vertical jitter to simulate lift
+        
         if (this.age % 5 == 0) {
             this.yd += (random.nextFloat() - 0.5f) * 0.003f;
         }
 
-        // Optional: fade out smoothly (alpha)
+        
         if (this.age > this.lifetime - 40) {
             this.alpha = (this.lifetime - this.age) / 40.0f;
         }
@@ -65,7 +65,7 @@ public class WindLeafParticle extends TextureSheetParticle {
         return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
     }
 
-    // Factory provider for particle creation
+    
     public static class Provider implements ParticleProvider<SimpleParticleType> {
         private final SpriteSet spriteSet;
 

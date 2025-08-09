@@ -6,7 +6,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 
-// src/main/java/net/Gabou/projectatmosphere/ClientOnlyRegistrar.java
+
 @OnlyIn(Dist.CLIENT)
 public class ClientOnlyRegistrar {
     public static void registerClient(IEventBus modEventBus) {

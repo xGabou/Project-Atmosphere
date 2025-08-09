@@ -28,22 +28,22 @@ import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MAX_RADIUS;
 import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MIN_RADIUS;
 
 public class SimpleCloudSpawner {
-    // Constante pour l'intervalle de spawn des nuages en ticks.
-    private static final int SPAWN_INTERVAL_TICKS = 24000; // 50 secondes (20 ticks par seconde)
-    // Dernier tick de spawn pour éviter les spawns trop fréquents.
+    
+    private static final int SPAWN_INTERVAL_TICKS = 24000; 
+    
     private static long LAST_SPAWN_TICK = 0;
 
-    // Pression moyenne en hPa (niveau de la mer)
+    
     private static float PRESSION_MOYENNE = 1013.25f;
 
     private static int NB_MAX_CLOUDS_TYPES = 4;
 
     private static int currentViolence = 0;
 
-    private static float DEW_GAP_MODIFIER = 1.0f; // Modificateur pour le gap de rosée
-    private static float PRESSURE_MODIFIER = 1.0f; // Modificateur pour la pression
-    private static float HUMIDITY_MODIFIER = 1.0f; // Modificateur pour l'humidité
-    private static float TEMPERATURE_MODIFIER = 1.0f; // Modificateur pour la température
+    private static float DEW_GAP_MODIFIER = 1.0f; 
+    private static float PRESSURE_MODIFIER = 1.0f; 
+    private static float HUMIDITY_MODIFIER = 1.0f; 
+    private static float TEMPERATURE_MODIFIER = 1.0f; 
 
     public static int getCurrentViolence() {
         return currentViolence;
@@ -55,19 +55,19 @@ public class SimpleCloudSpawner {
         return violence;
     }
 
-    // Méthode pour essayer de spawn des nuages dans le niveau serveur si l'intervalle de temps est respecté.
+    
     public static void trySpawnClouds(ServerLevel level, CloudGenerator generator) {
         List<SpawnRegion> spawnRegions = generator.getSpawnRegions();
         RandomSource random = RandomSource.create();
         CloudSpawningConfig config = generator.getSpawnConfig().get();
 
-        // 1. Determine how many new regions we can spawn
+        
         int currentCount = generator.getClouds().size();
         int maxRegions = config.getMaxInitialRegions();
         int remaining = maxRegions - currentCount;
         if (remaining <= 0) return;
 
-        int toSpawn = Mth.clamp(BiasedToBottomInt.of(1, 5).sample(random), 1, remaining); // spawn 1–5 clouds or up to the limit
+        int toSpawn = Mth.clamp(BiasedToBottomInt.of(1, 5).sample(random), 1, remaining); 
 
         for (int i = 0; i < toSpawn; i++) {
             if (spawnRegions.isEmpty()) {
@@ -75,17 +75,17 @@ public class SimpleCloudSpawner {
                 return;
             }
 
-            // 2. Pick a random region and a point inside it
+            
             SpawnRegion region = spawnRegions.get(random.nextInt(spawnRegions.size()));
             int radius = BiasedToBottomInt.of(MIN_RADIUS, MAX_RADIUS).sample(random);
             Vector2i point = SpawnRegion.getRandomPointInRegion(region, random);
 
-            // 3. Weather sampling for surrounding biomes
+            
             Set<BiomeInstanceKey> sample = WeatherSampler.sampleBiomesInArea(point.x, point.y, radius, level);
             WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sample, level, level.getGameTime());
             if (stats == null) continue;
 
-            // 4. Determine cloud ID
+            
             String cloudId = CloudLibrary.getCloudIdFromSeverity(
                     determineCloudSeverity(
                             stats.temperature(),
@@ -103,7 +103,7 @@ public class SimpleCloudSpawner {
                 continue;
             }
 
-            // 5. Create dummy region for size control
+            
             Optional<CloudRegion> dummyOpt = SimpleCloudsCompat.createRegion(
                     info,
                     new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
@@ -118,7 +118,7 @@ public class SimpleCloudSpawner {
             CloudRegion dummy = dummyOpt.get();
             dummy.setRadius(radius);
 
-            // 6. Spawn cloud with weather-based region
+            
             SimpleCloudsCompat.spawnCloudInBiome(
                     cloudId,
                     new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
@@ -144,7 +144,7 @@ public class SimpleCloudSpawner {
 
 
     public static float calculateDewPoint(float temperature, float humidity) {
-        // Formule de calcul du point de rosée (dewPoint) de la formule d'August-Roche-Magnus
+        
         final float ACONST = 17.62f;
         final float BCONST = 243.12f;
 
@@ -153,7 +153,7 @@ public class SimpleCloudSpawner {
     }
     public static int determineCloudSeverity(float temperature, float humidity, float pressure,float dewPoint,float stormChance) {
 
-        float dewGap = temperature - dewPoint; //Plus de dewGap est petit -> Plus il y a de nuages
+        float dewGap = temperature - dewPoint; 
         float pressureFactor = 1.0f - (pressure / PRESSION_MOYENNE);
         float humidityFactor = humidity / 100.0f;
         float tempIdealness = 1.0f - Math.abs(temperature - 15.0f) / 40.0f;

@@ -1,10 +1,10 @@
 package net.Gabou.projectatmosphere.client.render;
 
 public class SideInfo {
-    public int side;      // int
-    public float radius;  // float
-    public float brightness; // float
-    public byte x, y, z;  // byte
-    public byte pad;      // for alignment
+    public int side;      
+    public float radius;  
+    public float brightness; 
+    public byte x, y, z;  
+    public byte pad;      
 }
 

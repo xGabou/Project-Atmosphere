@@ -35,7 +35,7 @@ public class TemperatureGenerator {
         long seed = chunkPos.asLong() ^ biomeId.hashCode() ^
                 ProjectAtmosphere.seed;
         Random rand = new Random(seed);
-        // look up the current Sereneseasons primary season
+        
         int cycleTicks = SeasonHelper.getSeasonState(world).getSeasonCycleTicks();
         long seasonDuration = SeasonHelper.getSeasonState(world).getSeasonDuration();
         long dayDuration    = SeasonHelper.getSeasonState(world).getDayDuration();
@@ -43,15 +43,15 @@ public class TemperatureGenerator {
         Season currentSeason = Season.valueOf(st.getSeason().name());
 
 
-        // Base temperature (sea level + altitude + season)
+        
         float baseTemp = SeasonHooks.getBiomeTemperature(world, world.getBiome(chunkPos), chunkPos);
         float seaLevelC = toCelsiusSeaLevel(biomeId, baseTemp, currentSeason);
         float altitudeBase = seaLevelC + (chunkPos.getY() - SEA_LEVEL) * LAPSE_RATE;
 
 
 
-        float randomAmp = isTropicalBiome(biomeId,world,4f,8f);        // ±3 °C in tropics, ±6 °C elsewhere
-        float fluctuationAmp = isTropicalBiome(biomeId,world,2f,4f); // spatial/day noise
+        float randomAmp = isTropicalBiome(biomeId,world,4f,8f);        
+        float fluctuationAmp = isTropicalBiome(biomeId,world,2f,4f); 
 
         BiomeTempConfig.DailyRange clamp = BiomeTempConfig.getClamp(biomeId, currentSeason);
 
@@ -62,13 +62,13 @@ public class TemperatureGenerator {
             float seasonalShift = (float)Math.sin(prog * 2 * Math.PI) * -10f;
             float dailyMean = altitudeBase + seasonalShift;
 
-            // 1) Spatial/day noise
+            
             float mapNoise = getDailyFluctuation(world, chunkPos, fluctuationAmp);
-            // 2) Random daily variation
+            
             float randNoise = (rand.nextFloat() * 2f * randomAmp) - randomAmp;
             float dailyBase   = dailyMean + mapNoise + randNoise;
 
-            // times in ticks: dawn(6000), noon(9000), dusk(12000), midnight(21000), etc.
+            
             float[] sampleTicks = { 21000f, 6000f, 9000f, 12000f, 18000f };
             float dayMin = Float.POSITIVE_INFINITY;
             float dayMax = Float.NEGATIVE_INFINITY;
@@ -78,16 +78,16 @@ public class TemperatureGenerator {
                 dayMin = Math.min(dayMin, temp);
                 dayMax = Math.max(dayMax, temp);
             }
-            // D) smooth‐clamp min toward avgNight & max toward avgDay
+            
             if (clamp != null) {
-                // ease the min toward avgNight
+                
                 float easedMin = easeTowardAverage(dayMin, clamp.avgNight());
-                // if still outside [minMin..maxMax], apply the ultimate smoother
+                
                 dayMin = (easedMin < clamp.minMin() || easedMin > clamp.maxMax())
                         ? ultimateSmoother(easedMin, clamp.minMin(), clamp.maxMax())
                         : easedMin;
 
-                // same for the max toward avgDay
+                
                 float easedMax = easeTowardAverage(dayMax, clamp.avgDay());
                 dayMax = (easedMax < clamp.minMin() || easedMax > clamp.maxMax())
                         ? ultimateSmoother(easedMax, clamp.minMin(), clamp.maxMax())
@@ -111,18 +111,18 @@ public class TemperatureGenerator {
     private static float ultimateSmoother(float v, float boundLow, float boundHigh) {
         float sign = Math.signum(v);
 
-        // 1) Cap to ±65°C
+        
         float capped = sign * Math.min(BOUND_TEMP, Math.abs(v));
 
-        // 2) Compute credit based on overshoot and scale
+        
         float credit = computeCredit(v) * sign;
         float postCap = capped + credit;
 
-        // 3) Ease toward the average of the bounds
+        
         float boundMid = (boundLow + boundHigh) / 2f;
         float eased = easeTowardAverage(postCap, boundMid);
 
-        // 4) Final hard clamp into a 2°C safety buffer
+        
         if (eased < boundLow)  return boundLow + 2f;
         if (eased > boundHigh) return boundHigh - 2f;
 
@@ -133,10 +133,10 @@ public class TemperatureGenerator {
         float overshoot = abs - BOUND_TEMP;
         if (overshoot <= 0f) return 0f;
 
-        // Example: a natural log-based asymptotic curve, scaled to fit
+        
         float credit = (float) (Math.log(overshoot + 1) / Math.log(2.5)) + 0.5f;
 
-        // Optional: clamp to a max if needed
+        
         return Math.min(credit*4, 10f);
     }
 
@@ -155,16 +155,16 @@ public class TemperatureGenerator {
         float diff = v - avg;
         float absDiff = Math.abs(diff);
 
-        // More tolerant: increase denominator to reduce strength
-        float strength = (float)(1.0 - Math.exp(-absDiff / 8.0)); // was /4.0
-        strength = Math.min(strength, 0.7f);  // still cap at 70% pull
+        
+        float strength = (float)(1.0 - Math.exp(-absDiff / 8.0)); 
+        strength = Math.min(strength, 0.7f);  
 
         return avg + diff * (1.0f - strength);
     }
 
 
 
-    /*────────────────────────────────────────────────────────────────────────*/
+    
 
     /** Maps Serene baseTemp (–0.5→2.0) into biome’s sea-level °C range. */
     private static float toCelsiusSeaLevel(ResourceLocation biome, float baseTemp, Season season) {
@@ -176,7 +176,7 @@ public class TemperatureGenerator {
 
     /** Applies day/night drop: night=18:00–06:00, cold drop or minor in tropics. */
     private static float getNighttimeTempModifier(float timeOfDay, ResourceLocation biome, Level world) {
-        // Night = [12000..23999] & [0..5999]
+        
         if (timeOfDay >= 12000f || timeOfDay < 6000f) {
             return isTropicalBiome(biome,world,-2.0f, -4f);
         }

@@ -28,8 +28,8 @@ import net.minecraftforge.fml.common.Mod;
 public class EventHandler {
 
     private static final int MIN_TICKS_BETWEEN_DUST_SPAWN = 5000;
-    // Increase delay between tempest effects to reduce how often
-    // cochonerie (debris) spawns
+    
+    
     private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
 
     private static final int TICKS_BETWEEN_TORNADO_CHECK = 200;

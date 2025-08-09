@@ -114,7 +114,7 @@ public class SimpleCloudsCompat {
         float rotation = windAngleRad + (float) Math.PI;
 
 
-        // Return new region
+        
         Optional<CloudRegion> region = generator.createRegion(info, 10, 10, x, z, random, true);
         if (region.isEmpty()) {
             return Optional.empty();
@@ -151,7 +151,7 @@ public class SimpleCloudsCompat {
                 if (intersectsOther)
                     continue;
 
-                // 🌦️ Échantillonnage météo à partir de cette unique région
+                
                 Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInArea(pos.x,pos.y,sharedRadius,level);
                 WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, level, level.getGameTime());
                 if (stats == null)
@@ -179,7 +179,7 @@ public class SimpleCloudsCompat {
                 );
 
                 cloudFormation.ifPresent(cf -> {
-                    cf.setRadius(sharedRadius); // Force la même taille
+                    cf.setRadius(sharedRadius); 
                     generator.addCloud(cf, CloudGenerator.Order.USE_WEIGHT);
                     isInit = true;
                 });

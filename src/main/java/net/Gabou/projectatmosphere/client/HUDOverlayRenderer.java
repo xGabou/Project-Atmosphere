@@ -18,7 +18,7 @@ public class HUDOverlayRenderer {
 
     public static void showTemperatureOverlay(String msg) {
         temperatureMessage = msg;
-        displayUntil = System.currentTimeMillis() + 3000; // 3 seconds
+        displayUntil = System.currentTimeMillis() + 3000; 
     }
 
     @SubscribeEvent
@@ -36,7 +36,7 @@ public class HUDOverlayRenderer {
         int screenHeight = mc.getWindow().getGuiScaledHeight();
 
         int x = (screenWidth - font.width(temperatureMessage)) / 2;
-        int y = screenHeight - 60; // Just above the hotbar
+        int y = screenHeight - 60; 
 
         guiGraphics.drawString(font, temperatureMessage, x, y, 0xFFFFFF, true);
     }

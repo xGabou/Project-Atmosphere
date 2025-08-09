@@ -46,7 +46,7 @@ import java.util.Objects;
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ProjectAtmosphere {
 
-    public static final float DEFAULT_REGION_RADIUS = 700F; // Default radius for region generation
+    public static final float DEFAULT_REGION_RADIUS = 700F; 
 
     public static final int DEFAULT_RADIUS = 10000;
     public static long seed;
@@ -75,7 +75,7 @@ public class ProjectAtmosphere {
         modEventBus.addListener(this::setup);
         modEventBus.addListener(this::clientSetup);
 
-        // Register COMMON-side handlers
+        
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
         MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
@@ -121,7 +121,7 @@ public class ProjectAtmosphere {
 
         if (world != null) {
             AtmosphereManager.onServerStopping(world);
-            seed = 0; // Reset the seed when the server stops
+            seed = 0; 
         }
     }
 
@@ -150,31 +150,31 @@ public class ProjectAtmosphere {
         AtmosphereManager.onRegisterCommands(event);
     }
 
-    //    @SubscribeEvent
-//    public static void onEntityJoin(EntityJoinLevelEvent event) {
-//        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-//        ServerLevel world = Objects.requireNonNull(event.getEntity().getServer()).getLevel(ServerLevel.OVERWORLD);
-//        if (world != null) {
-//            AtmosphereManager.onPlayerLogin(world, player);
-//        }
-//    }
+    
+
+
+
+
+
+
+
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         LOGGER.info("Player logged in!");
         AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
 
-//        LoginDataGate.sendBiomeSyncPacketIfReady(player.getServer(), player);
-        // Lance la logique async → quand prête, libère le client
+
+        
 
     }
 
 
     @SubscribeEvent
     public static void onConfigLoaded(ModConfigEvent event) {
-//        if (event.getConfig().getSpec() == AtmoCommonConfig.COMMON_SPEC) {
-//            ProjectAtmosphere.LOGGER.info("✔ Config loaded!");
-//        }
+
+
+
     }
 
     private static void sendInfo() {
@@ -209,7 +209,7 @@ public class ProjectAtmosphere {
 
         public abstract String getGPUName();
 
-        // Factory method
+        
         public static SystemProfile create(boolean isClient) {
             return isClient ? new ClientSystemProfile() : new ServerSystemProfile();
         }

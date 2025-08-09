@@ -60,19 +60,19 @@ public class AtmosphereManager {
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.updateForecast(world,center);
-//            biomeSamples.addAll(AtmosphereUtils.findBiomes(world, center, DEFAULT_RADIUS));
-//            allCenterOfMap.add(center);
-//            TemperatureManager.updateForecastAround(world, biomeSamples);
-//            PressureManager.updateForecastAround(world, biomeSamples);
-//            HumidityManager.updateForecastAround(world, biomeSamples);
-//            WindManager.updateForecastAround(world, biomeSamples);
-//            StormManager.updateForecastAround(world, biomeSamples);
-//            refreshUnifiedForecast(biomeSamples);
+
+
+
+
+
+
+
+
         });
     }
 
     public static void onRegisterCommands(final RegisterCommandsEvent event) {
-        // Register commands here
+        
         TemperatureCommands.register(event.getDispatcher());
         HumidityCommand.register(event.getDispatcher());
         PressureCommand.register(event.getDispatcher());

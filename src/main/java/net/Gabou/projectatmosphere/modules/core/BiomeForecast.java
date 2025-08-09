@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.modules.core;
 
 public class BiomeForecast {
-    private float[][] temperature; // 7x2: min/max per day
+    private float[][] temperature; 
     private float[][] pressure;
     private float[][] humidity;
     private WindVector[] wind;
@@ -38,7 +38,7 @@ public class BiomeForecast {
         this.stormChance = stormChance;
     }
 
-    // Forecast getters
+    
     public float[][] getTemperature() {
         return temperature;
     }
@@ -58,7 +58,7 @@ public class BiomeForecast {
         return stormChance;
     }
 
-    // Daily profile getters
+    
     public float[] getTemperatureDay() {
         return temperatureDay;
     }
@@ -91,7 +91,7 @@ public class BiomeForecast {
         return stormChanceTomorrow;
     }
 
-    // Forecast setters
+    
     public void setTemperature(float[][] temperature) {
         this.temperature = temperature;
     }
@@ -112,7 +112,7 @@ public class BiomeForecast {
         this.stormChance = stormChance;
     }
 
-    // Daily profile setters
+    
     public void setTemperatureDay(float[] temperatureDay) {
         this.temperatureDay = temperatureDay;
     }

@@ -53,7 +53,7 @@ public class BiomeChangeManager {
 
         if (last == null || !last.equals(nowBiome)) {
             lastBiome.put(uuid, nowBiome);
-            onBiomeChanged(player, last, nowBiome); // decision to regen is now inside
+            onBiomeChanged(player, last, nowBiome); 
         }
     }
 
@@ -71,9 +71,9 @@ public class BiomeChangeManager {
         BlockPos currentPos = player.blockPosition();
         BlockPos originalCenter = ForecastDataStorage.playerData.get(uuid);
 
-        // only trigger update if the player moved far from original forecast center
+        
         if (originalCenter == null || originalCenter.distManhattan(currentPos) > MIN_DISTANCE_BETWEEN_CENTERS) {
-            ForecastDataStorage.playerData.put(uuid, currentPos); // update center
+            ForecastDataStorage.playerData.put(uuid, currentPos); 
             AtmosphereManager.updateForecastAround(player.serverLevel(), currentPos);
 
             player.sendSystemMessage(net.minecraft.network.chat.Component.literal(

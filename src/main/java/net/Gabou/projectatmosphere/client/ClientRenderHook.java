@@ -17,8 +17,8 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.List;
 
 @Mod.EventBusSubscriber(
-        modid = ProjectAtmosphere.MODID,                       // ← your mod ID
-        bus = Mod.EventBusSubscriber.Bus.FORGE,   // ← must be FORGE bus
+        modid = ProjectAtmosphere.MODID,                       
+        bus = Mod.EventBusSubscriber.Bus.FORGE,   
         value = Dist.CLIENT
 )
 public class ClientRenderHook {
@@ -52,7 +52,7 @@ public class ClientRenderHook {
                         level,camera,Minecraft.getInstance(),tornado
 
                 );
-                //TornadoRenderHandler.renderTornadoVolume(poseStack, tornado.position, new Vec3(12, SimpleCloudsConfig.CLIENT.cloudHeight.get() /2.0, 12),tornado.getTwist());
+                
             }
             catch (Exception e){
                 ProjectAtmosphere.LOGGER.error("Error rendering tornado at position: " + tornado.position, e);

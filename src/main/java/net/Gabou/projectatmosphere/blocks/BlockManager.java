@@ -89,13 +89,13 @@ public class BlockManager {
      */
     public static void clearDust(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
-        int radius = 20; // Clear dust within a 20-block radius
+        int radius = 20; 
 
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 BlockPos dustPos = centerPos.offset(dx, 0, dz);
-                if (level.getBlockState(dustPos).is(Blocks.SAND)) { // Check if it's a dust block
-                    level.setBlockAndUpdate(dustPos, Blocks.AIR.defaultBlockState()); // Clear the dust block
+                if (level.getBlockState(dustPos).is(Blocks.SAND)) { 
+                    level.setBlockAndUpdate(dustPos, Blocks.AIR.defaultBlockState()); 
                 }
             }
         }
@@ -116,14 +116,14 @@ public class BlockManager {
 
         int ENTITY_THRESHOLD = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
 
-        // Get bounding box of the chunk containing centerPos
+        
         ChunkPos chunkPos = new ChunkPos(centerPos);
         AABB chunkBox = new AABB(
                 chunkPos.getMinBlockX(), level.getMinBuildHeight(), chunkPos.getMinBlockZ(),
                 chunkPos.getMaxBlockX() + 1, level.getMaxBuildHeight(), chunkPos.getMaxBlockZ() + 1
         );
 
-        // Count item entities inside the chunk
+        
         long itemCount = level.getEntitiesOfClass(ItemEntity.class, chunkBox).size();
 
         if (itemCount >= ENTITY_THRESHOLD) {
@@ -188,7 +188,7 @@ public class BlockManager {
                     int x = center.getX() + dx;
                     int z = center.getZ() + dz;
 
-                    // Delay the heightmap and world logic until we're back on the main thread
+                    
                     BlockPos posXZ = new BlockPos(x, 0, z);
 
                     AtomicInteger dustSpawned = new AtomicInteger(0);
@@ -217,7 +217,7 @@ public class BlockManager {
             }
 
 
-            // Schedule batched execution on the main thread
+            
             int batchSize = 100;
             for (int i = 0; i < mainThreadTasks.size(); i += batchSize) {
                 int start = i;
