@@ -20,9 +20,25 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class Balai extends DiggerItem {
 
+    /**
+     * Creates a new broom item capable of sweeping dust layers.
+     *
+     * @param p_204108_ attack damage modifier
+     * @param p_204109_ attack speed modifier
+     * @param p_204110_ tool tier
+     * @param p_204111_ effective block tag
+     * @param p_204112_ item properties
+     */
     public Balai(float p_204108_, float p_204109_, Tier p_204110_, TagKey<Block> p_204111_, Properties p_204112_) {
         super(p_204108_, p_204109_, p_204110_, p_204111_, p_204112_);
     }
+
+    /**
+     * Removes a dust layer at the targeted position and plays a sweeping animation.
+     *
+     * @param context the use-on context
+     * @return the interaction result
+     */
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();

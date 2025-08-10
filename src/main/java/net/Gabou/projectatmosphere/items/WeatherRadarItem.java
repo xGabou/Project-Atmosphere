@@ -11,10 +11,23 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 public class WeatherRadarItem extends Item implements InstrumentReader {
+    /**
+     * Creates a new weather radar item.
+     *
+     * @param properties the item properties
+     */
     public WeatherRadarItem(Properties properties) {
         super(properties);
     }
 
+    /**
+     * Opens the weather radar interface when the player right-clicks without sneaking.
+     *
+     * @param level  the world in which the item is used
+     * @param player the player using the item
+     * @param hand   the hand holding the item
+     * @return the interaction result holder
+     */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         if (!player.isShiftKeyDown()) {
@@ -26,6 +39,12 @@ public class WeatherRadarItem extends Item implements InstrumentReader {
         return super.use(level, player, hand);
     }
 
+    /**
+     * Displays the weather radar screen to the player.
+     *
+     * @param level  the world in which the player resides
+     * @param player the player using the item
+     */
     @Override
     public void display(Level level, Player player) {
         Minecraft.getInstance().setScreen(new WeatherRadarScreen(player));
