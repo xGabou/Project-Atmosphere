@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.particles.DebrisParticle;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.config.AtmoConfigScreen;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -25,6 +26,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
@@ -61,6 +63,8 @@ public class ProjectAtmosphere {
         IEventBus modEventBus = context.getModEventBus();
 
         context.registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
+        context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
+                () -> new ConfigScreenHandler.ConfigScreenFactory((mc, screen) -> new AtmoConfigScreen(screen)));
 
         CompatHandler.init();
         ModItems.register(modEventBus);
