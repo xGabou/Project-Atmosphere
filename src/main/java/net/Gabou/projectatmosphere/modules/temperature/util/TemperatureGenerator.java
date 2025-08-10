@@ -29,7 +29,15 @@ public class TemperatureGenerator {
     private static final float SEA_LEVEL = 63f;
     private static final float LAPSE_RATE = -0.0065f;
 
-    /** Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM), with noise & season. */
+    /**
+     * Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM),
+     * incorporating random noise and seasonal effects.
+     *
+     * @param world    the level to sample
+     * @param chunkPos the chunk position used as a seed
+     * @param biomeId  the biome identifier
+     * @return a 7×2 array where each day contains [min, max] temperatures
+     */
     public static float[][] generateWeekForecast(Level world, BlockPos chunkPos, ResourceLocation biomeId) {
         float[][] week = new float[7][2];
         long seed = chunkPos.asLong() ^ biomeId.hashCode() ^
@@ -102,11 +110,18 @@ public class TemperatureGenerator {
         return week;
     }
     /**
-     * If `v` lies outside [boundLow..boundHigh], then:
-     * 1) globally cap to ±65 °C,
-     * 2) credit back a scaled portion of the overshoot,
-     * 3) ease the value toward the nearest bound using average-based easing,
-     * 4) snap within a 2 °C buffer if still out-of-bounds.
+     * If {@code v} lies outside {@code [boundLow..boundHigh]}, then:
+     * <ol>
+     *   <li>globally cap to ±65 °C,</li>
+     *   <li>credit back a scaled portion of the overshoot,</li>
+     *   <li>ease the value toward the nearest bound using average-based easing,</li>
+     *   <li>snap within a 2 °C buffer if still out-of-bounds.</li>
+     * </ol>
+     *
+     * @param v        the value to smooth
+     * @param boundLow the lower temperature bound
+     * @param boundHigh the upper temperature bound
+     * @return the smoothed value within or near the bounds
      */
     private static float ultimateSmoother(float v, float boundLow, float boundHigh) {
         float sign = Math.signum(v);
@@ -128,28 +143,40 @@ public class TemperatureGenerator {
 
         return eased;
     }
+    /**
+     * Computes the credit applied back after capping a value that exceeds the
+     * temperature bounds.
+     *
+     * @param value the original temperature value
+     * @return the credit to add after the cap
+     */
     private static float computeCredit(float value) {
         float abs = Math.abs(value);
         float overshoot = abs - BOUND_TEMP;
         if (overshoot <= 0f) return 0f;
 
-        
+
         float credit = (float) (Math.log(overshoot + 1) / Math.log(2.5)) + 0.5f;
 
-        
-        return Math.min(credit*4, 10f);
+
+        return Math.min(credit * 4, 10f);
     }
 
 
     /**
-     * Eases `v` toward `avg` in four bands:
-     *  - |Δ| ≤ 3°C  → 10% pull
-     *  - |Δ| ≤ 6°C  → 35% pull
-     *  - |Δ| ≤ 10°C → 65% pull
-     *  - |Δ| > 10°C → 100% pull
+     * Eases {@code v} toward {@code avg} in four bands:
+     * <ul>
+     *   <li>|Δ| ≤ 3°C  → 10% pull</li>
+     *   <li>|Δ| ≤ 6°C  → 35% pull</li>
+     *   <li>|Δ| ≤ 10°C → 65% pull</li>
+     *   <li>|Δ| > 10°C → 100% pull</li>
+     * </ul>
+     * Does not enforce any bounds—it simply returns an eased value:
+     * {@code eased = avg + (v - avg) * (1 - factor)}.
      *
-     * Does NOT enforce any bounds—just returns an eased value:
-     *   eased = avg + (v − avg) * (1 − factor)
+     * @param v   the value to ease
+     * @param avg the target average
+     * @return the value eased toward the average
      */
     private static float easeTowardAverage(float v, float avg) {
         float diff = v - avg;
@@ -166,7 +193,15 @@ public class TemperatureGenerator {
 
     
 
-    /** Maps Serene baseTemp (–0.5→2.0) into biome’s sea-level °C range. */
+    /**
+     * Maps the Serene Seasons base temperature (–0.5→2.0) into the biome's
+     * sea-level Celsius range.
+     *
+     * @param biome    the biome identifier
+     * @param baseTemp the Serene Seasons base temperature
+     * @param season   the current season
+     * @return the mapped sea-level temperature in degrees Celsius
+     */
     private static float toCelsiusSeaLevel(ResourceLocation biome, float baseTemp, Season season) {
         baseTemp = Math.max(IN_MIN, Math.min(IN_MAX, baseTemp));
         BiomeTempConfig.Range range = BiomeTempConfig.getRange(biome,season);
@@ -174,7 +209,15 @@ public class TemperatureGenerator {
         return range.minC() + norm * (range.maxC() - range.minC());
     }
 
-    /** Applies day/night drop: night=18:00–06:00, cold drop or minor in tropics. */
+    /**
+     * Applies a day or night temperature modifier based on the time of day and
+     * biome.
+     *
+     * @param timeOfDay the time of day in ticks
+     * @param biome     the biome identifier
+     * @param world     the level being sampled
+     * @return the modifier to apply to the base temperature
+     */
     private static float getNighttimeTempModifier(float timeOfDay, ResourceLocation biome, Level world) {
         
         if (timeOfDay >= 12000f || timeOfDay < 6000f) {
@@ -185,8 +228,17 @@ public class TemperatureGenerator {
         }
     }
 
-    /** True if biome belongs to Sereneseasons tropical tag. */
-    public static float isTropicalBiome(ResourceLocation biomeId, Level level,float tropicalAmp, float nonTropicalAmp) {
+    /**
+     * Chooses a temperature amplitude based on whether the biome belongs to the
+     * Sereneseasons tropical tag.
+     *
+     * @param biomeId        the biome identifier
+     * @param level          the level containing the biome
+     * @param tropicalAmp    amplitude to use for tropical biomes
+     * @param nonTropicalAmp amplitude to use for non-tropical biomes
+     * @return the selected amplitude based on biome type
+     */
+    public static float isTropicalBiome(ResourceLocation biomeId, Level level, float tropicalAmp, float nonTropicalAmp) {
         Registry<Biome> reg = level.registryAccess().registryOrThrow(Registries.BIOME);
         Biome b = reg.get(biomeId);
         if (b == null) return nonTropicalAmp;
@@ -197,7 +249,14 @@ public class TemperatureGenerator {
         return bol ? tropicalAmp : nonTropicalAmp;
     }
 
-    /** Spatial daily fluctuation based on chunk and day: ±maxFluctuation. */
+    /**
+     * Computes a spatial daily fluctuation value based on chunk position and day.
+     *
+     * @param world          the level used for the day time
+     * @param pos            the block position serving as seed
+     * @param maxFluctuation the maximum fluctuation amplitude
+     * @return the fluctuation value in degrees Celsius
+     */
     private static float getDailyFluctuation(Level world, BlockPos pos, float maxFluctuation) {
         long day = world.getDayTime() / 24000L;
         int hash = Objects.hash(pos.getX() >> 4, pos.getZ() >> 4, day);
