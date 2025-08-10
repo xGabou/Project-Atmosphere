@@ -21,6 +21,7 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
     public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
     public static final ForgeConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
+    public static final ForgeConfigSpec.BooleanValue DAMAGE_GLASS_ON_TORNADO;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -39,7 +40,13 @@ public class AtmoCommonConfig {
         AUTO_REPAIR_GLASS = builder
                 .comment("Automatically repair tornado-damaged glass after 5 minutes of no new damage")
                 .define("autoRepairGlass", true);
+        DAMAGE_GLASS_ON_TORNADO = builder
+                .comment("Enable glass damage when a tornado passes over it")
+                .define("damageGlassOnTornado", true);
         builder.pop();
+
+
+
         COMMON_SPEC = builder.build();
     }
 

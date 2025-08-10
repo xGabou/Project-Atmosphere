@@ -11,7 +11,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.GlassBlock;
-import net.minecraft.world.level.block.GlassPaneBlock;
 import net.minecraft.world.level.block.StainedGlassBlock;
 import net.minecraft.world.level.block.StainedGlassPaneBlock;
 import net.minecraft.world.level.block.TintedGlassBlock;
@@ -22,6 +21,7 @@ import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 
 public class TornadoInstance {
 
+    private static final int DEBRIS_RANGE_EXTENSION = 5;
     public Vec3 position;
     public final long spawnTime;
     public final float radius;
@@ -29,7 +29,9 @@ public class TornadoInstance {
 
     private float angularSpeed = 0.15f; 
     private long lastDemolitionCheck = 0L;
-    private final long demolitionIntervalMs = 1000L; 
+    private final long demolitionIntervalMs = 1000L;
+
+
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind) {
         this(position, radius, wind, 0.15f);
@@ -71,6 +73,15 @@ public class TornadoInstance {
     }
 
     private void demolishBlocks(ServerLevel level) {
+        // Precompute once per tick/per tornado
+        final long tick = level.getGameTime();
+        final ServerLevel sLevel = (ServerLevel) level;
+        final double innerSq = radius * radius;
+        final double outerSq = (radius + 5) * (radius + 5);
+        final double band = Math.max(1.0, outerSq - innerSq);
+        final double invBand = 1.0 / band; // reuse
+// Optional: time-slice to spread load (every 2 ticks per pos "bucket")
+        final int sliceMod = 2;
         BlockPos center = BlockPos.containing(position);
         int intRadius = Mth.ceil(radius);
         for (BlockPos pos : BlockPos.betweenClosed(
@@ -84,10 +95,22 @@ public class TornadoInstance {
                         pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
                         5, 0.2, 0.2, 0.2, 0.05);
             } else if (isGlass(state)) {
-                if (distSq <= radius * radius) {
-                    level.destroyBlock(pos, false);
-                } else if (distSq <= (radius + 5) * (radius + 5)) {
-                    GlassDamageManager.damageGlass(level, pos, state);
+                // quick reject
+                if (distSq > outerSq) return;
+
+                // time-slice (hash by pos to spread work)
+                if (((pos.asLong() ^ tick) & (sliceMod - 1)) != 0) return;
+
+                // probability grows linearly from outer edge (≈0) to inner edge (≈pMax)
+                // tune pMax; 0.35f means ~35% hit chance right at the core per slice tick
+                final float pMax = 0.35f;
+                final double t = Math.min(1.0, Math.max(0.0, (outerSq - distSq) * invBand)); // 0..1
+                final float p = (float)(t * pMax);
+
+                // one RNG + one branch
+                if (sLevel.random.nextFloat() < p) {
+                    // constant damage = 1; breaks over time; inner area just hits more often
+                    GlassDamageManager.damageGlass(sLevel, pos, state, 1);
                 }
             }
         }
@@ -95,7 +118,6 @@ public class TornadoInstance {
 
     private boolean isGlass(BlockState state) {
         return state.getBlock() instanceof GlassBlock
-                || state.getBlock() instanceof GlassPaneBlock
                 || state.getBlock() instanceof StainedGlassBlock
                 || state.getBlock() instanceof StainedGlassPaneBlock
                 || state.getBlock() instanceof TintedGlassBlock;
