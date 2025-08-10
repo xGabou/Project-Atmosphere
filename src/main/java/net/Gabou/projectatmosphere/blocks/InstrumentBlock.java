@@ -13,26 +13,57 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.phys.BlockHitResult;
 
+/**
+ * Base class for interactive weather instruments that display data when used.
+ */
 public abstract class InstrumentBlock extends HorizontalDirectionalBlock implements InstrumentReader {
+
+    /**
+     * Creates a new instrument block with a default north-facing orientation.
+     *
+     * @param properties block properties
+     */
     public InstrumentBlock(Properties properties) {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
+    /**
+     * Adds the facing property to the block state definition.
+     *
+     * @param builder state definition builder
+     */
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING);
     }
 
+    /**
+     * Determines the block's orientation when placed by a player.
+     *
+     * @param context placement context
+     * @return block state with facing opposite the player's direction
+     */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
 
+    /**
+     * Handles player interaction by displaying instrument data.
+     *
+     * @param state  block state
+     * @param level  world level
+     * @param pos    block position
+     * @param player interacting player
+     * @param hand   hand used
+     * @param hit    hit result
+     * @return interaction result
+     */
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos,
                                  Player player, InteractionHand hand, BlockHitResult hit) {
-        display(level,player);
+        display(level, player);
         return  InteractionResult.SUCCESS;
     }
 
