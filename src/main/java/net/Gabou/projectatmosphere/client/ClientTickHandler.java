@@ -49,7 +49,7 @@ public class ClientTickHandler {
                 TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
             }
         }
-        if (tickCounter % 40 != 0) return; // Run every 20 ticks (1 second)
+        if (tickCounter % 40 != 0) return; 
         AsyncAtmosphereService.runClient(() -> {
             if (mc.level == null || mc.player == null) return;
             if (random == null) {
@@ -71,15 +71,15 @@ public class ClientTickHandler {
 
             SimpleParticleType particle = getSeasonalLeafParticle(mc.level, pos, mc.level.random);
             if (particle != null) {
-                // Spawn behind the player relative to wind direction
-                // Spawn at least 20 blocks away, up to 25 blocks, with a small sideways spread
+                
+                
                 double minDist = 20.0;
                 double maxDist = 100.0;
                 double distance = minDist + mc.level.random.nextDouble() * (maxDist - minDist);
                 double lateralRange = 10.0;
                 double lateral = (mc.level.random.nextDouble() * 2.0 - 1.0) * lateralRange;
 
-                // perp vector to wind dir
+                
                 double perpX = -dz;
                 double perpZ = dx;
 
@@ -88,7 +88,7 @@ public class ClientTickHandler {
                 double spawnZ = pos.getZ() + 0.5 - dz * distance + perpZ * lateral;
 
 
-                // Particle velocity following the wind
+                
                 speed *= 0.2F;
                 double vx = dx * speed;
                 double vy = 0.03;
@@ -116,7 +116,7 @@ public class ClientTickHandler {
                     ModParticles.ROUND_VERT.get(),
                     ModParticles.HEART_VERT.get()
             );
-            default -> List.of(); // WINTER or null = no leaves
+            default -> List.of(); 
         };
 
         return candidates.isEmpty() ? null : candidates.get(random.nextInt(candidates.size()));

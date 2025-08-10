@@ -43,14 +43,14 @@ public class Balai extends DiggerItem {
                 level.removeBlock(pos, false);
             }
 
-            // Optional: jouer un son de balayage
+            
             level.playSound(null, pos, SoundEvents.SAND_BREAK, SoundSource.BLOCKS, 1.0f, 1.0f);
             ((ServerLevel) level).sendParticles(ParticleTypes.CLOUD,
                     pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
                     5, 0.2, 0.1, 0.2, 0.01);
 
 
-            // Endommager le balai
+            
             context.getItemInHand().hurtAndBreak(1, player, p -> p.broadcastBreakEvent(context.getHand()));
         }
 

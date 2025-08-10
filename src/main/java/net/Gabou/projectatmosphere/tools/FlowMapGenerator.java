@@ -14,7 +14,7 @@ public class FlowMapGenerator {
                 double u = (x / (double) size) - 0.5;
                 double v = (y / (double) size) - 0.5;
                 double angle = Math.atan2(v, u);
-                // encode unit-vector into RG [0..1]
+                
                 float fx = (float)((Math.cos(angle) * 0.5) + 0.5);
                 float fz = (float)((Math.sin(angle) * 0.5) + 0.5);
 

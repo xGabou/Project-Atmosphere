@@ -12,9 +12,9 @@ public class WindMath {
      * - Smooth sinusoidal transition
      */
     public static float computeGustFactor(long worldTime) {
-        // 1000-tick (50s) gust cycle
+        
         float wave = (float) Math.sin((worldTime % 1000L) / 100.0);
-        return 0.5f + 0.5f * wave; // range [0, 1]
+        return 0.5f + 0.5f * wave; 
     }
 
     /**
@@ -39,7 +39,7 @@ public class WindMath {
      * - Positive Z for south, negative Z for north
      */
     public static BlockPos getWindOffset(WindVector wind) {
-        float angle = wind.angleRadians(); // angle in radians
+        float angle = wind.angleRadians(); 
         double dx = Math.cos(angle);
         double dz = Math.sin(angle);
 

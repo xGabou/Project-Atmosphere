@@ -23,7 +23,7 @@ public class CloudLibrary {
             case "stratus" -> 4;
             case "cumulus" -> 3;
             case "small_cumulus" -> 2;
-            default -> 1; // for "itty_bitty" or unknown
+            default -> 1; 
         };
     }
     public static int getSeverityFromRessourceLocation(ResourceLocation id) {

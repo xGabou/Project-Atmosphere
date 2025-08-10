@@ -22,14 +22,14 @@ public class SpikeManager {
     public static float[][] applySpikeLogic(BiomeInstanceKey biome, float[][] week) {
         SpikeState state = biomeSpikeStates.computeIfAbsent(biome, k -> new SpikeState());
 
-        // Apply previous spike if still ongoing
+        
         if (state.remainingSpikeDays > 0) {
             SpikeData data = new SpikeData(biome, week, state);
             new ApplyOngoingSpikeCommand(data).execute();
             return week;
         }
 
-        // Start a new spike if criteria met
+        
         if (shouldStartNewSpike(state)) {
             SpikeData data = new SpikeData(biome, week, state);
             new StartNewSpikeCommand(data).execute();
@@ -37,7 +37,7 @@ public class SpikeManager {
             return week;
         }
 
-        // Otherwise, apply rare jolt
+        
         if (random.nextFloat() < RANDOM_JOLT_CHANCE) {
             SpikeData data = new SpikeData(biome, week, state);
             new ApplyRandomJoltCommand(data, RANDOM_JOLT_MAX).execute();
@@ -51,7 +51,7 @@ public class SpikeManager {
         return random.nextFloat() < 0.075f || state.daysSinceLastSpike > 10;
     }
 
-    // Used for saving and loading
+    
     public static Map<BiomeInstanceKey, SpikeState> getAllStates() {
         return biomeSpikeStates;
     }

@@ -28,7 +28,7 @@ import static net.Gabou.projectatmosphere.modules.wind.WindMath.getWindOffset;
 public class SandStormAPI {
 
     private SandStormAPI() {
-        // Prevent instantiation
+        
     }
 
     public static SandstormPhase getSandstormPhase() {
@@ -83,19 +83,19 @@ public class SandStormAPI {
         BlockPos target = sourcePos.offset(offset);
 
 
-        // Check if we can move sand to the target
+        
         if (level.isEmptyBlock(target)) {
             BlockState sand = level.getBlockState(sourcePos);
 
-            // Remove sand from source
+            
             level.setBlock(sourcePos, Blocks.AIR.defaultBlockState(), 3);
 
-            // Place sand at target
+            
             level.setBlock(target, sand, 3);
 
-            // Add visual particles at source and target
+            
             if (level instanceof ServerLevel serverLevel) {
-                // Source burst
+                
                 serverLevel.sendParticles(
                         new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SAND.defaultBlockState()),
                         sourcePos.getX() + 0.5, sourcePos.getY() + 0.5, sourcePos.getZ() + 0.5,
@@ -103,7 +103,7 @@ public class SandStormAPI {
                 );
 
 
-                // Landing puff
+                
                 serverLevel.sendParticles(ParticleTypes.CLOUD,
                         target.getX() + 0.5, target.getY() + 1.0, target.getZ() + 0.5,
                         5, 0.2, 0.1, 0.2, 0.01);
@@ -113,7 +113,7 @@ public class SandStormAPI {
     public static void blowSandInBiome(ServerLevel level, BiomeInstanceKey key, WindVector wind) {
         BlockPos center = key.samplePos();
 
-        // Define a sampling area (e.g., 16x16x4 around the center)
+        
         int radiusXZ = 8;
         int height = 4;
 
@@ -137,8 +137,8 @@ public class SandStormAPI {
 
         if (sandBlocks.isEmpty()) return;
 
-        // Pick 10 to 30 random sand blocks to move
-        int countToMove = Mth.clamp(10 + level.random.nextInt(21), 1, sandBlocks.size()); // 10–30
+        
+        int countToMove = Mth.clamp(10 + level.random.nextInt(21), 1, sandBlocks.size()); 
         Collections.shuffle(sandBlocks, (Random) level.random);
 
         for (int i = 0; i < countToMove; i++) {

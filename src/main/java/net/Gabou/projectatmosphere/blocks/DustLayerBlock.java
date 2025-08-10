@@ -44,7 +44,7 @@ public class DustLayerBlock extends SnowLayerBlock {
             return Collections.singletonList(new ItemStack(ModItems.DUST.get(), layers));
         }
 
-        // Ne rien drop si pas de balai
+        
         return Collections.emptyList();
     }
 

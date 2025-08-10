@@ -27,7 +27,7 @@ public class ForecastDataStorage {
 
     public static final Map<UUID, BlockPos> playerData = new ConcurrentHashMap<>();
 
-    // Save both forecast centers and forecast map
+    
     public static void saveAll(ServerLevel world) {
         savePlayerCenters(world);
         saveForecastMap(world);
@@ -38,7 +38,7 @@ public class ForecastDataStorage {
         hasForecastData = false;
         hasCenterData = false;
 
-        // Remove files
+        
         try {
             Files.deleteIfExists(getSavePath(world, FILE_NAME));
             Files.deleteIfExists(getSavePath(world, FORECAST_FILE));
@@ -164,7 +164,7 @@ public class ForecastDataStorage {
         return StorageUtils.getPerWorldSavePath(world, fileName);
     }
 
-    // Helpers
+    
     private static JsonArray serializeWeek(float[][] week) {
         JsonArray array = new JsonArray();
         if (week == null) return array;
@@ -203,7 +203,7 @@ public class ForecastDataStorage {
         return week;
     }
 
-    // Utility: safe float extraction
+    
     private static float getAsFloatSafe(JsonElement e) {
         try {
             return e.getAsFloat();

@@ -22,7 +22,7 @@ public class ClientSyncLock {
     }
 
     public static void setReady(UUID playerUUID, boolean ready) {
-        //lockMap.put(playerUUID, ready);
+        
         ProjectAtmosphere.LOGGER.info("Setting player ready to " + playerUUID);
     }
 
@@ -34,6 +34,6 @@ public class ClientSyncLock {
     }
 
     public static void clear() {
-        //lockMap.clear();
+        
     }
 }

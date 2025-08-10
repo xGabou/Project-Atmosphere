@@ -9,7 +9,7 @@ import static net.Gabou.projectatmosphere.ProjectAtmosphere.MODID;
 public class CompatHandler {
 
     private CompatHandler() {
-        // Private constructor to prevent instantiation
+        
     }
 
     public static final Logger LOGGER = LogManager.getLogger(MODID);

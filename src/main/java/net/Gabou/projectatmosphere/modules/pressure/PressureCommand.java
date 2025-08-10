@@ -13,21 +13,21 @@ import java.util.Arrays;
 
 public class PressureCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        // Register the "humidity" subcommand
+        
         dispatcher.register(Commands.literal("pressure")
-                .then(Commands.literal("get") // "get" subcommand
+                .then(Commands.literal("get") 
                         .executes(ctx -> {
                             Player player = ctx.getSource().getPlayerOrException();
                             BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
 
-                            // Get the weekly forecast based on the biome
+                            
                             float[][] forecastArr = ForecastGenerator.getForecastMap().get(biome).getPressure();
                             String forecast = Arrays.deepToString(forecastArr);
 
-                            // Send the forecast to the player
+                            
                             ctx.getSource().sendSuccess(() -> Component.literal(forecast), false);
 
-                            return 1; // Return success code
+                            return 1; 
                         })
                 )
         );

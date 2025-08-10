@@ -33,12 +33,12 @@ import java.util.function.Function;
 
 public class ForecastGenerator {
 
-    private static final int DIFFUSION_RADIUS = 200; // blocks
+    private static final int DIFFUSION_RADIUS = 200; 
     private static final float DIFFUSION_RATE = 0.1f;
     private static final int SAMPLE_STEP = 256;
     private static BiomeInstanceKey scheduledStormBiome = null;
     private static SandstormPhase scheduledStormPhase = null;
-    private static long scheduledStormTime = -1L; // in world ticks
+    private static long scheduledStormTime = -1L; 
 
     public static BiomeInstanceKey getScheduledSandstormBiome() {
         return scheduledStormBiome;
@@ -189,7 +189,7 @@ public class ForecastGenerator {
 
 
     private static float interpolate(float base, float minOrMax, float chanceMax) {
-        float t = Mth.clamp(chanceMax - 1.0f, 0f, 1f); // stormChance max in [1.0, 2.0]
+        float t = Mth.clamp(chanceMax - 1.0f, 0f, 1f); 
         return base - t * (base - minOrMax);
     }
 
@@ -199,7 +199,7 @@ public class ForecastGenerator {
             float[][] humidity,
             float[][] pressure,
             WindVector wind,
-            float[] stormChance // expects [min, max]
+            float[] stormChance 
     ) {
         if (!SANDSTORM_BIOMES.contains(key.biomeType())) return false;
         if (stormChance == null || stormChance.length < 2) return false;
@@ -210,7 +210,7 @@ public class ForecastGenerator {
         float todayPressureMin = pressure[0][0];
         float windSpeed = wind.gustSpeed();
 
-        // Dynamically interpolate thresholds
+        
         float humidityThreshold = interpolate(SANDSTORM_HUMIDITY_THRESHOLD_BASE, SANDSTORM_HUMIDITY_THRESHOLD_MAX, chanceMax);
         float pressureThreshold = interpolate(SANDSTORM_PRESSURE_THRESHOLD_BASE, SANDSTORM_PRESSURE_THRESHOLD_MAX, chanceMax);
         float windThreshold = interpolate(SANDSTORM_WIND_THRESHOLD_BASE, SANDSTORM_WIND_THRESHOLD_MIN, chanceMax);
@@ -264,9 +264,9 @@ public class ForecastGenerator {
                 });
 
 
-        // 10. Génération courbes journalières
+        
         DailyForecastGenerator.scheduleAll(level, FORECAST_MAP);
-        // Recompute averages now that daily profiles are available
+        
         computeAverageForecastsByBiomeType();
 
         AsyncAtmosphereService.runStorm(() -> {
@@ -280,7 +280,7 @@ public class ForecastGenerator {
                             BiomeForecast forecast = FORECAST_MAP.get(selected);
                             if (forecast != null) {
                                 long baseTime = (level.getDayTime() / 24000L) * 24000L;
-                                long randomOffset = 1000 + level.random.nextInt(9000); // Between 0.5–5 min into the day
+                                long randomOffset = 1000 + level.random.nextInt(9000); 
 
                                 scheduledStormBiome = selected;
                                 scheduledStormPhase = computeStormPhase(forecast);
@@ -304,7 +304,7 @@ public class ForecastGenerator {
      * @param level  The server level where the region is located.
      */
     static void generateForecastForRegion(BlockPos center, ServerLevel level) {
-        long start = System.nanoTime(); // Start timer
+        long start = System.nanoTime(); 
 
         for (int dx = -RADIUS; dx <= RADIUS; dx += SAMPLE_STEP) {
             for (int dz = -RADIUS; dz <= RADIUS; dz += SAMPLE_STEP) {
@@ -313,7 +313,7 @@ public class ForecastGenerator {
                 level.getBiome(samplePos).unwrapKey().ifPresent(biomeKey -> {
                     ResourceLocation biomeId = biomeKey.location();
 
-                    // Cap at 10 samples per biome
+                    
                     int count = biomeSampleCounts.getOrDefault(biomeId, 0);
                     if (count >= MAX_POSITIONS_PER_BIOME) return;
 
@@ -327,13 +327,13 @@ public class ForecastGenerator {
 
 
         if (CompatHandler.isLegendaryModLoaded) {
-            // Forecast using Legendary Survival Overhaul temperature
+            
             Map<ResourceLocation, Integer> biomeSampleCount = new HashMap<>();
 
             for (BiomeInstanceKey key : biomeSamples) {
-                ResourceLocation biomeId = key.biomeType(); // your BiomeInstanceKey should expose this
+                ResourceLocation biomeId = key.biomeType(); 
 
-                // Limit to 2 samples per biome type
+                
                 int count = biomeSampleCount.getOrDefault(biomeId, 0);
                 if (count >= 1)
                     continue;
@@ -353,12 +353,12 @@ public class ForecastGenerator {
 
 
         } else if (CompatHandler.isToughAsNailsLoaded) {
-            // Forecast using Tough As Nails temperature
+            
             Map<ResourceLocation, Integer> biomeSampleCount = new HashMap<>();
             for (BiomeInstanceKey key : biomeSamples) {
-                ResourceLocation biomeId = key.biomeType(); // your BiomeInstanceKey should expose this
+                ResourceLocation biomeId = key.biomeType(); 
 
-                // Limit to 2 samples per biome type
+                
                 int count = biomeSampleCount.getOrDefault(biomeId, 0);
                 if (count >= 1)
                     continue;
@@ -375,53 +375,53 @@ public class ForecastGenerator {
             }
 
         } else {
-            // 1. Température brute
+            
             for (BiomeInstanceKey key : biomeSamples) {
                 BiomeForecast forecast = new BiomeForecast();
-                forecast.setTemperature(generateTemperature(key, level));  // your internal logic
+                forecast.setTemperature(generateTemperature(key, level));  
                 FORECAST_MAP.put(key, forecast);
             }
 
-            // 2. Diffusion température
+            
             diffuseAndSmoothField(BiomeForecast::getTemperature, BiomeForecast::setTemperature);
         }
 
         computeAverageTemperature();
-        // 3. Humidité (après température)
+        
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setHumidity(generateHumidity(entry.getKey(), level));
         }
 
-        // 4. Diffusion humidité
+        
         diffuseAndSmoothField(BiomeForecast::getHumidity, BiomeForecast::setHumidity);
 
         computeAverageHumidity();
 
-        // 5. Pression (après temp + humidité)
+        
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setPressure(generatePressure(entry.getKey(), level));
         }
 
-        // 6. Diffusion pression
+        
         diffuseAndSmoothField(BiomeForecast::getPressure, BiomeForecast::setPressure);
 
         computeAveragePressure();
-        // 7. Vent (dépend de tout)
+        
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setWind(generateWind(entry.getKey(), level));
         }
 
         computeAverageWind();
-        // 8. Génération des tempêtes
+        
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setStormChance(generateStorm(entry.getKey(), level, entry.getValue().getTemperature(), entry.getValue().getHumidity(), entry.getValue().getPressure(), entry.getValue().getWind()));
         }
         computeAverageStormChance();
-        // 9. Check for sandstorm conditions
+        
         dailyAndSand(level);
 
 
-        long end = System.nanoTime(); // End timer
+        long end = System.nanoTime(); 
         long durationMs = (end - start) / 1_000_000;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast region generation took " + durationMs + " ms.");
     }
@@ -535,7 +535,7 @@ public class ForecastGenerator {
             diffused.put(key, smoothed);
         }
 
-        // Apply 3-day smoothing on diffused result
+        
         for (var entry : diffused.entrySet()) {
             float[][] week = entry.getValue();
             for (int d = 0; d < 7; d++) {
@@ -618,7 +618,7 @@ public class ForecastGenerator {
         WindVector original = forecast.getWindDay();
         if (original == null) return WindVector.fromBase(0, 0);
 
-        // Choose speed based on gust state
+        
         float speed = WindMath.getEffectiveWindSpeed(original, worldTime);
 
         return new WindVector(speed, original.angleRadians(), original.gustSpeed());
@@ -631,7 +631,7 @@ public class ForecastGenerator {
             return direct;
         }
 
-        // 2. Try to use the average forecast for this biome type
+        
         BiomeForecast avg = AVERAGE_FORECASTS.get(key.biomeType());
         if (avg != null && avg.hasData(type)) {
             return avg;
@@ -640,7 +640,7 @@ public class ForecastGenerator {
         BiomeForecast closestSame = null;
         double minDistSame = Double.MAX_VALUE;
 
-        // 1. Try to find same biome type (by biomeId) with available data
+        
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeInstanceKey otherKey = entry.getKey();
             BiomeForecast forecast = entry.getValue();
@@ -652,14 +652,14 @@ public class ForecastGenerator {
             if (dist < minDistSame) {
                 minDistSame = dist;
                 closestSame = forecast;
-                if (dist < SAMPLE_STEP * 2) break; // early exit for near-perfect match
+                if (dist < SAMPLE_STEP * 2) break; 
             }
         }
 
         if (closestSame != null) return closestSame;
 
 
-        // 3. Fallback to any closest biome with valid data
+        
         BiomeForecast closestFallback = null;
         double minDistAny = Double.MAX_VALUE;
 
@@ -682,14 +682,14 @@ public class ForecastGenerator {
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeForecast forecast = entry.getValue();
 
-            // 1. Rotate raw 7-day data forward
+            
             forecast.setTemperature(rotateWeek(forecast.getTemperature()));
             forecast.setHumidity(rotateWeek(forecast.getHumidity()));
             forecast.setPressure(rotateWeek(forecast.getPressure()));
             forecast.setStormChance(rotateWeek(forecast.getStormChance()));
             forecast.setWind(rotateWindWeek(forecast.getWind()));
 
-            // 2. Shift daily interpolations
+            
             if (forecast.getTemperatureTomorrow() != null) {
                 forecast.setTemperatureDay(forecast.getTemperatureTomorrow());
             }
@@ -722,8 +722,8 @@ public class ForecastGenerator {
             rotated[i] = original[i + 1];
         }
 
-        // Optionally reset the last day
-        rotated[len - 1] = new float[]{0f, 0f}; // or reuse previous, or regenerate on demand
+        
+        rotated[len - 1] = new float[]{0f, 0f}; 
         return rotated;
     }
 
@@ -737,7 +737,7 @@ public class ForecastGenerator {
             rotated[i] = original[i + 1];
         }
 
-        rotated[len - 1] = WindVector.fromBase(0, 0); // or null if you want to regenerate
+        rotated[len - 1] = WindVector.fromBase(0, 0); 
         return rotated;
     }
 
@@ -837,7 +837,7 @@ public class ForecastGenerator {
             int count = 0;
 
             for (BiomeForecast forecast : forecasts) {
-                WindVector[] windWeek = extractor.apply(forecast); // <- uses extractor properly
+                WindVector[] windWeek = extractor.apply(forecast); 
                 if (windWeek == null || windWeek.length != 7) continue;
 
                 WindVector wind = windWeek[day];
@@ -882,18 +882,18 @@ public class ForecastGenerator {
     }
 
     public static float getEffectiveWindSpeed(WindVector vector, long worldTime) {
-        // gust appears every ~600 ticks (30s) for 200 ticks
+        
         long gustCycle = (worldTime + 37) % 600;
         if (gustCycle < 200) {
-            return vector.gustSpeed(); // during gust
+            return vector.gustSpeed(); 
         } else {
-            return vector.baseSpeed(); // normal
+            return vector.baseSpeed(); 
         }
     }
 
     public static float getSmoothGustedSpeed(WindVector vector, long worldTime) {
         float gustWave = (float) Math.sin((worldTime % 1000) / 100.0);
-        float gustFactor = 0.5f + 0.5f * gustWave; // [0,1]
+        float gustFactor = 0.5f + 0.5f * gustWave; 
         return vector.baseSpeed() + (vector.gustSpeed() - vector.baseSpeed()) * gustFactor;
     }
 

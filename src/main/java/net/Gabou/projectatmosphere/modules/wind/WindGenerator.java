@@ -77,7 +77,7 @@ public class WindGenerator {
             speed = Mth.clamp(speed, 1.2f, 60f);
             int hash = selfKey.hashCode();
             float baseSpeed = speed;
-            float gustFactor = Mth.sin((d + hash % 50) * 0.6f) * 0.5f + 1.6f; // ~[1.1, 2.1]
+            float gustFactor = Mth.sin((d + hash % 50) * 0.6f) * 0.5f + 1.6f; 
             float gustSpeed = baseSpeed * gustFactor;
             gustSpeed = Mth.clamp(gustSpeed, 1.5f, 75f);
             if (windVector.length() > 1e-3) {

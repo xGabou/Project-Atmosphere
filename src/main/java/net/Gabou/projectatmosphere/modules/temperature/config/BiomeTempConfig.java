@@ -32,7 +32,7 @@ public class BiomeTempConfig {
     public static final Map<Season, Map<ResourceLocation, DailyRange>> SEASON_CLAMPS;
 
     static {
-        // Initialisation des maps
+        
         SEASON_RANGES = new EnumMap<>(Season.class);
         SEASON_CLAMPS = new EnumMap<>(Season.class);
         for (Season s : Season.values()) {
@@ -40,22 +40,22 @@ public class BiomeTempConfig {
             SEASON_CLAMPS.put(s, new HashMap<>());
         }
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Overworld – Temperate & Humid Biomes
-        // ─────────────────────────────────────────────────────────────────────
+        
+        
+        
         putAllSeasons("plains", new Range[]{
-                new Range(-20f,  5f),  // WINTER
-                new Range(  -10f, 18f),  // SPRING
-                new Range( 15f, 36f),  // SUMMER
-                new Range(  -6f, 18f)   // AUTUMN
+                new Range(-20f,  5f),  
+                new Range(  -10f, 18f),  
+                new Range( 15f, 36f),  
+                new Range(  -6f, 18f)   
         });
         mirrorBiome("sunflower_plains", "plains");
 
         putAllSeasons("forest", new Range[]{
-                new Range(-18f,  5f),  // WINTER (forêt boréale)
-                new Range(  -7f, 13f),  // SPRING
-                new Range( 7f, 28f),  // SUMMER
-                new Range(  -2f, 19f)   // AUTUMN
+                new Range(-18f,  5f),  
+                new Range(  -7f, 13f),  
+                new Range( 7f, 28f),  
+                new Range(  -2f, 19f)   
         });
         mirrorBiome("flower_forest",   "forest");
         mirrorBiome("birch_forest",    "forest");
@@ -81,7 +81,7 @@ public class BiomeTempConfig {
                 new Range( 8f, 28f),
                 new Range(  4f, 21f)
         });
-//TODO here
+
         putAllSeasons("swamp", new Range[]{
                 new Range( -5f, 10f),
                 new Range( 10f, 22f),
@@ -96,9 +96,9 @@ public class BiomeTempConfig {
                 new Range(  2f, 14f)
         });
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Overworld – Cold & Alpine Biomes
-        // ─────────────────────────────────────────────────────────────────────
+        
+        
+        
         putAllSeasons("taiga", new Range[]{
                 new Range(-25f, -5f),
                 new Range( -5f, 10f),
@@ -131,9 +131,9 @@ public class BiomeTempConfig {
                 new Range(-25f,  -5f)
         });
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Overworld – Warm & Arid Biomes
-        // ─────────────────────────────────────────────────────────────────────
+        
+        
+        
         putAllSeasons("jungle", new Range[]{
                 new Range(20f, 25f),
                 new Range(22f, 30f),
@@ -168,9 +168,9 @@ public class BiomeTempConfig {
         mirrorBiome("windswept_savanna", "savanna");
         mirrorBiome("mangrove_swamp",    "swamp");
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Overworld – Oceanic & Coastal Biomes
-        // ─────────────────────────────────────────────────────────────────────
+        
+        
+        
         putAllSeasons("ocean", new Range[]{
                 new Range( 0f, 10f),
                 new Range( 5f, 15f),
@@ -203,9 +203,9 @@ public class BiomeTempConfig {
         });
         mirrorBiome("mushroom_field_shore", "mushroom_fields");
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Overworld – Underground Biomes
-        // ─────────────────────────────────────────────────────────────────────
+        
+        
+        
         putAllSeasons("lush_caves", new Range[]{
                 new Range(12f, 15f),
                 new Range(14f, 18f),
@@ -229,7 +229,7 @@ public class BiomeTempConfig {
         mirrorBiome("savanna_plateau",        "savanna");
         mirrorBiome("stony_shore",            "beach");
         mirrorBiome("snowy_beach",            "beach");
-        mirrorBiome("windswept_gravelly_hills", "taiga");       // terrain rocheux et froid
+        mirrorBiome("windswept_gravelly_hills", "taiga");       
         mirrorBiome("windswept_forest",       "taiga");
         mirrorBiome("windswept_hills",        "taiga");
         mirrorBiome("jagged_peaks",           "frozen_peaks");
@@ -239,18 +239,18 @@ public class BiomeTempConfig {
 
 
 
-        // ─────────────────────────────────────────────────────────────────────
-        // Nether (constant)
-        // ─────────────────────────────────────────────────────────────────────
+        
+        
+        
         putConstSeasons("nether_wastes",    new Range(45f,50f), new DailyRange(40f,45f,47f,52f));
         putConstSeasons("basalt_deltas",    new Range(50f,55f), new DailyRange(45f,50f,53f,60f));
         putConstSeasons("crimson_forest",   new Range(40f,45f), new DailyRange(35f,40f,43f,48f));
         putConstSeasons("warped_forest",    new Range(30f,40f), new DailyRange(25f,32f,35f,45f));
         putConstSeasons("soul_sand_valley", new Range(35f,45f), new DailyRange(30f,38f,42f,50f));
 
-        // ─────────────────────────────────────────────────────────────────────
-        // End (constant)
-        // ─────────────────────────────────────────────────────────────────────
+        
+        
+        
         putConstSeasons("the_end",           new Range(5f,10f),    new DailyRange(0f,7f,8f,12f));
         putConstSeasons("end_highlands",     new Range(5f,10f),    new DailyRange(0f,7f,8f,12f));
         putConstSeasons("end_midlands",      new Range(5f,10f),    new DailyRange(0f,7f,8f,12f));

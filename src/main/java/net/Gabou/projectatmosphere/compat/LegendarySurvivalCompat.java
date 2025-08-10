@@ -9,9 +9,9 @@ import sfiomn.legendarysurvivaloverhaul.api.temperature.TemperatureUtil;
 
 public class LegendarySurvivalCompat {
 
-    private static final float MIN_DAILY_SWING = 2.5F;  // Minimum °C difference between min/max
-    private static final float MAX_DAILY_SWING = 6.0F;  // Max fluctuation
-    private static final float DAILY_JITTER = 0.5F;     // Add slight randomness
+    private static final float MIN_DAILY_SWING = 2.5F;  
+    private static final float MAX_DAILY_SWING = 6.0F;  
+    private static final float DAILY_JITTER = 0.5F;     
 
     /**
      * Generates a 7-day forecast using current LSO temp as base, with estimated min/max per day.
@@ -33,10 +33,10 @@ public class LegendarySurvivalCompat {
         float overallSwing = Mth.lerp(random.nextFloat(), MIN_DAILY_SWING, MAX_DAILY_SWING);
 
         for (int i = 0; i < 7; i++) {
-            // Simulate a realistic weekly fluctuation (e.g., mid-week peak)
-            float dayOffset = (float) Math.sin((i / 6.0F) * Math.PI); // 0 → 1 → 0
+            
+            float dayOffset = (float) Math.sin((i / 6.0F) * Math.PI); 
 
-            // Daily min/max derived from base + swing
+            
             float swing = dayOffset * overallSwing;
 
             float minTemp = (float) (base - (swing / 2.0F) + random.nextGaussian() * DAILY_JITTER);

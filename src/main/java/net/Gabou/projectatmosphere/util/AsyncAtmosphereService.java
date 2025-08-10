@@ -24,7 +24,7 @@ public class AsyncAtmosphereService {
         boolean forceShared;
 
         try {
-            // Replace with AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get() if needed
+            
             forceShared = false;
         } catch (IllegalStateException e) {
             ProjectAtmosphere.LOGGER.warn("⚠ Tried to access config before it was ready. Defaulting to shared executor.");
@@ -103,7 +103,7 @@ public class AsyncAtmosphereService {
         });
     }
 
-    // Per-module executors
+    
     public static void runTemperature(Runnable task) {
         if (TEMP_EXECUTOR != null && !TEMP_EXECUTOR.isShutdown()) TEMP_EXECUTOR.submit(task);
     }
@@ -120,7 +120,7 @@ public class AsyncAtmosphereService {
         if (PRESSURE_EXECUTOR != null && !PRESSURE_EXECUTOR.isShutdown()) PRESSURE_EXECUTOR.submit(task);
     }
 
-    // Unified weather runner
+    
     public static CompletableFuture<Void> runWeather(Runnable task) {
         if (WEATHER_EXECUTOR != null && !WEATHER_EXECUTOR.isShutdown()) {
             return CompletableFuture.runAsync(task, WEATHER_EXECUTOR);
@@ -135,12 +135,12 @@ public class AsyncAtmosphereService {
     }
 
 
-    // Shared executor if needed externally
+    
     public static void runShared(Runnable task) {
         if (SHARED_EXECUTOR != null && !SHARED_EXECUTOR.isShutdown()) SHARED_EXECUTOR.submit(task);
     }
 
-    // Shutdown cleanly
+    
     public static void shutdown() {
         if (SHARED_EXECUTOR != null) SHARED_EXECUTOR.shutdown();
         if (GROUP_A_EXECUTOR != null) GROUP_A_EXECUTOR.shutdown();
