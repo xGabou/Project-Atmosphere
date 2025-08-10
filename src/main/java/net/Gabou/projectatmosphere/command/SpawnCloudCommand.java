@@ -10,6 +10,12 @@ import net.minecraft.world.level.Level;
 import java.util.Objects;
 
 public class SpawnCloudCommand {
+    /**
+     * Registers the <code>/spawncloud</code> command which spawns a cloud for the executing player
+     * when used in the Overworld.
+     *
+     * @param dispatcher the command dispatcher used to register the command
+     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("spawncloud")
                 .requires(source -> source.hasPermission(2))
