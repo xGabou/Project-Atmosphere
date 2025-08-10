@@ -21,20 +21,46 @@ import java.util.List;
 public class DustLayerBlock extends SnowLayerBlock {
     public static final IntegerProperty LAYERS = IntegerProperty.create("layers", 1, 8);
 
+    /**
+     * Creates a dust layer block with a single layer by default.
+     *
+     * @param properties block properties
+     */
     public DustLayerBlock(Properties properties) {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any().setValue(LAYERS, 1));
     }
 
+    /**
+     * Adds the layer property to the block state definition.
+     *
+     * @param builder builder used to define block states
+     */
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(LAYERS);
     }
 
+    /**
+     * Dust layers never form a full collision block, allowing entities to pass through.
+     *
+     * @param state block state
+     * @param getter world accessor
+     * @param pos block position
+     * @return false because dust layers are non-solid
+     */
     @Override
     public boolean isCollisionShapeFullBlock(BlockState state, BlockGetter getter, BlockPos pos) {
         return false;
     }
+
+    /**
+     * Determines the items dropped when the block is harvested.
+     *
+     * @param state   block state
+     * @param builder loot parameter builder
+     * @return list of item stacks dropped
+     */
     @Override
     public @NotNull List<ItemStack> getDrops(BlockState state, LootParams.Builder builder) {
         ItemStack tool = builder.getParameter(LootContextParams.TOOL);
@@ -44,7 +70,7 @@ public class DustLayerBlock extends SnowLayerBlock {
             return Collections.singletonList(new ItemStack(ModItems.DUST.get(), layers));
         }
 
-        
+
         return Collections.emptyList();
     }
 
