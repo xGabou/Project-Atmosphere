@@ -20,6 +20,7 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
     public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
+    public static final ForgeConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -35,6 +36,9 @@ public class AtmoCommonConfig {
         MAX_STORM_DEBRIS_PER_CHUNK = builder
                 .comment("Maximum number of storm debris items allowed per chunk")
                 .defineInRange("maxStormDebrisPerChunk", 30, 0, Integer.MAX_VALUE);
+        AUTO_REPAIR_GLASS = builder
+                .comment("Automatically repair tornado-damaged glass after 5 minutes of no new damage")
+                .define("autoRepairGlass", true);
         builder.pop();
         COMMON_SPEC = builder.build();
     }

@@ -10,9 +10,15 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.GlassBlock;
+import net.minecraft.world.level.block.GlassPaneBlock;
+import net.minecraft.world.level.block.StainedGlassBlock;
+import net.minecraft.world.level.block.StainedGlassPaneBlock;
+import net.minecraft.world.level.block.TintedGlassBlock;
 import net.minecraft.world.phys.Vec3;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 
 public class TornadoInstance {
 
@@ -68,16 +74,31 @@ public class TornadoInstance {
         BlockPos center = BlockPos.containing(position);
         int intRadius = Mth.ceil(radius);
         for (BlockPos pos : BlockPos.betweenClosed(
-                center.offset(-intRadius, -1, -intRadius),
-                center.offset(intRadius, intRadius, intRadius))) {
+                center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, -1, -intRadius - DEBRIS_RANGE_EXTENSION),
+                center.offset(intRadius + DEBRIS_RANGE_EXTENSION, intRadius, intRadius + DEBRIS_RANGE_EXTENSION))) {
             BlockState state = level.getBlockState(pos);
+            double distSq = pos.distSqr(center);
             if (state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)) {
                 level.destroyBlock(pos, false);
                 level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),
                         pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
                         5, 0.2, 0.2, 0.2, 0.05);
+            } else if (isGlass(state)) {
+                if (distSq <= radius * radius) {
+                    level.destroyBlock(pos, false);
+                } else if (distSq <= (radius + 5) * (radius + 5)) {
+                    GlassDamageManager.damageGlass(level, pos, state);
+                }
             }
         }
+    }
+
+    private boolean isGlass(BlockState state) {
+        return state.getBlock() instanceof GlassBlock
+                || state.getBlock() instanceof GlassPaneBlock
+                || state.getBlock() instanceof StainedGlassBlock
+                || state.getBlock() instanceof StainedGlassPaneBlock
+                || state.getBlock() instanceof TintedGlassBlock;
     }
 
     private void playDemolitionSound(Level level) {
