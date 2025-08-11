@@ -79,7 +79,9 @@ public class AtmoConfigScreen extends Screen {
         int parsed = this.maxStormDebrisPerChunk;
         try {
             parsed = Integer.parseInt(this.maxDebrisBox.getValue());
+            errorMessage = null;
         } catch (NumberFormatException ignored) {
+            errorMessage = Component.translatable("Invalid number for Max Storm Debris per Chunk.");
         }
         AtmoCommonConfig.FORCE_SHARED_EXECUTOR.set(forceSharedExecutor);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
