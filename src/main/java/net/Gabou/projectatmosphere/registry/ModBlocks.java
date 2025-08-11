@@ -28,6 +28,16 @@ public class ModBlocks {
                     .pushReaction(PushReaction.DESTROY)
                     .isViewBlocking((state, getter, pos) -> false)
             ));
+    public static final RegistryObject<Block> SAND_LAYER = REGISTRY.register("sand_layer", () ->
+            new SandLayerBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(0.1f)
+                    .sound(SoundType.SAND)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .isViewBlocking((state, getter, pos) -> false)
+            ));
     public static final RegistryObject<Block> WEATHER_VANE = REGISTRY.register("weather_vane", () ->
             new WeatherVaneBlock(BlockBehaviour.Properties
                     .of()
