@@ -88,7 +88,12 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(parsed);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
         AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.set(damageGlassOnTornado);
-        ConfigTracker.INSTANCE.saveConfigs(ModConfig.Type.COMMON);
+        try {
+            ConfigTracker.INSTANCE.saveConfigs(ModConfig.Type.COMMON);
+            errorMessage = null;
+        } catch (Exception e) {
+            errorMessage = Component.literal("Failed to save config: " + e.getMessage());
+        }
     }
 
     @Override
