@@ -14,14 +14,13 @@ uniform float LightDirX;
 uniform float LightDirY;
 uniform float LightDirZ;
 
-uniform float SkyColorR;
-uniform float SkyColorG;
-uniform float SkyColorB;
-
 uniform sampler2D Sampler0;
 uniform sampler2D FlowMap;
 uniform sampler2D NormalMap;
 uniform sampler2D NoiseMap;
+uniform sampler2D CloudScene;
+uniform float ScreenSizeX;
+uniform float ScreenSizeY;
 
 // ──────── Varyings ────────
 in vec2 texCoord;
@@ -110,8 +109,17 @@ void main() {
     float lighting = max(dot(normal, lightDir), 0.0);
 
     // Final smoke color
-    vec3 skyColor = vec3(SkyColorR, SkyColorG, SkyColorB);
-    vec3 color = mix(skyColor, base.rgb, DustIntensity);
+    // Screen-space UVs for the clouds RT
+
+    vec2 screen = normalize(vec2(ScreenSizeX, ScreenSizeY));
+    vec2 scrUV = gl_FragCoord.xy / screen;
+
+    // Sample the cloud scene and use it to modulate the funnel
+    vec3 cloudTint = texture(CloudScene, scrUV).rgb;
+    float k = clamp(DustIntensity, 0.0, 1.0);
+    vec3 color = mix(base.rgb, vec3(DustIntensity), k);
+
+    color = mix(color, cloudTint, 0.25);
     color *= 0.4 + 0.6 * lighting;
     color *= 0.5 + n1 * 0.5;
 

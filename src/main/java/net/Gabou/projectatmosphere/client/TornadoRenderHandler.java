@@ -1,9 +1,12 @@
 package net.Gabou.projectatmosphere.client;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.shaders.Uniform;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
+import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
@@ -41,20 +44,37 @@ public class TornadoRenderHandler {
     public static void renderTornado(PoseStack stack, double tornadoX, double tornadoY, double tornadoZ, float twistSpeed, ClientLevel level, Camera camera, Minecraft minecraft, TornadoInstance tornado) {
         ShaderInstance shader = MyShaders.TORNADO;
         if (shader == null) return;
-        RenderSystem.setShader(() -> shader);
+        RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
+        RenderSystem.setShaderTexture(1, FLOWMAP_TEXTURE);
+        RenderSystem.setShaderTexture(2, NORMALMAP_TEXTURE);
+        RenderSystem.setShaderTexture(3, NOISE_TEXTURE);
+        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
+            RenderTarget cloudRT = scr.getCloudTarget(); // offscreen clouds color
+            if( cloudRT == null) {
+                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot render tornado.");
+                return;
+            }
+            shader.setSampler("CloudScene", cloudRT);    // bind RT as sampler2D
 
+            // pass size so we can compute screen-space UVs
+            Uniform u = shader.getUniform("ScreenSizeX");
+            Uniform u1 = shader.getUniform("ScreenSizeY");
+            if (u != null&& u1!=null){ u.set((float) cloudRT.width); u1.set((float)cloudRT.height);}
+        });
+        RenderSystem.setShader(() -> shader);
+        shader.apply();
         int segments = 64;
         int rings = 128;
         float baseRadius = 20f;
         float topRadius = 2f;
-        float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
+        float height = 356f;
         float coneStart = 0.8f;
         float coneFactor = 1.5f;
         stack.pushPose();
         stack.translate(tornadoX, tornadoY, tornadoZ);
 
         Matrix4f matrix = stack.last().pose();
-        shader.apply();
+
 
         var modelView = shader.getUniform("ModelViewMat");
         if (modelView != null) modelView.set(matrix);
@@ -111,26 +131,8 @@ public class TornadoRenderHandler {
         if (lightX != null) lightX.set(xLight);
         if (lightY != null) lightY.set(yLight);
         if (lightZ != null) lightZ.set(zLight);
-        Vec3 skyVec3 = level.getSkyColor(camera.getPosition(), partialTicks);
-
-        float r = (float) skyVec3.x;
-        float g = (float) skyVec3.y;
-        float b = (float) skyVec3.z;
-
-        Uniform uSkyR = shader.getUniform("SkyColorR");
-        Uniform uSkyG = shader.getUniform("SkyColorG");
-        Uniform uSkyB = shader.getUniform("SkyColorB");
-
-        if (uSkyR != null) uSkyR.set(r);
-        if (uSkyG != null) uSkyG.set(g);
-        if (uSkyB != null) uSkyB.set(b);
 
 
-        RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
-
-        RenderSystem.setShaderTexture(1, FLOWMAP_TEXTURE);
-        RenderSystem.setShaderTexture(2, NORMALMAP_TEXTURE);
-        RenderSystem.setShaderTexture(3, NOISE_TEXTURE);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();

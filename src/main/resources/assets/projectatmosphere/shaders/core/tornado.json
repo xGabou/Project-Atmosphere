@@ -6,7 +6,8 @@
     { "name": "Sampler0" },
     { "name": "FlowMap" },
     { "name": "NormalMap" },
-    { "name": "NoiseMap" }
+    { "name": "NoiseMap" },
+    { "name": "CloudScene" }
   ],
   "uniforms": [
     { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0] },
@@ -16,17 +17,15 @@
     { "name": "TwistSpeed",   "type": "float", "count": 1, "values": [1.0] },
     { "name": "BaseRadius",   "type": "float", "count": 1, "values": [0.2] },
     { "name": "TopRadius",    "type": "float", "count": 1, "values": [3.0] },
-    { "name": "Height",       "type": "float", "count": 1, "values": [100.0] },
+    { "name": "Height",       "type": "float", "count": 1, "values": [300.0] },
     { "name": "DustIntensity","type": "float", "count": 1, "values": [0.5] },
     { "name": "CoreTightness","type": "float", "count": 1, "values": [0.5] },
     { "name": "FlowIntensity","type": "float", "count": 1, "values": [0.2] },
     { "name": "LightDirX", "type": "float", "count": 1, "values": [0.5] },
     { "name": "LightDirY", "type": "float", "count": 1, "values": [1.0] },
     { "name": "LightDirZ", "type": "float", "count": 1, "values": [0.2] },
-
-    { "name": "SkyColorR", "type": "float", "count": 1, "values": [0.1] },
-    { "name": "SkyColorG", "type": "float", "count": 1, "values": [0.1] },
-    { "name": "SkyColorB", "type": "float", "count": 1, "values": [0.12] }
+    { "name": "ScreenSizeX", "type": "float", "count": 1, "values": [0.1] },
+    { "name": "ScreenSizeY", "type": "float", "count": 1, "values": [0.2] }
   ],
 
   "blend": {

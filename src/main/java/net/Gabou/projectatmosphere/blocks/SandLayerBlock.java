@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.blocks;
 
+import net.Gabou.projectatmosphere.registry.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;

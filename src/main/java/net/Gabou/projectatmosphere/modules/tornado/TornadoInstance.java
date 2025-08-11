@@ -34,7 +34,7 @@ public class TornadoInstance {
 
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind) {
-        this(position, radius, wind, 0.15f);
+        this(position, radius, wind, 0.05f);
     }
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind, float angularSpeed) {
@@ -51,8 +51,8 @@ public class TornadoInstance {
 
     public float getTwist() {
         long elapsedMs = System.currentTimeMillis() - spawnTime;
-        float elapsedTicks = elapsedMs / 50.0f;
-        return elapsedTicks * angularSpeed;
+        float elapsedTicks = elapsedMs / 100.0f;
+        return Mth.clamp(elapsedTicks * angularSpeed,0.5f,5.0f);
     }
 
     /**
@@ -86,7 +86,7 @@ public class TornadoInstance {
         int intRadius = Mth.ceil(radius);
         for (BlockPos pos : BlockPos.betweenClosed(
                 center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, -1, -intRadius - DEBRIS_RANGE_EXTENSION),
-                center.offset(intRadius + DEBRIS_RANGE_EXTENSION, intRadius, intRadius + DEBRIS_RANGE_EXTENSION))) {
+                center.offset(intRadius + DEBRIS_RANGE_EXTENSION, intRadius+3, intRadius + DEBRIS_RANGE_EXTENSION))) {
             BlockState state = level.getBlockState(pos);
             double distSq = pos.distSqr(center);
             if (state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)) {

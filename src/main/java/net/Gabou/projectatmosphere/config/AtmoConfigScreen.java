@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.config;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -82,18 +83,37 @@ public class AtmoConfigScreen extends Screen {
             parsed = Integer.parseInt(this.maxDebrisBox.getValue());
             errorMessage = null;
         } catch (NumberFormatException ignored) {
-            errorMessage = Component.translatable("Invalid number for Max Storm Debris per Chunk.");
+            errorMessage = Component.literal("Invalid number for Max Storm Debris per Chunk.");
         }
+
         AtmoCommonConfig.FORCE_SHARED_EXECUTOR.set(forceSharedExecutor);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(parsed);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
         AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.set(damageGlassOnTornado);
+
         try {
-            ConfigTracker.INSTANCE.saveConfigs(ModConfig.Type.COMMON);
+            // EITHER A) save via ModConfig
+            saveCommonConfigForMod(ProjectAtmosphere.MODID);
+
+            // OR B) if you prefer and your SPEC is registered:
+            // AtmoCommonConfig.SPEC.save();
+
             errorMessage = null;
         } catch (Exception e) {
             errorMessage = Component.literal("Failed to save config: " + e.getMessage());
+        }
+    }
+
+    /** Finds this mod's COMMON config and saves it. */
+    private static void saveCommonConfigForMod(String modId) {
+        var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
+        if (set == null) return;
+        for (ModConfig cfg : set) {
+            if (cfg.getModId().equals(modId)) {
+                cfg.save(); // writes to disk
+                return;
+            }
         }
     }
 
