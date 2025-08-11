@@ -41,6 +41,6 @@ public class SandLayerBlock extends SnowLayerBlock {
     @Override
     public @NotNull List<ItemStack> getDrops(BlockState state, LootParams.Builder builder) {
         int layers = state.getValue(LAYERS);
-        return Collections.singletonList(new ItemStack(Items.SAND, layers));
+        return Collections.singletonList(new ItemStack(ModItems.SAND_LAYER.get(), layers));
     }
 }
