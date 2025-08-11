@@ -45,9 +45,11 @@ public class TornadoRenderHandler {
 
         int segments = 64;
         int rings = 128;
-        float baseRadius = 10f;
-        float topRadius = 10f;
-        float height = SimpleCloudsConfig.CLIENT.cloudHeight.get() + 50f;
+        float baseRadius = 20f;
+        float topRadius = 2f;
+        float height = SimpleCloudsConfig.CLIENT.cloudHeight.get();
+        float coneStart = 0.8f;
+        float coneFactor = 1.5f;
         stack.pushPose();
         stack.translate(tornadoX, tornadoY, tornadoZ);
 
@@ -174,6 +176,15 @@ public class TornadoRenderHandler {
             float shaped1 = (float) Math.pow(t1, 0.6);
             float baseR0 = topRadius + (baseRadius - topRadius) * shaped0;
             float baseR1 = topRadius + (baseRadius - topRadius) * shaped1;
+
+            if (t0 > coneStart) {
+                float ct = (t0 - coneStart) / (1.0f - coneStart);
+                baseR0 = Mth.lerp(ct, baseR0, baseR0 * coneFactor);
+            }
+            if (t1 > coneStart) {
+                float ct1 = (t1 - coneStart) / (1.0f - coneStart);
+                baseR1 = Mth.lerp(ct1, baseR1, baseR1 * coneFactor);
+            }
 
 
             float oscFreq = 4f;
