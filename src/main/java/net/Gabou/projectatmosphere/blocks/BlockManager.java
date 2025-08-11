@@ -5,6 +5,8 @@ import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.registry.ModBlocks;
+import net.Gabou.projectatmosphere.blocks.SandLayerBlock;
+import net.Gabou.projectatmosphere.registry.ModBlocks;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -74,6 +76,57 @@ public class BlockManager {
                             .count() < 6)
             {
                  level.setBlockAndUpdate(dustPos, ModBlocks.DUST.get().defaultBlockState());
+            }
+        }
+    }
+
+    /**
+     * Spawns sand layers around the player depending on wind strength.
+     * Converts to a full sand block once eight layers accumulate.
+     *
+     * @param level The server world
+     * @param centerPos The central position (e.g., player's position)
+     */
+    public static void spawnSand(ServerLevel level, BlockPos centerPos) {
+        RandomSource random = level.getRandom();
+        WindVector windVector = ForecastOrchestrator.getCurrentWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
+        float windStrength = windVector.baseSpeed();
+        int maxSpawn = Math.min(10, (int)(windStrength * 8));
+
+        for (int i = 0; i < maxSpawn; i++) {
+            if (random.nextFloat() > windStrength) continue;
+
+            double angle = windVector.angleRadians() + (random.nextDouble() - 0.5);
+            double distance = 10 + random.nextDouble() * 10;
+
+            int dx = (int)(Math.cos(angle) * distance);
+            int dz = (int)(Math.sin(angle) * distance);
+            int x = centerPos.getX() + dx;
+            int z = centerPos.getZ() + dz;
+            int y = level.getHeightmapPos(
+                    Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    new BlockPos(x, 0, z)
+            ).getY();
+
+            BlockPos sandPos = new BlockPos(x, y, z);
+            BlockState state = level.getBlockState(sandPos);
+            BlockState groundState = level.getBlockState(sandPos.below());
+
+            boolean validGround = groundState.is(Blocks.DIRT) ||
+                    groundState.is(Blocks.SAND) ||
+                    groundState.is(Blocks.GRAVEL);
+
+            if (!validGround) continue;
+
+            if (state.isAir() || state.is(Blocks.SNOW)) {
+                level.setBlockAndUpdate(sandPos, ModBlocks.SAND_LAYER.get().defaultBlockState());
+            } else if (state.is(ModBlocks.SAND_LAYER.get())) {
+                int layers = state.getValue(SandLayerBlock.LAYERS);
+                if (layers < 8) {
+                    level.setBlockAndUpdate(sandPos, state.setValue(SandLayerBlock.LAYERS, layers + 1));
+                } else {
+                    level.setBlockAndUpdate(sandPos, Blocks.SAND.defaultBlockState());
+                }
             }
         }
     }
