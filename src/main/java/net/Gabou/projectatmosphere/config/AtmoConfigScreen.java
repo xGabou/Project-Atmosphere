@@ -77,6 +77,7 @@ public class AtmoConfigScreen extends Screen {
 
     private void saveChanges() {
         int parsed = this.maxStormDebrisPerChunk;
+        Component errorMessage;
         try {
             parsed = Integer.parseInt(this.maxDebrisBox.getValue());
             errorMessage = null;
