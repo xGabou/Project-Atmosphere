@@ -48,7 +48,7 @@ public class AtmoConfigScreen extends Screen {
         }).bounds(center - 100, y, 200, 20).build());
         y += 24;
 
-        this.maxDebrisBox = new EditBox(this.font, center - 100, y, 200, 20, Component.literal("Max Debris"));
+        this.maxDebrisBox = new EditBox(this.font, center - 100, y, 200, 20, Component.literal("Max Storm Debris Per Chunk"));
         this.maxDebrisBox.setValue(Integer.toString(maxStormDebrisPerChunk));
         addRenderableWidget(this.maxDebrisBox);
         y += 24;
