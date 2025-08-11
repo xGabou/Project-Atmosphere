@@ -23,7 +23,12 @@ float noise(vec3 p) { return hash(p.x + p.y*57.0 + p.z*113.0); }
 // Sample tornado density at world‐pos p
 float sampleTornado(vec3 p) {
     float h = clamp(p.y/Height, 0.0, 1.0);
-    float r = mix(BaseRadius, TopRadius, h);
+    float shaped = pow(h, 0.6);
+    float r = mix(BaseRadius, TopRadius, shaped);
+    if (h > 0.8) {
+        float ct = (h - 0.8) / 0.2;
+        r = mix(r, r * 1.5, ct);
+    }
     float a = atan(p.z, p.x) + Time*TwistSpeed + h*6.0;
     vec2 sp = vec2(cos(a), sin(a)) * r;
     float d = length(p.xz - sp);
