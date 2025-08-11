@@ -22,7 +22,6 @@ import java.util.List;
  */
 public class SandLayerBlock extends SnowLayerBlock {
     public static final IntegerProperty LAYERS = IntegerProperty.create("layers", 1, 8);
-
     public SandLayerBlock(Properties properties) {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any().setValue(LAYERS, 1));
