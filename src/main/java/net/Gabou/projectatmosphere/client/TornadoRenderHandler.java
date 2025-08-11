@@ -66,10 +66,10 @@ public class TornadoRenderHandler {
         int segments = 64;
         int rings = 128;
         float baseRadius = 20f;
-        float topRadius = 2f;
+        float topRadius = 5f;
         float height = 356f;
-        float coneStart = 0.8f;
-        float coneFactor = 1.5f;
+        float coneStart = 0.5f;
+        float coneFactor = 3.5f;
         stack.pushPose();
         stack.translate(tornadoX, tornadoY, tornadoZ);
 
@@ -99,13 +99,13 @@ public class TornadoRenderHandler {
 
 
         var dustUniform = shader.getUniform("DustIntensity");
-        if (dustUniform != null) dustUniform.set(0.2F);
+        if (dustUniform != null) dustUniform.set(0.5F);
 
         var coreUniform = shader.getUniform("CoreTightness");
-        if (coreUniform != null) coreUniform.set(0.5f);
+        if (coreUniform != null) coreUniform.set(0.2f);
 
         var flowIntensity = shader.getUniform("FlowIntensity");
-        if (flowIntensity != null) flowIntensity.set(0.2f);
+        if (flowIntensity != null) flowIntensity.set(0.1f);
 
 
         float partialTicks = minecraft.getFrameTime();
@@ -152,7 +152,7 @@ public class TornadoRenderHandler {
         double windX = Math.cos(windAngleRad) * windSpeed;
         double windZ = Math.sin(windAngleRad) * windSpeed;
 
-        Vec3 horizontalWind = new Vec3(windX, 0, windZ);
+        Vec3 horizontalWind = new Vec3(windX, 5, windZ);
 
 
         float spawnProgress = Mth.clamp(tornado.getLifetimeSeconds() / SPAWN_DESCENT_DURATION, 0f, 1f);

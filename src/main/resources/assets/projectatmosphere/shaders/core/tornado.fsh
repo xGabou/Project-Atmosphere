@@ -72,17 +72,22 @@ vec2 buildSwirlUV(float angle, float y, vec2 offset) {
 
 // ──────── Main ────────
 void main() {
-    float height = clamp(texCoord.y, 0.0, 1.0);
+    // v = normalized vertical coordinate (0..1) from mesh UVs
+    float v = clamp(texCoord.y, 0.0, 1.0);
+
+    // yWorld if/when you need actual units (blocks/meters)
+    float yWorld = v * Height;
+
     float angle = texCoord.x * 2.0 * PI;
 
-    // Rotation based on height and time
-    float rotation = Time * TwistSpeed + height * 12.0;
+    // Rotation based on time + vertical factor
+    float rotation = Time * TwistSpeed + v * 12.0;
 
-    // Core falloff calculation using CoreTightness
-    float coreFalloff = exp(-pow((BaseRadius - (BaseRadius - TopRadius) * height) * CoreTightness, 2.0));
+    // Core falloff uses normalized v (keep this as 0..1)
+    float coreFalloff = exp(-pow((BaseRadius - (BaseRadius - TopRadius) * v) * CoreTightness, 2.0));
 
     // Large-scale swirls
-    vec2 polar = vec2(texCoord.x, height);
+    vec2 polar = vec2(texCoord.x, v);
     float n1 = noise(vec3(polar * 3.0, Time * 0.05));
     float n2 = noise(vec3(polar * 6.0, -Time * 0.04));
     angle += rotation + smoothstep(0.0, 1.0, n1) * 4.0;
@@ -94,40 +99,33 @@ void main() {
     angle += (offset.x - 0.5) * 3.0;
 
     // Final UVs
-    vec2 swirlUV = buildSwirlUV(angle, height, offset);
+    vec2 swirlUV = buildSwirlUV(angle, v, offset);
 
-    // Apply flow warping
+    // Flow warp
     vec2 flow = texture(FlowMap, texCoord).rg - 0.5;
     swirlUV += flow * FlowIntensity;
 
-    // Base texture sample
+    // Base + normal/lighting
     vec4 base = texture(Sampler0, swirlUV);
-
-    // Normal map for lighting
     vec3 normal = normalize(texture(NormalMap, swirlUV).rgb * 2.0 - 1.0);
     vec3 lightDir = normalize(vec3(LightDirX, LightDirY, LightDirZ));
     float lighting = max(dot(normal, lightDir), 0.0);
 
-    // Final smoke color
-    // Screen-space UVs for the clouds RT
-
-    vec2 screen = normalize(vec2(ScreenSizeX, ScreenSizeY));
-    vec2 scrUV = gl_FragCoord.xy / screen;
-
-    // Sample the cloud scene and use it to modulate the funnel
+    // Screen-space cloud sampling (fix: don't normalize screen size)
+    vec2 scrUV = gl_FragCoord.xy / vec2(ScreenSizeX, ScreenSizeY);
     vec3 cloudTint = texture(CloudScene, scrUV).rgb;
+
     float k = clamp(DustIntensity, 0.0, 1.0);
     vec3 color = mix(base.rgb, vec3(DustIntensity), k);
-
     color = mix(color, cloudTint, 0.25);
     color *= 0.4 + 0.6 * lighting;
     color *= 0.5 + n1 * 0.5;
 
-    // Final alpha
-    float alpha = base.a * verticalFade(height);
+    // Alpha uses normalized v (0..1)
+    float alpha = base.a * verticalFade(v);
     alpha *= mix(0.8, 1.0, texture(NoiseMap, swirlUV * 4.0).r);
     alpha *= 0.7 + n2 * 0.3;
-    alpha = clamp(alpha * coreFalloff, 0.8, 1.0);
+    alpha = clamp(alpha * coreFalloff, 0.9, 1.0);
 
     fragColor = vec4(color, alpha);
 }

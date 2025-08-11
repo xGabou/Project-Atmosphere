@@ -4,14 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update tornado rendering parameters and add cone cap functionality">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance tornado rendering with cloud scene integration and shader improvements">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/SandLayerBlock.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/SandLayerBlock.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -496,15 +492,7 @@
       <workItem from="1754526256444" duration="10365000" />
       <workItem from="1754585274973" duration="26164000" />
       <workItem from="1754860451239" duration="6907000" />
-      <workItem from="1754932726663" duration="4441000" />
-    </task>
-    <task id="LOCAL-00035" summary="Refactor wind forecast modules: simplify data structures and enhance forecast calculations">
-      <option name="closed" value="true" />
-      <created>1746671988275</created>
-      <option name="number" value="00035" />
-      <option name="presentableId" value="LOCAL-00035" />
-      <option name="project" value="LOCAL" />
-      <updated>1746671988275</updated>
+      <workItem from="1754932726663" duration="5101000" />
     </task>
     <task id="LOCAL-00036" summary="Refactor atmosphere management: streamline module initialization and add storage management">
       <option name="closed" value="true" />
@@ -890,7 +878,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754871337598</updated>
     </task>
-    <option name="localTasksCounter" value="84" />
+    <task id="LOCAL-00084" summary="feat: enhance tornado rendering with cloud scene integration and shader improvements">
+      <option name="closed" value="true" />
+      <created>1754937511488</created>
+      <option name="number" value="00084" />
+      <option name="presentableId" value="LOCAL-00084" />
+      <option name="project" value="LOCAL" />
+      <updated>1754937511488</updated>
+    </task>
+    <option name="localTasksCounter" value="85" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -909,7 +905,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor weather management: update AsyncAtmosphereService and AtmosphereManager to use CompletableFuture for asynchronous tasks and streamline biome sample handling" />
     <MESSAGE value="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly" />
     <MESSAGE value="Enhance cloud spawning and debugging: implement violence tracking in SimpleCloudSpawner and add command for current violence status" />
     <MESSAGE value="changed simpleclouds-1.20.1-0.7.jar" />
@@ -934,7 +929,8 @@
     <MESSAGE value="fix: update legendary survival overhaul dependency and increase max positions per biome" />
     <MESSAGE value="feat: enhance tornado rendering with improved shader parameters and error handling" />
     <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: update tornado rendering parameters and add cone cap functionality" />
+    <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
