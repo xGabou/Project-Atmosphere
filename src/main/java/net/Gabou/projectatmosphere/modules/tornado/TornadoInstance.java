@@ -88,7 +88,9 @@ public class TornadoInstance {
         AABB box = new AABB(
                 position.x - influence, position.y - 5,
                 position.z - influence, position.x + influence,
-                position.y + 50, position.z + influence);
+                position.x - influence, position.y + WIND_EFFECT_VERTICAL_MIN_OFFSET,
+                position.z - influence, position.x + influence,
+                position.y + WIND_EFFECT_VERTICAL_MAX_OFFSET, position.z + influence);
 
         double windSpeed = wind.gustSpeed() * WIND_SPEED_SCALING_FACTOR;
         double vx = Math.cos(wind.angleRadians()) * windSpeed;
