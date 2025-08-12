@@ -68,6 +68,10 @@ public class TornadoInstance {
         applyAmbientWind(level);
 
         long now = System.currentTimeMillis();
+        if (now - lastAmbientWindCheck >= ambientWindIntervalMs) {
+            lastAmbientWindCheck = now;
+            applyAmbientWind(level);
+        }
         if (now - lastDemolitionCheck >= demolitionIntervalMs) {
             lastDemolitionCheck = now;
             playDemolitionSound(level);
