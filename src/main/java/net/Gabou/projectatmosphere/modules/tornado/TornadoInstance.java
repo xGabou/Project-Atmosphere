@@ -80,7 +80,7 @@ public class TornadoInstance {
             return;
         }
 
-        double influence = radius + 15.0;
+        double influence = radius + AMBIENT_WIND_INFLUENCE_EXTENSION;
         AABB box = new AABB(
                 position.x - influence, position.y - 5,
                 position.z - influence, position.x + influence,
