@@ -8,12 +8,14 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.GlassBlock;
 import net.minecraft.world.level.block.StainedGlassBlock;
 import net.minecraft.world.level.block.StainedGlassPaneBlock;
 import net.minecraft.world.level.block.TintedGlassBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -63,12 +65,33 @@ public class TornadoInstance {
         if (level.isClientSide) {
             return;
         }
+        applyAmbientWind(level);
 
         long now = System.currentTimeMillis();
         if (now - lastDemolitionCheck >= demolitionIntervalMs) {
             lastDemolitionCheck = now;
             playDemolitionSound(level);
             demolishBlocks((ServerLevel) level);
+        }
+    }
+
+    private void applyAmbientWind(Level level) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        double influence = radius + 15.0;
+        AABB box = new AABB(
+                position.x - influence, position.y - 5,
+                position.z - influence, position.x + influence,
+                position.y + 50, position.z + influence);
+
+        double windSpeed = wind.gustSpeed() * 0.05;
+        double vx = Math.cos(wind.angleRadians()) * windSpeed;
+        double vz = Math.sin(wind.angleRadians()) * windSpeed;
+
+        for (Entity entity : serverLevel.getEntities(null, box)) {
+            entity.push(vx, 0, vz);
         }
     }
 
