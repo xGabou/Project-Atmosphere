@@ -86,7 +86,7 @@ public class TornadoInstance {
                 position.z - influence, position.x + influence,
                 position.y + 50, position.z + influence);
 
-        double windSpeed = wind.gustSpeed() * 0.05;
+        double windSpeed = wind.gustSpeed() * WIND_SPEED_SCALING_FACTOR;
         double vx = Math.cos(wind.angleRadians()) * windSpeed;
         double vz = Math.sin(wind.angleRadians()) * windSpeed;
 
