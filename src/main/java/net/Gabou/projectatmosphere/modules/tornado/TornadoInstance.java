@@ -8,12 +8,14 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.GlassBlock;
 import net.minecraft.world.level.block.StainedGlassBlock;
 import net.minecraft.world.level.block.StainedGlassPaneBlock;
 import net.minecraft.world.level.block.TintedGlassBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -63,12 +65,39 @@ public class TornadoInstance {
         if (level.isClientSide) {
             return;
         }
+        applyAmbientWind(level);
 
         long now = System.currentTimeMillis();
+        if (now - lastAmbientWindCheck >= ambientWindIntervalMs) {
+            lastAmbientWindCheck = now;
+            applyAmbientWind(level);
+        }
         if (now - lastDemolitionCheck >= demolitionIntervalMs) {
             lastDemolitionCheck = now;
             playDemolitionSound(level);
             demolishBlocks((ServerLevel) level);
+        }
+    }
+
+    private void applyAmbientWind(Level level) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        double influence = radius + AMBIENT_WIND_INFLUENCE_EXTENSION;
+        AABB box = new AABB(
+                position.x - influence, position.y - 5,
+                position.z - influence, position.x + influence,
+                position.x - influence, position.y + WIND_EFFECT_VERTICAL_MIN_OFFSET,
+                position.z - influence, position.x + influence,
+                position.y + WIND_EFFECT_VERTICAL_MAX_OFFSET, position.z + influence);
+
+        double windSpeed = wind.gustSpeed() * WIND_SPEED_SCALING_FACTOR;
+        double vx = Math.cos(wind.angleRadians()) * windSpeed;
+        double vz = Math.sin(wind.angleRadians()) * windSpeed;
+
+        for (Entity entity : serverLevel.getEntities(null, box)) {
+            entity.push(vx, 0, vz);
         }
     }
 
