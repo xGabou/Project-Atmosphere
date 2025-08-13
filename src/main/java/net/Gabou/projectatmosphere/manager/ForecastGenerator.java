@@ -1,11 +1,13 @@
 package net.Gabou.projectatmosphere.manager;
 
 import com.BreadRes.desertstormwarming.logic.SandstormPhase;
+import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.LegendarySurvivalCompat;
 import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
+import net.Gabou.projectatmosphere.event.BiomeChangeManager;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -20,11 +22,17 @@ import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
-import sfiomn.legendarysurvivaloverhaul.api.temperature.TemperatureUtil;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraftforge.common.Tags;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -288,6 +296,16 @@ public class ForecastGenerator {
 
                                 ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in biome {} (phase: {})",
                                         scheduledStormTime, selected.biomeType(), scheduledStormPhase);
+                                for(ServerPlayer player : level.players()) {
+
+
+                                    if (!BiomeChangeManager.getLastBiome().get(player.getUUID()).getValue()) {
+                                        for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
+                                            Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(),null);
+                                        }
+                                    }
+
+                                }
                             }
                         }
                     }

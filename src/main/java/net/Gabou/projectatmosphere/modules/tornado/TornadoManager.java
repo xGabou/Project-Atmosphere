@@ -32,6 +32,14 @@ public class TornadoManager {
         return ACTIVE_TORNADOES;
     }
 
+    public static void removeTornado(TornadoInstance tornado) {
+        ACTIVE_TORNADOES.remove(tornado);
+    }
+
+    public static void clearTornadoes() {
+        ACTIVE_TORNADOES.clear();
+    }
+
     public static float getShaderTime() {
         return shaderTime;
     }

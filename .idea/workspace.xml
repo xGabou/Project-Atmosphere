@@ -4,10 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance tornado rendering with cloud scene integration and shader improvements">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: refine tornado rendering with improved height calculations and shader adjustments">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModItems.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModItems.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -94,9 +98,8 @@
   }
 }</component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/dev/nonamecrackers2/simpleclouds-1.20.1/0.7_mapped_official_1.20.1/simpleclouds-1.20.1-0.7_mapped_official_1.20.1.jar!/dev/nonamecrackers2/simpleclouds/common/cloud/spawning/CloudGenerator.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.20.1-47.4.0_mapped_official_1.20.1/forge-1.20.1-47.4.0_mapped_official_1.20.1-sources.jar!/net/minecraft/world/item/Item.java" root0="SKIP_INSPECTION" />
-    <setting file="jar://$USER_HOME$/.jdks/temurin-17.0.15/lib/src.zip!/java.base/sun/nio/ch/WEPoll.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/c1f2266a7d0386d7643879ed1b93f51d29126180/joml-1.10.5-sources.jar!/org/joml/Matrix4f.java" root0="SKIP_INSPECTION" />
   </component>
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
@@ -402,9 +405,9 @@
     <recent_temporary>
       <list>
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [clean]" />
         <item itemvalue="Application.FlowMapGenerator" />
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
       </list>
     </recent_temporary>
@@ -492,15 +495,10 @@
       <workItem from="1754526256444" duration="10365000" />
       <workItem from="1754585274973" duration="26164000" />
       <workItem from="1754860451239" duration="6907000" />
-      <workItem from="1754932726663" duration="5101000" />
-    </task>
-    <task id="LOCAL-00036" summary="Refactor atmosphere management: streamline module initialization and add storage management">
-      <option name="closed" value="true" />
-      <created>1746899201207</created>
-      <option name="number" value="00036" />
-      <option name="presentableId" value="LOCAL-00036" />
-      <option name="project" value="LOCAL" />
-      <updated>1746899201207</updated>
+      <workItem from="1754932726663" duration="6715000" />
+      <workItem from="1754944016231" duration="1200000" />
+      <workItem from="1755006818545" duration="3602000" />
+      <workItem from="1755092299309" duration="5226000" />
     </task>
     <task id="LOCAL-00037" summary="Refactor snow block temperature handling: update temperature retrieval method for accuracy">
       <option name="closed" value="true" />
@@ -886,7 +884,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754937511488</updated>
     </task>
-    <option name="localTasksCounter" value="85" />
+    <task id="LOCAL-00085" summary="feat: refine tornado rendering with improved height calculations and shader adjustments">
+      <option name="closed" value="true" />
+      <created>1754938463059</created>
+      <option name="number" value="00085" />
+      <option name="presentableId" value="LOCAL-00085" />
+      <option name="project" value="LOCAL" />
+      <updated>1754938463059</updated>
+    </task>
+    <option name="localTasksCounter" value="86" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -905,7 +911,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly" />
     <MESSAGE value="Enhance cloud spawning and debugging: implement violence tracking in SimpleCloudSpawner and add command for current violence status" />
     <MESSAGE value="changed simpleclouds-1.20.1-0.7.jar" />
     <MESSAGE value="Début du thermomètre" />
@@ -930,7 +935,8 @@
     <MESSAGE value="feat: enhance tornado rendering with improved shader parameters and error handling" />
     <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
     <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
+    <MESSAGE value="feat: refine tornado rendering with improved height calculations and shader adjustments" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: refine tornado rendering with improved height calculations and shader adjustments" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

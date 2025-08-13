@@ -24,6 +24,10 @@ import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 public class TornadoInstance {
 
     private static final int DEBRIS_RANGE_EXTENSION = 5;
+    public static final double AMBIENT_WIND_INFLUENCE_EXTENSION= 15;
+    public static final double WIND_SPEED_SCALING_FACTOR= 0.05;
+    public static final double WIND_EFFECT_VERTICAL_MAX_OFFSET = 50;
+    public static final double WIND_EFFECT_VERTICAL_MIN_OFFSET= -5;
     public Vec3 position;
     public final long spawnTime;
     public final float radius;
@@ -32,7 +36,8 @@ public class TornadoInstance {
     private float angularSpeed = 0.15f; 
     private long lastDemolitionCheck = 0L;
     private final long demolitionIntervalMs = 1000L;
-
+    private final long ambientWindIntervalMs = 2000L;
+    private long lastAmbientWindCheck = 0L;
 
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind) {
@@ -62,15 +67,16 @@ public class TornadoInstance {
      * client relies on separate rendering logic.
      */
     public void tick(Level level) {
+
         if (level.isClientSide) {
             return;
         }
-        applyAmbientWind(level);
 
         long now = System.currentTimeMillis();
         if (now - lastAmbientWindCheck >= ambientWindIntervalMs) {
             lastAmbientWindCheck = now;
             applyAmbientWind(level);
+            lastAmbientWindCheck= now;
         }
         if (now - lastDemolitionCheck >= demolitionIntervalMs) {
             lastDemolitionCheck = now;
@@ -88,9 +94,8 @@ public class TornadoInstance {
         AABB box = new AABB(
                 position.x - influence, position.y - 5,
                 position.z - influence, position.x + influence,
-                position.x - influence, position.y + WIND_EFFECT_VERTICAL_MIN_OFFSET,
-                position.z - influence, position.x + influence,
-                position.y + WIND_EFFECT_VERTICAL_MAX_OFFSET, position.z + influence);
+                position.x - influence, position.y + WIND_EFFECT_VERTICAL_MIN_OFFSET
+        );
 
         double windSpeed = wind.gustSpeed() * WIND_SPEED_SCALING_FACTOR;
         double vx = Math.cos(wind.angleRadians()) * windSpeed;

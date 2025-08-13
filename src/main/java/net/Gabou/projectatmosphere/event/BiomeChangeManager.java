@@ -7,16 +7,21 @@ import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraftforge.common.Tags;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,9 +29,14 @@ import java.util.UUID;
 
 @Mod.EventBusSubscriber
 public class BiomeChangeManager {
-    private static final Map<UUID, ResourceLocation> lastBiome = new HashMap<>();
+    private static final Map<UUID, Pair<ResourceLocation, Boolean>> lastBiome = new HashMap<>();
     private static final int RUN_INTERVAL_TICKS = 2000;
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = 6000;
+
+
+    public static  Map<UUID, Pair<ResourceLocation, Boolean>> getLastBiome() {
+        return lastBiome;
+    }
 
 
 
@@ -36,13 +46,15 @@ public class BiomeChangeManager {
         if (!(ev.player instanceof ServerPlayer player)) return;
         if (player.level().isClientSide) return;
 
+        ServerLevel level = player.serverLevel();
         long t = player.serverLevel().getDayTime() % 24000L;
         if (t % RUN_INTERVAL_TICKS != 0) return;
 
         UUID uuid = player.getUUID();
         ResourceLocation nowBiome = getBiomeKeyAt(player);
-        ResourceLocation last = lastBiome.get(uuid);
-        if(!ForecastGenerator.SANDSTORM_BIOMES.contains(nowBiome)) {
+        ResourceLocation last = lastBiome.get(uuid).getKey();
+        boolean wasInDesert = lastBiome.get(uuid).getValue();
+        if(!wasInDesert) {
             if(SandStormAPI.isSandstormActive()) {
                 for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
                     Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(),null);
@@ -52,10 +64,20 @@ public class BiomeChangeManager {
         }
 
         if (last == null || !last.equals(nowBiome)) {
-            lastBiome.put(uuid, nowBiome);
+            lastBiome.put(uuid,Pair.of(nowBiome,isDesert(level,nowBiome)));
             onBiomeChanged(player, last, nowBiome); 
         }
+
     }
+    private static boolean isDesert(ServerLevel level, ResourceLocation biomeId)
+    {
+        return level.registryAccess()
+                .registryOrThrow(Registries.BIOME)
+                .getHolder(ResourceKey.create(Registries.BIOME, biomeId))
+                .map(holder -> holder.is(Tags.Biomes.IS_DESERT))
+                .orElse(false);
+    }
+
 
     private static ResourceLocation getBiomeKeyAt(ServerPlayer p) {
         BlockPos pos = p.blockPosition();

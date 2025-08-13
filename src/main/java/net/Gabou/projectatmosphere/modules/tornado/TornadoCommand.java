@@ -46,5 +46,36 @@ public class TornadoCommand {
         event.getDispatcher().register(Commands.literal("spawntornadoes")
                 .requires(source -> source.hasPermission(2))
                 .executes(baseCommand.getCommand()));
+
+        event.getDispatcher().register(Commands.literal("cleartornadoes")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> {
+                    ServerLevel level = ctx.getSource().getLevel();
+                    TornadoManager.clearTornadoes();
+                    ctx.getSource().sendSuccess(
+                            () -> Component.literal("🌪️ All tornadoes cleared."), true);
+                    return 1;
+                }));
+        event.getDispatcher().register(Commands.literal("removetornado")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    ServerLevel level = player.serverLevel();
+                    if (!level.dimension().equals(Level.OVERWORLD)) return 0;
+                    Vec3 playerPos = player.position();
+                    TornadoInstance tornado = TornadoManager.getActiveTornadoes().stream()
+                            .filter(t -> t.position.distanceToSqr(playerPos) < 100)
+                            .findFirst()
+                            .orElse(null);
+                    if (tornado != null) {
+                        TornadoManager.removeTornado(tornado);
+                        ctx.getSource().sendSuccess(
+                                () -> Component.literal("🌪️ Tornado removed."), true);
+                    } else {
+                        ctx.getSource().sendFailure(
+                                Component.literal("No tornado found near you."));
+                    }
+                    return 1;
+                }));
     }
 }

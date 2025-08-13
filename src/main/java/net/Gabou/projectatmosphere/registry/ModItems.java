@@ -15,6 +15,9 @@ import sfiomn.legendarysurvivaloverhaul.common.items.ThermometerItem;
 
 public class ModItems {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ProjectAtmosphere.MODID);
+    public static void register(IEventBus eventBus) {
+        ITEMS.register(eventBus);
+    }
 
     public static final RegistryObject<Item> WEATHER_VANE = blockUtilities(ModBlocks.WEATHER_VANE);
     public static final RegistryObject<Item> THERMOMETER = ITEMS.register("thermometer_block", () ->
@@ -85,9 +88,7 @@ public class ModItems {
 
 
 
-    public static void register(IEventBus eventBus) {
-        ITEMS.register(eventBus);
-    }
+
 
     public static final RegistryObject<Item> DUST = blockUtilities(ModBlocks.DUST);
     public static final RegistryObject<Item> SAND_LAYER = blockUtilities(ModBlocks.SAND_LAYER);

@@ -48,7 +48,7 @@ versionRange = "*"
 side = "CLIENT"
 
 [[dependencies."${mod_id}"]]
-modId = "sereneseasonsextended"
+modId = "sereneseasonsplus"
 mandatory = true
 versionRange = "*"
 side = "BOTH"
