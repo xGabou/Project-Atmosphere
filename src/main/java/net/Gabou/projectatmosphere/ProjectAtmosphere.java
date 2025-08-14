@@ -63,8 +63,7 @@ public class ProjectAtmosphere {
         IEventBus modEventBus = context.getModEventBus();
 
         context.registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
-        context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory((mc, screen) -> new AtmoConfigScreen(screen)));
+
 
         CompatHandler.init();
         ModItems.register(modEventBus);
@@ -77,7 +76,9 @@ public class ProjectAtmosphere {
         );
 
         modEventBus.addListener(this::setup);
-        modEventBus.addListener(this::clientSetup);
+        modEventBus.addListener((FMLClientSetupEvent event) -> {
+            clientSetup(event,context);
+        });
 
         
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
@@ -140,10 +141,10 @@ public class ProjectAtmosphere {
     }
 
 
-    private void clientSetup(final FMLClientSetupEvent event) {
-        LOGGER.info("Setting up Project Atmosphere (Client)");
-        ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS);
+    private void clientSetup(final FMLClientSetupEvent event, FMLJavaModLoadingContext context) {
         event.enqueueWork(() -> {
+            LOGGER.info("Setting up Project Atmosphere (Client)");
+            ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS,context);
             Map<String, String> translations = Language.getInstance().getLanguageData();
             translations.put("sandstorm.debug.blocked", "Nothing to report. Stay alert.");
         });

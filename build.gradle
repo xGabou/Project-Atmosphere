@@ -90,7 +90,7 @@ repositories {
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation fg.deobf("curse.maven:serene-season-plus-1288843:6883390")
+    implementation fg.deobf("curse.maven:serene-season-plus-1288843:6887411")
     implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.2+1.20.1-forge")
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
     implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
@@ -101,7 +101,7 @@ dependencies {
     implementation fg.deobf("curse.maven:desert-storms-1312888:6836227")
     implementation fg.deobf("curse.maven:lodestone-616457:6213794")
 
-    runtimeOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
+    //runtimeOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
     //runtimeOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
 
 

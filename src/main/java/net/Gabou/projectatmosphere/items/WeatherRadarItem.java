@@ -9,6 +9,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
 public class WeatherRadarItem extends Item implements InstrumentReader {
     /**
@@ -45,6 +47,7 @@ public class WeatherRadarItem extends Item implements InstrumentReader {
      * @param level  the world in which the player resides
      * @param player the player using the item
      */
+    @OnlyIn(Dist.CLIENT)
     @Override
     public void display(Level level, Player player) {
         Minecraft.getInstance().setScreen(new WeatherRadarScreen(player));
