@@ -5,5 +5,9 @@
     "refmap": "projectatmosphere.refmap.json",
     "mixins": [
         "CachedTemperatureUtilMixin"
+
+    ],
+    "client": [
+        "OverwriteDesertSound"
     ]
 }

@@ -99,4 +99,9 @@ public class EventHandler {
         ticksSinceLastCloudSpawn++;
         tickCounter++;
     }
+    public static void onRegenerate()
+    {
+        tickCounter = 0;
+        ticksSinceLastCloudSpawn = 0;
+    }
 }

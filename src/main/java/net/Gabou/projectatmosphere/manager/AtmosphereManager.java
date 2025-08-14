@@ -1,12 +1,15 @@
 package net.Gabou.projectatmosphere.manager;
 
 
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.event.EventHandler;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.wind.WindCommand;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
@@ -112,6 +115,9 @@ public class AtmosphereManager {
     public static void   onRegenerate(ServerLevel world) {
         AsyncAtmosphereService.runWeather(() -> {
             ForecastGenerator.clearBiomeSamples();
+            EventHandler.onRegenerate();
+            CloudManager.get(world).getCloudGenerator().removeAllClouds();
+            TornadoManager.clearTornadoes();
             for (ServerPlayer player : world.players()) {
                 BlockPos pos = player.blockPosition();
                 allCenterOfMap.add(pos);

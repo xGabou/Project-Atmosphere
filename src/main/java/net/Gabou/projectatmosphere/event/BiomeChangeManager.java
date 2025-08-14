@@ -13,6 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraftforge.common.Tags;
 import net.minecraftforge.event.TickEvent;
@@ -52,8 +53,17 @@ public class BiomeChangeManager {
 
         UUID uuid = player.getUUID();
         ResourceLocation nowBiome = getBiomeKeyAt(player);
-        ResourceLocation last = lastBiome.get(uuid).getKey();
-        boolean wasInDesert = lastBiome.get(uuid).getValue();
+        ResourceLocation last;
+        boolean wasInDesert;
+        try{
+            last = lastBiome.get(uuid).getKey();
+            wasInDesert = lastBiome.get(uuid).getValue();
+        }
+        catch (NullPointerException e){
+            last = null;
+            wasInDesert = false;
+        }
+
         if(!wasInDesert) {
             if(SandStormAPI.isSandstormActive()) {
                 for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
@@ -69,7 +79,7 @@ public class BiomeChangeManager {
         }
 
     }
-    private static boolean isDesert(ServerLevel level, ResourceLocation biomeId)
+    public static boolean isDesert(Level level, ResourceLocation biomeId)
     {
         return level.registryAccess()
                 .registryOrThrow(Registries.BIOME)
