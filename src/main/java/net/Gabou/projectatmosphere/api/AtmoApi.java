@@ -1,6 +1,10 @@
 package net.Gabou.projectatmosphere.api;
 
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastType;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -30,8 +34,8 @@ public class AtmoApi {
      * @return The BiomeForecast for that position
      */
     public BiomeForecast getWeatherForecast(ServerLevel level, BlockPos pos) {
-        
-        return null;
+        BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, pos);
+        return ForecastGenerator.getClosestValidForecast(key, ForecastType.TEMPERATURE);
     }
 
     /**

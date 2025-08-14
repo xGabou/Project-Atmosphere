@@ -1,0 +1,14 @@
+plugins {
+    id 'java'
+}
+
+group = 'net.Gabou.projectatmosphere'
+version = '0.1.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Placeholder for Project Atmosphere and TerraFirmaCraft dependencies.
+}
