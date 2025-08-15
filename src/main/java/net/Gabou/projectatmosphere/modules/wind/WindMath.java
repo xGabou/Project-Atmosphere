@@ -26,14 +26,6 @@ public class WindMath {
     }
 
     /**
-     * Returns gustSpeed during the peak 200 ticks of a 600-tick cycle, baseSpeed otherwise.
-     */
-    public static float getEffectiveWindSpeed(WindVector vector, long worldTime) {
-        long gustCycle = (worldTime + 37) % 600;
-        return (gustCycle < 200) ? vector.gustSpeed() : vector.baseSpeed();
-    }
-
-    /**
      * Returns a BlockPos offset based on the wind direction.
      * - Positive X for east, negative X for west
      * - Positive Z for south, negative Z for north
