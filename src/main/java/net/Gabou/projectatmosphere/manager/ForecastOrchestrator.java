@@ -7,7 +7,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoConfig;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.wind.FloatRange;
 import net.Gabou.projectatmosphere.wind.WindEngine;
@@ -209,7 +209,8 @@ public class ForecastOrchestrator {
     public static void tick(ServerLevel level) {
         ForecastGenerator.tickSandstormScheduler(level);
         long now = level.getGameTime();
-        if (now - lastTornadoCheckTick >= (long) (TornadoConfig.CHECK_INTERVAL_SEC * 20f)) {
+        if (now - lastTornadoCheckTick >=
+                (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f)) {
             lastTornadoCheckTick = now;
             TornadoProbabilityManager.onScheduledCheck(level);
         }

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.Gabou.projectatmosphere.api.WindVector;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -10,7 +11,8 @@ public final class TornadoSpawner {
     private TornadoSpawner() {}
 
     public static void spawn(BiomeInstanceKey key, ServerLevel level, float intensity) {
-        BlockPos center = pickSpawnPosNear(key, level, TornadoConfig.BASE_SPAWN_RADIUS_M);
+        float radiusSetting = AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get().floatValue();
+        BlockPos center = pickSpawnPosNear(key, level, radiusSetting);
         WindVector.WindSample wind = WindVector.getSurface(key, level);
         float radius = 5f + 20f * intensity;
         net.Gabou.projectatmosphere.modules.core.WindVector w =
