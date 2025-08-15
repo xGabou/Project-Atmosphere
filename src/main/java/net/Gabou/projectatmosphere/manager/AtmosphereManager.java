@@ -7,8 +7,11 @@ import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.event.EventHandler;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
+import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
+import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.wind.WindCommand;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -135,6 +138,9 @@ public class AtmosphereManager {
 
     public static void tick(ServerLevel level) {
         ForecastOrchestrator.tick(level);
+        TornadoManager.tick(level);
+        HurricaneManager.tick(level);
+        //SnowstormManager.tick(level);
     }
 
 

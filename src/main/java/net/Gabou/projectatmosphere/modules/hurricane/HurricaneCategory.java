@@ -2,21 +2,21 @@ package net.Gabou.projectatmosphere.modules.hurricane;
 
 /**
  * Saffir–Simpson hurricane wind scale categories with
- * sustained wind speed ranges in miles per hour.
+ * sustained wind speed ranges in km per hour.
  */
 public enum HurricaneCategory {
-    ONE(74, 95),
-    TWO(96, 110),
-    THREE(111, 129),
-    FOUR(130, 156),
-    FIVE(157, Integer.MAX_VALUE);
+    ONE(119, 153),
+    TWO(154, 177),
+    THREE(178, 208),
+    FOUR(209, 251),
+    FIVE(252, Integer.MAX_VALUE);
 
-    public final int minMph;
-    public final int maxMph;
+    public final int minKmh;
+    public final int maxKmh;
 
-    HurricaneCategory(int minMph, int maxMph) {
-        this.minMph = minMph;
-        this.maxMph = maxMph;
+    HurricaneCategory(int minKmh, int maxKmh) {
+        this.minKmh = minKmh;
+        this.maxKmh = maxKmh;
     }
 
     public static HurricaneCategory fromId(int id) {

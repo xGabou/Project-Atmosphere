@@ -4,6 +4,8 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
@@ -37,15 +39,14 @@ public class ForecastOrchestrator {
         ForecastDataStorage.loadAll(level);
         TornadoStorageManager.load(level);
 
-        
+
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
             try {
                 ForecastGenerator.generateForecastForSavedRegion(level);
                 return true;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
-                
+
                 ForecastDataStorage.clearAll(level);
                 ForecastGenerator.clearForecasts();
                 ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
@@ -207,13 +208,17 @@ public class ForecastOrchestrator {
     }
 
     public static void tick(ServerLevel level) {
-        ForecastGenerator.tickSandstormScheduler(level);
-        long now = level.getGameTime();
-        if (now - lastTornadoCheckTick >=
-                (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f)) {
-            lastTornadoCheckTick = now;
-            TornadoProbabilityManager.onScheduledCheck(level);
-        }
+        AsyncAtmosphereService.runStorm(() -> {
+                    GlassDamageManager.tick(level);
+                    ForecastGenerator.tickSandstormScheduler(level);
+                    long now = level.getGameTime();
+                    if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f)) {
+                        lastTornadoCheckTick = now;
+                        TornadoProbabilityManager.onScheduledCheck(level);
+                    }
+                }
+        );
+
     }
 
     public static Set<BiomeInstanceKey> getActiveBiomeKeys(ServerLevel level) {
