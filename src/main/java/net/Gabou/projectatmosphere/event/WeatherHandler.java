@@ -11,10 +11,8 @@ public class WeatherHandler {
 
     @SubscribeEvent
     public static void onWeatherTick(TickEvent.LevelTickEvent event) {
-
-
-
-
+        if (event.level instanceof ServerLevel level && event.phase == TickEvent.Phase.END) {
+            SnowstormManager.tick(level);
+        }
     }
 }
-
