@@ -15,6 +15,7 @@ import net.minecraftforge.fml.config.ModConfig;
 public class AtmoConfigScreen extends Screen {
     private final Screen parent;
     private boolean forceSharedExecutor;
+    private boolean enableTornadoes;
     private boolean enableStormDebris;
     private int maxStormDebrisPerChunk;
     private boolean autoRepairGlass;
@@ -29,6 +30,7 @@ public class AtmoConfigScreen extends Screen {
     @Override
     protected void init() {
         this.forceSharedExecutor = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get();
+        this.enableTornadoes = AtmoCommonConfig.ENABLE_TORNADOES.get();
         this.enableStormDebris = AtmoCommonConfig.ENABLE_STORM_DEBRIS.get();
         this.maxStormDebrisPerChunk = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
         this.autoRepairGlass = AtmoCommonConfig.AUTO_REPAIR_GLASS.get();
@@ -40,6 +42,12 @@ public class AtmoConfigScreen extends Screen {
         addRenderableWidget(Button.builder(toggleLabel("Force Shared Executor", forceSharedExecutor), b -> {
             forceSharedExecutor = !forceSharedExecutor;
             b.setMessage(toggleLabel("Force Shared Executor", forceSharedExecutor));
+        }).bounds(center - 100, y, 200, 20).build());
+        y += 24;
+
+        addRenderableWidget(Button.builder(toggleLabel("Tornadoes", enableTornadoes), b -> {
+            enableTornadoes = !enableTornadoes;
+            b.setMessage(toggleLabel("Tornadoes", enableTornadoes));
         }).bounds(center - 100, y, 200, 20).build());
         y += 24;
 
@@ -87,6 +95,7 @@ public class AtmoConfigScreen extends Screen {
         }
 
         AtmoCommonConfig.FORCE_SHARED_EXECUTOR.set(forceSharedExecutor);
+        AtmoCommonConfig.ENABLE_TORNADOES.set(enableTornadoes);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(parsed);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
