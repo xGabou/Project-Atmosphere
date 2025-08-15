@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.modules.snowstorm;
 
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -7,10 +9,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.SnowLayerBlock;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.config.ConfigTracker;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.loading.FMLPaths;
+
+import java.nio.file.Path;
 
 public class SnowstormManager {
 
@@ -26,7 +30,7 @@ public class SnowstormManager {
             Biome biome = level.getBiome(pos).value();
             if (biome.coldEnoughToSnow(pos)) {
                 applyEffects(player);
-                accumulateSnow(level, pos);
+                updateSnowstormConfig();
             }
         }
     }
@@ -38,22 +42,27 @@ public class SnowstormManager {
         player.displayClientMessage(Component.literal("Snow forecast: " + forecast + " blocks"), true);
     }
 
-    private static void accumulateSnow(ServerLevel level, BlockPos pos) {
-        BlockPos top = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, pos);
-        if (level.isEmptyBlock(top)) {
-            level.setBlock(top, Blocks.SNOW.defaultBlockState(), 3);
-        } else if (level.getBlockState(top).is(Blocks.SNOW)) {
-            int layers = level.getBlockState(top).getValue(SnowLayerBlock.LAYERS);
-            if (layers < 8) {
-                level.setBlock(top, level.getBlockState(top).setValue(SnowLayerBlock.LAYERS, layers + 1), 3);
-            }
-        }
-    }
-
     private static void applyFreezingCompat(ServerPlayer player) {
         if (ModList.get().isLoaded("toughasnails") || ModList.get().isLoaded("legendarysurvivaloverhaul") || ModList.get().isLoaded("coldsweat")) {
             player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 0, false, false));
         }
+    }
+
+    private static void updateSnowstormConfig() {
+        if (!ModList.get().isLoaded("sereneseasonsplus")) {
+            return;
+        }
+
+        Path configPath = FMLPaths.CONFIGDIR.get().resolve("sereneseasonsplus-common.toml");
+        try (CommentedFileConfig config = CommentedFileConfig.builder(configPath).sync().build()) {
+            config.load();
+            config.set("snowstorm.enabled", true);
+            config.save();
+        } catch (Exception e) {
+            ProjectAtmosphere.LOGGER.warn("Failed to update Serene Seasons Plus config: {}", e.getMessage());
+        }
+
+        ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.COMMON, FMLPaths.CONFIGDIR.get());
     }
 
     public static int forecastBlockCount(int durationTicks) {
