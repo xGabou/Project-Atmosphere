@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 
 public class AtmoCommonConfig {
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
     public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
     public static final ForgeConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
@@ -31,6 +32,9 @@ public class AtmoCommonConfig {
                 .define("forceSharedExecutor", false);
         builder.pop();
         builder.push("storms");
+        ENABLE_TORNADOES = builder
+                .comment("Enable tornado spawning and commands")
+                .define("enableTornadoes", true);
         ENABLE_STORM_DEBRIS = builder
                 .comment("Enable random debris spawning during storms")
                 .define("enableStormDebris", true);

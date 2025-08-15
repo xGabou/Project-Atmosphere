@@ -9,7 +9,6 @@ import net.Gabou.projectatmosphere.blocks.BlockManager;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
@@ -20,7 +19,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -33,9 +31,6 @@ public class EventHandler {
     
     
     private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
-
-    private static final int TICKS_BETWEEN_TORNADO_CHECK = 200;
-    private static final float NATURAL_TORNADO_CHANCE = 0.01f;
 
     private static int tickCounter = 0;
 
@@ -87,17 +82,6 @@ public class EventHandler {
 
         }
 
-        if (tickCounter % TICKS_BETWEEN_TORNADO_CHECK == 0) {
-            for (CloudRegion region : generator.getClouds()) {
-                int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
-                if (severity >= 6 && serverLevel.random.nextFloat() < NATURAL_TORNADO_CHANCE) {
-                    BlockPos spawnPos = new BlockPos((int) region.getPosX(), serverLevel.getSeaLevel(), (int) region.getPosZ());
-                    BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(serverLevel, spawnPos);
-                    WindVector wind = ForecastOrchestrator.getCurrentWind(key, serverLevel.getGameTime());
-                    TornadoManager.spawnServer(serverLevel, new Vec3(spawnPos.getX(), spawnPos.getY(), spawnPos.getZ()), 4.0f, wind);
-                }
-            }
-        }
         ticksSinceLastCloudSpawn++;
         tickCounter++;
     }
