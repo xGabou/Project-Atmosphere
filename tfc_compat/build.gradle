@@ -7,8 +7,10 @@ version = '0.1.0'
 
 repositories {
     mavenCentral()
+    // Add Forge or other mod repositories here when wiring dependencies.
 }
 
 dependencies {
-    // Placeholder for Project Atmosphere and TerraFirmaCraft dependencies.
+    compileOnly project(':')
+    compileOnly "net.dries007.tfc:TerraFirmaCraft:0.0.0"
 }
