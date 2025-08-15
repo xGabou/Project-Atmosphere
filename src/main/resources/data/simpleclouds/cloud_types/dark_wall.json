@@ -1,0 +1,38 @@
+{
+  "noise_settings": [
+    {
+      "scale_z": 32.0,
+      "fade_distance": 5.0,
+      "height_offset": 0.0,
+      "value_scale": 0.5,
+      "height": 256.0,
+      "value_offset": 0.5,
+      "scale_x": 48.0,
+      "scale_y": 48.0
+    },
+    {
+      "scale_z": 128.0,
+      "fade_distance": 128.0,
+      "height_offset": 0.0,
+      "value_scale": 2.0,
+      "height": 256.0,
+      "value_offset": 2.0,
+      "scale_x": 256.0,
+      "scale_y": 128.0
+    },
+    {
+      "scale_z": 500.0,
+      "fade_distance": 5.0,
+      "height_offset": 0.0,
+      "value_scale": 0.5,
+      "height": 256.0,
+      "value_offset": 0.5,
+      "scale_x": 3000.0,
+      "scale_y": 1000.0
+    }
+  ],
+  "weather_type": "thunderstorm",
+  "storminess": 1.0,
+  "storm_start": 32.0,
+  "storm_fade_distance": 256.0
+}
