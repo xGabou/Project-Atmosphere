@@ -5,6 +5,10 @@ import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.wind.FloatRange;
+import net.Gabou.projectatmosphere.wind.WindEngine;
+import net.Gabou.projectatmosphere.wind.WindForecast;
+import net.Gabou.projectatmosphere.wind.WindForecastPart;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -199,6 +203,20 @@ public class ForecastOrchestrator {
 
     public static void tick(ServerLevel level) {
         ForecastGenerator.tickSandstormScheduler(level);
+    }
+
+    public static void generateWindForecast(BiomeInstanceKey key, ServerLevel level) {
+        java.util.EnumMap<WindForecastPart, FloatRange> base = new java.util.EnumMap<>(WindForecastPart.class);
+        java.util.EnumMap<WindForecastPart, FloatRange> gust = new java.util.EnumMap<>(WindForecastPart.class);
+        java.util.EnumMap<WindForecastPart, Float> prob = new java.util.EnumMap<>(WindForecastPart.class);
+        java.util.EnumMap<WindForecastPart, FloatRange> dir = new java.util.EnumMap<>(WindForecastPart.class);
+        for (WindForecastPart part : WindForecastPart.values()) {
+            base.put(part, new FloatRange(0f, 1f));
+            gust.put(part, new FloatRange(0f, 1f));
+            prob.put(part, 0f);
+            dir.put(part, new FloatRange(0f, 360f));
+        }
+        WindEngine.putForecast(key, new WindForecast(base, gust, prob, dir));
     }
 
 
