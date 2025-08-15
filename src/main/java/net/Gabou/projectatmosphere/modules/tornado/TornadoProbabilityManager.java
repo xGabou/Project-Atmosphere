@@ -8,6 +8,8 @@ import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
+import java.util.Objects;
+
 public final class TornadoProbabilityManager {
     private TornadoProbabilityManager() {}
 
@@ -18,7 +20,7 @@ public final class TornadoProbabilityManager {
     public static void onScheduledCheck(ServerLevel level) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         long now = level.getGameTime();
-        for (BiomeInstanceKey key : ForecastOrchestrator.getActiveBiomeKeys(level)) {
+        for (BiomeInstanceKey key : ForecastOrchestrator.getActiveBiomeKeys(level)) {//TODO fill this first
             if (!isStormy(key, level)) continue;
             if (isCellOnCooldown(key, level, now)) continue;
 

@@ -30,12 +30,13 @@ public class ClientRenderHook {
         if (Minecraft.getInstance().level == null) return;
 
         ClientLevel level = Minecraft.getInstance().level;
+        List<TornadoInstance> tornadoes = TornadoManager.getActiveTornadoes();
+        if (tornadoes.isEmpty()) return;
         PoseStack poseStack = event.getPoseStack();
         Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
         Vec3 camPos = camera.getPosition();
 
-        List<TornadoInstance> tornadoes = TornadoManager.getActiveTornadoes();
-        if (tornadoes.isEmpty()) return;
+
 
         poseStack.pushPose();
         poseStack.translate(-camPos.x, -camPos.y, -camPos.z);

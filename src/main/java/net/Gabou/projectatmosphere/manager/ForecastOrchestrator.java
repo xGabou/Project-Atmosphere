@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
@@ -19,16 +20,17 @@ import net.Gabou.projectatmosphere.wind.WindForecastPart;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class ForecastOrchestrator {
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = ForecastGenerator.RADIUS / 2;
     private static long lastTornadoCheckTick = 0;
 
 
+    private static Map<UUID, Set<BiomeInstanceKey>> activePlayerBiomeKeys = new HashMap<>();
 
 
 
@@ -54,7 +56,7 @@ public class ForecastOrchestrator {
             }
         }
 
-        
+
         if (!ForecastDataStorage.playerData.isEmpty()) {
             for (BlockPos pos : ForecastDataStorage.playerData.values()) {
                 ForecastGenerator.generateForecastForRegion(pos, level);
@@ -82,7 +84,7 @@ public class ForecastOrchestrator {
     public static void onPlayerLogin(ServerPlayer player, ServerLevel level) {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
-
+        getNearbyBiomeKeys(level,player,500);
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
             boolean shouldGenerate = true;
             for (BlockPos center : ForecastDataStorage.playerData.values()) {
@@ -99,6 +101,7 @@ public class ForecastOrchestrator {
         } else {
             SimpleCloudsCompat.isInit = true;
         }
+
     }
 
     /**
@@ -130,7 +133,7 @@ public class ForecastOrchestrator {
     public static void onSwapDay(ServerLevel level) {
         boolean needsRegen = false;
 
-        
+
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
             BiomeForecast forecast = entry.getValue();
 
@@ -147,17 +150,16 @@ public class ForecastOrchestrator {
         }
 
         if (needsRegen || ForecastGenerator.getForecastMap().isEmpty()) {
-            
+
             BlockPos spawn = level.getSharedSpawnPos();
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing or invalid. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
         }
 
-        
+
         ForecastGenerator.swapToTomorrow();
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
     }
-
 
 
     /**
@@ -167,12 +169,6 @@ public class ForecastOrchestrator {
         ForecastGenerator.generateForecastForRegion(center, level);
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
     }
-
-
-
-
-
-
 
 
     /**
@@ -199,8 +195,8 @@ public class ForecastOrchestrator {
     /**
      * Get wind for any biome
      */
-    public static WindVector getCurrentWind(BiomeInstanceKey key,long tick) {
-         return ForecastGenerator.getWindValue(key, tick);
+    public static WindVector getCurrentWind(BiomeInstanceKey key, long tick) {
+        return ForecastGenerator.getWindValue(key, tick);
     }
 
     public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {
@@ -212,7 +208,7 @@ public class ForecastOrchestrator {
                     GlassDamageManager.tick(level);
                     ForecastGenerator.tickSandstormScheduler(level);
                     long now = level.getGameTime();
-                    if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f)) {
+                    if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
                         lastTornadoCheckTick = now;
                         TornadoProbabilityManager.onScheduledCheck(level);
                     }
@@ -222,7 +218,41 @@ public class ForecastOrchestrator {
     }
 
     public static Set<BiomeInstanceKey> getActiveBiomeKeys(ServerLevel level) {
-        return ForecastGenerator.getForecastMap().keySet();
+        return activePlayerBiomeKeys.values().stream()
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+    }
+
+
+    public static Set<BiomeInstanceKey> getActiveBiomeKeysForPlayer(ServerLevel level, ServerPlayer player) {
+        UUID uuid = player.getUUID();
+        if (activePlayerBiomeKeys.containsKey(uuid)) {
+            return activePlayerBiomeKeys.get(uuid);
+
+        }
+        return Collections.emptySet();
+
+    }
+
+    public static void getNearbyBiomeKeys(ServerLevel level, ServerPlayer player, double radius) {
+        Vec3 center = Vec3.atCenterOf(player.blockPosition());
+        double radiusSq = radius * radius;
+        Set<BiomeInstanceKey> get = getActiveBiomeKeysForPlayer(level, player);
+        if (!get.isEmpty()) {
+            return;
+        }
+        get = ForecastGenerator.getForecastMap().keySet().stream()
+                .filter(key -> key.samplePos() != null &&
+                        key.samplePos().distToCenterSqr(center.x, center.y, center.z) <= radiusSq)
+                .collect(Collectors.toSet());
+        activePlayerBiomeKeys.put(player.getUUID(),get);
+    }
+
+    public static void clearActiveBiomeKeysForPlayer(ServerPlayer player) {
+        activePlayerBiomeKeys.remove(player.getUUID());
+    }
+    public static void clearActiveBiomeKeys() {
+        activePlayerBiomeKeys.clear();
     }
 
     public static void generateWindForecast(BiomeInstanceKey key, ServerLevel level) {
