@@ -13,6 +13,7 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.config.AtmoConfigScreen;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
+import net.Gabou.projectatmosphere.tornado.TornadoProbabilityManager;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.locale.Language;
 import net.minecraft.resources.ResourceLocation;
@@ -133,6 +134,7 @@ public class ProjectAtmosphere {
     private void setup(final FMLCommonSetupEvent event) {
         LOGGER.info("Setting up Project Atmosphere (Common)");
         initModules();
+        TornadoProbabilityManager.init();
         event.enqueueWork(() -> {
             SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
         });
