@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.tornado;
+package net.Gabou.projectatmosphere.modules.tornado;
 
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;

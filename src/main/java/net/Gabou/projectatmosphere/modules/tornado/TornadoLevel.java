@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.weather;
+package net.Gabou.projectatmosphere.modules.tornado;
 
 public enum TornadoLevel {
     F1(73, 112, 5.0),
@@ -7,21 +7,21 @@ public enum TornadoLevel {
     F4(207, 260, 40.0),
     F5(261, 318, 80.0);
 
-    private final int minWindSpeed;
-    private final int maxWindSpeed;
+    private final float minWindSpeed;
+    private final float maxWindSpeed;
     private final double baseDamage;
 
-    TornadoLevel(int minWindSpeed, int maxWindSpeed, double baseDamage) {
+    TornadoLevel(float minWindSpeed, float maxWindSpeed, double baseDamage) {
         this.minWindSpeed = minWindSpeed;
         this.maxWindSpeed = maxWindSpeed;
         this.baseDamage = baseDamage;
     }
 
-    public int getMinWindSpeed() {
+    public float getMinWindSpeed() {
         return minWindSpeed;
     }
 
-    public int getMaxWindSpeed() {
+    public float getMaxWindSpeed() {
         return maxWindSpeed;
     }
 
@@ -29,7 +29,7 @@ public enum TornadoLevel {
         return baseDamage;
     }
 
-    public static TornadoLevel fromWindSpeed(int windSpeed) {
+    public static TornadoLevel fromWindSpeed(float windSpeed) {
         for (TornadoLevel level : values()) {
             if (windSpeed >= level.minWindSpeed && windSpeed <= level.maxWindSpeed) {
                 return level;

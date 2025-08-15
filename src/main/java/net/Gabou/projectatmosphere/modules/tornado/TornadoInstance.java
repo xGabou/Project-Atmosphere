@@ -19,7 +19,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 
 public class TornadoInstance {
 
@@ -40,6 +39,21 @@ public class TornadoInstance {
     private long lastAmbientWindCheck = 0L;
 
 
+    private final TornadoLevel level;
+
+
+    public TornadoLevel getLevel() {
+        return level;
+    }
+
+    public double getSuctionRadius() {
+        return level.getBaseDamage() * 2;
+    }
+
+    public double getDamageMultiplier() {
+        return level.getBaseDamage();
+    }
+
     public TornadoInstance(Vec3 position, float radius, WindVector wind) {
         this(position, radius, wind, 0.05f);
     }
@@ -50,6 +64,7 @@ public class TornadoInstance {
         this.wind = wind;
         this.angularSpeed = angularSpeed;
         this.spawnTime = System.currentTimeMillis();
+        this.level = TornadoLevel.fromWindSpeed(wind.baseSpeed());
     }
 
     public float getLifetimeSeconds() {

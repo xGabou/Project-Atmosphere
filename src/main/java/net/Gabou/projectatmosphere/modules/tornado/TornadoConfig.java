@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.tornado;
+package net.Gabou.projectatmosphere.modules.tornado;
 
 public final class TornadoConfig {
     private TornadoConfig() {}

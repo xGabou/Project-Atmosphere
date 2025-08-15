@@ -1,7 +1,6 @@
-package net.Gabou.projectatmosphere.tornado;
+package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.Gabou.projectatmosphere.api.WindVector;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

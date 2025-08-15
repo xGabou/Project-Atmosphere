@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.tornado;
+package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.Gabou.projectatmosphere.api.ForecastSampling;
 import net.Gabou.projectatmosphere.api.WindVector;

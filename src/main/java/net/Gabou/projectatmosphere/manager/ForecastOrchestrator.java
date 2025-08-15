@@ -6,20 +6,17 @@ import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
-import net.Gabou.projectatmosphere.tornado.TornadoProbabilityManager;
-import net.Gabou.projectatmosphere.tornado.TornadoConfig;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoConfig;
 
 import net.Gabou.projectatmosphere.wind.FloatRange;
 import net.Gabou.projectatmosphere.wind.WindEngine;
 import net.Gabou.projectatmosphere.wind.WindForecast;
 import net.Gabou.projectatmosphere.wind.WindForecastPart;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.RegisterCommandsEvent;
 
 import java.util.Map;
 import java.util.Set;
