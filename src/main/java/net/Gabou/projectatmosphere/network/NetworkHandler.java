@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.network.SyncWindPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
@@ -22,6 +23,11 @@ public class NetworkHandler {
                 .decoder(SpawnTornadoPacket::new)
                 .encoder(SpawnTornadoPacket::encode)
                 .consumerMainThread(SpawnTornadoPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncWindPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncWindPacket::decode)
+                .encoder(SyncWindPacket::encode)
+                .consumerMainThread(SyncWindPacket::handle)
                 .add();
     }
 }
