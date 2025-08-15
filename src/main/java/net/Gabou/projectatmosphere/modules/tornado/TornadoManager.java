@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
@@ -16,6 +17,7 @@ public class TornadoManager {
     private static float shaderTime = 0.0f;
 
     public static void spawn(Vec3 pos, float radius, WindVector wind) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         ACTIVE_TORNADOES.add(new TornadoInstance(pos, radius, wind));
     }
 

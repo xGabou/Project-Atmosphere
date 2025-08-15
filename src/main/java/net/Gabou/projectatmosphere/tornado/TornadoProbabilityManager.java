@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.tornado;
 
 import net.Gabou.projectatmosphere.api.ForecastSampling;
 import net.Gabou.projectatmosphere.api.WindVector;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -15,6 +16,7 @@ public final class TornadoProbabilityManager {
     }
 
     public static void onScheduledCheck(ServerLevel level) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         long now = level.getGameTime();
         for (BiomeInstanceKey key : ForecastOrchestrator.getActiveBiomeKeys(level)) {
             if (!isStormy(key, level)) continue;

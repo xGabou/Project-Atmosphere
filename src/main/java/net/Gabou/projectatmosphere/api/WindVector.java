@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.api;
 
-import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
@@ -10,10 +9,9 @@ public final class WindVector {
     public record WindSample(float speedMps, float directionDeg) {}
 
     public static WindSample getSurface(BiomeInstanceKey key, ServerLevel level) {
-        net.Gabou.projectatmosphere.modules.core.WindVector w =
-                ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
-        if (w == null) return new WindSample(0f, 0f);
-        return new WindSample(w.baseSpeed(), (float) Math.toDegrees(w.angleRadians()));
+        net.Gabou.projectatmosphere.modules.core.WindVector.WindSample w =
+                net.Gabou.projectatmosphere.modules.core.WindVector.getOrFallback(key, level);
+        return new WindSample(w.speedMps(), w.directionDeg());
     }
 
     public static WindSample getOrFallback(BiomeInstanceKey key, ServerLevel level) {
