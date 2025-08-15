@@ -637,7 +637,7 @@ public class ForecastGenerator {
         if (original == null) return WindVector.fromBase(0, 0);
 
         
-        float speed = WindMath.getEffectiveWindSpeed(original, worldTime);
+        float speed = WindMath.getSmoothGustedSpeed(original, worldTime);
 
         return new WindVector(speed, original.angleRadians(), original.gustSpeed());
     }
@@ -899,21 +899,6 @@ public class ForecastGenerator {
         return SandstormPhase.PHASE_1;
     }
 
-    public static float getEffectiveWindSpeed(WindVector vector, long worldTime) {
-        
-        long gustCycle = (worldTime + 37) % 600;
-        if (gustCycle < 200) {
-            return vector.gustSpeed(); 
-        } else {
-            return vector.baseSpeed(); 
-        }
-    }
-
-    public static float getSmoothGustedSpeed(WindVector vector, long worldTime) {
-        float gustWave = (float) Math.sin((worldTime % 1000) / 100.0);
-        float gustFactor = 0.5f + 0.5f * gustWave; 
-        return vector.baseSpeed() + (vector.gustSpeed() - vector.baseSpeed()) * gustFactor;
-    }
 
 
 }
