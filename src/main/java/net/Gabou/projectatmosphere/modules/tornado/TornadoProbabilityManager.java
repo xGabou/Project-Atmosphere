@@ -23,17 +23,19 @@ public final class TornadoProbabilityManager {
             if (isCellOnCooldown(key, level, now)) continue;
 
             float risk = computeRisk(key, level, now);
-            if (risk < TornadoConfig.RISK_MIN_TO_CONSIDER) continue;
+            float riskMin = AtmoCommonConfig.TORNADO_RISK_MIN_TO_CONSIDER.get().floatValue();
+            if (risk < riskMin) continue;
 
-            float chance = TornadoConfig.BASE_TRIGGER_CHANCE * risk;
+            float chance = AtmoCommonConfig.TORNADO_BASE_TRIGGER_CHANCE.get().floatValue() * risk;
             if (level.random.nextFloat() < chance) {
                 float intensity = map(risk,
-                        TornadoConfig.RISK_MIN_TO_CONSIDER,
-                        TornadoConfig.RISK_MIN_TO_CONSIDER + 4f,
-                        TornadoConfig.INTENSITY_MIN,
-                        TornadoConfig.INTENSITY_MAX);
+                        riskMin,
+                        riskMin + 4f,
+                        AtmoCommonConfig.TORNADO_INTENSITY_MIN.get().floatValue(),
+                        AtmoCommonConfig.TORNADO_INTENSITY_MAX.get().floatValue());
                 TornadoSpawner.spawn(key, level, clamp01(intensity));
-                TornadoStorageManager.setCooldown(key, now + minutesToTicks(TornadoConfig.CELL_COOLDOWN_MINUTES));
+                TornadoStorageManager.setCooldown(key,
+                        now + minutesToTicks(AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get()));
             }
         }
     }
@@ -44,26 +46,29 @@ public final class TornadoProbabilityManager {
         float tempSurface = ForecastSampling.getTemperatureC(key, level);
         float humidity = ForecastSampling.getHumidityPercent(key, level);
         float tempAloft = tempSurface -
-                (TornadoConfig.LAPSE_RATE_C_PER_100M * (TornadoConfig.ALOFT_DELTA_H_M / 100f));
+                (AtmoCommonConfig.TORNADO_LAPSE_RATE_C_PER_100M.get().floatValue() *
+                        (AtmoCommonConfig.TORNADO_ALOFT_DELTA_H_M.get().floatValue() / 100f));
         float tempContrast = Math.max(0f, tempSurface - tempAloft);
         risk += (tempContrast / 10f);
-        if (humidity >= TornadoConfig.HUMIDITY_MIN_PERCENT) risk += 1f;
+        if (humidity >= AtmoCommonConfig.TORNADO_HUMIDITY_MIN_PERCENT.get().floatValue()) risk += 1f;
 
         float pHere = ForecastSampling.getPressureHpa(key, level);
         float pNear = ForecastSampling.minNeighborPressureHpa(key, level);
-        float pDiff = Math.abs(pHere - pNear) * TornadoConfig.PRESSURE_GRADIENT_GAIN;
-        risk += Math.min(pDiff, TornadoConfig.PRESSURE_GRADIENT_CAP);
+        float pDiff = Math.abs(pHere - pNear) * AtmoCommonConfig.TORNADO_PRESSURE_GRADIENT_GAIN.get().floatValue();
+        risk += Math.min(pDiff,
+                AtmoCommonConfig.TORNADO_PRESSURE_GRADIENT_CAP.get().floatValue());
 
         WindVector.WindSample wSurf = WindVector.getOrFallback(key, level);
         WindVector.WindSample wAloft = WindVector.getAloftProxy(key, level);
         float speedDiff = Math.abs(wSurf.speedMps() - wAloft.speedMps());
         float dirDiff = minimalAngleDiffDeg(wSurf.directionDeg(), wAloft.directionDeg());
-        if (speedDiff >= TornadoConfig.SHEAR_MIN_SPEED_DIFF_MPS &&
-                dirDiff >= TornadoConfig.SHEAR_MIN_DIR_DIFF_DEG) {
+        if (speedDiff >= AtmoCommonConfig.TORNADO_SHEAR_MIN_SPEED_DIFF_MPS.get().floatValue() &&
+                dirDiff >= AtmoCommonConfig.TORNADO_SHEAR_MIN_DIR_DIFF_DEG.get().floatValue()) {
             risk += 2f;
         }
 
-        if (isStormy(key, level)) risk *= TornadoConfig.STORM_MULTIPLIER;
+        if (isStormy(key, level))
+            risk *= AtmoCommonConfig.TORNADO_STORM_MULTIPLIER.get().floatValue();
 
         return risk;
     }
