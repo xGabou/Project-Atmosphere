@@ -117,6 +117,7 @@ public class ForecastOrchestrator {
      */
     public static void clearAndRegenerate(ServerLevel level, Set<BlockPos> centers) {
         ForecastGenerator.clearForecasts();
+        clearActiveBiomeKeys();
         ForecastDataStorage.playerData.clear();
 
         for (BlockPos center : centers) {

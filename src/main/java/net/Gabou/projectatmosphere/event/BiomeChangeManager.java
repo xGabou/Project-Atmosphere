@@ -4,6 +4,7 @@ import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -103,9 +104,11 @@ public class BiomeChangeManager {
         BlockPos currentPos = player.blockPosition();
         BlockPos originalCenter = ForecastDataStorage.playerData.get(uuid);
 
-        
+        ForecastOrchestrator.clearActiveBiomeKeysForPlayer(player);
+        ForecastOrchestrator.getNearbyBiomeKeys(player.serverLevel(), player, 500);
+
         if (originalCenter == null || originalCenter.distManhattan(currentPos) > MIN_DISTANCE_BETWEEN_CENTERS) {
-            ForecastDataStorage.playerData.put(uuid, currentPos); 
+            ForecastDataStorage.playerData.put(uuid, currentPos);
             AtmosphereManager.updateForecastAround(player.serverLevel(), currentPos);
 
             player.sendSystemMessage(net.minecraft.network.chat.Component.literal(

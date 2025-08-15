@@ -115,7 +115,8 @@ public class AtmosphereManager {
         });
     }
 
-    public static void   onRegenerate(ServerLevel world) {
+    public static void onRegenerate(ServerLevel world) {
+        ForecastOrchestrator.clearActiveBiomeKeys();
         AsyncAtmosphereService.runWeather(() -> {
             ForecastGenerator.clearBiomeSamples();
             EventHandler.onRegenerate();
