@@ -2,10 +2,25 @@ package net.Gabou.projectatmosphere.modules.core;
 
 import net.minecraft.resources.ResourceLocation;
 import java.util.Random;
+import java.util.Set;
 
 public class CloudLibrary {
 
     private static final Random RANDOM = new Random();
+
+    private static final String[] SNOWSTORM_CLOUDS = {
+            "snow",
+            "nimbostratus",
+            "severe_nimbostratus"
+    };
+
+    private static final Set<String> THUNDER_CLOUDS = Set.of(
+            "cumulonimbus",
+            "severe_cumulonimbus",
+            "tsegrus",
+            "dense_tsegrus",
+            "dark_wall"
+    );
 
     private static final String[] SEVERITY_7_CLOUDS = {
             "cumulonimbus",
@@ -83,6 +98,14 @@ public class CloudLibrary {
             case 2 -> getRandomFrom(SEVERITY_2_CLOUDS);
             default -> getRandomFrom(SEVERITY_1_CLOUDS);
         };
+    }
+
+    public static String getSnowstormCloudId() {
+        return getRandomFrom(SNOWSTORM_CLOUDS);
+    }
+
+    public static boolean isThunderCloud(String id) {
+        return THUNDER_CLOUDS.contains(id);
     }
 
     public static int getSeverityFromCloudId(String id) {
