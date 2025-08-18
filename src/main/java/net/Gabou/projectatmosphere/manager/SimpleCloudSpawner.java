@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
@@ -99,10 +100,13 @@ public class SimpleCloudSpawner {
                     calculateDewPoint(stats.temperature(), stats.humidity()),
                     stats.stormChance()
             );
+            boolean snowstorm = severity > 5 && freezing;
             String cloudId;
-            if (isWinter || freezing) {
+            if (snowstorm) {
+                SnowstormManager.startSnowstorm(severity);
                 cloudId = CloudLibrary.getSnowstormCloudId();
             } else {
+                SnowstormManager.stopSnowstorm();
                 cloudId = CloudLibrary.getCloudIdFromSeverity(severity);
                 if (CloudLibrary.isThunderCloud(cloudId) && (isWinter || freezing)) {
                     cloudId = CloudLibrary.getCloudIdFromSeverity(5);

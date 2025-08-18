@@ -141,7 +141,7 @@ public class AtmosphereManager {
         ForecastOrchestrator.tick(level);
         TornadoManager.tick(level);
         HurricaneManager.tick(level);
-        //SnowstormManager.tick(level);
+        SnowstormManager.tick(level);
     }
 
 
