@@ -1,17 +1,17 @@
 {
-    "required": true,
-    "package": "net.Gabou.projectatmosphere.mixin",
-    "compatibilityLevel": "JAVA_17",
-    "refmap": "projectatmosphere.refmap.json",
-    "mixins": [
-        "CachedTemperatureUtilMixin"
+  "required": true,
+  "package": "net.Gabou.projectatmosphere.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "projectatmosphere.refmap.json",
+  "mixins": [
+    "CachedTemperatureUtilMixin"
 
-    ],
-    "client": [
-        "OverwriteDesertSound",
-        "net.Gabou.projectatmosphere.compat.simpleclouds.mixin.SimpleCloudsRendererMixin"
-    ],
-    "injectors": {
-        "defaultRequire": 1
-    }
+  ],
+  "client": [
+    "OverwriteDesertSound",
+    "SimpleCloudsRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.compat.simpleclouds.mixin;
+package net.Gabou.projectatmosphere.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
