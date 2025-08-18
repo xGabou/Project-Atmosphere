@@ -6,15 +6,21 @@ import net.Gabou.projectatmosphere.common.SimpleCloudsBridge;
 public final class HurricaneStateProvider {
     private HurricaneStateProvider() {}
 
-    /** Return active hurricane, or null. Must provide cloud-space coords/radii. */
-    public static HurricaneStateCloudSpace getActive() {
-        var s = ForecastOrchestrator.getActiveHurricane(); // your existing API
-        if (s == null) return null;
+    /**
+     * Return active hurricane, or {@code null}. Coordinates are converted from world
+     * space to Simple Clouds' cloud space by subtracting the camera position and
+     * dividing by the cloud scale.
+     */
+    public static HurricaneStateCloudSpace getActive(double camX, double camZ) {
+        var s = ForecastOrchestrator.getActiveHurricane();
+        if (s == null) {
+            return null;
+        }
 
-        double scale = SimpleCloudsBridge.getCloudScale(); // return SimpleCloudsConstants.CLOUD_SCALE
+        double scale = SimpleCloudsBridge.getCloudScale();
         return new HurricaneStateCloudSpace(
-            s.centerX() / scale,
-            s.centerZ() / scale,
+            (s.centerX() - camX) / scale,
+            (s.centerZ() - camZ) / scale,
             s.eyeRadius() / scale,
             s.eyewallFade() / scale
         );
