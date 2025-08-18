@@ -21,7 +21,7 @@ public final class WindPhysics {
     private static void applyIfStrong(ServerLevel lvl, LivingEntity e) {
         BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(lvl, e.blockPosition());
         WindVector.WindSample w = WindVector.getOrFallback(key, lvl);
-        if (w.speedMps() < WindConfig.PUSH_THRESHOLD_MPS) return;
+        if (w.speedMps() < WindConfig.pushThresholdMps()) return;
         Vec3 push = dirToVec(w.directionDeg()).scale(w.speedMps() * pushScale(e));
         e.push(push.x, 0.0, push.z);
         e.hurtMarked = true;
@@ -33,7 +33,7 @@ public final class WindPhysics {
     }
 
     private static double pushScale(LivingEntity e) {
-        return e instanceof ServerPlayer ? WindConfig.PLAYER_PUSH_SCALE : WindConfig.ENTITY_PUSH_SCALE;
+        return e instanceof ServerPlayer ? WindConfig.playerPushScale() : WindConfig.entityPushScale();
     }
 }
 

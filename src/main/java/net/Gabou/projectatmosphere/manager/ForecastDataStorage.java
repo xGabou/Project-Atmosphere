@@ -118,6 +118,7 @@ public class ForecastDataStorage {
             obj.add("pressure", serializeWeek(forecast.getPressure()));
             obj.add("humidity", serializeWeek(forecast.getHumidity()));
             obj.add("wind", serializeWinds(forecast.getWind()));
+            obj.add("stormChance", serializeWeek(forecast.getStormChance()));
 
             root.add(key.toString(), obj);
         }
@@ -151,6 +152,7 @@ public class ForecastDataStorage {
                 forecast.setPressure(deserializeWeek(obj.getAsJsonArray("pressure")));
                 forecast.setHumidity(deserializeWeek(obj.getAsJsonArray("humidity")));
                 forecast.setWind(deserializeWinds(obj.getAsJsonArray("wind")));
+                forecast.setStormChance(deserializeWeek(obj.getAsJsonArray("stormChance")));
 
                 ForecastGenerator.putForecast(key, forecast);
             }
