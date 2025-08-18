@@ -8,6 +8,10 @@
 
     ],
     "client": [
-        "OverwriteDesertSound"
-    ]
+        "OverwriteDesertSound",
+        "net.Gabou.projectatmosphere.compat.simpleclouds.mixin.SimpleCloudsRendererMixin"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
 }
