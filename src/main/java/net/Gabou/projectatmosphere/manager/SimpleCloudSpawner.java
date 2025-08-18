@@ -23,6 +23,9 @@ import net.minecraft.util.valueproviders.BiasedToBottomInt;
 import org.joml.Vector2i;
 
 import java.util.*;
+import net.minecraftforge.fml.ModList;
+import sereneseasons.api.season.Season;
+import sereneseasons.api.season.SeasonHelper;
 
 import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MAX_RADIUS;
 import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MIN_RADIUS;
@@ -86,15 +89,25 @@ public class SimpleCloudSpawner {
             if (stats == null) continue;
 
             
-            String cloudId = CloudLibrary.getCloudIdFromSeverity(
-                    determineCloudSeverity(
-                            stats.temperature(),
-                            stats.humidity(),
-                            stats.pressure(),
-                            calculateDewPoint(stats.temperature(), stats.humidity()),
-                            stats.stormChance()
-                    )
+            boolean isWinter = ModList.get().isLoaded("sereneseasons") &&
+                    SeasonHelper.getSeasonState(level).getSeason() == Season.WINTER;
+            boolean freezing = stats.temperature() <= 0.0F;
+            int severity = determineCloudSeverity(
+                    stats.temperature(),
+                    stats.humidity(),
+                    stats.pressure(),
+                    calculateDewPoint(stats.temperature(), stats.humidity()),
+                    stats.stormChance()
             );
+            String cloudId;
+            if (isWinter || freezing) {
+                cloudId = CloudLibrary.getSnowstormCloudId();
+            } else {
+                cloudId = CloudLibrary.getCloudIdFromSeverity(severity);
+                if (CloudLibrary.isThunderCloud(cloudId) && (isWinter || freezing)) {
+                    cloudId = CloudLibrary.getCloudIdFromSeverity(5);
+                }
+            }
 
             ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
             CloudSpawningConfig.Info info = config.getWeightInfo(rl);

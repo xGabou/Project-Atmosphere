@@ -29,26 +29,41 @@ public class SnowstormManager {
             BlockPos pos = player.blockPosition();
             Biome biome = level.getBiome(pos).value();
             if (biome.coldEnoughToSnow(pos)) {
-                applyEffects(player);
-                updateSnowstormConfig();
+                int intensity = forecastBlockCount(20 * 60);
+                applyEffects(player, intensity);
+                updateSnowstormConfig(intensity);
             }
         }
     }
 
-    private static void applyEffects(ServerPlayer player) {
+    private static void applyEffects(ServerPlayer player, int intensity) {
         player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, false, false));
-        applyFreezingCompat(player);
-        int forecast = forecastBlockCount(20 * 60);
-        player.displayClientMessage(Component.literal("Snow forecast: " + forecast + " blocks"), true);
+        triggerTemperatureEffect(player);
+        player.displayClientMessage(Component.literal("Snow forecast: " + intensity + " blocks"), true);
     }
 
-    private static void applyFreezingCompat(ServerPlayer player) {
-        if (ModList.get().isLoaded("toughasnails") || ModList.get().isLoaded("legendarysurvivaloverhaul") || ModList.get().isLoaded("coldsweat")) {
+    private static final String[] TEMPERATURE_MODS = {
+            "toughasnails",
+            "legendarysurvivaloverhaul",
+            "coldsweat"
+    };
+
+    private static boolean isTemperatureModLoaded() {
+        for (String mod : TEMPERATURE_MODS) {
+            if (ModList.get().isLoaded(mod)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void triggerTemperatureEffect(ServerPlayer player) {
+        if (isTemperatureModLoaded()) {
             player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 0, false, false));
         }
     }
 
-    private static void updateSnowstormConfig() {
+    private static void updateSnowstormConfig(int intensity) {
         if (!ModList.get().isLoaded("sereneseasonsplus")) {
             return;
         }
@@ -57,6 +72,7 @@ public class SnowstormManager {
         try (CommentedFileConfig config = CommentedFileConfig.builder(configPath).sync().build()) {
             config.load();
             config.set("snowstorm.enabled", true);
+            config.set("snowstorm.intensity", intensity);
             config.save();
         } catch (Exception e) {
             ProjectAtmosphere.LOGGER.warn("Failed to update Serene Seasons Plus config: {}", e.getMessage());
