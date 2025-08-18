@@ -43,18 +43,14 @@ public final class WindEngine {
                 if (dir != null) {
                     state.setTargetDirectionDeg(dir.random(new java.util.Random()));
                 }
-                state.setNextRetargetTick(now + (long) (WindConfig.BASE_RETARGET_SEC * 20));
+                state.setNextRetargetTick(now + (long) (WindConfig.baseRetargetSec() * 20));
             }
             float speed = state.getCurrentBaseSpeed() + (state.getTargetBaseSpeed() - state.getCurrentBaseSpeed()) * 0.1f;
             state.setCurrentBaseSpeed(speed);
             float dirCur = state.getCurrentDirectionDeg() + (state.getTargetDirectionDeg() - state.getCurrentDirectionDeg()) * 0.1f;
             state.setCurrentDirectionDeg(dirCur);
 
-            if (state.getCurrentGustSpeed() <= 0f) {
-                WindGustManager.maybeStartGust(state, forecast, part, 1f, now);
-            } else {
-                WindGustManager.updateGustDecay(state, now, WindConfig.GUST_DECAY_MPS);
-            }
+            WindGustManager.tick(state, forecast, part, key, level, now);
             float effective = state.getCurrentBaseSpeed() + state.getCurrentGustSpeed();
             WindVector.set(key, effective, state.getCurrentDirectionDeg());
         }

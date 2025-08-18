@@ -40,6 +40,15 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
 
+    public static final ForgeConfigSpec.DoubleValue WIND_BASE_RETARGET_SEC;
+    public static final ForgeConfigSpec.DoubleValue WIND_DIR_RETARGET_SEC;
+    public static final ForgeConfigSpec.DoubleValue WIND_GUST_MEAN_SEC;
+    public static final ForgeConfigSpec.DoubleValue WIND_GUST_DECAY_MPS;
+    public static final ForgeConfigSpec.DoubleValue WIND_STORM_GUST_MULT;
+    public static final ForgeConfigSpec.DoubleValue WIND_PUSH_THRESHOLD_MPS;
+    public static final ForgeConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
+    public static final ForgeConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
+
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
         builder.push("performance");
@@ -115,7 +124,32 @@ public class AtmoCommonConfig {
         builder.pop();
         builder.pop();
 
-
+        builder.push("wind");
+        WIND_BASE_RETARGET_SEC = builder
+                .comment("Seconds between base wind retarget")
+                .defineInRange("baseRetargetSec", 60d, 1d, 600d);
+        WIND_DIR_RETARGET_SEC = builder
+                .comment("Seconds between direction retarget")
+                .defineInRange("dirRetargetSec", 90d, 1d, 600d);
+        WIND_GUST_MEAN_SEC = builder
+                .comment("Average gust duration in seconds")
+                .defineInRange("gustMeanSec", 15d, 1d, 600d);
+        WIND_GUST_DECAY_MPS = builder
+                .comment("Gust decay speed in m/s per second")
+                .defineInRange("gustDecayMps", 1.0d, 0d, 100d);
+        WIND_STORM_GUST_MULT = builder
+                .comment("Multiplier for gust speed during storms")
+                .defineInRange("stormGustMult", 2.0d, 0d, 10d);
+        WIND_PUSH_THRESHOLD_MPS = builder
+                .comment("Minimum wind speed to push entities")
+                .defineInRange("pushThresholdMps", 6.0d, 0d, 100d);
+        WIND_PLAYER_PUSH_SCALE = builder
+                .comment("Push scale applied to players")
+                .defineInRange("playerPushScale", 0.04d, 0d, 1d);
+        WIND_ENTITY_PUSH_SCALE = builder
+                .comment("Push scale applied to other entities")
+                .defineInRange("entityPushScale", 0.03d, 0d, 1d);
+        builder.pop();
 
         COMMON_SPEC = builder.build();
     }

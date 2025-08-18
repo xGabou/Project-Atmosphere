@@ -1,15 +1,40 @@
 package net.Gabou.projectatmosphere.wind;
 
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+
 public final class WindConfig {
     private WindConfig() { }
 
-    public static float BASE_RETARGET_SEC = 60f;
-    public static float DIR_RETARGET_SEC = 90f;
-    public static float GUST_MEAN_SEC = 15f;
-    public static float GUST_DECAY_MPS = 1.0f;
-    public static float STORM_GUST_MULT = 2.0f;
-    public static float PUSH_THRESHOLD_MPS = 6.0f;
-    public static float PLAYER_PUSH_SCALE = 0.04f;
-    public static float ENTITY_PUSH_SCALE = 0.03f;
+    public static float baseRetargetSec() {
+        return AtmoCommonConfig.WIND_BASE_RETARGET_SEC.get().floatValue();
+    }
+
+    public static float dirRetargetSec() {
+        return AtmoCommonConfig.WIND_DIR_RETARGET_SEC.get().floatValue();
+    }
+
+    public static float gustMeanSec() {
+        return AtmoCommonConfig.WIND_GUST_MEAN_SEC.get().floatValue();
+    }
+
+    public static float gustDecayMps() {
+        return AtmoCommonConfig.WIND_GUST_DECAY_MPS.get().floatValue();
+    }
+
+    public static float stormGustMult() {
+        return AtmoCommonConfig.WIND_STORM_GUST_MULT.get().floatValue();
+    }
+
+    public static float pushThresholdMps() {
+        return AtmoCommonConfig.WIND_PUSH_THRESHOLD_MPS.get().floatValue();
+    }
+
+    public static float playerPushScale() {
+        return AtmoCommonConfig.WIND_PLAYER_PUSH_SCALE.get().floatValue();
+    }
+
+    public static float entityPushScale() {
+        return AtmoCommonConfig.WIND_ENTITY_PUSH_SCALE.get().floatValue();
+    }
 }
 
