@@ -63,7 +63,7 @@ public class SimpleCloudSpawner {
     }
 
 
-    public static void trySpawnClouds(ServerLevel level, CloudGenerator generator) {
+    public static boolean trySpawnClouds(ServerLevel level, CloudGenerator generator) {
         List<SpawnRegion> spawnRegions = generator.getSpawnRegions();
         RandomSource random = RandomSource.create();
         CloudSpawningConfig config = generator.getSpawnConfig().get();
@@ -72,14 +72,14 @@ public class SimpleCloudSpawner {
         int currentCount = generator.getClouds().size();
         int maxRegions = config.getMaxInitialRegions();
         int remaining = maxRegions - currentCount;
-        if (remaining <= 0) return;
+        if (remaining <= 0) return false;
 
         int toSpawn = Mth.clamp(BiasedToBottomInt.of(1, 5).sample(random), 1, remaining);
 
         for (int i = 0; i < toSpawn; i++) {
             if (spawnRegions.isEmpty()) {
                 ProjectAtmosphere.LOGGER.warn("[Atmosphere] No spawn regions available");
-                return;
+                return false;
             }
 
 
@@ -147,7 +147,7 @@ public class SimpleCloudSpawner {
                     stats.windVector()
             );
 
-            if (generator.getClouds().size() >= maxRegions) return;
+            if (generator.getClouds().size() >= maxRegions) return true;
         }
     }
 

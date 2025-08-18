@@ -2,156 +2,254 @@ package net.Gabou.projectatmosphere.util;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 
-import java.nio.file.Path;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Objects;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class AsyncAtmosphereService {
+/**
+ * Async runner sized by ProjectAtmosphere.SystemProfile.
+ *
+ * Public API preserved:
+ *   - runStorm(Runnable)
+ *   - runWeather(Runnable) -> CompletableFuture<Void>
+ *   - runClient(Runnable)
+ *
+ * Call once at boot:
+ *   AsyncAtmosphereService.init(isClient-> true|false);
+        */
+public final class AsyncAtmosphereService {
 
-    private static ExecutorService TEMP_EXECUTOR, HUMIDITY_EXECUTOR, STORM_EXECUTOR, PRESSURE_EXECUTOR;
-    private static ExecutorService SHARED_EXECUTOR, GROUP_A_EXECUTOR, GROUP_B_EXECUTOR;
-    private static ExecutorService WEATHER_EXECUTOR;
-    private static ExecutorService CLIENT_EXECUTOR;
+    private static volatile boolean initialized = false;
 
-    private static boolean initialized = false;
+    /** pools */
+    private static ThreadPoolExecutor WEATHER_POOL;
+    private static ThreadPoolExecutor STORM_POOL;
+    private static ThreadPoolExecutor CLIENT_POOL;
+    private static ThreadPoolExecutor SHARED_POOL; // low-spec fallback
 
-    public static void init() {
+    private AsyncAtmosphereService() {}
+
+    /** prefer this: we’ll size pools using the detected SystemProfile */
+    public static void init(boolean isClient) {
         if (initialized) return;
-        initialized = true;
+        synchronized (AsyncAtmosphereService.class) {
+            if (initialized) return;
 
-        int CPU_COUNT = Runtime.getRuntime().availableProcessors();
-        boolean forceShared;
+            ProjectAtmosphere.SystemProfile profile = ProjectAtmosphere.SystemProfile.create(isClient);
 
-        try {
-            
-            forceShared = false;
-        } catch (IllegalStateException e) {
-            ProjectAtmosphere.LOGGER.warn("⚠ Tried to access config before it was ready. Defaulting to shared executor.");
-            forceShared = true;
+            final int cpu = Math.max(1, profile.cpuCount);
+            final long memMB = Math.max(1, profile.maxMemoryMB);
+            final boolean lowSpec = profile.isLowSpec();
+            final boolean goodGpu = profile.isGoodEnoughGPU();
+
+            // choose mode
+            final boolean USE_SHARED = lowSpec || cpu <= 4;
+            final boolean SPLIT_POOLS = !USE_SHARED;
+
+            // queue caps: smaller on low-mem
+            final int baseQueue = memMB <= 2048 ? 256 : memMB <= 4096 ? 512 : 1024;
+            final int weatherQueueCap = baseQueue;
+            final int stormQueueCap   = baseQueue;
+            final int clientQueueCap  = 256;
+
+            // thread sizing helpers
+            final int weatherCore = clamp( USE_SHARED ? 1 : Math.min(4, Math.max(2, cpu - 2)), 1, 8);
+            final int weatherMax  = clamp( USE_SHARED ? 1 : Math.min(8, cpu * 2),                 weatherCore, 16);
+            final int stormCore   = clamp( USE_SHARED ? 1 : Math.min(4, Math.max(2, cpu - 2)), 1, 8);
+            final int stormMax    = clamp( USE_SHARED ? 1 : Math.min(8, cpu * 2),                 stormCore, 16);
+
+            if (USE_SHARED) {
+                SHARED_POOL = new ThreadPoolExecutor(
+                        Math.min(2, Math.max(1, cpu - 1)), // 1–2 threads on low spec
+                        Math.min(2, Math.max(1, cpu - 1)),
+                        60L, TimeUnit.SECONDS,
+                        new LinkedBlockingQueue<>(baseQueue),
+                        namedFactory("SharedCalc"),
+                        new ThreadPoolExecutor.CallerRunsPolicy()
+                );
+                SHARED_POOL.allowCoreThreadTimeOut(true);
+
+                WEATHER_POOL = SHARED_POOL;
+                STORM_POOL   = SHARED_POOL;
+
+                ProjectAtmosphere.LOGGER.info(
+                        "[AsyncAtmosphere] init(shared) | cpu={} mem={}MB gpuOK={} | shared(core={},q={})",
+                        cpu, memMB, goodGpu, SHARED_POOL.getCorePoolSize(), baseQueue
+                );
+            } else {
+                WEATHER_POOL = new ThreadPoolExecutor(
+                        weatherCore,
+                        weatherMax,
+                        60L, TimeUnit.SECONDS,
+                        new LinkedBlockingQueue<>(weatherQueueCap),
+                        namedFactory("WeatherMgr"),
+                        new ThreadPoolExecutor.CallerRunsPolicy()
+                );
+                WEATHER_POOL.allowCoreThreadTimeOut(true);
+
+                STORM_POOL = new ThreadPoolExecutor(
+                        stormCore,
+                        stormMax,
+                        60L, TimeUnit.SECONDS,
+                        new LinkedBlockingQueue<>(stormQueueCap),
+                        namedFactory("StormCalc"),
+                        new ThreadPoolExecutor.CallerRunsPolicy()
+                );
+                STORM_POOL.allowCoreThreadTimeOut(true);
+
+                ProjectAtmosphere.LOGGER.info(
+                        "[AsyncAtmosphere] init(split)  | cpu={} mem={}MB gpuOK={} | weather(core={},max={},q={}) storm(core={},max={},q={})",
+                        cpu, memMB, goodGpu,
+                        weatherCore, weatherMax, weatherQueueCap,
+                        stormCore, stormMax, stormQueueCap
+                );
+            }
+
+            // client: ordered single-thread (bounded queue)
+            CLIENT_POOL = new ThreadPoolExecutor(
+                    1, 1,
+                    30L, TimeUnit.SECONDS,
+                    new LinkedBlockingQueue<>(clientQueueCap),
+                    namedFactory("ClientMgr"),
+                    new ThreadPoolExecutor.CallerRunsPolicy()
+            );
+
+            ProjectAtmosphere.LOGGER.info(
+                    "[AsyncAtmosphere] client(core=1,q={}) | profile.gpu='{}'",
+                    clientQueueCap, safeGpuName(profile)
+            );
+
+            initialized = true;
         }
-
-        boolean USE_TWO = !forceShared && CPU_COUNT > 6 && CPU_COUNT <= 10;
-        boolean USE_FOUR = !forceShared && CPU_COUNT > 10;
-        boolean USE_SHARED = forceShared || CPU_COUNT <= 6;
-
-        SHARED_EXECUTOR = Executors.newFixedThreadPool(Math.max(2, CPU_COUNT - 1), r -> {
-            ProjectAtmosphere.LOGGER.info("🔁 Creating SHARED executor pool (all async tasks) | CPU: " + CPU_COUNT);
-            Thread t = new Thread(r, "SharedCalcThread");
-            t.setDaemon(false);
-            return t;
-        });
-
-        if (USE_TWO) {
-            GROUP_A_EXECUTOR = Executors.newFixedThreadPool(2, r -> {
-                ProjectAtmosphere.LOGGER.info("🔄 Creating GROUP A executor (Temperature & Humidity)");
-                Thread t = new Thread(r, "GroupAExecutor");
-                t.setDaemon(false);
-                return t;
-            });
-            GROUP_B_EXECUTOR = Executors.newFixedThreadPool(2, r -> {
-                ProjectAtmosphere.LOGGER.info("🔄 Creating GROUP B executor (Storm & Pressure)");
-                Thread t = new Thread(r, "GroupBExecutor");
-                t.setDaemon(false);
-                return t;
-            });
-        }
-
-        TEMP_EXECUTOR = USE_SHARED ? SHARED_EXECUTOR :
-                USE_TWO ? GROUP_A_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
-                    ProjectAtmosphere.LOGGER.info("🧊 Creating TEMP executor");
-                    Thread t = new Thread(r, "TempCalcThread");
-                    t.setDaemon(false);
-                    return t;
-                });
-
-        HUMIDITY_EXECUTOR = USE_SHARED ? SHARED_EXECUTOR :
-                USE_TWO ? GROUP_A_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
-                    ProjectAtmosphere.LOGGER.info("💧 Creating HUMIDITY executor");
-                    Thread t = new Thread(r, "HumidityCalcThread");
-                    t.setDaemon(false);
-                    return t;
-                });
-
-        STORM_EXECUTOR = USE_SHARED ? SHARED_EXECUTOR :
-                USE_TWO ? GROUP_B_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
-                    ProjectAtmosphere.LOGGER.info("🌪 Creating STORM executor");
-                    Thread t = new Thread(r, "StormCalcThread");
-                    t.setDaemon(false);
-                    return t;
-                });
-
-        PRESSURE_EXECUTOR = USE_SHARED ? SHARED_EXECUTOR :
-                USE_TWO ? GROUP_B_EXECUTOR : Executors.newSingleThreadExecutor(r -> {
-                    ProjectAtmosphere.LOGGER.info("🧪 Creating PRESSURE executor");
-                    Thread t = new Thread(r, "PressureCalcThread");
-                    t.setDaemon(false);
-                    return t;
-                });
-
-        WEATHER_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
-            ProjectAtmosphere.LOGGER.info("⛅ Creating WEATHER orchestrator executor (ordered full forecast)");
-            Thread t = new Thread(r, "WeatherManagerThread");
-            t.setDaemon(false);
-            return t;
-        });
-        CLIENT_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
-            ProjectAtmosphere.LOGGER.info("⛅ Creating CLIENT orchestrator executor (ordered full forecast)");
-            Thread t = new Thread(r, "ClientManagerThread");
-            t.setDaemon(false);
-            return t;
-        });
     }
 
-    
-    public static void runTemperature(Runnable task) {
-        if (TEMP_EXECUTOR != null && !TEMP_EXECUTOR.isShutdown()) TEMP_EXECUTOR.submit(task);
+    /** legacy: keep for compatibility (defaults to server profile) */
+    public static void init() {
+        init(false);
     }
 
-    public static void runHumidity(Runnable task) {
-        if (HUMIDITY_EXECUTOR != null && !HUMIDITY_EXECUTOR.isShutdown()) HUMIDITY_EXECUTOR.submit(task);
-    }
+    // ----------------- public API (unchanged) -----------------
 
     public static void runStorm(Runnable task) {
-        if (STORM_EXECUTOR != null && !STORM_EXECUTOR.isShutdown()) STORM_EXECUTOR.submit(task);
+        ensureInit();
+        Objects.requireNonNull(task, "task");
+        executeSafe(STORM_POOL, wrap(task, "Storm"));
     }
 
-    public static void runPression(Runnable task) {
-        if (PRESSURE_EXECUTOR != null && !PRESSURE_EXECUTOR.isShutdown()) PRESSURE_EXECUTOR.submit(task);
-    }
-
-    
     public static CompletableFuture<Void> runWeather(Runnable task) {
-        if (WEATHER_EXECUTOR != null && !WEATHER_EXECUTOR.isShutdown()) {
-            return CompletableFuture.runAsync(task, WEATHER_EXECUTOR);
-        } else {
-            return CompletableFuture.failedFuture(new IllegalStateException("Weather executor not available."));
-        }
+        ensureInit();
+        Objects.requireNonNull(task, "task");
+        CompletableFuture<Void> cf = new CompletableFuture<>();
+        executeSafe(WEATHER_POOL, () -> {
+            try {
+                wrap(task, "Weather").run();
+                cf.complete(null);
+            } catch (Throwable t) {
+                cf.completeExceptionally(t);
+            }
+        });
+        return cf;
     }
+
     public static void runClient(Runnable task) {
-        if (CLIENT_EXECUTOR != null && !CLIENT_EXECUTOR.isShutdown()) {
-            CLIENT_EXECUTOR.submit(task);
+        ensureInit();
+        Objects.requireNonNull(task, "task");
+        executeSafe(CLIENT_POOL, wrap(task, "Client"));
+    }
+
+    public static void shutdown() {
+        if (!initialized) return;
+        synchronized (AsyncAtmosphereService.class) {
+            if (!initialized) return;
+
+            ProjectAtmosphere.LOGGER.info("[AsyncAtmosphere] shutdown");
+            if (SHARED_POOL != null && SHARED_POOL == WEATHER_POOL) {
+                // shared mode: shut it once
+                shutdownPool("Shared", SHARED_POOL);
+                WEATHER_POOL = null;
+                STORM_POOL   = null;
+                SHARED_POOL  = null;
+            } else {
+                shutdownPool("Weather", WEATHER_POOL);
+                shutdownPool("Storm",   STORM_POOL);
+            }
+            shutdownPool("Client",  CLIENT_POOL);
+
+            WEATHER_POOL = null;
+            STORM_POOL   = null;
+            CLIENT_POOL  = null;
+
+            initialized = false;
         }
     }
 
+    // ----------------- helpers -----------------
 
-    
-    public static void runShared(Runnable task) {
-        if (SHARED_EXECUTOR != null && !SHARED_EXECUTOR.isShutdown()) SHARED_EXECUTOR.submit(task);
+    private static void ensureInit() {
+        if (!initialized) init(false);
     }
 
-    
-    public static void shutdown() {
-        if (SHARED_EXECUTOR != null) SHARED_EXECUTOR.shutdown();
-        if (GROUP_A_EXECUTOR != null) GROUP_A_EXECUTOR.shutdown();
-        if (GROUP_B_EXECUTOR != null) GROUP_B_EXECUTOR.shutdown();
-        if (TEMP_EXECUTOR != null && TEMP_EXECUTOR != SHARED_EXECUTOR && TEMP_EXECUTOR != GROUP_A_EXECUTOR) TEMP_EXECUTOR.shutdown();
-        if (HUMIDITY_EXECUTOR != null && HUMIDITY_EXECUTOR != SHARED_EXECUTOR && HUMIDITY_EXECUTOR != GROUP_A_EXECUTOR) HUMIDITY_EXECUTOR.shutdown();
-        if (STORM_EXECUTOR != null && STORM_EXECUTOR != SHARED_EXECUTOR && STORM_EXECUTOR != GROUP_B_EXECUTOR) STORM_EXECUTOR.shutdown();
-        if (PRESSURE_EXECUTOR != null && PRESSURE_EXECUTOR != SHARED_EXECUTOR && PRESSURE_EXECUTOR != GROUP_B_EXECUTOR) PRESSURE_EXECUTOR.shutdown();
-        if (WEATHER_EXECUTOR != null) WEATHER_EXECUTOR.shutdown();
-        if( CLIENT_EXECUTOR != null) CLIENT_EXECUTOR.shutdown();
+    private static void executeSafe(ExecutorService svc, Runnable r) {
+        if (svc == null || svc.isShutdown()) {
+            ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] executor not available; running in caller thread");
+            r.run();
+            return;
+        }
+        try {
+            svc.execute(r);
+        } catch (RejectedExecutionException rex) {
+            ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] task rejected; running in caller thread", rex);
+            r.run();
+        }
+    }
 
-        initialized = false;
+    private static Runnable wrap(Runnable r, String tag) {
+        return () -> {
+            try {
+                // uncomment for trace:
+                // ProjectAtmosphere.LOGGER.debug("[{}] start on {}", tag, Thread.currentThread().getName());
+                r.run();
+            } catch (Throwable t) {
+                ProjectAtmosphere.LOGGER.error("[{}] task failed", tag, t);
+                throw t;
+            } finally {
+                // ProjectAtmosphere.LOGGER.debug("[{}] end", tag);
+            }
+        };
+    }
+
+    private static ThreadFactory namedFactory(String base) {
+        AtomicInteger idx = new AtomicInteger(1);
+        return r -> {
+            Thread t = new Thread(r, base + "-" + idx.getAndIncrement());
+            t.setDaemon(false);
+            t.setPriority(Thread.NORM_PRIORITY);
+            return t;
+        };
+    }
+
+    private static void shutdownPool(String name, ExecutorService svc) {
+        if (svc == null) return;
+        svc.shutdown();
+        try {
+            if (!svc.awaitTermination(5, TimeUnit.SECONDS)) {
+                ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] {} pool timed out; forcing shutdownNow()", name);
+                svc.shutdownNow();
+            } else {
+                ProjectAtmosphere.LOGGER.info("[AsyncAtmosphere] {} pool terminated", name);
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] {} pool shutdown interrupted; forcing shutdownNow()", name);
+            svc.shutdownNow();
+        }
+    }
+
+    private static int clamp(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    private static String safeGpuName(ProjectAtmosphere.SystemProfile p) {
+        try { return String.valueOf(p.getGPUName()); } catch (Throwable t) { return "unknown"; }
     }
 }

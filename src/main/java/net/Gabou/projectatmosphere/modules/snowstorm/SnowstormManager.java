@@ -66,6 +66,8 @@ public class SnowstormManager {
 
     private static void triggerTemperatureEffect(ServerPlayer player) {
         if (isTemperatureModLoaded()) {
+            if(player.getArmorValue()>12)//TODO : make this configurable
+                return;
             player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 0, false, false));
         }
     }

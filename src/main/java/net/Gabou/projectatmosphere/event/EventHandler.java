@@ -28,7 +28,8 @@ import net.minecraftforge.fml.common.Mod;
 public class EventHandler {
 
     private static final int MIN_TICKS_BETWEEN_DUST_SPAWN = 5000;
-    
+
+    private static boolean isFirstTick = false;
     
     private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
 
@@ -55,8 +56,12 @@ public class EventHandler {
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
         CloudGenerator generator = cloudManager.getCloudGenerator();
         AtmosphereManager.tick(serverLevel);
-        if (generator.getTicksTillNextGen() <= 0 && ticksSinceLastCloudSpawn % 1000 == 0) {
-            SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
+        if(!isFirstTick) {
+            isFirstTick=SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
+            ticksSinceLastCloudSpawn = 0;
+        }
+        else if (generator.getTicksTillNextGen() <= 0 && ticksSinceLastCloudSpawn % 1000 == 0) {
+            isFirstTick= SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
             ticksSinceLastCloudSpawn = 0;
         }
 
