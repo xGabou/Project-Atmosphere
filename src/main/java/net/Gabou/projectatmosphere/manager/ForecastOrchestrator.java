@@ -111,6 +111,7 @@ public class ForecastOrchestrator {
     public static void regenerateAround(ServerLevel level, BlockPos pos) {
         ForecastGenerator.generateForecastForRegion(pos, level);
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
+        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
     }
 
     /**
@@ -127,6 +128,7 @@ public class ForecastOrchestrator {
         }
 
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
+        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
     }
 
     /**
@@ -161,6 +163,7 @@ public class ForecastOrchestrator {
 
         ForecastGenerator.swapToTomorrow();
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
+        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
     }
 
 
@@ -170,6 +173,7 @@ public class ForecastOrchestrator {
     public static void updateForecast(ServerLevel level, BlockPos center) {
         ForecastGenerator.generateForecastForRegion(center, level);
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
+        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
     }
 
 
@@ -257,46 +261,32 @@ public class ForecastOrchestrator {
         activePlayerBiomeKeys.clear();
     }
 
-    public static void generateWindForecast(BiomeInstanceKey key, ServerLevel level, WindVector[] week) {
-        if (week == null || week.length == 0) {
+    public static void generateWindForecast(BiomeInstanceKey key, ServerLevel level, BiomeForecast forecast) {
+        WindVector today = forecast.getWindDay();
+        if (today == null) {
             return;
         }
 
-        float baseAvg = 0f;
-        float gustAvg = 0f;
-        float dirAvg = 0f;
-        int count = 0;
-        for (WindVector v : week) {
-            if (v == null) {
-                continue;
-            }
-            baseAvg += v.baseSpeed();
-            gustAvg += v.gustSpeed();
-            dirAvg += (float) Math.toDegrees(v.angleRadians());
-            count++;
-        }
-        if (count == 0) {
-            return;
-        }
-        baseAvg /= count;
-        gustAvg /= count;
-        dirAvg /= count;
-        float gustProbValue = gustAvg > baseAvg ? 0.3f : 0f;
+        float baseMax = today.baseSpeed();
+        float gustMax = today.gustSpeed();
+        float dirDeg = (float) Math.toDegrees(today.angleRadians());
+        float gustProbValue = gustMax > baseMax ? 0.3f : 0f;
 
         java.util.EnumMap<WindForecastPart, FloatRange> base = new java.util.EnumMap<>(WindForecastPart.class);
         java.util.EnumMap<WindForecastPart, FloatRange> gust = new java.util.EnumMap<>(WindForecastPart.class);
         java.util.EnumMap<WindForecastPart, Float> prob = new java.util.EnumMap<>(WindForecastPart.class);
         java.util.EnumMap<WindForecastPart, FloatRange> dir = new java.util.EnumMap<>(WindForecastPart.class);
 
-        FloatRange baseRange = new FloatRange(baseAvg, baseAvg);
-        FloatRange gustRange = new FloatRange(gustAvg, gustAvg);
-        FloatRange dirRange = new FloatRange(dirAvg, dirAvg);
-        for (WindForecastPart part : WindForecastPart.values()) {
-            base.put(part, baseRange);
-            gust.put(part, gustRange);
-            prob.put(part, gustProbValue);
-            dir.put(part, dirRange);
+        float[] stageScale = {0.3f, 1.0f, 0.8f, 0.6f, 0.4f, 0.2f};
+        WindForecastPart[] parts = WindForecastPart.values();
+        for (int i = 0; i < parts.length; i++) {
+            float scale = stageScale[i];
+            base.put(parts[i], new FloatRange(0f, baseMax * scale));
+            gust.put(parts[i], new FloatRange(0f, gustMax * scale));
+            prob.put(parts[i], gustProbValue);
+            dir.put(parts[i], new FloatRange(dirDeg - 15f, dirDeg + 15f));
         }
+
         WindEngine.putForecast(key, new WindForecast(base, gust, prob, dir));
     }
 

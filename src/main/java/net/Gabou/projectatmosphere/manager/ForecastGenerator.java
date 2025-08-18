@@ -274,7 +274,8 @@ public class ForecastGenerator {
 
         
         DailyForecastGenerator.scheduleAll(level, FORECAST_MAP);
-        
+        FORECAST_MAP.forEach((key, forecast) -> ForecastOrchestrator.generateWindForecast(key, level, forecast));
+
         computeAverageForecastsByBiomeType();
 
         AsyncAtmosphereService.runStorm(() -> {
@@ -497,9 +498,7 @@ public class ForecastGenerator {
     }
 
     private static WindVector[] generateWind(BiomeInstanceKey key, ServerLevel level) {
-        WindVector[] week = WindGenerator.generateWindWeek(key);
-        ForecastOrchestrator.generateWindForecast(key, level, week);
-        return week;
+        return WindGenerator.generateWindWeek(key);
     }
 
 
