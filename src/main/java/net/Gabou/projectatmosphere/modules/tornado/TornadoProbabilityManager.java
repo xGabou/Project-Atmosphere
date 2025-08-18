@@ -33,17 +33,19 @@ public final class TornadoProbabilityManager {
             float risk = computeRisk(key, level, now);
             float riskMin = AtmoCommonConfig.TORNADO_RISK_MIN_TO_CONSIDER.get().floatValue();
             if (risk < riskMin) continue;
-
-            float intensity = map(risk,
-                    riskMin,
-                    riskMin + 4f,
-                    AtmoCommonConfig.TORNADO_INTENSITY_MIN.get().floatValue(),
-                    AtmoCommonConfig.TORNADO_INTENSITY_MAX.get().floatValue());
-            TornadoSpawner.spawn(key, level, clamp01(intensity));
-            TornadoStorageManager.setCooldown(key,
-                    now + minutesToTicks(AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get()));
-            TornadoSpawnScheduler.recordSpawn(now);
-            break;
+            float chance = AtmoCommonConfig.TORNADO_BASE_TRIGGER_CHANCE.get().floatValue() * risk;
+            if (level.random.nextFloat() < chance) {
+                float intensity = map(risk,
+                        riskMin,
+                        riskMin + 4f,
+                        AtmoCommonConfig.TORNADO_INTENSITY_MIN.get().floatValue(),
+                        AtmoCommonConfig.TORNADO_INTENSITY_MAX.get().floatValue());
+                TornadoSpawner.spawn(key, level, clamp01(intensity));
+                TornadoStorageManager.setCooldown(key,
+                        now + minutesToTicks(AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get()));
+                TornadoSpawnScheduler.recordSpawn(now);
+                break;
+            }
         }
     }
 
