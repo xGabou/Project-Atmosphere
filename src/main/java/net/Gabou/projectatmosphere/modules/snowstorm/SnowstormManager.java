@@ -64,10 +64,6 @@ public class SnowstormManager {
     }
 
     private static void updateSnowstormConfig(int intensity) {
-        if (!ModList.get().isLoaded("sereneseasonsplus")) {
-            return;
-        }
-
         Path configPath = FMLPaths.CONFIGDIR.get().resolve("sereneseasonsplus-common.toml");
         try (CommentedFileConfig config = CommentedFileConfig.builder(configPath).sync().build()) {
             config.load();

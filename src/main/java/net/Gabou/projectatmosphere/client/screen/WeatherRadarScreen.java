@@ -23,7 +23,7 @@ public class WeatherRadarScreen extends Screen {
         super(Component.translatable("item.projectatmosphere.weather_radar"));
         this.player = player;
         this.cloudManager = CloudManager.get(player.level());
-        this.scale = (float) RANGE / MAP_SIZE;
+        this.scale = ((float) RANGE / MAP_SIZE)*10;
     }
 
     @Override

@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance biome key management for players and optimize tornado checks">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: improve compatibility logging and refactor mixin structure for weather management">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/simpleclouds/mixin/SimpleCloudsRendererMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SimpleCloudsRendererMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/wind/WindStorageManager.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -493,15 +491,7 @@
       <workItem from="1755092299309" duration="13530000" />
       <workItem from="1755203861302" duration="4509000" />
       <workItem from="1755287668091" duration="10626000" />
-      <workItem from="1755523871342" duration="622000" />
-    </task>
-    <task id="LOCAL-00043" summary="Refactor pressure management logic: streamline forecast handling and remove unused code">
-      <option name="closed" value="true" />
-      <created>1748953382901</created>
-      <option name="number" value="00043" />
-      <option name="presentableId" value="LOCAL-00043" />
-      <option name="project" value="LOCAL" />
-      <updated>1748953382901</updated>
+      <workItem from="1755523871342" duration="6616000" />
     </task>
     <task id="LOCAL-00044" summary="Add SimpleClouds compatibility and refactor cloud spawning logic: implement SimpleCloudSpawner and CloudLibrary for enhanced cloud management">
       <option name="closed" value="true" />
@@ -887,7 +877,15 @@
       <option name="project" value="LOCAL" />
       <updated>1755297185630</updated>
     </task>
-    <option name="localTasksCounter" value="92" />
+    <task id="LOCAL-00092" summary="feat: improve compatibility logging and refactor mixin structure for weather management">
+      <option name="closed" value="true" />
+      <created>1755524512517</created>
+      <option name="number" value="00092" />
+      <option name="presentableId" value="LOCAL-00092" />
+      <option name="project" value="LOCAL" />
+      <updated>1755524512518</updated>
+    </task>
+    <option name="localTasksCounter" value="93" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -906,7 +904,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="WOrk in progress" />
     <MESSAGE value="Refactor and enhance weather forecasting system; rename files, add new forecast data structures, and implement crafting recipes for new items&#10;&#10;&#10;&#10;&#10;New system now one generator and refactored the logic behind the biome generation." />
     <MESSAGE value="Refactor build configuration and enhance cloud integration; update dependencies and streamline setup logic for weather control" />
     <MESSAGE value="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling" />
@@ -931,7 +928,8 @@
     <MESSAGE value="feat: refactor tornado module structure and enhance tornado level handling" />
     <MESSAGE value="feat: integrate hurricane and snowstorm management into atmosphere tick process" />
     <MESSAGE value="feat: enhance biome key management for players and optimize tornado checks" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance biome key management for players and optimize tornado checks" />
+    <MESSAGE value="feat: improve compatibility logging and refactor mixin structure for weather management" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: improve compatibility logging and refactor mixin structure for weather management" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
