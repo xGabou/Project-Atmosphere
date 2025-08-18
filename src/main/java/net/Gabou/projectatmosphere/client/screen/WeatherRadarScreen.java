@@ -6,12 +6,14 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec2;
 
 import java.util.List;
 
 public class WeatherRadarScreen extends Screen {
     private static final int MAP_SIZE = 128;
     private static final int RANGE = 2048;
+    private static final int FORECAST_TICKS = 20 * 30;
 
     private final Player player;
     private final CloudManager<?> cloudManager;
@@ -21,7 +23,7 @@ public class WeatherRadarScreen extends Screen {
         super(Component.translatable("item.projectatmosphere.weather_radar"));
         this.player = player;
         this.cloudManager = CloudManager.get(player.level());
-        this.scale = (float) RANGE / MAP_SIZE;
+        this.scale = ((float) RANGE / MAP_SIZE)*10;
     }
 
     @Override
@@ -45,6 +47,16 @@ public class WeatherRadarScreen extends Screen {
                 int x = left + MAP_SIZE / 2 + Math.round(dx);
                 int y = top + MAP_SIZE / 2 + Math.round(dz);
                 guiGraphics.fill(x - r, y - r, x + r, y + r, 0x80FFFFFF);
+
+                Vec2 dir = region.getMovementDirection();
+                float speed = region.getMaxSpeed();
+                float futureX = region.getWorldX() + dir.x * speed * FORECAST_TICKS;
+                float futureZ = region.getWorldZ() + dir.y * speed * FORECAST_TICKS;
+                float fdx = (futureX - (float) player.getX()) / scale;
+                float fdz = (futureZ - (float) player.getZ()) / scale;
+                int fx = left + MAP_SIZE / 2 + Math.round(fdx);
+                int fy = top + MAP_SIZE / 2 + Math.round(fdz);
+                guiGraphics.fill(fx - r, fy - r, fx + r, fy + r, 0x40FF0000);
             }
         }
 

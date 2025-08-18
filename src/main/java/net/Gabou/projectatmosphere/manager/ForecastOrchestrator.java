@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
+import net.Gabou.projectatmosphere.storms.HurricaneState;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
@@ -271,4 +272,9 @@ public class ForecastOrchestrator {
     }
 
 
+    public static HurricaneState getActiveHurricane() {
+        return null;
+    }
+
 }
+

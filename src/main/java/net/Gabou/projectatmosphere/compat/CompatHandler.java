@@ -19,10 +19,10 @@ public class CompatHandler {
     public static void init()
     {
         if (isLegendaryModLoaded) {
-
+            LOGGER.info("Legendary mod loaded");
         }
         else if (isToughAsNailsLoaded) {
-
+            LOGGER.info("Tough as nails mod loaded");
         }
         else{
             LOGGER.info("ToughAsNails or Legendary Survival Overhaul is not loaded, skipping compatibility setup.");

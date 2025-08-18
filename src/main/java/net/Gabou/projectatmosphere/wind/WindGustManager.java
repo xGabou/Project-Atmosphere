@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.wind;
 
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
@@ -9,7 +10,8 @@ public final class WindGustManager {
     private WindGustManager() { }
 
     public static float stormGustMultiplier(BiomeInstanceKey key, ServerLevel lvl) {
-        return WindConfig.STORM_GUST_MULT;
+        float chance = ForecastOrchestrator.getCurrentStormChance(key, lvl.getGameTime());
+        return chance > 0.5f ? WindConfig.stormGustMult() : 1f;
     }
 
     public static float maybeStartGust(WindRuntimeState s, WindForecast f, WindForecastPart p, float stormMult, long nowTick) {
@@ -21,7 +23,7 @@ public final class WindGustManager {
             if (range != null) {
                 float speed = range.random(new Random());
                 s.setCurrentGustSpeed(speed);
-                s.setGustEndTick(nowTick + (long) (WindConfig.GUST_MEAN_SEC * 20));
+                s.setGustEndTick(nowTick + (long) (WindConfig.gustMeanSec() * 20));
                 return speed;
             }
         }
@@ -36,6 +38,15 @@ public final class WindGustManager {
         }
         float dec = decayPerSec / 20f;
         s.setCurrentGustSpeed(Math.max(0f, s.getCurrentGustSpeed() - dec));
+    }
+
+    public static void tick(WindRuntimeState s, WindForecast f, WindForecastPart p, BiomeInstanceKey key, ServerLevel lvl, long nowTick) {
+        float mult = stormGustMultiplier(key, lvl);
+        if (s.getCurrentGustSpeed() <= 0f) {
+            maybeStartGust(s, f, p, mult, nowTick);
+        } else {
+            updateGustDecay(s, nowTick, WindConfig.gustDecayMps());
+        }
     }
 }
 

@@ -9,7 +9,7 @@ displayName = "${mod_name}"
 authors = "${mod_authors}"
 description = '''${mod_description}'''
 logoFile = "${mod_logo_file}"
-mixinConfig = "${mod_mixins}"
+mixinConfigs = "${mod_mixins}"
 displayTest = "IGNORE_ALL_VERSION"
 
 [[dependencies."${mod_id}"]]

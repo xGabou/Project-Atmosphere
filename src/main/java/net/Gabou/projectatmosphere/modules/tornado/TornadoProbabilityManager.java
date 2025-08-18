@@ -1,14 +1,19 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.api.ForecastSampling;
 import net.Gabou.projectatmosphere.api.WindVector;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.Objects;
 
 public final class TornadoProbabilityManager {
     private TornadoProbabilityManager() {}
@@ -28,7 +33,6 @@ public final class TornadoProbabilityManager {
             float risk = computeRisk(key, level, now);
             float riskMin = AtmoCommonConfig.TORNADO_RISK_MIN_TO_CONSIDER.get().floatValue();
             if (risk < riskMin) continue;
-
             float chance = AtmoCommonConfig.TORNADO_BASE_TRIGGER_CHANCE.get().floatValue() * risk;
             if (level.random.nextFloat() < chance) {
                 float intensity = map(risk,
@@ -83,7 +87,20 @@ public final class TornadoProbabilityManager {
     }
 
     private static boolean isStormy(BiomeInstanceKey key, ServerLevel level) {
-        return ForecastSampling.isStormyClouds(key, level);
+        ServerCloudManager manager = (ServerCloudManager) CloudManager.get(level);
+        CloudGenerator generator = manager.getCloudGenerator();
+        BlockPos pos = key.samplePos();
+        for (CloudRegion region : generator.getClouds()) {
+            int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
+            if (severity < 7) continue;
+            double dx = region.getPosX() - pos.getX();
+            double dz = region.getPosZ() - pos.getZ();
+            double r = region.getRadius();
+            if (dx * dx + dz * dz <= r * r) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static float minimalAngleDiffDeg(float a, float b) {
