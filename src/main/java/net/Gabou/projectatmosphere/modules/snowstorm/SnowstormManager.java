@@ -2,13 +2,9 @@ package net.Gabou.projectatmosphere.modules.snowstorm;
 
 import com.Gabou.sereneseasonsplus.api.SnowstormHelper;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.fml.ModList;
 
 public class SnowstormManager {
 
@@ -32,42 +28,23 @@ public class SnowstormManager {
             return;
         }
 
-        int forecast = forecastBlockCount(20 * 60);
-
         for (ServerPlayer player : level.players()) {
             BlockPos pos = player.blockPosition();
             Biome biome = level.getBiome(pos).value();
-            if (biome.coldEnoughToSnow(pos)) {
-                applyEffects(player, forecast);
+            if (biome.coldEnoughToSnow(pos) && level.canSeeSky(pos.above())) {
+                applyFreezingEffect(player);
             }
         }
     }
 
-    private static void applyEffects(ServerPlayer player, int forecast) {
-        player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, false, false));
-        triggerTemperatureEffect(player);
-        player.displayClientMessage(Component.literal("Snow forecast: " + forecast + " blocks"), true);
-    }
-
-    private static final String[] TEMPERATURE_MODS = {
-            "toughasnails",
-            "legendarysurvivaloverhaul",
-            "coldsweat"
-    };
-
-    private static boolean isTemperatureModLoaded() {
-        for (String mod : TEMPERATURE_MODS) {
-            if (ModList.get().isLoaded(mod)) {
-                return true;
-            }
+    private static void applyFreezingEffect(ServerPlayer player) {
+        if (player.getArmorValue() > 12) {
+            return;
         }
-        return false;
-    }
 
-    private static void triggerTemperatureEffect(ServerPlayer player) {
-        if (isTemperatureModLoaded()) {
-            player.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 40, 0, false, false));
-        }
+        int required = player.getTicksRequiredToFreeze();
+        int current = player.getTicksFrozen();
+        player.setTicksFrozen(Math.min(required - 1, current + 1));
     }
 
     public static int forecastBlockCount(int durationTicks) {
