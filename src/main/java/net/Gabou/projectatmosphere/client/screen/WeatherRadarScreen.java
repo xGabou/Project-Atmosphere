@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client.screen;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -46,7 +47,28 @@ public class WeatherRadarScreen extends Screen {
                 int r = Math.max(1, Math.round(region.getWorldRadius() / scale));
                 int x = left + MAP_SIZE / 2 + Math.round(dx);
                 int y = top + MAP_SIZE / 2 + Math.round(dz);
-                guiGraphics.fill(x - r, y - r, x + r, y + r, 0x80FFFFFF);
+
+                int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
+                String cloudId = region.getCloudTypeId().getPath();
+                boolean thunder = CloudLibrary.isThunderCloud(cloudId);
+                boolean snow = CloudLibrary.isSnowCloud(cloudId);
+                float density = severity / 7.0f;
+                int alpha = 0x20 + Math.round(density * 0xDF);
+                int colorRgb;
+                if (snow) {
+                    colorRgb = severity >= 6 ? 0xFFC0CB : 0x0000FF;
+                } else if (thunder) {
+                    colorRgb = switch (severity) {
+                        case 7 -> 0x800080;
+                        case 6 -> 0xFF0000;
+                        case 5 -> 0xFFA500;
+                        default -> 0xFFFF00;
+                    };
+                } else {
+                    colorRgb = 0xFFFFFF;
+                }
+                int color = (alpha << 24) | colorRgb;
+                guiGraphics.fill(x - r, y - r, x + r, y + r, color);
 
                 Vec2 dir = region.getMovementDirection();
                 float speed = region.getMaxSpeed();
@@ -56,7 +78,8 @@ public class WeatherRadarScreen extends Screen {
                 float fdz = (futureZ - (float) player.getZ()) / scale;
                 int fx = left + MAP_SIZE / 2 + Math.round(fdx);
                 int fy = top + MAP_SIZE / 2 + Math.round(fdz);
-                guiGraphics.fill(fx - r, fy - r, fx + r, fy + r, 0x40FF0000);
+                int forecastColor = ((alpha / 2) << 24) | colorRgb;
+                guiGraphics.fill(fx - r, fy - r, fx + r, fy + r, forecastColor);
             }
         }
 

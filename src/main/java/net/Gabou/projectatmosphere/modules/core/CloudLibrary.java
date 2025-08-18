@@ -13,6 +13,7 @@ public class CloudLibrary {
             "nimbostratus",
             "severe_nimbostratus"
     };
+    private static final Set<String> SNOW_CLOUDS = Set.of(SNOWSTORM_CLOUDS);
 
     private static final Set<String> THUNDER_CLOUDS = Set.of(
             "cumulonimbus",
@@ -108,6 +109,10 @@ public class CloudLibrary {
 
     public static boolean isThunderCloud(String id) {
         return THUNDER_CLOUDS.contains(id);
+    }
+
+    public static boolean isSnowCloud(String id) {
+        return SNOW_CLOUDS.contains(id);
     }
 
     public static int getSeverityFromCloudId(String id) {
