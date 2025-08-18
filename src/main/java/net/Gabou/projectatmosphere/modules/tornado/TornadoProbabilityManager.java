@@ -20,6 +20,7 @@ public final class TornadoProbabilityManager {
     public static void onScheduledCheck(ServerLevel level) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         long now = level.getGameTime();
+        if (!TornadoSpawnScheduler.isSlotAvailable(now)) return;
         for (BiomeInstanceKey key : ForecastOrchestrator.getActiveBiomeKeys(level)) {//TODO fill this first
             if (!isStormy(key, level)) continue;
             if (isCellOnCooldown(key, level, now)) continue;
@@ -38,6 +39,8 @@ public final class TornadoProbabilityManager {
                 TornadoSpawner.spawn(key, level, clamp01(intensity));
                 TornadoStorageManager.setCooldown(key,
                         now + minutesToTicks(AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get()));
+                TornadoSpawnScheduler.recordSpawn(now);
+                break;
             }
         }
     }
