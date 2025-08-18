@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.storms.HurricaneState;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.wind.FloatRange;
@@ -302,7 +303,13 @@ public class ForecastOrchestrator {
 
 
     public static HurricaneState getActiveHurricane() {
-        return null;
+        var hurricanes = HurricaneManager.getActiveHurricanes();
+        if (hurricanes.isEmpty()) {
+            return null;
+        }
+
+        var h = hurricanes.get(0);
+        return new HurricaneState(h.position.x, h.position.z, h.radius, h.radius * 0.5);
     }
 
 }

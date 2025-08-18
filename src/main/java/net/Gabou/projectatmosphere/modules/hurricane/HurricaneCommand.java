@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.modules.hurricane;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.commands.Commands;
@@ -43,6 +44,7 @@ public class HurricaneCommand {
                             HurricaneCategory cat = HurricaneCategory.fromId(catInt);
                             BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
                             var wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
+                            SimpleCloudsCompat.spawnCloudInBiome("custom_cumulonimbus", key, level, null, wind);
                             Vec3 spawnPos = new Vec3(player.getX(), level.getSeaLevel(), player.getZ());
                             HurricaneManager.spawnServer(level, spawnPos, 40f, wind, cat);
                             ctx.getSource().sendSuccess(() -> Component.literal("🌀 Hurricane category " + catInt + " spawned."), true);
