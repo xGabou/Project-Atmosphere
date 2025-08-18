@@ -497,7 +497,9 @@ public class ForecastGenerator {
     }
 
     private static WindVector[] generateWind(BiomeInstanceKey key, ServerLevel level) {
-        return WindGenerator.generateWindWeek(key);
+        WindVector[] week = WindGenerator.generateWindWeek(key);
+        ForecastOrchestrator.generateWindForecast(key, level, week);
+        return week;
     }
 
 
