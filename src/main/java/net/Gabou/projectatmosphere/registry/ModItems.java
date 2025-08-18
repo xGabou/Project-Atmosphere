@@ -93,6 +93,8 @@ public class ModItems {
     public static final RegistryObject<Item> DUST = blockUtilities(ModBlocks.DUST);
     public static final RegistryObject<Item> SAND_LAYER = blockUtilities(ModBlocks.SAND_LAYER);
 
+    public static final RegistryObject<Item> STORM_SIREN = blockUtilities(ModBlocks.STORM_SIREN);
+
     private static RegistryObject<Item> blockUtilities(RegistryObject<Block> block) {
         return ITEMS.register(block.getId().getPath(), () -> new BlockItem(block.get(), new Item.Properties()));
     }

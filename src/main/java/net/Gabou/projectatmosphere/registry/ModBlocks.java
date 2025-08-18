@@ -78,4 +78,12 @@ public class ModBlocks {
                     .noOcclusion()
             ));
 
+    public static final RegistryObject<Block> STORM_SIREN = REGISTRY.register("storm_siren", () ->
+            new StormSirenBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(0.5f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
 }
