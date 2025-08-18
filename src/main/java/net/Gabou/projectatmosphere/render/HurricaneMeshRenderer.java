@@ -18,12 +18,17 @@ public final class HurricaneMeshRenderer {
 
     /** Draw a flat eye-wall ring in Simple Clouds' cloud space. */
     public static void renderCloudSpace(SimpleCloudsRenderer sc, PoseStack pose,
-                                        Matrix4f proj, float partialTick) {
+                                        Matrix4f proj, float partialTick,
+                                        double camX, double camZ) {
         var mc = Minecraft.getInstance();
-        if (mc.level == null) return;
+        if (mc.level == null) {
+            return;
+        }
 
-        var state = HurricaneStateProvider.getActive(); // implemented below
-        if (state == null) return;
+        var state = HurricaneStateProvider.getActive(camX, camZ);
+        if (state == null) {
+            return;
+        }
 
         // Center & radii are expected in *cloud space* units
         float cx = (float) state.centerXCloudSpace();

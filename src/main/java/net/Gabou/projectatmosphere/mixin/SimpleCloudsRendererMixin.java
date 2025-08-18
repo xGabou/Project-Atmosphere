@@ -26,7 +26,7 @@ public abstract class SimpleCloudsRendererMixin {
         self.translateClouds(stack, camX, camY, camZ);
 
         // Draw hurricane ring in cloud space (y≈0 is cloud plane)
-        HurricaneMeshRenderer.renderCloudSpace(self, stack, projMat, partialTick);
+        HurricaneMeshRenderer.renderCloudSpace(self, stack, projMat, partialTick, camX, camZ);
 
         stack.popPose();
     }
