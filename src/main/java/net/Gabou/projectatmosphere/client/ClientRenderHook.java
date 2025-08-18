@@ -43,19 +43,21 @@ public class ClientRenderHook {
 
 
         for (TornadoInstance tornado : tornadoes) {
-            try{
+            try {
+                if (tornado.position.distanceToSqr(camPos) > 500 * 500) {
+                    continue;
+                }
                 TornadoRenderHandler.renderTornado(
                         poseStack,
                         tornado.position.x,
                         Minecraft.getInstance().level.getSeaLevel(),
                         tornado.position.z,
                         tornado.getTwist(),
-                        level,camera,Minecraft.getInstance(),tornado
+                        level, camera, Minecraft.getInstance(), tornado
 
                 );
-                
-            }
-            catch (Exception e){
+
+            } catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("Error rendering tornado at position: " + tornado.position, e);
             }
 
