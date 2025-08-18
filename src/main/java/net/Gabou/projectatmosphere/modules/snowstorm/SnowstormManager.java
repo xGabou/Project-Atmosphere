@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.snowstorm;
 
-import com.Gabou.sereneseasonsplus.util.SnowstormHelper;
+import com.Gabou.sereneseasonsplus.api.SnowstormHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;

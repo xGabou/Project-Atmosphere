@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.render;
 
-import net.Gabou.projectatmosphere.storms.HurricaneState;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.common.SimpleCloudsBridge;
 

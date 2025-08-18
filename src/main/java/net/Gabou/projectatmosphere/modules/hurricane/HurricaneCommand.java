@@ -17,6 +17,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
+import sereneseasons.init.ModTags;
 
 @Mod.EventBusSubscriber
 public class HurricaneCommand {
@@ -31,7 +32,7 @@ public class HurricaneCommand {
                             if (!level.dimension().equals(Level.OVERWORLD)) return 0;
                             var pos = player.blockPosition();
                             var biome = level.getBiome(pos);
-                            if (!biome.is(BiomeTags.IS_OCEAN) || biome.value().getBaseTemperature() < 0.8f) {
+                            if (!biome.is(BiomeTags.IS_OCEAN) && !biome.is(ModTags.Biomes.TROPICAL_BIOMES)) {
                                 ctx.getSource().sendFailure(Component.literal("Hurricanes can only spawn in warm oceans."));
                                 return 0;
                             }

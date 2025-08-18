@@ -163,7 +163,7 @@ public class SimpleCloudsCompat {
                                 stats.temperature(),
                                 stats.humidity(),
                                 stats.pressure(),
-                                calculateDewPoint(stats.temperature(), stats.humidity()),stats.stormChance()
+                                calculateDewPoint(stats.temperature(), stats.humidity()),stats.stormChance(),level
                         ));
                 ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID,cloudId);
                 CloudSpawningConfig.Info selected = config.getWeightInfo(rl);

@@ -37,7 +37,8 @@ public class StormGenerator {
 
             float windStrength = (wind != null && wind.length > day) ? wind[day].baseSpeed() : 0f;
 
-            
+            if (tempAvg > 26f) stormScore += 0.1f;
+            if (tempAvg > 30f) stormScore += 0.1f;
             if (pressureAvg < 1000f) stormScore += 0.3f;
             if (pressureAvg < 990f) stormScore += 0.2f;
             if (rhAvg > 0.8f) stormScore += 0.2f;

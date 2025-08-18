@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.wind;
+package net.Gabou.projectatmosphere.modules.wind;
 
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;

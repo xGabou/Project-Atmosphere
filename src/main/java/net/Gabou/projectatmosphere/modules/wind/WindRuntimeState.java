@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.wind;
+package net.Gabou.projectatmosphere.modules.wind;
 
 public final class WindRuntimeState {
     private float currentBaseSpeed;

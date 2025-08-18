@@ -1,10 +1,9 @@
-package net.Gabou.projectatmosphere.wind;
+package net.Gabou.projectatmosphere.modules.wind;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 

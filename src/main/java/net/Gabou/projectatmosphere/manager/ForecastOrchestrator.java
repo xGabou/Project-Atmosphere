@@ -6,18 +6,17 @@ import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
-import net.Gabou.projectatmosphere.storms.HurricaneState;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneState;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
-import net.Gabou.projectatmosphere.wind.FloatRange;
-import net.Gabou.projectatmosphere.wind.WindEngine;
-import net.Gabou.projectatmosphere.wind.WindForecast;
-import net.Gabou.projectatmosphere.wind.WindForecastPart;
+import net.Gabou.projectatmosphere.modules.wind.FloatRange;
+import net.Gabou.projectatmosphere.modules.wind.WindEngine;
+import net.Gabou.projectatmosphere.modules.wind.WindForecast;
+import net.Gabou.projectatmosphere.modules.wind.WindForecastPart;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

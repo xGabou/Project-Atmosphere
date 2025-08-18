@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.wind;
+package net.Gabou.projectatmosphere.modules.wind;
 
 /** Simple inclusive float range. */
 public record FloatRange(float min, float max) {
