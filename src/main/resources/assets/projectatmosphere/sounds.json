@@ -1,10 +1,12 @@
 {
-    "weather_siren": {
-        "sounds": [
-            {
-                "name": "projectatmosphere:weather_siren",
-                "stream": true
-            }
-        ]
-    }
+  "weather_siren": {
+    "sounds": [
+      { "name": "projectatmosphere:weather_siren", "stream": true }
+    ]
+  },
+  "tornado_roar": {
+    "sounds": [
+      { "name": "projectatmosphere:tornado_roar", "stream": true }
+    ]
+  }
 }
