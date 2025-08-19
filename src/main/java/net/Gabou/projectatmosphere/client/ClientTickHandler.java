@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -24,7 +25,9 @@ import net.minecraftforge.fml.common.Mod;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
 public class ClientTickHandler {
@@ -32,6 +35,7 @@ public class ClientTickHandler {
     private static RandomSource random;
 
     private static int tickCounter = 0;
+    private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
 
     private final ProjectAtmosphere.SystemProfile systemProfile = ProjectAtmosphere.SystemProfile.create(true) ;
 
@@ -44,6 +48,22 @@ public class ClientTickHandler {
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
         Minecraft mc = Minecraft.getInstance();
+
+        if (mc.level != null) {
+            Set<TornadoInstance> current = new HashSet<>(TornadoManager.getActiveTornadoes());
+            for (TornadoInstance tornado : current) {
+                float baseVol = 0.35f + 0.45f * 0.75f;
+                TornadoAudioClient.ensure(tornado, baseVol, 140f);
+            }
+            for (TornadoInstance t : prevTornadoes) {
+                if (!current.contains(t)) {
+                    TornadoAudioClient.stop(t);
+                }
+            }
+            prevTornadoes.clear();
+            prevTornadoes.addAll(current);
+        }
+
         if (mc.level != null && mc.level.getGameTime() % 2 == 0) {
             for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
                 TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
