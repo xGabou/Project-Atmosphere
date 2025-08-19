@@ -2,9 +2,9 @@ package net.Gabou.projectatmosphere.blocks;
 
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
+import net.Gabou.projectatmosphere.registry.ModSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -39,7 +39,7 @@ public class StormSirenBlock extends Block {
         Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInArea(pos.getX(), pos.getZ(), CHECK_RADIUS, level);
         WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, level, level.getGameTime());
         if (stats != null && stats.stormChance() > INTENSITY_THRESHOLD) {
-            level.playSound(null, pos, SoundEvents.RAID_HORN, SoundSource.BLOCKS, 1.0f, 1.0f);
+            level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
         }
         level.scheduleTick(pos, this, 20);
     }
