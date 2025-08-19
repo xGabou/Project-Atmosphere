@@ -14,6 +14,8 @@ public class ModSounds {
 
     public static final RegistryObject<SoundEvent> WEATHER_SIREN = registerSound("weather_siren");
 
+    public static final RegistryObject<SoundEvent> TORNADO_ROAR = registerSound("tornado_roar");
+
     public static void register(IEventBus eventBus) {
         SOUND_EVENTS.register(eventBus);
     }
