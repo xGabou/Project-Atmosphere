@@ -61,6 +61,7 @@ public class ProjectAtmosphere {
 
         CompatHandler.init();
         ModItems.register(modEventBus);
+        ModSounds.register(modEventBus);
         NetworkHandler.init();
 
         SimpleCloudsConstants.SPAWN_RADIUS = Math.round(

@@ -1,0 +1,10 @@
+{
+    "weather_siren": {
+        "sounds": [
+            {
+                "name": "projectatmosphere:weather_siren",
+                "stream": true
+            }
+        ]
+    }
+}
