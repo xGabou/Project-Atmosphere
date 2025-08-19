@@ -9,6 +9,6 @@ public class ServerSystemProfile extends ProjectAtmosphere.SystemProfile {
 
     @Override
     public boolean isGoodEnoughGPU() {
-        return false; 
+        return true;
     }
 }

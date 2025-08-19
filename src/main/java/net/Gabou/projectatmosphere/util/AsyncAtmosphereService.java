@@ -53,10 +53,10 @@ public final class AsyncAtmosphereService {
             final int clientQueueCap  = 256;
 
             // thread sizing helpers
-            final int weatherCore = clamp( USE_SHARED ? 1 : Math.min(4, Math.max(2, cpu - 2)), 1, 8);
-            final int weatherMax  = clamp( USE_SHARED ? 1 : Math.min(8, cpu * 2),                 weatherCore, 16);
-            final int stormCore   = clamp( USE_SHARED ? 1 : Math.min(4, Math.max(2, cpu - 2)), 1, 8);
-            final int stormMax    = clamp( USE_SHARED ? 1 : Math.min(8, cpu * 2),                 stormCore, 16);
+            final int weatherCore = clamp( USE_SHARED ? 1 : Math.min(3, Math.max(2, cpu - 2)), 1, 8);
+            final int weatherMax  = clamp( USE_SHARED ? 1 : Math.min(5, cpu * 2),                 weatherCore, 16);
+            final int stormCore   = clamp( USE_SHARED ? 1 : Math.min(3, Math.max(2, cpu - 2)), 1, 8);
+            final int stormMax    = clamp( USE_SHARED ? 1 : Math.min(5, cpu * 2),                 stormCore, 16);
 
             if (USE_SHARED) {
                 SHARED_POOL = new ThreadPoolExecutor(
@@ -206,8 +206,8 @@ public final class AsyncAtmosphereService {
     private static Runnable wrap(Runnable r, String tag) {
         return () -> {
             try {
-                // uncomment for trace:
-                // ProjectAtmosphere.LOGGER.debug("[{}] start on {}", tag, Thread.currentThread().getName());
+                 //uncomment for trace:
+                 ProjectAtmosphere.LOGGER.debug("[{}] start on {}", tag,  Thread.currentThread().getName());
                 r.run();
             } catch (Throwable t) {
                 ProjectAtmosphere.LOGGER.error("[{}] task failed", tag, t);

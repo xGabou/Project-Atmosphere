@@ -29,13 +29,13 @@ public final class TornadoAudioClient {
     public static void stop(TornadoInstance tornado) {
         TornadoRoarLoop loop = ACTIVE.remove(tornado);
         if (loop != null) {
-            loop.stop();
+            loop.stopSound();
         }
     }
 
     /** Stop all active tornado roar loops. */
     public static void stopAll() {
-        ACTIVE.values().forEach(TornadoRoarLoop::stop);
+        ACTIVE.values().forEach(TornadoRoarLoop::stopSound);
         ACTIVE.clear();
     }
 }

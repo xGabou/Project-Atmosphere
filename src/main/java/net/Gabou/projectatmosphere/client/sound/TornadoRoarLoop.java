@@ -55,4 +55,8 @@ public class TornadoRoarLoop extends AbstractTickableSoundInstance {
     public void setBaseVolume(float v) {
         this.baseVolume = Mth.clamp(v, 0.0f, 1.0f);
     }
+
+    public void stopSound(){
+        this.stop();
+    }
 }

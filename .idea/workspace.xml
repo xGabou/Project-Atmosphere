@@ -4,12 +4,24 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement global storm history tracking and adjust storm chance based on severe event frequency">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic">
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/sounds/tornado_roar.ogg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ServerSystemProfile.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ServerSystemProfile.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/BlockManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/BlockManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/sound/TornadoAudioClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/sound/TornadoAudioClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/sound/TornadoRoarLoop.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/sound/TornadoRoarLoop.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/custom_cumulonimbus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/custom_cumulonimbus.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -37,6 +49,23 @@
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="forgegradle runs" type="c8890929:TasksNode$1" />
               </path>
             </expand>
             <select />
@@ -95,66 +124,66 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Downloaded.Files.Path.Enabled&quot;: &quot;false&quot;,
-    &quot;Gradle.Build Project-Atmosphere.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Download Sources.executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.G:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.H:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor&quot;: &quot;Debug&quot;,
-    &quot;Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.FlowMapGenerator.main()].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [:prepareRunClientCompile].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [build].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [clean].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Debug&quot;,
-    &quot;Gradle.Project-Atmosphere [runClient].executor&quot;: &quot;Debug&quot;,
-    &quot;Gradle.Project-Atmosphere [runGameTestServer].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [runServer].executor&quot;: &quot;Run&quot;,
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;Repository.Attach.Annotations&quot;: &quot;false&quot;,
-    &quot;Repository.Attach.JavaDocs&quot;: &quot;false&quot;,
-    &quot;Repository.Attach.Sources&quot;: &quot;false&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;extract.method.default.visibility&quot;: &quot;private&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/libs&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.6172414&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Downloaded.Files.Path.Enabled": "false",
+    "Gradle.Build Project-Atmosphere.executor": "Run",
+    "Gradle.Download Sources.executor": "Run",
+    "Gradle.G:/Project-Atmosphere [createMcpToSrg].executor": "Run",
+    "Gradle.H:/Project-Atmosphere [createMcpToSrg].executor": "Run",
+    "Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor": "Run",
+    "Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor": "Debug",
+    "Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.FlowMapGenerator.main()].executor": "Run",
+    "Gradle.Project-Atmosphere [:prepareRunClientCompile].executor": "Run",
+    "Gradle.Project-Atmosphere [build].executor": "Run",
+    "Gradle.Project-Atmosphere [clean].executor": "Run",
+    "Gradle.Project-Atmosphere [createMcpToSrg].executor": "Run",
+    "Gradle.Project-Atmosphere [genIntellijRuns].executor": "Debug",
+    "Gradle.Project-Atmosphere [runClient].executor": "Debug",
+    "Gradle.Project-Atmosphere [runGameTestServer].executor": "Run",
+    "Gradle.Project-Atmosphere [runServer].executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Repository.Attach.Annotations": "false",
+    "Repository.Attach.JavaDocs": "false",
+    "Repository.Attach.Sources": "false",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "extract.method.default.visibility": "private",
+    "git-widget-placeholder": "master",
+    "ignore.virus.scanning.warn.message": "true",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "G:/Project-Atmosphere/src/main/resources/assets/projectatmosphere/sounds",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.6172414",
+    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;ChangesTree.GroupingKeys&quot;: [
-      &quot;module&quot;,
-      &quot;repository&quot;
+  "keyToStringList": {
+    "ChangesTree.GroupingKeys": [
+      "module",
+      "repository"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
       <recent name="net.Gabou.projectatmosphere.blocks" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\sounds" />
       <recent name="G:\Project-Atmosphere\libs" />
       <recent name="G:\Project-Atmosphere\shaders" />
       <recent name="G:\Project-Atmosphere" />
       <recent name="G:\Project-Atmosphere\build\resources\main\assets\projectatmosphere\textures\effects" />
-      <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\recipes" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\effects" />
@@ -493,15 +522,7 @@
       <workItem from="1755092299309" duration="13530000" />
       <workItem from="1755203861302" duration="4509000" />
       <workItem from="1755287668091" duration="10626000" />
-      <workItem from="1755523871342" duration="18490000" />
-    </task>
-    <task id="LOCAL-00046" summary="Refactor build configuration: remove unused dependencies and update jade library to runtimeOnly">
-      <option name="closed" value="true" />
-      <created>1750696590665</created>
-      <option name="number" value="00046" />
-      <option name="presentableId" value="LOCAL-00046" />
-      <option name="project" value="LOCAL" />
-      <updated>1750696590665</updated>
+      <workItem from="1755523871342" duration="26683000" />
     </task>
     <task id="LOCAL-00047" summary="Enhance cloud spawning and debugging: implement violence tracking in SimpleCloudSpawner and add command for current violence status">
       <option name="closed" value="true" />
@@ -887,7 +908,15 @@
       <option name="project" value="LOCAL" />
       <updated>1755538368808</updated>
     </task>
-    <option name="localTasksCounter" value="95" />
+    <task id="LOCAL-00095" summary="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic">
+      <option name="closed" value="true" />
+      <created>1755559754827</created>
+      <option name="number" value="00095" />
+      <option name="presentableId" value="LOCAL-00095" />
+      <option name="project" value="LOCAL" />
+      <updated>1755559754827</updated>
+    </task>
+    <option name="localTasksCounter" value="96" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -906,7 +935,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling" />
     <MESSAGE value="Refactor shader file structure; move tornado shaders to core directory and update workspace settings" />
     <MESSAGE value="Add desert storms dependency and update workspace settings" />
     <MESSAGE value="Add sandstorm management features and integrate delayed task scheduling" />
@@ -931,7 +959,8 @@
     <MESSAGE value="feat: improve compatibility logging and refactor mixin structure for weather management" />
     <MESSAGE value="feat: update build configuration and enhance snowstorm management integration" />
     <MESSAGE value="feat: implement global storm history tracking and adjust storm chance based on severe event frequency" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: implement global storm history tracking and adjust storm chance based on severe event frequency" />
+    <MESSAGE value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -967,19 +996,6 @@
           <option name="timeStamp" value="244" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java</url>
-          <line>368</line>
-          <option name="timeStamp" value="275" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ClientSystemProfile.java</url>
-          <line>22</line>
-          <properties>
-            <option name="lambda-ordinal" value="-1" />
-          </properties>
-          <option name="timeStamp" value="294" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java</url>
           <line>35</line>
           <option name="timeStamp" value="295" />
@@ -990,14 +1006,27 @@
           <option name="timeStamp" value="297" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java</url>
-          <line>56</line>
-          <option name="timeStamp" value="299" />
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSpawnScheduler.java</url>
+          <line>34</line>
+          <option name="timeStamp" value="312" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java</url>
-          <line>66</line>
-          <option name="timeStamp" value="300" />
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ClientSystemProfile.java</url>
+          <line>18</line>
+          <properties>
+            <option name="lambda-ordinal" value="-1" />
+          </properties>
+          <option name="timeStamp" value="314" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ClientSystemProfile.java</url>
+          <line>9</line>
+          <option name="timeStamp" value="315" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/serene-season-plus-1288843/6901282_mapped_official_1.20.1/serene-season-plus-1288843-6901282_mapped_official_1.20.1.jar!/com/Gabou/sereneseasonsplus/features/SnowBlockReplacer.class</url>
+          <line>93</line>
+          <option name="timeStamp" value="323" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />

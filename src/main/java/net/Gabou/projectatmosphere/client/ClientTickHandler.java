@@ -37,7 +37,6 @@ public class ClientTickHandler {
     private static int tickCounter = 0;
     private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
 
-    private final ProjectAtmosphere.SystemProfile systemProfile = ProjectAtmosphere.SystemProfile.create(true) ;
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {

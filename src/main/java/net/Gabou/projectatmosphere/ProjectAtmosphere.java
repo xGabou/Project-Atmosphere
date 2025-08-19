@@ -34,6 +34,10 @@ import net.Gabou.projectatmosphere.network.NetworkHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.event.*;
+import sereneseasons.config.SeasonsConfig;
+import sereneseasons.core.SereneSeasons;
+import sereneseasons.season.SeasonHandler;
+import sereneseasons.season.SeasonTime;
 
 import java.util.Map;
 import java.util.Objects;
@@ -85,17 +89,26 @@ public class ProjectAtmosphere {
         ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);
+
     }
 
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent event) {
         ServerLevel world = event.getServer().getLevel(ServerLevel.OVERWORLD);
-        AsyncAtmosphereService.init();
-        if (world != null&& !world.isClientSide) {
-            SimpleCloudsCompat.init(world);
-            AtmosphereManager.onServerStarting(world);
-            seed = world.getSeed();
+
+        if (world != null) {
+            if(!world.isClientSide)
+            {
+                AsyncAtmosphereService.init(false);
+                SimpleCloudsCompat.init(world);
+                AtmosphereManager.onServerStarting(world);
+                seed = world.getSeed();
+            }
+            else{
+                AsyncAtmosphereService.init(true);
+            }
+
         }
     }
 

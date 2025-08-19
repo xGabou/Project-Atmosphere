@@ -26,6 +26,7 @@ import net.minecraft.util.valueproviders.BiasedToBottomInt;
 import org.joml.Vector2i;
 
 import java.util.*;
+
 import net.minecraftforge.fml.ModList;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
@@ -149,6 +150,7 @@ public class SimpleCloudSpawner {
 
             if (generator.getClouds().size() >= maxRegions) return true;
         }
+        return true;
     }
 
 

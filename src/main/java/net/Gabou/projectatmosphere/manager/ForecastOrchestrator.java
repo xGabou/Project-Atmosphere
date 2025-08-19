@@ -210,16 +210,15 @@ public class ForecastOrchestrator {
     }
 
     public static void tick(ServerLevel level) {
-        AsyncAtmosphereService.runStorm(() -> {
                     GlassDamageManager.tick(level);
                     ForecastGenerator.tickSandstormScheduler(level);
                     long now = level.getGameTime();
                     if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
                         lastTornadoCheckTick = now;
-                        TornadoProbabilityManager.onScheduledCheck(level);
+                        ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
+                        AsyncAtmosphereService.runStorm(() ->
+                        TornadoProbabilityManager.onScheduledCheck(level));
                     }
-                }
-        );
 
     }
 

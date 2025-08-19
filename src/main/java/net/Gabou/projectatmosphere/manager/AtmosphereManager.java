@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.manager;
 
 
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
@@ -64,16 +65,9 @@ public class AtmosphereManager {
     }
 
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
+        ProjectAtmosphere.LOGGER.info("Updating forecast Around");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.updateForecast(world,center);
-
-
-
-
-
-
-
-
         });
     }
 
@@ -110,12 +104,14 @@ public class AtmosphereManager {
     }
 
     public static void onSwapProfiles(ServerLevel world) {
+        ProjectAtmosphere.LOGGER.info("Swapping profiles and updating weather");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.onSwapDay(world);
         });
     }
 
     public static void onRegenerate(ServerLevel world) {
+        ProjectAtmosphere.LOGGER.info("Regenerating weather data for all players");
         ForecastOrchestrator.clearActiveBiomeKeys();
         AsyncAtmosphereService.runWeather(() -> {
             ForecastGenerator.clearBiomeSamples();
