@@ -1,9 +1,14 @@
 package net.Gabou.projectatmosphere.util;
 
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
+import net.Gabou.projectatmosphere.compat.ColdSweatCompat;
+import net.Gabou.projectatmosphere.compat.CompatHandler;
+import net.Gabou.projectatmosphere.compat.LegendarySurvivalCompat;
+import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
@@ -28,13 +33,29 @@ public class InstrumentUtils {
         if (!level.isClientSide) return;
 
         BlockPos pos = player.blockPosition();
-        BiomeInstanceKey key = new BiomeInstanceKey(
-                AtmosphereUtils.getBiomeLocation(pos, level), pos
-        );
-        float temp = ForecastOrchestrator.getCurrentTemperature(key, level.getDayTime());
+        float temp;
+
+        switch (CompatHandler.getActiveTemperatureMod()) {
+            case LEGENDARY_SURVIVAL -> temp = LegendarySurvivalCompat.getLiveTemperature((ServerLevel) level, pos);
+
+            case TOUGH_AS_NAILS -> temp = ToughAsNailsCompat.getLiveTemperatureTAN((ServerLevel) level, pos);
+
+            case COLD_SWEAT -> temp = ColdSweatCompat.getLiveTemperatureColdSweat((ServerLevel) level, pos);
+
+            default -> temp = getForecastTemperature(level, pos);
+        }
+
         String msg = "Current temperature: " + String.format("%.1f°C", temp);
         HUDOverlayRenderer.showTemperatureOverlay(msg);
     }
+
+    private static float getForecastTemperature(Level level, BlockPos pos) {
+        BiomeInstanceKey key = new BiomeInstanceKey(
+                AtmosphereUtils.getBiomeLocation(pos, level), pos
+        );
+        return ForecastOrchestrator.getCurrentTemperature(key, level.getDayTime());
+    }
+
 
     public static void displayHumidity(Level level, Player player) {
         if (!level.isClientSide) return;

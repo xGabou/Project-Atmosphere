@@ -40,6 +40,9 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
 
+
+
+
     public static final ForgeConfigSpec.DoubleValue WIND_BASE_RETARGET_SEC;
     public static final ForgeConfigSpec.DoubleValue WIND_DIR_RETARGET_SEC;
     public static final ForgeConfigSpec.DoubleValue WIND_GUST_MEAN_SEC;
@@ -65,7 +68,7 @@ public class AtmoCommonConfig {
                 .define("enableStormDebris", true);
         MAX_STORM_DEBRIS_PER_CHUNK = builder
                 .comment("Maximum number of storm debris items allowed per chunk")
-                .defineInRange("maxStormDebrisPerChunk", 30, 0, Integer.MAX_VALUE);
+                .defineInRange("maxStormDebrisPerChunk", 10, 0, Integer.MAX_VALUE);
         AUTO_REPAIR_GLASS = builder
                 .comment("Automatically repair tornado-damaged glass after 5 minutes of no new damage")
                 .define("autoRepairGlass", true);

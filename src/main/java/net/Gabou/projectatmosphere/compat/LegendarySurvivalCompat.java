@@ -54,6 +54,6 @@ public class LegendarySurvivalCompat {
     }
 
     public static boolean isLoaded() {
-        return CompatHandler.isLegendaryModLoaded;
+        return CompatHandler.isLegendarySurvivalLoaded();
     }
 }

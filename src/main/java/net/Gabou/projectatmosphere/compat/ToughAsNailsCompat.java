@@ -49,6 +49,11 @@ public class ToughAsNailsCompat {
     }
 
     public static boolean isLoaded() {
-        return CompatHandler.isToughAsNailsLoaded;
+        return CompatHandler.isToughAsNailsLoaded();
+    }
+
+    public static float getLiveTemperatureTAN(ServerLevel level, BlockPos pos) {
+        TemperatureLevel band = TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(level, pos);
+        return mapBandToTemperature(band);
     }
 }

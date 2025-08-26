@@ -81,8 +81,8 @@ public class ForecastGenerator {
 
 
     static {
-        if (CompatHandler.isLegendaryModLoaded || CompatHandler.isToughAsNailsLoaded) {
-            MAX_POSITIONS_PER_BIOME = 15;
+        if (CompatHandler.isToughAsNailsLoaded()) {
+            MAX_POSITIONS_PER_BIOME = 25;
         } else {
             MAX_POSITIONS_PER_BIOME = 40;
         }
@@ -342,33 +342,8 @@ public class ForecastGenerator {
         }
 
 
-        if (CompatHandler.isLegendaryModLoaded) {
 
-            Map<ResourceLocation, Integer> biomeSampleCount = new HashMap<>();
-
-            for (BiomeInstanceKey key : biomeSamples) {
-                ResourceLocation biomeId = key.biomeType();
-
-
-                int count = biomeSampleCount.getOrDefault(biomeId, 0);
-                if (count >= 1)
-                    continue;
-
-                biomeSampleCount.put(biomeId, count + 1);
-
-                long sampleTime = System.currentTimeMillis();
-                float[][] forecast = LegendarySurvivalCompat.injectForecastForLSO(key, level);
-                long endTime = System.currentTimeMillis();
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Legendary Survival forecast for " + key.biomeType() + " at " + key.samplePos() + " took " + (endTime - sampleTime) + " ms");
-                BiomeForecast bf = new BiomeForecast();
-                bf.setTemperature(forecast);
-                bf.setLegendaryFlag(true);
-
-                FORECAST_MAP.put(key, bf);
-            }
-
-
-        } else if (CompatHandler.isToughAsNailsLoaded) {
+        if (CompatHandler.isToughAsNailsLoaded()) {
 
             Map<ResourceLocation, Integer> biomeSampleCount = new HashMap<>();
             for (BiomeInstanceKey key : biomeSamples) {
