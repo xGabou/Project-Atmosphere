@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.config;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -78,6 +79,18 @@ public class AtmoConfigScreen extends Screen {
             saveChanges();
             Minecraft.getInstance().setScreen(parent);
         }).bounds(center - 100, this.height - 27, 200, 20).build());
+    }
+
+    @Override
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        renderBackground(g);
+        int panelW = 240;
+        int panelX = (this.width - panelW) / 2;
+        int top = 30;
+        int bottom = this.height - 30;
+        g.fill(panelX - 4, top - 4, panelX + panelW + 4, bottom, -1442840576);
+        g.drawString(this.font, "Project Atmosphere Config", panelX + 6, top - 14, 0xFFFFFF, false);
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
     private Component toggleLabel(String name, boolean enabled) {
