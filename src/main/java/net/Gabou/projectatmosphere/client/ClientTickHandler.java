@@ -29,6 +29,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+
 @OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
 public class ClientTickHandler {
 
@@ -36,6 +39,17 @@ public class ClientTickHandler {
 
     private static int tickCounter = 0;
     private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
+    private static final Set<Integer> culledRegionIds = new HashSet<>();
+
+    private static final double CLOUD_RENDER_DISTANCE = 10000.0;
+
+    private static int getRegionId(CloudRegion region) {
+        return System.identityHashCode(region);
+    }
+
+    public static boolean isRegionCulled(CloudRegion region) {
+        return culledRegionIds.contains(getRegionId(region));
+    }
 
 
     @SubscribeEvent
@@ -47,6 +61,34 @@ public class ClientTickHandler {
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
         Minecraft mc = Minecraft.getInstance();
+
+        if (mc.level != null && mc.player != null) {
+            CloudManager<?> manager = CloudManager.get(mc.level);
+            List<CloudRegion> regions = manager.getCloudGenerator().getClouds();
+            double playerX = mc.player.getX();
+            double playerZ = mc.player.getZ();
+            for (CloudRegion region : regions) {
+                double dx = region.getWorldX() - playerX;
+                double dz = region.getWorldZ() - playerZ;
+                double distSq = dx * dx + dz * dz;
+                if (distSq > CLOUD_RENDER_DISTANCE * CLOUD_RENDER_DISTANCE) {
+                    culledRegionIds.add(getRegionId(region));
+                }
+            }
+            if (!culledRegionIds.isEmpty()) {
+                culledRegionIds.removeIf(id -> {
+                    for (CloudRegion region : regions) {
+                        if (getRegionId(region) == id) {
+                            double dx = region.getWorldX() - playerX;
+                            double dz = region.getWorldZ() - playerZ;
+                            double distSq = dx * dx + dz * dz;
+                            return distSq <= CLOUD_RENDER_DISTANCE * CLOUD_RENDER_DISTANCE;
+                        }
+                    }
+                    return true;
+                });
+            }
+        }
 
         if (mc.level != null) {
             Set<TornadoInstance> current = new HashSet<>(TornadoManager.getActiveTornadoes());
