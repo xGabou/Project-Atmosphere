@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.event;
 
+import com.Gabou.sereneseasonsplus.util.EnvironmentHelper;
 import glitchcore.event.EventManager;
 import net.minecraft.server.level.ServerLevel;
 import sereneseasons.api.season.SeasonChangedEvent;
@@ -12,6 +13,7 @@ public class SeasonTracker {
             if (event.getLevel() instanceof ServerLevel serverLevel) {
                 if (event.getNewSeason().getSeason() != event.getPrevSeason().getSeason()) {
                     AtmosphereManager.onSeasonChange(serverLevel);
+                    EnvironmentHelper.onSeasonChange(serverLevel);
                 }
             }
         });
@@ -20,6 +22,7 @@ public class SeasonTracker {
             if (event.getLevel() instanceof ServerLevel serverLevel) {
                 if (event.getNewSeason() != event.getPrevSeason()) {
                     AtmosphereManager.onSeasonChange(serverLevel);
+                    EnvironmentHelper.onSeasonChange(serverLevel);
                 }
             }
         });

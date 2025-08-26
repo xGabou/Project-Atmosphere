@@ -4,18 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ColdSweatCompat.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/TemperatureMod.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance compatibility with temperature mods and update configuration settings">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/LegendarySurvivalCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/LegendarySurvivalCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ToughAsNailsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ToughAsNailsCompat.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/InstrumentUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/InstrumentUtils.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SeasonTracker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SeasonTracker.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -113,6 +112,7 @@
 }</component>
   <component name="ProjectId" id="2wHyCaznG4OiND30AjwMkNjd4Nq" />
   <component name="ProjectLevelVcsManager">
+    <OptionsSetting value="false" id="Update" />
     <ConfirmationsSetting value="2" id="Add" />
   </component>
   <component name="ProjectViewState">
@@ -521,15 +521,7 @@
       <workItem from="1755804715132" duration="583000" />
       <workItem from="1755894394378" duration="1123000" />
       <workItem from="1756153065881" duration="18000" />
-      <workItem from="1756215890068" duration="3647000" />
-    </task>
-    <task id="LOCAL-00047" summary="Enhance cloud spawning and debugging: implement violence tracking in SimpleCloudSpawner and add command for current violence status">
-      <option name="closed" value="true" />
-      <created>1750705761039</created>
-      <option name="number" value="00047" />
-      <option name="presentableId" value="LOCAL-00047" />
-      <option name="project" value="LOCAL" />
-      <updated>1750705761039</updated>
+      <workItem from="1756215890068" duration="8813000" />
     </task>
     <task id="LOCAL-00048" summary="changed simpleclouds-1.20.1-0.7.jar">
       <option name="closed" value="true" />
@@ -915,7 +907,15 @@
       <option name="project" value="LOCAL" />
       <updated>1755559754827</updated>
     </task>
-    <option name="localTasksCounter" value="96" />
+    <task id="LOCAL-00096" summary="feat: enhance compatibility with temperature mods and update configuration settings">
+      <option name="closed" value="true" />
+      <created>1756219615038</created>
+      <option name="number" value="00096" />
+      <option name="presentableId" value="LOCAL-00096" />
+      <option name="project" value="LOCAL" />
+      <updated>1756219615038</updated>
+    </task>
+    <option name="localTasksCounter" value="97" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -934,7 +934,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Refactor shader file structure; move tornado shaders to core directory and update workspace settings" />
     <MESSAGE value="Add desert storms dependency and update workspace settings" />
     <MESSAGE value="Add sandstorm management features and integrate delayed task scheduling" />
     <MESSAGE value="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support" />
@@ -959,7 +958,8 @@
     <MESSAGE value="feat: update build configuration and enhance snowstorm management integration" />
     <MESSAGE value="feat: implement global storm history tracking and adjust storm chance based on severe event frequency" />
     <MESSAGE value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
+    <MESSAGE value="feat: enhance compatibility with temperature mods and update configuration settings" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance compatibility with temperature mods and update configuration settings" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -985,11 +985,6 @@
           <option name="timeStamp" value="179" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java</url>
-          <line>93</line>
-          <option name="timeStamp" value="244" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java</url>
           <line>35</line>
           <option name="timeStamp" value="295" />
@@ -998,11 +993,6 @@
           <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/serene-season-plus-1288843/6900796_mapped_official_1.20.1/serene-season-plus-1288843-6900796_mapped_official_1.20.1.jar!/com/Gabou/sereneseasonsplus/features/SnowPiller.class</url>
           <line>80</line>
           <option name="timeStamp" value="297" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSpawnScheduler.java</url>
-          <line>34</line>
-          <option name="timeStamp" value="312" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ClientSystemProfile.java</url>

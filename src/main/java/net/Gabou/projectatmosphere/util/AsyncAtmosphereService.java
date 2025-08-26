@@ -136,19 +136,10 @@ public final class AsyncAtmosphereService {
         executeSafe(STORM_POOL, wrap(task, "Storm"));
     }
 
-    public static CompletableFuture<Void> runWeather(Runnable task) {
+    public static void runWeather(Runnable task) {
         ensureInit();
         Objects.requireNonNull(task, "task");
-        CompletableFuture<Void> cf = new CompletableFuture<>();
-        executeSafe(WEATHER_POOL, () -> {
-            try {
-                wrap(task, "Weather").run();
-                cf.complete(null);
-            } catch (Throwable t) {
-                cf.completeExceptionally(t);
-            }
-        });
-        return cf;
+        executeSafe(WEATHER_POOL, wrap(task, "Weather"));
     }
 
     public static void runClient(Runnable task) {
@@ -206,8 +197,6 @@ public final class AsyncAtmosphereService {
     private static Runnable wrap(Runnable r, String tag) {
         return () -> {
             try {
-                 //uncomment for trace:
-                 ProjectAtmosphere.LOGGER.debug("[{}] start on {}", tag,  Thread.currentThread().getName());
                 r.run();
             } catch (Throwable t) {
                 ProjectAtmosphere.LOGGER.error("[{}] task failed", tag, t);

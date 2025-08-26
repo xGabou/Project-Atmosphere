@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.event;
 
+import com.BreadRes.desertstormwarming.logic.SandstormUtils;
 import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
@@ -27,6 +28,7 @@ import org.apache.commons.lang3.tuple.Triple;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
@@ -82,12 +84,35 @@ public class BiomeChangeManager {
     }
     public static boolean isDesert(Level level, ResourceLocation biomeId)
     {
-        return level.registryAccess()
-                .registryOrThrow(Registries.BIOME)
-                .getHolder(ResourceKey.create(Registries.BIOME, biomeId))
-                .map(holder -> holder.is(Tags.Biomes.IS_DESERT))
-                .orElse(false);
+//        return level.registryAccess()
+//                .registryOrThrow(Registries.BIOME)
+//                .getHolder(ResourceKey.create(Registries.BIOME, biomeId))
+//                .map(holder -> holder.is(Tags.Biomes.IS_DESERT))
+//                .orElse(false);
+        return isSandstormBiome(biomeId);
     }
+    private static final Set<String> SANDSTORM_KEYWORDS = Set.of(
+            "desert", "badlands", "mesa", "wasteland",
+            "volcanic_plains", "lush_desert", "cold_desert",
+            "dryland", "scrubland", "shrubland", "rocky_shrubland",
+            "tundra", "dead_forest", "old_growth_dead_forest",
+            "arid", "savanna_badlands", "red_desert",
+            "ash", "barren", "dry"
+    );
+
+    private static boolean isSandstormBiome(ResourceLocation biomeKey) {
+        if (biomeKey == null) {
+            return false;
+        }
+        String path = biomeKey.getPath().toLowerCase();
+        for (String keyword : SANDSTORM_KEYWORDS) {
+            if (path.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 
     private static ResourceLocation getBiomeKeyAt(ServerPlayer p) {

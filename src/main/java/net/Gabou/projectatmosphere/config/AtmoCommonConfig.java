@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 
 public class AtmoCommonConfig {
+    public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
@@ -58,6 +59,9 @@ public class AtmoCommonConfig {
         FORCE_SHARED_EXECUTOR = builder
                 .comment("Force use of shared executor for all async tasks, regardless of CPU count")
                 .define("forceSharedExecutor", false);
+        CLOUD_RENDER_DISTANCE = builder
+                .comment("Maximum distance in blocks to render clouds; higher values impact performance")
+                .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
         builder.pop();
         builder.push("storms");
         ENABLE_TORNADOES = builder

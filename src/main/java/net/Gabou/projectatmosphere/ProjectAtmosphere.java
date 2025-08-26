@@ -145,7 +145,6 @@ public class ProjectAtmosphere {
         event.enqueueWork(() -> {
             SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
         });
-        SeasonTracker.register();
 
     }
 

@@ -53,6 +53,8 @@ public class AtmoConfigScreen extends Screen {
     private double windEntityPushScale;
 
     private EditBox maxDebrisBox;
+    private int cloudRenderDistance;
+    private EditBox cloudDistanceBox;
     private EditBox tornadoCheckIntervalBox;
     private EditBox tornadoBaseSpawnRadiusBox;
     private EditBox tornadoMinTempContrastBox;
@@ -126,6 +128,7 @@ public class AtmoConfigScreen extends Screen {
         this.maxStormDebrisPerChunk = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
         this.autoRepairGlass = AtmoCommonConfig.AUTO_REPAIR_GLASS.get();
         this.damageGlassOnTornado = AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get();
+        this.cloudRenderDistance = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
         this.tornadoCheckIntervalSec = AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get();
         this.tornadoBaseSpawnRadiusM = AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get();
         this.tornadoMinTempContrastC = AtmoCommonConfig.TORNADO_MIN_TEMP_CONTRAST_C.get();
@@ -174,6 +177,14 @@ public class AtmoConfigScreen extends Screen {
             b.setMessage(toggleLabel("Storm Debris", enableStormDebris));
         }).bounds(center - 100, y, 200, 20).build(), y);
         y += 24;
+
+        this.cloudDistanceBox = new EditBox(this.font, center - 100, y, 200, 20, Component.literal("Cloud Render Distance"));
+        this.cloudDistanceBox.setValue(Integer.toString(cloudRenderDistance));
+        addRenderableWidget(this.cloudDistanceBox);
+        y += 24;
+
+
+        addRenderableWidget(Button.builder(toggleLabel("Auto Repair Glass", autoRepairGlass), b -> {
         maxDebrisBox = addNumberField(center, y, "Max Storm Debris Per Chunk", Integer.toString(maxStormDebrisPerChunk));
         y += 34;
         addConfigWidget(Button.builder(toggleLabel("Auto Repair Glass", autoRepairGlass), b -> {
@@ -307,6 +318,10 @@ public class AtmoConfigScreen extends Screen {
         return Component.literal(name + ": " + (enabled ? "ON" : "OFF"));
     }
 
+    private void saveChanges() {
+        int parsedDebris = this.maxStormDebrisPerChunk;
+        int parsedCloudDist = this.cloudRenderDistance;
+        Component errorMessage;
     private int parseInt(EditBox box, int fallback) {
         try {
             return Integer.parseInt(box.getValue());
@@ -317,9 +332,18 @@ public class AtmoConfigScreen extends Screen {
 
     private double parseDouble(EditBox box, double fallback) {
         try {
+            parsedDebris = Integer.parseInt(this.maxDebrisBox.getValue());
+            errorMessage = null;
+        } catch (NumberFormatException ignored) {
+            errorMessage = Component.literal("Invalid number for Max Storm Debris per Chunk.");
             return Double.parseDouble(box.getValue());
         } catch (NumberFormatException e) {
             return fallback;
+        }
+        try {
+            parsedCloudDist = Integer.parseInt(this.cloudDistanceBox.getValue());
+        } catch (NumberFormatException ignored) {
+            errorMessage = Component.literal("Invalid number for Cloud Render Distance.");
         }
     }
 
@@ -353,6 +377,8 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.FORCE_SHARED_EXECUTOR.set(forceSharedExecutor);
         AtmoCommonConfig.ENABLE_TORNADOES.set(enableTornadoes);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
+        AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(parsedDebris);
+        AtmoCommonConfig.CLOUD_RENDER_DISTANCE.set(parsedCloudDist);
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(maxStormDebrisPerChunk);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
         AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.set(damageGlassOnTornado);

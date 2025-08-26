@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.TornadoRenderHandler;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -41,7 +42,7 @@ public class ClientTickHandler {
     private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
     private static final Set<Integer> culledRegionIds = new HashSet<>();
 
-    private static final double CLOUD_RENDER_DISTANCE = 10000.0;
+    private static final double CLOUD_RENDER_DISTANCE = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
 
     private static int getRegionId(CloudRegion region) {
         return System.identityHashCode(region);

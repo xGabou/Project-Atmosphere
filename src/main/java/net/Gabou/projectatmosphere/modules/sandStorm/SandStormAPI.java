@@ -139,8 +139,9 @@ public class SandStormAPI {
         if (sandBlocks.isEmpty()) return;
 
         
-        int countToMove = Mth.clamp(10 + level.random.nextInt(21), 1, sandBlocks.size()); 
-        Collections.shuffle(sandBlocks, (Random) level.random);
+        int countToMove = Mth.clamp(10 + level.random.nextInt(21), 1, sandBlocks.size());
+        Collections.shuffle(sandBlocks);
+
 
         for (int i = 0; i < countToMove; i++) {
             maybeMoveSand(level, sandBlocks.get(i), wind);
