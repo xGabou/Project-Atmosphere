@@ -183,8 +183,6 @@ public class AtmoConfigScreen extends Screen {
         addRenderableWidget(this.cloudDistanceBox);
         y += 24;
 
-
-        addRenderableWidget(Button.builder(toggleLabel("Auto Repair Glass", autoRepairGlass), b -> {
         maxDebrisBox = addNumberField(center, y, "Max Storm Debris Per Chunk", Integer.toString(maxStormDebrisPerChunk));
         y += 34;
         addConfigWidget(Button.builder(toggleLabel("Auto Repair Glass", autoRepairGlass), b -> {
@@ -318,10 +316,6 @@ public class AtmoConfigScreen extends Screen {
         return Component.literal(name + ": " + (enabled ? "ON" : "OFF"));
     }
 
-    private void saveChanges() {
-        int parsedDebris = this.maxStormDebrisPerChunk;
-        int parsedCloudDist = this.cloudRenderDistance;
-        Component errorMessage;
     private int parseInt(EditBox box, int fallback) {
         try {
             return Integer.parseInt(box.getValue());
@@ -332,23 +326,15 @@ public class AtmoConfigScreen extends Screen {
 
     private double parseDouble(EditBox box, double fallback) {
         try {
-            parsedDebris = Integer.parseInt(this.maxDebrisBox.getValue());
-            errorMessage = null;
-        } catch (NumberFormatException ignored) {
-            errorMessage = Component.literal("Invalid number for Max Storm Debris per Chunk.");
             return Double.parseDouble(box.getValue());
         } catch (NumberFormatException e) {
             return fallback;
-        }
-        try {
-            parsedCloudDist = Integer.parseInt(this.cloudDistanceBox.getValue());
-        } catch (NumberFormatException ignored) {
-            errorMessage = Component.literal("Invalid number for Cloud Render Distance.");
         }
     }
 
     private void saveChanges() {
         maxStormDebrisPerChunk = parseInt(maxDebrisBox, maxStormDebrisPerChunk);
+        cloudRenderDistance = parseInt(cloudDistanceBox, cloudRenderDistance);
         tornadoCheckIntervalSec = parseDouble(tornadoCheckIntervalBox, tornadoCheckIntervalSec);
         tornadoBaseSpawnRadiusM = parseDouble(tornadoBaseSpawnRadiusBox, tornadoBaseSpawnRadiusM);
         tornadoMinTempContrastC = parseDouble(tornadoMinTempContrastBox, tornadoMinTempContrastC);
@@ -377,9 +363,8 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.FORCE_SHARED_EXECUTOR.set(forceSharedExecutor);
         AtmoCommonConfig.ENABLE_TORNADOES.set(enableTornadoes);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
-        AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(parsedDebris);
-        AtmoCommonConfig.CLOUD_RENDER_DISTANCE.set(parsedCloudDist);
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(maxStormDebrisPerChunk);
+        AtmoCommonConfig.CLOUD_RENDER_DISTANCE.set(cloudRenderDistance);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
         AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.set(damageGlassOnTornado);
         AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.set(tornadoCheckIntervalSec);
