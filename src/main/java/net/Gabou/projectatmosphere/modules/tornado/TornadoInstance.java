@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -9,6 +11,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.GlassBlock;
 import net.minecraft.world.level.block.StainedGlassBlock;
@@ -82,23 +85,35 @@ public class TornadoInstance {
      * client relies on separate rendering logic.
      */
     public void tick(Level level) {
-
         if (level.isClientSide) {
             return;
         }
 
         long now = System.currentTimeMillis();
-        if (now - lastAmbientWindCheck >= ambientWindIntervalMs) {
-            lastAmbientWindCheck = now;
-            applyAmbientWind(level);
-            lastAmbientWindCheck= now;
+
+        boolean ambientDue = now - lastAmbientWindCheck >= ambientWindIntervalMs;
+        boolean demolitionDue = now - lastDemolitionCheck >= demolitionIntervalMs;
+
+        if (ambientDue || demolitionDue) {
+            AsyncAtmosphereService.runStorm(() -> {
+                try {
+                    if (ambientDue) {
+                        lastAmbientWindCheck = now;
+                        applyAmbientWind(level);
+                    }
+                    if (demolitionDue) {
+                        lastDemolitionCheck = now;
+                        demolishBlocks((ServerLevel) level);
+                        playDemolitionSound(level);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
         }
-        if (now - lastDemolitionCheck >= demolitionIntervalMs) {
-            lastDemolitionCheck = now;
-            playDemolitionSound(level);
-            demolishBlocks((ServerLevel) level);
-        }
+
     }
+
 
     private void applyAmbientWind(Level level) {
         if (!(level instanceof ServerLevel serverLevel)) {
@@ -118,6 +133,8 @@ public class TornadoInstance {
 
         for (Entity entity : serverLevel.getEntities(null, box)) {
             entity.push(vx, 0, vz);
+            if(entity instanceof Player)
+                ProjectAtmosphere.LOGGER.info("Pushed player by wind: vx=" + vx + ", vz=" + vz);
         }
     }
 

@@ -33,19 +33,6 @@ versionRange = "*"
 ordering = "AFTER"
 side = "BOTH"
 
-[[dependencies."${mod_id}"]]
-modId = "glitchcore"
-mandatory = true
-versionRange = "*"
-ordering = "AFTER"
-side = "BOTH"
-
-
-[[dependencies."${mod_id}"]]
-modId = "particlerain"
-mandatory = true
-versionRange = "*"
-side = "CLIENT"
 
 [[dependencies."${mod_id}"]]
 modId = "sereneseasonsplus"
@@ -55,6 +42,13 @@ side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "sandstorm"
+mandatory = true
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "simpleclouds"
 mandatory = true
 versionRange = "*"
 ordering = "AFTER"

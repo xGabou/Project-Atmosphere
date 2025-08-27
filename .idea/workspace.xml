@@ -5,16 +5,47 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance compatibility with temperature mods and update configuration settings">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/InfoMixin.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/MixinSandstormDebugBlocker.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SeasonTracker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SeasonTracker.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/BlockManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/BlockManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/StormSirenBlock.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/StormSirenBlock.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastDataStorage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastDataStorage.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/OverwriteDesertSound.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/OverwriteDesertSound.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherSampler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherSampler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/balls.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/balls.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cookie.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cookie.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dark_wall.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dark_wall.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_cumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_cumulus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_tsegrus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_tsegrus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/floating_farlands.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/floating_farlands.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/heavy_stratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/heavy_stratus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/noise_itty_bitty.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pathway.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pathway.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pattern.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pattern.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_cumulonimbus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_cumulonimbus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_nimbostratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_nimbostratus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spots.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spots.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spotted.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spotted.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stronger_stratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stronger_stratus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/sugar.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/tsegrus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/tsegrus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/noise_itty_bitty.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/sugar.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -75,8 +106,8 @@
         <option value="Interface" />
         <option value="vs-template" />
         <option value="shader-template" />
-        <option value="Class" />
         <option value="Enum" />
+        <option value="Class" />
       </list>
     </option>
   </component>
@@ -196,7 +227,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -419,11 +450,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
+        <item itemvalue="Gradle.Project-Atmosphere [clean]" />
         <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
-        <item itemvalue="Gradle.Project-Atmosphere [clean]" />
       </list>
     </recent_temporary>
   </component>
@@ -521,15 +552,8 @@
       <workItem from="1755804715132" duration="583000" />
       <workItem from="1755894394378" duration="1123000" />
       <workItem from="1756153065881" duration="18000" />
-      <workItem from="1756215890068" duration="8813000" />
-    </task>
-    <task id="LOCAL-00048" summary="changed simpleclouds-1.20.1-0.7.jar">
-      <option name="closed" value="true" />
-      <created>1750705851494</created>
-      <option name="number" value="00048" />
-      <option name="presentableId" value="LOCAL-00048" />
-      <option name="project" value="LOCAL" />
-      <updated>1750705851494</updated>
+      <workItem from="1756215890068" duration="9560000" />
+      <workItem from="1756252310141" duration="19781000" />
     </task>
     <task id="LOCAL-00049" summary="Début du thermomètre">
       <option name="closed" value="true" />
@@ -915,7 +939,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756219615038</updated>
     </task>
-    <option name="localTasksCounter" value="97" />
+    <task id="LOCAL-00097" summary="feat: add cloud render distance configuration and improve weather task execution">
+      <option name="closed" value="true" />
+      <created>1756225304578</created>
+      <option name="number" value="00097" />
+      <option name="presentableId" value="LOCAL-00097" />
+      <option name="project" value="LOCAL" />
+      <updated>1756225304578</updated>
+    </task>
+    <option name="localTasksCounter" value="98" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1007,6 +1039,16 @@
           <line>9</line>
           <option name="timeStamp" value="315" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SimpleCloudsCloudSpawningConfigProviderMixin.java</url>
+          <line>21</line>
+          <option name="timeStamp" value="326" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/nonamecrackers2/simpleclouds/0.7.3+1.20.1-forge_mapped_official_1.20.1/simpleclouds-0.7.3+1.20.1-forge_mapped_official_1.20.1-sources.jar!/dev/nonamecrackers2/simpleclouds/common/data/SimpleCloudsCloudSpawningConfigProvider.java</url>
+          <line>35</line>
+          <option name="timeStamp" value="327" />
+        </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />
           <option name="timeStamp" value="97" />
@@ -1038,6 +1080,8 @@
         <watch expression="tornado.level" />
         <watch expression="tornado.level" language="JAVA" />
         <watch expression="tornado.level" language="JAVA" />
+        <watch expression="((com.google.common.collect.RegularImmutableMap)((CloudTypeDataManager)CloudManager.get(level).cloudSource).cloudTypes).entrySet().toArray()[0]" custom="com.google.common.collect.RegularImmutableMap,dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager,dev.nonamecrackers2.simpleclouds.common.cloud.CloudTypeDataManager" />
+        <watch expression="((com.google.common.collect.RegularImmutableMap)((CloudTypeDataManager)CloudManager.get(level).cloudSource).cloudTypes).entrySet().toArray()[0]" language="JAVA" custom="com.google.common.collect.RegularImmutableMap,dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager,dev.nonamecrackers2.simpleclouds.common.cloud.CloudTypeDataManager" />
       </configuration>
     </watches-manager>
   </component>

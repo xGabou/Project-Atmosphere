@@ -48,6 +48,7 @@ public class ForecastDataStorage {
     }
 
     public static void loadAll(ServerLevel world) {
+        clearAll(world);
         loadPlayerCenters(world);
         loadForecastMap(world);
     }
@@ -156,6 +157,8 @@ public class ForecastDataStorage {
 
                 ForecastGenerator.putForecast(key, forecast);
             }
+            ForecastGenerator.groupForecastsByBiome();
+            ForecastGenerator.groupBiomeByType();
 
         } catch (IOException ex) {
             ex.printStackTrace();

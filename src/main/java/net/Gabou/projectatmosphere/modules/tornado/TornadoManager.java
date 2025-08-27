@@ -49,7 +49,7 @@ public class TornadoManager {
     public static void tick(Level level) {
         ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 600);
         for (TornadoInstance tornado : ACTIVE_TORNADOES) {
-            float speed = tornado.wind.baseSpeed() * 0.05f;
+            float speed = tornado.wind.baseSpeed() * 0.2f;
             tornado.position = tornado.position.add(
                     Math.cos(tornado.wind.angleRadians()) * speed,
                     0,

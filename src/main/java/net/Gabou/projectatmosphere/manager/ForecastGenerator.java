@@ -33,11 +33,13 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraftforge.common.Tags;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class ForecastGenerator {
 
@@ -93,6 +95,11 @@ public class ForecastGenerator {
 
     static final Set<BiomeInstanceKey> biomeSamples = ConcurrentHashMap.newKeySet();
 
+    // Build once at startup or cache
+    private static Map<ResourceLocation, List<BiomeInstanceKey>> biomeIndex = new ConcurrentHashMap<>();
+
+
+
     private static final Map<ResourceLocation, Integer> biomeSampleCounts = new ConcurrentHashMap<>();
 
 
@@ -100,6 +107,17 @@ public class ForecastGenerator {
 
 
     static final Map<BiomeInstanceKey, BiomeForecast> FORECAST_MAP = new ConcurrentHashMap<>();
+
+    private static final Map<ResourceLocation, List<BiomeForecast>> grouped = new HashMap<>();
+
+    public static Map<ResourceLocation, List<BiomeInstanceKey>> getBiomeIndex() {
+        return Collections.unmodifiableMap(biomeIndex);
+    }
+
+    public static void groupBiomeByType() {
+        biomeIndex = biomeSamples.stream()
+                .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType));
+    }
 
     private static void computeAverageForecastsByBiomeType() {
         computeAverageTemperature();
@@ -110,8 +128,6 @@ public class ForecastGenerator {
     }
 
     private static void computeAverageTemperature() {
-        Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
-
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
             if (list.isEmpty()) continue;
@@ -124,19 +140,14 @@ public class ForecastGenerator {
         }
     }
 
-    private static Map<ResourceLocation, List<BiomeForecast>> groupForecastsByBiome() {
-        Map<ResourceLocation, List<BiomeForecast>> grouped = new HashMap<>();
-
+    public static void groupForecastsByBiome() {
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             ResourceLocation biomeType = entry.getKey().biomeType();
             grouped.computeIfAbsent(biomeType, k -> new ArrayList<>()).add(entry.getValue());
         }
-
-        return grouped;
     }
 
     private static void computeAverageStormChance() {
-        Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
 
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
@@ -151,8 +162,6 @@ public class ForecastGenerator {
     }
 
     private static void computeAverageWind() {
-        Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
-
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
             if (list.isEmpty()) continue;
@@ -166,8 +175,6 @@ public class ForecastGenerator {
     }
 
     private static void computeAveragePressure() {
-        Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
-
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
             if (list.isEmpty()) continue;
@@ -181,8 +188,6 @@ public class ForecastGenerator {
     }
 
     private static void computeAverageHumidity() {
-        Map<ResourceLocation, List<BiomeForecast>> grouped = groupForecastsByBiome();
-
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
             if (list.isEmpty()) continue;
@@ -242,6 +247,7 @@ public class ForecastGenerator {
 
     static void clearBiomeSamples() {
         biomeSamples.clear();
+        biomeIndex.clear();
     }
 
 
@@ -299,11 +305,17 @@ public class ForecastGenerator {
                     for (ServerPlayer player : level.players()) {
 
 
-                        if (!BiomeChangeManager.getLastBiome().get(player.getUUID()).getValue()) {
+                        boolean lastBiomeFlag = BiomeChangeManager
+                                .getLastBiome()
+                                .getOrDefault(player.getUUID(), Pair.of(null, false))
+                                .getValue();
+
+                        if (!lastBiomeFlag) {
                             for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
                                 Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(), null);
                             }
                         }
+
 
                     }
                 }
@@ -329,7 +341,9 @@ public class ForecastGenerator {
                 level.getBiome(samplePos).unwrapKey().ifPresent(biomeKey -> {
                     ResourceLocation biomeId = biomeKey.location();
 
-
+                    if(biomeId.toString().contains("cave")){
+                        return;
+                    }
                     int count = biomeSampleCounts.getOrDefault(biomeId, 0);
                     if (count >= MAX_POSITIONS_PER_BIOME) return;
 
@@ -340,6 +354,8 @@ public class ForecastGenerator {
                 });
             }
         }
+        biomeIndex = biomeSamples.stream()
+                .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType));
 
 
 
@@ -364,6 +380,7 @@ public class ForecastGenerator {
                 bf.setToughAsNailsFlag(true);
                 FORECAST_MAP.put(key, bf);
             }
+            groupForecastsByBiome();
 
         } else {
 
@@ -372,8 +389,7 @@ public class ForecastGenerator {
                 forecast.setTemperature(generateTemperature(key, level));
                 FORECAST_MAP.put(key, forecast);
             }
-
-
+            groupForecastsByBiome();
             diffuseAndSmoothField(BiomeForecast::getTemperature, BiomeForecast::setTemperature);
         }
 
@@ -552,7 +568,9 @@ public class ForecastGenerator {
 
     static void clearForecasts() {
         FORECAST_MAP.clear();
+        grouped.clear();
         biomeSamples.clear();
+        biomeIndex.clear();
         biomeSampleCounts.clear();
         AVERAGE_FORECASTS.clear();
         clearSandstormForecasts();
@@ -565,6 +583,10 @@ public class ForecastGenerator {
 
     static void putForecast(BiomeInstanceKey key, BiomeForecast forecast) {
         FORECAST_MAP.put(key, forecast);
+        if(biomeSamples.add(key)){
+            biomeSampleCounts.put(key.biomeType(), biomeSampleCounts.getOrDefault(key.biomeType(), 0) + 1);
+        }
+
     }
 
     public static BiomeForecast getForecast(BiomeInstanceKey key) {

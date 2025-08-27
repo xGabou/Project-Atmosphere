@@ -62,7 +62,6 @@ public class CloudLibrary {
             "matrix",
             "pattern",
             "snow",
-            "sugar",
             "cookie",
             "balls"
     };
@@ -83,7 +82,6 @@ public class CloudLibrary {
     private static final String[] SEVERITY_1_CLOUDS = {
             "itty_bitty",
             "dense_itty_bitty",
-            "noise_itty_bitty",
             "real_itty_bitty"
     };
 
@@ -122,10 +120,10 @@ public class CloudLibrary {
             case "stratocumulus", "dense_stratocumulus", "smaller_stratocumulus", "thicker_stratocumulus", "dithering",
                     "islands", "pathway", "spots", "spotted", "stripe", "stripe_side" -> 5;
             case "stratus", "heavy_stratus", "overcast", "stronger_stratus", "floating_farlands", "mammatus_thin",
-                    "matrix", "pattern", "snow", "sugar", "cookie", "balls" -> 4;
+                    "matrix", "pattern", "snow", "cookie", "balls" -> 4;
             case "cumulus", "dense_cumulus", "cumulus_noise", "tall_noise", "tall_weirdness" -> 3;
             case "small_cumulus", "itty_bitty_bigger" -> 2;
-            case "itty_bitty", "dense_itty_bitty", "noise_itty_bitty", "real_itty_bitty" -> 1;
+            case "itty_bitty", "dense_itty_bitty", "real_itty_bitty" -> 1;
             default -> 1;
         };
     }

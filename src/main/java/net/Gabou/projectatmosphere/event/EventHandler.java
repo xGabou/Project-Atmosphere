@@ -6,6 +6,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
@@ -29,13 +30,9 @@ public class EventHandler {
 
     private static final int MIN_TICKS_BETWEEN_DUST_SPAWN = 5000;
 
-    private static boolean isFirstTick = false;
-    
     private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
 
     private static int tickCounter = 0;
-
-    private static int ticksSinceLastCloudSpawn = 0;
 
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
@@ -51,32 +48,25 @@ public class EventHandler {
 
         if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
 
-        ServerPlayer player = serverLevel.players().get(0);
-
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
         CloudGenerator generator = cloudManager.getCloudGenerator();
         AtmosphereManager.tick(serverLevel);
-        if(!isFirstTick) {
-            isFirstTick=SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
-            ticksSinceLastCloudSpawn = 0;
-        }
-        else if (generator.getTicksTillNextGen() <= 0 && ticksSinceLastCloudSpawn % 1000 == 0) {
-            isFirstTick= SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
-            ticksSinceLastCloudSpawn = 0;
+
+        if (generator.getTicksTillNextGen() <= 0) {
+            SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
         }
 
-        if (tickCounter % MIN_TICKS_BETWEEN_DUST_SPAWN == 0) {
-            BlockManager.spawnDust(serverLevel, player.blockPosition());
-        }
 
-        if (tickCounter % MIN_TICKS_BETWEEN_TEMPESTA == 0) {
+        if (!AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
+            return;
+        } else if (tickCounter % MIN_TICKS_BETWEEN_TEMPESTA == 0) {
 
             final int cloudY = cloudManager.getCloudHeight();
 
             for (CloudRegion region : generator.getClouds()) {
                 int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
                 if (severity > 5) {
-                    BlockPos pos = new BlockPos((int) region.getPosX(), cloudY, (int) region.getPosZ());
+                    BlockPos pos = new BlockPos((int) region.getWorldX(), cloudY, (int) region.getWorldZ());
                     BlockManager.simulateTempesta(serverLevel, pos, (int) region.getRadius());
                 }
             }
@@ -84,12 +74,10 @@ public class EventHandler {
 
         }
 
-        ticksSinceLastCloudSpawn++;
         tickCounter++;
     }
-    public static void onRegenerate()
-    {
+
+    public static void onRegenerate() {
         tickCounter = 0;
-        ticksSinceLastCloudSpawn = 0;
     }
 }

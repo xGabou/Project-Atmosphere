@@ -93,8 +93,8 @@ public final class TornadoProbabilityManager {
         for (CloudRegion region : generator.getClouds()) {
             int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
             if (severity < 7) continue;
-            double dx = region.getPosX() - pos.getX();
-            double dz = region.getPosZ() - pos.getZ();
+            double dx = region.getWorldX() - pos.getX();
+            double dz = region.getWorldZ() - pos.getZ();
             double r = region.getRadius();
             if (dx * dx + dz * dz <= r * r) {
                 return true;

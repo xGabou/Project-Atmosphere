@@ -34,6 +34,8 @@ public class WeatherSampler {
         int step = 24;
         int radiusSq = radius * radius;
 
+        BlockPos center = new BlockPos(centerX, level.getSeaLevel(), centerZ);
+
         for (int dx = -radius; dx <= radius; dx += step) {
             for (int dz = -radius; dz <= radius; dz += step) {
                 if (dx * dx + dz * dz > radiusSq)
@@ -44,24 +46,36 @@ public class WeatherSampler {
                 level.getBiome(pos).unwrapKey().ifPresent(biomeKey -> {
                     ResourceLocation biomeId = biomeKey.location();
 
-                    
                     BiomeInstanceKey bestMatch = null;
                     double bestDistSq = Double.MAX_VALUE;
 
-                    for (BiomeInstanceKey known : ForecastGenerator.getBiomeSamples()) {
-                        if (known.biomeType().equals(biomeId)) {
-                            double distSq = known.samplePos().distSqr(pos);
-                            if (distSq < bestDistSq) {
-                                bestDistSq = distSq;
-                                bestMatch = known;
+                    // only check candidates of this biome type
+                    List<BiomeInstanceKey> candidates = ForecastGenerator.getBiomeIndex().get(biomeId);
+                    if (candidates != null) {
+                        for (BiomeInstanceKey known : candidates) {
+                            // quick reject if outside radius
+                            if (known.samplePos().closerThan(center, radius)) {
+                                double distSq = known.samplePos().distSqr(pos);
+                                if (distSq < bestDistSq) {
+                                    bestDistSq = distSq;
+                                    bestMatch = known;
+                                }
                             }
                         }
                     }
 
                     if (bestMatch != null) {
-                        result.add(bestMatch); 
+                        result.add(bestMatch);
                     } else {
-                        result.add(new BiomeInstanceKey(biomeId, pos)); 
+                        // Only add a fallback key if no nearby one of the same biome already exists
+                        boolean tooClose = result.stream().anyMatch(existing ->
+                                existing.biomeType().equals(biomeId) &&
+                                        existing.samplePos().distSqr(pos) < 100 * 100
+                        );
+
+                        if (!tooClose) {
+                            result.add(new BiomeInstanceKey(biomeId, pos));
+                        }
                     }
                 });
             }
@@ -69,6 +83,8 @@ public class WeatherSampler {
 
         return result;
     }
+
+
 
 
 

@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.manager;
 
 import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
-import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
@@ -9,9 +8,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.storm.GlobalStormHistoryData;
-import net.Gabou.projectatmosphere.modules.storm.StormLullHook;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -64,7 +61,7 @@ public class SimpleCloudSpawner {
     }
 
 
-    public static boolean trySpawnClouds(ServerLevel level, CloudGenerator generator) {
+    public static void trySpawnClouds(ServerLevel level, CloudGenerator generator) {
         List<SpawnRegion> spawnRegions = generator.getSpawnRegions();
         RandomSource random = RandomSource.create();
         CloudSpawningConfig config = generator.getSpawnConfig().get();
@@ -73,14 +70,14 @@ public class SimpleCloudSpawner {
         int currentCount = generator.getClouds().size();
         int maxRegions = config.getMaxInitialRegions();
         int remaining = maxRegions - currentCount;
-        if (remaining <= 0) return false;
+        if (remaining <= 0) return;
 
         int toSpawn = Mth.clamp(BiasedToBottomInt.of(1, 5).sample(random), 1, remaining);
 
         for (int i = 0; i < toSpawn; i++) {
             if (spawnRegions.isEmpty()) {
                 ProjectAtmosphere.LOGGER.warn("[Atmosphere] No spawn regions available");
-                return false;
+                return;
             }
 
 
@@ -148,9 +145,8 @@ public class SimpleCloudSpawner {
                     stats.windVector()
             );
 
-            if (generator.getClouds().size() >= maxRegions) return true;
+            if (generator.getClouds().size() >= maxRegions) return;
         }
-        return true;
     }
 
 

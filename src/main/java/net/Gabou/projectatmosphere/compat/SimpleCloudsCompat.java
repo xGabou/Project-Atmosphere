@@ -124,7 +124,7 @@ public class SimpleCloudsCompat {
         cloudRegion.setRotation(rotation);
         cloudRegion.setMaxSpeed(cloudRegion.getMaxSpeed() + wind.baseSpeed() * 0.01F);
         float acc = cloudRegion.getAccelerationFactor();
-        cloudRegion.setAccelerationFactor(acc * wind.baseSpeed() + acc);
+        cloudRegion.setAccelerationFactor(acc * wind.baseSpeed() * 0.005F);
         cloudRegion.setRadius(ProjectAtmosphere.DEFAULT_REGION_RADIUS);
 
         return Optional.of(cloudRegion);
@@ -140,7 +140,16 @@ public class SimpleCloudsCompat {
         for (int i = 0; i < config.getMaxInitialRegions(); i++) {
             int sharedRadius = BiasedToBottomInt.of(MIN_RADIUS,MAX_RADIUS).sample(random) ;
             for (int j = 0; j < SimpleCloudsConstants.SPAWN_ATTEMPTS; j++) {
-                Vector2i pos = SpawnRegion.getRandomPointInRegion(region, random);
+                Vector2i pos;
+                if(generator.getClouds().isEmpty())
+                {
+                    sharedRadius = 200;
+                    pos = new Vector2i(x, z);
+                }
+                else {
+                    pos = SpawnRegion.getRandomPointInRegion(region, random);
+                }
+
 
                 if (generator.getCloudsInRegion(region).size() >= config.getMaxInitialRegions())
                     return;
@@ -178,8 +187,9 @@ public class SimpleCloudsCompat {
                         generator
                 );
 
+                int finalSharedRadius = sharedRadius;
                 cloudFormation.ifPresent(cf -> {
-                    cf.setRadius(sharedRadius); 
+                    cf.setRadius(finalSharedRadius);
                     generator.addCloud(cf, CloudGenerator.Order.USE_WEIGHT);
                     isInit = true;
                 });

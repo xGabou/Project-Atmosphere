@@ -187,9 +187,7 @@ public class BlockManager {
 
 
     public static void spawnCochonnerie(ServerLevel level, BlockPos centerPos) {
-        if (!AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
-            return;
-        }
+
 
 
         int ENTITY_THRESHOLD = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();

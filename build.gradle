@@ -98,12 +98,14 @@ dependencies {
     compileOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
     implementation fg.deobf("curse.maven:betterdays-895618:5877548")
     implementation fg.deobf("curse.maven:spectrelib-993948:5217603")
-    implementation fg.deobf("curse.maven:desert-storms-1312888:6905321")
+    implementation fg.deobf("curse.maven:desert-storms-1312888:6931061")
     implementation fg.deobf("curse.maven:lodestone-616457:6213794")
 
     //runtimeOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
     //runtimeOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
 
+    runtimeOnly fg.deobf("curse.maven:chloride-931925:6615986")
+    runtimeOnly fg.deobf("curse.maven:embeddium-908741:5681725")
 
     // Local dependency, ensure the file exists in the libs directory
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings

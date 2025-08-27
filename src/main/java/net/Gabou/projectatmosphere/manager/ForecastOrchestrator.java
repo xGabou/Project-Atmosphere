@@ -86,6 +86,7 @@ public class ForecastOrchestrator {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
         getNearbyBiomeKeys(level,player,500);
+        long start = System.nanoTime();
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
             boolean shouldGenerate = true;
             for (BlockPos center : ForecastDataStorage.playerData.values()) {
@@ -96,12 +97,16 @@ public class ForecastOrchestrator {
             }
 
             if (shouldGenerate) {
+                ProjectAtmosphere.LOGGER.info("[Atmosphere] Player " + player.getName().getString());
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
         } else {
             SimpleCloudsCompat.isInit = true;
         }
+        long end = System.nanoTime();
+        long durationMs = (end - start) / 1_000_000;
+        ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
 
     }
 
