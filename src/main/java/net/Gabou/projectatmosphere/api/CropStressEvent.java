@@ -2,7 +2,7 @@ package net.Gabou.projectatmosphere.api;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 import java.util.EnumSet;
 

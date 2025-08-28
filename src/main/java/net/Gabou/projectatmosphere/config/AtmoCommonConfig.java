@@ -3,11 +3,11 @@ package net.Gabou.projectatmosphere.config;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 import java.util.List;
 import java.util.Set;
@@ -17,44 +17,44 @@ import java.util.stream.Collectors;
 
 
 public class AtmoCommonConfig {
-    public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
-    public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
-    public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
-    public static final ForgeConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
-    public static final ForgeConfigSpec.BooleanValue DAMAGE_GLASS_ON_TORNADO;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_CHECK_INTERVAL_SEC;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_BASE_SPAWN_RADIUS_M;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_MIN_TEMP_CONTRAST_C;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_HUMIDITY_MIN_PERCENT;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_PRESSURE_GRADIENT_GAIN;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_PRESSURE_GRADIENT_CAP;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_SHEAR_MIN_SPEED_DIFF_MPS;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_SHEAR_MIN_DIR_DIFF_DEG;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_STORM_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_RISK_MIN_TO_CONSIDER;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_BASE_TRIGGER_CHANCE;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_LAPSE_RATE_C_PER_100M;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_ALOFT_DELTA_H_M;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MIN;
-    public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
-    public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
+    public static final ModConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
+    public static final ModConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
+    public static final ModConfigSpec.BooleanValue ENABLE_TORNADOES;
+    public static final ModConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
+    public static final ModConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
+    public static final ModConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
+    public static final ModConfigSpec.BooleanValue DAMAGE_GLASS_ON_TORNADO;
+    public static final ModConfigSpec.DoubleValue TORNADO_CHECK_INTERVAL_SEC;
+    public static final ModConfigSpec.DoubleValue TORNADO_BASE_SPAWN_RADIUS_M;
+    public static final ModConfigSpec.DoubleValue TORNADO_MIN_TEMP_CONTRAST_C;
+    public static final ModConfigSpec.DoubleValue TORNADO_HUMIDITY_MIN_PERCENT;
+    public static final ModConfigSpec.DoubleValue TORNADO_PRESSURE_GRADIENT_GAIN;
+    public static final ModConfigSpec.DoubleValue TORNADO_PRESSURE_GRADIENT_CAP;
+    public static final ModConfigSpec.DoubleValue TORNADO_SHEAR_MIN_SPEED_DIFF_MPS;
+    public static final ModConfigSpec.DoubleValue TORNADO_SHEAR_MIN_DIR_DIFF_DEG;
+    public static final ModConfigSpec.DoubleValue TORNADO_STORM_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue TORNADO_RISK_MIN_TO_CONSIDER;
+    public static final ModConfigSpec.DoubleValue TORNADO_BASE_TRIGGER_CHANCE;
+    public static final ModConfigSpec.DoubleValue TORNADO_LAPSE_RATE_C_PER_100M;
+    public static final ModConfigSpec.DoubleValue TORNADO_ALOFT_DELTA_H_M;
+    public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MIN;
+    public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
+    public static final ModConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
 
 
 
 
-    public static final ForgeConfigSpec.DoubleValue WIND_BASE_RETARGET_SEC;
-    public static final ForgeConfigSpec.DoubleValue WIND_DIR_RETARGET_SEC;
-    public static final ForgeConfigSpec.DoubleValue WIND_GUST_MEAN_SEC;
-    public static final ForgeConfigSpec.DoubleValue WIND_GUST_DECAY_MPS;
-    public static final ForgeConfigSpec.DoubleValue WIND_STORM_GUST_MULT;
-    public static final ForgeConfigSpec.DoubleValue WIND_PUSH_THRESHOLD_MPS;
-    public static final ForgeConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
-    public static final ForgeConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
+    public static final ModConfigSpec.DoubleValue WIND_BASE_RETARGET_SEC;
+    public static final ModConfigSpec.DoubleValue WIND_DIR_RETARGET_SEC;
+    public static final ModConfigSpec.DoubleValue WIND_GUST_MEAN_SEC;
+    public static final ModConfigSpec.DoubleValue WIND_GUST_DECAY_MPS;
+    public static final ModConfigSpec.DoubleValue WIND_STORM_GUST_MULT;
+    public static final ModConfigSpec.DoubleValue WIND_PUSH_THRESHOLD_MPS;
+    public static final ModConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
+    public static final ModConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
 
     static {
-        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.push("performance");
         FORCE_SHARED_EXECUTOR = builder
                 .comment("Force use of shared executor for all async tasks, regardless of CPU count")
@@ -161,6 +161,6 @@ public class AtmoCommonConfig {
         COMMON_SPEC = builder.build();
     }
 
-    public static final ForgeConfigSpec COMMON_SPEC;
+    public static final ModConfigSpec COMMON_SPEC;
 }
 

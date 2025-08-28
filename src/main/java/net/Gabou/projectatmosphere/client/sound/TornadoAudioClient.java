@@ -3,8 +3,8 @@ package net.Gabou.projectatmosphere.client.sound;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
 @OnlyIn(Dist.CLIENT)
 public final class TornadoAudioClient {
