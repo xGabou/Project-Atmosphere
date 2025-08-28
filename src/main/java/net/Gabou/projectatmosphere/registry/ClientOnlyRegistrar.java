@@ -2,20 +2,18 @@ package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
 import net.Gabou.projectatmosphere.config.AtmoConfigScreen;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.ConfigScreenHandler;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModLoadingContext;
 
 
 @OnlyIn(Dist.CLIENT)
 public class ClientOnlyRegistrar {
-    public static void registerClient(IEventBus modEventBus, FMLJavaModLoadingContext context) {
+    public static void registerClient(IEventBus modEventBus) {
         modEventBus.register(ClientTickHandler.class);
-        context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
-                () -> new ConfigScreenHandler.ConfigScreenFactory((mc, screen) -> new AtmoConfigScreen(screen)));
+        ModLoadingContext.get().registerExtensionPoint(IConfigScreenFactory.class,
+                () -> (mc, screen) -> new AtmoConfigScreen(screen));
     }
 }

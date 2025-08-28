@@ -8,7 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 public class SnowstormManager {
 

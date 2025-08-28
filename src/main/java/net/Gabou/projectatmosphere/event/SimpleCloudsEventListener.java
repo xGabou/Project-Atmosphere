@@ -7,8 +7,8 @@ import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec2;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)

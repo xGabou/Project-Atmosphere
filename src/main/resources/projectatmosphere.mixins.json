@@ -8,8 +8,6 @@
     "InfoMixin"
   ],
   "client": [
-    "MixinSandstormDebugBlocker",
-    "OverwriteDesertSound",
     "SimpleCloudsRendererMixin"
   ],
   "injectors": {

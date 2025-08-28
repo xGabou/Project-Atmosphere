@@ -8,15 +8,15 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.block.SoundType;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 import org.slf4j.Logger;
 
 public class ModBlocks {
     private static final Logger LOGGER = LogUtils.getLogger();
     public static final DeferredRegister<Block> REGISTRY =
-            DeferredRegister.create(ForgeRegistries.BLOCKS, ProjectAtmosphere.MODID);
+            DeferredRegister.create(NeoForgeRegistries.BLOCKS, ProjectAtmosphere.MODID);
 
     public static final RegistryObject<Block> DUST = REGISTRY.register("dust", () ->
             new DustLayerBlock(BlockBehaviour.Properties

@@ -6,7 +6,7 @@ import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.EnumSet;
 
@@ -50,7 +50,7 @@ public class CropStressManager {
         }
 
         if (!stresses.isEmpty()) {
-            MinecraftForge.EVENT_BUS.post(new CropStressEvent(level, pos, stresses, temperature, humidity));
+            NeoForge.EVENT_BUS.post(new CropStressEvent(level, pos, stresses, temperature, humidity));
         }
         return stresses;
     }

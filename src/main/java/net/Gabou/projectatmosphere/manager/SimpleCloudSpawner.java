@@ -24,7 +24,7 @@ import org.joml.Vector2i;
 
 import java.util.*;
 
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
 

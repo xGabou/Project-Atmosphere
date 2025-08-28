@@ -15,21 +15,21 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.minecraft.locale.Language;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.fml.ModLoadingContext;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod.EventBusSubscriber;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -56,11 +56,9 @@ public class ProjectAtmosphere {
 
 
 
-    public ProjectAtmosphere(FMLJavaModLoadingContext context) {
+    public ProjectAtmosphere(IEventBus modEventBus) {
         LOGGER.info("Project Atmosphere is loading!");
-        IEventBus modEventBus = context.getModEventBus();
-
-        context.registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
 
 
         CompatHandler.init();
@@ -75,17 +73,15 @@ public class ProjectAtmosphere {
         );
 
         modEventBus.addListener(this::setup);
-        modEventBus.addListener((FMLClientSetupEvent event) -> {
-            clientSetup(event,context);
-        });
+        modEventBus.addListener(this::clientSetup);
 
         
-        MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
-        MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
-        MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
-        MinecraftForge.EVENT_BUS.register(EventHandler.class);
+        NeoForge.EVENT_BUS.register(TemperatureTickHandler.class);
+        NeoForge.EVENT_BUS.register(SeasonTracker.class);
+        NeoForge.EVENT_BUS.register(BiomeChangeManager.class);
+        NeoForge.EVENT_BUS.register(EventHandler.class);
 
-        MinecraftForge.EVENT_BUS.addListener(TickCounter::onServerTick);
+        NeoForge.EVENT_BUS.addListener(TickCounter::onServerTick);
         ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);
@@ -149,10 +145,10 @@ public class ProjectAtmosphere {
     }
 
 
-    private void clientSetup(final FMLClientSetupEvent event, FMLJavaModLoadingContext context) {
+    private void clientSetup(final FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             LOGGER.info("Setting up Project Atmosphere (Client)");
-            ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS,context);
+            ClientOnlyRegistrar.registerClient(NeoForge.EVENT_BUS);
             Map<String, String> translations = Language.getInstance().getLanguageData();
             translations.put("sandstorm.debug.blocked", "Nothing to report. Stay alert.");
         });

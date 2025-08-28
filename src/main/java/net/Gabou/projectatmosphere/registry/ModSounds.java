@@ -3,14 +3,14 @@ package net.Gabou.projectatmosphere.registry;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 public class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
-            DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, ProjectAtmosphere.MODID);
+            DeferredRegister.create(NeoForgeRegistries.SOUND_EVENTS, ProjectAtmosphere.MODID);
 
     public static final RegistryObject<SoundEvent> WEATHER_SIREN = registerSound("weather_siren");
 
