@@ -4,48 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance compatibility with temperature mods and update configuration settings">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/InfoMixin.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/MixinSandstormDebugBlocker.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: disable cloud movement towards player and update related configurations">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/BlockManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/BlockManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/StormSirenBlock.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/StormSirenBlock.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastDataStorage.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastDataStorage.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/OverwriteDesertSound.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/OverwriteDesertSound.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherSampler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherSampler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/balls.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/balls.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cookie.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cookie.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dark_wall.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dark_wall.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_cumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_cumulus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_tsegrus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_tsegrus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/floating_farlands.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/floating_farlands.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/heavy_stratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/heavy_stratus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/noise_itty_bitty.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pathway.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pathway.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pattern.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pattern.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_cumulonimbus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_cumulonimbus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_nimbostratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_nimbostratus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spots.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spots.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spotted.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spotted.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stronger_stratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stronger_stratus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/sugar.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/tsegrus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/tsegrus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/noise_itty_bitty.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/sugar.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -553,15 +513,8 @@
       <workItem from="1755894394378" duration="1123000" />
       <workItem from="1756153065881" duration="18000" />
       <workItem from="1756215890068" duration="9560000" />
-      <workItem from="1756252310141" duration="19781000" />
-    </task>
-    <task id="LOCAL-00049" summary="Début du thermomètre">
-      <option name="closed" value="true" />
-      <created>1750810615805</created>
-      <option name="number" value="00049" />
-      <option name="presentableId" value="LOCAL-00049" />
-      <option name="project" value="LOCAL" />
-      <updated>1750810615805</updated>
+      <workItem from="1756252310141" duration="19809000" />
+      <workItem from="1756275172157" duration="583000" />
     </task>
     <task id="LOCAL-00050" summary="Début du thermomètre">
       <option name="closed" value="true" />
@@ -947,7 +900,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756225304578</updated>
     </task>
-    <option name="localTasksCounter" value="98" />
+    <task id="LOCAL-00098" summary="feat: disable cloud movement towards player and update related configurations">
+      <option name="closed" value="true" />
+      <created>1756272515958</created>
+      <option name="number" value="00098" />
+      <option name="presentableId" value="LOCAL-00098" />
+      <option name="project" value="LOCAL" />
+      <updated>1756272515958</updated>
+    </task>
+    <option name="localTasksCounter" value="99" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -966,7 +927,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Add desert storms dependency and update workspace settings" />
     <MESSAGE value="Add sandstorm management features and integrate delayed task scheduling" />
     <MESSAGE value="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support" />
     <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
@@ -991,7 +951,8 @@
     <MESSAGE value="feat: implement global storm history tracking and adjust storm chance based on severe event frequency" />
     <MESSAGE value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
     <MESSAGE value="feat: enhance compatibility with temperature mods and update configuration settings" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance compatibility with temperature mods and update configuration settings" />
+    <MESSAGE value="feat: disable cloud movement towards player and update related configurations" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: disable cloud movement towards player and update related configurations" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
