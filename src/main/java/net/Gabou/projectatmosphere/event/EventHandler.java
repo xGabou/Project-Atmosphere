@@ -4,39 +4,28 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
-import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
-
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class EventHandler {
 
     private static final int MIN_TICKS_BETWEEN_DUST_SPAWN = 5000;
-
     private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
 
     private static int tickCounter = 0;
 
     @SubscribeEvent
-    public static void onLevelTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.level.isClientSide || !(event.level instanceof ServerLevel serverLevel)) {
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        if (event.getLevel().isClientSide
+                || !(event.getLevel() instanceof ServerLevel serverLevel)) {
             return;
         }
         if (!AtmosphereManager.isInitialGenerationDone) {
@@ -45,9 +34,17 @@ public class EventHandler {
         if (serverLevel.players().isEmpty()) {
             return;
         }
+        if (!serverLevel.dimension().equals(Level.OVERWORLD)) {
+            return;
+        }
 
-        if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
+        // ✅ Daily profile swap check
+        long t = serverLevel.getDayTime() % 24000L;
+        if (t == 21000L) {
+            AtmosphereManager.onSwapProfiles(serverLevel);
+        }
 
+        // Cloud/weather tick logic
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
         CloudGenerator generator = cloudManager.getCloudGenerator();
         AtmosphereManager.tick(serverLevel);
@@ -56,13 +53,10 @@ public class EventHandler {
             SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
         }
 
-
         if (!AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
             return;
         } else if (tickCounter % MIN_TICKS_BETWEEN_TEMPESTA == 0) {
-
             final int cloudY = cloudManager.getCloudHeight();
-
             for (CloudRegion region : generator.getClouds()) {
                 int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
                 if (severity > 5) {
@@ -70,8 +64,6 @@ public class EventHandler {
                     BlockManager.simulateTempesta(serverLevel, pos, (int) region.getRadius());
                 }
             }
-
-
         }
 
         tickCounter++;

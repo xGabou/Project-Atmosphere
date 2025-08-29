@@ -1,13 +1,18 @@
 package net.Gabou.projectatmosphere.blocks;
 
+import com.mojang.serialization.MapCodec;
 import net.Gabou.projectatmosphere.util.InstrumentUtils;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 
 /**
  * Block representing a thermometer that reports temperature.
  */
 public class ThermometerBlock extends InstrumentBlock {
+
+    public static final MapCodec<ThermometerBlock> CODEC = simpleCodec(ThermometerBlock::new);
+
 
     /**
      * Creates a new thermometer block.
@@ -16,6 +21,11 @@ public class ThermometerBlock extends InstrumentBlock {
      */
     public ThermometerBlock(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    protected MapCodec<? extends InstrumentBlock> codec() {
+        return CODEC;
     }
 
     /**

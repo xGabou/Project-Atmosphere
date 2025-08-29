@@ -1,10 +1,12 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.registry.ModTags;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -13,10 +15,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.GlassBlock;
-import net.minecraft.world.level.block.StainedGlassBlock;
-import net.minecraft.world.level.block.StainedGlassPaneBlock;
-import net.minecraft.world.level.block.TintedGlassBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -84,11 +82,11 @@ public class TornadoInstance {
      * Called each tick from tornado manager. Server handles demolition,
      * client relies on separate rendering logic.
      */
-    public void tick(Level level) {
-        if (level.isClientSide) {
+    public void tick(Level level1) {
+        if (level1.isClientSide) {
             return;
         }
-
+        ServerLevel level = (ServerLevel) level1;
         long now = System.currentTimeMillis();
 
         boolean ambientDue = now - lastAmbientWindCheck >= ambientWindIntervalMs;
@@ -181,24 +179,22 @@ public class TornadoInstance {
             }
         }
     }
-
     private boolean isGlass(BlockState state) {
-        return state.getBlock() instanceof GlassBlock
-                || state.getBlock() instanceof StainedGlassBlock
-                || state.getBlock() instanceof StainedGlassPaneBlock
-                || state.getBlock() instanceof TintedGlassBlock;
+        return state.is(ModTags.GLASS_LIKE);
     }
 
-    private void playDemolitionSound(Level level) {
-        BlockPos center = BlockPos.containing(position);
 
-        level.playLocalSound(
-                center.getX(), center.getY(), center.getZ(),
-                SoundEvents.GENERIC_EXPLODE,
+
+    private void playDemolitionSound(ServerLevel level) {
+        BlockPos pos = BlockPos.containing(position);
+        level.playSound(
+                null, // null = all players
+                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                SoundEvents.GENERIC_EXPLODE, // ✅ Holder<SoundEvent>
                 SoundSource.WEATHER,
-                2.0f, 
-                0.5f + level.getRandom().nextFloat() * 0.4f, 
-                false
+                2.0f, 1.0f
         );
+
     }
+
 }

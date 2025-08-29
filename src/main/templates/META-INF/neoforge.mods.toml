@@ -8,14 +8,15 @@ version = "${mod_version}"
 displayName = "${mod_name}"
 authors = "${mod_authors}"
 description = '''${mod_description}'''
-logoFile = "${mod_logo_file}"
-mixinConfigs = "${mod_mixins}"
-displayTest = "IGNORE_ALL_VERSION"
+logoFile = "assets/projectatmosphere/icon.png"
+
+[[mixins]]
+config = "${mod_id}.mixins.json"
 
 [[dependencies."${mod_id}"]]
-modId = "forge"
+modId = "neoforge"
 mandatory = true
-versionRange = "${forge_version_range}"
+versionRange = "${neo_version_range}"
 ordering = "NONE"
 side = "BOTH"
 
@@ -40,12 +41,6 @@ mandatory = true
 versionRange = "*"
 side = "BOTH"
 
-[[dependencies."${mod_id}"]]
-modId = "sandstorm"
-mandatory = true
-versionRange = "*"
-ordering = "AFTER"
-side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "simpleclouds"

@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.event;
 
-import com.BreadRes.desertstormwarming.logic.SandstormUtils;
-import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
+
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
@@ -17,11 +16,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.TickEvent;
+
 import net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 
@@ -31,7 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber
+
 public class BiomeChangeManager {
     private static final Map<UUID, Pair<ResourceLocation, Boolean>> lastBiome = new HashMap<>();
     private static final int RUN_INTERVAL_TICKS = 2000;
@@ -45,9 +44,8 @@ public class BiomeChangeManager {
 
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent ev) {
-        if (ev.phase != TickEvent.Phase.END) return;
-        if (!(ev.player instanceof ServerPlayer player)) return;
+    public static void onPlayerTick(PlayerTickEvent.Post ev) {
+        if (!(ev.getEntity() instanceof ServerPlayer player)) return;
         if (player.level().isClientSide) return;
 
         ServerLevel level = player.serverLevel();
@@ -67,14 +65,14 @@ public class BiomeChangeManager {
             wasInDesert = false;
         }
 
-        if(!wasInDesert) {
-            if(SandStormAPI.isSandstormActive()) {
-                for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
-                    Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(),null);
-                }
-
-            }
-        }
+//        if(!wasInDesert) {
+//            if(SandStormAPI.isSandstormActive()) {
+//                for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
+//                    Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(),null);
+//                }
+//
+//            }
+//        }
 
         if (last == null || !last.equals(nowBiome)) {
             lastBiome.put(uuid,Pair.of(nowBiome,isDesert(level,nowBiome)));

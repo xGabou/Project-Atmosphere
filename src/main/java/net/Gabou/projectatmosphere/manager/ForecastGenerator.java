@@ -1,39 +1,27 @@
 package net.Gabou.projectatmosphere.manager;
 
-import com.BreadRes.desertstormwarming.logic.SandstormPhase;
-import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
+//import com.BreadRes.desertstormwarming.logic.SandstormPhase;
+//import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.LegendarySurvivalCompat;
 import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
-import net.Gabou.projectatmosphere.event.BiomeChangeManager;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityGenerator;
 import net.Gabou.projectatmosphere.modules.pressure.PressureGenerator;
-import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
 import net.Gabou.projectatmosphere.modules.storm.StormGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.variation.VariationGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
-import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.common.Tags;
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,7 +35,7 @@ public class ForecastGenerator {
     private static final float DIFFUSION_RATE = 0.1f;
     private static final int SAMPLE_STEP = 256;
     private static BiomeInstanceKey scheduledStormBiome = null;
-    private static SandstormPhase scheduledStormPhase = null;
+//    private static SandstormPhase scheduledStormPhase = null;
     private static long scheduledStormTime = -1L;
 
     public static BiomeInstanceKey getScheduledSandstormBiome() {
@@ -284,43 +272,43 @@ public class ForecastGenerator {
         computeAverageForecastsByBiomeType();
 
 
-        if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty()) {
-            BiomeInstanceKey selected = SANDSTORM_FORECASTS.stream()
-                    .skip(level.random.nextInt(SANDSTORM_FORECASTS.size()))
-                    .findFirst()
-                    .orElse(null);
-
-            if (selected != null) {
-                BiomeForecast forecast = FORECAST_MAP.get(selected);
-                if (forecast != null) {
-                    long baseTime = (level.getDayTime() / 24000L) * 24000L;
-                    long randomOffset = 1000 + level.random.nextInt(9000);
-
-                    scheduledStormBiome = selected;
-                    scheduledStormPhase = computeStormPhase(forecast);
-                    scheduledStormTime = baseTime + randomOffset;
-
-                    ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in biome {} (phase: {})",
-                            scheduledStormTime, selected.biomeType(), scheduledStormPhase);
-                    for (ServerPlayer player : level.players()) {
-
-
-                        boolean lastBiomeFlag = BiomeChangeManager
-                                .getLastBiome()
-                                .getOrDefault(player.getUUID(), Pair.of(null, false))
-                                .getValue();
-
-                        if (!lastBiomeFlag) {
-                            for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
-                                Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(), null);
-                            }
-                        }
-
-
-                    }
-                }
-            }
-        }
+//        if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty()) {
+//            BiomeInstanceKey selected = SANDSTORM_FORECASTS.stream()
+//                    .skip(level.random.nextInt(SANDSTORM_FORECASTS.size()))
+//                    .findFirst()
+//                    .orElse(null);
+//
+//            if (selected != null) {
+//                BiomeForecast forecast = FORECAST_MAP.get(selected);
+//                if (forecast != null) {
+//                    long baseTime = (level.getDayTime() / 24000L) * 24000L;
+//                    long randomOffset = 1000 + level.random.nextInt(9000);
+//
+//                    scheduledStormBiome = selected;
+//                    scheduledStormPhase = computeStormPhase(forecast);
+//                    scheduledStormTime = baseTime + randomOffset;
+//
+//                    ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in biome {} (phase: {})",
+//                            scheduledStormTime, selected.biomeType(), scheduledStormPhase);
+//                    for (ServerPlayer player : level.players()) {
+//
+//
+//                        boolean lastBiomeFlag = BiomeChangeManager
+//                                .getLastBiome()
+//                                .getOrDefault(player.getUUID(), Pair.of(null, false))
+//                                .getValue();
+//
+//                        if (!lastBiomeFlag) {
+//                            for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
+//                                Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(), null);
+//                            }
+//                        }
+//
+//
+//                    }
+//                }
+//            }
+//        }
     }
 
     /**
@@ -437,37 +425,37 @@ public class ForecastGenerator {
 
     static void tickSandstormScheduler(ServerLevel level) {
 
-        if (scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
-            SandStormAPI.startSandstorm(scheduledStormPhase, scheduledStormBiome);
-
-
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
-                    scheduledStormBiome.biomeType(), scheduledStormPhase);
-
-            scheduledStormBiome = null;
-            scheduledStormTime = -1L;
-            scheduledStormPhase = null;
-        }
-        if (SandStormAPI.isSandstormActive() && tickCounter % 50 == 0) {
-            var sandStorms = SandStormAPI.getScheduledStormBiome();
-            if (sandStorms.isEmpty()) {
-                ProjectAtmosphere.LOGGER.warn("[Atmosphere] No sandstorm biomes found, but storm is active!");
-                return;
-            }
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Sandstorm active in {} biomes: {}", sandStorms.size(), sandStorms);
-            AsyncAtmosphereService.runStorm(() -> {
-            for (BiomeInstanceKey biome : sandStorms) {
-
-                SandStormAPI.blowSandInBiome(level,
-                        biome,
-                        getWindValue(biome, level.getDayTime()));
-
-            }
-            });
-            tickCounter = 0;
-
-        }
-        tickCounter++;
+//        if (scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
+//            SandStormAPI.startSandstorm(scheduledStormPhase, scheduledStormBiome);
+//
+//
+//            ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
+//                    scheduledStormBiome.biomeType(), scheduledStormPhase);
+//
+//            scheduledStormBiome = null;
+//            scheduledStormTime = -1L;
+//            scheduledStormPhase = null;
+//        }
+//        if (SandStormAPI.isSandstormActive() && tickCounter % 50 == 0) {
+//            var sandStorms = SandStormAPI.getScheduledStormBiome();
+//            if (sandStorms.isEmpty()) {
+//                ProjectAtmosphere.LOGGER.warn("[Atmosphere] No sandstorm biomes found, but storm is active!");
+//                return;
+//            }
+//            ProjectAtmosphere.LOGGER.info("[Atmosphere] Sandstorm active in {} biomes: {}", sandStorms.size(), sandStorms);
+//            AsyncAtmosphereService.runStorm(() -> {
+//            for (BiomeInstanceKey biome : sandStorms) {
+//
+//                SandStormAPI.blowSandInBiome(level,
+//                        biome,
+//                        getWindValue(biome, level.getDayTime()));
+//
+//            }
+//            });
+//            tickCounter = 0;
+//
+//        }
+//        tickCounter++;
     }
 
     private static float[][] generateStorm(BiomeInstanceKey key, ServerLevel level, float[][] temperature, float[][] humidity, float[][] pressure, WindVector[] wind) {
@@ -575,7 +563,7 @@ public class ForecastGenerator {
         AVERAGE_FORECASTS.clear();
         clearSandstormForecasts();
         scheduledStormBiome = null;
-        scheduledStormPhase = null;
+//        scheduledStormPhase = null;
         scheduledStormTime = -1L;
         tickCounter = 0;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cleared all forecasts and samples.");
@@ -886,17 +874,17 @@ public class ForecastGenerator {
     }
 
 
-    private static SandstormPhase computeStormPhase(BiomeForecast forecast) {
-        float wind = forecast.getWind()[0].baseSpeed();
-        float pressure = forecast.getPressure()[0][0];
-        float humidity = forecast.getHumidity()[0][0];
-
-        if (wind > 35 && pressure < 980 && humidity < 0.15f) return SandstormPhase.PHASE_5;
-        if (wind > 30) return SandstormPhase.PHASE_4;
-        if (wind > 25) return SandstormPhase.PHASE_3;
-        if (wind > 20) return SandstormPhase.PHASE_2;
-        return SandstormPhase.PHASE_1;
-    }
+//    private static SandstormPhase computeStormPhase(BiomeForecast forecast) {
+//        float wind = forecast.getWind()[0].baseSpeed();
+//        float pressure = forecast.getPressure()[0][0];
+//        float humidity = forecast.getHumidity()[0][0];
+//
+//        if (wind > 35 && pressure < 980 && humidity < 0.15f) return SandstormPhase.PHASE_5;
+//        if (wind > 30) return SandstormPhase.PHASE_4;
+//        if (wind > 25) return SandstormPhase.PHASE_3;
+//        if (wind > 20) return SandstormPhase.PHASE_2;
+//        return SandstormPhase.PHASE_1;
+//    }
 
 
 }

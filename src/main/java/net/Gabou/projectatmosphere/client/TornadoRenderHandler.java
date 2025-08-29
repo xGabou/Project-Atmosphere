@@ -108,7 +108,7 @@ public class TornadoRenderHandler {
         if (flowIntensity != null) flowIntensity.set(0.1f);
 
 
-        float partialTicks = minecraft.getFrameTime();
+        float partialTicks = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
         float sunAngle = level.getTimeOfDay(partialTicks);
         float angle = sunAngle * ((float) Math.PI * 2.0F);
 
@@ -141,9 +141,8 @@ public class TornadoRenderHandler {
 
 
         Tesselator tess = Tesselator.getInstance();
-        BufferBuilder buffer = tess.getBuilder();
-        buffer.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX);
-
+        BufferBuilder buffer = tess.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX);
+        VertexConsumer consumer = buffer;
 
         float windSpeed = tornado.wind.gustSpeed();
         float windAngleDeg = tornado.wind.angleRadians();
@@ -264,13 +263,13 @@ public class TornadoRenderHandler {
                 z11 += offsetZ1;
 
 
-                buffer.vertex(matrix, x00, y0, z00).uv(u0s, v0).endVertex();
-                buffer.vertex(matrix, x10, y1, z10).uv(u0s, v1).endVertex();
-                buffer.vertex(matrix, x11, y1, z11).uv(u1s, v1).endVertex();
+               consumer.addVertex(matrix, x00, y0, z00).setUv(u0s, v0);
+               consumer.addVertex(matrix, x10, y1, z10).setUv(u0s, v1);
+               consumer.addVertex(matrix, x11, y1, z11).setUv(u1s, v1);
 
-                buffer.vertex(matrix, x00, y0, z00).uv(u0s, v0).endVertex();
-                buffer.vertex(matrix, x11, y1, z11).uv(u1s, v1).endVertex();
-                buffer.vertex(matrix, x01, y0, z01).uv(u1s, v0).endVertex();
+               consumer.addVertex(matrix, x00, y0, z00).setUv(u0s, v0);
+               consumer.addVertex(matrix, x11, y1, z11).setUv(u1s, v1);
+               consumer.addVertex(matrix, x01, y0, z01).setUv(u1s, v0);
             }
         }
 
@@ -345,21 +344,21 @@ public class TornadoRenderHandler {
                 float v0 = Math.min(1f - epsilon, y0 / height);
                 float v1 = Math.min(1f - epsilon, y1 / height);
 
-                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
-                buffer.vertex(matrix, x10, y1, z10).uv(u0, v1).endVertex();
-                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
+               consumer.addVertex(matrix, x00, y0, z00).setUv(u0, v0);
+               consumer.addVertex(matrix, x10, y1, z10).setUv(u0, v1);
+               consumer.addVertex(matrix, x11, y1, z11).setUv(u1, v1);
 
-                buffer.vertex(matrix, x00, y0, z00).uv(u0, v0).endVertex();
-                buffer.vertex(matrix, x11, y1, z11).uv(u1, v1).endVertex();
-                buffer.vertex(matrix, x01, y0, z01).uv(u1, v0).endVertex();
+               consumer.addVertex(matrix, x00, y0, z00).setUv(u0, v0);
+               consumer.addVertex(matrix, x11, y1, z11).setUv(u1, v1);
+               consumer.addVertex(matrix, x01, y0, z01).setUv(u1, v0);
             }
         }
-
-
-        tess.end();
+        MeshData mesh = buffer.build();
+        BufferUploader.drawWithShader(mesh);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         stack.popPose();
+
     }
 
     public static void spawnDebrisParticles(TornadoInstance tornado, ClientLevel level) {
@@ -374,103 +373,9 @@ public class TornadoRenderHandler {
         }
     }
 
-    public static void renderTornadoVolume(PoseStack poseStack,
-                                           Vec3 center,
-                                           Vec3 halfExtents,
-                                           float twistSpeed) {
-        ShaderInstance sh = MyShaders.BOX_TORNADO;
-        if (sh == null) return;
-
-        RenderSystem.setShader(() -> sh);
-        sh.apply();
 
 
-        Uniform dbg = sh.getUniform("DebugBox");
-        if (dbg != null) dbg.set(1.0f);
-        Vec3 cam = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-        sh.getUniform("CameraPos").set((float) cam.x, (float) cam.y, (float) cam.z);
 
-
-        Vec3 min = center.subtract(halfExtents);
-        Vec3 max = center.add(halfExtents);
-        sh.getUniform("BoxMin").set((float) min.x, (float) min.y, (float) min.z);
-        sh.getUniform("BoxMax").set((float) max.x, (float) max.y, (float) max.z);
-
-
-        sh.getUniform("Time").set(TornadoManager.getShaderTime());
-        sh.getUniform("TwistSpeed").set(twistSpeed);
-        sh.getUniform("BaseRadius").set(8f);
-        sh.getUniform("TopRadius").set(1.5f);
-        sh.getUniform("Height").set((float) SimpleCloudsConfig.CLIENT.cloudHeight.get());
-        sh.getUniform("DustIntensity").set(0.5f);
-
-
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.enableCull();
-        glCullFace(GL_BACK);
-
-
-        float x0 = (float) min.x, y0 = (float) min.y, z0 = (float) min.z;
-        float x1 = (float) max.x, y1 = (float) max.y, z1 = (float) max.z;
-
-        Tesselator t = Tesselator.getInstance();
-        BufferBuilder b = t.getBuilder();
-        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
-
-
-        b.vertex(x1, y0, z0).endVertex();
-        b.vertex(x1, y0, z1).endVertex();
-        b.vertex(x1, y1, z1).endVertex();
-        b.vertex(x1, y1, z0).endVertex();
-
-        b.vertex(x0, y0, z1).endVertex();
-        b.vertex(x0, y0, z0).endVertex();
-        b.vertex(x0, y1, z0).endVertex();
-        b.vertex(x0, y1, z1).endVertex();
-
-        b.vertex(x0, y1, z0).endVertex();
-        b.vertex(x1, y1, z0).endVertex();
-        b.vertex(x1, y1, z1).endVertex();
-        b.vertex(x0, y1, z1).endVertex();
-
-        b.vertex(x0, y0, z1).endVertex();
-        b.vertex(x1, y0, z1).endVertex();
-        b.vertex(x1, y0, z0).endVertex();
-        b.vertex(x0, y0, z0).endVertex();
-
-        b.vertex(x0, y0, z1).endVertex();
-        b.vertex(x1, y0, z1).endVertex();
-        b.vertex(x1, y1, z1).endVertex();
-        b.vertex(x0, y1, z1).endVertex();
-
-        b.vertex(x1, y0, z0).endVertex();
-        b.vertex(x0, y0, z0).endVertex();
-        b.vertex(x0, y1, z0).endVertex();
-        b.vertex(x1, y1, z0).endVertex();
-
-        t.end();
-
-        RenderSystem.depthMask(true);
-    }
-
-
-    public static Matrix4f getInverseViewProjection() {
-
-        Matrix4f proj = RenderSystem.getProjectionMatrix();
-        Matrix4f view = RenderSystem.getModelViewMatrix();
-
-
-        Matrix4f viewProj = new Matrix4f(proj);
-        viewProj.mul(view);
-
-
-        viewProj.invert();
-
-        return viewProj;
-    }
     /**
      * Cone cap radius by specifying a *cone angle* (degrees).
      * angleDeg = 0..89 (slope = tan(angleDeg))

@@ -1,16 +1,12 @@
 package net.Gabou.projectatmosphere.client;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.neoforged.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.common.NeoForge;
 
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT)
 public class HUDOverlayRenderer {
 
     private static String temperatureMessage = null;
@@ -18,11 +14,14 @@ public class HUDOverlayRenderer {
 
     public static void showTemperatureOverlay(String msg) {
         temperatureMessage = msg;
-        displayUntil = System.currentTimeMillis() + 3000; 
+        displayUntil = System.currentTimeMillis() + 3000; // show for 3s
     }
 
-    @SubscribeEvent
-    public static void onRenderOverlay(RenderGuiOverlayEvent.Post event) {
+    public static void register() {
+        NeoForge.EVENT_BUS.addListener(HUDOverlayRenderer::onRenderOverlay);
+    }
+
+    private static void onRenderOverlay(RenderGuiEvent.Post event) {
         if (temperatureMessage == null || System.currentTimeMillis() > displayUntil) {
             temperatureMessage = null;
             return;
@@ -36,10 +35,8 @@ public class HUDOverlayRenderer {
         int screenHeight = mc.getWindow().getGuiScaledHeight();
 
         int x = (screenWidth - font.width(temperatureMessage)) / 2;
-        int y = screenHeight - 60; 
+        int y = screenHeight - 60;
 
         guiGraphics.drawString(font, temperatureMessage, x, y, 0xFFFFFF, true);
     }
 }
-
-

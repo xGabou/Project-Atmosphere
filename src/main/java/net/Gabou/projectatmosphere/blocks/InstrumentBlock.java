@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.blocks;
 
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
@@ -56,15 +57,14 @@ public abstract class InstrumentBlock extends HorizontalDirectionalBlock impleme
      * @param level  world level
      * @param pos    block position
      * @param player interacting player
-     * @param hand   hand used
      * @param hit    hit result
      * @return interaction result
      */
     @Override
-    public InteractionResult use(BlockState state, Level level, BlockPos pos,
-                                 Player player, InteractionHand hand, BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
+                                               Player player, BlockHitResult hit) {
         display(level, player);
-        return  InteractionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
 

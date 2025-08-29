@@ -5,25 +5,35 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterShadersEvent;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 
 import java.io.IOException;
 
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class TornadoShaders {
-
-
-    @SubscribeEvent
-    public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
-        ShaderInstance shader = new ShaderInstance(event.getResourceProvider(),
-                ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "tornado"), DefaultVertexFormat.POSITION_TEX);
-        event.registerShader(shader, s -> MyShaders.TORNADO = s);
-        ShaderInstance shader1 = new ShaderInstance(event.getResourceProvider(),
-                ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "box_tornado"), DefaultVertexFormat.POSITION_TEX);
-        event.registerShader(shader1, s -> MyShaders.BOX_TORNADO = s);
+    public static void init(IEventBus modEventBus) {
+        modEventBus.addListener(TornadoShaders::onRegisterShaders);
     }
 
+    private static void onRegisterShaders(RegisterShadersEvent event) {
+        try {
+            ShaderInstance tornado = new ShaderInstance(
+                    event.getResourceProvider(),
+                    ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "tornado"),
+                    DefaultVertexFormat.POSITION_TEX
+            );
+            event.registerShader(tornado, shader -> MyShaders.TORNADO = shader);
 
+            ShaderInstance boxTornado = new ShaderInstance(
+                    event.getResourceProvider(),
+                    ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "box_tornado"),
+                    DefaultVertexFormat.POSITION_TEX
+            );
+            event.registerShader(boxTornado, shader -> MyShaders.BOX_TORNADO = shader);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load tornado shaders", e);
+        }
+    }
 }

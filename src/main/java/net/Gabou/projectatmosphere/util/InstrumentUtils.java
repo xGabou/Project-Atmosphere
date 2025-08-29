@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.util;
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
 import net.Gabou.projectatmosphere.compat.ColdSweatCompat;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.LegendarySurvivalCompat;
 import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -36,8 +35,6 @@ public class InstrumentUtils {
         float temp;
 
         switch (CompatHandler.getActiveTemperatureMod()) {
-            case LEGENDARY_SURVIVAL -> temp = LegendarySurvivalCompat.getLiveTemperature((ServerLevel) level, pos);
-
             case TOUGH_AS_NAILS -> temp = ToughAsNailsCompat.getLiveTemperatureTAN((ServerLevel) level, pos);
 
             case COLD_SWEAT -> temp = ColdSweatCompat.getLiveTemperatureColdSweat((ServerLevel) level, pos);

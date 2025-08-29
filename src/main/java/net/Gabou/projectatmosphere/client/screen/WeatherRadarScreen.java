@@ -34,7 +34,7 @@ public class WeatherRadarScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(guiGraphics);
+        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         int left = (this.width - MAP_SIZE) / 2;
         int top = (this.height - MAP_SIZE) / 2;
         guiGraphics.fill(left, top, left + MAP_SIZE, top + MAP_SIZE, 0xFF000000);

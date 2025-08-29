@@ -1,52 +1,40 @@
 package net.Gabou.projectatmosphere.network;
 
-import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 
-import java.util.function.Supplier;
+public record SyncWindPacket(float speed, float angle, float gust)
+        implements CustomPacketPayload {
 
-public class SyncWindPacket {
-    private final BiomeInstanceKey key;
-    private final float baseSpeed;
-    private final float gustSpeed;
-    private final float directionDeg;
-    private final long gustEndTick;
+    public static final ResourceLocation ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "sync_wind");
 
-    public SyncWindPacket(BiomeInstanceKey key, float baseSpeed, float gustSpeed, float directionDeg, long gustEndTick) {
-        this.key = key;
-        this.baseSpeed = baseSpeed;
-        this.gustSpeed = gustSpeed;
-        this.directionDeg = directionDeg;
-        this.gustEndTick = gustEndTick;
+    public static final Type<SyncWindPacket> TYPE = new Type<>(ID);
+
+    public static final StreamCodec<FriendlyByteBuf, SyncWindPacket> STREAM_CODEC =
+            StreamCodec.of(
+                    (buf, pkt) -> {
+                        buf.writeFloat(pkt.speed);
+                        buf.writeFloat(pkt.angle);
+                        buf.writeFloat(pkt.gust);
+                    },
+                    buf -> new SyncWindPacket(buf.readFloat(), buf.readFloat(), buf.readFloat())
+            );
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
-    public SyncWindPacket(FriendlyByteBuf buf) {
-        this.key = BiomeInstanceKey.fromString(buf.readUtf());
-        this.baseSpeed = buf.readFloat();
-        this.gustSpeed = buf.readFloat();
-        this.directionDeg = buf.readFloat();
-        this.gustEndTick = buf.readLong();
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(key.toString());
-        buf.writeFloat(baseSpeed);
-        buf.writeFloat(gustSpeed);
-        buf.writeFloat(directionDeg);
-        buf.writeLong(gustEndTick);
-    }
-
-    public static SyncWindPacket decode(FriendlyByteBuf buf) {
-        return new SyncWindPacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            WindVector.set(key, baseSpeed + gustSpeed, directionDeg);
+    public static void handle(SyncWindPacket pkt, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            // Replace this with your actual client-side wind update system
+            // e.g., ClientWindStorage.update(pkt.speed(), pkt.angle(), pkt.gust());
         });
-        ctx.get().setPacketHandled(true);
     }
 }
 

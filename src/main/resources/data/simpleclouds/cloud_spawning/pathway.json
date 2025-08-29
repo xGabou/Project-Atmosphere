@@ -24,18 +24,12 @@
     }
   },
   "speed": {
-    "type": "minecraft:uniform",
-    "value": {
       "max_exclusive": 0.4,
       "min_inclusive": 0.2
-    }
   },
   "stretch_factor": {
-    "type": "minecraft:uniform",
-    "value": {
       "max_exclusive": 0.4,
       "min_inclusive": 0.2
-    }
   },
   "weight": 16
 }

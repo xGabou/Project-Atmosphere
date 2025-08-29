@@ -19,7 +19,6 @@ import java.util.Collections;
 import java.util.List;
 
 public class DustLayerBlock extends SnowLayerBlock {
-    public static final IntegerProperty LAYERS = IntegerProperty.create("layers", 1, 8);
 
     /**
      * Creates a dust layer block with a single layer by default.
@@ -38,7 +37,7 @@ public class DustLayerBlock extends SnowLayerBlock {
      */
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(LAYERS);
+        super.createBlockStateDefinition(builder);
     }
 
     /**

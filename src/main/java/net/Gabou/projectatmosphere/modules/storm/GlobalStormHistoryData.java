@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.storm;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -15,23 +16,27 @@ public final class GlobalStormHistoryData extends SavedData {
     private int lastSevereDay = Integer.MIN_VALUE; // none yet
 
     public static GlobalStormHistoryData get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(GlobalStormHistoryData::load,
-                GlobalStormHistoryData::new,
-                STORAGE_ID);
+        return level.getDataStorage().computeIfAbsent(
+                new SavedData.Factory<>(
+                        GlobalStormHistoryData::new,  // constructor
+                        GlobalStormHistoryData::load  // deserializer
+                ),
+                STORAGE_ID
+        );
     }
 
     public GlobalStormHistoryData() {}
 
-    public static GlobalStormHistoryData load(CompoundTag tag) {
+    @Override
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
+        tag.putInt("lastSevereDay", lastSevereDay);
+        return tag;
+    }
+
+    public static GlobalStormHistoryData load(CompoundTag tag, HolderLookup.Provider provider) {
         GlobalStormHistoryData data = new GlobalStormHistoryData();
         data.lastSevereDay = tag.getInt("lastSevereDay");
         return data;
-    }
-
-    @Override
-    public CompoundTag save(CompoundTag tag) {
-        tag.putInt("lastSevereDay", lastSevereDay);
-        return tag;
     }
 
     public int getLastSevereDay() {
@@ -43,3 +48,4 @@ public final class GlobalStormHistoryData extends SavedData {
         setDirty();
     }
 }
+

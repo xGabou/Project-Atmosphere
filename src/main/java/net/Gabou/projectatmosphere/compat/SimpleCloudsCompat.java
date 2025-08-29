@@ -200,8 +200,7 @@ public class SimpleCloudsCompat {
     }
 
 
-
-
-
-
+    public static double getCloudScale() {
+        return SimpleCloudsConstants.CLOUD_SCALE;
+    }
 }

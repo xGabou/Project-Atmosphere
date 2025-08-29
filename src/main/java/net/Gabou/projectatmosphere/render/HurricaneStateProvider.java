@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.render;
 
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.common.SimpleCloudsBridge;
 
 public final class HurricaneStateProvider {
     private HurricaneStateProvider() {}
@@ -17,7 +17,7 @@ public final class HurricaneStateProvider {
             return null;
         }
 
-        double scale = SimpleCloudsBridge.getCloudScale();
+        double scale = SimpleCloudsCompat.getCloudScale();
         return new HurricaneStateCloudSpace(
             (s.centerX() - camX) / scale,
             (s.centerZ() - camZ) / scale,

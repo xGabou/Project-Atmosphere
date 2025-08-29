@@ -10,22 +10,22 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.List;
 
-@Mod.EventBusSubscriber(
-        modid = ProjectAtmosphere.MODID,                       
-        bus = Mod.EventBusSubscriber.Bus.FORGE,   
-        value = Dist.CLIENT
-)
+
 public class ClientRenderHook {
 
+    public static void register() {
+        NeoForge.EVENT_BUS.addListener(ClientRenderHook::onRender);
+    }
 
-    @SubscribeEvent
-    public static void onRender(RenderLevelStageEvent event) {
+
+    private static void onRender(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
         if (Minecraft.getInstance().level == null) return;
 

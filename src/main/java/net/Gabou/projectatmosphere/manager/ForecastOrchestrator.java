@@ -216,7 +216,7 @@ public class ForecastOrchestrator {
 
     public static void tick(ServerLevel level) {
                     GlassDamageManager.tick(level);
-                    ForecastGenerator.tickSandstormScheduler(level);
+                    //ForecastGenerator.tickSandstormScheduler(level);
                     long now = level.getGameTime();
                     if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
                         lastTornadoCheckTick = now;

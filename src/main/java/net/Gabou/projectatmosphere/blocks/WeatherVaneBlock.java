@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.blocks;
 
+import com.mojang.serialization.MapCodec;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -11,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -18,6 +20,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * Block representing a weather vane that aligns with the wind direction.
  */
 public class WeatherVaneBlock extends InstrumentBlock {
+    public static final MapCodec<WeatherVaneBlock> CODEC = simpleCodec(WeatherVaneBlock::new);
 
     /**
      * Creates a new weather vane block.
@@ -28,6 +31,10 @@ public class WeatherVaneBlock extends InstrumentBlock {
         super(properties);
     }
 
+    @Override
+    protected MapCodec<? extends InstrumentBlock> codec() {
+        return CODEC;
+    }
     /**
      * Schedules the first tick to update the vane orientation when placed.
      *

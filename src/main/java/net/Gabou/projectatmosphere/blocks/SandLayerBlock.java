@@ -22,7 +22,6 @@ import java.util.List;
  * Eight layers convert into a full sand block via external logic.
  */
 public class SandLayerBlock extends SnowLayerBlock {
-    public static final IntegerProperty LAYERS = IntegerProperty.create("layers", 1, 8);
     public SandLayerBlock(Properties properties) {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any().setValue(LAYERS, 1));
@@ -30,7 +29,7 @@ public class SandLayerBlock extends SnowLayerBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(LAYERS);
+        super.createBlockStateDefinition(builder);
     }
 
     @Override

@@ -1,13 +1,16 @@
 package net.Gabou.projectatmosphere.blocks;
 
+import com.mojang.serialization.MapCodec;
 import net.Gabou.projectatmosphere.util.InstrumentUtils;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 
 /**
  * Block representing a barometer that shows atmospheric pressure.
  */
 public class BarometreBlock extends InstrumentBlock {
+    public static final MapCodec<BarometreBlock> CODEC = simpleCodec(BarometreBlock::new);
 
     /**
      * Creates a new barometer block.
@@ -16,6 +19,11 @@ public class BarometreBlock extends InstrumentBlock {
      */
     public BarometreBlock(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    protected MapCodec<? extends InstrumentBlock> codec() {
+        return CODEC;
     }
 
     /**

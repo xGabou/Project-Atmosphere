@@ -10,14 +10,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
 
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public final class TornadoDebug {
     private TornadoDebug() {}
 
-    @SubscribeEvent
     public static void register(RegisterCommandsEvent event) {
         event.getDispatcher().register(
                 Commands.literal("weatherdebug")
@@ -28,9 +24,9 @@ public final class TornadoDebug {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                                             ServerLevel level = player.serverLevel();
                                             BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+
                                             float risk = TornadoProbabilityManager.computeRisk(key, level, level.getGameTime());
-                                            ctx.getSource().sendSuccess(
-                                                    () -> Component.literal("Risk: " + risk), false);
+                                            ctx.getSource().sendSuccess(() -> Component.literal("Risk: " + risk), false);
                                             return 1;
                                         }))
                                 .then(Commands.literal("force")
@@ -39,10 +35,11 @@ public final class TornadoDebug {
                                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                                     ServerLevel level = player.serverLevel();
                                                     BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+
                                                     float intensity = FloatArgumentType.getFloat(ctx, "intensity");
                                                     TornadoSpawner.spawn(key, level, intensity);
-                                                    ctx.getSource().sendSuccess(
-                                                            () -> Component.literal("Tornado spawned."), true);
+
+                                                    ctx.getSource().sendSuccess(() -> Component.literal("Tornado spawned."), true);
                                                     return 1;
                                                 })))
                                 .then(Commands.literal("cooldown")
@@ -51,11 +48,12 @@ public final class TornadoDebug {
                                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                                     ServerLevel level = player.serverLevel();
                                                     BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+
                                                     TornadoStorageManager.setCooldown(key, 0);
-                                                    ctx.getSource().sendSuccess(
-                                                            () -> Component.literal("Cooldown cleared."), true);
+                                                    ctx.getSource().sendSuccess(() -> Component.literal("Cooldown cleared."), true);
                                                     return 1;
-                                                })))));
+                                                })))
+                        )
+        );
     }
 }
-

@@ -1,12 +1,7 @@
 package net.Gabou.projectatmosphere.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.*;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
@@ -30,7 +25,6 @@ public final class HurricaneMeshRenderer {
             return;
         }
 
-        // Center & radii are expected in *cloud space* units
         float cx = (float) state.centerXCloudSpace();
         float cz = (float) state.centerZCloudSpace();
         float inner = (float) state.eyeRadiusCloudSpace();
@@ -46,27 +40,31 @@ public final class HurricaneMeshRenderer {
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
 
-        Tesselator t = Tesselator.getInstance();
-        BufferBuilder buf = t.getBuilder();
-        buf.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION);
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder bufferbuilder = tesselator.begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION);
+
+        VertexConsumer consumer = bufferbuilder;
 
         final int segs = 160;
-        final float y = 0.02f; // slight lift to avoid z-fighting
-        final float twoPi = (float)(Math.PI * 2.0);
+        final float y = 0.02f;
+        final float twoPi = (float) (Math.PI * 2.0);
         Matrix4f mv = pose.last().pose();
 
         for (int i = 0; i <= segs; i++) {
             float a = twoPi * i / segs;
-            float cs = (float)Math.cos(a), sn = (float)Math.sin(a);
-            buf.vertex(mv, cx + cs * inner, y, cz + sn * inner).endVertex();
-            buf.vertex(mv, cx + cs * outer, y, cz + sn * outer).endVertex();
+            float cs = (float) Math.cos(a), sn = (float) Math.sin(a);
+            consumer.addVertex(mv, cx + cs * inner, y, cz + sn * inner);
+            consumer.addVertex(mv, cx + cs * outer, y, cz + sn * outer);
         }
 
-        BufferUploader.drawWithShader(buf.end());
+        // In Mojang mappings 1.21.1 this is MeshData
+        var mesh = bufferbuilder.build();
+        BufferUploader.drawWithShader(mesh);
 
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         shader.clear();
     }
+
 }
 

@@ -13,22 +13,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class SimpleCloudsRendererMixin {
 
     @Inject(
-        method = "renderBeforeWeather(Lcom/mojang/blaze3d/vertex/PoseStack;Lorg/joml/Matrix4f;FDDD)V",
-        at = @At("TAIL"),
-        remap = false
+            method = "renderBeforeWeather(Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;FDDD)V",
+            at = @At("TAIL"),
+            remap = false
     )
-    private void pa$afterBeforeWeather(PoseStack stack, Matrix4f projMat, float partialTick,
+    private void pa$afterBeforeWeather(Matrix4f projMat, Matrix4f camMat, float partialTick,
                                        double camX, double camY, double camZ, CallbackInfo ci) {
         SimpleCloudsRenderer self = (SimpleCloudsRenderer)(Object)this;
 
-        // Enter Simple Clouds' cloud space (translate + scale + cloud height)
-        stack.pushPose();
-        self.translateClouds(stack, camX, camY, camZ);
+        // In 1.21.x, PoseStack is no longer passed in, so you’ll need to
+        // allocate your own for local rendering if HurricaneMeshRenderer expects one
+        PoseStack pose = new PoseStack();
 
-        // Draw hurricane ring in cloud space (y≈0 is cloud plane)
-        HurricaneMeshRenderer.renderCloudSpace(self, stack, projMat, partialTick, camX, camZ);
-
-        stack.popPose();
+        // Draw hurricane ring in cloud space
+        HurricaneMeshRenderer.renderCloudSpace(self, pose, projMat, partialTick, camX, camZ);
     }
 }
+
 

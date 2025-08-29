@@ -38,7 +38,7 @@ public class HumidityGenerator {
         long seed = ProjectAtmosphere.seed ^ pos.asLong() ^ biomeId.hashCode() ^ day;
         Random rand = new Random(seed);
 
-        Biome biome = world.getBiome(pos).get();
+        Biome biome = world.getBiome(pos).value();
         float baseRH = biome.getModifiedClimateSettings().downfall() * MAX_HUMIDITY;
 
         

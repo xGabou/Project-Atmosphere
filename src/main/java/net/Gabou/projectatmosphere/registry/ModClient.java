@@ -3,19 +3,22 @@ package net.Gabou.projectatmosphere.registry;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.particles.DebrisParticle;
 import net.Gabou.projectatmosphere.particles.WindLeafParticle;
-import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.neoforged.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.registries.RegistryObject;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class ModClient {
 
-    @SubscribeEvent
-    public static void onRegisterParticles(RegisterParticleProvidersEvent event) {
+    public static void register(IEventBus modEventBus) {
+        // Hook into client mod bus
+        modEventBus.addListener(ModClient::onRegisterParticles);
+    }
+
+    private static void onRegisterParticles(RegisterParticleProvidersEvent event) {
+        // Simple leaf-style particles
         register(event, ModParticles.TRIANGLE_VERT);
         register(event, ModParticles.TRIANGLE_JAUNE);
         register(event, ModParticles.TRIANGLE_ORANGE);
@@ -25,10 +28,13 @@ public class ModClient {
         register(event, ModParticles.HEART_VERT);
         register(event, ModParticles.HEART_JAUNE);
         register(event, ModParticles.HEART_ORANGE);
+
+        // Custom debris particle
         event.registerSpriteSet(ModParticles.DEBRIS.get(), DebrisParticle.Provider::new);
     }
 
-    private static void register(RegisterParticleProvidersEvent event, RegistryObject<SimpleParticleType> particleType) {
+    private static void register(RegisterParticleProvidersEvent event,
+                                 DeferredHolder<ParticleType<?>, SimpleParticleType> particleType) {
         event.registerSpriteSet(particleType.get(), WindLeafParticle.Provider::new);
     }
 }

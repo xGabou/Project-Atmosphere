@@ -9,8 +9,9 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.minecraftforge.fml.config.ConfigTracker;
-import net.minecraftforge.fml.config.ModConfig;
+import net.neoforged.fml.config.ConfigTracker;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLPaths;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -280,7 +281,7 @@ public class AtmoConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
+        renderBackground(g, mouseX, mouseY, partialTick);
         int panelW = 240;
         int panelX = (this.width - panelW) / 2;
         int top = 30;
@@ -297,13 +298,13 @@ public class AtmoConfigScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (maxScroll > 0) {
-            scrollOffset = Mth.clamp(scrollOffset - (int) (delta * 20), 0, maxScroll);
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (maxScroll > 0 && scrollY != 0) {
+            scrollOffset = Mth.clamp(scrollOffset - (int) (scrollY * 20), 0, maxScroll);
             updateWidgetPositions();
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     private void updateWidgetPositions() {
@@ -391,24 +392,10 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.WIND_PUSH_THRESHOLD_MPS.set(windPushThresholdMps);
         AtmoCommonConfig.WIND_PLAYER_PUSH_SCALE.set(windPlayerPushScale);
         AtmoCommonConfig.WIND_ENTITY_PUSH_SCALE.set(windEntityPushScale);
-
-        try {
-            saveCommonConfigForMod(ProjectAtmosphere.MODID);
-        } catch (Exception ignored) {
-        }
     }
 
-    /** Finds this mod's COMMON config and saves it. */
-    private static void saveCommonConfigForMod(String modId) {
-        var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
-        if (set == null) return;
-        for (ModConfig cfg : set) {
-            if (cfg.getModId().equals(modId)) {
-                cfg.save();
-                return;
-            }
-        }
-    }
+
+
 
     @Override
     public void onClose() {
