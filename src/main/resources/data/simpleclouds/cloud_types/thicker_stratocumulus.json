@@ -1,0 +1,49 @@
+{
+    "noise_settings":  [
+                           {
+                               "scale_z":  200.0,
+                               "fade_distance":  10.0,
+                               "height_offset":  64.0,
+                               "value_scale":  1.0,
+                               "height":  64.0,
+                               "value_offset":  -0.1,
+                               "scale_x":  200.0,
+                               "scale_y":  80.0
+                           },
+                           {
+                               "scale_z":  30.0,
+                               "fade_distance":  10.0,
+                               "height_offset":  64.0,
+                               "value_scale":  0.2,
+                               "height":  64.0,
+                               "value_offset":  0.0,
+                               "scale_x":  30.0,
+                               "scale_y":  30.0
+                           },
+                           {
+                               "scale_z":  30.0,
+                               "fade_distance":  10.0,
+                               "height_offset":  64.0,
+                               "value_scale":  3.0,
+                               "height":  32.0,
+                               "value_offset":  -0.5,
+                               "scale_x":  40.0,
+                               "scale_y":  60.0
+                           },
+                           {
+                               "scale_z":  200.0,
+                               "fade_distance":  10.0,
+                               "height_offset":  100.0,
+                               "value_scale":  5.0,
+                               "height":  40.0,
+                               "value_offset":  -0.5,
+                               "scale_x":  300.0,
+                               "scale_y":  400.0
+                           }
+                       ],
+    "weather_type":  "none",
+    "storminess":  0.6,
+    "storm_start":  32.0,
+    "transparency_fade":  0.0,
+    "storm_fade_distance":  128.0
+}
