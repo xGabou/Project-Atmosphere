@@ -5,81 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add new cloud types and configurations for weather system">
-      <change afterPath="$PROJECT_DIR$/error.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cookie.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus_noise.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/custom_cumulonimbus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dark_wall.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_cumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_itty_bitty.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_tsegrus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/floating_farlands.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/heavy_stratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/islands.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/itty_bitty_bigger.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/mammatus_thin.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/matrix.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pathway.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/pattern.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/real_itty_bitty.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_cumulonimbus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/severe_nimbostratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/smaller_stratocumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spots.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/spotted.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stripe.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stripe_side.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stronger_stratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/tall_noise.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/tall_weirdness.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/thicker_stratocumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/tsegrus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/balls.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cookie.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_noise.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/custom_cumulonimbus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/dark_wall.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/dense_cumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/dense_tsegrus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/dithering.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/floating_farlands.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/heavy_stratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/itty_bitty_bigger.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/mammatus_thin.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/matrix.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/overcast.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/pathway.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/real_itty_bitty.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/severe_cumulonimbus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/severe_nimbostratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/smaller_stratocumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/snow.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/spots.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/spotted.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stripe.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stripe_side.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stronger_stratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/tall_noise.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/tall_weirdness.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/thicker_stratocumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/tsegrus.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/config.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulonimbus.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/overcast.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/itty_bitty.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/snow.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/nimbostratus.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/small_cumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dithering.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stratocumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dense_stratocumulus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/balls.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulonimbus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/islands.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/itty_bitty.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/dense_itty_bitty.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/nimbostratus.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/small_cumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/pattern.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stratocumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/dense_stratocumulus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stratus.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -263,7 +190,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
     <configuration name="Client" type="Application" factoryName="Application">
       <option name="MAIN_CLASS_NAME" value="net.neoforged.devlaunch.Main" />
       <module name="project-atmosphere.main" />
@@ -526,11 +453,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [clean]" />
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
       </list>
     </recent_temporary>
   </component>
@@ -630,15 +557,8 @@
       <workItem from="1756153065881" duration="18000" />
       <workItem from="1756215890068" duration="9560000" />
       <workItem from="1756252310141" duration="19781000" />
-      <workItem from="1756441542036" duration="1623000" />
-    </task>
-    <task id="LOCAL-00050" summary="Début du thermomètre">
-      <option name="closed" value="true" />
-      <created>1750810631443</created>
-      <option name="number" value="00050" />
-      <option name="presentableId" value="LOCAL-00050" />
-      <option name="project" value="LOCAL" />
-      <updated>1750810631444</updated>
+      <workItem from="1756441542036" duration="2469000" />
+      <workItem from="1756502652077" duration="689000" />
     </task>
     <task id="LOCAL-00051" summary="Début du thermomètre">
       <option name="closed" value="true" />
@@ -1024,7 +944,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756433677709</updated>
     </task>
-    <option name="localTasksCounter" value="99" />
+    <task id="LOCAL-00099" summary="feat: add new cloud types and configurations for weather system">
+      <option name="closed" value="true" />
+      <created>1756443214744</created>
+      <option name="number" value="00099" />
+      <option name="presentableId" value="LOCAL-00099" />
+      <option name="project" value="LOCAL" />
+      <updated>1756443214744</updated>
+    </task>
+    <option name="localTasksCounter" value="100" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1043,7 +971,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Add sandstorm management features and integrate delayed task scheduling" />
     <MESSAGE value="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support" />
     <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
     <MESSAGE value="Enhance tornado rendering with shader integration and improved animation effects" />
@@ -1068,7 +995,8 @@
     <MESSAGE value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
     <MESSAGE value="feat: enhance compatibility with temperature mods and update configuration settings" />
     <MESSAGE value="feat: update temperature mod compatibility and refactor related classes" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: update temperature mod compatibility and refactor related classes" />
+    <MESSAGE value="feat: add new cloud types and configurations for weather system" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add new cloud types and configurations for weather system" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

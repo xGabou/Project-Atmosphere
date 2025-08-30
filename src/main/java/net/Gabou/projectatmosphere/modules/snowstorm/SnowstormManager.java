@@ -51,7 +51,6 @@ public class SnowstormManager {
 
     private static final String[] TEMPERATURE_MODS = {
             "toughasnails",
-            "legendarysurvivaloverhaul",
             "coldsweat"
     };
 
