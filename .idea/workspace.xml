@@ -4,9 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: remove legendary survival overhaul from temperature mods">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: refactor cloud spawning logic and improve code formatting">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -202,7 +202,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
     <configuration name="Client" type="Application" factoryName="Application">
       <option name="MAIN_CLASS_NAME" value="net.neoforged.devlaunch.Main" />
       <module name="project-atmosphere.main" />
@@ -465,8 +465,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [clean]" />
@@ -572,15 +572,7 @@
       <workItem from="1756441542036" duration="2469000" />
       <workItem from="1756502652077" duration="689000" />
       <workItem from="1756574669519" duration="54000" />
-      <workItem from="1756668517228" duration="4918000" />
-    </task>
-    <task id="LOCAL-00052" summary="Début du thermomètre">
-      <option name="closed" value="true" />
-      <created>1750810661461</created>
-      <option name="number" value="00052" />
-      <option name="presentableId" value="LOCAL-00052" />
-      <option name="project" value="LOCAL" />
-      <updated>1750810661461</updated>
+      <workItem from="1756668517228" duration="5547000" />
     </task>
     <task id="LOCAL-00053" summary="Add new particle textures and implement Balai item; enhance client synchronization for weather data">
       <option name="closed" value="true" />
@@ -966,7 +958,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756574717880</updated>
     </task>
-    <option name="localTasksCounter" value="101" />
+    <task id="LOCAL-00101" summary="feat: refactor cloud spawning logic and improve code formatting">
+      <option name="closed" value="true" />
+      <created>1756673693615</created>
+      <option name="number" value="00101" />
+      <option name="presentableId" value="LOCAL-00101" />
+      <option name="project" value="LOCAL" />
+      <updated>1756673693615</updated>
+    </task>
+    <option name="localTasksCounter" value="102" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -985,7 +985,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
     <MESSAGE value="Enhance tornado rendering with shader integration and improved animation effects" />
     <MESSAGE value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
     <MESSAGE value="fix: correct temperature caching and add debris particle configuration" />
@@ -1010,7 +1009,8 @@
     <MESSAGE value="feat: update temperature mod compatibility and refactor related classes" />
     <MESSAGE value="feat: add new cloud types and configurations for weather system" />
     <MESSAGE value="feat: remove legendary survival overhaul from temperature mods" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: remove legendary survival overhaul from temperature mods" />
+    <MESSAGE value="feat: refactor cloud spawning logic and improve code formatting" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: refactor cloud spawning logic and improve code formatting" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
