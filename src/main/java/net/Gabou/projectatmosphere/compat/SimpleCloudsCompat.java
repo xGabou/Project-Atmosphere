@@ -38,7 +38,7 @@ public class SimpleCloudsCompat {
 
     private static final float MIN_PER_TICK = 0.001F; // very gentle drift
     private static final float MAX_PER_TICK = 0.02F;  // about one block per second
-    private static final float BASE_ACCEL   = 0.002F; // gentle ramp
+    private static final float BASE_ACCEL = 0.002F; // gentle ramp
     private static final float ACCEL_PER_WIND = 0.0005F;
 
     public static RandomSource random = RandomSource.create();
@@ -46,7 +46,7 @@ public class SimpleCloudsCompat {
 
     public static final int SCALE = SimpleCloudsConstants.CLOUD_SCALE;
 
-    public static final int MIN_RADIUS = Math.round(5000F/ SCALE);
+    public static final int MIN_RADIUS = Math.round(5000F / SCALE);
     public static final int MAX_RADIUS = Math.round(9429F / SCALE);
 
     public static void init(ServerLevel level) {
@@ -120,7 +120,6 @@ public class SimpleCloudsCompat {
         float rotation = windAngleRad + (float) Math.PI;
 
 
-        
         Optional<CloudRegion> region = generator.createRegion(info, 10, 10, x, z, random, true);
         if (region.isEmpty()) {
             return Optional.empty();
@@ -141,53 +140,59 @@ public class SimpleCloudsCompat {
     }
 
     public static void doInitialGenWithWeather(int x, int z, ServerLevel level) {
-        SpawnRegion region = new SpawnRegion(x, z, SimpleCloudsConstants.SPAWN_RADIUS);
+        List<SpawnRegion> regions = generator.getSpawnRegions();
+
+        // Find existing region that includes (x, z)
+        SpawnRegion region = regions.stream()
+                .filter(r -> r.includesPoint(x, z))
+                .findFirst()
+                .orElseGet(() -> new SpawnRegion(x, z, SimpleCloudsConstants.SPAWN_RADIUS));
+
         CloudSpawningConfig config = spawnConfig;
 
         if (generator.getCloudsInRegion(region).size() > config.getMaxInitialRegions())
             return;
 
         for (int i = 0; i < config.getMaxInitialRegions(); i++) {
-            int sharedRadius = BiasedToBottomInt.of(MIN_RADIUS,MAX_RADIUS).sample(random) ;
+            int sharedRadius = BiasedToBottomInt.of(MIN_RADIUS, MAX_RADIUS).sample(random);
+
             for (int j = 0; j < SimpleCloudsConstants.SPAWN_ATTEMPTS; j++) {
                 Vector2i pos;
-                if(generator.getClouds().isEmpty())
-                {
+                if (generator.getClouds().isEmpty()) {
                     sharedRadius = 200;
                     pos = new Vector2i(x, z);
-                }
-                else {
+                } else {
                     pos = SpawnRegion.getRandomPointInRegion(region, random);
                 }
-
 
                 if (generator.getCloudsInRegion(region).size() >= config.getMaxInitialRegions())
                     return;
 
-                boolean intersectsOther = generator.getSpawnRegions().stream()
+                boolean intersectsOther = regions.stream()
                         .filter(r -> r != region)
                         .anyMatch(r -> r.includesPoint(pos.x, pos.y));
                 if (intersectsOther)
                     continue;
 
-                
-                Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInArea(pos.x,pos.y,sharedRadius,level);
+                Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInArea(pos.x, pos.y, sharedRadius, level);
                 WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, level, level.getGameTime());
                 if (stats == null)
                     continue;
 
                 String cloudId = CloudLibrary.getCloudIdFromSeverity(
-
                         determineCloudSeverity(
                                 stats.temperature(),
                                 stats.humidity(),
                                 stats.pressure(),
-                                calculateDewPoint(stats.temperature(), stats.humidity()),stats.stormChance(),level
+                                calculateDewPoint(stats.temperature(), stats.humidity()),
+                                stats.stormChance(),
+                                level
                         ));
-                ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID,cloudId);
+                ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
                 CloudSpawningConfig.Info selected = config.getWeightInfo(rl);
                 if (selected == null)
                     return;
+
                 Optional<CloudRegion> cloudFormation = createRegion(
                         selected,
                         new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
@@ -208,6 +213,7 @@ public class SimpleCloudsCompat {
             }
         }
     }
+
 
 
     public static double getCloudScale() {
