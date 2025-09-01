@@ -168,15 +168,18 @@ public class SimpleCloudsCompat {
                 if (stats == null)
                     continue;
 
-                String cloudId = CloudLibrary.getCloudIdFromSeverity(
-                        determineCloudSeverity(
-                                stats.temperature(),
-                                stats.humidity(),
-                                stats.pressure(),
-                                calculateDewPoint(stats.temperature(), stats.humidity()),
-                                stats.stormChance(),
-                                level
-                        ));
+                int severity = determineCloudSeverity(
+                        stats.temperature(),
+                        stats.humidity(),
+                        stats.pressure(),
+                        calculateDewPoint(stats.temperature(), stats.humidity()),
+                        stats.stormChance(),
+                        level
+                );
+                if (severity <= 0) {
+                    continue;
+                }
+                String cloudId = CloudLibrary.getCloudIdFromSeverity(severity);
                 ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
                 CloudSpawningConfig.Info selected = config.getWeightInfo(rl);
                 if (selected == null)
