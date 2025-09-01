@@ -49,6 +49,9 @@ public class SimpleCloudSpawner {
     private static float HUMIDITY_MODIFIER = 1.0f;
     private static float TEMPERATURE_MODIFIER = 1.0f;
 
+    private static final float STORM_BIAS = 1.2f;
+    private static final float SUNNY_THRESHOLD = 0.6f;
+
     public static int getCurrentViolence() {
         return currentViolence;
     }
@@ -101,6 +104,7 @@ public class SimpleCloudSpawner {
                     calculateDewPoint(stats.temperature(), stats.humidity()),
                     stats.stormChance(), level
             );
+            if (severity <= 0) continue;
             boolean snowstorm = severity > 5 && freezing;
             String cloudId;
             if (snowstorm) {
@@ -189,10 +193,14 @@ public class SimpleCloudSpawner {
 
         float boost = 1f + 0.08f * daysSince;  // +8% per day
         boost = Math.min(boost, 4f);         // cap at 2.5x
-        float adjustedChance = Math.min(1f, stormChance * boost);
+        float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
 
+        float rawScore = instability * adjustedChance;
+        if (rawScore < SUNNY_THRESHOLD) {
+            return 0;
+        }
 
-        int severity = Math.round(instability * adjustedChance);
+        int severity = Math.round(rawScore);
         severity = Math.max(1, Math.min(7, severity));
 
         if (severity >= 5) {
