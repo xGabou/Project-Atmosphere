@@ -5,6 +5,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.GlassBlock;
+import net.minecraft.world.level.block.StainedGlassBlock;
+import net.minecraft.world.level.block.StainedGlassPaneBlock;
+import net.minecraft.world.level.block.TintedGlassBlock;
+import net.minecraft.world.level.block.state.BlockState;
 
 public class AtmosphereUtils {
 
@@ -41,6 +46,12 @@ public class AtmosphereUtils {
     }
     public static ResourceLocation getBiomeLocation(BlockPos pos, Level world) {
         return world.getBiome(pos).unwrapKey().get().location();
+    }
+    public static boolean isGlass(BlockState state) {
+        return state.getBlock() instanceof GlassBlock
+                || state.getBlock() instanceof StainedGlassBlock
+                || state.getBlock() instanceof StainedGlassPaneBlock
+                || state.getBlock() instanceof TintedGlassBlock;
     }
 
 

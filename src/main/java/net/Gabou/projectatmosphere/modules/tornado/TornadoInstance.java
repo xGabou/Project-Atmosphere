@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.tornado;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -19,6 +20,7 @@ import net.minecraft.world.level.block.StainedGlassBlock;
 import net.minecraft.world.level.block.StainedGlassPaneBlock;
 import net.minecraft.world.level.block.TintedGlassBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -38,7 +40,7 @@ public class TornadoInstance {
 
     private final CloudRegion cloudRegion;
 
-    private float angularSpeed = 0.15f; 
+    private float angularSpeed = 0.15f;
     private long lastDemolitionCheck = 0L;
     private final long demolitionIntervalMs = 1000L;
     private final long ambientWindIntervalMs = 2000L;
@@ -147,56 +149,94 @@ public class TornadoInstance {
         }
     }
 
+    // worker thread seulement
     private void demolishBlocks(ServerLevel level) {
-        // Precompute once per tick/per tornado
-        final long tick = level.getGameTime();
-        final ServerLevel sLevel = (ServerLevel) level;
-        final double innerSq = radius * radius;
+        final BlockPos center = BlockPos.containing(position);
+        final int intRadius = Mth.ceil(radius);
         final double outerSq = (radius + 5) * (radius + 5);
+        final double innerSq = radius * radius;
         final double band = Math.max(1.0, outerSq - innerSq);
-        final double invBand = 1.0 / band; // reuse
-// Optional: time-slice to spread load (every 2 ticks per pos "bucket")
-        final int sliceMod = 2;
-        BlockPos center = BlockPos.containing(position);
-        int intRadius = Mth.ceil(radius);
-        for (BlockPos pos : BlockPos.betweenClosed(
-                center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, -1, -intRadius - DEBRIS_RANGE_EXTENSION),
-                center.offset(intRadius + DEBRIS_RANGE_EXTENSION, intRadius+3, intRadius + DEBRIS_RANGE_EXTENSION))) {
-            BlockState state = level.getBlockState(pos);
-            double distSq = pos.distSqr(center);
-            if (state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)) {
-                level.destroyBlock(pos, false);
-                level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),
-                        pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
-                        5, 0.2, 0.2, 0.2, 0.05);
-            } else if (isGlass(state)) {
-                // quick reject
-                if (distSq > outerSq) return;
+        final double invBand = 1.0 / band;
+        final BlockPos min = center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, 0, -intRadius - DEBRIS_RANGE_EXTENSION);
+        final BlockPos max = center.offset( intRadius + DEBRIS_RANGE_EXTENSION, 3 + intRadius,  intRadius + DEBRIS_RANGE_EXTENSION);
 
-                // time-slice (hash by pos to spread work)
-                if (((pos.asLong() ^ tick) & (sliceMod - 1)) != 0) return;
+        it.unimi.dsi.fastutil.longs.LongArrayList toDestroy = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
+        it.unimi.dsi.fastutil.longs.LongArrayList toDestroyGlass = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
 
-                // probability grows linearly from outer edge (≈0) to inner edge (≈pMax)
-                // tune pMax; 0.35f means ~35% hit chance right at the core per slice tick
-                final float pMax = 0.35f;
-                final double t = Math.min(1.0, Math.max(0.0, (outerSq - distSq) * invBand)); // 0..1
-                final float p = (float)(t * pMax);
+        // lecture off thread avec checks stricts
+        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+            // ne charge pas de chunk ici
+            if (!level.isLoaded(pos)) continue;
 
-                // one RNG + one branch
-                if (sLevel.random.nextFloat() < p) {
-                    // constant damage = 1; breaks over time; inner area just hits more often
-                    GlassDamageManager.damageGlass(sLevel, pos, state, 1);
+            try {
+                // récupère le chunk si déjà chargé sinon skip
+                LevelChunk chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
+                if (chunk == null) continue;
+
+                // lecture état depuis le chunk existant
+                BlockState state = chunk.getBlockState(pos);
+                if (state.isAir()) continue;
+                final double distSq = pos.distSqr(center);
+                // ton test demandé hors main thread
+                if (state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)) {
+                    toDestroy.add(pos.asLong());
                 }
+                else if (AtmosphereUtils.isGlass(state)) {
+                    if (distSq > outerSq) continue;
+
+                    final float pMax = 0.35f;
+                    final double t = Mth.clamp((outerSq - distSq) * invBand, 0.0, 1.0);
+                    final float p = (float) (t * pMax);
+
+                    if (level.random.nextFloat() < p) {
+                        toDestroyGlass.add(pos.asLong());
+                    }
+                }
+
+
+            } catch (Throwable t) {
+                // au moindre souci on ignore cette position
             }
+        }
+
+        if (toDestroy.isEmpty()) return;
+
+        // destruction uniquement sur le thread serveur
+        final int perTick = 256;
+        this._destroyCursor = 0;
+        level.getServer().execute(() -> processLeafLogDestruction(level, toDestroy, perTick));
+        GlassDamageManager.damageGlass(level, toDestroyGlass);
+    }
+
+    // curseur pour le batching
+    private int _destroyCursor = 0;
+
+    // main thread seulement
+    private void processLeafLogDestruction(ServerLevel level,
+                                           it.unimi.dsi.fastutil.longs.LongArrayList list,
+                                           int perTick) {
+        if (_destroyCursor >= list.size()) { _destroyCursor = 0; return; }
+
+        int end = Math.min(_destroyCursor + perTick, list.size());
+        for (int i = _destroyCursor; i < end; i++) {
+            BlockPos pos = BlockPos.of(list.getLong(i));
+            if (!level.isLoaded(pos)) continue;
+
+            BlockState state = level.getBlockState(pos);
+            if (!(state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS))) continue;
+            level.destroyBlock(pos, false);
+        }
+
+        _destroyCursor = end;
+        if (_destroyCursor < list.size()) {
+            level.getServer().execute(() -> processLeafLogDestruction(level, list, perTick));
+        } else {
+            _destroyCursor = 0;
         }
     }
 
-    private boolean isGlass(BlockState state) {
-        return state.getBlock() instanceof GlassBlock
-                || state.getBlock() instanceof StainedGlassBlock
-                || state.getBlock() instanceof StainedGlassPaneBlock
-                || state.getBlock() instanceof TintedGlassBlock;
-    }
+
+
 
     private void playDemolitionSound(Level level) {
         BlockPos center = BlockPos.containing(position);
@@ -205,8 +245,8 @@ public class TornadoInstance {
                 center.getX(), center.getY(), center.getZ(),
                 SoundEvents.GENERIC_EXPLODE,
                 SoundSource.WEATHER,
-                2.0f, 
-                0.5f + level.getRandom().nextFloat() * 0.4f, 
+                2.0f,
+                0.5f + level.getRandom().nextFloat() * 0.4f,
                 false
         );
     }
