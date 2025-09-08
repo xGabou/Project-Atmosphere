@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.api.WindVector;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -35,13 +36,15 @@ public class TornadoCommand {
                     SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
 
                     Vec3 playerPos = player.position();
-                    TornadoManager.spawnServer(level,
-                            new Vec3(playerPos.x, level.getSeaLevel(), playerPos.z),
-                            10f,
-                            wind);
+                    DelayedTaskScheduler.schedule(500, () -> {
+                        TornadoManager.spawnServer(level,
+                                new Vec3(playerPos.x, level.getSeaLevel(), playerPos.z),
+                                10f,
+                                wind);
 
+                    });
                     ctx.getSource().sendSuccess(
-                            () -> Component.literal("🌪️ Tornado + ☁️ Cumulonimbus spawned."), true);
+                            () -> Component.literal("🌪️ Tornado + ☁️ Cumulonimbus spawned. in 500 ticks"), true);
                     return 1;
                 });
 

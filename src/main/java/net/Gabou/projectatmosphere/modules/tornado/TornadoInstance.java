@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.minecraft.core.BlockPos;
@@ -35,6 +36,8 @@ public class TornadoInstance {
     public final float radius;
     public final WindVector wind;
 
+    private final CloudRegion cloudRegion;
+
     private float angularSpeed = 0.15f; 
     private long lastDemolitionCheck = 0L;
     private final long demolitionIntervalMs = 1000L;
@@ -49,6 +52,10 @@ public class TornadoInstance {
         return level;
     }
 
+    public CloudRegion getCloudRegion() {
+        return cloudRegion;
+    }
+
     public double getSuctionRadius() {
         return level.getBaseDamage() * 2;
     }
@@ -57,17 +64,19 @@ public class TornadoInstance {
         return level.getBaseDamage();
     }
 
-    public TornadoInstance(Vec3 position, float radius, WindVector wind) {
-        this(position, radius, wind, 0.05f);
+    public TornadoInstance(Vec3 position, float radius, WindVector wind,CloudRegion cloudRegion) {
+        this(position, radius, wind, 0.05f,cloudRegion);
     }
 
-    public TornadoInstance(Vec3 position, float radius, WindVector wind, float angularSpeed) {
+    public TornadoInstance(Vec3 position, float radius, WindVector wind, float angularSpeed, CloudRegion cloudRegion) {
         this.position = position;
         this.radius = radius;
         this.wind = wind;
         this.angularSpeed = angularSpeed;
         this.spawnTime = System.currentTimeMillis();
         this.level = TornadoLevel.fromWindSpeed(wind.baseSpeed());
+        this.cloudRegion = cloudRegion;
+
     }
 
     public float getLifetimeSeconds() {

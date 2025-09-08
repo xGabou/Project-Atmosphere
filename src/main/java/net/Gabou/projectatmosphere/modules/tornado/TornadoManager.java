@@ -1,9 +1,13 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
+import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -16,17 +20,32 @@ public class TornadoManager {
     private static final List<TornadoInstance> ACTIVE_TORNADOES = new ArrayList<>();
     private static float shaderTime = 0.0f;
 
-    public static void spawn(Vec3 pos, float radius, WindVector wind) {
+    public static void spawn(Vec3 pos, float radius, WindVector wind, Level level) {
+        SpawnRegion temporaryRegion = new SpawnRegion((int)pos.x,(int) pos.z,(int) radius);
+        for (CloudRegion cloud : CloudManager.get(level).getClouds()) {
+            if (cloud.intersects(temporaryRegion)) {
+                if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
+                ACTIVE_TORNADOES.add(new TornadoInstance(pos, radius, wind, cloud));
+                break;
+            }
+        }
+
+
+    }
+    public static void spawnClient(Vec3 pos, float radius, WindVector wind) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
-        ACTIVE_TORNADOES.add(new TornadoInstance(pos, radius, wind));
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return;
+        spawn(pos, radius, wind, level);
     }
 
-    public static void spawn(Vec3 pos, float radius) {
-        spawn(pos, radius, WindVector.fromBase(0, 0));
-    }
+
+//    public static void spawn(Vec3 pos, float radius) {
+//        spawn(pos, radius, WindVector.fromBase(0, 0));
+//    }
 
     public static void spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind) {
-        spawn(pos, radius, wind);
+        spawn(pos, radius, wind, level);
         NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new SpawnTornadoPacket(pos, radius, wind));
     }
 

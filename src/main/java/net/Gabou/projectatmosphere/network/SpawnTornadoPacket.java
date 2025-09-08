@@ -47,7 +47,7 @@ public class SpawnTornadoPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            TornadoManager.spawn(pos, radius, new WindVector(speed, angle, gust));
+            TornadoManager.spawnClient(pos, radius, new WindVector(speed, angle, gust));
         });
         ctx.get().setPacketHandled(true);
     }

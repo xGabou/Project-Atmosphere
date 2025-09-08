@@ -7,11 +7,9 @@ import com.mojang.blaze3d.vertex.*;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -20,9 +18,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
 
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.opengl.GL11C.GL_BACK;
 import static org.lwjgl.opengl.GL11C.glCullFace;
@@ -44,23 +42,36 @@ public class TornadoRenderHandler {
     public static void renderTornado(PoseStack stack, double tornadoX, double tornadoY, double tornadoZ, float twistSpeed, ClientLevel level, Camera camera, Minecraft minecraft, TornadoInstance tornado) {
         ShaderInstance shader = MyShaders.TORNADO;
         if (shader == null) return;
-        RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
+
+        // Bind the tornado’s base texture: prefer SimpleClouds’ cloud color target, fallback to static texture
+        AtomicBoolean boundBaseToClouds = new AtomicBoolean(false);
+        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
+            RenderTarget cloudRT = scr.getCloudTarget(); // offscreen clouds color
+            if (cloudRT == null) {
+                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot bind clouds as tornado base texture.");
+                return;
+            }
+            // Replace the base sampler (Sampler0) with the cloud texture and also expose it as CloudScene
+            shader.setSampler("Sampler0", cloudRT);
+            shader.setSampler("CloudScene", cloudRT);
+
+            // Pass size so we can compute screen-space UVs in the shader
+            Uniform u = shader.getUniform("ScreenSizeX");
+            Uniform u1 = shader.getUniform("ScreenSizeY");
+            if (u != null && u1 != null) {
+                u.set((float) cloudRT.width);
+                u1.set((float) cloudRT.height);
+            }
+            boundBaseToClouds.set(true);
+        });
+
+        if (!boundBaseToClouds.get()) {
+            // Fallback: keep existing static tornado texture
+            RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
+        }
         RenderSystem.setShaderTexture(1, FLOWMAP_TEXTURE);
         RenderSystem.setShaderTexture(2, NORMALMAP_TEXTURE);
         RenderSystem.setShaderTexture(3, NOISE_TEXTURE);
-        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
-            RenderTarget cloudRT = scr.getCloudTarget(); // offscreen clouds color
-            if( cloudRT == null) {
-                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot render tornado.");
-                return;
-            }
-            shader.setSampler("CloudScene", cloudRT);    // bind RT as sampler2D
-
-            // pass size so we can compute screen-space UVs
-            Uniform u = shader.getUniform("ScreenSizeX");
-            Uniform u1 = shader.getUniform("ScreenSizeY");
-            if (u != null&& u1!=null){ u.set((float) cloudRT.width); u1.set((float)cloudRT.height);}
-        });
         RenderSystem.setShader(() -> shader);
         shader.apply();
         int segments = 64;
