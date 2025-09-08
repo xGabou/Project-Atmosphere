@@ -9,6 +9,7 @@ import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoLevel;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -117,6 +118,12 @@ public class TornadoRenderHandler {
 
         var flowIntensity = shader.getUniform("FlowIntensity");
         if (flowIntensity != null) flowIntensity.set(0.1f);
+
+        var scaleUniform = shader.getUniform("Scale");
+        if (scaleUniform != null) {
+            float scale = (float) (tornado.getLevel().getBaseDamage() / TornadoLevel.F1.getBaseDamage());
+            scaleUniform.set(scale);
+        }
 
 
         float partialTicks = minecraft.getFrameTime();
