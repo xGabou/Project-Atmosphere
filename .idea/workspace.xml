@@ -4,11 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement glass block damage handling and destruction for tornado effects">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/GlassDamageManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/GlassDamageManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -527,15 +525,7 @@
       <workItem from="1756740325351" duration="787000" />
       <workItem from="1757076555542" duration="491000" />
       <workItem from="1757077121414" duration="3150000" />
-      <workItem from="1757362828921" duration="10819000" />
-    </task>
-    <task id="LOCAL-00053" summary="Add new particle textures and implement Balai item; enhance client synchronization for weather data">
-      <option name="closed" value="true" />
-      <created>1750875513261</created>
-      <option name="number" value="00053" />
-      <option name="presentableId" value="LOCAL-00053" />
-      <option name="project" value="LOCAL" />
-      <updated>1750875513262</updated>
+      <workItem from="1757362828921" duration="12187000" />
     </task>
     <task id="LOCAL-00054" summary="Add Barometre and Thermometre items; implement HUD overlay for temperature display and enhance cloud spawning logic with wind vector support">
       <option name="closed" value="true" />
@@ -921,7 +911,15 @@
       <option name="project" value="LOCAL" />
       <updated>1757371865256</updated>
     </task>
-    <option name="localTasksCounter" value="102" />
+    <task id="LOCAL-00102" summary="feat: implement glass block damage handling and destruction for tornado effects">
+      <option name="closed" value="true" />
+      <created>1757375783648</created>
+      <option name="number" value="00102" />
+      <option name="presentableId" value="LOCAL-00102" />
+      <option name="project" value="LOCAL" />
+      <updated>1757375783648</updated>
+    </task>
+    <option name="localTasksCounter" value="103" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -940,7 +938,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
     <MESSAGE value="Enhance tornado rendering with shader integration and improved animation effects" />
     <MESSAGE value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
     <MESSAGE value="fix: correct temperature caching and add debris particle configuration" />
@@ -965,7 +962,8 @@
     <MESSAGE value="feat: disable cloud movement towards player and update related configurations" />
     <MESSAGE value="feat: update AtmoConfigScreen layout and improve widget visibility handling" />
     <MESSAGE value="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects" />
+    <MESSAGE value="feat: implement glass block damage handling and destruction for tornado effects" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: implement glass block damage handling and destruction for tornado effects" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1030,10 +1028,6 @@
         <breakpoint enabled="true" type="java-exception">
           <properties class="java.lang.NoClassDefFoundError" package="java.lang" />
           <option name="timeStamp" value="220" />
-        </breakpoint>
-        <breakpoint enabled="true" type="java-exception">
-          <properties class="java.util.NoSuchElementException" package="java.util" />
-          <option name="timeStamp" value="333" />
         </breakpoint>
       </breakpoints>
       <default-breakpoints>

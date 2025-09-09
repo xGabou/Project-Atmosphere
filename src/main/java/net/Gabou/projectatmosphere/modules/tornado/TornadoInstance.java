@@ -115,7 +115,7 @@ public class TornadoInstance {
                     if (demolitionDue) {
                         lastDemolitionCheck = now;
                         demolishBlocks((ServerLevel) level);
-                        playDemolitionSound(level);
+                        level.getServer().execute(()->playDemolitionSound(level));
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -170,7 +170,7 @@ public class TornadoInstance {
 
             try {
                 // récupère le chunk si déjà chargé sinon skip
-                LevelChunk chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
+                LevelChunk chunk = level.getChunkSource().getChunk(pos.getX() >> 4, pos.getZ() >> 4, false);
                 if (chunk == null) continue;
 
                 // lecture état depuis le chunk existant
