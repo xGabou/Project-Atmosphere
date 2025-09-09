@@ -20,7 +20,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.opengl.GL11C.GL_BACK;
@@ -80,8 +79,6 @@ public class TornadoRenderHandler {
         float baseRadius = 20f;
         float topRadius = 5f;
         float height = 356f;
-        float coneStart = 0.5f;
-        float coneFactor = 3.5f;
         stack.pushPose();
         stack.translate(tornadoX, tornadoY, tornadoZ);
 
@@ -176,7 +173,7 @@ public class TornadoRenderHandler {
         float spawnProgress = Mth.clamp(tornado.getLifetimeSeconds() / SPAWN_DESCENT_DURATION, 0f, 1f);
         float cutoffY = height * (1.0f - spawnProgress);
 
-        Random rand = new Random(1337);
+        float time = TornadoManager.getShaderTime();
 
         for (int i = rings - 1; i >= 0; i--) {
             float y0 = i * (height / rings);
@@ -191,33 +188,6 @@ public class TornadoRenderHandler {
             float t0 = y0 / height;
             float t1 = y1 / height;
 
-
-            float shaped0 = (float) Math.pow(t0, 0.6);
-            float shaped1 = (float) Math.pow(t1, 0.6);
-            float baseR0 = topRadius + (baseRadius - topRadius) * shaped0;
-            float baseR1 = topRadius + (baseRadius - topRadius) * shaped1;
-
-            if (t0 > coneStart) {
-                float ct = (t0 - coneStart) / (1.0f - coneStart);
-                baseR0 = Mth.lerp(ct, baseR0, baseR0 * coneFactor);
-            }
-            if (t1 > coneStart) {
-                float ct1 = (t1 - coneStart) / (1.0f - coneStart);
-                baseR1 = Mth.lerp(ct1, baseR1, baseR1 * coneFactor);
-            }
-
-
-            float oscFreq = 4f;
-            float oscAmp = 0.6f;
-            float noiseAmp = 0f;
-
-            float radius0 = baseR0
-                    + (float) Math.sin(t0 * Math.PI * oscFreq) * oscAmp
-                    + (rand.nextFloat() - 0.5f) * 2f * noiseAmp;
-
-            float radius1 = baseR1
-                    + (float) Math.sin(t1 * Math.PI * oscFreq) * oscAmp
-                    + (rand.nextFloat() - 0.5f) * 2f * noiseAmp;
 
             for (int j = 0; j < segments; j++) {
                 float u0 = j / (float) segments;
@@ -237,14 +207,14 @@ public class TornadoRenderHandler {
                 float angle1_1 = (float) (2 * Math.PI * u1 + angleOffset1);
 
 
-                float x00 = radius0 * (float) Math.cos(angle0_0);
-                float z00 = radius0 * (float) Math.sin(angle0_0);
-                float x01 = radius0 * (float) Math.cos(angle0_1);
-                float z01 = radius0 * (float) Math.sin(angle0_1);
-                float x10 = radius1 * (float) Math.cos(angle1_0);
-                float z10 = radius1 * (float) Math.sin(angle1_0);
-                float x11 = radius1 * (float) Math.cos(angle1_1);
-                float z11 = radius1 * (float) Math.sin(angle1_1);
+                float x00 = tornadoShapeRadius(y0, angle0_0, time) * (float) Math.cos(angle0_0);
+                float z00 = tornadoShapeRadius(y0, angle0_0, time) * (float) Math.sin(angle0_0);
+                float x01 = tornadoShapeRadius(y0, angle0_1, time) * (float) Math.cos(angle0_1);
+                float z01 = tornadoShapeRadius(y0, angle0_1, time) * (float) Math.sin(angle0_1);
+                float x10 = tornadoShapeRadius(y1, angle1_0, time) * (float) Math.cos(angle1_0);
+                float z10 = tornadoShapeRadius(y1, angle1_0, time) * (float) Math.sin(angle1_0);
+                float x11 = tornadoShapeRadius(y1, angle1_1, time) * (float) Math.cos(angle1_1);
+                float z11 = tornadoShapeRadius(y1, angle1_1, time) * (float) Math.sin(angle1_1);
 
 
                 float wiggleFreq = 5f;
@@ -472,6 +442,18 @@ public class TornadoRenderHandler {
         t.end();
 
         RenderSystem.depthMask(true);
+    }
+
+
+    private static float tornadoShapeRadius(float y, float angle, float time) {
+        float yAdj = y + 45.0f;
+        float zcurve = (float) Math.pow(yAdj, 1.5f) * 0.03f;
+        float base = zcurve + 5.5f;
+        float scale = Mth.clamp(zcurve * 0.2f, 0.1f, 1.0f);
+        float radius = base + scale * Mth.sin((time - Mth.sqrt(yAdj)) + angle) * 5.0f;
+        float ridgedNoise = 1.0f - 2.0f * Math.abs(Mth.sin((time * 1.5f + 0.1f * yAdj) + angle));
+        radius -= ridgedNoise * 1.2f;
+        return radius;
     }
 
 
