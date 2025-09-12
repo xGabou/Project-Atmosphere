@@ -1,12 +1,9 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.BlockParticleOption;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -15,10 +12,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.GlassBlock;
-import net.minecraft.world.level.block.StainedGlassBlock;
-import net.minecraft.world.level.block.StainedGlassPaneBlock;
-import net.minecraft.world.level.block.TintedGlassBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
@@ -232,13 +225,17 @@ public class TornadoInstance {
             }
         }
 
-        if (toDestroy.isEmpty()) return;
-
         // destruction uniquement sur le thread serveur
         final int perTick = 256;
         this._destroyCursor = 0;
-        level.getServer().execute(() -> processLeafLogDestruction(level, toDestroy, perTick));
-        GlassDamageManager.damageGlass(level, toDestroyGlass);
+        if (!toDestroy.isEmpty()) {
+           AsyncAtmosphereService.runOnMainThread(
+                   ()-> processLeafLogDestruction(level, toDestroy, perTick)
+           );
+        }
+        if (!toDestroyGlass.isEmpty()) {
+           GlassDamageManager.damageGlass(level, toDestroyGlass);
+        }
     }
 
     // curseur pour le batching

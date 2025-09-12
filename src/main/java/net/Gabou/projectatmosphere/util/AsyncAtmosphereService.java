@@ -1,10 +1,17 @@
 package net.Gabou.projectatmosphere.util;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.async.PoolType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.server.MinecraftServer;
+import net.minecraftforge.fml.LogicalSide;
+import net.minecraftforge.fml.util.thread.EffectiveSide;
+import net.minecraftforge.server.ServerLifecycleHooks;
 
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * Async runner sized by ProjectAtmosphere.SystemProfile.
@@ -26,6 +33,17 @@ public final class AsyncAtmosphereService {
     private static ThreadPoolExecutor STORM_POOL;
     private static ThreadPoolExecutor CLIENT_POOL;
     private static ThreadPoolExecutor SHARED_POOL; // low-spec fallback
+
+    public static ThreadPoolExecutor getWeatherExecutor() {
+        return  WEATHER_POOL;
+    }
+
+    public static ThreadPoolExecutor getStormExecutor() {
+        return  STORM_POOL;
+    }
+    public static ThreadPoolExecutor getClientExecutor() {
+        return  CLIENT_POOL;
+    }
 
     private AsyncAtmosphereService() {}
 
@@ -173,6 +191,106 @@ public final class AsyncAtmosphereService {
             initialized = false;
         }
     }
+
+    /**
+     * Run code on the correct Minecraft main thread (client or server).
+     */
+    public static void runOnMainThread(Runnable task) {
+        Objects.requireNonNull(task, "task");
+        if (EffectiveSide.get() == LogicalSide.CLIENT) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                mc.execute(task);
+            } else {
+                ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] Tried to schedule on client thread but Minecraft was null");
+            }
+        } else {
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null) {
+                server.execute(task);
+            } else {
+                ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] Tried to schedule on server thread but server was null");
+            }
+        }
+    }
+
+    public static <T> T callOnMainThread(Callable<T> task) {
+        Objects.requireNonNull(task, "task");
+
+        if (EffectiveSide.get() == LogicalSide.CLIENT) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null) {
+                try {
+                    return task.call(); // already on client thread
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } else if (EffectiveSide.get() == LogicalSide.SERVER) {
+            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            if (server != null && server.isSameThread()) {
+                try {
+                    return task.call(); // already on server thread
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        // Not on main thread -> enqueue and wait
+        CompletableFuture<T> future = new CompletableFuture<>();
+        runOnMainThread(() -> {
+            try {
+                future.complete(task.call());
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+
+        try {
+            return future.get(); // block until finished
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    /**
+     * Run an async task in the given pool, then deliver its result back to the main thread.
+     * @param pool Which executor to use (WEATHER, STORM, CLIENT)
+     * @param asyncWork Heavy computation, executed async
+     * @param callback Runs on main thread with the result
+     */
+    public static <T> void runWithCallback(PoolType pool, Callable<T> asyncWork, Consumer<T> callback) {
+        ensureInit();
+        Objects.requireNonNull(pool, "pool");
+        Objects.requireNonNull(asyncWork, "asyncWork");
+        Objects.requireNonNull(callback, "callback");
+
+        ExecutorService exec = switch (pool) {
+            case WEATHER -> WEATHER_POOL;
+            case STORM   -> STORM_POOL;
+            case CLIENT  -> CLIENT_POOL;
+        };
+
+        executeSafe(exec, wrap(() -> {
+            try {
+                T result = asyncWork.call();
+                if (result != null) {
+                    runOnMainThread(() -> {
+                        try {
+                            callback.accept(result);
+                        } catch (Throwable t) {
+                            ProjectAtmosphere.LOGGER.error("[AsyncAtmosphere] callback failed", t);
+                        }
+                    });
+                }
+            } catch (Throwable t) {
+                ProjectAtmosphere.LOGGER.error("[AsyncAtmosphere] asyncWork failed", t);
+            }
+        }, pool.name()));
+    }
+
 
     // ----------------- helpers -----------------
 

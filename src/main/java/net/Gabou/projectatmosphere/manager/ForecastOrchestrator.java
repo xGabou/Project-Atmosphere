@@ -34,20 +34,20 @@ public class ForecastOrchestrator {
     private static Map<UUID, Set<BiomeInstanceKey>> activePlayerBiomeKeys = new HashMap<>();
 
 
-
     /**
      * Called when the server starts
      */
     public static boolean onServerStart(ServerLevel level) {
         ForecastDataStorage.loadAll(level);
         TornadoStorageManager.load(level);
-
+        ForecastGenerator.seed = level.getSeed();
 
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
             try {
                 ForecastGenerator.generateForecastForSavedRegion(level);
                 return true;
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
 
                 ForecastDataStorage.clearAll(level);
@@ -85,7 +85,7 @@ public class ForecastOrchestrator {
     public static void onPlayerLogin(ServerPlayer player, ServerLevel level) {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
-        getNearbyBiomeKeys(level,player,500);
+        getNearbyBiomeKeys(level, player, 500);
         long start = System.nanoTime();
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
             boolean shouldGenerate = true;
@@ -101,9 +101,10 @@ public class ForecastOrchestrator {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
-        } else {
-            SimpleCloudsCompat.setIsInit(true);
+
         }
+        SimpleCloudsCompat.setIsInit(true);
+
         long end = System.nanoTime();
         long durationMs = (end - start) / 1_000_000;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
@@ -114,9 +115,7 @@ public class ForecastOrchestrator {
      * Used to manually trigger regeneration
      */
     public static void regenerateAround(ServerLevel level, BlockPos pos) {
-        ForecastGenerator.generateForecastForRegion(pos, level);
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        updateForecast(level, pos);
     }
 
     /**
@@ -132,16 +131,16 @@ public class ForecastOrchestrator {
             ForecastGenerator.generateForecastForRegion(center, level);
         }
 
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
+        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
     }
 
     /**
      * Called on profile swap (e.g. midnight transition)
      */
     public static void onSwapDay(ServerLevel level) {
-        boolean needsRegen = false;
 
+        boolean needsRegen = false;
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
             BiomeForecast forecast = entry.getValue();
@@ -159,16 +158,14 @@ public class ForecastOrchestrator {
         }
 
         if (needsRegen || ForecastGenerator.getForecastMap().isEmpty()) {
-
             BlockPos spawn = level.getSharedSpawnPos();
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing or invalid. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
         }
 
-
         ForecastGenerator.swapToTomorrow();
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
+        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
     }
 
 
@@ -177,8 +174,8 @@ public class ForecastOrchestrator {
      */
     public static void updateForecast(ServerLevel level, BlockPos center) {
         ForecastGenerator.generateForecastForRegion(center, level);
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
+        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
     }
 
 
@@ -215,15 +212,15 @@ public class ForecastOrchestrator {
     }
 
     public static void tick(ServerLevel level) {
-                    GlassDamageManager.tick(level);
-                    ForecastGenerator.tickSandstormScheduler(level);
-                    long now = level.getGameTime();
-                    if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
-                        lastTornadoCheckTick = now;
-                        ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
-                        AsyncAtmosphereService.runStorm(() ->
-                        TornadoProbabilityManager.onScheduledCheck(level));
-                    }
+        GlassDamageManager.tick(level);
+        ForecastGenerator.tickSandstormScheduler(level);
+        long now = level.getGameTime();
+        if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
+            lastTornadoCheckTick = now;
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
+            AsyncAtmosphereService.runStorm(() ->
+                    TornadoProbabilityManager.onScheduledCheck(level));
+        }
 
     }
 
@@ -255,17 +252,18 @@ public class ForecastOrchestrator {
                 .filter(key -> key.samplePos() != null &&
                         key.samplePos().distToCenterSqr(center.x, center.y, center.z) <= radiusSq)
                 .collect(Collectors.toSet());
-        activePlayerBiomeKeys.put(player.getUUID(),get);
+        activePlayerBiomeKeys.put(player.getUUID(), get);
     }
 
     public static void clearActiveBiomeKeysForPlayer(ServerPlayer player) {
         activePlayerBiomeKeys.remove(player.getUUID());
     }
+
     public static void clearActiveBiomeKeys() {
         activePlayerBiomeKeys.clear();
     }
 
-    public static void generateWindForecast(BiomeInstanceKey key, ServerLevel level, BiomeForecast forecast) {
+    public static void generateWindForecast(BiomeInstanceKey key, BiomeForecast forecast) {
         WindVector today = forecast.getWindDay();
         if (today == null) {
             return;

@@ -1,11 +1,9 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.BlockParticleOption;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.HashMap;
@@ -60,7 +58,7 @@ public class GlassDamageManager {
         // destruction uniquement sur le thread serveur
         final int perTick = 256;
         _destroyCursor = 0;
-        level.getServer().execute(() -> processGlassDestruction(level, toDestroy, perTick));
+        AsyncAtmosphereService.runOnMainThread(() -> processGlassDestruction(level, toDestroy, perTick));
     }
 
     private static int _destroyCursor = 0;

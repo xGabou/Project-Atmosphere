@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import sereneseasons.api.season.Season;
 
 import java.util.Random;
 
@@ -17,11 +18,12 @@ public class StormGenerator {
      * Returns a 7-day storm profile, each day having [min, max] chance.
      */
     public static float[][] generateWeeklyStormProfile(
-            BiomeInstanceKey biome, ServerLevel level,
+            BiomeInstanceKey biome,
             float[][] temperature,
             float[][] humidity,
             float[][] pressure,
-            WindVector[] wind
+            WindVector[] wind,
+            Season season
     ) {
         float[][] stormWeek = new float[7][2];
         BlockPos pos = biome.samplePos();
@@ -37,28 +39,46 @@ public class StormGenerator {
 
             float windStrength = (wind != null && wind.length > day) ? wind[day].baseSpeed() : 0f;
 
-            if (tempAvg > 26f) stormScore += 0.1f;
-            if (tempAvg > 30f) stormScore += 0.1f;
-            if (pressureAvg < 1000f) stormScore += 0.3f;
+            if (tempAvg > 24f) stormScore += 0.1f;
+            if (tempAvg > 30f) stormScore += 0.15f;
+            if (pressureAvg < 1008f) stormScore += 0.15f;
+            if (pressureAvg < 1000f) stormScore += 0.25f;
             if (pressureAvg < 990f) stormScore += 0.2f;
-            if (rhAvg > 0.8f) stormScore += 0.2f;
-            if (tempDelta > 10f) stormScore += 0.15f;
-            if (windStrength > 12f) stormScore += 0.1f;
+            if (rhAvg > 0.6f) stormScore += 0.15f;
+            if (rhAvg > 0.8f) stormScore += 0.15f;
+            if (tempDelta > 8f) stormScore += 0.15f;
+            if (windStrength > 10f) stormScore += 0.1f;
+            if (windStrength > 14f) stormScore += 0.1f;
 
             
-            float seasonalMultiplier = getSeasonalStormMultiplier(level, pos);
+            float seasonalMultiplier = getSeasonalStormMultiplier(season);
             stormScore *= seasonalMultiplier;
 
             
             long seed = ProjectAtmosphere.seed ^ pos.asLong() ^ biome.hashCode() ^ day;
             Random rand = new Random(seed);
-            stormScore += (rand.nextFloat() - 0.5f) * 0.1f;
+            stormScore += (rand.nextFloat() - 0.5f) * 0.15f;
 
             
-            float min = getSeasonalStormMin(level, pos);
-            float max = getSeasonalStormMax(level, pos);
-            stormWeek[day][0] = min+1;
-            stormWeek[day][1] = clamp(stormScore, min, max)+1;
+            float baseMin = getSeasonalStormMin(season);
+            float baseMax = getSeasonalStormMax(season);
+
+            float minJitter = (rand.nextFloat() - 0.5f) * 0.1f;
+            float dailyMin = clamp(baseMin + minJitter, 0.0f, baseMax);
+
+            float amplified = stormScore * 1.15f;
+            float dailyMax = clamp(amplified, dailyMin, baseMax);
+
+            if (dailyMax < 0.25f && rand.nextFloat() < 0.2f) {
+                dailyMin = 0.0f;
+                dailyMax = 0.0f;
+            } else if (dailyMax < 0.45f && rand.nextFloat() < 0.25f) {
+                dailyMin = Math.max(dailyMin, 0.18f);
+                dailyMax = Math.max(dailyMax, 0.30f);
+            }
+
+            stormWeek[day][0] = dailyMin;
+            stormWeek[day][1] = dailyMax;
         }
 
         return stormWeek;
@@ -77,34 +97,30 @@ public class StormGenerator {
         return Math.max(min, Math.min(max, val));
     }
 
-    private static float getSeasonalStormMultiplier(ServerLevel level, BlockPos pos) {
-        int season = (int)((level.getDayTime() / 24000L) % 4);
+    private static float getSeasonalStormMultiplier(Season season) {
         return switch (season) {
-            case 0 -> 1.0f;  
-            case 1 -> 1.3f;  
-            case 2 -> 1.5f;  
-            case 3 -> 0.7f;  
-            default -> 1.0f;
+            case SPRING -> 1.1f;
+            case SUMMER -> 1.4f;
+            case AUTUMN -> 1.6f;
+            case WINTER -> 0.8f;
         };
     }
 
-    private static float getSeasonalStormMin(ServerLevel level, BlockPos pos) {
-        int season = (int)((level.getDayTime() / 24000L) % 4);
+    private static float getSeasonalStormMin(Season season) {
         return switch (season) {
-            case 1 -> 0.15f;
-            case 2 -> 0.10f;
-            case 3 -> 0.0f;
-            default -> 0.05f;
+            case SPRING -> 0.18f;
+            case SUMMER -> 0.12f;
+            case AUTUMN -> 0.0f;
+            case WINTER -> 0.08f;
         };
     }
 
-    private static float getSeasonalStormMax(ServerLevel level, BlockPos pos) {
-        int season = (int)((level.getDayTime() / 24000L) % 4);
-        return switch (season) {
-            case 1 -> 1.2f;
-            case 2 -> 1.0f;
-            case 3 -> 0.6f;
-            default -> 0.9f;
+    private static float getSeasonalStormMax(Season currentSeason) {
+        return switch (currentSeason) {
+            case SPRING -> 0.9f;
+            case SUMMER, AUTUMN -> 1.0f;
+            case WINTER -> 0.7f;
         };
     }
+
 }

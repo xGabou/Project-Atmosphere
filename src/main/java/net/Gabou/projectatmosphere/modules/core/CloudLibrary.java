@@ -122,7 +122,7 @@ public class CloudLibrary {
     }
 
     public static String getRandomRainCloud(int intensity, boolean includeThunder) {
-        if (includeThunder && RANDOM.nextInt(4) == 0) {
+        if (includeThunder && RANDOM.nextInt(3) == 0) {
             return getRandomThunderCloud(intensity);
         }
         int severity = intensity == 2 ? 6 : 5;

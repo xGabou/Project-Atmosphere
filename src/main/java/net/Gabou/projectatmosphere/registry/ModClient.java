@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.registry;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.particles.DebrisParticle;
 import net.Gabou.projectatmosphere.particles.WindLeafParticle;
+import net.Gabou.projectatmosphere.particles.WindStreakParticle;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraftforge.api.distmarker.Dist;
@@ -26,6 +27,7 @@ public class ModClient {
         register(event, ModParticles.HEART_JAUNE);
         register(event, ModParticles.HEART_ORANGE);
         event.registerSpriteSet(ModParticles.DEBRIS.get(), DebrisParticle.Provider::new);
+        event.registerSpriteSet(ModParticles.WIND_STREAKS.get(), WindStreakParticle.Provider::new);
     }
 
     private static void register(RegisterParticleProvidersEvent event, RegistryObject<SimpleParticleType> particleType) {

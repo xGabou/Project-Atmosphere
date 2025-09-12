@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.modules.temperature.spike;
 
 import com.google.gson.*;
-import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.StorageUtils;

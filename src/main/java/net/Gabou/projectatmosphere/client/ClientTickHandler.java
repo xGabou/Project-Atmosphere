@@ -1,9 +1,7 @@
 package net.Gabou.projectatmosphere.client;
 
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.client.TornadoRenderHandler;
+import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
@@ -22,13 +20,13 @@ import net.minecraft.util.RandomSource;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
@@ -111,54 +109,36 @@ public class ClientTickHandler {
                 TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
             }
         }
-        if (tickCounter % 40 != 0) return; 
-        AsyncAtmosphereService.runClient(() -> {
-            if (mc.level == null || mc.player == null) return;
-            if (random == null) {
-                random = mc.level.random;
+        if (tickCounter % 40 == 0) {
+            if (mc.level != null && mc.player != null) {
+                // snapshot
+                BlockPos pos = mc.player.blockPosition();
+                long gameTime = mc.level.getGameTime();
+                BiomeInstanceKey key = new BiomeInstanceKey(
+                        AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
+                WindVector wind = ForecastOrchestrator.getCurrentWind(key, gameTime);
+                float speed = WindMath.getSmoothGustedSpeed(wind, gameTime);
+
+                if (speed >= 2.0f) {
+                    AsyncAtmosphereService.runWithCallback(
+                            PoolType.CLIENT,
+                            () -> computeWindSpawn(pos, wind, speed),
+                            data -> {
+                                if (mc.level == null) return;
+                                SimpleParticleType particle = getSeasonalLeafParticle(mc.level, data.pos(), mc.level.random);
+                                SimpleParticleType windStreaks = ModParticles.WIND_STREAKS.get();
+
+                                if (particle != null) {
+                                    mc.level.addParticle(particle, data.x(), data.y(), data.z(),
+                                            data.vx(), data.vy(), data.vz());
+                                }
+                                mc.level.addParticle(windStreaks, data.x(), data.y(), data.z(),
+                                        data.vx(), data.vy(), data.vz());
+                            }
+                    );
+                }
             }
-            BlockPos pos = mc.player.blockPosition();
-            BiomeInstanceKey key = new BiomeInstanceKey(
-                    AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
-            if (key == null) return;
-
-            long gameTime = mc.level.getGameTime();
-            WindVector wind = ForecastOrchestrator.getCurrentWind(key, gameTime);
-            float speed = WindMath.getSmoothGustedSpeed(wind,gameTime);
-            if (speed < 2.0f) return;
-
-            float angle = wind.angleRadians();
-            double dx = Math.cos(angle);
-            double dz = Math.sin(angle);
-
-            SimpleParticleType particle = getSeasonalLeafParticle(mc.level, pos, mc.level.random);
-            if (particle != null) {
-                
-                
-                double minDist = 20.0;
-                double maxDist = 100.0;
-                double distance = minDist + mc.level.random.nextDouble() * (maxDist - minDist);
-                double lateralRange = 10.0;
-                double lateral = (mc.level.random.nextDouble() * 2.0 - 1.0) * lateralRange;
-
-                
-                double perpX = -dz;
-                double perpZ = dx;
-
-                double spawnX = pos.getX() + 0.5 - dx * distance + perpX * lateral;
-                double spawnY = pos.getY() + 1.5 + (random.nextDouble() - 0.5) * 0.5;
-                double spawnZ = pos.getZ() + 0.5 - dz * distance + perpZ * lateral;
-
-
-                
-                speed *= 0.2F;
-                double vx = dx * speed;
-                double vy = 0.03;
-                double vz = dz * speed;
-
-                mc.level.addParticle(particle, spawnX, spawnY, spawnZ, vx, vy, vz);
-            }
-        });
+        }
     }
 
     public static SimpleParticleType getSeasonalLeafParticle(ClientLevel level, BlockPos pos, RandomSource random) {
@@ -178,7 +158,7 @@ public class ClientTickHandler {
                     ModParticles.ROUND_VERT.get(),
                     ModParticles.HEART_VERT.get()
             );
-            default -> List.of(); 
+            default -> List.of();
         };
 
         return candidates.isEmpty() ? null : candidates.get(random.nextInt(candidates.size()));
@@ -187,4 +167,34 @@ public class ClientTickHandler {
     public static Season getCurrentSeason(ClientLevel level, BlockPos pos) {
         return SeasonHelper.getSeasonState(level).getSeason();
     }
+    public record WindSpawnData(BlockPos pos,
+                                double x, double y, double z,
+                                double vx, double vy, double vz) {}
+
+    private static WindSpawnData computeWindSpawn(BlockPos pos, WindVector wind, float speed) {
+        float angle = wind.angleRadians();
+        double dx = Math.cos(angle);
+        double dz = Math.sin(angle);
+
+        double minDist = 20.0;
+        double maxDist = 100.0;
+        double distance = minDist + ThreadLocalRandom.current().nextDouble() * (maxDist - minDist);
+        double lateralRange = 10.0;
+        double lateral = (ThreadLocalRandom.current().nextDouble() * 2.0 - 1.0) * lateralRange;
+
+        double perpX = -dz;
+        double perpZ = dx;
+
+        double spawnX = pos.getX() + 0.5 - dx * distance + perpX * lateral;
+        double spawnY = pos.getY() + 1.5 + (ThreadLocalRandom.current().nextDouble() - 0.5) * 0.5;
+        double spawnZ = pos.getZ() + 0.5 - dz * distance + perpZ * lateral;
+
+        speed *= 0.2F;
+        double vx = dx * speed;
+        double vy = 0.03;
+        double vz = dz * speed;
+
+        return new WindSpawnData(pos, spawnX, spawnY, spawnZ, vx, vy, vz);
+    }
+
 }

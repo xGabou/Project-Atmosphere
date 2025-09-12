@@ -1,10 +1,14 @@
 package net.Gabou.projectatmosphere.modules.core;
 
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+
 public class BiomeForecast {
     private float[][] temperature; 
     private float[][] pressure;
     private float[][] humidity;
     private WindVector[] wind;
+
+    private BiomeInstanceKey biomeKey;
 
     private float[][] stormChance;
 
@@ -38,7 +42,13 @@ public class BiomeForecast {
         this.stormChance = stormChance;
     }
 
-    
+    public BiomeInstanceKey getBiomeKey() {
+        return biomeKey;
+    }
+    public void setBiomeKey(BiomeInstanceKey biomeKey) {
+        this.biomeKey = biomeKey;
+    }
+
     public float[][] getTemperature() {
         return temperature;
     }

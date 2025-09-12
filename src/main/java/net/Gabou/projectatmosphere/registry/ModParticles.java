@@ -37,6 +37,9 @@ public class ModParticles {
     public static final RegistryObject<SimpleParticleType> HEART_JAUNE =
             PARTICLES.register("heart_jaune", () -> new SimpleParticleType(true));
 
+    public static final RegistryObject<SimpleParticleType> WIND_STREAKS =
+            PARTICLES.register("wind_streaks", () -> new SimpleParticleType(true));
+
     public static final RegistryObject<ParticleType<DebrisParticleData>> DEBRIS =
             PARTICLES.register("debris", () -> new ParticleType<DebrisParticleData>(true, DebrisParticleData.DESERIALIZER) {
                 @Override

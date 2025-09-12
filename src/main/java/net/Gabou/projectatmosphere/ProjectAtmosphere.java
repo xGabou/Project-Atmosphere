@@ -13,11 +13,14 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.minecraft.locale.Language;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -34,10 +37,6 @@ import net.Gabou.projectatmosphere.network.NetworkHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.event.*;
-import sereneseasons.config.SeasonsConfig;
-import sereneseasons.core.SereneSeasons;
-import sereneseasons.season.SeasonHandler;
-import sereneseasons.season.SeasonTime;
 
 import java.util.Map;
 import java.util.Objects;
@@ -102,7 +101,6 @@ public class ProjectAtmosphere {
             {
                 AsyncAtmosphereService.init(false);
                 SimpleCloudsCompat.init(world);
-                AtmosphereManager.onServerStarting(world);
                 seed = world.getSeed();
             }
             else{
@@ -111,6 +109,15 @@ public class ProjectAtmosphere {
 
         }
     }
+
+    @SubscribeEvent
+    public static void onServerStarted(ServerStartedEvent event) {
+        MinecraftServer server = event.getServer();
+        ServerLevel overworld = server.overworld();
+        AtmosphereManager.onServerStarting(overworld);
+        ProjectAtmosphere.LOGGER.info("BiomeSampler initialized with live biome source.");
+    }
+
 
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {

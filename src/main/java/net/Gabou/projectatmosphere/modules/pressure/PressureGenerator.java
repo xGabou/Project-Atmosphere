@@ -20,11 +20,11 @@ import java.util.Random;
 public class PressureGenerator {
 
     public static final float PRESSION_MOYENNE = 1013.25f; 
-    public static float[][] generateWeekForecast(Level world, BiomeInstanceKey key) {
+    public static float[][] generateWeekForecast(BiomeInstanceKey key,Long day) {
 
         ResourceLocation biome = key.biomeType();
         BlockPos pos = key.samplePos();
-        long day = world.getDayTime() / 24000L;
+
         long seed = ProjectAtmosphere.seed
                 ^ pos.asLong() ^ biome.hashCode() ^ day;
         Random rand = new Random(seed);

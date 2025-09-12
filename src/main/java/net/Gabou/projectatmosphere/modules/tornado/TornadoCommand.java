@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
-import net.Gabou.projectatmosphere.api.WindVector;
+import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -29,7 +29,7 @@ public class TornadoCommand {
                     BiomeInstanceKey key = new BiomeInstanceKey(
                             AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                             player.blockPosition());
-                    WindVector.WindSample sample = WindVector.getOrFallback(key, level);
+                    WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(key);
                     net.Gabou.projectatmosphere.modules.core.WindVector wind =
                             net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(sample.speedMps(),
                                     (float) Math.toRadians(sample.directionDeg()));

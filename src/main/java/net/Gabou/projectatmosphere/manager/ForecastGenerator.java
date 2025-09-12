@@ -4,8 +4,8 @@ import com.BreadRes.desertstormwarming.logic.SandstormPhase;
 import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.async.BiomeSampler;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.LegendarySurvivalCompat;
 import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
 import net.Gabou.projectatmosphere.event.BiomeChangeManager;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
@@ -24,16 +24,15 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.common.Tags;
+import net.minecraft.world.level.biome.BiomeSource;
 import org.apache.commons.lang3.tuple.Pair;
+import sereneseasons.api.season.Season;
+import sereneseasons.api.season.SeasonHelper;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,7 +44,7 @@ public class ForecastGenerator {
 
     private static final int DIFFUSION_RADIUS = 200;
     private static final float DIFFUSION_RATE = 0.1f;
-    private static final int SAMPLE_STEP = 256;
+    private static final int SAMPLE_STEP = 128;
     private static BiomeInstanceKey scheduledStormBiome = null;
     private static SandstormPhase scheduledStormPhase = null;
     private static long scheduledStormTime = -1L;
@@ -54,6 +53,7 @@ public class ForecastGenerator {
         return scheduledStormBiome;
     }
 
+    static long seed = 0L;
 
     private static final float SANDSTORM_WIND_THRESHOLD_BASE = 10f;
     private static final float SANDSTORM_WIND_THRESHOLD_MIN = 6f;
@@ -99,7 +99,6 @@ public class ForecastGenerator {
     private static Map<ResourceLocation, List<BiomeInstanceKey>> biomeIndex = new ConcurrentHashMap<>();
 
 
-
     private static final Map<ResourceLocation, Integer> biomeSampleCounts = new ConcurrentHashMap<>();
 
 
@@ -108,7 +107,7 @@ public class ForecastGenerator {
 
     static final Map<BiomeInstanceKey, BiomeForecast> FORECAST_MAP = new ConcurrentHashMap<>();
 
-    private static final Map<ResourceLocation, List<BiomeForecast>> grouped = new HashMap<>();
+    private static final Map<ResourceLocation, List<BiomeForecast>> grouped = new ConcurrentHashMap<>();
 
     public static Map<ResourceLocation, List<BiomeInstanceKey>> getBiomeIndex() {
         return Collections.unmodifiableMap(biomeIndex);
@@ -137,6 +136,7 @@ public class ForecastGenerator {
             avg.setTemperature(averageWeek(list, BiomeForecast::getTemperature));
             avg.setTemperatureDay(averageDay(list, BiomeForecast::getTemperatureDay));
             avg.setTemperatureTomorrow(averageDay(list, BiomeForecast::getTemperatureTomorrow));
+            avg.setBiomeKey(entry.getValue().get(0).getBiomeKey());
         }
     }
 
@@ -279,7 +279,7 @@ public class ForecastGenerator {
 
 
         DailyForecastGenerator.scheduleAll(level, FORECAST_MAP);
-        FORECAST_MAP.forEach((key, forecast) -> ForecastOrchestrator.generateWindForecast(key, level, forecast));
+        FORECAST_MAP.forEach(ForecastOrchestrator::generateWindForecast);
 
         computeAverageForecastsByBiomeType();
 
@@ -332,61 +332,67 @@ public class ForecastGenerator {
      * @param level  The server level where the region is located.
      */
     static void generateForecastForRegion(BlockPos center, ServerLevel level) {
-        long start = System.nanoTime();
+        final long start = System.nanoTime();
 
+        // Fetch world-dependent values safely on main
+        long day = AsyncAtmosphereService.callOnMainThread(
+                () -> level.getDayTime() / 24000L
+        );
+        Season season = AsyncAtmosphereService.callOnMainThread(
+                () -> SeasonHelper.getSeasonState(level).getSeason()
+        );
+        BiomeSource biomeSource = AsyncAtmosphereService.callOnMainThread(
+                () -> level.getChunkSource().getGenerator().getBiomeSource()
+        );
+
+        // Collect biome samples
+        BiomeSampler sampler = new BiomeSampler(ProjectAtmosphere.seed, level.registryAccess(),biomeSource);
         for (int dx = -RADIUS; dx <= RADIUS; dx += SAMPLE_STEP) {
             for (int dz = -RADIUS; dz <= RADIUS; dz += SAMPLE_STEP) {
                 BlockPos samplePos = center.offset(dx, 0, dz);
+                ResourceLocation biomeId = sampler.getBiomeId(samplePos.getX(), samplePos.getY(), samplePos.getZ());
+                if (biomeId.getPath().contains("cave")) continue;
 
-                level.getBiome(samplePos).unwrapKey().ifPresent(biomeKey -> {
-                    ResourceLocation biomeId = biomeKey.location();
+                int count = biomeSampleCounts.getOrDefault(biomeId, 0);
+                if (count >= MAX_POSITIONS_PER_BIOME) continue;
 
-                    if(biomeId.toString().contains("cave")){
-                        return;
-                    }
-                    int count = biomeSampleCounts.getOrDefault(biomeId, 0);
-                    if (count >= MAX_POSITIONS_PER_BIOME) return;
-
-                    BiomeInstanceKey key = new BiomeInstanceKey(biomeId, samplePos);
-                    if (biomeSamples.add(key)) {
-                        biomeSampleCounts.put(biomeId, count + 1);
-                    }
-                });
+                biomeSamples.add(new BiomeInstanceKey(biomeId, samplePos));
+                biomeSampleCounts.put(biomeId, count + 1);
             }
         }
+
+        // Build biome index
         biomeIndex = biomeSamples.stream()
                 .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType));
 
-
-
+        // Forecast generation
         if (CompatHandler.isToughAsNailsLoaded()) {
-
-            Map<ResourceLocation, Integer> biomeSampleCount = new HashMap<>();
+            Set<ResourceLocation> processed = new HashSet<>();
             for (BiomeInstanceKey key : biomeSamples) {
                 ResourceLocation biomeId = key.biomeType();
-
-
-                int count = biomeSampleCount.getOrDefault(biomeId, 0);
-                if (count >= 1)
-                    continue;
+                if (!processed.add(biomeId)) continue; // already handled this biome
 
                 long sampleTime = System.currentTimeMillis();
-                biomeSampleCount.put(biomeId, count + 1);
                 float[][] forecast = ToughAsNailsCompat.injectForecastForTAN(key, level);
+
                 BiomeForecast bf = new BiomeForecast();
-                long endTime = System.currentTimeMillis();
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Tough as Nail forecast for " + key.biomeType() + " at " + key.samplePos() + " took " + (endTime - sampleTime) + " ms");
                 bf.setTemperature(forecast);
                 bf.setToughAsNailsFlag(true);
+                bf.setBiomeKey(key);
                 FORECAST_MAP.put(key, bf);
+
+                long endTime = System.currentTimeMillis();
+                ProjectAtmosphere.LOGGER.info(
+                        "[Atmosphere] Tough as Nail forecast for " + biomeId + " at " + key.samplePos() +
+                                " took " + (endTime - sampleTime) + " ms"
+                );
             }
             groupForecastsByBiome();
-
         } else {
-
             for (BiomeInstanceKey key : biomeSamples) {
                 BiomeForecast forecast = new BiomeForecast();
                 forecast.setTemperature(generateTemperature(key, level));
+                forecast.setBiomeKey(key);
                 FORECAST_MAP.put(key, forecast);
             }
             groupForecastsByBiome();
@@ -396,42 +402,42 @@ public class ForecastGenerator {
         computeAverageTemperature();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setHumidity(generateHumidity(entry.getKey(), level));
+            entry.getValue().setHumidity(generateHumidity(entry.getKey(), level, day));
         }
-
-
         diffuseAndSmoothField(BiomeForecast::getHumidity, BiomeForecast::setHumidity);
-
         computeAverageHumidity();
 
-
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setPressure(generatePressure(entry.getKey(), level));
+            entry.getValue().setPressure(generatePressure(entry.getKey(), day));
         }
-
-
         diffuseAndSmoothField(BiomeForecast::getPressure, BiomeForecast::setPressure);
-
         computeAveragePressure();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setWind(generateWind(entry.getKey(), level));
+            entry.getValue().setWind(generateWind(entry.getKey()));
         }
-
         computeAverageWind();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setStormChance(generateStorm(entry.getKey(), level, entry.getValue().getTemperature(), entry.getValue().getHumidity(), entry.getValue().getPressure(), entry.getValue().getWind()));
+            entry.getValue().setStormChance(generateStorm(
+                    entry.getKey(),
+                    level,
+                    entry.getValue().getTemperature(),
+                    entry.getValue().getHumidity(),
+                    entry.getValue().getPressure(),
+                    entry.getValue().getWind(),
+                    season
+            ));
         }
         computeAverageStormChance();
 
         dailyAndSand(level);
 
-
         long end = System.nanoTime();
         long durationMs = (end - start) / 1_000_000;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast region generation took " + durationMs + " ms.");
     }
+
 
     private static int tickCounter = 0;
 
@@ -456,13 +462,13 @@ public class ForecastGenerator {
             }
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Sandstorm active in {} biomes: {}", sandStorms.size(), sandStorms);
             AsyncAtmosphereService.runStorm(() -> {
-            for (BiomeInstanceKey biome : sandStorms) {
+                for (BiomeInstanceKey biome : sandStorms) {
 
-                SandStormAPI.blowSandInBiome(level,
-                        biome,
-                        getWindValue(biome, level.getDayTime()));
+                    SandStormAPI.blowSandInBiome(level,
+                            biome,
+                            getWindValue(biome, level.getDayTime()));
 
-            }
+                }
             });
             tickCounter = 0;
 
@@ -470,8 +476,8 @@ public class ForecastGenerator {
         tickCounter++;
     }
 
-    private static float[][] generateStorm(BiomeInstanceKey key, ServerLevel level, float[][] temperature, float[][] humidity, float[][] pressure, WindVector[] wind) {
-        return StormGenerator.generateWeeklyStormProfile(key, level, temperature, humidity, pressure, wind);
+    private static float[][] generateStorm(BiomeInstanceKey key, ServerLevel level, float[][] temperature, float[][] humidity, float[][] pressure, WindVector[] wind, Season season) {
+        return StormGenerator.generateWeeklyStormProfile(key, temperature, humidity, pressure, wind, season);
     }
 
 
@@ -482,15 +488,15 @@ public class ForecastGenerator {
                 ));
     }
 
-    private static float[][] generateHumidity(BiomeInstanceKey key, ServerLevel level) {
-        return HumidityGenerator.generateWeekForecast(level, key);
+    private static float[][] generateHumidity(BiomeInstanceKey key, ServerLevel level, Long day) {
+        return HumidityGenerator.generateWeekForecast(level, key, day);
     }
 
-    private static float[][] generatePressure(BiomeInstanceKey key, ServerLevel level) {
-        return PressureGenerator.generateWeekForecast(level, key);
+    private static float[][] generatePressure(BiomeInstanceKey key, Long day) {
+        return PressureGenerator.generateWeekForecast(key, day);
     }
 
-    private static WindVector[] generateWind(BiomeInstanceKey key, ServerLevel level) {
+    private static WindVector[] generateWind(BiomeInstanceKey key) {
         return WindGenerator.generateWindWeek(key);
     }
 
@@ -498,11 +504,29 @@ public class ForecastGenerator {
     public static Map<BiomeInstanceKey, BiomeForecast> getForecastMap() {
         return FORECAST_MAP;
     }
+    // Build once at initialization
+    private static final Map<BiomeInstanceKey, List<BiomeInstanceKey>> NEIGHBOR_CACHE = new ConcurrentHashMap<>();
+
+    private static void buildNeighborCache(Map<BiomeInstanceKey, float[][]> original, long threshold) {
+        for (BiomeInstanceKey a : original.keySet()) {
+            BlockPos pa = a.samplePos();
+            List<BiomeInstanceKey> neighbors = new ArrayList<>();
+            for (BiomeInstanceKey b : original.keySet()) {
+                if (a == b) continue;
+                if (pa.distSqr(b.samplePos()) <= threshold) {
+                    neighbors.add(b);
+                }
+            }
+            NEIGHBOR_CACHE.put(a, neighbors);
+        }
+    }
+
 
     private static void diffuseAndSmoothField(Function<BiomeForecast, float[][]> getter,
                                               BiConsumer<BiomeForecast, float[][]> setter) {
         long threshold = DIFFUSION_RADIUS * DIFFUSION_RADIUS;
 
+        // 1. Collect original values
         Map<BiomeInstanceKey, float[][]> original = new HashMap<>();
         for (var entry : FORECAST_MAP.entrySet()) {
             float[][] data = getter.apply(entry.getValue());
@@ -511,20 +535,19 @@ public class ForecastGenerator {
             }
         }
 
+        // 2. Build neighbor cache only if empty or outdated
+        if (NEIGHBOR_CACHE.isEmpty() || NEIGHBOR_CACHE.size() != original.size()) {
+            buildNeighborCache(original, threshold);
+        }
+
         Map<BiomeInstanceKey, float[][]> diffused = new HashMap<>();
 
+        // 3. Use precomputed neighbors
         for (var entry : original.entrySet()) {
             BiomeInstanceKey key = entry.getKey();
             float[][] week = entry.getValue();
-            BlockPos pos = key.samplePos();
 
-            Map<BiomeInstanceKey, float[][]> neighbors = new HashMap<>();
-            for (var other : original.entrySet()) {
-                if (!other.getKey().equals(key) && other.getKey().samplePos().distSqr(pos) <= threshold) {
-                    neighbors.put(other.getKey(), other.getValue());
-                }
-            }
-
+            List<BiomeInstanceKey> neighbors = NEIGHBOR_CACHE.getOrDefault(key, List.of());
             if (neighbors.isEmpty()) {
                 diffused.put(key, week);
                 continue;
@@ -535,7 +558,8 @@ public class ForecastGenerator {
                 for (int i = 0; i < 2; i++) {
                     float val = week[d][i];
                     float sum = 0, count = 0;
-                    for (float[][] n : neighbors.values()) {
+                    for (BiomeInstanceKey nKey : neighbors) {
+                        float[][] n = original.get(nKey);
                         sum += n[d][i];
                         count++;
                     }
@@ -547,7 +571,7 @@ public class ForecastGenerator {
             diffused.put(key, smoothed);
         }
 
-
+        // 4. Temporal smoothing and commit back
         for (var entry : diffused.entrySet()) {
             float[][] week = entry.getValue();
             for (int d = 0; d < 7; d++) {
@@ -566,6 +590,7 @@ public class ForecastGenerator {
         }
     }
 
+
     static void clearForecasts() {
         FORECAST_MAP.clear();
         grouped.clear();
@@ -583,7 +608,7 @@ public class ForecastGenerator {
 
     static void putForecast(BiomeInstanceKey key, BiomeForecast forecast) {
         FORECAST_MAP.put(key, forecast);
-        if(biomeSamples.add(key)){
+        if (biomeSamples.add(key)) {
             biomeSampleCounts.put(key.biomeType(), biomeSampleCounts.getOrDefault(key.biomeType(), 0) + 1);
         }
 
@@ -650,10 +675,7 @@ public class ForecastGenerator {
         }
 
 
-        BiomeForecast avg = AVERAGE_FORECASTS.get(key.biomeType());
-        if (avg != null && avg.hasData(type)) {
-            return avg;
-        }
+
 
         BiomeForecast closestSame = null;
         double minDistSame = Double.MAX_VALUE;
@@ -676,6 +698,11 @@ public class ForecastGenerator {
 
         if (closestSame != null) return closestSame;
 
+
+        BiomeForecast avg = AVERAGE_FORECASTS.get(key.biomeType());
+        if (avg != null && avg.hasData(type)) {
+            return avg;
+        }
 
         BiomeForecast closestFallback = null;
         double minDistAny = Double.MAX_VALUE;

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.util;
 
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
+import net.Gabou.projectatmosphere.async.BiomeSampler;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -36,6 +37,9 @@ public class WeatherSampler {
 
         BlockPos center = new BlockPos(centerX, level.getSeaLevel(), centerZ);
 
+        // Build sampler once per call
+        BiomeSampler sampler = new BiomeSampler(level.getSeed(), level.registryAccess(),level.getChunkSource().getGenerator().getBiomeSource());
+
         for (int dx = -radius; dx <= radius; dx += step) {
             for (int dz = -radius; dz <= radius; dz += step) {
                 if (dx * dx + dz * dz > radiusSq)
@@ -43,46 +47,45 @@ public class WeatherSampler {
 
                 BlockPos pos = new BlockPos(centerX + dx, level.getSeaLevel(), centerZ + dz);
 
-                level.getBiome(pos).unwrapKey().ifPresent(biomeKey -> {
-                    ResourceLocation biomeId = biomeKey.location();
+                // Async-safe biome lookup
+                ResourceLocation biomeId = sampler.getBiomeId(pos.getX(), pos.getY(), pos.getZ());
 
-                    BiomeInstanceKey bestMatch = null;
-                    double bestDistSq = Double.MAX_VALUE;
+                BiomeInstanceKey bestMatch = null;
+                double bestDistSq = Double.MAX_VALUE;
 
-                    // only check candidates of this biome type
-                    List<BiomeInstanceKey> candidates = ForecastGenerator.getBiomeIndex().get(biomeId);
-                    if (candidates != null) {
-                        for (BiomeInstanceKey known : candidates) {
-                            // quick reject if outside radius
-                            if (known.samplePos().closerThan(center, radius)) {
-                                double distSq = known.samplePos().distSqr(pos);
-                                if (distSq < bestDistSq) {
-                                    bestDistSq = distSq;
-                                    bestMatch = known;
-                                }
+                // Only check candidates of this biome type
+                List<BiomeInstanceKey> candidates = ForecastGenerator.getBiomeIndex().get(biomeId);
+                if (candidates != null) {
+                    for (BiomeInstanceKey known : candidates) {
+                        if (known.samplePos().closerThan(center, radius)) {
+                            double distSq = known.samplePos().distSqr(pos);
+                            if (distSq < bestDistSq) {
+                                bestDistSq = distSq;
+                                bestMatch = known;
                             }
                         }
                     }
+                }
 
-                    if (bestMatch != null) {
-                        result.add(bestMatch);
-                    } else {
-                        // Only add a fallback key if no nearby one of the same biome already exists
-                        boolean tooClose = result.stream().anyMatch(existing ->
-                                existing.biomeType().equals(biomeId) &&
-                                        existing.samplePos().distSqr(pos) < 100 * 100
-                        );
+                if (bestMatch != null) {
+                    result.add(bestMatch);
+                } else {
+                    // Only add a fallback key if no nearby one of the same biome already exists
+                    boolean tooClose = result.stream().anyMatch(existing ->
+                            existing.biomeType().equals(biomeId) &&
+                                    existing.samplePos().distSqr(pos) < 100 * 100
+                    );
 
-                        if (!tooClose) {
-                            result.add(new BiomeInstanceKey(biomeId, pos));
-                        }
+                    if (!tooClose) {
+                        result.add(new BiomeInstanceKey(biomeId, pos));
                     }
-                });
+                }
             }
         }
 
         return result;
     }
+
 
 
 

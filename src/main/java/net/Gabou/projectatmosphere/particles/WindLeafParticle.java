@@ -52,11 +52,11 @@ public class WindLeafParticle extends TextureSheetParticle {
             this.alpha = (this.lifetime - this.age) / 40.0f;
         }
     }
-    @Override
-    public float getQuadSize(float partialTicks) {
-        float flutter = (float) Math.sin((this.age + partialTicks) * 0.2f) * 0.1f;
-        return super.getQuadSize(partialTicks) + flutter;
-    }
+//    @Override
+//    public float getQuadSize(float partialTicks) {
+//        float flutter = (float) Math.sin((this.age + partialTicks) * 0.2f) * 0.1f;
+//        return super.getQuadSize(partialTicks) + flutter;
+//    }
 
 
 
