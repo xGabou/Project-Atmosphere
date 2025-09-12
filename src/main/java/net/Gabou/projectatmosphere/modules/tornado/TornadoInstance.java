@@ -132,20 +132,53 @@ public class TornadoInstance {
         }
 
         double influence = radius + AMBIENT_WIND_INFLUENCE_EXTENSION;
+        double minY = position.y + WIND_EFFECT_VERTICAL_MIN_OFFSET;
+        double maxY = position.y + WIND_EFFECT_VERTICAL_MAX_OFFSET;
         AABB box = new AABB(
-                position.x - influence, position.y - 5,
+                position.x - influence, minY,
                 position.z - influence, position.x + influence,
-                position.x - influence, position.y + WIND_EFFECT_VERTICAL_MIN_OFFSET
+                maxY, position.z + influence
         );
 
-        double windSpeed = wind.gustSpeed() * WIND_SPEED_SCALING_FACTOR;
-        double vx = Math.cos(wind.angleRadians()) * windSpeed;
-        double vz = Math.sin(wind.angleRadians()) * windSpeed;
+        // Base along-wind component (ambient)
+        double ambientSpeed = Math.max(0.0, wind.gustSpeed()) * WIND_SPEED_SCALING_FACTOR;
+        double ax = Math.cos(wind.angleRadians()) * ambientSpeed;
+        double az = Math.sin(wind.angleRadians()) * ambientSpeed;
 
         for (Entity entity : serverLevel.getEntities(null, box)) {
-            entity.push(vx, 0, vz);
-            if(entity instanceof Player)
-                ProjectAtmosphere.LOGGER.info("Pushed player by wind: vx=" + vx + ", vz=" + vz);
+            // Vector from entity to tornado center (horizontal)
+            double dx = position.x - entity.getX();
+            double dz = position.z - entity.getZ();
+            double distSq = dx * dx + dz * dz;
+            double dist = Math.sqrt(distSq);
+
+            // Avoid div by zero; normalize inward vector
+            double nx = dist > 1e-4 ? dx / dist : 0.0;
+            double nz = dist > 1e-4 ? dz / dist : 0.0;
+
+            // Suction strength scales with proximity, capped
+            double suctionRadius = Math.max(4.0, this.getSuctionRadius());
+            double proximity = Math.max(0.0, 1.0 - Math.min(dist, suctionRadius) / suctionRadius);
+
+            // Tangential (swirl) component: perpendicular to inward vector
+            double swirlDirX = -nz;
+            double swirlDirZ = nx;
+
+            // Scale factors — stronger than before; scales with tornado level
+            double baseMag = 0.06 + this.getLevel().getMaxWindSpeed() * 0.02; // stronger baseline
+            double suctionMag = baseMag * 2.0 * proximity; // inward
+            double swirlMag = baseMag * 1.5 * Math.sqrt(proximity); // rotational swirl
+
+            double vx = ax + nx * suctionMag + swirlDirX * swirlMag;
+            double vz = az + nz * suctionMag + swirlDirZ * swirlMag;
+
+            // Vertical lift increases near center
+            double vy = 0.02 * proximity * (1.0 + this.getLevel().getMaxWindSpeed() * 0.02);
+
+            entity.push(vx, vy, vz);
+            if (entity instanceof Player) {
+                entity.hurtMarked = true;
+            }
         }
     }
 

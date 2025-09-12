@@ -135,6 +135,8 @@ public class AtmosphereManager {
 
     public static void tick(ServerLevel level) {
         ForecastOrchestrator.tick(level);
+        // Apply ambient wind forces to players/entities when strong enough
+        net.Gabou.projectatmosphere.gameplay.WindPhysics.onServerTick(level);
         TornadoManager.tick(level);
         HurricaneManager.tick(level);
         SnowstormManager.tick(level);

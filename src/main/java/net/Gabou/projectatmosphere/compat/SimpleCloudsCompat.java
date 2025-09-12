@@ -49,7 +49,14 @@ public class SimpleCloudsCompat {
         spawnConfig = generator.getSpawnConfig().get();
     }
 
-    public static boolean isInit = false;
+    private static boolean isInit = false;
+
+    public static void setIsInit(boolean b) {
+        isInit = b;
+    }
+    public static boolean getIsInit() {
+        return isInit;
+    }
 
     public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
 
@@ -198,7 +205,7 @@ public class SimpleCloudsCompat {
                 cloudFormation.ifPresent(cf -> {
                     cf.setRadius(finalSharedRadius);
                     generator.addCloud(cf, CloudGenerator.Order.USE_WEIGHT);
-                    isInit = true;
+                    setIsInit(true);
                 });
 
                 break;

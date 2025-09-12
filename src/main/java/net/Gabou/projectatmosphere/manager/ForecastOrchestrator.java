@@ -102,7 +102,7 @@ public class ForecastOrchestrator {
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
         } else {
-            SimpleCloudsCompat.isInit = true;
+            SimpleCloudsCompat.setIsInit(true);
         }
         long end = System.nanoTime();
         long durationMs = (end - start) / 1_000_000;
