@@ -1,5 +1,4 @@
 {
-    "textures": [
-        "minecraft:particle/heart"
-    ]
+  "textures": [
+    "projectatmosphere:heart_vert"]
 }

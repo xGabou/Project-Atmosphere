@@ -4,25 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: introduce async biome sampling and enhance threading support">
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/effects/base.png" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add wind streaks texture configuration">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindLeafParticle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindLeafParticle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindStreakParticle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindStreakParticle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/debris.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/debris.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_jaune.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_jaune.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_orange.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_orange.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_vert.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_vert.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_jaune.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_jaune.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_orange.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_orange.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_vert.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_vert.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_jaune.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_jaune.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_orange.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_orange.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_vert.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_vert.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/effects/tornado.png" beforeDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -194,11 +177,11 @@
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\sounds" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\src\main\resources\assets" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\effects" />
       <recent name="G:\Project-Atmosphere\run\resourcepacks" />
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\geo\entity" />
       <recent name="H:\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere" />
-      <recent name="H:\Project-Atmosphere" />
     </key>
     <key name="MoveMembersDialog.RECENTS_KEY">
       <recent name="net.Gabou.projectatmosphere.util.StorageUtils" />
@@ -545,23 +528,7 @@
       <workItem from="1757362828921" duration="13271000" />
       <workItem from="1757680670678" duration="32214000" />
       <workItem from="1757772964530" duration="3661000" />
-      <workItem from="1757776713291" duration="2564000" />
-    </task>
-    <task id="LOCAL-00057" summary="Refactor and enhance weather forecasting system; rename files, add new forecast data structures, and implement crafting recipes for new items&#10;&#10;&#10;&#10;&#10;New system now one generator and refactored the logic behind the biome generation.">
-      <option name="closed" value="true" />
-      <created>1751438867685</created>
-      <option name="number" value="00057" />
-      <option name="presentableId" value="LOCAL-00057" />
-      <option name="project" value="LOCAL" />
-      <updated>1751438867685</updated>
-    </task>
-    <task id="LOCAL-00058" summary="Refactor build configuration and enhance cloud integration; update dependencies and streamline setup logic for weather control">
-      <option name="closed" value="true" />
-      <created>1751439466995</created>
-      <option name="number" value="00058" />
-      <option name="presentableId" value="LOCAL-00058" />
-      <option name="project" value="LOCAL" />
-      <updated>1751439466995</updated>
+      <workItem from="1757776713291" duration="3642000" />
     </task>
     <task id="LOCAL-00059" summary="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
       <option name="closed" value="true" />
@@ -939,7 +906,23 @@
       <option name="project" value="LOCAL" />
       <updated>1757714997682</updated>
     </task>
-    <option name="localTasksCounter" value="106" />
+    <task id="LOCAL-00106" summary="feat: update particle textures and enhance tornado rendering logic">
+      <option name="closed" value="true" />
+      <created>1757779387680</created>
+      <option name="number" value="00106" />
+      <option name="presentableId" value="LOCAL-00106" />
+      <option name="project" value="LOCAL" />
+      <updated>1757779387680</updated>
+    </task>
+    <task id="LOCAL-00107" summary="feat: add wind streaks texture configuration">
+      <option name="closed" value="true" />
+      <created>1757779403841</created>
+      <option name="number" value="00107" />
+      <option name="presentableId" value="LOCAL-00107" />
+      <option name="project" value="LOCAL" />
+      <updated>1757779403841</updated>
+    </task>
+    <option name="localTasksCounter" value="108" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -958,8 +941,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: enhance tornado rendering with shader effects and improved twist animation" />
-    <MESSAGE value="feat: add shader support for cloud rendering and implement noise functions" />
     <MESSAGE value="fix: update legendary survival overhaul dependency and increase max positions per biome" />
     <MESSAGE value="feat: enhance tornado rendering with improved shader parameters and error handling" />
     <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
@@ -983,7 +964,9 @@
     <MESSAGE value="feat: improve tornado block demolition handling and optimize chunk loading" />
     <MESSAGE value="feat: add cloud dumping command and enhance wind physics integration" />
     <MESSAGE value="feat: introduce async biome sampling and enhance threading support" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: introduce async biome sampling and enhance threading support" />
+    <MESSAGE value="feat: update particle textures and enhance tornado rendering logic" />
+    <MESSAGE value="feat: add wind streaks texture configuration" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add wind streaks texture configuration" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

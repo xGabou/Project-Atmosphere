@@ -1,5 +1,3 @@
 {
-    "textures": [
-        "minecraft:particle/crit"
-    ]
+  "textures": ["projectatmosphere:triangle_jaune"]
 }
