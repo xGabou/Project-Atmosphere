@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -33,16 +35,35 @@ public class TornadoCommand {
                     net.Gabou.projectatmosphere.modules.core.WindVector wind =
                             net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(sample.speedMps(),
                                     (float) Math.toRadians(sample.directionDeg()));
-                    SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
-
                     Vec3 playerPos = player.position();
-                    DelayedTaskScheduler.schedule(500, () -> {
-                        TornadoManager.spawnServer(level,
+
+                    if (CloudManager.get(level).getClouds().stream().noneMatch(cloudRegion ->
+                            cloudRegion.intersects(new SpawnRegion(player.getBlockX(), player.getBlockZ(), 10)) &&
+                                    cloudRegion.getCloudTypeId().toString().equals("simpleclouds:cumulonimbus"))) {
+
+                        // Force a cumulonimbus spawn in the biome
+                        SimpleCloudsCompat.spawnCloudInBiome("cumulonimbus", key, level, null, wind);
+
+                        // Capture player pos at trigger time
+
+
+                        // Delay tornado spawn
+                        DelayedTaskScheduler.schedule(500, () -> TornadoManager.spawnServer(
+                                level,
                                 new Vec3(playerPos.x, level.getSeaLevel(), playerPos.z),
                                 10f,
-                                wind);
+                                wind
+                        ));
+                    }
+                    else{
+                        TornadoManager.spawnServer(
+                                level,
+                                new Vec3(playerPos.x, level.getSeaLevel(), playerPos.z),
+                                10f,
+                                wind
+                        );
+                    }
 
-                    });
                     ctx.getSource().sendSuccess(
                             () -> Component.literal("🌪️ Tornado + ☁️ Cumulonimbus spawned. in 500 ticks"), true);
                     return 1;

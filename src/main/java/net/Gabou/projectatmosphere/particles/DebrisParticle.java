@@ -66,7 +66,11 @@ public class DebrisParticle extends TextureSheetParticle {
         @Override
         public Particle createParticle(DebrisParticleData data, ClientLevel level, double x, double y, double z, double vx, double vy, double vz) {
             DebrisParticle particle = new DebrisParticle(level, data.tornado(), data.radius(), data.height(), data.angularSpeed());
-            particle.pickSprite(sprites);
+            try {
+                particle.pickSprite(sprites);
+            } catch (Throwable ignored) {
+                // SpriteSet may not be ready yet
+            }
             return particle;
         }
     }

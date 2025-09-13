@@ -24,7 +24,11 @@ public class WindStreakParticle extends TextureSheetParticle {
 
         this.lifetime = 20 + random.nextInt(20); // streak lives for 1–2 seconds
         this.setSize(0.05f, 0.2f); // thin, tall rectangle
-        this.setSpriteFromAge(sprites);
+        try {
+            this.setSpriteFromAge(sprites);
+        } catch (Throwable ignored) {
+            // SpriteSet may not be bound yet; retry in tick()
+        }
 
         this.alpha = 0.0f; // start invisible, fade in
     }
@@ -32,6 +36,11 @@ public class WindStreakParticle extends TextureSheetParticle {
     @Override
     public void tick() {
         super.tick();
+        // Retry sprite binding in case atlas loaded after construction
+        try {
+            this.setSpriteFromAge(this.sprites);
+        } catch (Throwable ignored) {
+        }
 
         // Fade in first quarter of life
         if (this.age < this.lifetime / 4) {

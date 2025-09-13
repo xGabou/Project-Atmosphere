@@ -1,3 +1,5 @@
 {
-  "textures": ["projectatmosphere:round_jaune"]
+    "textures": [
+        "minecraft:particle/bubble"
+    ]
 }

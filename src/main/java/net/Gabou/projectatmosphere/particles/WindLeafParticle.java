@@ -26,7 +26,11 @@ public class WindLeafParticle extends TextureSheetParticle {
 
         this.lifetime = 200; 
         this.setSize(0.1f, 0.1f);
-        this.setSpriteFromAge(sprites);
+        try {
+            this.setSpriteFromAge(sprites);
+        } catch (Throwable ignored) {
+            // SpriteSet may not be ready yet; will retry in tick()
+        }
 
         
         this.roll = random.nextFloat() * (float)Math.PI * 2.0f; 
@@ -37,6 +41,11 @@ public class WindLeafParticle extends TextureSheetParticle {
     @Override
     public void tick() {
         super.tick();
+        // Retry sprite binding in case atlas loaded after construction
+        try {
+            this.setSpriteFromAge(this.sprites);
+        } catch (Throwable ignored) {
+        }
 
         
         this.oRoll = this.roll;

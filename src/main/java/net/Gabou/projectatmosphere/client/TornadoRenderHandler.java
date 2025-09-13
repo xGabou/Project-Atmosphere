@@ -30,7 +30,7 @@ public class TornadoRenderHandler {
     private static final ResourceLocation NOISE_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/noise.png");
     private static final ResourceLocation TORNADO_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/tornado.png");
+            ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/base.png");
     private static final ResourceLocation FLOWMAP_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/flowmap.png");
     private static final ResourceLocation NORMALMAP_TEXTURE =
@@ -43,32 +43,32 @@ public class TornadoRenderHandler {
         ShaderInstance shader = MyShaders.TORNADO;
         if (shader == null) return;
 
-        // Bind the tornado’s base texture: prefer SimpleClouds’ cloud color target, fallback to static texture
-        AtomicBoolean boundBaseToClouds = new AtomicBoolean(false);
-        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
-            RenderTarget cloudRT = scr.getCloudTarget(); // offscreen clouds color
-            if (cloudRT == null) {
-                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot bind clouds as tornado base texture.");
-                return;
-            }
-            // Replace the base sampler (Sampler0) with the cloud texture and also expose it as CloudScene
-            shader.setSampler("Sampler0", cloudRT);
-            shader.setSampler("CloudScene", cloudRT);
-
-            // Pass size so we can compute screen-space UVs in the shader
-            Uniform u = shader.getUniform("ScreenSizeX");
-            Uniform u1 = shader.getUniform("ScreenSizeY");
-            if (u != null && u1 != null) {
-                u.set((float) cloudRT.width);
-                u1.set((float) cloudRT.height);
-            }
-            boundBaseToClouds.set(true);
-        });
-
-        if (!boundBaseToClouds.get()) {
+//        // Bind the tornado’s base texture: prefer SimpleClouds’ cloud color target, fallback to static texture
+//        AtomicBoolean boundBaseToClouds = new AtomicBoolean(false);
+//        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
+//            RenderTarget cloudRT = scr.getCloudTarget(); // offscreen clouds color
+//            if (cloudRT == null) {
+//                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot bind clouds as tornado base texture.");
+//                return;
+//            }
+//            // Replace the base sampler (Sampler0) with the cloud texture and also expose it as CloudScene
+//            shader.setSampler("Sampler0", cloudRT);
+//            shader.setSampler("CloudScene", cloudRT);
+//
+//            // Pass size so we can compute screen-space UVs in the shader
+//            Uniform u = shader.getUniform("ScreenSizeX");
+//            Uniform u1 = shader.getUniform("ScreenSizeY");
+//            if (u != null && u1 != null) {
+//                u.set((float) cloudRT.width);
+//                u1.set((float) cloudRT.height);
+//            }
+//            boundBaseToClouds.set(true);
+//        });
+//
+//        if (!boundBaseToClouds.get()) {
             // Fallback: keep existing static tornado texture
             RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
-        }
+       // }
         RenderSystem.setShaderTexture(1, FLOWMAP_TEXTURE);
         RenderSystem.setShaderTexture(2, NORMALMAP_TEXTURE);
         RenderSystem.setShaderTexture(3, NOISE_TEXTURE);
@@ -362,87 +362,6 @@ public class TornadoRenderHandler {
         }
     }
 
-    public static void renderTornadoVolume(PoseStack poseStack,
-                                           Vec3 center,
-                                           Vec3 halfExtents,
-                                           float twistSpeed) {
-        ShaderInstance sh = MyShaders.BOX_TORNADO;
-        if (sh == null) return;
-
-        RenderSystem.setShader(() -> sh);
-        sh.apply();
-
-
-        Uniform dbg = sh.getUniform("DebugBox");
-        if (dbg != null) dbg.set(1.0f);
-        Vec3 cam = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-        sh.getUniform("CameraPos").set((float) cam.x, (float) cam.y, (float) cam.z);
-
-
-        Vec3 min = center.subtract(halfExtents);
-        Vec3 max = center.add(halfExtents);
-        sh.getUniform("BoxMin").set((float) min.x, (float) min.y, (float) min.z);
-        sh.getUniform("BoxMax").set((float) max.x, (float) max.y, (float) max.z);
-
-
-        sh.getUniform("Time").set(TornadoManager.getShaderTime());
-        sh.getUniform("TwistSpeed").set(twistSpeed);
-        sh.getUniform("BaseRadius").set(8f);
-        sh.getUniform("TopRadius").set(1.5f);
-        sh.getUniform("Height").set((float) SimpleCloudsConfig.CLIENT.cloudHeight.get());
-        sh.getUniform("DustIntensity").set(0.5f);
-
-
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.enableCull();
-        glCullFace(GL_BACK);
-
-
-        float x0 = (float) min.x, y0 = (float) min.y, z0 = (float) min.z;
-        float x1 = (float) max.x, y1 = (float) max.y, z1 = (float) max.z;
-
-        Tesselator t = Tesselator.getInstance();
-        BufferBuilder b = t.getBuilder();
-        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
-
-
-        b.vertex(x1, y0, z0).endVertex();
-        b.vertex(x1, y0, z1).endVertex();
-        b.vertex(x1, y1, z1).endVertex();
-        b.vertex(x1, y1, z0).endVertex();
-
-        b.vertex(x0, y0, z1).endVertex();
-        b.vertex(x0, y0, z0).endVertex();
-        b.vertex(x0, y1, z0).endVertex();
-        b.vertex(x0, y1, z1).endVertex();
-
-        b.vertex(x0, y1, z0).endVertex();
-        b.vertex(x1, y1, z0).endVertex();
-        b.vertex(x1, y1, z1).endVertex();
-        b.vertex(x0, y1, z1).endVertex();
-
-        b.vertex(x0, y0, z1).endVertex();
-        b.vertex(x1, y0, z1).endVertex();
-        b.vertex(x1, y0, z0).endVertex();
-        b.vertex(x0, y0, z0).endVertex();
-
-        b.vertex(x0, y0, z1).endVertex();
-        b.vertex(x1, y0, z1).endVertex();
-        b.vertex(x1, y1, z1).endVertex();
-        b.vertex(x0, y1, z1).endVertex();
-
-        b.vertex(x1, y0, z0).endVertex();
-        b.vertex(x0, y0, z0).endVertex();
-        b.vertex(x0, y1, z0).endVertex();
-        b.vertex(x1, y1, z0).endVertex();
-
-        t.end();
-
-        RenderSystem.depthMask(true);
-    }
 
 
     private static float tornadoShapeRadius(float y, float angle, float time) {
@@ -456,21 +375,6 @@ public class TornadoRenderHandler {
         return radius;
     }
 
-
-    public static Matrix4f getInverseViewProjection() {
-
-        Matrix4f proj = RenderSystem.getProjectionMatrix();
-        Matrix4f view = RenderSystem.getModelViewMatrix();
-
-
-        Matrix4f viewProj = new Matrix4f(proj);
-        viewProj.mul(view);
-
-
-        viewProj.invert();
-
-        return viewProj;
-    }
     /**
      * Cone cap radius by specifying a *cone angle* (degrees).
      * angleDeg = 0..89 (slope = tan(angleDeg))
@@ -484,28 +388,6 @@ public class TornadoRenderHandler {
         float linear = topRadius + (targetR - topRadius) * t;
         return p == 1f ? linear : topRadius + (targetR - topRadius) * (float) Math.pow(t, p);
     }
-
-    /**
-     * Cone cap radius by specifying the *target radius at the top*.
-     * p = 1 for pure cone; >1 slightly round; <1 flares faster.
-     */
-    static float coneRadiusByTarget(float y, float seamY, float topRadius, float bowlHeight,
-                                    float targetRadius, float p) {
-        float t = Mth.clamp((y - seamY) / bowlHeight, 0f, 1f);
-        float linear = topRadius + (targetRadius - topRadius) * t;
-        return p == 1f ? linear : topRadius + (targetRadius - topRadius) * (float) Math.pow(t, p);
-    }
-
-    /**
-     * Cone cap radius by specifying a *multiplier* of the seam radius at the top.
-     * factor = targetRadius / topRadius  (e.g., 1.8f => 80% wider at the top)
-     * p = 1 for pure cone; >1 slightly round; <1 flares faster.
-     */
-    static float coneRadiusByFactor(float y, float seamY, float topRadius, float bowlHeight,
-                                    float factor, float p) {
-        return coneRadiusByTarget(y, seamY, topRadius, bowlHeight, topRadius * factor, p);
-    }
-
 
 
 }
