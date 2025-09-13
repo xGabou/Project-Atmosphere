@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add wind streaks texture configuration">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -528,15 +528,7 @@
       <workItem from="1757362828921" duration="13271000" />
       <workItem from="1757680670678" duration="32214000" />
       <workItem from="1757772964530" duration="3661000" />
-      <workItem from="1757776713291" duration="3642000" />
-    </task>
-    <task id="LOCAL-00059" summary="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
-      <option name="closed" value="true" />
-      <created>1752014109366</created>
-      <option name="number" value="00059" />
-      <option name="presentableId" value="LOCAL-00059" />
-      <option name="project" value="LOCAL" />
-      <updated>1752014109366</updated>
+      <workItem from="1757776713291" duration="4072000" />
     </task>
     <task id="LOCAL-00060" summary="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
       <option name="closed" value="true" />
@@ -922,7 +914,15 @@
       <option name="project" value="LOCAL" />
       <updated>1757779403841</updated>
     </task>
-    <option name="localTasksCounter" value="108" />
+    <task id="LOCAL-00108" summary="feat: add wind streaks texture configuration">
+      <option name="closed" value="true" />
+      <created>1757780524259</created>
+      <option name="number" value="00108" />
+      <option name="presentableId" value="LOCAL-00108" />
+      <option name="project" value="LOCAL" />
+      <updated>1757780524259</updated>
+    </task>
+    <option name="localTasksCounter" value="109" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
