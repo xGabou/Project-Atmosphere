@@ -24,7 +24,7 @@ By downloading, using, modifying, or interacting with this mod, you agree to the
 ---
 
 ## 📧 Permission Requests
-For partnerships, commercial uses, server hosting integration, or modpacks beyond personal use, please contact Gabou directly via GitHub or CurseForge DM.
+For partnerships, commercial uses, server hosting integration, or modpacks beyond personal use, please contact Gabou directly via GitHub, Discord or CurseForge DM.
 
 ---
 
