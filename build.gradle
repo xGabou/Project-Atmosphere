@@ -116,10 +116,8 @@ dependencies {
     runtimeOnly( fg.deobf("curse.maven:jade-324717:6271651"))
     implementation fg.deobf("curse.maven:serene-seasons-291874:6398227")
     implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
-    implementation fg.deobf("curse.maven:pretty-rain-1163800:6347977")
     implementation fg.deobf("curse.maven:spark-361579:4738952")
     implementation fg.deobf("curse.maven:cloth-config-348521:5729105")
-    implementation fg.deobf("curse.maven:tumbleweed-245028:4891607")
     compileOnly fg.deobf("curse.maven:cold-sweat-506194:6880105")
 }
 

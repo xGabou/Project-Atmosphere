@@ -1,47 +1,71 @@
 package net.Gabou.projectatmosphere.modules.snowstorm;
 
 import com.Gabou.sereneseasonsplus.api.SnowstormHelper;
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraftforge.fml.ModList;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+
 public class SnowstormManager {
 
-    private static double accumulationRatePerTick = 0.0;
-    private static boolean snowstormActive = false;
 
-    public static void startSnowstorm(int intensity) {
-        SnowstormHelper.startSnowstorm(intensity);
-        snowstormActive = true;
-        accumulationRatePerTick = intensity / 1200.0;
+
+    private static List<SnowStorm> affectedRegions = new ArrayList<>();
+
+
+    public static void startSnowstorm(int intensity,CloudRegion region) {
+        affectedRegions.add(new SnowStorm(intensity,region));
+
     }
 
     public static void stopSnowstorm() {
-        SnowstormHelper.stopSnowstorm();
-        snowstormActive = false;
-        accumulationRatePerTick = 0.0;
+
+
+    }
+
+    public static int getSnowStormIntensity(ChunkPos pos)
+    {
+        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(),pos.getMinBlockZ(),16);
+        return affectedRegions.stream()
+                .filter(storm -> storm.getCloudRegion().intersects(region))
+                .mapToInt(SnowStorm::getIntensity)
+                .max()
+                .orElse(0);
+    }
+
+
+    public static boolean isSnowStormAt(ChunkPos pos){
+        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(),pos.getMinBlockZ(),16);
+        return affectedRegions.stream().anyMatch(storm -> storm.getCloudRegion().intersects(region));
     }
 
     public static void tick(ServerLevel level) {
-        if (!snowstormActive) {
-            return;
-        }
+        for (SnowStorm snow : affectedRegions) {
+            for (ServerPlayer player : level.players()) {
+                BlockPos pos = player.blockPosition();
+                if (snow.getCloudRegion().intersects(new SpawnRegion(pos.getX(), pos.getY(), 5)))
+                    applyEffects(player, snow.getIntensity());
 
-        int forecast = forecastBlockCount(20 * 60);
-
-        for (ServerPlayer player : level.players()) {
-            BlockPos pos = player.blockPosition();
-            Biome biome = level.getBiome(pos).value();
-            if (biome.coldEnoughToSnow(pos)) {
-                applyEffects(player, forecast);
             }
         }
     }
+
+
+
+
 
     private static void applyEffects(ServerPlayer player, int forecast) {
         player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, false, false));
@@ -72,7 +96,5 @@ public class SnowstormManager {
         }
     }
 
-    public static int forecastBlockCount(int durationTicks) {
-        return (int) (durationTicks * accumulationRatePerTick);
-    }
+
 }

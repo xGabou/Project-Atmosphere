@@ -1,8 +1,11 @@
 package net.Gabou.projectatmosphere.event;
 
 import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ScAPICloudRegion;
-import dev.nonamecrackers2.simpleclouds.api.common.event.*;
-import dev.nonamecrackers2.simpleclouds.api.common.world.ScAPICloudManager;
+import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionNaturallySpawnEvent;
+import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionRemovedEvent;
+import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionTickEvent;
+import dev.nonamecrackers2.simpleclouds.api.common.event.ModifyCloudSpeedEvent;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
@@ -15,20 +18,20 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec2;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class SimpleCloudsEventListener {
 
+    @SubscribeEvent
     public static void onCloudRegionSpawn(CloudRegionNaturallySpawnEvent event) {
         Level level = event.getLevel();
         ScAPICloudRegion region = event.getCloudRegion();
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getWorldX(), region.getWorldZ());
     }
 
+    @SubscribeEvent
     public static void onCloudRegionRemoved(CloudRegionRemovedEvent event) {
         if(event.getLevel()==null)
             return;
@@ -53,13 +56,12 @@ public class SimpleCloudsEventListener {
 
     @SubscribeEvent
     public static void onCloudRegionTick(CloudRegionTickEvent event) {
-        if (event.getLevel() == null || !(event.getLevel() instanceof ServerLevel serverLevel)) {
-            return;
-        }
-        if(!SimpleCloudsCompat.getIsInit())
-            return;
 
 
+        if ((event.getLevel() == null || event.getLevel().isClientSide)||!SimpleCloudsCompat.getIsInit())
+            return;
+
+        ServerLevel serverLevel = (ServerLevel) event.getLevel();
         ScAPICloudRegion region = event.getCloudRegion();
 
         // Determine a representative biome key at the region center
@@ -109,6 +111,7 @@ public class SimpleCloudsEventListener {
     }
 
 
+    @SubscribeEvent
     public static void onModifyCloudSpeed(ModifyCloudSpeedEvent event) {
     }
 }

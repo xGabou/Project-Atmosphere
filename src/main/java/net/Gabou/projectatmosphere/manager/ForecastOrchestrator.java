@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -33,6 +34,7 @@ public class ForecastOrchestrator {
 
     private static Map<UUID, Set<BiomeInstanceKey>> activePlayerBiomeKeys = new HashMap<>();
 
+    private static final boolean sandStormLoaded = CompatHandler.isSandStormsLoaded();
 
     /**
      * Called when the server starts
@@ -213,7 +215,9 @@ public class ForecastOrchestrator {
 
     public static void tick(ServerLevel level) {
         GlassDamageManager.tick(level);
-        ForecastGenerator.tickSandstormScheduler(level);
+        if(sandStormLoaded)
+            ForecastGenerator.tickSandstormScheduler(level);
+
         long now = level.getGameTime();
         if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
             lastTornadoCheckTick = now;

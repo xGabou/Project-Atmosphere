@@ -2,7 +2,6 @@ package net.Gabou.projectatmosphere.event;
 
 
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-
 import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;

@@ -12,6 +12,10 @@ public class CompatHandler {
 
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 
+    public static boolean isSandStormsLoaded() {
+        return ModList.get().isLoaded("sandstorm");
+    }
+
     public static TemperatureMod getActiveTemperatureMod() {
         if (ModList.get().isLoaded("legendarysurvivaloverhaul")) {
             return TemperatureMod.LEGENDARY_SURVIVAL;
@@ -45,5 +49,8 @@ public class CompatHandler {
             case COLD_SWEAT -> LOGGER.info("Cold Sweat loaded");
             case NONE -> LOGGER.info("No temperature mod loaded, skipping compatibility setup.");
         }
+        String sandStormMsg = isSandStormsLoaded() ? "Sand Storms mod loaded, enabling compatibility." : "Sand Storms mod not found.";
+        LOGGER.info(sandStormMsg);
+
     }
 }

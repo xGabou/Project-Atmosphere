@@ -30,7 +30,7 @@ public class OverwriteDesertSound {
         if(level == null || player == null) {
             return;
         }
-        if(!BiomeChangeManager.isDesert(level, AtmosphereUtils.getBiomeLocation(player.blockPosition(), level)) || SandstormUtils.getDesertProximity(player) <= 0.0F) {
+        if(!BiomeChangeManager.isDesert(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level)) || SandstormUtils.getDesertProximity(player) <= 0.0F) {
             SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase()).forEach(soundEvent -> Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(),null));
             ci.cancel();
 

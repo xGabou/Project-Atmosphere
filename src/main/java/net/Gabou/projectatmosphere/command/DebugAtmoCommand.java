@@ -167,7 +167,7 @@ public class DebugAtmoCommand {
 
     }
 
-    private static void spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {
+    private static CloudRegion spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {
         CloudGenerator generator = SimpleCloudsCompat.generator;
         if (generator != null) {
             CloudRegion existing = generator.getCloudAtWorldPosition(pos.getX(), pos.getZ());
@@ -177,7 +177,8 @@ public class DebugAtmoCommand {
         }
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
         WindVector wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
-        SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
+        return SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
+
     }
 
     private static int spawnRain(CommandContext<CommandSourceStack> ctx) {
@@ -229,11 +230,19 @@ public class DebugAtmoCommand {
     private static int spawnSnowstorm(CommandContext<CommandSourceStack> ctx) {
         ServerLevel level = ctx.getSource().getLevel();
         BlockPos pos;
+        int intensity;
         try {
             pos = BlockPosArgument.getBlockPos(ctx, "pos");
         } catch (IllegalArgumentException e) {
             pos = BlockPos.containing(ctx.getSource().getPosition());
         }
+        try {
+            intensity = IntegerArgumentType.getInteger(ctx, "intensity");
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(Component.literal("No Intensity given."));
+            return 0;
+        }
+
         boolean overwrite;
         try {
             overwrite = BoolArgumentType.getBool(ctx, "overwrite");
@@ -254,8 +263,8 @@ public class DebugAtmoCommand {
             }
         }
         String cloudId = CloudLibrary.getSnowstormCloudId();
-        SnowstormManager.startSnowstorm(CloudLibrary.getSeverityFromCloudId(cloudId));
-        spawnCloud(level, pos, cloudId);
+        CloudRegion region = spawnCloud(level, pos, cloudId);
+        SnowstormManager.startSnowstorm(intensity,region);
         ctx.getSource().sendSuccess(() -> Component.literal("❄ Spawned snowstorm cloud."), true);
         return 1;
     }

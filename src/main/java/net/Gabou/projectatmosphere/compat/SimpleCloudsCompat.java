@@ -58,12 +58,12 @@ public class SimpleCloudsCompat {
         return isInit;
     }
 
-    public static void spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
+    public static CloudRegion spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
 
 
         if (!isInit) {
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] SimpleClouds is not ready yet, cannot spawn cloud: {}", cloudId);
-            return;
+            return null;
         }
 
 
@@ -71,7 +71,7 @@ public class SimpleCloudsCompat {
         CloudSpawningConfig.Info info = spawnConfig.getWeightInfo(rl);
         if (info == null) {
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Unknown cloud type: {}", cloudId);
-            return;
+            return null;
         }
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawning cloud: " + cloudId);
         List<SpawnRegion> Region = generator.getSpawnRegions();
@@ -97,6 +97,7 @@ public class SimpleCloudsCompat {
                 r -> ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawned {} at {}, {} in {}", cloudId, x, z, key.biomeType()),
                 () -> ProjectAtmosphere.LOGGER.warn("[Atmosphere] Failed to spawn {} in {}", cloudId, key.biomeType())
         );
+        return  region.orElse(null);
     }
 
     public static Optional<CloudRegion> regionDummy(CloudRegion region) {

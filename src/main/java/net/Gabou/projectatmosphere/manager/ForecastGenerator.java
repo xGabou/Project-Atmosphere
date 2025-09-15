@@ -64,6 +64,7 @@ public class ForecastGenerator {
     private static final float SANDSTORM_PRESSURE_THRESHOLD_BASE = 1005f;
     private static final float SANDSTORM_PRESSURE_THRESHOLD_MAX = 1015f;
 
+    private static final boolean sandStormLoaded = CompatHandler.isSandStormsLoaded();
 
     public static final int MAX_POSITIONS_PER_BIOME;
 
@@ -284,7 +285,7 @@ public class ForecastGenerator {
         computeAverageForecastsByBiomeType();
 
 
-        if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty()) {
+        if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty() && sandStormLoaded ) {
             BiomeInstanceKey selected = SANDSTORM_FORECASTS.stream()
                     .skip(level.random.nextInt(SANDSTORM_FORECASTS.size()))
                     .findFirst()

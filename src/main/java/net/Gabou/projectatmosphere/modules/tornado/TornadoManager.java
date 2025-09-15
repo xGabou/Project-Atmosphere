@@ -11,6 +11,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ import java.util.List;
 
 public class TornadoManager {
     private static final List<TornadoInstance> ACTIVE_TORNADOES = new ArrayList<>();
+
     private static float shaderTime = 0.0f;
 
     public static void spawn(Vec3 pos, float radius, WindVector wind, Level level) {
@@ -32,6 +35,7 @@ public class TornadoManager {
 
 
     }
+    @OnlyIn(Dist.CLIENT)
     public static void spawnClient(Vec3 pos, float radius, WindVector wind) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         Level level = Minecraft.getInstance().level;
@@ -61,6 +65,7 @@ public class TornadoManager {
         ACTIVE_TORNADOES.clear();
     }
 
+    @OnlyIn(Dist.CLIENT)
     public static float getShaderTime() {
         return shaderTime;
     }
