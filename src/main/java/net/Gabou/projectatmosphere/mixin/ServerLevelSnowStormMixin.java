@@ -7,16 +7,16 @@ import net.minecraft.world.level.ChunkPos;
 import org.spongepowered.asm.mixin.Mixin;
 
 @Mixin(ServerLevel.class)
-public abstract class ServerLevelSnowStormMixin implements ISnowStormLevel {
+public abstract class ServerLevelSnowStormMixin /*implements ISnowStormLevel*/ {
 
 
-    @Override
+    //@Override
     public boolean sereneseasonsplus$isSnowStormAt(ChunkPos pos) {
         ((ServerLevel) (Object)  this).isRainingAt(pos.getWorldPosition());
         return SnowstormManager.isSnowStormAt(pos);
     }
 
-    @Override
+    //@Override
     public int sereneseasonsplus$getSnowStormIntensity(ChunkPos pos) {
         return SnowstormManager.getSnowStormIntensity(pos);
     }

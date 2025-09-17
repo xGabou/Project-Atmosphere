@@ -22,7 +22,7 @@ public class SnowstormManager {
 
 
 
-    private static List<SnowStorm> affectedRegions = new ArrayList<>();
+    private static final List<SnowStorm> affectedRegions = new ArrayList<>();
 
 
     public static void startSnowstorm(int intensity,CloudRegion region) {
@@ -30,9 +30,8 @@ public class SnowstormManager {
 
     }
 
-    public static void stopSnowstorm() {
-
-
+    public static void stopSnowstorm(SnowStorm snowstorm) {
+        affectedRegions.remove(snowstorm);
     }
 
     public static int getSnowStormIntensity(ChunkPos pos)

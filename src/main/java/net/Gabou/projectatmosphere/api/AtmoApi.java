@@ -1,8 +1,10 @@
 package net.Gabou.projectatmosphere.api;
 
-import dev.nonamecrackers2.simpleclouds.api.common.world.ScAPICloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastType;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -31,9 +33,8 @@ public class AtmoApi {
      * @param pos The position in the world
      * @return The BiomeForecast for that position
      */
-    public BiomeForecast getWeatherForecast(ServerLevel level, BlockPos pos) {
-        
-        return null;
+    public BiomeForecast getWeatherForecast(ServerLevel level, BlockPos pos, ForecastType forecastType) {
+        return ForecastGenerator.getClosestValidForecast(AtmosphereUtils.getBiomeKey(level, pos),forecastType);
     }
 
     /**
@@ -43,8 +44,8 @@ public class AtmoApi {
      * @return A WeatherSnapshot representing current conditions (to be defined)
      */
     public Object getCurrentWeather(ServerLevel level, BlockPos pos) {
-        
-        return null;
+
+        return CloudManager.get(level).getCloudTypeAtPosition(pos.getX(), pos.getZ());
     }
 
     /**
@@ -69,6 +70,13 @@ public class AtmoApi {
         return null;
     }
 
+
+    /**
+     * Checks if it is currently raining at the specified position in the given level.
+     * @param level The server level to check
+     * @param pos The position in the world
+     * @return true if it is raining at the position, false otherwise
+     */
     public boolean isRainningAt(ServerLevel level, BlockPos pos) {
         return CloudManager.get(level).isRainingAt(pos);
     }

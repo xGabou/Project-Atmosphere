@@ -4,8 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: disable cloud movement towards player and update related configurations">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/ServerLevelSnowStormMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/ServerLevelSnowStormMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -43,6 +47,12 @@
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="project-atmosphere" type="f1a62948:ProjectNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="forgegradle runs" type="c8890929:TasksNode$1" />
               </path>
             </expand>
@@ -73,7 +83,7 @@
     </option>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="Forge-1.20.1" />
+        <entry key="$PROJECT_DIR$" value="NeoForge-1.21.1" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -87,7 +97,7 @@
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/xGabou/Project-Atmosphere.git&quot;,
-    &quot;accountId&quot;: &quot;8fc22d6b-cb87-4537-9f23-7d8effe9696e&quot;
+    &quot;accountId&quot;: &quot;28ad79d7-fbb5-4e79-a662-e94bfc7edb39&quot;
   }
 }</component>
   <component name="HighlightingSettingsPerFile">
@@ -125,13 +135,14 @@
     &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Debug&quot;,
     &quot;Gradle.Project-Atmosphere [runClient].executor&quot;: &quot;Debug&quot;,
     &quot;Gradle.Project-Atmosphere [runGameTestServer].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [runServer].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [runServer].executor&quot;: &quot;Debug&quot;,
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
     &quot;Repository.Attach.Annotations&quot;: &quot;false&quot;,
     &quot;Repository.Attach.JavaDocs&quot;: &quot;false&quot;,
     &quot;Repository.Attach.Sources&quot;: &quot;false&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;extract.method.default.visibility&quot;: &quot;private&quot;,
@@ -139,15 +150,16 @@
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/src/main/resources/assets/projectatmosphere/sounds&quot;,
+    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/src/main/resources/assets/projectatmosphere/textures/effects&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
     &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.6172414&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
@@ -163,17 +175,18 @@
       <recent name="net.Gabou.projectatmosphere.blocks" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\effects" />
+      <recent name="G:\Project-Atmosphere\run\resourcepacks" />
+      <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\particle" />
+      <recent name="G:\Project-Atmosphere\doc" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\sounds" />
-      <recent name="G:\Project-Atmosphere\libs" />
-      <recent name="G:\Project-Atmosphere\shaders" />
-      <recent name="G:\Project-Atmosphere" />
-      <recent name="G:\Project-Atmosphere\build\resources\main\assets\projectatmosphere\textures\effects" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\src\main\resources\assets" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\effects" />
+      <recent name="G:\Project-Atmosphere\run\resourcepacks" />
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\geo\entity" />
       <recent name="H:\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere" />
-      <recent name="H:\Project-Atmosphere" />
     </key>
     <key name="MoveMembersDialog.RECENTS_KEY">
       <recent name="net.Gabou.projectatmosphere.util.StorageUtils" />
@@ -186,7 +199,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -409,23 +422,22 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
-        <item itemvalue="Gradle.Project-Atmosphere [clean]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
+        <item itemvalue="Gradle.Project-Atmosphere [clean]" />
       </list>
     </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-fdfe4dae3a2d-intellij.indexing.shared.core-IU-243.21565.193" />
-        <option value="bundled-js-predefined-d6986cc7102b-e768b9ed790e-JavaScript-IU-243.21565.193" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.25557.131" />
+        <option value="bundled-js-predefined-d6986cc7102b-b598e85cdad2-JavaScript-IU-252.25557.131" />
       </set>
     </attachedChunks>
   </component>
-  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="" />
@@ -515,103 +527,17 @@
       <workItem from="1756215890068" duration="9560000" />
       <workItem from="1756252310141" duration="19809000" />
       <workItem from="1756275172157" duration="583000" />
-      <workItem from="1758125754024" duration="1118000" />
-    </task>
-    <task id="LOCAL-00050" summary="Début du thermomètre">
-      <option name="closed" value="true" />
-      <created>1750810631443</created>
-      <option name="number" value="00050" />
-      <option name="presentableId" value="LOCAL-00050" />
-      <option name="project" value="LOCAL" />
-      <updated>1750810631444</updated>
-    </task>
-    <task id="LOCAL-00051" summary="Début du thermomètre">
-      <option name="closed" value="true" />
-      <created>1750810657521</created>
-      <option name="number" value="00051" />
-      <option name="presentableId" value="LOCAL-00051" />
-      <option name="project" value="LOCAL" />
-      <updated>1750810657521</updated>
-    </task>
-    <task id="LOCAL-00052" summary="Début du thermomètre">
-      <option name="closed" value="true" />
-      <created>1750810661461</created>
-      <option name="number" value="00052" />
-      <option name="presentableId" value="LOCAL-00052" />
-      <option name="project" value="LOCAL" />
-      <updated>1750810661461</updated>
-    </task>
-    <task id="LOCAL-00053" summary="Add new particle textures and implement Balai item; enhance client synchronization for weather data">
-      <option name="closed" value="true" />
-      <created>1750875513261</created>
-      <option name="number" value="00053" />
-      <option name="presentableId" value="LOCAL-00053" />
-      <option name="project" value="LOCAL" />
-      <updated>1750875513262</updated>
-    </task>
-    <task id="LOCAL-00054" summary="Add Barometre and Thermometre items; implement HUD overlay for temperature display and enhance cloud spawning logic with wind vector support">
-      <option name="closed" value="true" />
-      <created>1750890230889</created>
-      <option name="number" value="00054" />
-      <option name="presentableId" value="LOCAL-00054" />
-      <option name="project" value="LOCAL" />
-      <updated>1750890230889</updated>
-    </task>
-    <task id="LOCAL-00055" summary="Add dust layer block and related assets; implement block registration and enhance client-side randomization for particle effects">
-      <option name="closed" value="true" />
-      <created>1751053723921</created>
-      <option name="number" value="00055" />
-      <option name="presentableId" value="LOCAL-00055" />
-      <option name="project" value="LOCAL" />
-      <updated>1751053723921</updated>
-    </task>
-    <task id="LOCAL-00056" summary="WOrk in progress">
-      <option name="closed" value="true" />
-      <created>1751060290252</created>
-      <option name="number" value="00056" />
-      <option name="presentableId" value="LOCAL-00056" />
-      <option name="project" value="LOCAL" />
-      <updated>1751060290252</updated>
-    </task>
-    <task id="LOCAL-00057" summary="Refactor and enhance weather forecasting system; rename files, add new forecast data structures, and implement crafting recipes for new items&#10;&#10;&#10;&#10;&#10;New system now one generator and refactored the logic behind the biome generation.">
-      <option name="closed" value="true" />
-      <created>1751438867685</created>
-      <option name="number" value="00057" />
-      <option name="presentableId" value="LOCAL-00057" />
-      <option name="project" value="LOCAL" />
-      <updated>1751438867685</updated>
-    </task>
-    <task id="LOCAL-00058" summary="Refactor build configuration and enhance cloud integration; update dependencies and streamline setup logic for weather control">
-      <option name="closed" value="true" />
-      <created>1751439466995</created>
-      <option name="number" value="00058" />
-      <option name="presentableId" value="LOCAL-00058" />
-      <option name="project" value="LOCAL" />
-      <updated>1751439466995</updated>
-    </task>
-    <task id="LOCAL-00059" summary="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
-      <option name="closed" value="true" />
-      <created>1752014109366</created>
-      <option name="number" value="00059" />
-      <option name="presentableId" value="LOCAL-00059" />
-      <option name="project" value="LOCAL" />
-      <updated>1752014109366</updated>
-    </task>
-    <task id="LOCAL-00060" summary="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
-      <option name="closed" value="true" />
-      <created>1753999778188</created>
-      <option name="number" value="00060" />
-      <option name="presentableId" value="LOCAL-00060" />
-      <option name="project" value="LOCAL" />
-      <updated>1753999778188</updated>
-    </task>
-    <task id="LOCAL-00061" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
-      <option name="closed" value="true" />
-      <created>1754000326121</created>
-      <option name="number" value="00061" />
-      <option name="presentableId" value="LOCAL-00061" />
-      <option name="project" value="LOCAL" />
-      <updated>1754000326121</updated>
+      <workItem from="1756740325351" duration="787000" />
+      <workItem from="1757076555542" duration="491000" />
+      <workItem from="1757077121414" duration="3150000" />
+      <workItem from="1757362828921" duration="13271000" />
+      <workItem from="1757680670678" duration="32214000" />
+      <workItem from="1757772964530" duration="3661000" />
+      <workItem from="1757776713291" duration="8405000" />
+      <workItem from="1757790924500" duration="6518000" />
+      <workItem from="1757874600130" duration="1667000" />
+      <workItem from="1757967041442" duration="4749000" />
+      <workItem from="1758031145844" duration="4113000" />
     </task>
     <task id="LOCAL-00062" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
       <option name="closed" value="true" />
@@ -909,7 +835,103 @@
       <option name="project" value="LOCAL" />
       <updated>1756272515958</updated>
     </task>
-    <option name="localTasksCounter" value="99" />
+    <task id="LOCAL-00099" summary="feat: update AtmoConfigScreen layout and improve widget visibility handling">
+      <option name="closed" value="true" />
+      <created>1756676450465</created>
+      <option name="number" value="00099" />
+      <option name="presentableId" value="LOCAL-00099" />
+      <option name="project" value="LOCAL" />
+      <updated>1756676450465</updated>
+    </task>
+    <task id="LOCAL-00100" summary="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects">
+      <option name="closed" value="true" />
+      <created>1756710295260</created>
+      <option name="number" value="00100" />
+      <option name="presentableId" value="LOCAL-00100" />
+      <option name="project" value="LOCAL" />
+      <updated>1756710295260</updated>
+    </task>
+    <task id="LOCAL-00101" summary="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects">
+      <option name="closed" value="true" />
+      <created>1757371865256</created>
+      <option name="number" value="00101" />
+      <option name="presentableId" value="LOCAL-00101" />
+      <option name="project" value="LOCAL" />
+      <updated>1757371865256</updated>
+    </task>
+    <task id="LOCAL-00102" summary="feat: implement glass block damage handling and destruction for tornado effects">
+      <option name="closed" value="true" />
+      <created>1757375783648</created>
+      <option name="number" value="00102" />
+      <option name="presentableId" value="LOCAL-00102" />
+      <option name="project" value="LOCAL" />
+      <updated>1757375783648</updated>
+    </task>
+    <task id="LOCAL-00103" summary="feat: improve tornado block demolition handling and optimize chunk loading">
+      <option name="closed" value="true" />
+      <created>1757377165648</created>
+      <option name="number" value="00103" />
+      <option name="presentableId" value="LOCAL-00103" />
+      <option name="project" value="LOCAL" />
+      <updated>1757377165648</updated>
+    </task>
+    <task id="LOCAL-00104" summary="feat: add cloud dumping command and enhance wind physics integration">
+      <option name="closed" value="true" />
+      <created>1757692455403</created>
+      <option name="number" value="00104" />
+      <option name="presentableId" value="LOCAL-00104" />
+      <option name="project" value="LOCAL" />
+      <updated>1757692455403</updated>
+    </task>
+    <task id="LOCAL-00105" summary="feat: introduce async biome sampling and enhance threading support">
+      <option name="closed" value="true" />
+      <created>1757714997682</created>
+      <option name="number" value="00105" />
+      <option name="presentableId" value="LOCAL-00105" />
+      <option name="project" value="LOCAL" />
+      <updated>1757714997682</updated>
+    </task>
+    <task id="LOCAL-00106" summary="feat: update particle textures and enhance tornado rendering logic">
+      <option name="closed" value="true" />
+      <created>1757779387680</created>
+      <option name="number" value="00106" />
+      <option name="presentableId" value="LOCAL-00106" />
+      <option name="project" value="LOCAL" />
+      <updated>1757779387680</updated>
+    </task>
+    <task id="LOCAL-00107" summary="feat: add wind streaks texture configuration">
+      <option name="closed" value="true" />
+      <created>1757779403841</created>
+      <option name="number" value="00107" />
+      <option name="presentableId" value="LOCAL-00107" />
+      <option name="project" value="LOCAL" />
+      <updated>1757779403841</updated>
+    </task>
+    <task id="LOCAL-00108" summary="feat: add wind streaks texture configuration">
+      <option name="closed" value="true" />
+      <created>1757780524259</created>
+      <option name="number" value="00108" />
+      <option name="presentableId" value="LOCAL-00108" />
+      <option name="project" value="LOCAL" />
+      <updated>1757780524259</updated>
+    </task>
+    <task id="LOCAL-00109" summary="feat: add wind streaks texture configuration">
+      <option name="closed" value="true" />
+      <created>1757780813371</created>
+      <option name="number" value="00109" />
+      <option name="presentableId" value="LOCAL-00109" />
+      <option name="project" value="LOCAL" />
+      <updated>1757780813371</updated>
+    </task>
+    <task id="LOCAL-00110" summary="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane">
+      <option name="closed" value="true" />
+      <created>1757969705654</created>
+      <option name="number" value="00110" />
+      <option name="presentableId" value="LOCAL-00110" />
+      <option name="project" value="LOCAL" />
+      <updated>1757969705655</updated>
+    </task>
+    <option name="localTasksCounter" value="111" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -928,15 +950,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Add sandstorm management features and integrate delayed task scheduling" />
-    <MESSAGE value="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support" />
-    <MESSAGE value="Enhance tornado simulation with blending effects and animation adjustments" />
-    <MESSAGE value="Enhance tornado rendering with shader integration and improved animation effects" />
-    <MESSAGE value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
-    <MESSAGE value="fix: correct temperature caching and add debris particle configuration" />
-    <MESSAGE value="feat: enhance tornado rendering with shader effects and improved twist animation" />
-    <MESSAGE value="feat: add shader support for cloud rendering and implement noise functions" />
-    <MESSAGE value="fix: update legendary survival overhaul dependency and increase max positions per biome" />
     <MESSAGE value="feat: enhance tornado rendering with improved shader parameters and error handling" />
     <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
     <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
@@ -953,7 +966,16 @@
     <MESSAGE value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
     <MESSAGE value="feat: enhance compatibility with temperature mods and update configuration settings" />
     <MESSAGE value="feat: disable cloud movement towards player and update related configurations" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: disable cloud movement towards player and update related configurations" />
+    <MESSAGE value="feat: update AtmoConfigScreen layout and improve widget visibility handling" />
+    <MESSAGE value="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects" />
+    <MESSAGE value="feat: implement glass block damage handling and destruction for tornado effects" />
+    <MESSAGE value="feat: improve tornado block demolition handling and optimize chunk loading" />
+    <MESSAGE value="feat: add cloud dumping command and enhance wind physics integration" />
+    <MESSAGE value="feat: introduce async biome sampling and enhance threading support" />
+    <MESSAGE value="feat: update particle textures and enhance tornado rendering logic" />
+    <MESSAGE value="feat: add wind streaks texture configuration" />
+    <MESSAGE value="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -980,7 +1002,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java</url>
-          <line>35</line>
+          <line>55</line>
           <option name="timeStamp" value="295" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
@@ -1012,9 +1034,9 @@
           <option name="timeStamp" value="327" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java</url>
-          <line>159</line>
-          <option name="timeStamp" value="335" />
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java</url>
+          <line>141</line>
+          <option name="timeStamp" value="340" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />
@@ -1037,18 +1059,25 @@
       <pinned-members>
         <PinnedItemInfo parentTag="net.minecraftforge.common.ForgeConfigSpec" memberName="config" />
         <PinnedItemInfo parentTag="dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion" memberName="cloudTypeId" />
+        <PinnedItemInfo parentTag="java.util.concurrent.ConcurrentHashMap$MapEntry" memberName="key" />
       </pinned-members>
     </pin-to-top-manager>
     <watches-manager>
       <configuration name="GradleRunConfiguration">
+        <watch expression="ForecastGenerator.getForecastMap().keySet().stream().min(Comparator.comparingDouble(k -&gt; k.samplePos().distSqr(new BlockPos(x, y, z)))).orElse(null)" language="JAVA" custom="java.util.Comparator" />
+        <watch expression="serverLevel.getBiome(new BlockPos(x,y,-z))" language="JAVA" />
         <watch expression="TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(Minecraft.getInstance().level,Minecraft.getInstance().player.getOnPos())" language="JAVA" custom="toughasnails.temperature.TemperatureHelperImpl,net.minecraft.client.Minecraft,toughasnails.block.TemperatureGaugeBlock" />
         <watch expression="((java.util.ArrayList)((ServerCloudGenerator)SimpleCloudsCompat.generator).clouds).get(0)" custom="dev.nonamecrackers2.simpleclouds.common.cloud.spawning.ServerCloudGenerator,java.util.ArrayList" />
         <watch expression="shader.uniforms" />
         <watch expression="tornado.level" />
         <watch expression="tornado.level" language="JAVA" />
         <watch expression="tornado.level" language="JAVA" />
-        <watch expression="((com.google.common.collect.RegularImmutableMap)((CloudTypeDataManager)CloudManager.get(level).cloudSource).cloudTypes).entrySet().toArray()[0]" custom="com.google.common.collect.RegularImmutableMap,dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager,dev.nonamecrackers2.simpleclouds.common.cloud.CloudTypeDataManager" />
         <watch expression="((com.google.common.collect.RegularImmutableMap)((CloudTypeDataManager)CloudManager.get(level).cloudSource).cloudTypes).entrySet().toArray()[0]" language="JAVA" custom="com.google.common.collect.RegularImmutableMap,dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager,dev.nonamecrackers2.simpleclouds.common.cloud.CloudTypeDataManager" />
+        <watch expression="((com.google.common.collect.RegularImmutableMap)((CloudTypeDataManager)CloudManager.get(level).cloudSource).cloudTypes).entrySet().toArray()[0]" language="JAVA" custom="com.google.common.collect.RegularImmutableMap,dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager,dev.nonamecrackers2.simpleclouds.common.cloud.CloudTypeDataManager" />
+        <watch expression="serverLevel.getBiome(new BlockPos(94,80,-121))" language="JAVA" />
+        <watch expression="ForecastGenerator.getForecastMap().keySet().stream().min(Comparator.comparingDouble(k -&gt; k.samplePos().distSqr(new BlockPos(x, y, z)))).orElse(null)" language="JAVA" custom="java.util.Comparator" />
+        <watch expression="serverLevel.getBiome(new BlockPos(x,y,-z))" language="JAVA" />
+        <watch expression="((java.util.concurrent.ConcurrentHashMap)ForecastGenerator.getForecastMap()).entrySet().toArray()[0]" custom="java.util.concurrent.ConcurrentHashMap" />
       </configuration>
     </watches-manager>
   </component>
