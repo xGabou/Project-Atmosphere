@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.api;
 
+import dev.nonamecrackers2.simpleclouds.api.common.world.ScAPICloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -65,5 +67,9 @@ public class AtmoApi {
     public Object getWeatherHistory(ServerLevel level, BlockPos pos) {
         
         return null;
+    }
+
+    public boolean isRainningAt(ServerLevel level, BlockPos pos) {
+        return CloudManager.get(level).isRainingAt(pos);
     }
 }

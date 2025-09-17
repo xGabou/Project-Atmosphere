@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.modules.snowstorm;
 
-import com.Gabou.sereneseasonsplus.api.SnowstormHelper;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.minecraft.core.BlockPos;
