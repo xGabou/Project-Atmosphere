@@ -46,7 +46,7 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
         CURRENT.put(key, new WindSample(effectiveSpeed, directionDeg));
     }
 
-    public static WindSample getOrFallback(BiomeInstanceKey key, ServerLevel level) {
+    public static WindSample getOrFallback(BiomeInstanceKey key) {
         return CURRENT.computeIfAbsent(key, k -> randomSample(new Random()));
     }
 

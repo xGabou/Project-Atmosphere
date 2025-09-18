@@ -113,7 +113,7 @@ public class DailyForecastGenerator {
             float factor;
 
             switch (type) {
-                case TEMPERATURE -> {
+                case TEMPERATURE, PRESSURE -> {
                     float theta = (float) (Math.PI * t); 
                     factor = (1f - (float) Math.cos(theta)) * 0.5f;
                 }
@@ -127,9 +127,15 @@ public class DailyForecastGenerator {
                     }
                     factor = 1f - factor; 
                 }
-                case PRESSURE -> {
-                    float theta = (float) (Math.PI * t); 
-                    factor = (1f - (float) Math.cos(theta)) * 0.5f;
+                case STORM -> {
+                    // Storm probability: low overnight, ramps up by afternoon, tapers at night
+                    // Use a slightly skewed bell to make afternoons more active
+                    float theta = (float) (Math.PI * Math.min(1f, t * 1.1f));
+                    factor = (1f - (float) Math.cos(theta)) * 0.6f; // peak a bit higher than others
+                    // soften early morning further
+                    if (t < 0.2f) {
+                        factor *= t * 5f;
+                    }
                 }
                 default -> factor = 0f;
             }
@@ -143,7 +149,7 @@ public class DailyForecastGenerator {
     /**
      * Regenerates today and tomorrow daily profiles for all known biomes in the forecast.
      */
-    public static void scheduleGenerationForTodayAndTomorrow(ServerLevel level) {
+    public static void scheduleGenerationForTodayAndTomorrow() {
         Map<BiomeInstanceKey, BiomeForecast> allForecasts = ForecastGenerator.getForecastMap();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : allForecasts.entrySet()) {

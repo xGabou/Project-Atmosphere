@@ -22,6 +22,10 @@ public class CompatHandler {
         return TemperatureMod.NONE;
     }
 
+    public static boolean isSandStormsLoaded() {
+        return ModList.get().isLoaded("sandstorm");
+    }
+
 
 
     public static boolean isToughAsNailsLoaded() {
@@ -43,5 +47,7 @@ public class CompatHandler {
             case COLD_SWEAT -> LOGGER.info("Cold Sweat loaded");
             case NONE -> LOGGER.info("No temperature mod loaded, skipping compatibility setup.");
         }
+        String sandStormMsg = isSandStormsLoaded() ? "Sand Storms mod loaded, enabling compatibility." : "Sand Storms mod not found.";
+        LOGGER.info(sandStormMsg);
     }
 }

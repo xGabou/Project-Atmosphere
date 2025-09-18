@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.event;
 
 
+import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
@@ -36,6 +37,8 @@ public class BiomeChangeManager {
     private static final int RUN_INTERVAL_TICKS = 2000;
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = 6000;
 
+    private static final boolean sandStormsLoaded = CompatHandler.isSandStormsLoaded();
+
 
     public static  Map<UUID, Pair<ResourceLocation, Boolean>> getLastBiome() {
         return lastBiome;
@@ -65,28 +68,14 @@ public class BiomeChangeManager {
             wasInDesert = false;
         }
 
-//        if(!wasInDesert) {
-//            if(SandStormAPI.isSandstormActive()) {
-//                for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
-//                    Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(),null);
-//                }
-//
-//            }
-//        }
-
         if (last == null || !last.equals(nowBiome)) {
-            lastBiome.put(uuid,Pair.of(nowBiome,isDesert(level,nowBiome)));
+            lastBiome.put(uuid,Pair.of(nowBiome,isDesert(nowBiome)));
             onBiomeChanged(player, last, nowBiome); 
         }
 
     }
-    public static boolean isDesert(Level level, ResourceLocation biomeId)
+    public static boolean isDesert(ResourceLocation biomeId)
     {
-//        return level.registryAccess()
-//                .registryOrThrow(Registries.BIOME)
-//                .getHolder(ResourceKey.create(Registries.BIOME, biomeId))
-//                .map(holder -> holder.is(Tags.Biomes.IS_DESERT))
-//                .orElse(false);
         return isSandstormBiome(biomeId);
     }
     private static final Set<String> SANDSTORM_KEYWORDS = Set.of(

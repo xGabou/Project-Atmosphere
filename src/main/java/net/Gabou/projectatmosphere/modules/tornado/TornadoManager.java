@@ -1,13 +1,18 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
+import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -15,43 +20,53 @@ import java.util.List;
 
 public class TornadoManager {
     private static final List<TornadoInstance> ACTIVE_TORNADOES = new ArrayList<>();
+
     private static float shaderTime = 0.0f;
 
-    public static void spawn(Vec3 pos, float radius, WindVector wind) {
+    public static void spawn(Vec3 pos, float radius, WindVector wind, Level level) {
+        SpawnRegion temporaryRegion = new SpawnRegion((int)pos.x,(int) pos.z,(int) radius);
+        for (CloudRegion cloud : CloudManager.get(level).getClouds()) {
+            if (cloud.intersects(temporaryRegion)) {
+                if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
+                ACTIVE_TORNADOES.add(new TornadoInstance(pos, radius, wind, cloud));
+                break;
+            }
+        }
+
+
+    }
+    @OnlyIn(Dist.CLIENT)
+    public static void spawnClient(Vec3 pos, float radius, WindVector wind) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
-        ACTIVE_TORNADOES.add(new TornadoInstance(pos, radius, wind));
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return;
+        spawn(pos, radius, wind, level);
     }
 
-    public static void spawn(Vec3 pos, float radius) {
-        spawn(pos, radius, WindVector.fromBase(0, 0));
-    }
+
+//    public static void spawn(Vec3 pos, float radius) {
+//        spawn(pos, radius, WindVector.fromBase(0, 0));
+//    }
 
     public static void spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind) {
-        spawn(pos, radius, wind);
-        SpawnTornadoPacket packet = new SpawnTornadoPacket(pos, radius, wind.baseSpeed(), wind.angleRadians(), wind.gustSpeed());
-        // Send to all players tracking this level
-        for (ServerPlayer player : level.players()) {
-            player.connection.send(packet);
-        }
+        spawn(pos, radius, wind, level);
+        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new SpawnTornadoPacket(pos, radius, wind));
     }
-
 
     public static List<TornadoInstance> getActiveTornadoes() {
         return ACTIVE_TORNADOES;
     }
-
     public static void removeTornado(TornadoInstance tornado) {
         ACTIVE_TORNADOES.remove(tornado);
     }
-
     public static void clearTornadoes() {
         ACTIVE_TORNADOES.clear();
     }
 
+    @OnlyIn(Dist.CLIENT)
     public static float getShaderTime() {
         return shaderTime;
     }
-
     public static void tick(Level level) {
         ACTIVE_TORNADOES.removeIf(tornado -> tornado.getLifetimeSeconds() > 600);
         for (TornadoInstance tornado : ACTIVE_TORNADOES) {
@@ -66,5 +81,4 @@ public class TornadoManager {
             shaderTime += 0.05f;
         }
     }
-
 }

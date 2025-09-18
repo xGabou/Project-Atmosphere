@@ -15,6 +15,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -30,8 +31,8 @@ public class ClientRenderHook {
         if (Minecraft.getInstance().level == null) return;
 
         ClientLevel level = Minecraft.getInstance().level;
-        List<TornadoInstance> tornadoes = TornadoManager.getActiveTornadoes();
-        if (tornadoes.isEmpty()) return;
+        List<TornadoInstance> snapshot = new ArrayList<>(TornadoManager.getActiveTornadoes());
+        if (snapshot.isEmpty()) return;
         PoseStack poseStack = event.getPoseStack();
         Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
         Vec3 camPos = camera.getPosition();
@@ -42,7 +43,7 @@ public class ClientRenderHook {
         poseStack.translate(-camPos.x, -camPos.y, -camPos.z);
 
 
-        for (TornadoInstance tornado : tornadoes) {
+        for (TornadoInstance tornado : snapshot) {
             try {
                 if (tornado.position.distanceToSqr(camPos) > 500 * 500) {
                     continue;

@@ -6,10 +6,12 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.storm.GlobalStormHistoryData;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
@@ -49,6 +51,9 @@ public class SimpleCloudSpawner {
     private static float HUMIDITY_MODIFIER = 1.0f;
     private static float TEMPERATURE_MODIFIER = 1.0f;
 
+    private static final float STORM_BIAS = 1.5f;
+    private static final float SUNNY_THRESHOLD = 0.45f;
+
     public static int getCurrentViolence() {
         return currentViolence;
     }
@@ -63,6 +68,10 @@ public class SimpleCloudSpawner {
 
     public static void trySpawnClouds(ServerLevel level, CloudGenerator generator) {
         List<SpawnRegion> spawnRegions = generator.getSpawnRegions();
+        if (spawnRegions.isEmpty()) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] No spawn regions available");
+            return;
+        }
         RandomSource random = RandomSource.create();
         CloudSpawningConfig config = generator.getSpawnConfig().get();
 
@@ -75,79 +84,84 @@ public class SimpleCloudSpawner {
         int toSpawn = Mth.clamp(BiasedToBottomInt.of(1, 5).sample(random), 1, remaining);
 
         for (int i = 0; i < toSpawn; i++) {
-            if (spawnRegions.isEmpty()) {
-                ProjectAtmosphere.LOGGER.warn("[Atmosphere] No spawn regions available");
-                return;
-            }
-
-
             SpawnRegion region = spawnRegions.get(random.nextInt(spawnRegions.size()));
             int radius = BiasedToBottomInt.of(MIN_RADIUS, MAX_RADIUS).sample(random);
             Vector2i point = SpawnRegion.getRandomPointInRegion(region, random);
 
 
-            Set<BiomeInstanceKey> sample = WeatherSampler.sampleBiomesInArea(point.x, point.y, radius, level);
-            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sample, level, level.getGameTime());
-            if (stats == null) continue;
+            AsyncAtmosphereService.runWithCallback(
+                    PoolType.WEATHER,
+                    () -> {
+                        Set<BiomeInstanceKey> sample = WeatherSampler.sampleBiomesInArea(point.x, point.y, radius, level);
+                        WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sample, level, level.getGameTime());
+                        if (stats == null) return null;
 
+                        boolean isWinter = SeasonHelper.getSeasonState(level).getSeason() == Season.WINTER;
+                        boolean freezing = stats.temperature() <= 0.0F;
 
-            boolean isWinter = ModList.get().isLoaded("sereneseasons") &&
-                    SeasonHelper.getSeasonState(level).getSeason() == Season.WINTER;
-            boolean freezing = stats.temperature() <= 0.0F;
-            int severity = determineCloudSeverity(
-                    stats.temperature(),
-                    stats.humidity(),
-                    stats.pressure(),
-                    calculateDewPoint(stats.temperature(), stats.humidity()),
-                    stats.stormChance(), level
+                        int severity = determineCloudSeverity(
+                                stats.temperature(),
+                                stats.humidity(),
+                                stats.pressure(),
+                                calculateDewPoint(stats.temperature(), stats.humidity()),
+                                stats.stormChance(),
+                                level
+                        );
+                        if (severity <= 0) return null;
+
+                        boolean snowstorm = severity > 5 && freezing;
+                        String cloudId;
+                        if (snowstorm) {
+                            cloudId = CloudLibrary.getSnowstormCloudId();
+                        } else {
+                            cloudId = CloudLibrary.getCloudIdFromSeverity(severity);
+                            if (CloudLibrary.isThunderCloud(cloudId) && (isWinter || freezing)) {
+                                cloudId = CloudLibrary.getCloudIdFromSeverity(5);
+                            }
+                        }
+
+                        return new CloudSpawnRequest(stats, radius, cloudId);
+                    },
+                    request -> {
+                        if (request == null) return;
+
+                        // Back on the main server thread
+                        ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, request.cloudId());
+                        CloudSpawningConfig.Info info = config.getWeightInfo(rl);
+                        if (info == null) {
+                            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Unknown cloud type: {}", request.cloudId());
+                            return;
+                        }
+
+                        BiomeInstanceKey biomeKey = new BiomeInstanceKey(request.stats().dominantBiome(), request.stats().pos());
+                        Optional<CloudRegion> dummyOpt = SimpleCloudsCompat.createRegion(
+
+                                info,
+                                biomeKey,
+                                level,
+                                random,
+                                request.stats().windVector(),
+                                generator
+                        );
+                        if (dummyOpt.isEmpty()) return;
+
+                        CloudRegion dummy = dummyOpt.get();
+                        dummy.setRadius(request.radius());
+
+                        SimpleCloudsCompat.spawnCloudInBiome(
+                                request.cloudId(),
+                                biomeKey,
+                                level,
+                                dummy,
+                                request.stats().windVector()
+                        );
+                    }
             );
-            boolean snowstorm = severity > 5 && freezing;
-            String cloudId;
-            if (snowstorm) {
-                SnowstormManager.startSnowstorm(severity);
-                cloudId = CloudLibrary.getSnowstormCloudId();
-            } else {
-                SnowstormManager.stopSnowstorm();
-                cloudId = CloudLibrary.getCloudIdFromSeverity(severity);
-                if (CloudLibrary.isThunderCloud(cloudId) && (isWinter || freezing)) {
-                    cloudId = CloudLibrary.getCloudIdFromSeverity(5);
-                }
-            }
-
-            ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
-            CloudSpawningConfig.Info info = config.getWeightInfo(rl);
-            if (info == null) {
-                ProjectAtmosphere.LOGGER.warn("[Atmosphere] Unknown cloud type: {}", cloudId);
-                continue;
-            }
-
-
-            Optional<CloudRegion> dummyOpt = SimpleCloudsCompat.createRegion(
-                    info,
-                    new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
-                    level,
-                    random,
-                    stats.windVector(),
-                    generator
-            );
-
-            if (dummyOpt.isEmpty()) continue;
-
-            CloudRegion dummy = dummyOpt.get();
-            dummy.setRadius(radius);
-
-
-            SimpleCloudsCompat.spawnCloudInBiome(
-                    cloudId,
-                    new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
-                    level,
-                    dummy,
-                    stats.windVector()
-            );
-
-            if (generator.getClouds().size() >= maxRegions) return;
         }
     }
+
+    // Data carrier between async and main thread
+    record CloudSpawnRequest(WeatherSampler.WeatherStats stats, int radius, String cloudId) {}
 
 
     public static BlockPos getRandomPosInRegion(SpawnRegion region, RandomSource random, ServerLevel level) {
@@ -189,12 +203,14 @@ public class SimpleCloudSpawner {
 
         float boost = 1f + 0.08f * daysSince;  // +8% per day
         boost = Math.min(boost, 4f);         // cap at 2.5x
-        float adjustedChance = Math.min(1f, stormChance * boost);
+        float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
 
+        float rawScore = instability * adjustedChance;
+        if (rawScore < SUNNY_THRESHOLD) {
+            return 0;
+        }
 
-        int severity = Math.round(instability * adjustedChance);
-        severity = Math.max(1, Math.min(7, severity));
-
+        int severity = Math.max(1, Math.min(7, Math.round(rawScore)));
         if (severity >= 5) {
             data.recordSevere(currentDay);
         }

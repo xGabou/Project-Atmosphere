@@ -2,11 +2,13 @@ package net.Gabou.projectatmosphere.modules.temperature.util;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import sereneseasons.api.season.SeasonHelper;
@@ -33,82 +35,87 @@ public class TemperatureGenerator {
      * Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM),
      * incorporating random noise and seasonal effects.
      *
-     * @param world    the level to sample
+     * @param level    the level to sample
      * @param chunkPos the chunk position used as a seed
      * @param biomeId  the biome identifier
      * @return a 7×2 array where each day contains [min, max] temperatures
      */
-    public static float[][] generateWeekForecast(Level world, BlockPos chunkPos, ResourceLocation biomeId) {
+    public static float[][] generateWeekForecast(ServerLevel level, BlockPos chunkPos, ResourceLocation biomeId) {
+        // Step 1: Grab world-dependent values safely
+        ForecastBaseData base = AsyncAtmosphereService.callOnMainThread(() -> {
+            int cycleTicks = SeasonHelper.getSeasonState(level).getSeasonCycleTicks();
+            long seasonDuration = SeasonHelper.getSeasonState(level).getSeasonDuration();
+            long dayDuration = SeasonHelper.getSeasonState(level).getDayDuration();
+            SeasonTime st = new SeasonTime(cycleTicks);
+            Season currentSeason = Season.valueOf(st.getSeason().name());
+
+            float baseTemp = SeasonHooks.getBiomeTemperature(level, level.getBiome(chunkPos), chunkPos);
+            BiomeTempConfig.DailyRange clamp = BiomeTempConfig.getClamp(biomeId, currentSeason);
+
+            return new ForecastBaseData(cycleTicks, seasonDuration, dayDuration, currentSeason, baseTemp, clamp);
+        });
+
+        // Step 2: Math-heavy async work
         float[][] week = new float[7][2];
-        long seed = chunkPos.asLong() ^ biomeId.hashCode() ^
-                ProjectAtmosphere.seed;
+        long seed = chunkPos.asLong() ^ biomeId.hashCode() ^ ProjectAtmosphere.seed;
         Random rand = new Random(seed);
-        
-        int cycleTicks = SeasonHelper.getSeasonState(world).getSeasonCycleTicks();
-        long seasonDuration = SeasonHelper.getSeasonState(world).getSeasonDuration();
-        long dayDuration    = SeasonHelper.getSeasonState(world).getDayDuration();
-        SeasonTime st = new SeasonTime(cycleTicks);
-        Season currentSeason = Season.valueOf(st.getSeason().name());
 
-
-        
-        float baseTemp = SeasonHooks.getBiomeTemperature(world, world.getBiome(chunkPos), chunkPos);
-        float seaLevelC = toCelsiusSeaLevel(biomeId, baseTemp, currentSeason);
+        float seaLevelC = toCelsiusSeaLevel(biomeId, base.baseTemp, base.currentSeason);
         float altitudeBase = seaLevelC + (chunkPos.getY() - SEA_LEVEL) * LAPSE_RATE;
 
-
-
-        float randomAmp = isTropicalBiome(biomeId,world,4f,8f);        
-        float fluctuationAmp = isTropicalBiome(biomeId,world,2f,4f); 
-
-        BiomeTempConfig.DailyRange clamp = BiomeTempConfig.getClamp(biomeId, currentSeason);
+        float randomAmp = isTropicalBiome(biomeId, level, 4f, 8f);
+        float fluctuationAmp = isTropicalBiome(biomeId, level, 2f, 4f);
 
         for (int day = 0; day < 7; day++) {
-
-
-            float prog = (cycleTicks + day * dayDuration) / (float) seasonDuration;
-            float seasonalShift = (float)Math.sin(prog * 2 * Math.PI) * -10f;
+            float prog = (base.cycleTicks + day * base.dayDuration) / (float) base.seasonDuration;
+            float seasonalShift = (float) Math.sin(prog * 2 * Math.PI) * -10f;
             float dailyMean = altitudeBase + seasonalShift;
 
-            
-            float mapNoise = getDailyFluctuation(world, chunkPos, fluctuationAmp);
-            
+            float mapNoise = getDailyFluctuation(level, chunkPos, fluctuationAmp);
             float randNoise = (rand.nextFloat() * 2f * randomAmp) - randomAmp;
-            float dailyBase   = dailyMean + mapNoise + randNoise;
+            float dailyBase = dailyMean + mapNoise + randNoise;
 
-            
-            float[] sampleTicks = { 21000f, 6000f, 9000f, 12000f, 18000f };
+            float[] sampleTicks = {21000f, 6000f, 9000f, 12000f, 18000f};
             float dayMin = Float.POSITIVE_INFINITY;
             float dayMax = Float.NEGATIVE_INFINITY;
+
             for (float t : sampleTicks) {
-                float modifier = getNighttimeTempModifier(t, biomeId, world);
+                float modifier = getNighttimeTempModifier(t, biomeId, level);
                 float temp = dailyBase + modifier;
                 dayMin = Math.min(dayMin, temp);
                 dayMax = Math.max(dayMax, temp);
             }
-            
-            if (clamp != null) {
-                
-                float easedMin = easeTowardAverage(dayMin, clamp.avgNight());
-                
-                dayMin = (easedMin < clamp.minMin() || easedMin > clamp.maxMax())
-                        ? ultimateSmoother(easedMin, clamp.minMin(), clamp.maxMax())
+
+            if (base.clamp != null) {
+                float easedMin = easeTowardAverage(dayMin, base.clamp.avgNight());
+                dayMin = (easedMin < base.clamp.minMin() || easedMin > base.clamp.maxMax())
+                        ? ultimateSmoother(easedMin, base.clamp.minMin(), base.clamp.maxMax())
                         : easedMin;
 
-                
-                float easedMax = easeTowardAverage(dayMax, clamp.avgDay());
-                dayMax = (easedMax < clamp.minMin() || easedMax > clamp.maxMax())
-                        ? ultimateSmoother(easedMax, clamp.minMin(), clamp.maxMax())
+                float easedMax = easeTowardAverage(dayMax, base.clamp.avgDay());
+                dayMax = (easedMax < base.clamp.minMin() || easedMax > base.clamp.maxMax())
+                        ? ultimateSmoother(easedMax, base.clamp.minMin(), base.clamp.maxMax())
                         : easedMax;
             }
 
             week[day][0] = dayMin;
             week[day][1] = dayMax;
-
         }
 
         return week;
     }
+
+    private record ForecastBaseData(
+            int cycleTicks,
+            long seasonDuration,
+            long dayDuration,
+            Season currentSeason,
+            float baseTemp,
+            BiomeTempConfig.DailyRange clamp
+    ) {}
+
+
+
     /**
      * If {@code v} lies outside {@code [boundLow..boundHigh]}, then:
      * <ol>

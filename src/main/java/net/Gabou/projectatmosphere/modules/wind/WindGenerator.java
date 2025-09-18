@@ -10,9 +10,29 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec2;
 
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class WindGenerator {
+    private static final Map<BiomeInstanceKey, Set<BiomeInstanceKey>> neighborCache = new ConcurrentHashMap<>();
+    private static final int MIN_DISTANCE = 200;
+
+    private static Set<BiomeInstanceKey> getNeighbors(BiomeInstanceKey self, Set<BiomeInstanceKey> all) {
+        return neighborCache.computeIfAbsent(self, key -> {
+            Set<BiomeInstanceKey> list = new HashSet<>();
+            BlockPos c = key.samplePos();
+            for (BiomeInstanceKey other : all) {
+                if (other == key) continue;
+                BlockPos o = other.samplePos();
+                if (c.distSqr(o) <= MIN_DISTANCE * MIN_DISTANCE) {
+                    list.add(other);
+                }
+            }
+            return list;
+        });
+    }
 
     private static final float SPEED_SCALING = 1.0f;
 
@@ -25,7 +45,7 @@ public class WindGenerator {
         float[][] selfPressure = biomeForecast.getPressure();
         float[][] selfTemp = biomeForecast.getTemperature();
         float[][] selfHumidity = biomeForecast.getHumidity();
-        Set<BiomeInstanceKey> neighbors = ForecastGenerator.getBiomeSamples();
+        Set<BiomeInstanceKey> neighbors = getNeighbors(selfKey, ForecastGenerator.getBiomeSamples());
 
         float altitude = center.getY();
         float biomeFactor = getBiomeWindModifier(biome);

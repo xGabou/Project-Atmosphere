@@ -1,11 +1,16 @@
 package net.Gabou.projectatmosphere.compat;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.async.ThreadingDetector;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import toughasnails.api.temperature.TemperatureLevel;
 import toughasnails.temperature.TemperatureHelperImpl;
+
+import java.util.concurrent.CompletableFuture;
 
 public class ToughAsNailsCompat {
 
@@ -18,9 +23,34 @@ public class ToughAsNailsCompat {
      */
     public static float[][] injectForecastForTAN(BiomeInstanceKey key, ServerLevel level) {
         BlockPos sample = key.samplePos();
-        TemperatureLevel band = TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(level, sample);
-        float baseTemp = mapBandToTemperature(band);
-        return generateMinMaxCurve(baseTemp, level.getRandom());
+        RandomSource rng = RandomSource.create(sample.asLong() ^ level.getSeed());
+
+        // If already on main thread → run inline
+        if (ThreadingDetector.isMainThread(level)) {
+            TemperatureLevel band = TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(level, sample);
+            float baseTemp = mapBandToTemperature(band);
+            return generateMinMaxCurve(baseTemp, rng);
+        }
+
+        // If called from async → schedule the band lookup on main, block until it returns
+        CompletableFuture<Float> future = new CompletableFuture<>();
+        AsyncAtmosphereService.runOnMainThread(() -> {
+            try {
+                TemperatureLevel band = TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(level, sample);
+                float baseTemp = mapBandToTemperature(band);
+                future.complete(baseTemp);
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            }
+        });
+
+        try {
+            float baseTemp = future.join();
+            return generateMinMaxCurve(baseTemp, rng);
+        } catch (Exception e) {
+            ProjectAtmosphere.LOGGER.error("[TAN Compat] Failed to generate forecast", e);
+            return new float[7][2]; // fallback safe array
+        }
     }
 
     private static float[][] generateMinMaxCurve(float base, RandomSource random) {

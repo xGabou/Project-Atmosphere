@@ -26,7 +26,11 @@ public class WindLeafParticle extends TextureSheetParticle {
 
         this.lifetime = 200; 
         this.setSize(0.1f, 0.1f);
-        this.setSpriteFromAge(sprites);
+        try {
+            this.setSpriteFromAge(sprites);
+        } catch (Throwable ignored) {
+            // SpriteSet may not be ready yet; will retry in tick()
+        }
 
         
         this.roll = random.nextFloat() * (float)Math.PI * 2.0f; 
@@ -52,11 +56,11 @@ public class WindLeafParticle extends TextureSheetParticle {
             this.alpha = (this.lifetime - this.age) / 40.0f;
         }
     }
-    @Override
-    public float getQuadSize(float partialTicks) {
-        float flutter = (float) Math.sin((this.age + partialTicks) * 0.2f) * 0.1f;
-        return super.getQuadSize(partialTicks) + flutter;
-    }
+//    @Override
+//    public float getQuadSize(float partialTicks) {
+//        float flutter = (float) Math.sin((this.age + partialTicks) * 0.2f) * 0.1f;
+//        return super.getQuadSize(partialTicks) + flutter;
+//    }
 
 
 

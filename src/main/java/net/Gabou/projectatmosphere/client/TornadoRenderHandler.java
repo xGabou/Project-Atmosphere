@@ -9,6 +9,7 @@ import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoLevel;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -32,7 +33,7 @@ public class TornadoRenderHandler {
     private static final ResourceLocation NOISE_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/noise.png");
     private static final ResourceLocation TORNADO_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/tornado.png");
+            ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/base.png");
     private static final ResourceLocation FLOWMAP_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("projectatmosphere", "textures/effects/flowmap.png");
     private static final ResourceLocation NORMALMAP_TEXTURE =
@@ -48,19 +49,19 @@ public class TornadoRenderHandler {
         RenderSystem.setShaderTexture(1, FLOWMAP_TEXTURE);
         RenderSystem.setShaderTexture(2, NORMALMAP_TEXTURE);
         RenderSystem.setShaderTexture(3, NOISE_TEXTURE);
-        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
-            RenderTarget cloudRT = scr.getCloudTarget(); // offscreen clouds color
-            if( cloudRT == null) {
-                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot render tornado.");
-                return;
-            }
-            shader.setSampler("CloudScene", cloudRT);    // bind RT as sampler2D
-
-            // pass size so we can compute screen-space UVs
-            Uniform u = shader.getUniform("ScreenSizeX");
-            Uniform u1 = shader.getUniform("ScreenSizeY");
-            if (u != null&& u1!=null){ u.set((float) cloudRT.width); u1.set((float)cloudRT.height);}
-        });
+//        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
+//            RenderTarget cloudRT = scr.getCloudTarget(); // offscreen clouds color
+//            if( cloudRT == null) {
+//                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot render tornado.");
+//                return;
+//            }
+//            shader.setSampler("CloudScene", cloudRT);    // bind RT as sampler2D
+//
+//            // pass size so we can compute screen-space UVs
+//            Uniform u = shader.getUniform("ScreenSizeX");
+//            Uniform u1 = shader.getUniform("ScreenSizeY");
+//            if (u != null&& u1!=null){ u.set((float) cloudRT.width); u1.set((float)cloudRT.height);}
+//        });
         RenderSystem.setShader(() -> shader);
         shader.apply();
         int segments = 64;
@@ -106,6 +107,13 @@ public class TornadoRenderHandler {
 
         var flowIntensity = shader.getUniform("FlowIntensity");
         if (flowIntensity != null) flowIntensity.set(0.1f);
+
+
+        var scaleUniform = shader.getUniform("Scale");
+        if (scaleUniform != null) {
+            float scale = (float) (tornado.getLevel().getBaseDamage() / TornadoLevel.F1.getBaseDamage());
+            scaleUniform.set(scale);
+        }
 
 
         float partialTicks = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
@@ -157,7 +165,8 @@ public class TornadoRenderHandler {
         float spawnProgress = Mth.clamp(tornado.getLifetimeSeconds() / SPAWN_DESCENT_DURATION, 0f, 1f);
         float cutoffY = height * (1.0f - spawnProgress);
 
-        Random rand = new Random(1337);
+
+        float time = TornadoManager.getShaderTime();
 
         for (int i = rings - 1; i >= 0; i--) {
             float y0 = i * (height / rings);
@@ -172,33 +181,6 @@ public class TornadoRenderHandler {
             float t0 = y0 / height;
             float t1 = y1 / height;
 
-
-            float shaped0 = (float) Math.pow(t0, 0.6);
-            float shaped1 = (float) Math.pow(t1, 0.6);
-            float baseR0 = topRadius + (baseRadius - topRadius) * shaped0;
-            float baseR1 = topRadius + (baseRadius - topRadius) * shaped1;
-
-            if (t0 > coneStart) {
-                float ct = (t0 - coneStart) / (1.0f - coneStart);
-                baseR0 = Mth.lerp(ct, baseR0, baseR0 * coneFactor);
-            }
-            if (t1 > coneStart) {
-                float ct1 = (t1 - coneStart) / (1.0f - coneStart);
-                baseR1 = Mth.lerp(ct1, baseR1, baseR1 * coneFactor);
-            }
-
-
-            float oscFreq = 4f;
-            float oscAmp = 0.6f;
-            float noiseAmp = 0f;
-
-            float radius0 = baseR0
-                    + (float) Math.sin(t0 * Math.PI * oscFreq) * oscAmp
-                    + (rand.nextFloat() - 0.5f) * 2f * noiseAmp;
-
-            float radius1 = baseR1
-                    + (float) Math.sin(t1 * Math.PI * oscFreq) * oscAmp
-                    + (rand.nextFloat() - 0.5f) * 2f * noiseAmp;
 
             for (int j = 0; j < segments; j++) {
                 float u0 = j / (float) segments;
@@ -218,14 +200,14 @@ public class TornadoRenderHandler {
                 float angle1_1 = (float) (2 * Math.PI * u1 + angleOffset1);
 
 
-                float x00 = radius0 * (float) Math.cos(angle0_0);
-                float z00 = radius0 * (float) Math.sin(angle0_0);
-                float x01 = radius0 * (float) Math.cos(angle0_1);
-                float z01 = radius0 * (float) Math.sin(angle0_1);
-                float x10 = radius1 * (float) Math.cos(angle1_0);
-                float z10 = radius1 * (float) Math.sin(angle1_0);
-                float x11 = radius1 * (float) Math.cos(angle1_1);
-                float z11 = radius1 * (float) Math.sin(angle1_1);
+                float x00 = tornadoShapeRadius(y0, angle0_0, time) * (float) Math.cos(angle0_0);
+                float z00 = tornadoShapeRadius(y0, angle0_0, time) * (float) Math.sin(angle0_0);
+                float x01 = tornadoShapeRadius(y0, angle0_1, time) * (float) Math.cos(angle0_1);
+                float z01 = tornadoShapeRadius(y0, angle0_1, time) * (float) Math.sin(angle0_1);
+                float x10 = tornadoShapeRadius(y1, angle1_0, time) * (float) Math.cos(angle1_0);
+                float z10 = tornadoShapeRadius(y1, angle1_0, time) * (float) Math.sin(angle1_0);
+                float x11 = tornadoShapeRadius(y1, angle1_1, time) * (float) Math.cos(angle1_1);
+                float z11 = tornadoShapeRadius(y1, angle1_1, time) * (float) Math.sin(angle1_1);
 
 
                 float wiggleFreq = 5f;
@@ -360,6 +342,16 @@ public class TornadoRenderHandler {
         stack.popPose();
 
     }
+    private static float tornadoShapeRadius(float y, float angle, float time) {
+        float yAdj = y + 45.0f;
+        float zcurve = (float) Math.pow(yAdj, 1.5f) * 0.03f;
+        float base = zcurve + 5.5f;
+        float scale = Mth.clamp(zcurve * 0.2f, 0.1f, 1.0f);
+        float radius = base + scale * Mth.sin((time - Mth.sqrt(yAdj)) + angle) * 5.0f;
+        float ridgedNoise = 1.0f - 2.0f * Math.abs(Mth.sin((time * 1.5f + 0.1f * yAdj) + angle));
+        radius -= ridgedNoise * 1.2f;
+        return radius;
+    }
 
     public static void spawnDebrisParticles(TornadoInstance tornado, ClientLevel level) {
         for (int i = 0; i < 10; i++) {
@@ -390,26 +382,6 @@ public class TornadoRenderHandler {
         return p == 1f ? linear : topRadius + (targetR - topRadius) * (float) Math.pow(t, p);
     }
 
-    /**
-     * Cone cap radius by specifying the *target radius at the top*.
-     * p = 1 for pure cone; >1 slightly round; <1 flares faster.
-     */
-    static float coneRadiusByTarget(float y, float seamY, float topRadius, float bowlHeight,
-                                    float targetRadius, float p) {
-        float t = Mth.clamp((y - seamY) / bowlHeight, 0f, 1f);
-        float linear = topRadius + (targetRadius - topRadius) * t;
-        return p == 1f ? linear : topRadius + (targetRadius - topRadius) * (float) Math.pow(t, p);
-    }
-
-    /**
-     * Cone cap radius by specifying a *multiplier* of the seam radius at the top.
-     * factor = targetRadius / topRadius  (e.g., 1.8f => 80% wider at the top)
-     * p = 1 for pure cone; >1 slightly round; <1 flares faster.
-     */
-    static float coneRadiusByFactor(float y, float seamY, float topRadius, float bowlHeight,
-                                    float factor, float p) {
-        return coneRadiusByTarget(y, seamY, topRadius, bowlHeight, topRadius * factor, p);
-    }
 
 
 

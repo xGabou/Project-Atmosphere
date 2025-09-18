@@ -19,6 +19,7 @@ import net.Gabou.projectatmosphere.util.CloudSpawnScheduler;
 import net.Gabou.projectatmosphere.util.TickCounter;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.minecraft.locale.Language;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.ModContainer;
@@ -26,6 +27,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.bus.api.IEventBus;
@@ -104,13 +106,21 @@ public class ProjectAtmosphere {
             if (!world.isClientSide) {
                 AsyncAtmosphereService.init(false);
                 SimpleCloudsCompat.init(world);
-                AtmosphereManager.onServerStarting(world);
                 seed = world.getSeed();
             } else {
                 AsyncAtmosphereService.init(true);
             }
 
         }
+    }
+
+
+    @SubscribeEvent
+    public static void onServerStarted(ServerStartedEvent event) {
+        MinecraftServer server = event.getServer();
+        ServerLevel overworld = server.overworld();
+        AtmosphereManager.onServerStarting(overworld);
+        ProjectAtmosphere.LOGGER.info("BiomeSampler initialized with live biome source.");
     }
 
     @SubscribeEvent

@@ -41,6 +41,7 @@ public class ForecastOrchestrator {
     public static boolean onServerStart(ServerLevel level) {
         ForecastDataStorage.loadAll(level);
         TornadoStorageManager.load(level);
+        ForecastGenerator.seed = level.getSeed();
 
 
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
@@ -101,9 +102,8 @@ public class ForecastOrchestrator {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
-        } else {
-            SimpleCloudsCompat.isInit = true;
         }
+        SimpleCloudsCompat.setIsInit(true);
         long end = System.nanoTime();
         long durationMs = (end - start) / 1_000_000;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
@@ -114,9 +114,7 @@ public class ForecastOrchestrator {
      * Used to manually trigger regeneration
      */
     public static void regenerateAround(ServerLevel level, BlockPos pos) {
-        ForecastGenerator.generateForecastForRegion(pos, level);
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        updateForecast(level, pos);
     }
 
     /**
@@ -132,8 +130,8 @@ public class ForecastOrchestrator {
             ForecastGenerator.generateForecastForRegion(center, level);
         }
 
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
+        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
     }
 
     /**
@@ -167,8 +165,8 @@ public class ForecastOrchestrator {
 
 
         ForecastGenerator.swapToTomorrow();
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
+        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
     }
 
 
@@ -177,8 +175,8 @@ public class ForecastOrchestrator {
      */
     public static void updateForecast(ServerLevel level, BlockPos center) {
         ForecastGenerator.generateForecastForRegion(center, level);
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow(level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> generateWindForecast(key, level, forecast));
+        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
+        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
     }
 
 
@@ -215,15 +213,14 @@ public class ForecastOrchestrator {
     }
 
     public static void tick(ServerLevel level) {
-                    GlassDamageManager.tick(level);
-                    //ForecastGenerator.tickSandstormScheduler(level);
-                    long now = level.getGameTime();
-                    if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
-                        lastTornadoCheckTick = now;
-                        ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
-                        AsyncAtmosphereService.runStorm(() ->
-                        TornadoProbabilityManager.onScheduledCheck(level));
-                    }
+        GlassDamageManager.tick(level);
+        long now = level.getGameTime();
+        if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
+            lastTornadoCheckTick = now;
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
+            AsyncAtmosphereService.runStorm(() ->
+                    TornadoProbabilityManager.onScheduledCheck(level));
+        }
 
     }
 
@@ -265,7 +262,7 @@ public class ForecastOrchestrator {
         activePlayerBiomeKeys.clear();
     }
 
-    public static void generateWindForecast(BiomeInstanceKey key, ServerLevel level, BiomeForecast forecast) {
+    public static void generateWindForecast(BiomeInstanceKey key, BiomeForecast forecast) {
         WindVector today = forecast.getWindDay();
         if (today == null) {
             return;

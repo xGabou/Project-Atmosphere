@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.registry;
 
+import betterdays.registry.RegistryObject;
 import com.mojang.serialization.Codec;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
@@ -40,6 +41,9 @@ public class ModParticles {
             PARTICLES.register("heart_orange", () -> new SimpleParticleType(true));
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> HEART_JAUNE =
             PARTICLES.register("heart_jaune", () -> new SimpleParticleType(true));
+
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> WIND_STREAKS =
+            PARTICLES.register("wind_streaks", () -> new SimpleParticleType(true));
 
     public static final DeferredHolder<ParticleType<?>, ParticleType<DebrisParticleData>> DEBRIS =
             PARTICLES.register("debris", () -> new ParticleType<DebrisParticleData>(true) {

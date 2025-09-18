@@ -29,7 +29,7 @@ public final class WindEngine {
             WindRuntimeState state = entry.getValue();
             WindForecast forecast = FORECASTS.get(key);
             if (forecast == null) {
-                WindVector.WindSample sample = WindVector.getOrFallback(key, level);
+                WindVector.WindSample sample = WindVector.getOrFallback(key);
                 WindVector.set(key, sample.speedMps(), sample.directionDeg());
                 continue;
             }

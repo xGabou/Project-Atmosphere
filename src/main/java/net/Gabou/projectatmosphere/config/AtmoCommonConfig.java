@@ -69,7 +69,7 @@ public class AtmoCommonConfig {
                 .define("enableTornadoes", true);
         ENABLE_STORM_DEBRIS = builder
                 .comment("Enable random debris spawning during storms")
-                .define("enableStormDebris", true);
+                .define("enableStormDebris", false);
         MAX_STORM_DEBRIS_PER_CHUNK = builder
                 .comment("Maximum number of storm debris items allowed per chunk")
                 .defineInRange("maxStormDebrisPerChunk", 10, 0, Integer.MAX_VALUE);

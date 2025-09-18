@@ -5,7 +5,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.api.ForecastSampling;
-import net.Gabou.projectatmosphere.api.WindVector;
+import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
@@ -67,8 +67,8 @@ public final class TornadoProbabilityManager {
         risk += Math.min(pDiff,
                 AtmoCommonConfig.TORNADO_PRESSURE_GRADIENT_CAP.get().floatValue());
 
-        WindVector.WindSample wSurf = WindVector.getOrFallback(key, level);
-        WindVector.WindSample wAloft = WindVector.getAloftProxy(key, level);
+        WindVectorApi.WindSample wSurf = WindVectorApi.getOrFallback(key);
+        WindVectorApi.WindSample wAloft = WindVectorApi.getAloftProxy(key, level);
         float speedDiff = Math.abs(wSurf.speedMps() - wAloft.speedMps());
         float dirDiff = minimalAngleDiffDeg(wSurf.directionDeg(), wAloft.directionDeg());
         if (speedDiff >= AtmoCommonConfig.TORNADO_SHEAR_MIN_SPEED_DIFF_MPS.get().floatValue() &&

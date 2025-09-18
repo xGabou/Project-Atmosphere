@@ -23,6 +23,19 @@ public class CloudLibrary {
             "dark_wall",
             "custom_cumulonimbus"
     );
+    private static final String[] THUNDER_LOW_CLOUDS = {
+            "cumulonimbus",
+            "tsegrus",
+            "custom_cumulonimbus"
+    };
+
+    private static final String[] THUNDER_HIGH_CLOUDS = {
+            "severe_cumulonimbus",
+            "dense_tsegrus",
+            "dark_wall"
+    };
+
+
 
     private static final String[] SEVERITY_7_CLOUDS = {
             "cumulonimbus",
@@ -129,6 +142,18 @@ public class CloudLibrary {
     }
     public static int getSeverityFromRessourceLocation(ResourceLocation id) {
         return getSeverityFromCloudId(id.getPath());
+    }
+
+    public static String getRandomThunderCloud(int intensity) {
+        return intensity == 2 ? getRandomFrom(THUNDER_HIGH_CLOUDS) : getRandomFrom(THUNDER_LOW_CLOUDS);
+    }
+
+    public static String getRandomRainCloud(int intensity, boolean includeThunder) {
+        if (includeThunder && RANDOM.nextInt(3) == 0) {
+            return getRandomThunderCloud(intensity);
+        }
+        int severity = intensity == 2 ? 6 : 5;
+        return getCloudIdFromSeverity(severity);
     }
 
 }

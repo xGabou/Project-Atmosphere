@@ -1,6 +1,10 @@
 package net.Gabou.projectatmosphere.api;
 
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastType;
+import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -8,13 +12,10 @@ import net.minecraft.server.level.ServerLevel;
  * Public-facing API for accessing Project Atmosphere forecasts and current weather.
  */
 public class AtmoApi {
-
     private static final AtmoApi INSTANCE = new AtmoApi();
-
     private AtmoApi() {
-        
-    }
 
+    }
     /**
      * Gets the global instance of the Atmosphere API.
      * @return the API instance
@@ -22,16 +23,14 @@ public class AtmoApi {
     public static AtmoApi getInstance() {
         return INSTANCE;
     }
-
     /**
      * Gets the weather forecast for the given position and level.
      * @param level The server level to sample
      * @param pos The position in the world
      * @return The BiomeForecast for that position
      */
-    public BiomeForecast getWeatherForecast(ServerLevel level, BlockPos pos) {
-        
-        return null;
+    public BiomeForecast getWeatherForecast(ServerLevel level, BlockPos pos, ForecastType forecastType) {
+        return ForecastGenerator.getClosestValidForecast(AtmosphereUtils.getBiomeKey(level, pos),forecastType);
     }
 
     /**
@@ -41,8 +40,8 @@ public class AtmoApi {
      * @return A WeatherSnapshot representing current conditions (to be defined)
      */
     public Object getCurrentWeather(ServerLevel level, BlockPos pos) {
-        
-        return null;
+
+        return CloudManager.get(level).getCloudTypeAtPosition(pos.getX(), pos.getZ());
     }
 
     /**
@@ -52,10 +51,9 @@ public class AtmoApi {
      * @return An object representing alerts (to be defined)
      */
     public Object getWeatherAlerts(ServerLevel level, BlockPos pos) {
-        
+
         return null;
     }
-
     /**
      * Gets historical weather data (could return past forecasts or measurements).
      * @param level The server level
@@ -63,7 +61,18 @@ public class AtmoApi {
      * @return Historical data object (to be defined)
      */
     public Object getWeatherHistory(ServerLevel level, BlockPos pos) {
-        
+
         return null;
+    }
+
+
+    /**
+     * Checks if it is currently raining at the specified position in the given level.
+     * @param level The server level to check
+     * @param pos The position in the world
+     * @return true if it is raining at the position, false otherwise
+     */
+    public boolean isRainningAt(ServerLevel level, BlockPos pos) {
+        return CloudManager.get(level).isRainingAt(pos);
     }
 }

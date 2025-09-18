@@ -20,7 +20,7 @@ public final class WindPhysics {
 
     private static void applyIfStrong(ServerLevel lvl, LivingEntity e) {
         BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(lvl, e.blockPosition());
-        WindVector.WindSample w = WindVector.getOrFallback(key, lvl);
+        WindVector.WindSample w = WindVector.getOrFallback(key);
         if (w.speedMps() < WindConfig.pushThresholdMps()) return;
         Vec3 push = dirToVec(w.directionDeg()).scale(w.speedMps() * pushScale(e));
         e.push(push.x, 0.0, push.z);

@@ -44,7 +44,7 @@ public record SpawnTornadoPacket(Vec3 pos, float radius, float speed, float angl
     }
 
     public static void handle(SpawnTornadoPacket pkt, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        ctx.enqueueWork(() -> TornadoManager.spawn(
+        ctx.enqueueWork(() -> TornadoManager.spawnClient(
                 pkt.pos(),
                 pkt.radius(),
                 new WindVector(pkt.speed(), pkt.angle(), pkt.gust())

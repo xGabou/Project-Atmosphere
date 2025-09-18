@@ -159,30 +159,30 @@ public class AtmoConfigScreen extends Screen {
         int y = 40;
 
         addTitle("Performance", y);
-        y += 14;
+        y += 18;
         addConfigWidget(Button.builder(toggleLabel("Force Shared Executor", forceSharedExecutor), b -> {
             forceSharedExecutor = !forceSharedExecutor;
             b.setMessage(toggleLabel("Force Shared Executor", forceSharedExecutor));
         }).bounds(center - 100, y, 200, 20).build(), y);
-        y += 24;
+        y += 32;
 
         addTitle("Storms", y);
-        y += 14;
+        y += 18;
         addConfigWidget(Button.builder(toggleLabel("Tornadoes", enableTornadoes), b -> {
             enableTornadoes = !enableTornadoes;
             b.setMessage(toggleLabel("Tornadoes", enableTornadoes));
         }).bounds(center - 100, y, 200, 20).build(), y);
-        y += 24;
+        y += 32;
         addConfigWidget(Button.builder(toggleLabel("Storm Debris", enableStormDebris), b -> {
             enableStormDebris = !enableStormDebris;
             b.setMessage(toggleLabel("Storm Debris", enableStormDebris));
         }).bounds(center - 100, y, 200, 20).build(), y);
-        y += 24;
+        y += 32;
 
         this.cloudDistanceBox = new EditBox(this.font, center - 100, y, 200, 20, Component.literal("Cloud Render Distance"));
         this.cloudDistanceBox.setValue(Integer.toString(cloudRenderDistance));
         addRenderableWidget(this.cloudDistanceBox);
-        y += 24;
+        y += 32;
 
         maxDebrisBox = addNumberField(center, y, "Max Storm Debris Per Chunk", Integer.toString(maxStormDebrisPerChunk));
         y += 34;
@@ -190,15 +190,15 @@ public class AtmoConfigScreen extends Screen {
             autoRepairGlass = !autoRepairGlass;
             b.setMessage(toggleLabel("Auto Repair Glass", autoRepairGlass));
         }).bounds(center - 100, y, 200, 20).build(), y);
-        y += 24;
+        y += 32;
         addConfigWidget(Button.builder(toggleLabel("Damage Glass On Tornado", damageGlassOnTornado), b -> {
             damageGlassOnTornado = !damageGlassOnTornado;
             b.setMessage(toggleLabel("Damage Glass On Tornado", damageGlassOnTornado));
         }).bounds(center - 100, y, 200, 20).build(), y);
-        y += 24;
+        y += 32;
 
         addTitle("Tornado", y);
-        y += 14;
+        y += 18;
         tornadoCheckIntervalBox = addNumberField(center, y, "Check Interval Sec", Double.toString(tornadoCheckIntervalSec));
         y += 34;
         tornadoBaseSpawnRadiusBox = addNumberField(center, y, "Base Spawn Radius M", Double.toString(tornadoBaseSpawnRadiusM));
@@ -233,7 +233,7 @@ public class AtmoConfigScreen extends Screen {
         y += 34;
 
         addTitle("Wind", y);
-        y += 14;
+        y += 18;
         windBaseRetargetBox = addNumberField(center, y, "Base Retarget Sec", Double.toString(windBaseRetargetSec));
         y += 34;
         windDirRetargetBox = addNumberField(center, y, "Dir Retarget Sec", Double.toString(windDirRetargetSec));
@@ -251,7 +251,11 @@ public class AtmoConfigScreen extends Screen {
         windEntityPushScaleBox = addNumberField(center, y, "Entity Push Scale", Double.toString(windEntityPushScale));
         y += 34;
 
-        maxScroll = Math.max(0, y - (this.height - 60));
+        // Compute scroll range based on the visible viewport between contentTop and contentBottom
+        int contentTop = 40;            // Start of scrollable content
+        int contentBottom = this.height - 50; // Leave room for the Done button
+        int viewportHeight = Math.max(0, contentBottom - contentTop);
+        maxScroll = Math.max(0, (y - contentTop) - viewportHeight);
         scrollOffset = 0;
         updateWidgetPositions();
 
@@ -284,16 +288,24 @@ public class AtmoConfigScreen extends Screen {
         renderBackground(g, mouseX, mouseY, partialTick);
         int panelW = 240;
         int panelX = (this.width - panelW) / 2;
-        int top = 30;
-        int bottom = this.height - 30;
-        g.fill(panelX - 4, top - 4, panelX + panelW + 4, bottom, -1442840576);
-        g.drawString(this.font, "Project Atmosphere Config", panelX + 6, top - 14, 0xFFFFFF, false);
+        int contentTop = 40;
+        int headerTop = 30;
+        int contentBottom = this.height - 50; // stop above the Done button for scrollable area
+        int panelBottom = this.height - 20;   // extend panel background to cover the footer region
+
+        // Panel background now extends under the footer so content never looks outside it
+        g.fill(panelX - 4, headerTop - 4, panelX + panelW + 4, panelBottom, -1442840576);
+        g.drawString(this.font, "Project Atmosphere Config", panelX + 6, headerTop - 14, 0xFFFFFF, false);
+
+        // Clip only the custom drawn titles/labels so they don't render under the Done button
+        g.enableScissor(panelX - 4, contentTop - 4, panelX + panelW + 4, contentBottom);
         for (Title t : titles) {
             g.drawString(this.font, t.text, panelX + 6, t.y - scrollOffset, 0xFFFFFF, false);
         }
         for (Label l : labels) {
             g.drawString(this.font, l.text, l.x, l.y - scrollOffset, 0xFFFFFF, false);
         }
+        g.disableScissor();
         super.render(g, mouseX, mouseY, partialTick);
     }
 
@@ -308,8 +320,16 @@ public class AtmoConfigScreen extends Screen {
     }
 
     private void updateWidgetPositions() {
+        int contentTop = 40;
+        int contentBottom = this.height - 50;
         for (int i = 0; i < configWidgets.size(); i++) {
-            configWidgets.get(i).setY(widgetBaseY.get(i) - scrollOffset);
+            AbstractWidget w = configWidgets.get(i);
+            int y = widgetBaseY.get(i) - scrollOffset;
+            w.setY(y);
+            // Require full containment within viewport to avoid spillover outside the panel
+            boolean inView = (y >= contentTop) && ((y + w.getHeight()) <= contentBottom);
+            w.visible = inView;
+            w.active = inView;
         }
     }
 
