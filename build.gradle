@@ -83,6 +83,7 @@ repositories {
         name "nonamecrackers2Maven"
         url "https://maven.nonamecrackers2.dev/releases"
     }
+    maven { url "https://maven.theillusivec4.top/" }
     flatDir { dir 'libs' }
 }
 
@@ -90,14 +91,14 @@ repositories {
 dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7003934")
+    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7006451")
     implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
     implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
     compileOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
     compileOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
     implementation fg.deobf("curse.maven:betterdays-895618:5877548")
-    implementation fg.deobf("curse.maven:spectrelib-993948:5217603")
+    implementation "com.illusivesoulworks.spectrelib:spectrelib-forge:0.13.17+1.20.1"
     implementation fg.deobf("curse.maven:desert-storms-1312888:6931061")
     implementation fg.deobf("curse.maven:lodestone-616457:6213794")
 

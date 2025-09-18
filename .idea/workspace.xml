@@ -6,10 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/ServerLevelSnowStormMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/ServerLevelSnowStormMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -538,14 +536,7 @@
       <workItem from="1757874600130" duration="1667000" />
       <workItem from="1757967041442" duration="4749000" />
       <workItem from="1758031145844" duration="4113000" />
-    </task>
-    <task id="LOCAL-00062" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
-      <option name="closed" value="true" />
-      <created>1754001044490</created>
-      <option name="number" value="00062" />
-      <option name="presentableId" value="LOCAL-00062" />
-      <option name="project" value="LOCAL" />
-      <updated>1754001044490</updated>
+      <workItem from="1758138678154" duration="3597000" />
     </task>
     <task id="LOCAL-00063" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
       <option name="closed" value="true" />
@@ -931,7 +922,15 @@
       <option name="project" value="LOCAL" />
       <updated>1757969705655</updated>
     </task>
-    <option name="localTasksCounter" value="111" />
+    <task id="LOCAL-00111" summary="feat: enhance weather forecasting system with new forecast retrieval and rain detection methods">
+      <option name="closed" value="true" />
+      <created>1758138759275</created>
+      <option name="number" value="00111" />
+      <option name="presentableId" value="LOCAL-00111" />
+      <option name="project" value="LOCAL" />
+      <updated>1758138759276</updated>
+    </task>
+    <option name="localTasksCounter" value="112" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
