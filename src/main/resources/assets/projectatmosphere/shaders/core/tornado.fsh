@@ -9,6 +9,7 @@ uniform float Height;
 uniform float DustIntensity;
 uniform float CoreTightness;
 uniform float FlowIntensity;
+uniform float Scale;
 
 uniform float LightDirX;
 uniform float LightDirY;
@@ -30,29 +31,33 @@ out vec4 fragColor;
 const float PI = 3.14159265;
 
 // ──────── Noise Functions ────────
-float hash(vec3 p) {
-    p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+float noise(in vec3 x) {
+    vec3 p = floor(x);
+    vec3 f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    vec2 uv = (p.xy + vec2(37.0, 17.0) * p.z) + f.xy;
+    vec2 rg = textureLod(NoiseMap, (uv + 0.5) / 256.0, 0.0).yx;
+    return -1.0 + 2.4 * mix(rg.x, rg.y, f.z);
 }
 
-float noise(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
+mat2 Spin(float angle) {
+    return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+}
 
-    float n000 = hash(i + vec3(0.0, 0.0, 0.0));
-    float n100 = hash(i + vec3(1.0, 0.0, 0.0));
-    float n010 = hash(i + vec3(0.0, 1.0, 0.0));
-    float n110 = hash(i + vec3(1.0, 1.0, 0.0));
-    float n001 = hash(i + vec3(0.0, 0.0, 1.0));
-    float n101 = hash(i + vec3(1.0, 0.0, 1.0));
-    float n011 = hash(i + vec3(0.0, 1.0, 1.0));
-    float n111 = hash(i + vec3(1.0, 1.0, 1.0));
+float ridged(float f) {
+    return 1.0 - 2.0 * abs(f);
+}
 
-    vec3 u = f * f * (3.0 - 2.0 * f);
-
-    return mix(mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-               mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y), u.z);
+float Shape(vec3 q) {
+    q.y += 45.0;
+    float h = 90.0;
+    float t = Time;
+    vec3 spin_pos = vec3(Spin(t - sqrt(q.y)) * q.xz, q.y - t * 5.0);
+    float zcurve = pow(q.y, 1.5) * 0.03;
+    float v = abs(length(q.xz) - zcurve) - 5.5 - clamp(zcurve * 0.2, 0.1, 1.0) * noise(spin_pos * vec3(0.1));
+    v = v - ridged(noise(vec3(Spin(t * 1.5 + 0.1 * q.y) * q.xz, q.y - t * 4.0) * 0.3)) * 1.2;
+    v = max(v, q.y - h);
+    return min(max(v, -q.y), 0.0) + max(v, -q.y);
 }
 
 // ──────── Helpers ────────
@@ -75,8 +80,13 @@ void main() {
     // v = normalized vertical coordinate (0..1) from mesh UVs
     float v = clamp(texCoord.y, 0.0, 1.0);
 
+    // Apply overall scale
+    float baseR = BaseRadius * Scale;
+    float topR = TopRadius * Scale;
+    float height = Height * Scale;
+
     // yWorld if/when you need actual units (blocks/meters)
-    float yWorld = v * Height;
+    float yWorld = v * height;
 
     float angle = texCoord.x * 2.0 * PI;
 
@@ -84,7 +94,7 @@ void main() {
     float rotation = Time * TwistSpeed + v * 12.0;
 
     // Core falloff uses normalized v (keep this as 0..1)
-    float coreFalloff = exp(-pow((BaseRadius - (BaseRadius - TopRadius) * v) * CoreTightness, 2.0));
+    float coreFalloff = exp(-pow((baseR - (baseR - topR) * v) * CoreTightness, 2.0));
 
     // Large-scale swirls
     vec2 polar = vec2(texCoord.x, v);
@@ -100,6 +110,12 @@ void main() {
 
     // Final UVs
     vec2 swirlUV = buildSwirlUV(angle, v, offset);
+
+    // World position for volumetric shaping
+    float radius = mix(baseR, topR, v);
+    vec2 pos = vec2(cos(angle), sin(angle)) * radius;
+    vec3 shapePos = vec3(pos.x, yWorld, pos.y);
+    float density = max(-Shape(shapePos), 0.0);
 
     // Flow warp
     vec2 flow = texture(FlowMap, texCoord).rg - 0.5;
@@ -120,11 +136,13 @@ void main() {
     color = mix(color, cloudTint, 0.25);
     color *= 0.4 + 0.6 * lighting;
     color *= 0.5 + n1 * 0.5;
+    color *= 0.5 + 0.5 * density;
 
     // Alpha uses normalized v (0..1)
     float alpha = base.a * verticalFade(v);
     alpha *= mix(0.8, 1.0, texture(NoiseMap, swirlUV * 4.0).r);
     alpha *= 0.7 + n2 * 0.3;
+    alpha *= density;
     alpha = clamp(alpha * coreFalloff, 0.9, 1.0);
 
     fragColor = vec4(color, alpha);

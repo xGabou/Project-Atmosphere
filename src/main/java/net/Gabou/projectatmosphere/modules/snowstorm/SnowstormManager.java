@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.snowstorm;
 
-import com.Gabou.sereneseasonsplus.api.SnowstormHelper;
+
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.minecraft.core.BlockPos;
@@ -10,7 +10,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.biome.Biome;
 import net.neoforged.fml.ModList;
 
 import java.util.ArrayList;

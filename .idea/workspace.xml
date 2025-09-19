@@ -4,59 +4,110 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: refactor cloud spawning logic and improve code formatting">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/async/BiomeSampler.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/async/PoolType.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/async/ThreadingDetector.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/ServerLevelSnowStormMixin.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowStorm.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindStreakParticle.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: introduce new weather sampling and management classes, refactor wind vector handling">
+      <change afterPath="$PROJECT_DIR$/libs/Serene Seasons Plus-neoforge-1.21.1-1.21.1-1.0.9.5-sources.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/libs/Serene Seasons Plus-neoforge-1.21.1-1.21.1-1.0.9.5.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/wind_streaks.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/black.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/corner_screens.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/north.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/screen.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/effects/base.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/item/ball_of_windvane.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/item/box_for_the_windvane.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/item/inside_shell.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/item/middle.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/item/north_south_east_west_sign.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/item/outer_shell.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/item/stick_for_the_windvane.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/wind_streaks.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/anemometer.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/barometer.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/hygrometer.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/storm_siren.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/thermometer.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/weather_vane.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/WindVector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/WindVectorApi.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ToughAsNailsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ToughAsNailsCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/BiomeChangeManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/gameplay/WindPhysics.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/gameplay/WindPhysics.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/DailyForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/DailyForecastGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/BiomeForecast.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/BiomeForecast.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/WindVector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/WindVector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/HumidityGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/humidity/HumidityGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/pressure/PressureGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/pressure/PressureGenerator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/DustLayerBlock.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/blocks/DustLayerBlock.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/snowstorm/SnowstormManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/StormGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/StormGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/TemperatureGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/TemperatureGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/GlassDamageManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/GlassDamageManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSpawner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindEngine.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindGenerator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindLeafParticle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/WindLeafParticle.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModClient.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModParticles.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ModParticles.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AsyncAtmosphereService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/AtmosphereUtils.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherSampler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherSampler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/anemometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/anemometer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/barometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/barometer_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/dust.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/dust.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/humidimeter_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/humidimeter_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/sand_layer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/sand_layer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/thermometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/thermometer_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/weather_vane.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/weather_vane.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/en_us.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/fr_fr.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/fr_fr.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/anemometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/anemometer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/barometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/barometer_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_1.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_1.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_2.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_2.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_3.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_3.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_4.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_4.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_5.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_5.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_6.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_6.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_7.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_7.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_8.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/dust_layer_8.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_1.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_1.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_2.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_2.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_3.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_3.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_4.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_4.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_5.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_5.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_6.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_6.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_7.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_7.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_8.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/sand_layer_8.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/thermometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/thermometer_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/weather_vane.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/weather_vane.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/anemometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/anemometer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/barometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/barometer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/dust.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/dust.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/humidimeter_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/humidimeter_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/sand_layer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/sand_layer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/thermometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/thermometer_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/weather_radar.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/weather_radar.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/weather_vane.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/weather_vane.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/debris.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/debris.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_jaune.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_jaune.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_orange.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_orange.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_vert.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/heart_vert.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_jaune.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_jaune.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_orange.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_orange.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_vert.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/round_vert.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_jaune.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_jaune.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_orange.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_orange.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_vert.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/particles/triangle_vert.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box.vsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box.vsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.fsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/sounds.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/sounds.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texture.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texture.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/effects/tornado.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/effects/tornado.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/debris.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/debris.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/heart_jaune.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/heart_jaune.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/heart_orange.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/heart_orange.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/heart_vert.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/heart_vert.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/round_jaune.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/round_jaune.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/round_orange.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/round_orange.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/round_vert.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/round_vert.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/triangle_jaune.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/triangle_jaune.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/triangle_orange.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/triangle_orange.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/triangle_vert.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/particle/triangle_vert.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_bois.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_bois.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_diamant.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_diamant.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_fer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_fer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_netherite.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_netherite.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_pierre.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/balai_pierre.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -159,67 +210,67 @@
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Downloaded.Files.Path.Enabled": "false",
-    "Gradle.Build Project-Atmosphere.executor": "Run",
-    "Gradle.Download Sources.executor": "Run",
-    "Gradle.G:/Project-Atmosphere [createMcpToSrg].executor": "Run",
-    "Gradle.H:/Project-Atmosphere [createMcpToSrg].executor": "Run",
-    "Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor": "Run",
-    "Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor": "Debug",
-    "Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.FlowMapGenerator.main()].executor": "Run",
-    "Gradle.Project-Atmosphere [:prepareRunClientCompile].executor": "Run",
-    "Gradle.Project-Atmosphere [build].executor": "Debug",
-    "Gradle.Project-Atmosphere [clean].executor": "Run",
-    "Gradle.Project-Atmosphere [createMcpToSrg].executor": "Run",
-    "Gradle.Project-Atmosphere [genIntellijRuns].executor": "Debug",
-    "Gradle.Project-Atmosphere [runClient].executor": "Debug",
-    "Gradle.Project-Atmosphere [runGameTestServer].executor": "Run",
-    "Gradle.Project-Atmosphere [runServer].executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Repository.Attach.Annotations": "false",
-    "Repository.Attach.JavaDocs": "false",
-    "Repository.Attach.Sources": "false",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "extract.method.default.visibility": "private",
-    "git-widget-placeholder": "NeoForge-1.21.1",
-    "ignore.virus.scanning.warn.message": "true",
-    "junie.onboarding.icon.badge.shown": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "G:/Project-Atmosphere/src/main/resources/data/simpleclouds/cloud_types",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Modules",
-    "project.structure.proportion": "0.15",
-    "project.structure.side.proportion": "0.6172414",
-    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Downloaded.Files.Path.Enabled&quot;: &quot;false&quot;,
+    &quot;Gradle.Build Project-Atmosphere.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Download Sources.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.G:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.H:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.FlowMapGenerator.main()].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [:prepareRunClientCompile].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [runClient].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [runGameTestServer].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [runServer].executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Repository.Attach.Annotations&quot;: &quot;false&quot;,
+    &quot;Repository.Attach.JavaDocs&quot;: &quot;false&quot;,
+    &quot;Repository.Attach.Sources&quot;: &quot;false&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;extract.method.default.visibility&quot;: &quot;private&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;NeoForge-1.21.1&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/libs&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.6172414&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "ChangesTree.GroupingKeys": [
-      "module",
-      "repository"
+  &quot;keyToStringList&quot;: {
+    &quot;ChangesTree.GroupingKeys&quot;: [
+      &quot;module&quot;,
+      &quot;repository&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CreateClassDialog.RecentsKey">
       <recent name="net.Gabou.projectatmosphere.blocks" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\libs" />
+      <recent name="G:\Project-Atmosphere\src\main\resources\data\projectatmosphere" />
+      <recent name="G:\Project-Atmosphere\src\main\resources\assets" />
       <recent name="G:\Project-Atmosphere\src\main\resources\data\simpleclouds\cloud_types" />
       <recent name="G:\Project-Atmosphere\src\main\resources\data\simpleclouds\cloud_spawning" />
-      <recent name="G:\Project-Atmosphere\src\main\resources\data" />
-      <recent name="G:\Project-Atmosphere\src\main" />
-      <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\sounds" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="G:\Project-Atmosphere\src\main\resources\data\simpleclouds\cloud_spawning" />
@@ -611,15 +662,9 @@
       <workItem from="1756502652077" duration="689000" />
       <workItem from="1756574669519" duration="54000" />
       <workItem from="1756668517228" duration="5547000" />
-      <workItem from="1758205302873" duration="8229000" />
-    </task>
-    <task id="LOCAL-00053" summary="Add new particle textures and implement Balai item; enhance client synchronization for weather data">
-      <option name="closed" value="true" />
-      <created>1750875513261</created>
-      <option name="number" value="00053" />
-      <option name="presentableId" value="LOCAL-00053" />
-      <option name="project" value="LOCAL" />
-      <updated>1750875513262</updated>
+      <workItem from="1758205302873" duration="9545000" />
+      <workItem from="1758231806245" duration="629000" />
+      <workItem from="1758259345384" duration="398000" />
     </task>
     <task id="LOCAL-00054" summary="Add Barometre and Thermometre items; implement HUD overlay for temperature display and enhance cloud spawning logic with wind vector support">
       <option name="closed" value="true" />
@@ -1005,7 +1050,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756673693615</updated>
     </task>
-    <option name="localTasksCounter" value="102" />
+    <task id="LOCAL-00102" summary="feat: introduce new weather sampling and management classes, refactor wind vector handling">
+      <option name="closed" value="true" />
+      <created>1758214441607</created>
+      <option name="number" value="00102" />
+      <option name="presentableId" value="LOCAL-00102" />
+      <option name="project" value="LOCAL" />
+      <updated>1758214441608</updated>
+    </task>
+    <option name="localTasksCounter" value="103" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1024,7 +1077,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="Enhance tornado rendering with shader integration and improved animation effects" />
     <MESSAGE value="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml" />
     <MESSAGE value="fix: correct temperature caching and add debris particle configuration" />
     <MESSAGE value="feat: enhance tornado rendering with shader effects and improved twist animation" />
@@ -1049,7 +1101,8 @@
     <MESSAGE value="feat: add new cloud types and configurations for weather system" />
     <MESSAGE value="feat: remove legendary survival overhaul from temperature mods" />
     <MESSAGE value="feat: refactor cloud spawning logic and improve code formatting" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: refactor cloud spawning logic and improve code formatting" />
+    <MESSAGE value="feat: introduce new weather sampling and management classes, refactor wind vector handling" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: introduce new weather sampling and management classes, refactor wind vector handling" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

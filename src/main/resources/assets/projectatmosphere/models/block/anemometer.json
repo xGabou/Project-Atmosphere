@@ -2,11 +2,13 @@
 	"format_version": "1.21.6",
 	"credit": "Made with Blockbench",
 	"parent": "block/block",
+	"texture_size": [4, 4],
 	"textures": {
+		"4": "projectatmosphere:block/north",
 		"base": "projectatmosphere:block/anemometer_base",
 		"rod": "projectatmosphere:block/anemometer_rod",
-		"cup": "projectatmosphere:block/anemometer_cup",
-		"vane": "projectatmosphere:block/anemometer_vane"
+		"vane": "projectatmosphere:block/anemometer_vane",
+		"particle": "projectatmosphere:block/north"
 	},
 	"elements": [
 		{
@@ -58,51 +60,55 @@
 			}
 		},
 		{
-			"from": [10, 11.25, 7],
-			"to": [11, 12.75, 9],
+			"from": [11, 11.25, 8],
+			"to": [13, 12.75, 8],
+			"rotation": {"angle": 0, "axis": "y", "origin": [20, 0, -2]},
 			"faces": {
-				"north": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
-				"east": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"south": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
-				"west": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"up": {"uv": [10, 7, 11, 9], "texture": "#cup"},
-				"down": {"uv": [10, 7, 11, 9], "texture": "#cup"}
+				"north": {"uv": [2.98438, 2.71875, 13.07813, 12.625], "texture": "#vane"},
+				"east": {"uv": [5, 3.25, 6, 4.75], "texture": "#vane"},
+				"south": {"uv": [3.01563, 2.76563, 13.10938, 12.625], "rotation": 180, "texture": "#vane"},
+				"west": {"uv": [10, 3.25, 11, 4.75], "texture": "#vane"},
+				"up": {"uv": [10, 7, 11, 9], "rotation": 90, "texture": "#vane"},
+				"down": {"uv": [10, 7, 11, 9], "rotation": 270, "texture": "#vane"}
 			}
 		},
 		{
-			"from": [5, 11.25, 7],
-			"to": [6, 12.75, 9],
+			"from": [8, 12.875, 4],
+			"to": [8, 14.375, 5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [16, 1.625, -1]},
 			"faces": {
-				"north": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
-				"east": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"south": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
-				"west": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"up": {"uv": [5, 7, 6, 9], "texture": "#cup"},
-				"down": {"uv": [5, 7, 6, 9], "texture": "#cup"}
+				"north": {"uv": [0, 8, 8, 14], "texture": "#4"},
+				"east": {"uv": [12, 0, 16, 6], "texture": "#4"},
+				"south": {"uv": [0, 0, 8, 6], "texture": "#4"},
+				"west": {"uv": [12, 8, 16, 14], "texture": "#4"},
+				"up": {"uv": [12, 8, 8, 0], "rotation": 90, "texture": "#4"},
+				"down": {"uv": [12, 8, 8, 16], "rotation": 270, "texture": "#4"}
 			}
 		},
 		{
-			"from": [7, 11.25, 5],
-			"to": [9, 12.75, 6],
+			"from": [3, 11.25, 8],
+			"to": [5, 12.75, 8],
+			"rotation": {"angle": 0, "axis": "y", "origin": [12, 0, 13]},
 			"faces": {
-				"north": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"east": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
-				"south": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"west": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
-				"up": {"uv": [7, 5, 9, 6], "texture": "#cup"},
-				"down": {"uv": [7, 10, 9, 11], "texture": "#cup"}
+				"north": {"uv": [2.84375, 2.71875, 13.10938, 12.625], "rotation": 180, "texture": "#vane"},
+				"east": {"uv": [5, 3.25, 6, 4.75], "texture": "#vane"},
+				"south": {"uv": [2.89063, 2.71875, 13.0625, 12.67188], "texture": "#vane"},
+				"west": {"uv": [10, 3.25, 11, 4.75], "texture": "#vane"},
+				"up": {"uv": [7, 5, 9, 6], "rotation": 180, "texture": "#vane"},
+				"down": {"uv": [7, 10, 9, 11], "rotation": 180, "texture": "#vane"}
 			}
 		},
 		{
-			"from": [7, 11.25, 10],
-			"to": [9, 12.75, 11],
+			"from": [8, 11.25, 11],
+			"to": [8, 12.75, 13],
+			"rotation": {"angle": 0, "axis": "y", "origin": [-2, 0, 20]},
 			"faces": {
-				"north": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"east": {"uv": [5, 3.25, 6, 4.75], "texture": "#cup"},
-				"south": {"uv": [7, 3.25, 9, 4.75], "texture": "#cup"},
-				"west": {"uv": [10, 3.25, 11, 4.75], "texture": "#cup"},
-				"up": {"uv": [7, 10, 9, 11], "texture": "#cup"},
-				"down": {"uv": [7, 5, 9, 6], "texture": "#cup"}
+				"north": {"uv": [5, 3.25, 6, 4.75], "texture": "#vane"},
+				"east": {"uv": [2.89063, 2.76563, 13.0625, 12.625], "texture": "#vane"},
+				"south": {"uv": [10, 3.25, 11, 4.75], "texture": "#vane"},
+				"west": {"uv": [2.84375, 2.71875, 13.0625, 12.67188], "rotation": 180, "texture": "#vane"},
+				"up": {"uv": [7, 10, 9, 11], "rotation": 270, "texture": "#vane"},
+				"down": {"uv": [7, 5, 9, 6], "rotation": 90, "texture": "#vane"}
 			}
 		},
 		{

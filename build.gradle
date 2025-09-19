@@ -120,7 +120,8 @@ dependencies {
     implementation "curse.maven:betterdays-895618:6883730"
     compileOnly "curse.maven:spectrelib-993948:5217603"
     implementation "curse.maven:simple-clouds-1121215:6928979"
-    implementation "curse.maven:serene-season-plus-1288843:6939029"
+    //implementation "curse.maven:serene-season-plus-1288843:6939029"
+    implementation files("libs/Serene Seasons Plus-neoforge-1.21.1-1.21.1-1.0.9.5.jar")
     implementation "nonamecrackers2:simplecloudsapi-neoforge:${api_version}"
     compileOnly "curse.maven:tough-as-nails-246391:5833252"
     compileOnly "curse.maven:cold-sweat-506194:6934631"

@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
@@ -50,7 +51,10 @@ public class TornadoManager {
 
     public static void spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind) {
         spawn(pos, radius, wind, level);
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new SpawnTornadoPacket(pos, radius, wind));
+        SpawnTornadoPacket packet = new SpawnTornadoPacket(pos, radius, wind.baseSpeed(), wind.angleRadians(), wind.gustSpeed());
+        for (ServerPlayer player : level.players()) {
+            player.connection.send(packet);
+        }
     }
 
     public static List<TornadoInstance> getActiveTornadoes() {

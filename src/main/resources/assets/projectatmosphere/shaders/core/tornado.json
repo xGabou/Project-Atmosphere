@@ -21,6 +21,7 @@
     { "name": "DustIntensity","type": "float", "count": 1, "values": [0.5] },
     { "name": "CoreTightness","type": "float", "count": 1, "values": [0.5] },
     { "name": "FlowIntensity","type": "float", "count": 1, "values": [0.2] },
+    { "name": "Scale",        "type": "float", "count": 1, "values": [1.0] },
     { "name": "LightDirX", "type": "float", "count": 1, "values": [0.5] },
     { "name": "LightDirY", "type": "float", "count": 1, "values": [1.0] },
     { "name": "LightDirZ", "type": "float", "count": 1, "values": [0.2] },

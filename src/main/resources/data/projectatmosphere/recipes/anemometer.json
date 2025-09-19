@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " I ",
+    "IRI",
+    " S "
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "result": { "item": "projectatmosphere:anemometer" }
+}
