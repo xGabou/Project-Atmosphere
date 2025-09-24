@@ -284,8 +284,8 @@ public class ForecastGenerator {
 
         computeAverageForecastsByBiomeType();
 
-
-        if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty() && sandStormLoaded ) {
+        if(!sandStormLoaded)return;
+        if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty() ) {
             BiomeInstanceKey selected = SANDSTORM_FORECASTS.stream()
                     .skip(level.random.nextInt(SANDSTORM_FORECASTS.size()))
                     .findFirst()
@@ -445,7 +445,7 @@ public class ForecastGenerator {
     static void tickSandstormScheduler(ServerLevel level) {
 
         if (scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
-            SandStormAPI.startSandstorm(scheduledStormPhase, scheduledStormBiome);
+            SandStormAPI. startSandstorm(scheduledStormPhase, scheduledStormBiome);
 
 
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
