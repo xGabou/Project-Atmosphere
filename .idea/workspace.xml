@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add new weather instruments and update textures for atmospheric effects">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add new weather instruments and update textures for atmospheric effects" />
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -564,6 +562,7 @@
       <workItem from="1758231806245" duration="629000" />
       <workItem from="1758259345384" duration="605000" />
       <workItem from="1758295294752" duration="2339000" />
+      <workItem from="1758839962427" duration="600000" />
     </task>
     <task id="LOCAL-00055" summary="Add dust layer block and related assets; implement block registration and enhance client-side randomization for particle effects">
       <option name="closed" value="true" />
