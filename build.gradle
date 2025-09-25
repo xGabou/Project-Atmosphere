@@ -124,6 +124,7 @@ dependencies {
     implementation "nonamecrackers2:simplecloudsapi-neoforge:${api_version}"
     compileOnly "curse.maven:tough-as-nails-246391:5833252"
     compileOnly "curse.maven:cold-sweat-506194:6934631"
+    runtimeOnly "curse.maven:sodium-394468:6382651"
 
 }
 
