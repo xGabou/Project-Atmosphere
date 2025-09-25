@@ -191,7 +191,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -414,10 +414,10 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
         <item itemvalue="Gradle.Project-Atmosphere [runGameTestServer]" />
-        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [clean]" />
       </list>
     </recent_temporary>
