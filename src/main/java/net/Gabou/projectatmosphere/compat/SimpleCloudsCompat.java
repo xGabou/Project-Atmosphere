@@ -17,6 +17,7 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.BiasedToBottomInt;
 import net.minecraft.world.phys.Vec2;
@@ -41,6 +42,11 @@ public class SimpleCloudsCompat {
     public static final int SCALE = SimpleCloudsConstants.CLOUD_SCALE;
 
     public static final int MIN_RADIUS = Math.round(5000F/ SCALE);
+    private static final float ACCEL_PER_WIND = 0.0005F;
+
+    private static final float MIN_PER_TICK = 0.001F; // very gentle drift
+    private static final float MAX_PER_TICK = 0.02F;  // about one block per second
+
     public static final int MAX_RADIUS = Math.round(9429F / SCALE);
 
     public static void init(ServerLevel level) {
@@ -130,9 +136,13 @@ public class SimpleCloudsCompat {
         CloudRegion cloudRegion = region.get();
         cloudRegion.setMovementDirection(direction);
         cloudRegion.setRotation(rotation);
-        cloudRegion.setMaxSpeed(cloudRegion.getMaxSpeed() + wind.baseSpeed() * 0.01F);
+        float targetPerTick = wind.baseSpeed() / 20.0F; // if baseSpeed is blocks per second
+        targetPerTick = Mth.clamp(targetPerTick, MIN_PER_TICK, MAX_PER_TICK);
+        cloudRegion.setMaxSpeed(targetPerTick);
         float acc = cloudRegion.getAccelerationFactor();
-        cloudRegion.setAccelerationFactor(acc * wind.baseSpeed() * 0.005F);
+        float accel = acc + ACCEL_PER_WIND * wind.baseSpeed();
+        accel = Mth.clamp(accel, 0.001F, 0.01F);
+        cloudRegion.setAccelerationFactor(accel);
         cloudRegion.setRadius(ProjectAtmosphere.DEFAULT_REGION_RADIUS);
 
         return Optional.of(cloudRegion);
