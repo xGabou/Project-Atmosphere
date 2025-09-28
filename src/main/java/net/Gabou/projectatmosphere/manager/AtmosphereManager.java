@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.event.EventHandler;
+import net.Gabou.projectatmosphere.gameplay.WindPhysics;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
@@ -133,8 +134,7 @@ public class AtmosphereManager {
 
     public static void tick(ServerLevel level) {
         ForecastOrchestrator.tick(level);
-        // Apply ambient wind forces to players/entities when strong enough
-        net.Gabou.projectatmosphere.gameplay.WindPhysics.onServerTick(level);
+        WindPhysics.onServerTick(level);
         TornadoManager.tick(level);
         HurricaneManager.tick(level);
         SnowstormManager.tick(level);

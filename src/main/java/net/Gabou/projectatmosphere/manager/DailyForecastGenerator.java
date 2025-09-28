@@ -113,7 +113,7 @@ public class DailyForecastGenerator {
             float factor;
 
             switch (type) {
-                case TEMPERATURE -> {
+                case TEMPERATURE, PRESSURE -> {
                     float theta = (float) (Math.PI * t); 
                     factor = (1f - (float) Math.cos(theta)) * 0.5f;
                 }
@@ -126,10 +126,6 @@ public class DailyForecastGenerator {
                         factor = 0.1f + (float) Math.pow((t - 0.75f) * 4f, 0.8); 
                     }
                     factor = 1f - factor; 
-                }
-                case PRESSURE -> {
-                    float theta = (float) (Math.PI * t); 
-                    factor = (1f - (float) Math.cos(theta)) * 0.5f;
                 }
                 case STORM -> {
                     // Storm probability: low overnight, ramps up by afternoon, tapers at night
