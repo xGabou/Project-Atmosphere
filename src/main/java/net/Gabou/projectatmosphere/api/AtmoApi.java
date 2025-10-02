@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
+import net.Gabou.projectatmosphere.util.WeatherType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -48,6 +49,18 @@ public class AtmoApi {
         return CloudManager.get(level).getCloudTypeAtPosition(pos.getX(), pos.getZ());
     }
 
+
+    /**
+     * Checks if it is currently raining or thundering at the specified position in the given level.
+     * @param level The server level to check
+     * @param pos The position in the world
+     * @return true if it is raining or thundering at the position, false otherwise
+     */
+    public boolean isRainingOrThundering(ServerLevel level, BlockPos pos) {
+
+        return WeatherType.isRainy(CloudManager.get(level).getCloudTypeAtPosition(pos.getX(), pos.getZ()).getKey().id());
+    }
+
     /**
      * Gets any active weather alerts for the given position.
      * @param level The server level
@@ -77,7 +90,14 @@ public class AtmoApi {
      * @param pos The position in the world
      * @return true if it is raining at the position, false otherwise
      */
+    @Deprecated(since ="0.5.4.0", forRemoval = true)
     public boolean isRainningAt(ServerLevel level, BlockPos pos) {
         return CloudManager.get(level).isRainingAt(pos);
+    }
+
+
+
+    public boolean isRainningLevel(ServerLevel level, BlockPos pos) {
+        return  CloudManager.get(level).getClouds().stream().anyMatch(cloud -> WeatherType.isRainy(cloud.getCloudTypeId()));
     }
 }
