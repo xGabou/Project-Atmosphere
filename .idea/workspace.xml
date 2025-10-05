@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherType.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/generate_weather_enum.py" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add WeatherType enum and update weather checks in AtmoApi">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/AtmoApi.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -433,8 +431,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.25557.131" />
-        <option value="bundled-js-predefined-d6986cc7102b-b598e85cdad2-JavaScript-IU-252.25557.131" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26830.84" />
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-IU-252.26830.84" />
       </set>
     </attachedChunks>
   </component>
@@ -543,15 +541,13 @@
       <workItem from="1759178286066" duration="607000" />
       <workItem from="1759264314468" duration="2765000" />
       <workItem from="1759434850724" duration="2760000" />
-      <workItem from="1759438722747" duration="846000" />
-    </task>
-    <task id="LOCAL-00063" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
-      <option name="closed" value="true" />
-      <created>1754056556273</created>
-      <option name="number" value="00063" />
-      <option name="presentableId" value="LOCAL-00063" />
-      <option name="project" value="LOCAL" />
-      <updated>1754056556274</updated>
+      <workItem from="1759438722747" duration="1697000" />
+      <workItem from="1759520319272" duration="690000" />
+      <workItem from="1759587412674" duration="595000" />
+      <workItem from="1759601697547" duration="1326000" />
+      <workItem from="1759633106532" duration="436000" />
+      <workItem from="1759633673209" duration="597000" />
+      <workItem from="1759680812568" duration="360000" />
     </task>
     <task id="LOCAL-00064" summary="Add desert storms dependency and update workspace settings">
       <option name="closed" value="true" />
@@ -937,7 +933,15 @@
       <option name="project" value="LOCAL" />
       <updated>1758138759276</updated>
     </task>
-    <option name="localTasksCounter" value="112" />
+    <task id="LOCAL-00112" summary="feat: add WeatherType enum and update weather checks in AtmoApi">
+      <option name="closed" value="true" />
+      <created>1759442223602</created>
+      <option name="number" value="00112" />
+      <option name="presentableId" value="LOCAL-00112" />
+      <option name="project" value="LOCAL" />
+      <updated>1759442223602</updated>
+    </task>
+    <option name="localTasksCounter" value="113" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -956,7 +960,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: enhance tornado rendering with improved shader parameters and error handling" />
     <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
     <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
     <MESSAGE value="feat: refine tornado rendering with improved height calculations and shader adjustments" />
@@ -981,7 +984,8 @@
     <MESSAGE value="feat: update particle textures and enhance tornado rendering logic" />
     <MESSAGE value="feat: add wind streaks texture configuration" />
     <MESSAGE value="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane" />
+    <MESSAGE value="feat: add WeatherType enum and update weather checks in AtmoApi" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add WeatherType enum and update weather checks in AtmoApi" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
