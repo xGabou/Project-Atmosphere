@@ -28,7 +28,9 @@ public class SimpleCloudsEventListener {
     }
 
     public static void onCloudRegionSpawn(CloudRegionNaturallySpawnEvent event) {
-        Level level = event.getLevel();
+        if(!(event.getLevel() instanceof ServerLevel serverLevel)) {
+            return;
+        }
         ScAPICloudRegion region = event.getCloudRegion();
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getWorldX(), region.getWorldZ());
     }
