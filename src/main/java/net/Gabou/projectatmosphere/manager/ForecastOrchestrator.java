@@ -163,11 +163,14 @@ public class ForecastOrchestrator {
             BlockPos spawn = level.getSharedSpawnPos();
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing or invalid. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
+            return;
         }
 
         ForecastGenerator.swapToTomorrow();
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
         ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
+
+
     }
 
 

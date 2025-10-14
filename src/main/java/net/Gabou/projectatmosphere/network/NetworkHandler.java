@@ -20,7 +20,7 @@ public class NetworkHandler {
 
     public static void init() {
         CHANNEL.messageBuilder(SpawnTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(SpawnTornadoPacket::new)
+                .decoder(SpawnTornadoPacket::decode)
                 .encoder(SpawnTornadoPacket::encode)
                 .consumerMainThread(SpawnTornadoPacket::handle)
                 .add();
@@ -29,6 +29,13 @@ public class NetworkHandler {
                 .encoder(SyncWindPacket::encode)
                 .consumerMainThread(SyncWindPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(BiomeDayTemperaturePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(BiomeDayTemperaturePacket::decode)
+                .encoder(BiomeDayTemperaturePacket::encode)
+                .consumerMainThread(BiomeDayTemperaturePacket::handle)
+                .add();
+
+
     }
 }
 

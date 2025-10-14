@@ -8,7 +8,7 @@ group = mod_group_id
 version = mod_version
 
 base {
-    archivesName = mod_id
+    archivesName = "Forge-Version-"+mod_id
 }
 
 
@@ -100,7 +100,7 @@ dependencies {
     implementation fg.deobf("curse.maven:betterdays-895618:7013807")
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
-    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7043292")
+    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7077698")
 //    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))
 
 

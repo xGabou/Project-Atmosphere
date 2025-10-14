@@ -20,6 +20,8 @@ import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator
 import net.Gabou.projectatmosphere.modules.temperature.variation.VariationGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
+import net.Gabou.projectatmosphere.network.BiomeDayTemperaturePacket;
+import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.client.Minecraft;
@@ -30,6 +32,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraftforge.network.PacketDistributor;
 import org.apache.commons.lang3.tuple.Pair;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
@@ -119,15 +122,69 @@ public class ForecastGenerator {
                 .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType));
     }
 
+    /** Compute average forecasts for each biome type inside grouped and only for daily*/
     private static void computeAverageForecastsByBiomeType() {
-        computeAverageTemperature();
-        computeAverageHumidity();
-        computeAveragePressure();
-        computeAverageWind();
-        computeAverageStormChance();
+        computeAverageDaily();
+
     }
 
-    private static void computeAverageTemperature() {
+    private static void computeAllAverage(){
+        Map<ResourceLocation, float[]> map = new HashMap<>();
+        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
+            List<BiomeForecast> list = entry.getValue();
+            if (list.isEmpty()) continue;
+
+            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
+            avg.setTemperature(averageWeek(list, BiomeForecast::getTemperature));
+            avg.setPressureDay(averageDay(list, BiomeForecast::getPressureDay));
+            avg.setHumidity(averageWeek(list, BiomeForecast::getHumidity));
+            avg.setPressure(averageWeek(list, BiomeForecast::getPressure));
+            avg.setPressureTomorrow(averageDay(list, BiomeForecast::getPressureTomorrow));
+            avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
+            avg.setTemperatureDay(averageDay(list, BiomeForecast::getTemperatureDay));
+            map.put(entry.getKey(), avg.getTemperatureDay());
+            avg.setTemperatureTomorrow(averageDay(list, BiomeForecast::getTemperatureTomorrow));
+            avg.setBiomeKey(entry.getValue().get(0).getBiomeKey());
+            avg.setStormChanceDay(averageDay(list, BiomeForecast::getStormChanceDay));
+            avg.setStormChanceTomorrow(averageDay(list, BiomeForecast::getStormChanceTomorrow));
+            avg.setWindDay(averageWind(list, BiomeForecast::getWindDay));
+            avg.setWindTomorrow(averageWind(list, BiomeForecast::getWindTomorrow));
+            avg.setHumidityDay(averageDay(list, BiomeForecast::getHumidityDay));
+            avg.setHumidityTomorrow(averageDay(list, BiomeForecast::getHumidityTomorrow));
+
+        }
+        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new BiomeDayTemperaturePacket(map));
+    }
+
+    private static void computeAverageDaily() {
+        Map<ResourceLocation, float[]> map = new HashMap<>();
+        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
+            List<BiomeForecast> list = entry.getValue();
+            if (list.isEmpty()) continue;
+
+            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
+
+            avg.setTemperatureDay(averageDay(list, BiomeForecast::getTemperatureDay));
+            map.put(entry.getKey(), avg.getTemperatureDay());
+            avg.setTemperatureTomorrow(averageDay(list, BiomeForecast::getTemperatureTomorrow));
+            avg.setBiomeKey(entry.getValue().get(0).getBiomeKey());
+
+            avg.setHumidityDay(averageDay(list, BiomeForecast::getHumidityDay));
+            avg.setHumidityTomorrow(averageDay(list, BiomeForecast::getHumidityTomorrow));
+            avg.setPressureDay(averageDay(list, BiomeForecast::getPressureDay));
+            avg.setPressureTomorrow(averageDay(list, BiomeForecast::getPressureTomorrow));
+            avg.setWindDay(averageWind(list, BiomeForecast::getWindDay));
+            avg.setWindTomorrow(averageWind(list, BiomeForecast::getWindTomorrow));
+            avg.setStormChanceDay(averageDay(list, BiomeForecast::getStormChanceDay));
+            avg.setStormChanceTomorrow(averageDay(list, BiomeForecast::getStormChanceTomorrow));
+
+
+
+        }
+        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new BiomeDayTemperaturePacket(map));
+    }
+
+    private static void computeAverageTemperatureWeek() {
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
             if (list.isEmpty()) continue;
@@ -135,9 +192,46 @@ public class ForecastGenerator {
             BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
 
             avg.setTemperature(averageWeek(list, BiomeForecast::getTemperature));
-            avg.setTemperatureDay(averageDay(list, BiomeForecast::getTemperatureDay));
-            avg.setTemperatureTomorrow(averageDay(list, BiomeForecast::getTemperatureTomorrow));
-            avg.setBiomeKey(entry.getValue().get(0).getBiomeKey());
+        }
+    }
+    private static void computeAverageHumidityWeek() {
+        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
+            List<BiomeForecast> list = entry.getValue();
+            if (list.isEmpty()) continue;
+
+            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
+
+            avg.setHumidity(averageWeek(list, BiomeForecast::getHumidity));
+        }
+    }
+    private static void computeAveragePressureWeek() {
+        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
+            List<BiomeForecast> list = entry.getValue();
+            if (list.isEmpty()) continue;
+
+            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
+
+            avg.setPressure(averageWeek(list, BiomeForecast::getPressure));
+        }
+    }
+    private static void computeAverageWindWeek() {
+        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
+            List<BiomeForecast> list = entry.getValue();
+            if (list.isEmpty()) continue;
+
+            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
+
+            avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
+        }
+    }
+    private static void computeAverageStormChanceWeek() {
+        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
+            List<BiomeForecast> list = entry.getValue();
+            if (list.isEmpty()) continue;
+
+            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
+
+            avg.setStormChance(averageWeek(list, BiomeForecast::getStormChance));
         }
     }
 
@@ -147,60 +241,6 @@ public class ForecastGenerator {
             grouped.computeIfAbsent(biomeType, k -> new ArrayList<>()).add(entry.getValue());
         }
     }
-
-    private static void computeAverageStormChance() {
-
-        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
-            List<BiomeForecast> list = entry.getValue();
-            if (list.isEmpty()) continue;
-
-            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
-
-            avg.setStormChance(averageWeek(list, BiomeForecast::getStormChance));
-            avg.setStormChanceDay(averageDay(list, BiomeForecast::getStormChanceDay));
-            avg.setStormChanceTomorrow(averageDay(list, BiomeForecast::getStormChanceTomorrow));
-        }
-    }
-
-    private static void computeAverageWind() {
-        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
-            List<BiomeForecast> list = entry.getValue();
-            if (list.isEmpty()) continue;
-
-            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
-
-            avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
-            avg.setWindDay(averageWind(list, BiomeForecast::getWindDay));
-            avg.setWindTomorrow(averageWind(list, BiomeForecast::getWindTomorrow));
-        }
-    }
-
-    private static void computeAveragePressure() {
-        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
-            List<BiomeForecast> list = entry.getValue();
-            if (list.isEmpty()) continue;
-
-            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
-
-            avg.setPressure(averageWeek(list, BiomeForecast::getPressure));
-            avg.setPressureDay(averageDay(list, BiomeForecast::getPressureDay));
-            avg.setPressureTomorrow(averageDay(list, BiomeForecast::getPressureTomorrow));
-        }
-    }
-
-    private static void computeAverageHumidity() {
-        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
-            List<BiomeForecast> list = entry.getValue();
-            if (list.isEmpty()) continue;
-
-            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
-
-            avg.setHumidity(averageWeek(list, BiomeForecast::getHumidity));
-            avg.setHumidityDay(averageDay(list, BiomeForecast::getHumidityDay));
-            avg.setHumidityTomorrow(averageDay(list, BiomeForecast::getHumidityTomorrow));
-        }
-    }
-
 
     private static float interpolate(float base, float minOrMax, float chanceMax) {
         float t = Mth.clamp(chanceMax - 1.0f, 0f, 1f);
@@ -283,6 +323,7 @@ public class ForecastGenerator {
         FORECAST_MAP.forEach(ForecastOrchestrator::generateWindForecast);
 
         computeAverageForecastsByBiomeType();
+        FORECAST_MAP.forEach(ForecastPointerRegistry::setPointer);
 
         if(!sandStormLoaded)return;
         if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty() ) {
@@ -400,24 +441,24 @@ public class ForecastGenerator {
             diffuseAndSmoothField(BiomeForecast::getTemperature, BiomeForecast::setTemperature);
         }
 
-        computeAverageTemperature();
+        computeAverageTemperatureWeek();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setHumidity(generateHumidity(entry.getKey(), level, day));
         }
         diffuseAndSmoothField(BiomeForecast::getHumidity, BiomeForecast::setHumidity);
-        computeAverageHumidity();
+        computeAverageHumidityWeek();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setPressure(generatePressure(entry.getKey(), day));
         }
         diffuseAndSmoothField(BiomeForecast::getPressure, BiomeForecast::setPressure);
-        computeAveragePressure();
+        computeAveragePressureWeek();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setWind(generateWind(entry.getKey()));
         }
-        computeAverageWind();
+        computeAverageWindWeek();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setStormChance(generateStorm(
@@ -430,7 +471,7 @@ public class ForecastGenerator {
                     season
             ));
         }
-        computeAverageStormChance();
+        computeAverageStormChanceWeek();
 
         dailyAndSand(level);
 
@@ -604,6 +645,7 @@ public class ForecastGenerator {
         scheduledStormPhase = null;
         scheduledStormTime = -1L;
         tickCounter = 0;
+        ForecastPointerRegistry.clear();
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cleared all forecasts and samples.");
     }
 
@@ -668,59 +710,63 @@ public class ForecastGenerator {
         return new WindVector(speed, original.angleRadians(), original.gustSpeed());
     }
 
-
     public static BiomeForecast getClosestValidForecast(BiomeInstanceKey key, ForecastType type) {
-        BiomeForecast direct = FORECAST_MAP.get(key);
-        if (direct != null && direct.hasData(type)) {
-            return direct;
-        }
-
-
-
-
-        BiomeForecast closestSame = null;
-        double minDistSame = Double.MAX_VALUE;
-
-
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeInstanceKey otherKey = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
-
-            if (!forecast.hasData(type)) continue;
-            if (!otherKey.biomeType().equals(key.biomeType())) continue;
-
-            double dist = otherKey.samplePos().distSqr(key.samplePos());
-            if (dist < minDistSame) {
-                minDistSame = dist;
-                closestSame = forecast;
-                if (dist < SAMPLE_STEP * 2) break;
-            }
-        }
-
-        if (closestSame != null) return closestSame;
-
-
-        BiomeForecast avg = AVERAGE_FORECASTS.get(key.biomeType());
-        if (avg != null && avg.hasData(type)) {
-            return avg;
-        }
-
-        BiomeForecast closestFallback = null;
-        double minDistAny = Double.MAX_VALUE;
-
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeForecast forecast = entry.getValue();
-            if (!forecast.hasData(type)) continue;
-
-            double dist = entry.getKey().samplePos().distSqr(key.samplePos());
-            if (dist < minDistAny) {
-                minDistAny = dist;
-                closestFallback = forecast;
-            }
-        }
-
-        return closestFallback;
+        return ForecastPointerRegistry.getPointer(key);
     }
+
+
+//    public static BiomeForecast getClosestValidForecast(BiomeInstanceKey key, ForecastType type) {
+//        BiomeForecast direct = FORECAST_MAP.get(key);
+//        if (direct != null && direct.hasData(type)) {
+//            return direct;
+//        }
+//
+//
+//
+//
+//        BiomeForecast closestSame = null;
+//        double minDistSame = Double.MAX_VALUE;
+//
+//
+//        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+//            BiomeInstanceKey otherKey = entry.getKey();
+//            BiomeForecast forecast = entry.getValue();
+//
+//            if (!forecast.hasData(type)) continue;
+//            if (!otherKey.biomeType().equals(key.biomeType())) continue;
+//
+//            double dist = otherKey.samplePos().distSqr(key.samplePos());
+//            if (dist < minDistSame) {
+//                minDistSame = dist;
+//                closestSame = forecast;
+//                if (dist < SAMPLE_STEP * 2) break;
+//            }
+//        }
+//
+//        if (closestSame != null) return closestSame;
+//
+//
+//        BiomeForecast avg = AVERAGE_FORECASTS.get(key.biomeType());
+//        if (avg != null && avg.hasData(type)) {
+//            return avg;
+//        }
+//
+//        BiomeForecast closestFallback = null;
+//        double minDistAny = Double.MAX_VALUE;
+//
+//        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+//            BiomeForecast forecast = entry.getValue();
+//            if (!forecast.hasData(type)) continue;
+//
+//            double dist = entry.getKey().samplePos().distSqr(key.samplePos());
+//            if (dist < minDistAny) {
+//                minDistAny = dist;
+//                closestFallback = forecast;
+//            }
+//        }
+//
+//        return closestFallback;
+//    }
 
 
     static void swapToTomorrow() {
@@ -755,6 +801,8 @@ public class ForecastGenerator {
                 forecast.setWindDay(forecast.getWindTomorrow());
             }
         }
+
+        computeAllAverage();
     }
 
     private static float[][] rotateWeek(float[][] original) {

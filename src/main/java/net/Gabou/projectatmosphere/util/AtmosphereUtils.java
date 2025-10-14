@@ -53,6 +53,11 @@ public class AtmosphereUtils {
                 || state.getBlock() instanceof StainedGlassPaneBlock
                 || state.getBlock() instanceof TintedGlassBlock;
     }
+    public static float toMinecraftSimple(float celsius, boolean isTropical) {
+        if (isTropical) return 1.8F;
+        return celsius <= 0.0F ? 0.0F : 0.5F;
+    }
+
 
 
 }

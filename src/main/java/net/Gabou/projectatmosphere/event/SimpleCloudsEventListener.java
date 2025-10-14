@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.event;
 
+import com.Gabou.sereneseasonsplus.api.SSPApi;
 import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ScAPICloudRegion;
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionNaturallySpawnEvent;
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionRemovedEvent;
@@ -15,6 +16,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.WeatherType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -31,7 +33,8 @@ public class SimpleCloudsEventListener {
        }
         ScAPICloudRegion region = event.getCloudRegion();
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getWorldX(), region.getWorldZ());
-
+        if(WeatherType.isRainy(event.getCloudRegion().getCloudTypeId()))
+            SSPApi.getINSTANCE().onSimpleCloudsSpawned(serverLevel,event.getCloudRegion().hashCode());
     }
 
     @SubscribeEvent
@@ -54,6 +57,8 @@ public class SimpleCloudsEventListener {
         } else {
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region removed for reason: {}", reason);
         }
+        if(WeatherType.isRainy(event.getCloudRegion().getCloudTypeId()))
+            SSPApi.getINSTANCE().onCloudsDespawned((ServerLevel) event.getLevel(),event.getCloudRegion().hashCode());
     }
 
 

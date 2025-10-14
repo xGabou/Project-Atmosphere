@@ -6,6 +6,7 @@
   "refmap": "projectatmosphere.refmap.json",
   "mixins": [
     "InfoMixin",
+    "SeasonHooksMixin",
     "ServerLevelSnowStormMixin"
   ],
   "client": [

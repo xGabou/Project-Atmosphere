@@ -181,6 +181,7 @@ public class DailyForecastGenerator {
                 forecast.setWindTomorrow(wind[1]);
             }
         }
+
     }
     /**
      * Linearly interpolates a 240-step curve between two [min, max] values of consecutive days.
