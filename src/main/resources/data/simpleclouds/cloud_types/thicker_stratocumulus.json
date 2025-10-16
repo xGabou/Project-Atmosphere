@@ -41,7 +41,7 @@
       "scale_y": 400.0
     }
   ],
-  "weather_type": "none",
+  "weather_type": "rain",
   "storminess": 0.6,
   "storm_start": 32.0,
   "transparency_fade": 0.2,

@@ -6,8 +6,10 @@ import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionNaturallySpa
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionRemovedEvent;
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionTickEvent;
 import dev.nonamecrackers2.simpleclouds.api.common.event.ModifyCloudSpeedEvent;
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
@@ -21,7 +23,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+import org.checkerframework.checker.units.qual.A;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class SimpleCloudsEventListener {
@@ -31,34 +36,14 @@ public class SimpleCloudsEventListener {
        if(!(event.getLevel() instanceof ServerLevel serverLevel)) {
            return;
        }
-        ScAPICloudRegion region = event.getCloudRegion();
+        CloudRegion region =(CloudRegion) event.getCloudRegion();
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getWorldX(), region.getWorldZ());
-        if(WeatherType.isRainy(event.getCloudRegion().getCloudTypeId()))
-            SSPApi.getINSTANCE().onSimpleCloudsSpawned(serverLevel,event.getCloudRegion().hashCode());
+        AtmosphereManager.queueAddCloudRegion(region);
     }
 
     @SubscribeEvent
     public static void onCloudRegionRemoved(CloudRegionRemovedEvent event) {
-        if(event.getLevel()==null)
-            return;
-        if((event.getLevel().isClientSide))
-            return;
-        ScAPICloudRegion region = event.getCloudRegion();
-        CloudRegionRemovedEvent.Reason reason = event.getReason();
 
-        if (reason == CloudRegionRemovedEvent.Reason.MANUALLY) {
-            try {
-                SimpleCloudsCompat.doInitialGenWithWeather((int) region.getWorldX(), (int) region.getWorldZ(), (ServerLevel) event.getLevel());
-            }
-            catch (Exception e) {
-                ProjectAtmosphere.LOGGER.error("[Atmosphere] Error during cloud region regeneration at {}, {}", region.getWorldX(), region.getWorldZ(), e);
-                SimpleCloudsCompat.setIsInit(true);
-            }
-        } else {
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region removed for reason: {}", reason);
-        }
-        if(WeatherType.isRainy(event.getCloudRegion().getCloudTypeId()))
-            SSPApi.getINSTANCE().onCloudsDespawned((ServerLevel) event.getLevel(),event.getCloudRegion().hashCode());
     }
 
 

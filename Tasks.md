@@ -73,3 +73,12 @@
 - [ ] Tough As Nails
 - [ ] Epic Fight
 
+
+
+
+
+
+Dithering, Island,pathways, stripe
+thicker_stratocumulus not rainy
+
+

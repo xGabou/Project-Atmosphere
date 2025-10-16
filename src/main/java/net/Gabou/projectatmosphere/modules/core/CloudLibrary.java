@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.core;
 
 import net.minecraft.resources.ResourceLocation;
+
 import java.util.Random;
 import java.util.Set;
 
@@ -8,93 +9,104 @@ public class CloudLibrary {
 
     private static final Random RANDOM = new Random();
 
-    private static final String[] SNOWSTORM_CLOUDS = {
-            "snow",
-            "nimbostratus",
-            "severe_nimbostratus"
+    private static final String[] RAINSTORM_CLOUDS = {
+            "heavy_stratus",
+            "dense_stratocumulus",
+            "overcast",
+            "stratus",
+            "floating_farlands",
+            "mammatus_thin",
+            "thicker_stratocumulus"
     };
-    private static final Set<String> SNOW_CLOUDS = Set.of(SNOWSTORM_CLOUDS);
+    private static final Set<String> SNOW_CLOUDS = Set.of(RAINSTORM_CLOUDS);
 
     private static final Set<String> THUNDER_CLOUDS = Set.of(
+            "nimbostratus",
             "cumulonimbus",
-            "severe_cumulonimbus",
             "tsegrus",
+            "stronger_stratus",
+            "cookie",
+            "severe_cumulonimbus",
             "dense_tsegrus",
             "dark_wall",
-            "custom_cumulonimbus"
+            "custom_cumulonimbus",
+            "severe_nimbostratus"
     );
 
     private static final String[] THUNDER_LOW_CLOUDS = {
             "cumulonimbus",
             "tsegrus",
-            "custom_cumulonimbus"
+            "custom_cumulonimbus",
+            "nimbostratus"
     };
 
     private static final String[] THUNDER_HIGH_CLOUDS = {
             "severe_cumulonimbus",
             "dense_tsegrus",
-            "dark_wall"
+            "dark_wall",
+            "severe_nimbostratus"
     };
 
     private static final String[] SEVERITY_7_CLOUDS = {
-            "cumulonimbus",
             "severe_cumulonimbus",
-            "tsegrus",
             "dense_tsegrus",
             "dark_wall",
-            "custom_cumulonimbus"
+            "custom_cumulonimbus",
+            "severe_nimbostratus"
+
     };
 
     private static final String[] SEVERITY_6_CLOUDS = {
             "nimbostratus",
-            "severe_nimbostratus"
+            "cumulonimbus",
+            "tsegrus",
+            "stronger_stratus",
+            "cookie"
     };
 
     private static final String[] SEVERITY_5_CLOUDS = {
-            "stratocumulus",
+            "heavy_stratus",
             "dense_stratocumulus",
-            "smaller_stratocumulus",
-            "thicker_stratocumulus",
-            "dithering",
-            "islands",
-            "pathway",
-            "spots",
-            "spotted",
-            "stripe",
-            "stripe_side"
+            "overcast"
+
     };
 
     private static final String[] SEVERITY_4_CLOUDS = {
             "stratus",
-            "heavy_stratus",
-            "overcast",
-            "stronger_stratus",
             "floating_farlands",
             "mammatus_thin",
-            "matrix",
-            "pattern",
-            "snow",
-            "cookie",
-            "balls"
+            "thicker_stratocumulus"
+
     };
 
     private static final String[] SEVERITY_3_CLOUDS = {
-            "cumulus",
-            "dense_cumulus",
-            "cumulus_noise",
-            "tall_noise",
-            "tall_weirdness"
+            "dense_itty_bitty",
+            "stratocumulus",
+            "cumulus"
     };
 
     private static final String[] SEVERITY_2_CLOUDS = {
             "small_cumulus",
-            "itty_bitty_bigger"
+            "smaller_stratocumulus",
+            "islands",
+            "spots",
+            "pattern",
+            "balls",
+            "cumulus_noise",
+            "dense_cumulus",
+            "tall_noise"
+
     };
 
     private static final String[] SEVERITY_1_CLOUDS = {
             "itty_bitty",
-            "dense_itty_bitty",
-            "real_itty_bitty"
+            "real_itty_bitty",
+            "itty_bitty_bigger",
+            "pathway",
+            "spotted",
+            "matrix",
+            "snow",
+            "tall_weirdness"
     };
 
     private static String getRandomFrom(String[] clouds) {
@@ -114,7 +126,7 @@ public class CloudLibrary {
     }
 
     public static String getSnowstormCloudId() {
-        return getRandomFrom(SNOWSTORM_CLOUDS);
+        return getRandomFrom(RAINSTORM_CLOUDS);
     }
 
     public static String getRandomThunderCloud(int intensity) {
@@ -125,7 +137,7 @@ public class CloudLibrary {
         if (includeThunder && RANDOM.nextInt(3) == 0) {
             return getRandomThunderCloud(intensity);
         }
-        int severity = intensity == 2 ? 6 : 5;
+        int severity = 4 + RANDOM.nextInt(2);
         return getCloudIdFromSeverity(severity);
     }
 
@@ -139,18 +151,43 @@ public class CloudLibrary {
 
     public static int getSeverityFromCloudId(String id) {
         return switch (id) {
-            case "cumulonimbus", "severe_cumulonimbus", "tsegrus", "dense_tsegrus", "dark_wall", "custom_cumulonimbus" -> 7;
-            case "nimbostratus", "severe_nimbostratus" -> 6;
-            case "stratocumulus", "dense_stratocumulus", "smaller_stratocumulus", "thicker_stratocumulus", "dithering",
-                    "islands", "pathway", "spots", "spotted", "stripe", "stripe_side" -> 5;
-            case "stratus", "heavy_stratus", "overcast", "stronger_stratus", "floating_farlands", "mammatus_thin",
-                    "matrix", "pattern", "snow", "cookie", "balls" -> 4;
-            case "cumulus", "dense_cumulus", "cumulus_noise", "tall_noise", "tall_weirdness" -> 3;
-            case "small_cumulus", "itty_bitty_bigger" -> 2;
-            case "itty_bitty", "dense_itty_bitty", "real_itty_bitty" -> 1;
-            default -> 1;
+            case "severe_cumulonimbus", "dense_tsegrus", "dark_wall", "custom_cumulonimbus", "severe_nimbostratus" -> 7;
+            case "nimbostratus",
+                 "cumulonimbus",
+                 "tsegrus",
+                 "stronger_stratus",
+                 "cookie" -> 6;
+            case "heavy_stratus",
+                 "dense_stratocumulus",
+                 "overcast" -> 5;
+            case "stratus",
+                 "floating_farlands",
+                 "mammatus_thin",
+                 "thicker_stratocumulus" -> 4;
+            case "dense_itty_bitty",
+                 "stratocumulus",
+                 "cumulus" -> 3;
+            case "small_cumulus",
+                 "smaller_stratocumulus",
+                 "islands",
+                 "spots",
+                 "pattern",
+                 "balls",
+                 "cumulus_noise",
+                 "dense_cumulus",
+                 "tall_noise" -> 2;
+            case "itty_bitty",
+                 "real_itty_bitty",
+                 "itty_bitty_bigger",
+                 "pathway",
+                 "spotted",
+                 "matrix",
+                 "snow",
+                 "tall_weirdness" -> 1;
+            default -> 0;
         };
     }
+
     public static int getSeverityFromRessourceLocation(ResourceLocation id) {
         return getSeverityFromCloudId(id.getPath());
     }
