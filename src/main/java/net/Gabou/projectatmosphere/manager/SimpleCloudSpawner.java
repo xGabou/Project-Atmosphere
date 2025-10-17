@@ -179,46 +179,58 @@ public class SimpleCloudSpawner {
         return (BCONST * result) / (ACONST - result);
     }
 
-    public static int determineCloudSeverity(float temperature, float humidity, float pressure, float dewPoint, float stormChance, ServerLevel level) {
+    public static int determineCloudSeverity(
+            float temperature,
+            float humidity,
+            float pressure,
+            float dewPoint,
+            float stormChance,
+            ServerLevel level
+    ) {
+        // Normalize dew gap: 0 when saturated, 1 when dry
+        float dewGap = Math.max(0f, temperature - dewPoint);
+        float dewGapFactor = 1.0f - Math.min(dewGap / 10.0f, 1.0f); // sharper curve near 0 gap
 
-        float dewGap = temperature - dewPoint;
-        float pressureFactor = 1.0f - (pressure / PRESSION_MOYENNE);
+        // Pressure deviation (normalized to ±1 around mean)
+        float pressureFactor = (PRESSION_MOYENNE - pressure) / 50.0f; // 50 hPa deviation = ±1
+        pressureFactor = Math.max(-1f, Math.min(pressureFactor, 1f));
+
         float humidityFactor = humidity / 100.0f;
-        float tempIdealness = 1.0f - Math.abs(temperature - 15.0f) / 40.0f;
+        float tempIdealness = 1.0f - Math.abs(temperature - 18.0f) / 40.0f;
 
-        float dewGapFactor = 1.0f - Math.min(dewGap, 10.0f) / 10.0f;
-
+        // Weighted instability (expanded dynamic range)
         float instability =
-                (dewGapFactor * DEW_GAP_MODIFIER) +
-                        (pressureFactor * PRESSURE_MODIFIER) +
-                        (humidityFactor * HUMIDITY_MODIFIER) +
-                        (tempIdealness * TEMPERATURE_MODIFIER);
+                (dewGapFactor * 0.5f) +
+                        (pressureFactor * 0.4f) +
+                        (humidityFactor * 0.6f) +
+                        (tempIdealness * 0.4f);
 
+        // Normalize to 0–1
+        instability = Math.min(Math.max(instability, 0f), 1f);
+
+        // Storm buildup factor
         int currentDay = (int) (level.getDayTime() / 24000L);
-
         GlobalStormHistoryData data = GlobalStormHistoryData.get(level);
         int lastSevere = data.getLastSevereDay();
         int daysSince = (lastSevere == Integer.MIN_VALUE) ? Integer.MAX_VALUE : Math.max(0, currentDay - lastSevere);
 
+        float boost = 1f + 0.15f * daysSince; // +15% per day since last severe
+        boost = Math.min(boost, 3.5f);
 
-        float boost = 1f + 0.08f * daysSince;  // +8% per day
-        boost = Math.min(boost, 4f);         // cap at 2.5x
         float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
 
-        float rawScore = instability * adjustedChance;
-        if (rawScore < SUNNY_THRESHOLD) {
-            return 0;
-        }
+        // Non-linear weighting for more “explosive” growth near high instability
+        float rawScore = (float) Math.pow(instability * adjustedChance * 8f, 1.2); // 8x scaling
 
         int severity = Math.round(rawScore);
         severity = Math.max(1, Math.min(7, severity));
 
-        if (severity >= 5) {
+        if (severity >= 6)
             data.recordSevere(currentDay);
-        }
 
         return severity;
     }
+
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level), player.blockPosition());

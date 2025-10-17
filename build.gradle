@@ -188,7 +188,7 @@ tasks.register("discordWebhook") {
                         "<@&1401956072784269443>\n" + // role mention
                         "Project: ${mod_name}\n" +
                         "Version: v${project.mod_version}-1.20.1\n\n" +
-                        "${changelogText.take(1500)}"
+                        "${changelogText.take(1900)}"
         ]
 
         println "Sending release notification to Discord..."
@@ -210,7 +210,7 @@ modrinth {
     changelog = rootProject.file("PAchangelog.md").text
     gameVersions = ["1.20.1"]
     loaders = ["forge"]
-    versionType = "release"
+    versionType = "beta"
     dependencies {
         required.project "e0bNACJD"
         required.project "4Al4H3t9"
@@ -224,7 +224,7 @@ curseforge {
     project {
         id = "1258344"
         changelog = rootProject.file("PAchangelog.md")
-        releaseType = "release" // options: alpha, beta, release
+        releaseType = "beta" // options: alpha, beta, release
         addGameVersion "1.20.1"
         addGameVersion "Forge"
         mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
