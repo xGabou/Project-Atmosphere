@@ -1,0 +1,26 @@
+{
+  "type": "simpleclouds:cumulus_mediocris",
+  "weight": 10,
+  "speed": {
+    "type": "minecraft:uniform",
+    "value": { "min_inclusive": 0.04, "max_exclusive": 0.07 }
+  },
+  "radius": {
+    "type": "minecraft:uniform",
+    "value": { "min_inclusive": 3000, "max_inclusive": 5000 }
+  },
+  "exist_ticks": {
+    "type": "minecraft:uniform",
+    "value": { "min_inclusive": 18000, "max_inclusive": 36000 }
+  },
+  "grow_ticks": {
+    "type": "minecraft:uniform",
+    "value": { "min_inclusive": 1000, "max_inclusive": 2000 }
+  },
+  "stretch_factor": {
+    "type": "minecraft:uniform",
+    "value": { "min_inclusive": 0.8, "max_exclusive": 1.0 }
+  },
+  "moves_to_player": false,
+  "order_weight": 500
+}

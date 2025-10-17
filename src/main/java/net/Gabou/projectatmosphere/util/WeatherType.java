@@ -32,7 +32,7 @@ public enum WeatherType {
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "heavy_stratus"), RAIN);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "islands"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "itty_bitty_bigger"), NONE);
-        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "mammatus_thin"), RAIN);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "mammatus_thin"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "matrix"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "overcast"), RAIN);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "pathway"), NONE);
@@ -58,6 +58,15 @@ public enum WeatherType {
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "small_cumulus"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "stratocumulus"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "stratus"), RAIN);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "cumulus_humilis"), NONE);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "cumulus_congestus"), RAIN);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "altostratus"), RAIN);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "cumulus_mediocris"), RAIN);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "altocumulus"), RAIN);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "stratocumulus_opacus"), NONE);
+        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "altostratus_dry"), NONE);
+
+
     }
 
     public static WeatherType getWeatherType(ResourceLocation id) {

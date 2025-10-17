@@ -2,10 +2,7 @@ package net.Gabou.projectatmosphere.manager;
 
 
 import com.Gabou.sereneseasonsplus.api.SSPApi;
-import com.Gabou.sereneseasonsplus.storage.ChunkQueue;
-import cpw.mods.modlauncher.Environment;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
@@ -26,9 +23,7 @@ import net.Gabou.projectatmosphere.util.WeatherType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.RandomSource;
 import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.fml.loading.FMLEnvironment;
 
 
 import java.util.*;
@@ -39,7 +34,6 @@ import java.util.stream.Collectors;
 public class AtmosphereManager {
 
 
-
     /**
      * Map to track player readiness for weather data
      * Key: Player UUID, Value: CompletableFuture that completes when the player is ready
@@ -48,13 +42,12 @@ public class AtmosphereManager {
 
     private static final List<CloudRegion> cloudRegions = new ArrayList<>();
 
-    public static boolean isInitialGenerationDone =false;
+    public static boolean isInitialGenerationDone = false;
 
 
     public static void onPlayerLogout(ServerLevel world, ServerPlayer player) {
         playerReadyMap.remove(player.getUUID());
     }
-
 
 
     private static final List<BlockPos> allCenterOfMap = new ArrayList<>();
@@ -65,15 +58,16 @@ public class AtmosphereManager {
 
     public static void onServerStarting(ServerLevel world) {
         playerReadyMap.clear();
-        isInitialGenerationDone=ForecastOrchestrator.onServerStart(world);
-        count =0;
+        isInitialGenerationDone = ForecastOrchestrator.onServerStart(world);
+        count = 0;
 
     }
+
     public static void onServerStopping(ServerLevel world) {
         ForecastOrchestrator.onServerStop(world);
         playerReadyMap.clear();
         isInitialGenerationDone = false;
-        count =0;
+        count = 0;
         CloudRegionQueue.clear();
 
     }
@@ -81,12 +75,12 @@ public class AtmosphereManager {
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
         ProjectAtmosphere.LOGGER.info("Updating forecast Around");
         AsyncAtmosphereService.runWeather(() -> {
-            ForecastOrchestrator.updateForecast(world,center);
+            ForecastOrchestrator.updateForecast(world, center);
         });
     }
 
     public static void onRegisterCommands(final RegisterCommandsEvent event) {
-        
+
         TemperatureCommands.register(event.getDispatcher());
         HumidityCommand.register(event.getDispatcher());
         PressureCommand.register(event.getDispatcher());
@@ -94,7 +88,6 @@ public class AtmosphereManager {
         SpawnCloudCommand.register(event.getDispatcher());
         DebugAtmoCommand.register(event.getDispatcher());
     }
-
 
 
     public static void onPlayerLogin(ServerLevel world, ServerPlayer player) {
@@ -112,6 +105,7 @@ public class AtmosphereManager {
     public static CompletableFuture<Void> getPlayerReadyFuture(ServerPlayer player) {
         return playerReadyMap.computeIfAbsent(player.getUUID(), uuid -> new CompletableFuture<>());
     }
+
     public static boolean isPlayerReady(UUID uuid) {
         CompletableFuture<Void> future = playerReadyMap.get(uuid);
         return future != null && future.isDone();
@@ -148,6 +142,7 @@ public class AtmosphereManager {
 
 
     private static int count;
+
     public static void tick(ServerLevel level) {
 
         ForecastOrchestrator.tick(level);
@@ -157,7 +152,7 @@ public class AtmosphereManager {
         SnowstormManager.tick(level);
 
         if (count % 20 != 0) {
-            CloudManager manager = CloudManager.get(level);
+            CloudManager<ServerLevel> manager = CloudManager.get(level);
 
             // Current clouds still existing in the manager
             List<CloudRegion> activeRegions = new ArrayList<>(manager.getClouds());
@@ -168,73 +163,52 @@ public class AtmosphereManager {
                     .map(r -> ((ICloudRegionId) r).projectatmosphere$getId())
                     .collect(Collectors.toSet());
 
-// Collect clouds that no longer exist
-            Map<CloudRegion, ICloudRegionId> toRemove = new HashMap<>();
-
             for (CloudRegion cloudRegion : new ArrayList<>(cloudRegions)) {
                 if (cloudRegion instanceof ICloudRegionId id) {
                     if (!activeIds.contains(id.projectatmosphere$getId())) {
-                        toRemove.put(cloudRegion, id);
+                        queueRemoveCloudRegion(cloudRegion);
                     }
                 }
             }
-
-// Process removals safely after iteration
-            for (Map.Entry<CloudRegion, ICloudRegionId> entry : toRemove.entrySet()) {
-                CloudRegion region = entry.getKey();
-                ICloudRegionId id = entry.getValue();
-
-                // Remove directly using the reference — faster and avoids double iteration
-                cloudRegions.remove(region);
-
-                if (WeatherType.isRainy(region.getCloudTypeId())) {
-                    SSPApi.getINSTANCE().onCloudsDespawned(level, id.projectatmosphere$getId());
-                }
-            }
-
         }
 
         count++;
-        if(CloudRegionQueue.isEmpty()){
+        if (CloudRegionQueue.isEmpty()) {
             CloudRegionQueue.shuffle();
             return;
         }
         CloudRegionQueue.Entry entry;
-        while((entry = CloudRegionQueue.poll())!=null){
-            switch (entry.type()){
-                case ADD ->
-                {
-                    handleCloudRegionToQueue(level,entry.region());
+        while ((entry = CloudRegionQueue.poll()) != null) {
+            switch (entry.type()) {
+                case ADD -> {
+                    handleCloudRegionToQueue(level, entry.region());
                 }
                 case REMOVE -> {
-                    handleCloudRegionToRemove(level,entry.region());
+                    handleCloudRegionToRemove(level, entry.region());
                 }
 
             }
         }
-
-
-
-
     }
 
     private static void handleCloudRegionToQueue(ServerLevel level, CloudRegion cloudRegion) {
-        if(cloudRegions.contains(cloudRegion)){
+        if (cloudRegions.contains(cloudRegion)) {
             return;
         }
         cloudRegions.add(cloudRegion);
-        if(WeatherType.isRainy(cloudRegion.getCloudTypeId()))
-            SSPApi.getINSTANCE().onSimpleCloudsSpawned(level,((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()))
+            SSPApi.getINSTANCE().onSimpleCloudsSpawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
 
     }
+
     private static void handleCloudRegionToRemove(ServerLevel level, CloudRegion cloudRegion) {
-        if(CloudManager.get(level).getClouds().contains(cloudRegion) && !cloudRegions.contains(cloudRegion)){
+        if (CloudManager.get(level).getClouds().contains(cloudRegion) && !cloudRegions.contains(cloudRegion)) {
             return;
         }
 
         cloudRegions.remove(cloudRegion);
-        if(WeatherType.isRainy(cloudRegion.getCloudTypeId()))
-            SSPApi.getINSTANCE().onCloudsDespawned(level,((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()))
+            SSPApi.getINSTANCE().onCloudsDespawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
 
     }
 
@@ -244,11 +218,12 @@ public class AtmosphereManager {
 
 
     public static void queueAddCloudRegion(CloudRegion cloudRegion) {
-            CloudRegionQueue.enqueueAdd(cloudRegion);
+        CloudRegionQueue.enqueueAdd(cloudRegion);
 
     }
+
     public static void queueRemoveCloudRegion(CloudRegion cloudRegion) {
-            CloudRegionQueue.enqueueRemove(cloudRegion);
+        CloudRegionQueue.enqueueRemove(cloudRegion);
 
     }
 }

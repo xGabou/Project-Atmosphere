@@ -4,28 +4,31 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add weather type utility and enhance rain/thunder checks in AtmoApi">
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/CloudRegionQueue.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/ICloudRegionId.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement cloud region management with unique IDs and enhance weather type handling">
+      <change afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/altocumulus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/altostratus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/altostratus_dry.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus_congestus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus_humilis.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus_mediocris.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stratocumulus_opacus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altocumulus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus_dry.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_congestus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_humilis.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_mediocris.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/nimbostratus.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stratocumulus_opacus.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Tasks.md" beforeDir="false" afterPath="$PROJECT_DIR$/Tasks.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherType.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherType.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/dithering.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stripe.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stripe_side.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/dithering.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/floating_farlands.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/floating_farlands.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/mammatus_thin.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/mammatus_thin.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/overcast.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/overcast.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stripe.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stripe_side.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/thicker_stratocumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/thicker_stratocumulus.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/severe_nimbostratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/severe_nimbostratus.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -166,7 +169,7 @@
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/libs&quot;,
+    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/src/main/resources/data/simpleclouds/cloud_types&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -193,18 +196,18 @@
       <recent name="net.Gabou.projectatmosphere.blocks" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\src\main\resources\data\simpleclouds\cloud_types" />
       <recent name="G:\Project-Atmosphere\libs" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\effects" />
       <recent name="G:\Project-Atmosphere\run\resourcepacks" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\particle" />
-      <recent name="G:\Project-Atmosphere\doc" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\effects" />
       <recent name="G:\Project-Atmosphere\run\resourcepacks" />
       <recent name="H:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\geo\entity" />
-      <recent name="H:\Project-Atmosphere\src\main\java\net\Gabou\projectatmosphere" />
     </key>
     <key name="MoveMembersDialog.RECENTS_KEY">
       <recent name="net.Gabou.projectatmosphere.util.StorageUtils" />
@@ -572,15 +575,10 @@
       <workItem from="1759848057023" duration="595000" />
       <workItem from="1760376611243" duration="10952000" />
       <workItem from="1760446058660" duration="2391000" />
-      <workItem from="1760645301612" duration="12600000" />
-    </task>
-    <task id="LOCAL-00064" summary="Add desert storms dependency and update workspace settings">
-      <option name="closed" value="true" />
-      <created>1754140788494</created>
-      <option name="number" value="00064" />
-      <option name="presentableId" value="LOCAL-00064" />
-      <option name="project" value="LOCAL" />
-      <updated>1754140788494</updated>
+      <workItem from="1760645301612" duration="14537000" />
+      <workItem from="1760705987067" duration="6711000" />
+      <workItem from="1760716213849" duration="608000" />
+      <workItem from="1760718824943" duration="1510000" />
     </task>
     <task id="LOCAL-00065" summary="Add sandstorm management features and integrate delayed task scheduling">
       <option name="closed" value="true" />
@@ -966,7 +964,15 @@
       <option name="project" value="LOCAL" />
       <updated>1759442223602</updated>
     </task>
-    <option name="localTasksCounter" value="113" />
+    <task id="LOCAL-00113" summary="feat: implement cloud region management with unique IDs and enhance weather type handling">
+      <option name="closed" value="true" />
+      <created>1760658215897</created>
+      <option name="number" value="00113" />
+      <option name="presentableId" value="LOCAL-00113" />
+      <option name="project" value="LOCAL" />
+      <updated>1760658215897</updated>
+    </task>
+    <option name="localTasksCounter" value="114" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -985,7 +991,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
     <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
     <MESSAGE value="feat: refine tornado rendering with improved height calculations and shader adjustments" />
     <MESSAGE value="feat: enhance tornado management with clear and remove commands, and update biome tracking" />
@@ -1010,7 +1015,8 @@
     <MESSAGE value="feat: add wind streaks texture configuration" />
     <MESSAGE value="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane" />
     <MESSAGE value="feat: add WeatherType enum and update weather checks in AtmoApi" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: add WeatherType enum and update weather checks in AtmoApi" />
+    <MESSAGE value="feat: implement cloud region management with unique IDs and enhance weather type handling" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: implement cloud region management with unique IDs and enhance weather type handling" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1084,9 +1090,9 @@
           <option name="timeStamp" value="361" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/nonamecrackers2/simpleclouds/0.7.3+1.20.1-forge_mapped_official_1.20.1/simpleclouds-0.7.3+1.20.1-forge_mapped_official_1.20.1-sources.jar!/dev/nonamecrackers2/simpleclouds/common/cloud/spawning/CloudGenerator.java</url>
-          <line>150</line>
-          <option name="timeStamp" value="365" />
+          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java</url>
+          <line>153</line>
+          <option name="timeStamp" value="362" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />

@@ -31,8 +31,8 @@
       "scale_y": 75.0
     }
   ],
-  "weather_type": "thunderstorm",
-  "storminess": 1.0,
+  "weather_type": "rain",
+  "storminess": 0.8,
   "storm_start": 64.0,
   "storm_fade_distance": 64.0
 }

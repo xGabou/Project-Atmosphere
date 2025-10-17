@@ -1,0 +1,29 @@
+{
+  "weather_type": "RAIN",
+  "storminess": 0.4,
+  "transparency_fade": 0.75,
+  "storm_start": 64.0,
+  "storm_fade_distance": 64.0,
+  "noise_settings": [
+    {
+      "height": 160.0,
+      "height_offset": 0.0,
+      "fade_distance": 12.0,
+      "value_offset": 1.4,
+      "value_scale": 1.1,
+      "scale_x": 150.0,
+      "scale_y": 150.0,
+      "scale_z": 150.0
+    },
+    {
+      "height": 96.0,
+      "height_offset": 64.0,
+      "fade_distance": 8.0,
+      "value_offset": 0.7,
+      "value_scale": 0.8,
+      "scale_x": 90.0,
+      "scale_y": 90.0,
+      "scale_z": 90.0
+    }
+  ]
+}

@@ -15,13 +15,19 @@ public class CloudLibrary {
             "overcast",
             "stratus",
             "floating_farlands",
-            "mammatus_thin",
-            "thicker_stratocumulus"
+            "thicker_stratocumulus",
+            "altostratus",
+            "nimbostratus",
+            "severe_nimbostratus",
+            "cumulus_congestus",
+            "cumulus_mediocris",
+            "altostratus",
+            "altocumulus"
+
     };
     private static final Set<String> SNOW_CLOUDS = Set.of(RAINSTORM_CLOUDS);
 
     private static final Set<String> THUNDER_CLOUDS = Set.of(
-            "nimbostratus",
             "cumulonimbus",
             "tsegrus",
             "stronger_stratus",
@@ -29,8 +35,7 @@ public class CloudLibrary {
             "severe_cumulonimbus",
             "dense_tsegrus",
             "dark_wall",
-            "custom_cumulonimbus",
-            "severe_nimbostratus"
+            "custom_cumulonimbus"
     );
 
     private static final String[] THUNDER_LOW_CLOUDS = {
@@ -52,12 +57,9 @@ public class CloudLibrary {
             "dense_tsegrus",
             "dark_wall",
             "custom_cumulonimbus",
-            "severe_nimbostratus"
-
     };
 
     private static final String[] SEVERITY_6_CLOUDS = {
-            "nimbostratus",
             "cumulonimbus",
             "tsegrus",
             "stronger_stratus",
@@ -67,22 +69,28 @@ public class CloudLibrary {
     private static final String[] SEVERITY_5_CLOUDS = {
             "heavy_stratus",
             "dense_stratocumulus",
-            "overcast"
+            "overcast",
+            "severe_nimbostratus",
+            "cumulus_congestus"
 
     };
 
     private static final String[] SEVERITY_4_CLOUDS = {
             "stratus",
+            "nimbostratus",
             "floating_farlands",
-            "mammatus_thin",
-            "thicker_stratocumulus"
-
+            "thicker_stratocumulus",
+            "altostratus",
+            "cumulus_mediocris"
     };
 
     private static final String[] SEVERITY_3_CLOUDS = {
             "dense_itty_bitty",
             "stratocumulus",
-            "cumulus"
+            "cumulus",
+            "altocumulus",
+            "stratocumulus_opacus",
+            "altostratus_dry"
     };
 
     private static final String[] SEVERITY_2_CLOUDS = {
@@ -106,7 +114,9 @@ public class CloudLibrary {
             "spotted",
             "matrix",
             "snow",
-            "tall_weirdness"
+            "mammatus_thin",
+            "tall_weirdness",
+            "cumulus_humilis"
     };
 
     private static String getRandomFrom(String[] clouds) {
@@ -162,7 +172,6 @@ public class CloudLibrary {
                  "overcast" -> 5;
             case "stratus",
                  "floating_farlands",
-                 "mammatus_thin",
                  "thicker_stratocumulus" -> 4;
             case "dense_itty_bitty",
                  "stratocumulus",
@@ -183,6 +192,7 @@ public class CloudLibrary {
                  "spotted",
                  "matrix",
                  "snow",
+                 "mammatus_thin",
                  "tall_weirdness" -> 1;
             default -> 0;
         };

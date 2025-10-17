@@ -60,26 +60,6 @@ public class CloudRegionMixin implements ICloudRegionId {
     }
 
     // ------------------------------------------------------------
-    // Constructor injection (load from packet)
-    // ------------------------------------------------------------
-    @Inject(method = "<init>(Lnet/minecraft/network/FriendlyByteBuf;)V", at = @At("RETURN"))
-    private void projectatmosphere$readId(FriendlyByteBuf buffer, CallbackInfo ci) {
-        try {
-            this.projectatmosphere$id = buffer.readVarInt();
-        } catch (Exception e) {
-            this.projectatmosphere$id = PROJECTATMOSPHERE$RANDOM.nextInt();
-        }
-    }
-
-    // ------------------------------------------------------------
-    // Packet write hook
-    // ------------------------------------------------------------
-    @Inject(method = "toPacket", at = @At("RETURN"))
-    private void projectatmosphere$writeId(FriendlyByteBuf buffer, CallbackInfo ci) {
-        buffer.writeInt(this.projectatmosphere$id);
-    }
-
-    // ------------------------------------------------------------
     // NBT save hook
     // ------------------------------------------------------------
     @Inject(method = "toTag", at = @At("RETURN"))

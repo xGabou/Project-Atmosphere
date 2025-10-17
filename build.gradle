@@ -1,7 +1,11 @@
+import groovy.json.JsonOutput
+
 plugins {
     id 'idea'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
     id 'org.spongepowered.mixin' version '0.7.+'
+    id 'com.matthewprenger.cursegradle' version '1.4.0' // CurseForge uploader
+    id "com.modrinth.minotaur" version "2.8.10" // Modrinth uploader
 }
 
 group = mod_group_id
@@ -100,7 +104,7 @@ dependencies {
     implementation fg.deobf("curse.maven:betterdays-895618:7013807")
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
-    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7107247")
+    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7117649")
 //    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))
 
 
@@ -171,5 +175,63 @@ tasks.withType(JavaCompile).configureEach {
             "-AreobfSrgFile=${buildDir}/tmp/reobf/SRG.srg"
     ]
 }
+import groovy.json.JsonOutput
+tasks.register("discordWebhook") {
+    doLast {
+        def webhookUrl = System.getenv("DISCORD_WEBHOOK_URL")
+        def changelogText = rootProject.file("PAchangelog.md").text
+
+        def payload = [
+                username: "Build Bot",
+                allowed_mentions: [ parse: ["roles"] ],
+                content: "**New release published!** 🎉\n" +
+                        "<@&1401956072784269443>\n" + // role mention
+                        "Project: ${mod_name}\n" +
+                        "Version: v${project.mod_version}-1.20.1\n\n" +
+                        "${changelogText.take(1500)}"
+        ]
+
+        println "Sending release notification to Discord..."
+        def connection = new URL(webhookUrl).openConnection()
+        connection.with {
+            doOutput = true
+            requestMethod = "POST"
+            setRequestProperty("Content-Type", "application/json")
+            outputStream.withWriter("UTF-8") { it << JsonOutput.toJson(payload) }
+            println "Webhook sent with response code: ${responseCode}"
+        }
+    }
+}
+modrinth {
+    token = System.getenv("MODRINTH_TOKEN")
+    projectId = "qIWoLcKJ" // from your Modrinth project URL
+    versionNumber = "Forge-${project.version}"
+    versionName = "Project Atmosphere ${mod_version}"
+    changelog = rootProject.file("PAchangelog.md").text
+    gameVersions = ["1.20.1"]
+    loaders = ["forge"]
+    versionType = "release"
+    dependencies {
+        required.project "e0bNACJD"
+        required.project "4Al4H3t9"
+        optional.project "LtZfKhel"
+    }
+    uploadFile = file("build/libs/${archivesBaseName}-${version}.jar")
+}
+curseforge {
+    apiKey = System.getenv("CURSEFORGE_TOKEN")
+
+    project {
+        id = "1258344"
+        changelog = rootProject.file("PAchangelog.md")
+        releaseType = "release" // options: alpha, beta, release
+        addGameVersion "1.20.1"
+        addGameVersion "Forge"
+        mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
+            displayName = "Forge-${version}"
+        }
+    }
+}
+
 
 
