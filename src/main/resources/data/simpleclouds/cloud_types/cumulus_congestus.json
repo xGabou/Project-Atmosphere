@@ -1,5 +1,5 @@
 {
-  "weather_type": "RAIN",
+  "weather_type": "rain",
   "storminess": 0.4,
   "transparency_fade": 0.75,
   "storm_start": 64.0,

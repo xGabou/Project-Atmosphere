@@ -21,7 +21,7 @@ public class CloudLibrary {
             "severe_nimbostratus",
             "cumulus_congestus",
             "cumulus_mediocris",
-            "altostratus",
+            "mammatus_thin",
             "altocumulus"
 
     };
@@ -90,7 +90,8 @@ public class CloudLibrary {
             "cumulus",
             "altocumulus",
             "stratocumulus_opacus",
-            "altostratus_dry"
+            "altostratus_dry",
+            "mammatus_thin"
     };
 
     private static final String[] SEVERITY_2_CLOUDS = {
@@ -114,7 +115,6 @@ public class CloudLibrary {
             "spotted",
             "matrix",
             "snow",
-            "mammatus_thin",
             "tall_weirdness",
             "cumulus_humilis"
     };

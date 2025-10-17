@@ -4,31 +4,16 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement cloud region management with unique IDs and enhance weather type handling">
-      <change afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/altocumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/altostratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/altostratus_dry.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus_congestus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus_humilis.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/cumulus_mediocris.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_spawning/stratocumulus_opacus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altocumulus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus_dry.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_congestus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_humilis.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_mediocris.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/nimbostratus.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stratocumulus_opacus.json" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add new cloud types and enhance weather parameters for rain and storm effects">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AGENTS.md" beforeDir="false" afterPath="$PROJECT_DIR$/AGENTS.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherType.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherType.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_congestus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_congestus.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/mammatus_thin.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/mammatus_thin.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/severe_nimbostratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/severe_nimbostratus.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -578,15 +563,7 @@
       <workItem from="1760645301612" duration="14537000" />
       <workItem from="1760705987067" duration="6711000" />
       <workItem from="1760716213849" duration="608000" />
-      <workItem from="1760718824943" duration="1510000" />
-    </task>
-    <task id="LOCAL-00065" summary="Add sandstorm management features and integrate delayed task scheduling">
-      <option name="closed" value="true" />
-      <created>1754309048602</created>
-      <option name="number" value="00065" />
-      <option name="presentableId" value="LOCAL-00065" />
-      <option name="project" value="LOCAL" />
-      <updated>1754309048602</updated>
+      <workItem from="1760718824943" duration="3660000" />
     </task>
     <task id="LOCAL-00066" summary="Add new weather instruments: anemometer, thermometer, barometer, and humidimeter with localization support">
       <option name="closed" value="true" />
@@ -972,7 +949,15 @@
       <option name="project" value="LOCAL" />
       <updated>1760658215897</updated>
     </task>
-    <option name="localTasksCounter" value="114" />
+    <task id="LOCAL-00114" summary="feat: add new cloud types and enhance weather parameters for rain and storm effects">
+      <option name="closed" value="true" />
+      <created>1760720368198</created>
+      <option name="number" value="00114" />
+      <option name="presentableId" value="LOCAL-00114" />
+      <option name="project" value="LOCAL" />
+      <updated>1760720368198</updated>
+    </task>
+    <option name="localTasksCounter" value="115" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -991,7 +976,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
     <MESSAGE value="feat: refine tornado rendering with improved height calculations and shader adjustments" />
     <MESSAGE value="feat: enhance tornado management with clear and remove commands, and update biome tracking" />
     <MESSAGE value="feat: implement cloud and tornado management on world regeneration" />
@@ -1016,7 +1000,8 @@
     <MESSAGE value="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane" />
     <MESSAGE value="feat: add WeatherType enum and update weather checks in AtmoApi" />
     <MESSAGE value="feat: implement cloud region management with unique IDs and enhance weather type handling" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: implement cloud region management with unique IDs and enhance weather type handling" />
+    <MESSAGE value="feat: add new cloud types and enhance weather parameters for rain and storm effects" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add new cloud types and enhance weather parameters for rain and storm effects" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1088,11 +1073,6 @@
           <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/nonamecrackers2/simpleclouds/0.7.3+1.20.1-forge_mapped_official_1.20.1/simpleclouds-0.7.3+1.20.1-forge_mapped_official_1.20.1-sources.jar!/dev/nonamecrackers2/simpleclouds/common/cloud/spawning/CloudGenerator.java</url>
           <line>223</line>
           <option name="timeStamp" value="361" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java</url>
-          <line>153</line>
-          <option name="timeStamp" value="362" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />
