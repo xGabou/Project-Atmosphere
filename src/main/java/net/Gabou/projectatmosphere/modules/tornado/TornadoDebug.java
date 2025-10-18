@@ -1,7 +1,10 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import com.mojang.brigadier.arguments.FloatArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
@@ -18,6 +21,33 @@ public final class TornadoDebug {
         event.getDispatcher().register(
                 Commands.literal("weatherdebug")
                         .requires(src -> src.hasPermission(2))
+                        .then(Commands.literal("cloud")
+                                .then(Commands.argument("id", StringArgumentType.word())
+                                        .executes(ctx -> {
+                                            ServerPlayer player = ctx.getSource().getPlayerOrException();
+                                            ServerLevel level = player.serverLevel();
+                                            var key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+
+                                            WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(key);
+                                            net.Gabou.projectatmosphere.modules.core.WindVector wind =
+                                                    net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(
+                                                            sample.speedMps(),
+                                                            (float) Math.toRadians(sample.directionDeg())
+                                                    );
+
+                                            String cloudId = StringArgumentType.getString(ctx, "id");
+                                            var region = SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
+
+                                            if (region != null) {
+                                                ctx.getSource().sendSuccess(
+                                                        () -> Component.literal("Spawned cloud '" + cloudId + "' at your position."),
+                                                        true);
+                                                return 1;
+                                            } else {
+                                                ctx.getSource().sendFailure(Component.literal("Failed to spawn cloud '" + cloudId + "'. SimpleClouds may not be initialized yet."));
+                                                return 0;
+                                            }
+                                        })))
                         .then(Commands.literal("tornado")
                                 .then(Commands.literal("risk")
                                         .executes(ctx -> {

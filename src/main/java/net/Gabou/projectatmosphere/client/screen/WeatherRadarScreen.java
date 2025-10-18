@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.client.screen;
 
+import com.Gabou.sereneseasonsplus.util.IScreen;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
@@ -39,7 +40,6 @@ public class WeatherRadarScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         int left = (this.width - MAP_SIZE) / 2;
         int top = (this.height - MAP_SIZE) / 2;
         float scale = ((float) RANGE / MAP_SIZE) / Math.max(0.25f, zoom); // blocks per pixel
@@ -124,7 +124,7 @@ public class WeatherRadarScreen extends Screen {
         drawLegendEntry(guiGraphics, legendX, legendY, 0xFF0000, "Severe TS"); legendY += 10;
         drawLegendEntry(guiGraphics, legendX, legendY, 0x800080, "Tornado"); legendY += 10;
         drawLegendEntry(guiGraphics, legendX, legendY, 0x000000, "Hurricane");
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+        ((IScreen)(Object)this).sereneseasonsplus$renderNoBackground(guiGraphics, mouseX, mouseY, partialTick);
     }
     private static int classifyColor(String cloudId, int severity, boolean thunder) {
         // White: generic clouds (<=4)

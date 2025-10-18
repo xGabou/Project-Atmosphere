@@ -1,8 +1,11 @@
 package net.Gabou.projectatmosphere.event;
 
+import com.Gabou.sereneseasonsplus.api.SSPApi;
 import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ScAPICloudRegion;
 import dev.nonamecrackers2.simpleclouds.api.common.event.*;
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
@@ -11,6 +14,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.WeatherType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -28,34 +32,18 @@ public class SimpleCloudsEventListener {
     }
 
     public static void onCloudRegionSpawn(CloudRegionNaturallySpawnEvent event) {
-        if(!(event.getLevel() instanceof ServerLevel serverLevel)) {
+        if (!(event.getLevel() instanceof ServerLevel serverLevel)) {
             return;
         }
-        ScAPICloudRegion region = event.getCloudRegion();
+        CloudRegion region = (CloudRegion) event.getCloudRegion();
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getWorldX(), region.getWorldZ());
+        AtmosphereManager.queueAddCloudRegion(region);
     }
 
     public static void onCloudRegionRemoved(CloudRegionRemovedEvent event) {
-        if (event.getLevel() == null)
-            return;
-
-        ScAPICloudRegion region = event.getCloudRegion();
-        CloudRegionRemovedEvent.Reason reason = event.getReason();
-
-        if (reason == CloudRegionRemovedEvent.Reason.MANUALLY) {
-            try {
-                SimpleCloudsCompat.doInitialGenWithWeather((int) region.getWorldX(), (int) region.getWorldZ(), (ServerLevel) event.getLevel());
-            } catch (Exception e) {
-                ProjectAtmosphere.LOGGER.error("[Atmosphere] Error during cloud region regeneration at {}, {}", region.getWorldX(), region.getWorldZ(), e);
-                SimpleCloudsCompat.setIsInit(true);
-            }
-        } else {
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region removed for reason: {}", reason);
-        }
     }
 
     public static void onCloudRegionTick(CloudRegionTickEvent event) {
-
         if ((event.getLevel() == null || event.getLevel().isClientSide) || !SimpleCloudsCompat.getIsInit())
             return;
 
@@ -107,6 +95,7 @@ public class SimpleCloudsEventListener {
         float finalSpeed = Math.min(30.0f, boosted + tornadoBoost);
         return finalSpeed;
     }
+
 
     public static void onModifyCloudSpeed(ModifyCloudSpeedEvent event) {
         // Can adjust cloud speed if needed

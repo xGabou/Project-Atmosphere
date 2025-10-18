@@ -27,14 +27,14 @@ public enum WeatherType {
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "dense_itty_bitty"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "dense_stratocumulus"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "dense_tsegrus"), THUNDERSTORM);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "dithering"), NONE);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "floating_farlands"), NONE);
+//        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "dithering"), NONE);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "floating_farlands"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "heavy_stratus"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "islands"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "itty_bitty_bigger"), NONE);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "mammatus_thin"), NONE);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "mammatus_thin"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "matrix"), NONE);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "overcast"), NONE);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "overcast"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "pathway"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "pattern"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "real_itty_bitty"), NONE);
@@ -44,12 +44,12 @@ public enum WeatherType {
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "snow"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "spots"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "spotted"), NONE);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stripe"), NONE);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stripe_side"), NONE);
+//        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stripe"), NONE);
+//        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stripe_side"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stronger_stratus"), THUNDERSTORM);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "tall_noise"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "tall_weirdness"), NONE);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "thicker_stratocumulus"), NONE);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "thicker_stratocumulus"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "tsegrus"), THUNDERSTORM);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "cumulonimbus"), THUNDERSTORM);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "cumulus"), NONE);
@@ -58,6 +58,15 @@ public enum WeatherType {
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "small_cumulus"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stratocumulus"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stratus"), RAIN);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "cumulus_humilis"), NONE);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "cumulus_congestus"), RAIN);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "altostratus"), RAIN);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "cumulus_mediocris"), RAIN);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "altocumulus"), RAIN);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "stratocumulus_opacus"), NONE);
+        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "altostratus_dry"), NONE);
+
+
     }
 
     public static WeatherType getWeatherType(ResourceLocation id) {

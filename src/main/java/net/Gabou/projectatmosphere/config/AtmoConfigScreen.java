@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.config;
 
+import com.Gabou.sereneseasonsplus.util.IScreen;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -285,7 +286,6 @@ public class AtmoConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g, mouseX, mouseY, partialTick);
         int panelW = 240;
         int panelX = (this.width - panelW) / 2;
         int contentTop = 40;
@@ -306,7 +306,7 @@ public class AtmoConfigScreen extends Screen {
             g.drawString(this.font, l.text, l.x, l.y - scrollOffset, 0xFFFFFF, false);
         }
         g.disableScissor();
-        super.render(g, mouseX, mouseY, partialTick);
+        ((IScreen)(Object)this).sereneseasonsplus$renderNoBackground(g, mouseX, mouseY, partialTick);
     }
 
     @Override

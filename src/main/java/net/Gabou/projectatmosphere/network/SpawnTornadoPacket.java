@@ -9,6 +9,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record SpawnTornadoPacket(Vec3 pos, float radius, float speed, float angle, float gust)
         implements CustomPacketPayload {
@@ -43,7 +44,7 @@ public record SpawnTornadoPacket(Vec3 pos, float radius, float speed, float angl
         return TYPE;
     }
 
-    public static void handle(SpawnTornadoPacket pkt, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+    public static void handle(SpawnTornadoPacket pkt, IPayloadContext ctx) {
         ctx.enqueueWork(() -> TornadoManager.spawnClient(
                 pkt.pos(),
                 pkt.radius(),

@@ -1,29 +1,29 @@
 {
-    "noise_settings":  [
-                           {
-                               "scale_z":  30.0,
-                               "fade_distance":  10.0,
-                               "height_offset":  0.0,
-                               "value_scale":  1.0,
-                               "height":  128.0,
-                               "value_offset":  -0.8,
-                               "scale_x":  30.0,
-                               "scale_y":  10.0
-                           },
-                           {
-                               "scale_z":  1000.0,
-                               "fade_distance":  50.0,
-                               "height_offset":  0.0,
-                               "value_scale":  1.0,
-                               "height":  128.0,
-                               "value_offset":  0.0,
-                               "scale_x":  1000.0,
-                               "scale_y":  100.0
-                           }
-                       ],
-    "weather_type":  "none",
-    "storminess":  0.3,
-    "storm_start":  16.0,
-    "transparency_fade":  0.1,
-    "storm_fade_distance":  32.0
+  "noise_settings": [
+    {
+      "scale_z": 30.0,
+      "fade_distance": 10.0,
+      "height_offset": 0.0,
+      "value_scale": 1.0,
+      "height": 128.0,
+      "value_offset": -0.8,
+      "scale_x": 30.0,
+      "scale_y": 10.0
+    },
+    {
+      "scale_z": 1000.0,
+      "fade_distance": 50.0,
+      "height_offset": 0.0,
+      "value_scale": 1.0,
+      "height": 128.0,
+      "value_offset": 0.0,
+      "scale_x": 1000.0,
+      "scale_y": 100.0
+    }
+  ],
+  "weather_type": "none",
+  "storminess": 0.3,
+  "storm_start": 16.0,
+  "transparency_fade": 0.1,
+  "storm_fade_distance": 32.0
 }

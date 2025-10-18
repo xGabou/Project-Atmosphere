@@ -26,7 +26,7 @@ public class DailyForecastGenerator {
             BiomeInstanceKey key = entry.getKey();
             BiomeForecast forecast = entry.getValue();
 
-            
+
             generateIfAbsent(key, forecast.getTemperature(), ForecastType.TEMPERATURE, today, tomorrow, forecast::setTemperatureDay, forecast::setTemperatureTomorrow);
             generateIfAbsent(key, forecast.getHumidity(), ForecastType.HUMIDITY, today, tomorrow, forecast::setHumidityDay, forecast::setHumidityTomorrow);
             generateIfAbsent(key, forecast.getPressure(), ForecastType.PRESSURE, today, tomorrow, forecast::setPressureDay, forecast::setPressureTomorrow);
@@ -72,7 +72,7 @@ public class DailyForecastGenerator {
     }
     private static void generateWindIfAbsent(
             BiomeInstanceKey key,
-            WindVector[] week, 
+            WindVector[] week,
             long todayTick,
             long tomorrowTick,
             Consumer<WindVector> todaySetter,
@@ -114,18 +114,18 @@ public class DailyForecastGenerator {
 
             switch (type) {
                 case TEMPERATURE, PRESSURE -> {
-                    float theta = (float) (Math.PI * t); 
+                    float theta = (float) (Math.PI * t);
                     factor = (1f - (float) Math.cos(theta)) * 0.5f;
                 }
                 case HUMIDITY -> {
                     if (t < 0.25f) {
-                        factor = 1f - (float) Math.pow(t * 4f, 0.8); 
+                        factor = 1f - (float) Math.pow(t * 4f, 0.8);
                     } else if (t < 0.75f) {
-                        factor = 0.1f + 0.9f * (1f - (float) Math.sin(Math.PI * (t - 0.25f) / 0.5f)); 
+                        factor = 0.1f + 0.9f * (1f - (float) Math.sin(Math.PI * (t - 0.25f) / 0.5f));
                     } else {
-                        factor = 0.1f + (float) Math.pow((t - 0.75f) * 4f, 0.8); 
+                        factor = 0.1f + (float) Math.pow((t - 0.75f) * 4f, 0.8);
                     }
-                    factor = 1f - factor; 
+                    factor = 1f - factor;
                 }
                 case STORM -> {
                     // Storm probability: low overnight, ramps up by afternoon, tapers at night
@@ -181,6 +181,7 @@ public class DailyForecastGenerator {
                 forecast.setWindTomorrow(wind[1]);
             }
         }
+
     }
     /**
      * Linearly interpolates a 240-step curve between two [min, max] values of consecutive days.
@@ -198,10 +199,10 @@ public class DailyForecastGenerator {
         float[] curve = new float[240];
         for (int i = 0; i < 240; i++) {
             float t = i / 239f;
-            
+
             float dayFactor = (1f - (float) Math.cos(Math.PI * t)) * 0.5f;
 
-            
+
             float blendedMin = min1 + (min2 - min1) * t;
             float blendedMax = max1 + (max2 - max1) * t;
 

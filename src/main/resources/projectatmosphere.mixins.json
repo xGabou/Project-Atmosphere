@@ -4,7 +4,9 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "projectatmosphere.refmap.json",
   "mixins": [
+    "CloudRegionMixin",
     "InfoMixin",
+    "SeasonHooksMixin",
     "ServerLevelSnowStormMixin"
   ],
   "client": [

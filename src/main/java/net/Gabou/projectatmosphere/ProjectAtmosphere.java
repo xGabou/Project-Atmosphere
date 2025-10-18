@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCommand;
+import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempUserConfig;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoCommand;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoDebug;
 import net.Gabou.projectatmosphere.registry.*;
@@ -155,6 +156,8 @@ public class ProjectAtmosphere {
         TornadoProbabilityManager.init();
         event.enqueueWork(() -> {
             SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
+            // Load user biome temperature overrides after defaults are initialized
+           BiomeTempUserConfig.load();
         });
 
     }

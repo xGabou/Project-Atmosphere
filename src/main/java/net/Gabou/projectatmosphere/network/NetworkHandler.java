@@ -26,5 +26,9 @@ public class NetworkHandler {
                 SyncWindPacket.STREAM_CODEC,
                 SyncWindPacket::handle
         );
+        registrar.playToClient(BiomeDayTemperaturePacket.TYPE,
+                BiomeDayTemperaturePacket.STREAM_CODEC,
+                BiomeDayTemperaturePacket::handle
+        );
     }
 }

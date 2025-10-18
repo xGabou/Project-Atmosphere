@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -33,7 +34,7 @@ public class ForecastOrchestrator {
 
     private static Map<UUID, Set<BiomeInstanceKey>> activePlayerBiomeKeys = new HashMap<>();
 
-
+    private static final boolean sandStormLoaded = CompatHandler.isSandStormsLoaded();
 
     /**
      * Called when the server starts
@@ -43,12 +44,12 @@ public class ForecastOrchestrator {
         TornadoStorageManager.load(level);
         ForecastGenerator.seed = level.getSeed();
 
-
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
             try {
                 ForecastGenerator.generateForecastForSavedRegion(level);
                 return true;
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
 
                 ForecastDataStorage.clearAll(level);
@@ -86,7 +87,7 @@ public class ForecastOrchestrator {
     public static void onPlayerLogin(ServerPlayer player, ServerLevel level) {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
-        getNearbyBiomeKeys(level,player,500);
+        getNearbyBiomeKeys(level, player, 500);
         long start = System.nanoTime();
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
             boolean shouldGenerate = true;
@@ -102,8 +103,10 @@ public class ForecastOrchestrator {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
+
         }
         SimpleCloudsCompat.setIsInit(true);
+
         long end = System.nanoTime();
         long durationMs = (end - start) / 1_000_000;
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
@@ -138,8 +141,8 @@ public class ForecastOrchestrator {
      * Called on profile swap (e.g. midnight transition)
      */
     public static void onSwapDay(ServerLevel level) {
-        boolean needsRegen = false;
 
+        boolean needsRegen = false;
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
             BiomeForecast forecast = entry.getValue();
@@ -157,16 +160,17 @@ public class ForecastOrchestrator {
         }
 
         if (needsRegen || ForecastGenerator.getForecastMap().isEmpty()) {
-
             BlockPos spawn = level.getSharedSpawnPos();
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing or invalid. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
+            return;
         }
-
 
         ForecastGenerator.swapToTomorrow();
         DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
         ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
+
+
     }
 
 
@@ -252,12 +256,13 @@ public class ForecastOrchestrator {
                 .filter(key -> key.samplePos() != null &&
                         key.samplePos().distToCenterSqr(center.x, center.y, center.z) <= radiusSq)
                 .collect(Collectors.toSet());
-        activePlayerBiomeKeys.put(player.getUUID(),get);
+        activePlayerBiomeKeys.put(player.getUUID(), get);
     }
 
     public static void clearActiveBiomeKeysForPlayer(ServerPlayer player) {
         activePlayerBiomeKeys.remove(player.getUUID());
     }
+
     public static void clearActiveBiomeKeys() {
         activePlayerBiomeKeys.clear();
     }

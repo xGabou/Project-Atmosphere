@@ -46,6 +46,10 @@ public class AtmosphereUtils {
     public static ResourceLocation getBiomeLocation(BlockPos pos, Level world) {
         return world.getBiome(pos).unwrapKey().get().location();
     }
+    public static float toMinecraftSimple(float celsius, boolean isTropical) {
+        if (isTropical) return 1.8F;
+        return celsius <= 0.0F ? 0.0F : 0.5F;
+    }
 
 
 }
