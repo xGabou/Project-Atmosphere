@@ -188,7 +188,7 @@ tasks.register("discordWebhook") {
                         "<@&1401956072784269443>\n" + // role mention
                         "Project: ${mod_name}\n" +
                         "Version: v${project.mod_version}-1.20.1\n\n" +
-                        "${changelogText.take(1900)}"
+                        "${changelogText.take(1891)}"
         ]
 
         println "Sending release notification to Discord..."

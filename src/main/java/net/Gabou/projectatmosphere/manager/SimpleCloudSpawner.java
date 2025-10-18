@@ -187,49 +187,59 @@ public class SimpleCloudSpawner {
             float stormChance,
             ServerLevel level
     ) {
-        // Normalize dew gap: 0 when saturated, 1 when dry
+        // === Base Atmospheric Inputs ===
         float dewGap = Math.max(0f, temperature - dewPoint);
-        float dewGapFactor = 1.0f - Math.min(dewGap / 10.0f, 1.0f); // sharper curve near 0 gap
+        float dewGapFactor = 1.0f - Math.min(dewGap / 12.0f, 1.0f); // saturation curve
 
-        // Pressure deviation (normalized to ±1 around mean)
-        float pressureFactor = (PRESSION_MOYENNE - pressure) / 50.0f; // 50 hPa deviation = ±1
+        float pressureFactor = (PRESSION_MOYENNE - pressure) / 60.0f; // ±60 hPa range
         pressureFactor = Math.max(-1f, Math.min(pressureFactor, 1f));
 
         float humidityFactor = humidity / 100.0f;
-        float tempIdealness = 1.0f - Math.abs(temperature - 18.0f) / 40.0f;
+        float tempIdealness = 1.0f - Math.abs(temperature - 18.0f) / 45.0f;
 
-        // Weighted instability (expanded dynamic range)
-        float instability =
-                (dewGapFactor * 0.5f) +
-                        (pressureFactor * 0.4f) +
-                        (humidityFactor * 0.6f) +
-                        (tempIdealness * 0.4f);
-
-        // Normalize to 0–1
+        float instability = (dewGapFactor * 0.4f)
+                + (pressureFactor * 0.25f)
+                + (humidityFactor * 0.55f)
+                + (tempIdealness * 0.3f);
         instability = Math.min(Math.max(instability, 0f), 1f);
 
-        // Storm buildup factor
-        int currentDay = (int) (level.getDayTime() / 24000L);
+        // === Storm History Memory ===
+        int currentDay = (int)(level.getDayTime() / 24000L);
         GlobalStormHistoryData data = GlobalStormHistoryData.get(level);
-        int lastSevere = data.getLastSevereDay();
-        int daysSince = (lastSevere == Integer.MIN_VALUE) ? Integer.MAX_VALUE : Math.max(0, currentDay - lastSevere);
+        int lastStrong = data.getLastSevereDay(); // stores last 5 +
+        int daysSince = (lastStrong == Integer.MIN_VALUE)
+                ? Integer.MAX_VALUE : Math.max(0, currentDay - lastStrong);
 
-        float boost = 1f + 0.15f * daysSince; // +15% per day since last severe
-        boost = Math.min(boost, 3.5f);
+        // Every calm day increases "storm tension" (+7 %/day → ×1.7 after 10 days)
+        int severity = getSeverity(stormChance, daysSince, instability);
 
-        float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
-
-        // Non-linear weighting for more “explosive” growth near high instability
-        float rawScore = (float) Math.pow(instability * adjustedChance * 8f, 1.2); // 8x scaling
-
-        int severity = Math.round(rawScore);
-        severity = Math.max(1, Math.min(7, severity));
-
-        if (severity >= 6)
+        // Record if we reached level 5 +
+        if (severity >= 5)
             data.recordSevere(currentDay);
 
         return severity;
     }
+    private static int getSeverity(float stormChance, int daysSince, float instability) {
+        float boost = 1f + 0.07f * daysSince;
+        boost = Math.min(boost, 1.7f);
+
+        float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
+
+        // === Smooth Probability Curve ===
+        float weighted = instability * adjustedChance * 4.5f;
+        float raw = (float)(1.0 / (1.0 + Math.exp(-2.3 * (weighted - 1.0)))); // sigmoid
+
+        // === Temporal Bias Toward 5 + Events ===
+        // grows linearly up to 10 days, pushing score upward by ≤ 0.25
+        float dayBias = Math.min(1f, daysSince / 10f);
+        float biasAdjusted = raw + (0.25f * dayBias * (1f - raw));
+
+        // Map 0–1 → 1–7
+        int severity = (int)Math.floor(biasAdjusted * 6.0f) + 1;
+        severity = Math.max(1, Math.min(7, severity));
+        return severity;
+    }
+
 
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {

@@ -48,14 +48,19 @@ public class SeasonHooksMixin {
             }
 
         }
-        else if (level instanceof ClientLevel clientLevel) {
-            var biomeKey = clientLevel.getBiome(pos).unwrapKey().orElse(null);
-            if (biomeKey != null) {
-                boolean freezing = BiomeClientTemperatureCache.isFreezing(biomeKey.location(),clientLevel);
-                cir.setReturnValue(!freezing);
-                cir.cancel();
+        else if (level.getClass().getName().equals("net.minecraft.client.multiplayer.ClientLevel")) {
+            try {
+                var biomeKey = ((LevelReader) level).getBiome(pos).unwrapKey().orElse(null);
+                if (biomeKey != null) {
+                    boolean freezing = BiomeClientTemperatureCache.isFreezing(biomeKey.location(), null);
+                    cir.setReturnValue(!freezing);
+                    cir.cancel();
+                }
+            } catch (Throwable ignored) {
+                // Client-only context not available on server
             }
         }
+
 
         // Otherwise let the original logic proceed (warm enough)
     }
