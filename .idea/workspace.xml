@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update version to 0.5.5.0, change release type to beta, and adjust cloud storminess parameters">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure">
       <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -581,15 +577,7 @@
       <workItem from="1760705987067" duration="6711000" />
       <workItem from="1760716213849" duration="608000" />
       <workItem from="1760718824943" duration="9960000" />
-      <workItem from="1760743232876" duration="5785000" />
-    </task>
-    <task id="LOCAL-00069" summary="Enhance tornado rendering with shader integration and improved animation effects">
-      <option name="closed" value="true" />
-      <created>1754432272776</created>
-      <option name="number" value="00069" />
-      <option name="presentableId" value="LOCAL-00069" />
-      <option name="project" value="LOCAL" />
-      <updated>1754432272776</updated>
+      <workItem from="1760743232876" duration="6487000" />
     </task>
     <task id="LOCAL-00070" summary="Enhance tornado rendering with shader integration and improved animation effects">
       <option name="closed" value="true" />
@@ -975,7 +963,15 @@
       <option name="project" value="LOCAL" />
       <updated>1760723734437</updated>
     </task>
-    <option name="localTasksCounter" value="118" />
+    <task id="LOCAL-00118" summary="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure">
+      <option name="closed" value="true" />
+      <created>1760765470791</created>
+      <option name="number" value="00118" />
+      <option name="presentableId" value="LOCAL-00118" />
+      <option name="project" value="LOCAL" />
+      <updated>1760765470791</updated>
+    </task>
+    <option name="localTasksCounter" value="119" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -994,7 +990,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: enhance tornado management with clear and remove commands, and update biome tracking" />
     <MESSAGE value="feat: implement cloud and tornado management on world regeneration" />
     <MESSAGE value="feat: add client-only display functionality for weather instruments and update gradle dependencies" />
     <MESSAGE value="feat: refactor tornado module structure and enhance tornado level handling" />
@@ -1019,7 +1014,8 @@
     <MESSAGE value="feat: implement cloud region management with unique IDs and enhance weather type handling" />
     <MESSAGE value="feat: add new cloud types and enhance weather parameters for rain and storm effects" />
     <MESSAGE value="feat: update version to 0.5.5.0, change release type to beta, and adjust cloud storminess parameters" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: update version to 0.5.5.0, change release type to beta, and adjust cloud storminess parameters" />
+    <MESSAGE value="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

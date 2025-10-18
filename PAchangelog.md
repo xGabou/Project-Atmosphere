@@ -1,7 +1,7 @@
-# 🌤 Project Atmosphere v0.5.5.1
+# 🌤 Project Atmosphere v0.5.5.2
 
 ## Changelog
 ### 🆕 Added
 ### 🛠️ Fixed
-- Fixed server crash when launching
-### ⚙️ Changed / Removedz
+- Nerfed Cloud Severity
+### ⚙️ Changed / Removed
