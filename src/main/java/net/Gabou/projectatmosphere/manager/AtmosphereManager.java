@@ -141,13 +141,17 @@ public class AtmosphereManager {
     private static int count;
 
     public static void tick(ServerLevel level) {
-
-        ForecastOrchestrator.tick(level);
-        WindPhysics.onServerTick(level);
-        TornadoManager.tick(level);
-        HurricaneManager.tick(level);
-        SnowstormManager.tick(level);
-
+        // During regeneration, skip dependent ticks to avoid using transient/cleared state
+        if (!ForecastOrchestrator.isRegenerating()) {
+            ForecastOrchestrator.tick(level);
+            WindPhysics.onServerTick(level);
+            TornadoManager.tick(level);
+            HurricaneManager.tick(level);
+            SnowstormManager.tick(level);
+        } else {
+            // Still advance orchestrator's internal timing (e.g., tornado check scheduling) safely
+            ForecastOrchestrator.tick(level);
+        }
         if (count % 20 != 0) {
             CloudManager<ServerLevel> manager = CloudManager.get(level);
 

@@ -31,7 +31,23 @@ import java.util.stream.Collectors;
 public class ForecastOrchestrator {
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = ForecastGenerator.RADIUS / 2;
     private static long lastTornadoCheckTick = 0;
+    private static volatile boolean REGENERATING = false;
+    private static final java.util.concurrent.ConcurrentLinkedQueue<Runnable> POST_REGEN_QUEUE = new java.util.concurrent.ConcurrentLinkedQueue<>();
 
+    public static boolean isRegenerating() {
+        return REGENERATING;
+    }
+
+    public static void runAfterRegen(Runnable task) {
+        if (task == null) return;
+        if (REGENERATING) {
+            POST_REGEN_QUEUE.add(task);
+        } else {
+            try {
+                task.run();
+            } catch (Throwable ignored) { }
+        }
+    }
 
     private static Map<UUID, Set<BiomeInstanceKey>> activePlayerBiomeKeys = new HashMap<>();
 
@@ -125,31 +141,40 @@ public class ForecastOrchestrator {
      * Called when `/atmo regen` is used
      */
     public static void clearAndRegenerate(ServerLevel level) {
-        ForecastGenerator.clearForecasts();
-        clearActiveBiomeKeys();
-        ForecastDataStorage.playerData.clear();
-        List<ServerPlayer> players = AsyncAtmosphereService.callOnMainThread(level::players);
-        Set<BlockPos> centers = new HashSet<>();
-        for (Player player : players) {
-            BlockPos center = player.blockPosition();
-            boolean tooClose = false;
-            ForecastDataStorage.playerData.put(player.getUUID(), center);
-            for (BlockPos existingCenter : centers) {
-                if (existingCenter.distManhattan(center) < MIN_DISTANCE_BETWEEN_CENTERS) {
-                    tooClose = true;
-                    break;
+        REGENERATING = true;
+        try {
+            ForecastGenerator.clearForecasts();
+            clearActiveBiomeKeys();
+            ForecastDataStorage.playerData.clear();
+            List<ServerPlayer> players = AsyncAtmosphereService.callOnMainThread(level::players);
+            Set<BlockPos> centers = new HashSet<>();
+            for (Player player : players) {
+                BlockPos center = player.blockPosition();
+                boolean tooClose = false;
+                ForecastDataStorage.playerData.put(player.getUUID(), center);
+                for (BlockPos existingCenter : centers) {
+                    if (existingCenter.distManhattan(center) < MIN_DISTANCE_BETWEEN_CENTERS) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (!tooClose) {
+                    centers.add(center);
                 }
             }
-            if (!tooClose) {
-                centers.add(center);
+            for (BlockPos center : centers) {
+                ForecastGenerator.generateForecastForRegion(center, level);
+            }
+
+            DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
+            ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
+        } finally {
+            REGENERATING = false;
+            Runnable r;
+            while ((r = POST_REGEN_QUEUE.poll()) != null) {
+                try { r.run(); } catch (Throwable ignored) { }
             }
         }
-        for (BlockPos center : centers) {
-            ForecastGenerator.generateForecastForRegion(center, level);
-        }
-
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
-        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
     }
 
     /**
@@ -236,9 +261,12 @@ public class ForecastOrchestrator {
         long now = level.getGameTime();
         if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
             lastTornadoCheckTick = now;
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
-            AsyncAtmosphereService.runStorm(() ->
-                    TornadoProbabilityManager.onScheduledCheck(level));
+            if (REGENERATING) {
+                runAfterRegen(() -> AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level)));
+            } else {
+                ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
+                AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level));
+            }
         }
 
     }
