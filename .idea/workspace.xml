@@ -4,23 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add imperial units display option for temperature, wind speed, and pressure">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ColdSweatCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ColdSweatCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/LegendarySurvivalCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/LegendarySurvivalCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ToughAsNailsCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/ToughAsNailsCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/InstrumentUtils.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/InstrumentUtils.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -233,7 +221,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [curseforge1258344]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -456,11 +444,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
-        <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
         <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
         <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
+        <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
       </list>
     </recent_temporary>
   </component>
@@ -593,15 +581,7 @@
       <workItem from="1760716213849" duration="608000" />
       <workItem from="1760718824943" duration="9960000" />
       <workItem from="1760743232876" duration="6487000" />
-      <workItem from="1760894591846" duration="6888000" />
-    </task>
-    <task id="LOCAL-00070" summary="Enhance tornado rendering with shader integration and improved animation effects">
-      <option name="closed" value="true" />
-      <created>1754432731625</created>
-      <option name="number" value="00070" />
-      <option name="presentableId" value="LOCAL-00070" />
-      <option name="project" value="LOCAL" />
-      <updated>1754432731625</updated>
+      <workItem from="1760894591846" duration="7724000" />
     </task>
     <task id="LOCAL-00071" summary="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml">
       <option name="closed" value="true" />
@@ -987,7 +967,15 @@
       <option name="project" value="LOCAL" />
       <updated>1760765470791</updated>
     </task>
-    <option name="localTasksCounter" value="119" />
+    <task id="LOCAL-00119" summary="feat: add imperial units display option for temperature, wind speed, and pressure">
+      <option name="closed" value="true" />
+      <created>1760905257692</created>
+      <option name="number" value="00119" />
+      <option name="presentableId" value="LOCAL-00119" />
+      <option name="project" value="LOCAL" />
+      <updated>1760905257692</updated>
+    </task>
+    <option name="localTasksCounter" value="120" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1006,7 +994,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: implement cloud and tornado management on world regeneration" />
     <MESSAGE value="feat: add client-only display functionality for weather instruments and update gradle dependencies" />
     <MESSAGE value="feat: refactor tornado module structure and enhance tornado level handling" />
     <MESSAGE value="feat: integrate hurricane and snowstorm management into atmosphere tick process" />
@@ -1031,7 +1018,8 @@
     <MESSAGE value="feat: add new cloud types and enhance weather parameters for rain and storm effects" />
     <MESSAGE value="feat: update version to 0.5.5.0, change release type to beta, and adjust cloud storminess parameters" />
     <MESSAGE value="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure" />
+    <MESSAGE value="feat: add imperial units display option for temperature, wind speed, and pressure" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add imperial units display option for temperature, wind speed, and pressure" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

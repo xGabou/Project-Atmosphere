@@ -8,10 +8,10 @@ This file records functionality additions/removals made during development sessi
   - Wind speed shows as mph when enabled (m/s otherwise).
   - Pressure shows as inHg when enabled (hPa otherwise).
 - In-game config screen adds an “Imperial Units” toggle under Display.
+- Regeneration safety: clearing/regenerating forecasts now pauses dependent ticks (wind physics, tornado/hurricane/snowstorm managers), and defers scheduled tornado checks until regeneration completes.
 
 ## 0.5.4.4 — Added weatherdebug cloud command (2025-10-17)
 - Added command: `/weatherdebug cloud <id>`
   - Spawns the specified SimpleClouds cloud at the player’s position/biome.
   - Requires permission level 2.
   - Applies current wind sample; fails gracefully if SimpleClouds is not initialized.
-
