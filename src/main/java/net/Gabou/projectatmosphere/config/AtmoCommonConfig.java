@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 public class AtmoCommonConfig {
     public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
+    public static final ForgeConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
     public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
@@ -62,6 +63,12 @@ public class AtmoCommonConfig {
         CLOUD_RENDER_DISTANCE = builder
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
+        builder.pop();
+
+        builder.push("display");
+        DISPLAY_UNITS_IMPERIAL = builder
+                .comment("Display values in imperial units (F, mph, inHg) instead of metric (C, m/s, hPa)")
+                .define("imperialUnits", false);
         builder.pop();
         builder.push("storms");
         ENABLE_TORNADOES = builder

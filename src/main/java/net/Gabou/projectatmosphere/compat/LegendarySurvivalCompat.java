@@ -5,7 +5,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
 import sfiomn.legendarysurvivaloverhaul.api.temperature.TemperatureUtil;
+
+
 
 public class LegendarySurvivalCompat {
 
@@ -49,7 +52,7 @@ public class LegendarySurvivalCompat {
         return result;
     }
 
-    public static float getLiveTemperature(ServerLevel level, BlockPos pos) {
+    public static float getLiveTemperature(Level level, BlockPos pos) {
         return TemperatureUtil.getWorldTemperature(level, pos);
     }
 
