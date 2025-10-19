@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
 import toughasnails.api.temperature.TemperatureLevel;
 import toughasnails.temperature.TemperatureHelperImpl;
 
@@ -82,7 +83,7 @@ public class ToughAsNailsCompat {
         return CompatHandler.isToughAsNailsLoaded();
     }
 
-    public static float getLiveTemperatureTAN(ServerLevel level, BlockPos pos) {
+    public static float getLiveTemperatureTAN(Level level, BlockPos pos) {
         TemperatureLevel band = TemperatureHelperImpl.getTemperatureAtPosWithoutProximity(level, pos);
         return mapBandToTemperature(band);
     }

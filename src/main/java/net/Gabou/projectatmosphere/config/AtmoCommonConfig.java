@@ -40,7 +40,7 @@ public class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MIN;
     public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ModConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
-
+    public static final ModConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
 
 
 
@@ -62,6 +62,11 @@ public class AtmoCommonConfig {
         CLOUD_RENDER_DISTANCE = builder
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
+        builder.pop();
+        builder.push("display");
+        DISPLAY_UNITS_IMPERIAL = builder
+                .comment("Display values in imperial units (F, mph, inHg) instead of metric (C, m/s, hPa)")
+                .define("imperialUnits", false);
         builder.pop();
         builder.push("storms");
         ENABLE_TORNADOES = builder

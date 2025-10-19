@@ -22,6 +22,7 @@ import net.Gabou.projectatmosphere.modules.wind.WindForecastPart;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
@@ -123,13 +124,27 @@ public class ForecastOrchestrator {
     /**
      * Called when `/atmo regen` is used
      */
-    public static void clearAndRegenerate(ServerLevel level, Set<BlockPos> centers) {
+    public static void clearAndRegenerate(ServerLevel level) {
         ForecastGenerator.clearForecasts();
         clearActiveBiomeKeys();
         ForecastDataStorage.playerData.clear();
-
+        List<ServerPlayer> players = AsyncAtmosphereService.callOnMainThread(level::players);
+        Set<BlockPos> centers = new HashSet<>();
+        for (Player player : players) {
+            BlockPos center = player.blockPosition();
+            boolean tooClose = false;
+            ForecastDataStorage.playerData.put(player.getUUID(), center);
+            for (BlockPos existingCenter : centers) {
+                if (existingCenter.distManhattan(center) < MIN_DISTANCE_BETWEEN_CENTERS) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (!tooClose) {
+                centers.add(center);
+            }
+        }
         for (BlockPos center : centers) {
-            ForecastDataStorage.playerData.put(UUID.randomUUID(), center);
             ForecastGenerator.generateForecastForRegion(center, level);
         }
 

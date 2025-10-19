@@ -8,6 +8,7 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.Arrays;
@@ -19,10 +20,8 @@ public class WindCommand {
                 .then(Commands.literal("get") 
                         .executes(ctx -> {
                             Player player = ctx.getSource().getPlayerOrException();
-                            BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
-
-                            
-                            WindVector[] forecastArr = ForecastGenerator.getForecast(biome).getWind();
+                            ResourceLocation biome = TemperatureCommandHelper.getCurrentBiomeResourceLocation(player);
+                            WindVector[] forecastArr = ForecastGenerator.getAverageForecast(biome).getWind();
                             String forecast = Arrays.toString(forecastArr);
 
                             

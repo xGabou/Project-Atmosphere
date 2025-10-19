@@ -24,6 +24,7 @@ public class AtmoConfigScreen extends Screen {
     private final Screen parent;
 
     private boolean forceSharedExecutor;
+    private boolean displayUnitsImperial;
     private boolean enableTornadoes;
     private boolean enableStormDebris;
     private int maxStormDebrisPerChunk;
@@ -123,7 +124,7 @@ public class AtmoConfigScreen extends Screen {
         widgetBaseY.clear();
         titles.clear();
         labels.clear();
-
+        this.displayUnitsImperial = AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.get();
         this.forceSharedExecutor = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get();
         this.enableTornadoes = AtmoCommonConfig.ENABLE_TORNADOES.get();
         this.enableStormDebris = AtmoCommonConfig.ENABLE_STORM_DEBRIS.get();
@@ -164,6 +165,14 @@ public class AtmoConfigScreen extends Screen {
         addConfigWidget(Button.builder(toggleLabel("Force Shared Executor", forceSharedExecutor), b -> {
             forceSharedExecutor = !forceSharedExecutor;
             b.setMessage(toggleLabel("Force Shared Executor", forceSharedExecutor));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+
+        addTitle("Display", y);
+        y += 18;
+        addConfigWidget(Button.builder(toggleLabel("Imperial Units", displayUnitsImperial), b -> {
+            displayUnitsImperial = !displayUnitsImperial;
+            b.setMessage(toggleLabel("Imperial Units", displayUnitsImperial));
         }).bounds(center - 100, y, 200, 20).build(), y);
         y += 32;
 
@@ -382,6 +391,7 @@ public class AtmoConfigScreen extends Screen {
         windEntityPushScale = parseDouble(windEntityPushScaleBox, windEntityPushScale);
 
         AtmoCommonConfig.FORCE_SHARED_EXECUTOR.set(forceSharedExecutor);
+        AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.set(displayUnitsImperial);
         AtmoCommonConfig.ENABLE_TORNADOES.set(enableTornadoes);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(maxStormDebrisPerChunk);

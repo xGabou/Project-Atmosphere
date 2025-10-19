@@ -544,7 +544,7 @@ public class ForecastGenerator {
 
     }
 
-    public static BiomeForecast getForecast(BiomeInstanceKey key) {
+    static BiomeForecast getForecast(BiomeInstanceKey key) {
         return FORECAST_MAP.get(key);
     }
 

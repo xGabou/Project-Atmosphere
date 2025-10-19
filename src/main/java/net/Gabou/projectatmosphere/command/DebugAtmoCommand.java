@@ -7,8 +7,6 @@ import com.mojang.brigadier.context.CommandContext;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
@@ -19,6 +17,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.UnitFormatter;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
@@ -28,61 +27,56 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
 
 public class DebugAtmoCommand {
-    /**
-     * Sends a formatted forecast message to the command source for the given biome.
-     *
-     * @param ctx       the command context
-     * @param forecast  the forecast to display, may be {@code null}
-     * @param biome     the biome to describe
-     * @return {@code 1} if a forecast was sent, {@code 0} otherwise
-     */
+
+    public static final Logger LOGGER = LogManager.getLogger("DebugAtmoCommand");
+
     private static int sendForecast(CommandContext<CommandSourceStack> ctx, BiomeForecast forecast, ResourceLocation biome) {
         if (forecast == null) {
             ctx.getSource().sendFailure(Component.literal("No forecast found for biome: " + biome));
             return 0;
         }
 
-        ctx.getSource().sendSuccess(() ->
-                Component.literal("Biome: " + biome +
-                        "\n  🌡 Temp:     [" + format(forecast.getTemperatureDay()) + "]" +
-                        "\n  🧪 Pressure: [" + format(forecast.getPressureDay()) + "]" +
-                        "\n  💧 Humidity: [" + format(forecast.getHumidityDay()) + "]" +
-                        "\n  🌬 Wind:     [" + forecast.getWindDay() + "]"
-                ), false);
+        String temps = formatTemps(forecast.getTemperatureDay());
+        String pressures = formatPressures(forecast.getPressureDay());
+        String humidities = formatHumidities(forecast.getHumidityDay());
+        WindVector w = forecast.getWindDay();
+        String wind = w == null ? "-" : UnitFormatter.formatWindSpeed(w.baseSpeed()) + " at " + String.format("%.0f°", Math.toDegrees(w.angleRadians()));
+
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "Biome: " + biome +
+                        "\n  Temp:     [" + temps + "]" +
+                        "\n  Pressure: [" + pressures + "]" +
+                        "\n  Humidity: [" + humidities + "]" +
+                        "\n  Wind:     [" + wind + "]"
+        ), false);
         return 1;
     }
-    /**
-     * Registers the <code>/weatherdebug</code> command and its subcommands used for debugging
-     * atmospheric data.
-     *
-     * @param dispatcher the command dispatcher used to register the command
-     */
+
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
                 Commands.literal("weatherdebug")
                         .then(Commands.literal("forecast")
                                 .executes(ctx -> {
-                                    
                                     ServerLevel world = ctx.getSource().getLevel();
                                     BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
                                     ResourceLocation biome = world.registryAccess()
                                             .registryOrThrow(Registries.BIOME)
                                             .getKey(world.getBiome(pos).value());
-                                   BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
-
-                                    return sendForecast(ctx,forecast, biome);
+                                    BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
+                                    return sendForecast(ctx, forecast, biome);
                                 })
                                 .then(Commands.argument("biome", ResourceLocationArgument.id())
                                         .executes(ctx -> {
                                             ResourceLocation biome = ResourceLocationArgument.getId(ctx, "biome");
                                             BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
                                             BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
-
-                                            return sendForecast(ctx,forecast, biome);
+                                            return sendForecast(ctx, forecast, biome);
                                         })
                                 )
                         )
@@ -99,16 +93,16 @@ public class DebugAtmoCommand {
                                     } else {
                                         mode = "Four Separate Executors";
                                     }
-
                                     ctx.getSource().sendSuccess(() -> Component.literal(
-                                            "🧠 CPU Info\n" +
-                                                    "• Logical cores: " + cores + "\n" +
-                                                    "• Force shared (config): " + forceShared + "\n" +
-                                                    "• Current async mode: " + mode
+                                            "CPU Info\n" +
+                                                    "- Logical cores: " + cores + "\n" +
+                                                    "- Force shared (config): " + forceShared + "\n" +
+                                                    "- Current async mode: " + mode
                                     ), false);
                                     return 1;
                                 })
                         )
+
                         .then(Commands.literal("rain")
                                 .executes(DebugAtmoCommand::spawnRain)
                                 .then(Commands.argument("pos", BlockPosArgument.blockPos())
@@ -121,6 +115,7 @@ public class DebugAtmoCommand {
                                         )
                                 )
                         )
+
                         .then(Commands.literal("thunder")
                                 .executes(DebugAtmoCommand::spawnThunder)
                                 .then(Commands.argument("pos", BlockPosArgument.blockPos())
@@ -130,6 +125,7 @@ public class DebugAtmoCommand {
                                         )
                                 )
                         )
+
                         .then(Commands.literal("snowstorm")
                                 .executes(DebugAtmoCommand::spawnSnowstorm)
                                 .then(Commands.argument("pos", BlockPosArgument.blockPos())
@@ -139,35 +135,23 @@ public class DebugAtmoCommand {
                                         )
                                 )
                         )
+
                         .then(Commands.argument("violence", ResourceLocationArgument.id())
                                 .executes(ctx -> {
-                                        int violence = SimpleCloudSpawner.getCurrentViolence();
-                                        if(violence==0) {
-                                        ctx.getSource().sendFailure(Component.literal("No violence detected  "));
+                                    int violence = SimpleCloudSpawner.getCurrentViolence();
+                                    if (violence == 0) {
+                                        ctx.getSource().sendFailure(Component.literal("No violence detected"));
                                         return 0;
                                     }
-
-                                    ctx.getSource().sendSuccess(() ->
-                                            Component.literal("Violence is: " + violence +
-                                                    "\n CloudViolence:     [" +violence + "]"
-                                            ), false);
+                                    ctx.getSource().sendSuccess(() -> Component.literal(
+                                            "Violence is: " + violence +
+                                                    "\nCloudViolence: [" + violence + "]"
+                                    ), false);
                                     return 1;
                                 })
                         )
-
         );
     }
-
-    /**
-     * Formats a two-element float array to a comma-separated string with one decimal place.
-     *
-     * @param arr the array to format
-     * @return the formatted string
-     */
-    private static String format(float[] arr) {
-        return String.format("%.1f, %.1f", arr[0], arr[1]);
-    }
-
 
     private static CloudRegion spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {
         CloudGenerator generator = SimpleCloudsCompat.generator;
@@ -180,7 +164,6 @@ public class DebugAtmoCommand {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
         WindVector wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
         return SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
-
     }
 
     private static int spawnRain(CommandContext<CommandSourceStack> ctx) {
@@ -205,7 +188,7 @@ public class DebugAtmoCommand {
         }
         String cloudId = CloudLibrary.getRandomRainCloud(intensity, !noThunder);
         spawnCloud(level, pos, cloudId);
-        ctx.getSource().sendSuccess(() -> Component.literal("☔ Spawned rain cloud: " + cloudId), true);
+        ctx.getSource().sendSuccess(() -> Component.literal("Spawned rain cloud: " + cloudId), true);
         return 1;
     }
 
@@ -225,7 +208,7 @@ public class DebugAtmoCommand {
         }
         String cloudId = CloudLibrary.getRandomThunderCloud(intensity);
         spawnCloud(level, pos, cloudId);
-        ctx.getSource().sendSuccess(() -> Component.literal("⚡ Spawned thunder cloud: " + cloudId), true);
+        ctx.getSource().sendSuccess(() -> Component.literal("Spawned thunder cloud: " + cloudId), true);
         return 1;
     }
 
@@ -241,7 +224,7 @@ public class DebugAtmoCommand {
         try {
             intensity = IntegerArgumentType.getInteger(ctx, "intensity");
         } catch (IllegalArgumentException e) {
-            ctx.getSource().sendFailure(Component.literal("No Intensity given."));
+            ctx.getSource().sendFailure(Component.literal("No intensity given."));
             return 0;
         }
 
@@ -266,11 +249,27 @@ public class DebugAtmoCommand {
         }
         String cloudId = CloudLibrary.getSnowstormCloudId();
         CloudRegion region = spawnCloud(level, pos, cloudId);
-        SnowstormManager.startSnowstorm(intensity,region);
-        ctx.getSource().sendSuccess(() -> Component.literal("❄ Spawned snowstorm cloud."), true);
+        SnowstormManager.startSnowstorm(intensity, region);
+        ctx.getSource().sendSuccess(() -> Component.literal("Spawned snowstorm cloud."), true);
         return 1;
     }
 
+    private static String formatTemps(float[] arr) {
+        if (arr == null || arr.length == 0) return "-";
+        if (arr.length == 1) return UnitFormatter.formatTemperature(arr[0]);
+        return UnitFormatter.formatTemperature(arr[0]) + ", " + UnitFormatter.formatTemperature(arr[1]);
+    }
 
+    private static String formatPressures(float[] arr) {
+        if (arr == null || arr.length == 0) return "-";
+        if (arr.length == 1) return UnitFormatter.formatPressure(arr[0]);
+        return UnitFormatter.formatPressure(arr[0]) + ", " + UnitFormatter.formatPressure(arr[1]);
+    }
+
+    private static String formatHumidities(float[] arr) {
+        if (arr == null || arr.length == 0) return "-";
+        if (arr.length == 1) return UnitFormatter.formatHumidity(arr[0]);
+        return UnitFormatter.formatHumidity(arr[0]) + ", " + UnitFormatter.formatHumidity(arr[1]);
+    }
 }
 

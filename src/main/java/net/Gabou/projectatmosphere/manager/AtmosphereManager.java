@@ -60,6 +60,7 @@ public class AtmosphereManager {
         playerReadyMap.clear();
         isInitialGenerationDone = ForecastOrchestrator.onServerStart(world);
         count = 0;
+        CloudRegionQueue.clear();
 
     }
 
@@ -120,18 +121,14 @@ public class AtmosphereManager {
 
     public static void onRegenerate(ServerLevel world) {
         ProjectAtmosphere.LOGGER.info("Regenerating weather data for all players");
-        ForecastOrchestrator.clearActiveBiomeKeys();
         AsyncAtmosphereService.runWeather(() -> {
-            ForecastGenerator.clearBiomeSamples();
             EventHandler.onRegenerate();
             CloudManager.get(world).getCloudGenerator().removeAllClouds();
             TornadoManager.clearTornadoes();
-            for (ServerPlayer player : world.players()) {
-                BlockPos pos = player.blockPosition();
-                allCenterOfMap.add(pos);
-                ForecastOrchestrator.regenerateAround(world, pos);
-            }
+            HurricaneManager.clearHurricanes();
+            ForecastOrchestrator.clearAndRegenerate(world);
         });
+
         CloudRegionQueue.clear();
     }
 
