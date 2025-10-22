@@ -102,5 +102,8 @@ public class TemperatureCommandHelper {
         }
         return sb.toString();
     }
+    public static boolean isInOverworld(Level level) {
+        return level.dimension().equals(Level.OVERWORLD);
+    }
 }
 

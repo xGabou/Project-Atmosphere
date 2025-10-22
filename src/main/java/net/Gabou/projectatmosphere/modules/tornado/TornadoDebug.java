@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
@@ -26,6 +27,11 @@ public final class TornadoDebug {
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                                             ServerLevel level = player.serverLevel();
+                                            if(!TemperatureCommandHelper.isInOverworld(level))
+                                            {
+                                                ctx.getSource().sendFailure(Component.literal("Cloud spawning is only available in the Overworld."));
+                                                return 0;
+                                            }
                                             var key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
 
                                             WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(key);
@@ -53,10 +59,15 @@ public final class TornadoDebug {
                                         .executes(ctx -> {
                                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                                             ServerLevel level = player.serverLevel();
+                                            if(!TemperatureCommandHelper.isInOverworld(level))
+                                            {
+                                                ctx.getSource().sendFailure(Component.literal("Tornado risk is only available in the Overworld."));
+                                                return 0;
+                                            }
                                             BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
-
                                             float risk = TornadoProbabilityManager.computeRisk(key, level, level.getGameTime());
-                                            ctx.getSource().sendSuccess(() -> Component.literal("Risk: " + risk), false);
+                                            ctx.getSource().sendSuccess(
+                                                    () -> Component.literal("Risk: " + risk), false);
                                             return 1;
                                         }))
                                 .then(Commands.literal("force")
@@ -64,12 +75,16 @@ public final class TornadoDebug {
                                                 .executes(ctx -> {
                                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                                     ServerLevel level = player.serverLevel();
+                                                    if(!TemperatureCommandHelper.isInOverworld(level))
+                                                    {
+                                                        ctx.getSource().sendFailure(Component.literal("Tornado spawning is only available in the Overworld."));
+                                                        return 0;
+                                                    }
                                                     BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
-
                                                     float intensity = FloatArgumentType.getFloat(ctx, "intensity");
                                                     TornadoSpawner.spawn(key, level, intensity);
-
-                                                    ctx.getSource().sendSuccess(() -> Component.literal("Tornado spawned."), true);
+                                                    ctx.getSource().sendSuccess(
+                                                            () -> Component.literal("Tornado spawned."), true);
                                                     return 1;
                                                 })))
                                 .then(Commands.literal("cooldown")
@@ -77,13 +92,16 @@ public final class TornadoDebug {
                                                 .executes(ctx -> {
                                                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                                                     ServerLevel level = player.serverLevel();
+                                                    if(!TemperatureCommandHelper.isInOverworld(level))
+                                                    {
+                                                        ctx.getSource().sendFailure(Component.literal("Tornado cooldown reset is only available in the Overworld."));
+                                                        return 0;
+                                                    }
                                                     BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
-
                                                     TornadoStorageManager.setCooldown(key, 0);
-                                                    ctx.getSource().sendSuccess(() -> Component.literal("Cooldown cleared."), true);
+                                                    ctx.getSource().sendSuccess(
+                                                            () -> Component.literal("Cooldown cleared."), true);
                                                     return 1;
-                                                })))
-                        )
-        );
+                                                })))));
     }
 }

@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
@@ -31,7 +32,7 @@ public class SeasonHooksMixin {
         // Only operate on the server to avoid client desyncs
         if (level instanceof ServerLevel serverLevel) {
 
-
+            if(serverLevel.dimension() != Level.OVERWORLD) return;
             // Build a BiomeInstanceKey for PA
             BiomeInstanceKey key = new BiomeInstanceKey(
                     serverLevel.getBiome(pos).unwrapKey().orElseThrow().location(),

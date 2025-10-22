@@ -57,11 +57,13 @@ public record BiomeDayTemperaturePacket(Map<ResourceLocation, float[]> temperatu
     }
 
     /**
-     * Handles packet client-side by updating cached biome temperature forecasts.
+     * Handles incoming biome day temperature data on the client.
+     * Clears old forecasts before inserting new ones to prevent stale data.
      */
     public static void handle(BiomeDayTemperaturePacket pkt, IPayloadContext ctx) {
-        ctx.enqueueWork(() ->
-                BiomeClientTemperatureCache.updateDayForecasts(pkt.temperatureDayMap())
-        );
+        ctx.enqueueWork(() -> {
+            BiomeClientTemperatureCache.clear(); // clear old data first
+            BiomeClientTemperatureCache.updateDayForecasts(pkt.temperatureDayMap());
+        });
     }
 }
