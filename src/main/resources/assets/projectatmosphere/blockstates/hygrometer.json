@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "projectatmosphere:block/hygrometer" },
+    "facing=south": { "model": "projectatmosphere:block/hygrometer", "y": 180 },
+    "facing=west":  { "model": "projectatmosphere:block/hygrometer", "y": 270 },
+    "facing=east":  { "model": "projectatmosphere:block/hygrometer", "y": 90 }
+  }
+}
