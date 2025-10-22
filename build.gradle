@@ -178,7 +178,7 @@ idea {
 modrinth {
     token = System.getenv("MODRINTH_TOKEN")
     projectId = "qIWoLcKJ" // from your Modrinth project URL
-    versionNumber = "Forge-${project.version}"
+    versionNumber = "NeoForge-${project.version}"
     versionName = "Project Atmosphere ${mod_version}"
     changelog = rootProject.file("PAchangelog.md").text
     gameVersions = ["1.21.1"]

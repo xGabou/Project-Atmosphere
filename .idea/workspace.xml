@@ -4,15 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update barometer and humidimeter models, add hygrometer, and enhance texture handling">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/BiomeDayTemperaturePacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/BiomeDayTemperaturePacket.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance temperature handling by clearing old forecasts and adding overworld checks for commands">
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -224,7 +217,7 @@
       <recent name="net.Gabou.projectatmosphere.client" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-AtmosphereNeoforge [discordWebhook]">
+  <component name="RunManager" selected="Gradle.Project-AtmosphereNeoforge [modrinth]">
     <configuration name="Client" type="Application" factoryName="Application">
       <option name="MAIN_CLASS_NAME" value="net.neoforged.devlaunch.Main" />
       <module name="project-atmosphere.main" />
@@ -487,9 +480,9 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-AtmosphereNeoforge [discordWebhook]" />
-        <item itemvalue="Gradle.Project-AtmosphereNeoforge [curseforge1258344]" />
         <item itemvalue="Gradle.Project-AtmosphereNeoforge [modrinth]" />
+        <item itemvalue="Gradle.Project-AtmosphereNeoforge [curseforge1258344]" />
+        <item itemvalue="Gradle.Project-AtmosphereNeoforge [discordWebhook]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
       </list>
@@ -608,15 +601,7 @@
       <workItem from="1760973444572" duration="595000" />
       <workItem from="1761016231857" duration="594000" />
       <workItem from="1761055151058" duration="3158000" />
-      <workItem from="1761168729366" duration="1706000" />
-    </task>
-    <task id="LOCAL-00058" summary="Refactor build configuration and enhance cloud integration; update dependencies and streamline setup logic for weather control">
-      <option name="closed" value="true" />
-      <created>1751439466995</created>
-      <option name="number" value="00058" />
-      <option name="presentableId" value="LOCAL-00058" />
-      <option name="project" value="LOCAL" />
-      <updated>1751439466995</updated>
+      <workItem from="1761168729366" duration="1777000" />
     </task>
     <task id="LOCAL-00059" summary="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
       <option name="closed" value="true" />
@@ -1002,7 +987,15 @@
       <option name="project" value="LOCAL" />
       <updated>1761170418832</updated>
     </task>
-    <option name="localTasksCounter" value="107" />
+    <task id="LOCAL-00107" summary="feat: enhance temperature handling by clearing old forecasts and adding overworld checks for commands">
+      <option name="closed" value="true" />
+      <created>1761170696735</created>
+      <option name="number" value="00107" />
+      <option name="presentableId" value="LOCAL-00107" />
+      <option name="project" value="LOCAL" />
+      <updated>1761170696736</updated>
+    </task>
+    <option name="localTasksCounter" value="108" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1053,7 +1046,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="fix: update legendary survival overhaul dependency and increase max positions per biome" />
     <MESSAGE value="feat: enhance tornado rendering with improved shader parameters and error handling" />
     <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
     <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
@@ -1078,7 +1070,8 @@
     <MESSAGE value="feat: add cloud region management and enhance weather type handling" />
     <MESSAGE value="feat: add imperial unit display options and enhance temperature formatting" />
     <MESSAGE value="feat: update barometer and humidimeter models, add hygrometer, and enhance texture handling" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: update barometer and humidimeter models, add hygrometer, and enhance texture handling" />
+    <MESSAGE value="feat: enhance temperature handling by clearing old forecasts and adding overworld checks for commands" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance temperature handling by clearing old forecasts and adding overworld checks for commands" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
