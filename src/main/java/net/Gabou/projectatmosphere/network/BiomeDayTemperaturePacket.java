@@ -9,6 +9,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
+/**
+ * Packet for transmitting per-biome daily temperature forecasts to the client.
+ */
 public class BiomeDayTemperaturePacket {
     private final Map<ResourceLocation, float[]> temperatureDayMap;
 
@@ -41,8 +44,15 @@ public class BiomeDayTemperaturePacket {
         return new BiomeDayTemperaturePacket(buf);
     }
 
+    /**
+     * Handles incoming biome day temperature data on the client.
+     * Clears old forecasts before inserting new ones to prevent stale data.
+     */
     public static void handle(BiomeDayTemperaturePacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> BiomeClientTemperatureCache.updateDayForecasts(msg.temperatureDayMap));
+        ctx.get().enqueueWork(() -> {
+            BiomeClientTemperatureCache.clear(); // clear old data first
+            BiomeClientTemperatureCache.updateDayForecasts(msg.temperatureDayMap);
+        });
         ctx.get().setPacketHandled(true);
     }
 }

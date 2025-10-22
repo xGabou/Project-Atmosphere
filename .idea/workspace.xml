@@ -4,11 +4,31 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add imperial units display option for temperature, wind speed, and pressure">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks">
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/hygrometer.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/hygrometer.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barmerc1.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barmerc2.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barvitre1.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barvitre2.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturemercure1.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturemercure2.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturevitre1.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturevitre2.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/BiomeDayTemperaturePacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/BiomeDayTemperaturePacket.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/barometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/barometer_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/thermometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/thermometer_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texture.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texture.png" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -170,7 +190,7 @@
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/src/main/resources/data/simpleclouds/cloud_types&quot;,
+    &quot;last_opened_file_path&quot;: &quot;G:/Project-Atmosphere/src/main/resources/assets/projectatmosphere/textures/block&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -197,11 +217,11 @@
       <recent name="net.Gabou.projectatmosphere.blocks" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\block" />
       <recent name="G:\Project-Atmosphere\src\main\resources\data\simpleclouds\cloud_types" />
       <recent name="G:\Project-Atmosphere\libs" />
       <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\effects" />
       <recent name="G:\Project-Atmosphere\run\resourcepacks" />
-      <recent name="G:\Project-Atmosphere\src\main\resources\assets\projectatmosphere\textures\particle" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="G:\Project-Atmosphere" />
@@ -221,7 +241,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [curseforge1258344]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [discordWebhook]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -444,11 +464,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
+        <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
         <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
+        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
-        <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
       </list>
     </recent_temporary>
   </component>
@@ -581,15 +601,12 @@
       <workItem from="1760716213849" duration="608000" />
       <workItem from="1760718824943" duration="9960000" />
       <workItem from="1760743232876" duration="6487000" />
-      <workItem from="1760894591846" duration="7724000" />
-    </task>
-    <task id="LOCAL-00071" summary="Fix tornado cloud spawning logic in TornadoCommand and update workspace.xml">
-      <option name="closed" value="true" />
-      <created>1754432873863</created>
-      <option name="number" value="00071" />
-      <option name="presentableId" value="LOCAL-00071" />
-      <option name="project" value="LOCAL" />
-      <updated>1754432873863</updated>
+      <workItem from="1760894591846" duration="8053000" />
+      <workItem from="1760965098640" duration="595000" />
+      <workItem from="1760973449762" duration="3982000" />
+      <workItem from="1761016240155" duration="1964000" />
+      <workItem from="1761055147020" duration="6282000" />
+      <workItem from="1761168722128" duration="1312000" />
     </task>
     <task id="LOCAL-00072" summary="fix: correct temperature caching and add debris particle configuration">
       <option name="closed" value="true" />
@@ -975,18 +992,53 @@
       <option name="project" value="LOCAL" />
       <updated>1760905257692</updated>
     </task>
-    <option name="localTasksCounter" value="120" />
+    <task id="LOCAL-00120" summary="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks">
+      <option name="closed" value="true" />
+      <created>1760906206199</created>
+      <option name="number" value="00120" />
+      <option name="presentableId" value="LOCAL-00120" />
+      <option name="project" value="LOCAL" />
+      <updated>1760906206199</updated>
+    </task>
+    <option name="localTasksCounter" value="121" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
+                  <option value="origin/Forge-1.20.1" />
+                </option>
+              </RecentGroup>
+            </list>
+          </value>
+        </entry>
+      </map>
+    </option>
     <option name="TAB_STATES">
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="origin/Forge-1.20.1" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
           </value>
         </entry>
       </map>
@@ -994,7 +1046,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: add client-only display functionality for weather instruments and update gradle dependencies" />
     <MESSAGE value="feat: refactor tornado module structure and enhance tornado level handling" />
     <MESSAGE value="feat: integrate hurricane and snowstorm management into atmosphere tick process" />
     <MESSAGE value="feat: enhance biome key management for players and optimize tornado checks" />
@@ -1019,7 +1070,8 @@
     <MESSAGE value="feat: update version to 0.5.5.0, change release type to beta, and adjust cloud storminess parameters" />
     <MESSAGE value="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure" />
     <MESSAGE value="feat: add imperial units display option for temperature, wind speed, and pressure" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: add imperial units display option for temperature, wind speed, and pressure" />
+    <MESSAGE value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

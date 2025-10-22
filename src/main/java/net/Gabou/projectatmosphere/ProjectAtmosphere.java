@@ -12,6 +12,8 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.locale.Language;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -164,6 +166,10 @@ public class ProjectAtmosphere {
             ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS,context);
             Map<String, String> translations = Language.getInstance().getLanguageData();
             translations.put("sandstorm.debug.blocked", "Nothing to report. Stay alert.");
+            ItemBlockRenderTypes.setRenderLayer(ModBlocks.BAROMETER_BLOCK.get(), RenderType.translucent());
+            ItemBlockRenderTypes.setRenderLayer(ModBlocks.THERMOMETER_BLOCK.get(), RenderType.translucent());
+
+
         });
     }
 

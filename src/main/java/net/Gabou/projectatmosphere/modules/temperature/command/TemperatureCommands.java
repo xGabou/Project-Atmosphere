@@ -38,6 +38,11 @@ public class TemperatureCommands {
                         .then(Commands.literal("forecast")
                                 .executes(ctx -> {
                                     Player player = ctx.getSource().getPlayerOrException();
+                                    if(!TemperatureCommandHelper.isInOverworld(player.level()))
+                                    {
+                                        ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
+                                        return 0;
+                                    }
                                     String forecast = TemperatureCommandHelper.getWeeklyForecast(TemperatureCommandHelper.getCurrentBiomeResourceLocation(player));
                                     ctx.getSource().sendSuccess(() -> Component.literal(forecast), false);
                                     return 1;
@@ -48,6 +53,11 @@ public class TemperatureCommands {
                                         .suggests(BIOME_SUGGESTIONS)
                                         .executes(ctx -> {
                                             Player player = ctx.getSource().getPlayerOrException();
+                                            if(!TemperatureCommandHelper.isInOverworld(player.level()))
+                                            {
+                                                ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
+                                                return 0;
+                                            }
                                             String biomeStr = StringArgumentType.getString(ctx, "biome");
                                             BiomeInstanceKey biome = TemperatureCommandHelper.resolveBiome(player, biomeStr);
                                             long tick = TemperatureCommandHelper.getCurrentTick(ctx.getSource().getLevel());
@@ -61,6 +71,11 @@ public class TemperatureCommands {
                         .then(Commands.literal("dayprofile")
                                 .executes(ctx -> {
                                     Player player = ctx.getSource().getPlayerOrException();
+                                    if(!TemperatureCommandHelper.isInOverworld(player.level()))
+                                    {
+                                        ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
+                                        return 0;
+                                    }
                                     BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
                                     float[] profile = TemperatureCommandHelper.getDayProfile(biome);
                                     ctx.getSource().sendSuccess(
@@ -84,6 +99,11 @@ public class TemperatureCommands {
                                 .executes(ctx -> {
                                     ServerLevel level = ctx.getSource().getLevel();
                                     Player player = ctx.getSource().getPlayerOrException();
+                                    if(!TemperatureCommandHelper.isInOverworld(player.level()))
+                                    {
+                                        ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
+                                        return 0;
+                                    }
                                     BlockPos pos = player.getOnPos();
 
                                     var biomeHolder = level.getBiome(pos);
@@ -104,7 +124,14 @@ public class TemperatureCommands {
                                 .executes(ctx -> {
                                     if (ctx.getSource().getPlayer() == null)
                                         ctx.getSource().sendFailure(Component.literal("This command can only be run by a player."));
-                                    AtmosphereManager.onRegenerate(ctx.getSource().getLevel());
+                                    ServerLevel level = ctx.getSource().getLevel();
+                                    if(!TemperatureCommandHelper.isInOverworld(level))
+                                    {
+                                        ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
+                                        return 0;
+                                    }
+                                    AtmosphereManager.onRegenerate(level);
+
 
                                     ctx.getSource().sendSuccess(() -> Component.literal("Temperature forecast cache has been cleared."), false);
                                     return 1;

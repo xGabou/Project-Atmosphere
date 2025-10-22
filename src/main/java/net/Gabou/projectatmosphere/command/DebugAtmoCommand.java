@@ -15,6 +15,7 @@ import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
+import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.UnitFormatter;
@@ -27,6 +28,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import sereneseasons.api.season.Season;
@@ -64,6 +66,10 @@ public class DebugAtmoCommand {
                         .then(Commands.literal("forecast")
                                 .executes(ctx -> {
                                     ServerLevel world = ctx.getSource().getLevel();
+                                    if (!TemperatureCommandHelper.isInOverworld(world)) {
+                                        ctx.getSource().sendFailure(Component.literal("Weather forecast is only available in the Overworld."));
+                                        return 0;
+                                    }
                                     BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
                                     ResourceLocation biome = world.registryAccess()
                                             .registryOrThrow(Registries.BIOME)
@@ -73,6 +79,10 @@ public class DebugAtmoCommand {
                                 })
                                 .then(Commands.argument("biome", ResourceLocationArgument.id())
                                         .executes(ctx -> {
+                                            if (!TemperatureCommandHelper.isInOverworld(ctx.getSource().getLevel())) {
+                                                ctx.getSource().sendFailure(Component.literal("Biome forecast is only available in the Overworld."));
+                                                return 0;
+                                            }
                                             ResourceLocation biome = ResourceLocationArgument.getId(ctx, "biome");
                                             BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
                                             BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
@@ -154,13 +164,24 @@ public class DebugAtmoCommand {
     }
 
     private static CloudRegion spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {
-        CloudGenerator generator = SimpleCloudsCompat.generator;
-        if (generator != null) {
-            CloudRegion existing = generator.getCloudAtWorldPosition(pos.getX(), pos.getZ());
-            if (existing != null) {
-                generator.removeClouds(r -> r == existing);
-            }
+        if (SimpleCloudsCompat.generator == null) {
+            LOGGER.warn("Simple Clouds generator is null, cannot spawn cloud.");
+            return null;
         }
+        if (cloudId == null) {
+            LOGGER.warn("Cloud ID is null, cannot spawn cloud.");
+            return null;
+        }
+        if(!level.dimension().equals(Level.OVERWORLD)) {
+            return null;
+        }
+
+        CloudGenerator generator = SimpleCloudsCompat.generator;
+        CloudRegion existing = generator.getCloudAtWorldPosition(pos.getX(), pos.getZ());
+        if (existing != null) {
+            generator.removeClouds(r -> r == existing);
+        }
+
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
         WindVector wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
         return SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
@@ -168,6 +189,10 @@ public class DebugAtmoCommand {
 
     private static int spawnRain(CommandContext<CommandSourceStack> ctx) {
         ServerLevel level = ctx.getSource().getLevel();
+        if (!TemperatureCommandHelper.isInOverworld(level)) {
+            ctx.getSource().sendFailure(Component.literal("Rain clouds can only be spawned in the Overworld."));
+            return 0;
+        }
         BlockPos pos;
         try {
             pos = BlockPosArgument.getBlockPos(ctx, "pos");
@@ -194,6 +219,10 @@ public class DebugAtmoCommand {
 
     private static int spawnThunder(CommandContext<CommandSourceStack> ctx) {
         ServerLevel level = ctx.getSource().getLevel();
+        if (!TemperatureCommandHelper.isInOverworld(level)) {
+            ctx.getSource().sendFailure(Component.literal("Thunder clouds can only be spawned in the Overworld."));
+            return 0;
+        }
         BlockPos pos;
         try {
             pos = BlockPosArgument.getBlockPos(ctx, "pos");
@@ -214,6 +243,10 @@ public class DebugAtmoCommand {
 
     private static int spawnSnowstorm(CommandContext<CommandSourceStack> ctx) {
         ServerLevel level = ctx.getSource().getLevel();
+        if (!TemperatureCommandHelper.isInOverworld(level)) {
+            ctx.getSource().sendFailure(Component.literal("Snowstorm clouds can only be spawned in the Overworld."));
+            return 0;
+        }
         BlockPos pos;
         int intensity;
         try {
