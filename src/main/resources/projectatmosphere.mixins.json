@@ -13,7 +13,9 @@
   "client": [
     "MixinSandstormDebugBlocker",
     "OverwriteDesertSound",
-    "SimpleCloudsRendererMixin"
+    "SimpleCloudsRendererMixin",
+    "compat.auroras.AuroraRendererMixin",
+    "compat.rainbows.RainbowsRendererParticleMixin"
   ],
   "injectors": {
     "defaultRequire": 1

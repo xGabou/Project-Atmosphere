@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
+import net.Gabou.projectatmosphere.compat.CompatHandler;
+import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
 import net.Gabou.projectatmosphere.config.AtmoConfigScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -17,5 +19,6 @@ public class ClientOnlyRegistrar {
         modEventBus.register(ClientTickHandler.class);
         context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
                 () -> new ConfigScreenHandler.ConfigScreenFactory((mc, screen) -> new AtmoConfigScreen(screen)));
+        RainbowWeatherTracker.setEnabled(CompatHandler.isRainbowsLoaded());
     }
 }

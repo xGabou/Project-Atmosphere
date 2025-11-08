@@ -1,7 +1,7 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " S ",
+    "S S",
     "IGI",
     " R "
   ],
@@ -11,5 +11,5 @@
     "G": { "item": "minecraft:glass_pane" },
     "R": { "item": "minecraft:redstone" }
   },
-  "result": { "item": "projectatmosphere:hygrometer" }
+  "result": { "item": "projectatmosphere:humidimeter_block", "count": 1 }
 }

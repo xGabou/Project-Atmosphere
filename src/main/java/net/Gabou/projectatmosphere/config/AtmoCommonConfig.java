@@ -42,6 +42,8 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
 
+    public static final ForgeConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
+
 
 
 
@@ -71,6 +73,9 @@ public class AtmoCommonConfig {
                 .define("imperialUnits", false);
         builder.pop();
         builder.push("storms");
+        STORM_SEVERITY_BOOSTER = builder
+                .comment("Global multiplier for storm severity calculations")
+                .defineInRange("stormSeverityBooster", 3.2d, 0.5d, 8d);
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);

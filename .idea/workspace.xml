@@ -4,31 +4,27 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks">
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/blockstates/hygrometer.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/item/hygrometer.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barmerc1.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barmerc2.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barvitre1.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/barvitre2.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturemercure1.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturemercure2.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturevitre1.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texturevitre2.png" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands">
+      <change afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/weather_radar.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SeasonHooksMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommandHelper.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/BiomeDayTemperaturePacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/BiomeDayTemperaturePacket.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/barometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/barometer_block.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/humidimeter_block.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/thermometer_block.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/models/block/thermometer_block.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texture.png" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/textures/block/texture.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/PAMixinPlugin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/PAMixinPlugin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/GlobalStormHistoryData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/storm/GlobalStormHistoryData.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ClientOnlyRegistrar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ClientOnlyRegistrar.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/TickCounter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/TickCounter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/hygrometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/humidimeter_block.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/thermometer.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/recipes/thermometer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -241,7 +237,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [discordWebhook]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -464,11 +460,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
-        <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
-        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
+        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
+        <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
+        <item itemvalue="Gradle.Project-Atmosphere [clean]" />
       </list>
     </recent_temporary>
   </component>
@@ -606,23 +602,18 @@
       <workItem from="1760973449762" duration="3982000" />
       <workItem from="1761016240155" duration="1964000" />
       <workItem from="1761055147020" duration="6282000" />
-      <workItem from="1761168722128" duration="1312000" />
-    </task>
-    <task id="LOCAL-00072" summary="fix: correct temperature caching and add debris particle configuration">
-      <option name="closed" value="true" />
-      <created>1754529467816</created>
-      <option name="number" value="00072" />
-      <option name="presentableId" value="LOCAL-00072" />
-      <option name="project" value="LOCAL" />
-      <updated>1754529467817</updated>
-    </task>
-    <task id="LOCAL-00073" summary="feat: enhance tornado rendering with shader effects and improved twist animation">
-      <option name="closed" value="true" />
-      <created>1754538209933</created>
-      <option name="number" value="00073" />
-      <option name="presentableId" value="LOCAL-00073" />
-      <option name="project" value="LOCAL" />
-      <updated>1754538209933</updated>
+      <workItem from="1761168722128" duration="2295000" />
+      <workItem from="1761260782368" duration="18000" />
+      <workItem from="1761313447736" duration="7222000" />
+      <workItem from="1761328526162" duration="2301000" />
+      <workItem from="1761506406893" duration="9000" />
+      <workItem from="1761597136149" duration="58000" />
+      <workItem from="1761624254726" duration="491000" />
+      <workItem from="1761658770259" duration="2866000" />
+      <workItem from="1761743082300" duration="630000" />
+      <workItem from="1761852450147" duration="34000" />
+      <workItem from="1762206371773" duration="699000" />
+      <workItem from="1762531113580" duration="9463000" />
     </task>
     <task id="LOCAL-00074" summary="feat: add shader support for cloud rendering and implement noise functions">
       <option name="closed" value="true" />
@@ -1000,7 +991,23 @@
       <option name="project" value="LOCAL" />
       <updated>1760906206199</updated>
     </task>
-    <option name="localTasksCounter" value="121" />
+    <task id="LOCAL-00121" summary="feat: update barometer and humidimeter models, add hygrometer, and increment version to 0.5.5.4">
+      <option name="closed" value="true" />
+      <created>1761170431542</created>
+      <option name="number" value="00121" />
+      <option name="presentableId" value="LOCAL-00121" />
+      <option name="project" value="LOCAL" />
+      <updated>1761170431542</updated>
+    </task>
+    <task id="LOCAL-00122" summary="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands">
+      <option name="closed" value="true" />
+      <created>1761170687166</created>
+      <option name="number" value="00122" />
+      <option name="presentableId" value="LOCAL-00122" />
+      <option name="project" value="LOCAL" />
+      <updated>1761170687166</updated>
+    </task>
+    <option name="localTasksCounter" value="123" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1046,8 +1053,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: refactor tornado module structure and enhance tornado level handling" />
-    <MESSAGE value="feat: integrate hurricane and snowstorm management into atmosphere tick process" />
     <MESSAGE value="feat: enhance biome key management for players and optimize tornado checks" />
     <MESSAGE value="feat: improve compatibility logging and refactor mixin structure for weather management" />
     <MESSAGE value="feat: update build configuration and enhance snowstorm management integration" />
@@ -1071,7 +1076,9 @@
     <MESSAGE value="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure" />
     <MESSAGE value="feat: add imperial units display option for temperature, wind speed, and pressure" />
     <MESSAGE value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
+    <MESSAGE value="feat: update barometer and humidimeter models, add hygrometer, and increment version to 0.5.5.4" />
+    <MESSAGE value="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

@@ -16,6 +16,14 @@ public class CompatHandler {
         return ModList.get().isLoaded("sandstorm");
     }
 
+    public static boolean isAurorasLoaded() {
+        return ModList.get().isLoaded("auroras");
+    }
+
+    public static boolean isRainbowsLoaded() {
+        return ModList.get().isLoaded("rainbows");
+    }
+
     public static TemperatureMod getActiveTemperatureMod() {
         if (ModList.get().isLoaded("legendarysurvivaloverhaul")) {
             return TemperatureMod.LEGENDARY_SURVIVAL;
@@ -49,8 +57,14 @@ public class CompatHandler {
             case COLD_SWEAT -> LOGGER.info("Cold Sweat loaded");
             case NONE -> LOGGER.info("No temperature mod loaded, skipping compatibility setup.");
         }
-        String sandStormMsg = isSandStormsLoaded() ? "Sand Storms mod loaded, enabling compatibility." : "Sand Storms mod not found.";
-        LOGGER.info(sandStormMsg);
-
+        LOGGER.info(isSandStormsLoaded()
+                ? "Sand Storms mod loaded, enabling compatibility."
+                : "Sand Storms mod not found.");
+        LOGGER.info(isAurorasLoaded()
+                ? "Auroras detected – enabling seasonal aurora tuning."
+                : "Auroras mod not detected.");
+        LOGGER.info(isRainbowsLoaded()
+                ? "Rainbows detected – enabling precipitation bridge."
+                : "Rainbows mod not detected.");
     }
 }

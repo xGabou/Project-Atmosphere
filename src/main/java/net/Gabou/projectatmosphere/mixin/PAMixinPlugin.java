@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.Set;
 
 public class PAMixinPlugin implements IMixinConfigPlugin {
-    private static Boolean SANDSTORMLOADED =null;
+    private static Boolean SANDSTORMLOADED = null;
+    private static Boolean AURORASLOADED = null;
+    private static Boolean RAINBOWSLOADED = null;
 
 
     private boolean isSandStormLoaded() {
@@ -26,6 +28,29 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
         return SANDSTORMLOADED;
     }
 
+    private boolean isAurorasLoaded() {
+        if (AURORASLOADED != null) return AURORASLOADED;
+        AURORASLOADED = isClassPresent("auroras.Auroras");
+        System.out.println("[Project Atmosphere] Auroras detected: " + AURORASLOADED);
+        return AURORASLOADED;
+    }
+
+    private boolean isRainbowsLoaded() {
+        if (RAINBOWSLOADED != null) return RAINBOWSLOADED;
+        RAINBOWSLOADED = isClassPresent("rainbows.Rainbows");
+        System.out.println("[Project Atmosphere] Rainbows detected: " + RAINBOWSLOADED);
+        return RAINBOWSLOADED;
+    }
+
+    private boolean isClassPresent(String className) {
+        try {
+            Class.forName(className, false, getClass().getClassLoader());
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
     @Override
     public void onLoad(String s) {
         
@@ -41,7 +66,16 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("OverwriteDesertSound") && !isSandStormLoaded()) {
             return false;
         }
-        else return !mixinClassName.endsWith("MixinSandstormDebugBlocker") || isSandStormLoaded();
+        if (mixinClassName.endsWith("MixinSandstormDebugBlocker") && !isSandStormLoaded()) {
+            return false;
+        }
+        if (mixinClassName.contains("compat.auroras") && !isAurorasLoaded()) {
+            return false;
+        }
+        if (mixinClassName.contains("compat.rainbows") && !isRainbowsLoaded()) {
+            return false;
+        }
+        return true;
     }
 
     @Override

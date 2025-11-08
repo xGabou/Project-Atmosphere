@@ -6,6 +6,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
@@ -49,7 +50,7 @@ public class SimpleCloudSpawner {
     private static float HUMIDITY_MODIFIER = 1.0f;
     private static float TEMPERATURE_MODIFIER = 1.0f;
 
-    private static final float STORM_BIAS = 1.5f;
+    private static final float STORM_BIAS = 1.1f;
     private static final float SUNNY_THRESHOLD = 0.45f;
 
     public static int getCurrentViolence() {
@@ -159,9 +160,8 @@ public class SimpleCloudSpawner {
     }
 
     // Data carrier between async and main thread
-    record CloudSpawnRequest(WeatherSampler.WeatherStats stats, int radius, String cloudId) {}
-
-
+    record CloudSpawnRequest(WeatherSampler.WeatherStats stats, int radius, String cloudId) {
+    }
 
 
     public static BlockPos getRandomPosInRegion(SpawnRegion region, RandomSource random, ServerLevel level) {
@@ -187,11 +187,10 @@ public class SimpleCloudSpawner {
             float stormChance,
             ServerLevel level
     ) {
-        // === Base Atmospheric Inputs ===
         float dewGap = Math.max(0f, temperature - dewPoint);
-        float dewGapFactor = 1.0f - Math.min(dewGap / 12.0f, 1.0f); // saturation curve
+        float dewGapFactor = 1.0f - Math.min(dewGap / 12.0f, 1.0f);
 
-        float pressureFactor = (PRESSION_MOYENNE - pressure) / 60.0f; // ±60 hPa range
+        float pressureFactor = (PRESSION_MOYENNE - pressure) / 60.0f;
         pressureFactor = Math.max(-1f, Math.min(pressureFactor, 1f));
 
         float humidityFactor = humidity / 100.0f;
@@ -203,31 +202,67 @@ public class SimpleCloudSpawner {
                 + (tempIdealness * 0.3f);
         instability = Math.min(Math.max(instability, 0f), 1f);
 
-        // === Storm History Memory ===
-        int currentDay = (int)(level.getDayTime() / 24000L);
+        int currentDay = (int) (level.getDayTime() / 24000L);
         GlobalStormHistoryData data = GlobalStormHistoryData.get(level);
-        int lastStrong = data.getLastSevereDay(); // stores last 5 +
+
+        int lastStrong = data.getLastSevereDay();
         int daysSince = (lastStrong == Integer.MIN_VALUE)
                 ? Integer.MAX_VALUE : Math.max(0, currentDay - lastStrong);
 
-        // Every calm day increases "storm tension" (+7 %/day → ×1.7 after 10 days)
+        // === Check recent storm streak ===
+        int recentStreak = data.getRecentSevereCount(); // track last consecutive severe storms
+        int cooldown = data.getCooldownDaysRemaining();
+
+        // If we hit 4 severe storms, start a cooldown of 3–5 days
+        if (recentStreak >= 4 && cooldown <= 0) {
+            cooldown = 3 + level.random.nextInt(3); // 3–5 days cooldown
+            data.setCooldownDaysRemaining(cooldown);
+        }
+
+        // Decrease cooldown daily if active
+        if (cooldown > 0 && daysSince > 0) {
+            cooldown = Math.max(0, cooldown - daysSince);
+            data.setCooldownDaysRemaining(cooldown);
+        }
+
+        // During cooldown, clamp stormChance and instability to reduce event frequency
+        if (cooldown > 0) {
+            stormChance *= 0.25f;
+            instability *= 0.5f;
+        }
+
         int severity = getSeverity(stormChance, daysSince, instability);
 
-        // Record if we reached level 5 +
-        if (severity >= 5)
+        // Record storm results
+        if (severity >= 5) {
             data.recordSevere(currentDay);
+        } else {
+            data.resetIfCalm(currentDay);
+        }
 
         return severity;
     }
+
+
     private static int getSeverity(float stormChance, int daysSince, float instability) {
-        float boost = 1f + 0.07f * daysSince;
-        boost = Math.min(boost, 1.7f);
+        float boost = 0f;
+        if (daysSince <= 2) {
+            boost = 1f/(5-daysSince);
+        } else {
+            boost = 1f + 0.07f * daysSince;
+            boost = Math.min(boost, 1.7f);
+        }
+
 
         float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
 
         // === Smooth Probability Curve ===
-        float weighted = instability * adjustedChance * 4.5f;
-        float raw = (float)(1.0 / (1.0 + Math.exp(-2.3 * (weighted - 1.0)))); // sigmoid
+        return calculateSeverity(daysSince, instability, adjustedChance);
+    }
+
+    private static int calculateSeverity(int daysSince, float instability, float adjustedChance) {
+        double weighted = instability * adjustedChance * AtmoCommonConfig.STORM_SEVERITY_BOOSTER.get();
+        float raw = (float) (1.0 / (1.0 + Math.exp(-2.3 * (weighted - 1.0)))); // sigmoid
 
         // === Temporal Bias Toward 5 + Events ===
         // grows linearly up to 10 days, pushing score upward by ≤ 0.25
@@ -235,12 +270,10 @@ public class SimpleCloudSpawner {
         float biasAdjusted = raw + (0.25f * dayBias * (1f - raw));
 
         // Map 0–1 → 1–7
-        int severity = (int)Math.floor(biasAdjusted * 6.0f) + 1;
+        int severity = (int) Math.floor(biasAdjusted * 6.0f) + 1;
         severity = Math.max(1, Math.min(7, severity));
         return severity;
     }
-
-
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level), player.blockPosition());

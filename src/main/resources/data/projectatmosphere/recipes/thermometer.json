@@ -1,9 +1,9 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " G ",
-    " R ",
-    " I "
+    "G",
+    "R",
+    "I"
   ],
   "key": {
     "G": { "item": "minecraft:glass" },

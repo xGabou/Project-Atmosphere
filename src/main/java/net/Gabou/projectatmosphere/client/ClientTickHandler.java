@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -60,6 +61,7 @@ public class ClientTickHandler {
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
         Minecraft mc = Minecraft.getInstance();
+        RainbowWeatherTracker.tick(mc);
 
         if (mc.level != null && mc.player != null) {
             CloudManager<?> manager = CloudManager.get(mc.level);

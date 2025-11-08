@@ -25,10 +25,7 @@ minecraft {
     copyIdeResources = true
     accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 
-    mixin {
-        add sourceSets.main, "projectatmosphere.refmap.json" // ⬅️ same as in mixins.json
-        config 'projectatmosphere.mixins.json' // ⬅️ same as in mixins.json
-    }
+
     runs {
         configureEach {
             workingDirectory project.file('run')
@@ -64,7 +61,10 @@ minecraft {
     }
 }
 
-
+mixin {
+    add sourceSets.main, "projectatmosphere.refmap.json" // ⬅️ same as in mixins.json
+    config 'projectatmosphere.mixins.json' // ⬅️ same as in mixins.json
+}
 
 
 repositories {
@@ -105,6 +105,8 @@ dependencies {
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
     implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7117649")
+    implementation fg.deobf("curse.maven:rainboows-1121832:6421980")
+    implementation fg.deobf("curse.maven:auroras-1105290:6040671")
 //    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))
 
 
@@ -171,10 +173,11 @@ tasks.withType(JavaCompile).configureEach {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs += [
-            "-AoutRefMapFile=build/classes/java/main/projectatmosphere.refmap.json",
+            "-AoutRefMapFile=${buildDir}/classes/java/main/projectatmosphere.refmap.json",
             "-AreobfSrgFile=${buildDir}/tmp/reobf/SRG.srg"
     ]
 }
+
 import groovy.json.JsonOutput
 tasks.register("discordWebhook") {
     doLast {

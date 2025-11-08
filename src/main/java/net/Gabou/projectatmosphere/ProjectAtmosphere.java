@@ -21,6 +21,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -86,7 +87,9 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
 
-        MinecraftForge.EVENT_BUS.addListener(TickCounter::onServerTick);
+        MinecraftForge.EVENT_BUS.addListener((TickEvent event)-> {
+            if (event.phase == TickEvent.Phase.END)TickCounter.onServerTick();
+        });
         ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);

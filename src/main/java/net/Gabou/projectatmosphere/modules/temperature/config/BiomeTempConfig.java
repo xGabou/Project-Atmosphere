@@ -2,10 +2,13 @@ package net.Gabou.projectatmosphere.modules.temperature.config;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Set;
+import java.util.LinkedHashSet;
 
 /**
  * Holds per‐biome temperature ranges for each of the four seasons,
@@ -1554,22 +1557,1510 @@ public class BiomeTempConfig {
                 new Range(6f, 18f),    // Summer — short but mild
                 new Range(-6f, 4f)     // Autumn — cooling transition
         });
+        putAllSeasons("alexscaves:candy_cavity", new Range[]{
+                new Range(18f, 25f),
+                new Range(20f, 30f),
+                new Range(18f, 26f),
+                new Range(17f, 24f)
+        });
+
+        putAllSeasons("ars_nouveau:archwood_forest", new Range[]{
+                new Range(8f, 16f),
+                new Range(18f, 26f),
+                new Range(10f, 18f),
+                new Range(0f, 8f)
+        });
+
+        putAllSeasons("atmospheric:aspen_parkland", new Range[]{
+                new Range(5f, 15f),
+                new Range(18f, 28f),
+                new Range(8f, 18f),
+                new Range(-5f, 5f)
+        });
+
+        putAllSeasons("atmospheric:dunes", new Range[]{
+                new Range(15f, 35f),
+                new Range(25f, 45f),
+                new Range(18f, 32f),
+                new Range(8f, 22f)
+        });
+
+        putAllSeasons("atmospheric:flourishing_dunes", new Range[]{
+                new Range(16f, 33f),
+                new Range(26f, 44f),
+                new Range(20f, 34f),
+                new Range(10f, 25f)
+        });
+
+        putAllSeasons("atmospheric:kousa_jungle", new Range[]{
+                new Range(20f, 30f),
+                new Range(24f, 35f),
+                new Range(22f, 32f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("atmospheric:laurel_forest", new Range[]{
+                new Range(12f, 20f),
+                new Range(18f, 28f),
+                new Range(14f, 22f),
+                new Range(8f, 15f)
+        });
+
+        putAllSeasons("atmospheric:petrified_dunes", new Range[]{
+                new Range(12f, 32f),
+                new Range(22f, 44f),
+                new Range(16f, 34f),
+                new Range(6f, 20f)
+        });
+
+        putAllSeasons("atmospheric:rainforest", new Range[]{
+                new Range(23f, 32f),
+                new Range(25f, 34f),
+                new Range(24f, 33f),
+                new Range(22f, 31f)
+        });
+
+        putAllSeasons("atmospheric:rainforest_basin", new Range[]{
+                new Range(24f, 33f),
+                new Range(25f, 35f),
+                new Range(24f, 33f),
+                new Range(23f, 32f)
+        });
+
+        putAllSeasons("atmospheric:rocky_dunes", new Range[]{
+                new Range(14f, 30f),
+                new Range(25f, 43f),
+                new Range(18f, 32f),
+                new Range(8f, 20f)
+        });
+
+        putAllSeasons("atmospheric:scrubland", new Range[]{
+                new Range(10f, 25f),
+                new Range(18f, 33f),
+                new Range(12f, 26f),
+                new Range(5f, 18f)
+        });
+
+        putAllSeasons("atmospheric:snowy_scrubland", new Range[]{
+                new Range(2f, 12f),
+                new Range(10f, 20f),
+                new Range(5f, 15f),
+                new Range(-10f, 2f)
+        });
+
+        putAllSeasons("atmospheric:sparse_rainforest", new Range[]{
+                new Range(20f, 30f),
+                new Range(24f, 34f),
+                new Range(22f, 32f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("atmospheric:sparse_rainforest_basin", new Range[]{
+                new Range(21f, 31f),
+                new Range(25f, 34f),
+                new Range(23f, 32f),
+                new Range(21f, 30f)
+        });
+
+        putAllSeasons("atmospheric:spiny_thicket", new Range[]{
+                new Range(10f, 28f),
+                new Range(20f, 38f),
+                new Range(14f, 30f),
+                new Range(8f, 20f)
+        });
+
+        putAllSeasons("autumnity:maple_forest", new Range[]{
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 15f),
+                new Range(-2f, 8f)
+        });
+
+        putAllSeasons("autumnity:pumpkin_fields", new Range[]{
+                new Range(8f, 18f),
+                new Range(20f, 28f),
+                new Range(10f, 20f),
+                new Range(0f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:aspen_glade", new Range[]{
+                new Range(6f, 16f),
+                new Range(16f, 28f),
+                new Range(10f, 20f),
+                new Range(-3f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:auroral_garden", new Range[]{
+                new Range(0f, 10f),
+                new Range(5f, 15f),
+                new Range(2f, 10f),
+                new Range(-15f, -2f)
+        });
+
+        putAllSeasons("biomesoplenty:bayou", new Range[]{
+                new Range(15f, 26f),
+                new Range(22f, 33f),
+                new Range(18f, 28f),
+                new Range(10f, 22f)
+        });
+
+        putAllSeasons("biomesoplenty:bog", new Range[]{
+                new Range(5f, 14f),
+                new Range(14f, 22f),
+                new Range(6f, 16f),
+                new Range(-5f, 5f)
+        });
+
+        putAllSeasons("biomesoplenty:cold_desert", new Range[]{
+                new Range(5f, 20f),
+                new Range(15f, 35f),
+                new Range(8f, 22f),
+                new Range(-10f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:coniferous_forest", new Range[]{
+                new Range(5f, 14f),
+                new Range(16f, 24f),
+                new Range(8f, 15f),
+                new Range(-5f, 5f)
+        });
+
+        putAllSeasons("biomesoplenty:crag", new Range[]{
+                new Range(0f, 10f),
+                new Range(8f, 18f),
+                new Range(2f, 12f),
+                new Range(-10f, 2f)
+        });
+
+        putAllSeasons("biomesoplenty:dead_forest", new Range[]{
+                new Range(5f, 15f),
+                new Range(16f, 25f),
+                new Range(8f, 16f),
+                new Range(-2f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:dryland", new Range[]{
+                new Range(12f, 28f),
+                new Range(20f, 40f),
+                new Range(15f, 30f),
+                new Range(8f, 20f)
+        });
+
+        putAllSeasons("biomesoplenty:dune_beach", new Range[]{
+                new Range(15f, 30f),
+                new Range(25f, 40f),
+                new Range(18f, 32f),
+                new Range(12f, 25f)
+        });
+
+        putAllSeasons("biomesoplenty:field", new Range[]{
+                new Range(10f, 20f),
+                new Range(18f, 28f),
+                new Range(12f, 22f),
+                new Range(0f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:fir_clearing", new Range[]{
+                new Range(5f, 14f),
+                new Range(15f, 24f),
+                new Range(8f, 16f),
+                new Range(-5f, 5f)
+        });
+
+        putAllSeasons("biomesoplenty:floodplain", new Range[]{
+                new Range(14f, 24f),
+                new Range(20f, 32f),
+                new Range(16f, 26f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomesoplenty:forested_field", new Range[]{
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(12f, 20f),
+                new Range(0f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:fungal_jungle", new Range[]{
+                new Range(22f, 30f),
+                new Range(25f, 34f),
+                new Range(23f, 31f),
+                new Range(21f, 30f)
+        });
+
+        putAllSeasons("biomesoplenty:glowing_grotto", new Range[]{
+                new Range(16f, 20f),
+                new Range(18f, 22f),
+                new Range(17f, 21f),
+                new Range(16f, 20f)
+        });
+
+        putAllSeasons("biomesoplenty:grassland", new Range[]{
+                new Range(10f, 20f),
+                new Range(20f, 30f),
+                new Range(12f, 22f),
+                new Range(0f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:gravel_beach", new Range[]{
+                new Range(10f, 18f),
+                new Range(20f, 28f),
+                new Range(14f, 22f),
+                new Range(8f, 15f)
+        });
+
+        putAllSeasons("biomesoplenty:highland", new Range[]{
+                new Range(5f, 15f),
+                new Range(10f, 22f),
+                new Range(6f, 16f),
+                new Range(-5f, 5f)
+        });
+
+        putAllSeasons("biomesoplenty:hot_springs", new Range[]{
+                new Range(10f, 20f),
+                new Range(15f, 28f),
+                new Range(12f, 22f),
+                new Range(5f, 15f)
+        });
+
+        putAllSeasons("biomesoplenty:jacaranda_glade", new Range[]{
+                new Range(8f, 18f),
+                new Range(18f, 26f),
+                new Range(10f, 20f),
+                new Range(2f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:jade_cliffs", new Range[]{
+                new Range(5f, 15f),
+                new Range(15f, 25f),
+                new Range(8f, 18f),
+                new Range(-3f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:lavender_field", new Range[]{
+                new Range(12f, 22f),
+                new Range(20f, 32f),
+                new Range(15f, 25f),
+                new Range(5f, 15f)
+        });
+
+        putAllSeasons("biomesoplenty:lush_desert", new Range[]{
+                new Range(18f, 35f),
+                new Range(25f, 45f),
+                new Range(20f, 34f),
+                new Range(10f, 25f)
+        });
+
+        putAllSeasons("biomesoplenty:lush_savanna", new Range[]{
+                new Range(20f, 32f),
+                new Range(24f, 38f),
+                new Range(22f, 34f),
+                new Range(18f, 28f)
+        });
+
+        putAllSeasons("biomesoplenty:maple_woods", new Range[]{
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 16f),
+                new Range(-2f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:marsh", new Range[]{
+                new Range(12f, 22f),
+                new Range(20f, 30f),
+                new Range(15f, 25f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomesoplenty:mediterranean_forest", new Range[]{
+                new Range(12f, 22f),
+                new Range(22f, 34f),
+                new Range(14f, 24f),
+                new Range(6f, 15f)
+        });
+
+        putAllSeasons("biomesoplenty:moor", new Range[]{
+                new Range(8f, 16f),
+                new Range(14f, 24f),
+                new Range(10f, 18f),
+                new Range(0f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:muskeg", new Range[]{
+                new Range(4f, 12f),
+                new Range(10f, 20f),
+                new Range(6f, 14f),
+                new Range(-8f, 4f)
+        });
+
+        putAllSeasons("biomesoplenty:mystic_grove", new Range[]{
+                new Range(12f, 20f),
+                new Range(18f, 28f),
+                new Range(14f, 22f),
+                new Range(8f, 16f)
+        });
+
+        putAllSeasons("biomesoplenty:old_growth_dead_forest", new Range[]{
+                new Range(4f, 12f),
+                new Range(14f, 22f),
+                new Range(6f, 14f),
+                new Range(-4f, 6f)
+        });
+
+        putAllSeasons("biomesoplenty:old_growth_woodland", new Range[]{
+                new Range(8f, 18f),
+                new Range(18f, 26f),
+                new Range(10f, 20f),
+                new Range(2f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:ominous_woods", new Range[]{
+                new Range(6f, 14f),
+                new Range(12f, 22f),
+                new Range(8f, 16f),
+                new Range(0f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:orchard", new Range[]{
+                new Range(10f, 18f),
+                new Range(18f, 28f),
+                new Range(12f, 20f),
+                new Range(2f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:overgrown_greens", new Range[]{
+                new Range(14f, 24f),
+                new Range(20f, 32f),
+                new Range(16f, 26f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("biomesoplenty:pasture", new Range[]{
+                new Range(10f, 20f),
+                new Range(18f, 30f),
+                new Range(12f, 22f),
+                new Range(0f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:prairie", new Range[]{
+                new Range(8f, 18f),
+                new Range(18f, 28f),
+                new Range(10f, 20f),
+                new Range(-2f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:pumpkin_patch", new Range[]{
+                new Range(10f, 18f),
+                new Range(18f, 28f),
+                new Range(12f, 20f),
+                new Range(2f, 10f)
+        });
+
+        putAllSeasons("biomesoplenty:rainforest", new Range[]{
+                new Range(23f, 32f),
+                new Range(25f, 34f),
+                new Range(24f, 33f),
+                new Range(22f, 31f)
+        });
+
+        putAllSeasons("biomesoplenty:redwood_forest", new Range[]{
+                new Range(10f, 20f),
+                new Range(18f, 26f),
+                new Range(12f, 22f),
+                new Range(4f, 12f)
+        });
+
+        putAllSeasons("biomesoplenty:rocky_rainforest", new Range[]{
+                new Range(20f, 30f),
+                new Range(24f, 34f),
+                new Range(22f, 32f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("biomesoplenty:rocky_shrubland", new Range[]{
+                new Range(8f, 22f),
+                new Range(18f, 34f),
+                new Range(10f, 24f),
+                new Range(4f, 18f)
+        });
+
+        putAllSeasons("biomesoplenty:scrubland", new Range[]{
+                new Range(10f, 25f),
+                new Range(18f, 33f),
+                new Range(12f, 26f),
+                new Range(5f, 18f)
+        });
+
+        putAllSeasons("biomesoplenty:seasonal_forest", new Range[]{
+                new Range(10f, 20f),
+                new Range(18f, 28f),
+                new Range(8f, 18f),
+                new Range(-5f, 8f)
+        });
+        putAllSeasons("biomesoplenty:seasonal_forest", new Range[]{
+                new Range(10f, 20f),
+                new Range(18f, 28f),
+                new Range(8f, 18f),
+                new Range(-5f, 8f)
+        });
+
+        putAllSeasons("biomesoplenty:shrubland", new Range[]{
+                new Range(8f, 22f),
+                new Range(18f, 34f),
+                new Range(10f, 24f),
+                new Range(4f, 18f)
+        });
+
+        putAllSeasons("biomesoplenty:snowblossom_grove", new Range[]{
+                new Range(0f, 10f),
+                new Range(5f, 18f),
+                new Range(2f, 12f),
+                new Range(-15f, 0f)
+        });
+
+        putAllSeasons("biomesoplenty:snowy_coniferous_forest", new Range[]{
+                new Range(0f, 10f),
+                new Range(5f, 18f),
+                new Range(2f, 10f),
+                new Range(-20f, -2f)
+        });
+
+        putAllSeasons("biomesoplenty:snowy_fir_clearing", new Range[]{
+                new Range(0f, 10f),
+                new Range(6f, 16f),
+                new Range(2f, 10f),
+                new Range(-18f, -2f)
+        });
+
+        putAllSeasons("biomesoplenty:snowy_maple_woods", new Range[]{
+                new Range(2f, 12f),
+                new Range(10f, 20f),
+                new Range(4f, 14f),
+                new Range(-10f, 2f)
+        });
+
+        putAllSeasons("biomesoplenty:spider_nest", new Range[]{
+                new Range(14f, 22f),
+                new Range(20f, 30f),
+                new Range(16f, 24f),
+                new Range(10f, 18f)
+        });
+
+        putAllSeasons("biomesoplenty:tropics", new Range[]{
+                new Range(25f, 33f),
+                new Range(26f, 35f),
+                new Range(25f, 34f),
+                new Range(24f, 33f)
+        });
+
+        putAllSeasons("biomesoplenty:tundra", new Range[]{
+                new Range(-15f, -2f),
+                new Range(-5f, 8f),
+                new Range(-10f, 0f),
+                new Range(-25f, -8f)
+        });
+
+        putAllSeasons("biomesoplenty:volcanic_plains", new Range[]{
+                new Range(20f, 35f),
+                new Range(25f, 45f),
+                new Range(22f, 36f),
+                new Range(15f, 28f)
+        });
+
+        putAllSeasons("biomesoplenty:volcano", new Range[]{
+                new Range(25f, 45f),
+                new Range(30f, 55f),
+                new Range(28f, 48f),
+                new Range(20f, 38f)
+        });
+
+        putAllSeasons("biomesoplenty:wasteland", new Range[]{
+                new Range(10f, 30f),
+                new Range(20f, 45f),
+                new Range(15f, 32f),
+                new Range(5f, 20f)
+        });
+
+        putAllSeasons("biomesoplenty:wasteland_steppe", new Range[]{
+                new Range(8f, 25f),
+                new Range(18f, 40f),
+                new Range(12f, 28f),
+                new Range(0f, 15f)
+        });
+
+        putAllSeasons("biomesoplenty:wetland", new Range[]{
+                new Range(12f, 24f),
+                new Range(20f, 32f),
+                new Range(15f, 26f),
+                new Range(8f, 20f)
+        });
+
+        putAllSeasons("biomesoplenty:woodland", new Range[]{
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(12f, 20f),
+                new Range(4f, 12f)
+        });
+
+        putAllSeasons("galosphere:crystal_canyons", new Range[]{
+                new Range(4f, 14f),
+                new Range(10f, 22f),
+                new Range(6f, 16f),
+                new Range(-6f, 6f)
+        });
+
+        putAllSeasons("integrateddynamics:meneglin", new Range[]{
+                new Range(8f, 18f),
+                new Range(16f, 26f),
+                new Range(10f, 20f),
+                new Range(2f, 12f)
+        });
+
+        putAllSeasons("neapolitan:strawberry_fields", new Range[]{
+                new Range(12f, 22f),
+                new Range(20f, 30f),
+                new Range(15f, 25f),
+                new Range(6f, 16f)
+        });
+// === Biomes You'll Go (BYG) Biomes ===
+
+        putAllSeasons("biomeswevegone:allium_shrubland", new Range[]{
+                new Range(8f, 18f),  // Temperate meadow with flowers
+                new Range(12f, 22f),
+                new Range(18f, 27f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("biomeswevegone:amaranth_grassland", new Range[]{
+                new Range(10f, 20f),  // Warm grassland with floral variety
+                new Range(15f, 25f),
+                new Range(22f, 32f),
+                new Range(12f, 22f)
+        });
+
+        putAllSeasons("biomeswevegone:araucaria_savanna", new Range[]{
+                new Range(14f, 26f),  // Warm savanna biome
+                new Range(18f, 30f),
+                new Range(25f, 36f),
+                new Range(16f, 26f)
+        });
+
+        putAllSeasons("biomeswevegone:aspen_boreal", new Range[]{
+                new Range(-5f, 6f),  // Cold boreal forest
+                new Range(2f, 14f),
+                new Range(10f, 20f),
+                new Range(-1f, 10f)
+        });
+
+        putAllSeasons("biomeswevegone:atacama_outback", new Range[]{
+                new Range(18f, 32f),  // Hot desert outback
+                new Range(25f, 42f),
+                new Range(35f, 54f),
+                new Range(22f, 38f)
+        });
+
+        putAllSeasons("biomeswevegone:baobab_savanna", new Range[]{
+                new Range(15f, 26f),  // Savanna with Baobab trees
+                new Range(20f, 30f),
+                new Range(28f, 38f),
+                new Range(18f, 28f)
+        });
+
+        putAllSeasons("biomeswevegone:basalt_barrera", new Range[]{
+                new Range(2f, 10f),  // Volcanic rocky region
+                new Range(5f, 14f),
+                new Range(8f, 18f),
+                new Range(4f, 12f)
+        });
+
+        putAllSeasons("biomeswevegone:bayou", new Range[]{
+                new Range(16f, 25f),  // Tropical swamp
+                new Range(20f, 32f),
+                new Range(26f, 38f),
+                new Range(18f, 28f)
+        });
+
+        putAllSeasons("biomeswevegone:black_forest", new Range[]{
+                new Range(2f, 10f),  // Cold, dark pine forest
+                new Range(8f, 16f),
+                new Range(15f, 24f),
+                new Range(4f, 12f)
+        });
+
+        putAllSeasons("biomeswevegone:canadian_shield", new Range[]{
+                new Range(-10f, 2f),  // Cold northern biome
+                new Range(-2f, 10f),
+                new Range(5f, 18f),
+                new Range(-5f, 8f)
+        });
+
+        putAllSeasons("biomeswevegone:cika_woods", new Range[]{
+                new Range(5f, 14f),  // Mild temperate forest
+                new Range(10f, 20f),
+                new Range(18f, 26f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:coconino_meadow", new Range[]{
+                new Range(8f, 18f),  // Temperate meadow
+                new Range(14f, 24f),
+                new Range(20f, 30f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("biomeswevegone:coniferous_forest", new Range[]{
+                new Range(-8f, 3f),  // Cold conifer forest
+                new Range(2f, 14f),
+                new Range(10f, 20f),
+                new Range(-2f, 8f)
+        });
+
+        putAllSeasons("biomeswevegone:crag_gardens", new Range[]{
+                new Range(6f, 14f),  // Elevated tropical cliffs
+                new Range(10f, 20f),
+                new Range(20f, 30f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:crimson_tundra", new Range[]{
+                new Range(-12f, -2f),  // Cold crimson tundra
+                new Range(-6f, 6f),
+                new Range(2f, 12f),
+                new Range(-8f, 2f)
+        });
+
+        putAllSeasons("biomeswevegone:cypress_swamplands", new Range[]{
+                new Range(16f, 25f),  // Warm swamp with cypress
+                new Range(20f, 32f),
+                new Range(26f, 36f),
+                new Range(18f, 28f)
+        });
+
+        putAllSeasons("biomeswevegone:cypress_wetlands", new Range[]{
+                new Range(18f, 26f),  // Tropical flooded wetlands
+                new Range(22f, 32f),
+                new Range(28f, 38f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("biomeswevegone:dacite_ridges", new Range[]{
+                new Range(-2f, 8f),  // Mountainous forest ridges
+                new Range(5f, 15f),
+                new Range(10f, 20f),
+                new Range(2f, 10f)
+        });
+
+        putAllSeasons("biomeswevegone:dacite_shore", new Range[]{
+                new Range(10f, 20f),  // Cool coastal shore
+                new Range(15f, 25f),
+                new Range(22f, 30f),
+                new Range(12f, 22f)
+        });
+
+        putAllSeasons("biomeswevegone:dead_sea", new Range[]{
+                new Range(18f, 26f),  // Saline sea biome
+                new Range(22f, 34f),
+                new Range(28f, 40f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("biomeswevegone:ebony_woods", new Range[]{
+                new Range(10f, 18f),  // Dense forest with mushrooms
+                new Range(14f, 24f),
+                new Range(20f, 28f),
+                new Range(12f, 20f)
+        });
+
+        putAllSeasons("biomeswevegone:enchanted_tangle", new Range[]{
+                new Range(8f, 16f),  // Mystical forest
+                new Range(12f, 22f),
+                new Range(18f, 26f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("biomeswevegone:eroded_borealis", new Range[]{
+                new Range(-18f, -4f),  // Arctic ice spikes
+                new Range(-10f, 0f),
+                new Range(-5f, 5f),
+                new Range(-12f, -2f)
+        });
+
+        putAllSeasons("biomeswevegone:firecracker_chaparral", new Range[]{
+                new Range(12f, 22f),  // Warm shrubland
+                new Range(20f, 30f),
+                new Range(25f, 36f),
+                new Range(15f, 25f)
+        });
+
+        putAllSeasons("biomeswevegone:forgotten_forest", new Range[]{
+                new Range(8f, 16f),  // Magical forest
+                new Range(14f, 22f),
+                new Range(18f, 26f),
+                new Range(10f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:fragment_jungle", new Range[]{
+                new Range(18f, 26f),  // Humid tropical cliffs
+                new Range(22f, 34f),
+                new Range(28f, 40f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("biomeswevegone:frosted_coniferous_forest", new Range[]{
+                new Range(-12f, -2f),  // Frozen coniferous region
+                new Range(-5f, 6f),
+                new Range(2f, 12f),
+                new Range(-8f, 2f)
+        });
+
+        putAllSeasons("biomeswevegone:frosted_taiga", new Range[]{
+                new Range(-14f, -5f),  // Snow-covered taiga
+                new Range(-8f, 2f),
+                new Range(2f, 10f),
+                new Range(-10f, 0f)
+        });
+
+        putAllSeasons("biomeswevegone:howling_peaks", new Range[]{
+                new Range(-10f, -2f),  // Mountainous peaks
+                new Range(-5f, 5f),
+                new Range(5f, 14f),
+                new Range(-6f, 4f)
+        });
+
+        putAllSeasons("biomeswevegone:ironwood_gour", new Range[]{
+                new Range(15f, 25f),  // Semi-arid terrain
+                new Range(20f, 32f),
+                new Range(30f, 42f),
+                new Range(18f, 28f)
+        });
+
+        putAllSeasons("biomeswevegone:jacaranda_jungle", new Range[]{
+                new Range(18f, 25f),  // Tropical jungle
+                new Range(22f, 32f),
+                new Range(28f, 38f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("biomeswevegone:lush_stacks", new Range[]{
+                new Range(16f, 24f),  // Humid oceanic region
+                new Range(20f, 30f),
+                new Range(26f, 38f),
+                new Range(18f, 28f)
+        });
+
+        putAllSeasons("biomeswevegone:maple_taiga", new Range[]{
+                new Range(-8f, 2f),  // Cold taiga forest
+                new Range(2f, 12f),
+                new Range(10f, 20f),
+                new Range(0f, 10f)
+        });
+
+        putAllSeasons("biomeswevegone:mojave_desert", new Range[]{
+                new Range(20f, 34f),  // Hot desert
+                new Range(28f, 42f),
+                new Range(36f, 54f),
+                new Range(25f, 40f)
+        });
+
+        putAllSeasons("biomeswevegone:orchard", new Range[]{
+                new Range(6f, 16f),  // Mild temperate orchard
+                new Range(12f, 22f),
+                new Range(20f, 30f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("biomeswevegone:overgrowth_woodlands", new Range[]{
+                new Range(4f, 14f),  // Dense shaded forest
+                new Range(10f, 20f),
+                new Range(18f, 26f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:pale_bog", new Range[]{
+                new Range(2f, 12f),  // Eerie swamp bog
+                new Range(8f, 18f),
+                new Range(15f, 25f),
+                new Range(5f, 15f)
+        });
+
+        putAllSeasons("biomeswevegone:prairie", new Range[]{
+                new Range(6f, 18f),  // Open grassland
+                new Range(12f, 24f),
+                new Range(22f, 32f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("biomeswevegone:pumpkin_valley", new Range[]{
+                new Range(5f, 15f),  // Temperate valley
+                new Range(12f, 22f),
+                new Range(20f, 28f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:rainbow_beach", new Range[]{
+                new Range(12f, 22f),  // Warm colorful coastal biome
+                new Range(18f, 28f),
+                new Range(24f, 34f),
+                new Range(14f, 24f)
+        });
+
+        putAllSeasons("biomeswevegone:red_rock_peaks", new Range[]{
+                new Range(5f, 15f),  // Warm elevated desert peaks
+                new Range(12f, 25f),
+                new Range(25f, 38f),
+                new Range(10f, 22f)
+        });
+
+        putAllSeasons("biomeswevegone:red_rock_valley", new Range[]{
+                new Range(8f, 20f),  // Semi-arid canyon valley
+                new Range(15f, 28f),
+                new Range(28f, 40f),
+                new Range(12f, 24f)
+        });
+
+        putAllSeasons("biomeswevegone:redwood_thicket", new Range[]{
+                new Range(4f, 12f),  // Temperate redwood forest
+                new Range(10f, 20f),
+                new Range(18f, 26f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:rose_fields", new Range[]{
+                new Range(10f, 20f),  // Warm floral fields
+                new Range(14f, 24f),
+                new Range(22f, 30f),
+                new Range(12f, 22f)
+        });
+
+        putAllSeasons("biomeswevegone:rugged_badlands", new Range[]{
+                new Range(15f, 26f),  // Arid badlands terrain
+                new Range(22f, 34f),
+                new Range(30f, 46f),
+                new Range(18f, 30f)
+        });
+
+        putAllSeasons("biomeswevegone:sakura_grove", new Range[]{
+                new Range(6f, 16f),  // Temperate cherry blossom grove
+                new Range(12f, 22f),
+                new Range(20f, 28f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("biomeswevegone:shattered_glacier", new Range[]{
+                new Range(-18f, -6f),  // Extreme frozen glacier
+                new Range(-10f, 0f),
+                new Range(-5f, 5f),
+                new Range(-12f, -2f)
+        });
+
+        putAllSeasons("biomeswevegone:sierra_badlands", new Range[]{
+                new Range(10f, 20f),  // Rugged badlands with vegetation
+                new Range(18f, 30f),
+                new Range(28f, 40f),
+                new Range(15f, 25f)
+        });
+
+        putAllSeasons("biomeswevegone:skyrise_vale", new Range[]{
+                new Range(6f, 16f),  // High-altitude forest biome
+                new Range(10f, 22f),
+                new Range(20f, 28f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:temperate_grove", new Range[]{
+                new Range(4f, 14f),  // Mild forest biome
+                new Range(10f, 20f),
+                new Range(18f, 26f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:tropical_rainforest", new Range[]{
+                new Range(20f, 28f),  // Hot humid rainforest
+                new Range(24f, 34f),
+                new Range(30f, 40f),
+                new Range(22f, 32f)
+        });
+
+        putAllSeasons("biomeswevegone:weeping_witch_forest", new Range[]{
+                new Range(4f, 12f),  // Magical forest biome
+                new Range(10f, 20f),
+                new Range(18f, 26f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("biomeswevegone:white_mangrove_marshes", new Range[]{
+                new Range(18f, 26f),  // Warm mangrove swamp
+                new Range(22f, 32f),
+                new Range(28f, 38f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("biomeswevegone:windswept_desert", new Range[]{
+                new Range(20f, 34f),  // Harsh hot desert
+                new Range(28f, 44f),
+                new Range(36f, 54f),
+                new Range(25f, 40f)
+        });
+
+        putAllSeasons("biomeswevegone:zelkova_forest", new Range[]{
+                new Range(6f, 16f),  // Temperate zelkova forest
+                new Range(12f, 22f),
+                new Range(20f, 28f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("regions_unexplored:alpha_grove", new Range[]{
+                new Range(-4f, 6f),
+                new Range(6f, 15f),
+                new Range(18f, 27f),
+                new Range(8f, 16f)
+        }); // Early-Minecraft-style temperate biome with nostalgic foliage
+
+        putAllSeasons("regions_unexplored:arid_mountains", new Range[]{
+                new Range(5f, 15f),
+                new Range(15f, 25f),
+                new Range(30f, 42f),
+                new Range(18f, 26f)
+        }); // Hot dry peaks, similar to badlands but elevated
+
+        putAllSeasons("regions_unexplored:ashen_woodland", new Range[]{
+                new Range(-2f, 8f),
+                new Range(8f, 16f),
+                new Range(14f, 25f),
+                new Range(6f, 14f)
+        }); // Charred grey biome with volcanic residue, mild-warm overall
+
+        putAllSeasons("regions_unexplored:autumnal_maple_forest", new Range[]{
+                new Range(-6f, 6f),
+                new Range(6f, 16f),
+                new Range(18f, 26f),
+                new Range(4f, 12f)
+        }); // Warm fall-colored forest, temperate humidity
+        putAllSeasons("regions_unexplored:bamboo_forest", new Range[]{
+                new Range(8f, 18f),
+                new Range(18f, 25f),
+                new Range(25f, 34f),
+                new Range(18f, 26f)
+        }); // Dense humid jungle-like forest with tall bamboo
+
+        putAllSeasons("regions_unexplored:baobab_savanna", new Range[]{
+                new Range(10f, 22f),
+                new Range(18f, 30f),
+                new Range(30f, 42f),
+                new Range(20f, 28f)
+        }); // Warm dry savanna biome with tall baobab trees
+
+        putAllSeasons("regions_unexplored:barley_fields", new Range[]{
+                new Range(-2f, 8f),
+                new Range(6f, 16f),
+                new Range(18f, 27f),
+                new Range(6f, 14f)
+        }); // Rolling temperate fields with barley vegetation
+
+        putAllSeasons("regions_unexplored:bayou", new Range[]{
+                new Range(8f, 16f),
+                new Range(16f, 26f),
+                new Range(26f, 34f),
+                new Range(18f, 24f)
+        }); // Hot swamp biome with willows and Spanish moss
+
+        putAllSeasons("regions_unexplored:blackwood_taiga", new Range[]{
+                new Range(-10f, 0f),
+                new Range(0f, 8f),
+                new Range(10f, 20f),
+                new Range(-2f, 6f)
+        }); // Cold dark taiga with dense canopy
+
+        putAllSeasons("regions_unexplored:boreal_taiga", new Range[]{
+                new Range(-18f, -6f),
+                new Range(-4f, 8f),
+                new Range(10f, 18f),
+                new Range(-2f, 6f)
+        }); // Boreal coniferous forest, cold winters mild summers
+
+        putAllSeasons("regions_unexplored:chalk_cliffs", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 16f)
+        }); // Coastal chalk cliffs, mild maritime climate
+
+        putAllSeasons("regions_unexplored:clover_plains", new Range[]{
+                new Range(-3f, 8f),
+                new Range(6f, 15f),
+                new Range(18f, 27f),
+                new Range(6f, 14f)
+        }); // Gentle plains dotted with clovers and lupines
+
+        putAllSeasons("regions_unexplored:cold_boreal_taiga", new Range[]{
+                new Range(-20f, -10f),
+                new Range(-8f, 4f),
+                new Range(8f, 16f),
+                new Range(-6f, 2f)
+        }); // Snowy conifer forest variant of boreal taiga
+
+        putAllSeasons("regions_unexplored:cold_deciduous_forest", new Range[]{
+                new Range(-18f, -8f),
+                new Range(-6f, 6f),
+                new Range(8f, 16f),
+                new Range(-4f, 4f)
+        }); // Frozen red-leaf forest, long cold seasons
+
+        putAllSeasons("regions_unexplored:cold_river", new Range[]{
+                new Range(-12f, -4f),
+                new Range(-4f, 8f),
+                new Range(8f, 16f),
+                new Range(-2f, 6f)
+        }); // Cold river biome flowing through snowy lands
+
+        putAllSeasons("regions_unexplored:deciduous_forest", new Range[]{
+                new Range(-4f, 8f),
+                new Range(8f, 16f),
+                new Range(18f, 28f),
+                new Range(8f, 14f)
+        }); // Balanced mixed forest, typical temperate climate
+
+        putAllSeasons("regions_unexplored:dry_bushland", new Range[]{
+                new Range(8f, 18f),
+                new Range(16f, 26f),
+                new Range(26f, 38f),
+                new Range(18f, 26f)
+        }); // Semi-arid shrubland with acacia and silt soil
+        putAllSeasons("regions_unexplored:eucalyptus_forest", new Range[]{
+                new Range(8f, 18f),
+                new Range(16f, 26f),
+                new Range(26f, 36f),
+                new Range(18f, 26f)
+        }); // Warm-humid subtropical forest with colorful trees
+
+        putAllSeasons("regions_unexplored:fen", new Range[]{
+                new Range(0f, 10f),
+                new Range(8f, 18f),
+                new Range(16f, 26f),
+                new Range(6f, 14f)
+        }); // Cool wetland with cattails and pine
+
+        putAllSeasons("regions_unexplored:flower_fields", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 20f),
+                new Range(18f, 28f),
+                new Range(8f, 16f)
+        }); // Colorful open plains with abundant flora
+
+        putAllSeasons("regions_unexplored:frozen_pine_taiga", new Range[]{
+                new Range(-25f, -12f),
+                new Range(-10f, 2f),
+                new Range(6f, 14f),
+                new Range(-8f, 0f)
+        }); // Harsh snowy pine forest, sub-arctic temperatures
+
+        putAllSeasons("regions_unexplored:frozen_tundra", new Range[]{
+                new Range(-30f, -18f),
+                new Range(-16f, -4f),
+                new Range(-2f, 6f),
+                new Range(-14f, -4f)
+        }); // Flat tundra, frozen year-round with permafrost
+
+        putAllSeasons("regions_unexplored:fungal_fen", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 16f)
+        }); // Humid fungal swamp variant of fen
+
+// ======== G ========
+
+        putAllSeasons("regions_unexplored:glistering_meadow", new Range[]{
+                new Range(0f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 28f),
+                new Range(8f, 16f)
+        }); // Bright temperate meadow with luminescent flowers
+
+        putAllSeasons("regions_unexplored:golden_forest", new Range[]{
+                new Range(-2f, 8f),
+                new Range(8f, 16f),
+                new Range(18f, 28f),
+                new Range(6f, 14f)
+        }); // Temperate deciduous forest with golden leaves
+
+        putAllSeasons("regions_unexplored:golden_fields", new Range[]{
+                new Range(-1f, 9f),
+                new Range(9f, 17f),
+                new Range(17f, 27f),
+                new Range(7f, 15f)
+        }); // Warm golden grasslands with scattered oaks
+
+        putAllSeasons("regions_unexplored:grassy_beach", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(20f, 30f),
+                new Range(10f, 18f)
+        }); // Mild coastal transition between plains and ocean
+
+        putAllSeasons("regions_unexplored:grassy_plains", new Range[]{
+                new Range(-4f, 8f),
+                new Range(8f, 18f),
+                new Range(18f, 28f),
+                new Range(6f, 14f)
+        }); // Classic open temperate plains biome
+
+        putAllSeasons("regions_unexplored:grove", new Range[]{
+                new Range(-6f, 6f),
+                new Range(6f, 14f),
+                new Range(14f, 22f),
+                new Range(4f, 12f)
+        }); // Small forest clearings, mild and balanced temperatures
+
+// ======== H ========
+
+        putAllSeasons("regions_unexplored:heath", new Range[]{
+                new Range(0f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 28f),
+                new Range(8f, 16f)
+        }); // Low-vegetation temperate heathland
+
+        putAllSeasons("regions_unexplored:highlands", new Range[]{
+                new Range(-10f, 2f),
+                new Range(2f, 10f),
+                new Range(12f, 20f),
+                new Range(0f, 8f)
+        }); // Cold mountain slopes with rocky terrain
+
+        putAllSeasons("regions_unexplored:holly_woods", new Range[]{
+                new Range(-4f, 8f),
+                new Range(8f, 16f),
+                new Range(16f, 26f),
+                new Range(6f, 14f)
+        }); // Mixed forest with holly and birch, mild humidity
+
+        putAllSeasons("regions_unexplored:hot_springs", new Range[]{
+                new Range(6f, 16f),
+                new Range(14f, 24f),
+                new Range(18f, 30f),
+                new Range(10f, 20f)
+        }); // Warm alpine biome with geysers and natural pools
+
+        putAllSeasons("regions_unexplored:hyacinth_fields", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 20f),
+                new Range(18f, 28f),
+                new Range(8f, 16f)
+        }); // Flower plains with hyacinths, temperate weather
+
+// ======== I ========
+
+        putAllSeasons("regions_unexplored:ice_spikes", new Range[]{
+                new Range(-30f, -18f),
+                new Range(-18f, -6f),
+                new Range(-10f, 0f),
+                new Range(-20f, -8f)
+        }); // Frozen tundra with large ice structures
+
+        putAllSeasons("regions_unexplored:icy_tundra", new Range[]{
+                new Range(-26f, -14f),
+                new Range(-14f, -4f),
+                new Range(-6f, 4f),
+                new Range(-16f, -6f)
+        }); // Open frozen plain with permafrost ground
+
+        putAllSeasons("regions_unexplored:ironwood_gour", new Range[]{
+                new Range(6f, 16f),
+                new Range(14f, 24f),
+                new Range(26f, 36f),
+                new Range(14f, 22f)
+        }); // Arid savanna-like biome with sparse trees
+
+// ======== J ========
+
+        putAllSeasons("regions_unexplored:jacaranda_forest", new Range[]{
+                new Range(6f, 14f),
+                new Range(14f, 22f),
+                new Range(22f, 32f),
+                new Range(12f, 20f)
+        }); // Warm colorful forest with jacaranda and green mushrooms
+
+// ======== K ========
+
+        putAllSeasons("regions_unexplored:kapok_jungle", new Range[]{
+                new Range(20f, 26f),
+                new Range(26f, 34f),
+                new Range(30f, 38f),
+                new Range(22f, 30f)
+        }); // Dense tropical jungle with giant kapok trees
+
+// ======== L ========
+
+        putAllSeasons("regions_unexplored:lavender_meadow", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(18f, 26f),
+                new Range(8f, 16f)
+        }); // Calm temperate meadow filled with lavender and tall grass
+
+        putAllSeasons("regions_unexplored:lush_meadow", new Range[]{
+                new Range(4f, 14f),
+                new Range(14f, 22f),
+                new Range(18f, 28f),
+                new Range(8f, 18f)
+        }); // Verdant meadow biome, warm and humid
+
+        putAllSeasons("regions_unexplored:lush_stacks", new Range[]{
+                new Range(8f, 18f),
+                new Range(16f, 26f),
+                new Range(24f, 32f),
+                new Range(14f, 22f)
+        }); // Warm oceanic biome with lush vegetation and spires
+
+// ======== M ========
+
+        putAllSeasons("regions_unexplored:maple_taiga", new Range[]{
+                new Range(-8f, 2f),
+                new Range(2f, 10f),
+                new Range(10f, 20f),
+                new Range(0f, 8f)
+        }); // Cold taiga biome with maple trees
+
+        putAllSeasons("regions_unexplored:marsh", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 16f)
+        }); // Wetland biome with shallow water and mud
+
+        putAllSeasons("regions_unexplored:mojave_desert", new Range[]{
+                new Range(18f, 28f),
+                new Range(26f, 36f),
+                new Range(38f, 50f),
+                new Range(24f, 34f)
+        }); // Extremely hot desert biome with cracked sand
+
+// ======== N ========
+
+        putAllSeasons("regions_unexplored:neon_oasis", new Range[]{
+                new Range(20f, 26f),
+                new Range(26f, 34f),
+                new Range(32f, 42f),
+                new Range(22f, 30f)
+        }); // Vibrant oasis biome in desert, high heat and humidity
+
+// ======== O ========
+
+        putAllSeasons("regions_unexplored:orchard", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 20f),
+                new Range(20f, 30f),
+                new Range(10f, 18f)
+        }); // Fruit tree fields, warm temperate with lush flora
+
+        putAllSeasons("regions_unexplored:overgrown_woodlands", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(20f, 28f),
+                new Range(10f, 18f)
+        }); // Dense forest canopy, humid with glowberries
+
+// ======== P ========
+
+        putAllSeasons("regions_unexplored:pale_bog", new Range[]{
+                new Range(-2f, 6f),
+                new Range(6f, 14f),
+                new Range(14f, 22f),
+                new Range(4f, 10f)
+        }); // Mysterious bog with pale trees and fog
+
+        putAllSeasons("regions_unexplored:pink_grove", new Range[]{
+                new Range(6f, 14f),
+                new Range(14f, 22f),
+                new Range(18f, 28f),
+                new Range(8f, 18f)
+        }); // Warm flower forest variant with pink petals
+
+        putAllSeasons("regions_unexplored:prairie", new Range[]{
+                new Range(-4f, 8f),
+                new Range(8f, 18f),
+                new Range(18f, 28f),
+                new Range(6f, 14f)
+        }); // Flat grassy biome, mild temperatures
+
+        putAllSeasons("regions_unexplored:pumpkin_valley", new Range[]{
+                new Range(-2f, 8f),
+                new Range(8f, 16f),
+                new Range(16f, 24f),
+                new Range(6f, 14f)
+        }); // Temperate pumpkin patch fields
+
+// ======== R ========
+
+        putAllSeasons("regions_unexplored:rainbow_beach", new Range[]{
+                new Range(10f, 20f),
+                new Range(20f, 28f),
+                new Range(26f, 34f),
+                new Range(18f, 26f)
+        }); // Colorful sand beach, tropical temperature
+
+        putAllSeasons("regions_unexplored:red_rock_peaks", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(20f, 30f),
+                new Range(10f, 18f)
+        }); // Dry red peaks with moderate summer heat
+
+        putAllSeasons("regions_unexplored:redwood_thicket", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 16f)
+        }); // Cool redwood forest, mild maritime weather
+
+        putAllSeasons("regions_unexplored:rose_fields", new Range[]{
+                new Range(0f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 16f)
+        }); // Rolling flower plains of roses
+
+        putAllSeasons("regions_unexplored:rugged_badlands", new Range[]{
+                new Range(8f, 18f),
+                new Range(16f, 26f),
+                new Range(30f, 42f),
+                new Range(20f, 30f)
+        }); // Harsh arid terrain with scattered shrubs
+
+// ======== S ========
+
+        putAllSeasons("regions_unexplored:sakura_grove", new Range[]{
+                new Range(4f, 14f),
+                new Range(14f, 22f),
+                new Range(20f, 30f),
+                new Range(10f, 18f)
+        }); // Warm cherry blossom forest
+
+        putAllSeasons("regions_unexplored:sandy_dunes", new Range[]{
+                new Range(16f, 26f),
+                new Range(26f, 34f),
+                new Range(36f, 46f),
+                new Range(24f, 32f)
+        }); // Very hot arid desert biome
+
+        putAllSeasons("regions_unexplored:shattered_glacier", new Range[]{
+                new Range(-28f, -16f),
+                new Range(-16f, -6f),
+                new Range(-8f, 2f),
+                new Range(-18f, -8f)
+        }); // Harsh frozen ice biome with deep glaciers
+
+        putAllSeasons("regions_unexplored:sierra_badlands", new Range[]{
+                new Range(6f, 16f),
+                new Range(16f, 24f),
+                new Range(28f, 38f),
+                new Range(18f, 26f)
+        }); // Warm mountainous badlands with rock formations
+
+        putAllSeasons("regions_unexplored:skyris_vale", new Range[]{
+                new Range(2f, 12f),
+                new Range(10f, 18f),
+                new Range(16f, 26f),
+                new Range(8f, 16f)
+        }); // Elevated forest biome with skyris trees
+
+        putAllSeasons("regions_unexplored:snowy_taiga", new Range[]{
+                new Range(-20f, -8f),
+                new Range(-8f, 2f),
+                new Range(2f, 10f),
+                new Range(-6f, 0f)
+        }); // Classic snowy pine biome
+
+        putAllSeasons("regions_unexplored:steppe", new Range[]{
+                new Range(-8f, 4f),
+                new Range(4f, 12f),
+                new Range(12f, 24f),
+                new Range(2f, 10f)
+        }); // Cold dry grassland, moderate summer heat
+
+        putAllSeasons("regions_unexplored:stone_prairie", new Range[]{
+                new Range(-2f, 8f),
+                new Range(8f, 16f),
+                new Range(16f, 24f),
+                new Range(6f, 14f)
+        }); // Rocky plains biome, mild temperature variation
+
+// ======== T ========
+
+        putAllSeasons("regions_unexplored:temperate_grove", new Range[]{
+                new Range(-4f, 8f),
+                new Range(8f, 18f),
+                new Range(18f, 28f),
+                new Range(6f, 14f)
+        }); // Classic temperate biome with balanced flora
+
+        putAllSeasons("regions_unexplored:tropical_rainforest", new Range[]{
+                new Range(20f, 26f),
+                new Range(26f, 34f),
+                new Range(30f, 38f),
+                new Range(24f, 32f)
+        }); // Hot humid rainforest with dense canopy
+
+// ======== W ========
+
+        putAllSeasons("regions_unexplored:weeping_witch_forest", new Range[]{
+                new Range(0f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(8f, 16f)
+        }); // Dark enchanted forest with weeping trees
+
+        putAllSeasons("regions_unexplored:white_mangrove_marsh", new Range[]{
+                new Range(8f, 18f),
+                new Range(16f, 26f),
+                new Range(26f, 34f),
+                new Range(18f, 26f)
+        }); // Tropical mangrove swamp with constant humidity
+
+        putAllSeasons("regions_unexplored:windswept_desert", new Range[]{
+                new Range(18f, 26f),
+                new Range(26f, 34f),
+                new Range(36f, 46f),
+                new Range(24f, 32f)
+        }); // Hot dry desert with strong winds and dunes
+
+        putAllSeasons("regions_unexplored:windswept_peaks", new Range[]{
+                new Range(-10f, 0f),
+                new Range(0f, 8f),
+                new Range(8f, 16f),
+                new Range(-2f, 6f)
+        }); // High-altitude cold mountain ridges
+
+// ======== Z ========
+
+        putAllSeasons("regions_unexplored:zelkova_forest", new Range[]{
+                new Range(-2f, 8f),
+                new Range(8f, 16f),
+                new Range(16f, 26f),
+                new Range(6f, 14f)
+        }); // Warm green forest with large zelkova trees
 
 
 
     }
 
+
+
+
     /**
      * Populates both SEASON_RANGES and SEASON_CLAMPS (automatically‐derived)
      */
     private static void putAllSeasons(String biomeKey, Range[] ranges) {
-        var id = ResourceLocation.withDefaultNamespace(biomeKey);
+        Set<ResourceLocation> ids = resolveBiomeIds(biomeKey);
         var seasons = Season.values();
-        for (int i = 0; i < seasons.length; i++) {
-            Season season = seasons[i];
-            Range r = ranges[i];
-            SEASON_RANGES.get(season).put(id, r);
-            SEASON_CLAMPS.get(season).put(id, deriveDaily(r));
+        for (ResourceLocation id : ids) {
+            for (int i = 0; i < seasons.length; i++) {
+                Season season = seasons[i];
+                Range r = ranges[i];
+                SEASON_RANGES.get(season).put(id, r);
+                SEASON_CLAMPS.get(season).put(id, deriveDaily(r));
+            }
         }
     }
 
@@ -1577,11 +3068,24 @@ public class BiomeTempConfig {
      * Copies one biome’s settings (all seasons) to another.
      */
     private static void mirrorBiome(String dstKey, String srcKey) {
-        var src = ResourceLocation.withDefaultNamespace(srcKey);
-        var dst = ResourceLocation.withDefaultNamespace(dstKey);
+        Set<ResourceLocation> dsts = resolveBiomeIds(dstKey);
+        Set<ResourceLocation> srcs = resolveBiomeIds(srcKey);
+        if (srcs.isEmpty()) {
+            ProjectAtmosphere.LOGGER.warn("mirrorBiome: no source biome resolved for '{}'", srcKey);
+            return;
+        }
+        ResourceLocation src = srcs.iterator().next();
         for (Season s : Season.values()) {
-            SEASON_RANGES.get(s).put(dst, SEASON_RANGES.get(s).get(src));
-            SEASON_CLAMPS.get(s).put(dst, SEASON_CLAMPS.get(s).get(src));
+            Range r = SEASON_RANGES.get(s).get(src);
+            DailyRange d = SEASON_CLAMPS.get(s).get(src);
+            if (r == null || d == null) {
+                ProjectAtmosphere.LOGGER.warn("mirrorBiome: source '{}' has no ranges for season {}", src, s);
+                continue;
+            }
+            for (ResourceLocation dst : dsts) {
+                SEASON_RANGES.get(s).put(dst, r);
+                SEASON_CLAMPS.get(s).put(dst, d);
+            }
         }
     }
 
@@ -1589,11 +3093,58 @@ public class BiomeTempConfig {
      * For biomes that never change with season (Nether, End).
      */
     private static void putConstSeasons(String biomeKey, Range r, DailyRange d) {
-        var id = ResourceLocation.withDefaultNamespace(biomeKey);
-        for (Season s : Season.values()) {
-            SEASON_RANGES.get(s).put(id, r);
-            SEASON_CLAMPS.get(s).put(id, d);
+        Set<ResourceLocation> ids = resolveBiomeIds(biomeKey);
+        for (ResourceLocation id : ids) {
+            for (Season s : Season.values()) {
+                SEASON_RANGES.get(s).put(id, r);
+                SEASON_CLAMPS.get(s).put(id, d);
+            }
         }
+    }
+
+    /**
+     * Resolve a biome key which may be namespaced (e.g. "modid:path") or just a path (e.g. "plains").
+     * If un-namespaced and not a vanilla biome, scans the biome registry for matching paths across mods.
+     * - Unique match: returns that id
+     * - Multiple matches: returns all matches and logs info
+     * - No matches: falls back to minecraft namespace and logs a warning
+     */
+    private static Set<ResourceLocation> resolveBiomeIds(String biomeKey) {
+        // Explicit namespace provided
+        if (biomeKey.indexOf(':') >= 0) {
+            ResourceLocation parsed = ResourceLocation.tryParse(biomeKey);
+            if (parsed != null) {
+                return Set.of(parsed);
+            } else {
+                ProjectAtmosphere.LOGGER.warn("Invalid biome id '{}'", biomeKey);
+                return Set.of();
+            }
+        }
+
+        // Default to minecraft namespace first
+        ResourceLocation def = ResourceLocation.withDefaultNamespace(biomeKey);
+
+        // If the vanilla key exists, prefer it
+        if (ForgeRegistries.BIOMES.containsKey(def)) {
+            return Set.of(def);
+        }
+
+        // Otherwise, search all registered biomes for matching path
+        Set<ResourceLocation> matches = new LinkedHashSet<>();
+        for (ResourceLocation key : ForgeRegistries.BIOMES.getKeys()) {
+            if (key.getPath().equals(biomeKey)) {
+                matches.add(key);
+            }
+        }
+
+        if (matches.isEmpty()) {
+            ProjectAtmosphere.LOGGER.warn("No biome found with path '{}' in registry; defaulting to {}", biomeKey, def);
+            return Set.of(def);
+        }
+        if (matches.size() > 1) {
+            ProjectAtmosphere.LOGGER.info("Multiple biomes match path '{}': {}", biomeKey, matches);
+        }
+        return matches;
     }
 
     /**
