@@ -127,6 +127,9 @@ dependencies {
     compileOnly "curse.maven:tough-as-nails-246391:5833252"
     compileOnly "curse.maven:cold-sweat-506194:6934631"
     runtimeOnly "curse.maven:sodium-394468:6382651"
+    implementation "curse.maven:auroras-1105290:6040674"
+    implementation "curse.maven:rainboows-1121832:6416604"
+    implementation "curse.maven:gabous-libs-1367332:7195722"
 
 }
 

@@ -54,6 +54,7 @@ public class AtmoConfigScreen extends Screen {
     private double windPushThresholdMps;
     private double windPlayerPushScale;
     private double windEntityPushScale;
+    private double stormBoostMultiplier;
 
     private EditBox maxDebrisBox;
     private int cloudRenderDistance;
@@ -82,6 +83,7 @@ public class AtmoConfigScreen extends Screen {
     private EditBox windPushThresholdBox;
     private EditBox windPlayerPushScaleBox;
     private EditBox windEntityPushScaleBox;
+    private EditBox stormBoostMultiplierBox;
 
     private final List<AbstractWidget> configWidgets = new ArrayList<>();
     private final List<Integer> widgetBaseY = new ArrayList<>();
@@ -125,6 +127,7 @@ public class AtmoConfigScreen extends Screen {
         titles.clear();
         labels.clear();
         this.displayUnitsImperial = AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.get();
+        this.stormBoostMultiplier = AtmoCommonConfig.STORM_SEVERITY_BOOSTER.get();
         this.forceSharedExecutor = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get();
         this.enableTornadoes = AtmoCommonConfig.ENABLE_TORNADOES.get();
         this.enableStormDebris = AtmoCommonConfig.ENABLE_STORM_DEBRIS.get();
@@ -193,6 +196,9 @@ public class AtmoConfigScreen extends Screen {
         this.cloudDistanceBox.setValue(Integer.toString(cloudRenderDistance));
         addRenderableWidget(this.cloudDistanceBox);
         y += 32;
+
+        this.stormBoostMultiplierBox = addNumberField(center, y, "Storm Severity Booster", Double.toString(stormBoostMultiplier));
+        y += 34;
 
         maxDebrisBox = addNumberField(center, y, "Max Storm Debris Per Chunk", Integer.toString(maxStormDebrisPerChunk));
         y += 34;
@@ -365,6 +371,7 @@ public class AtmoConfigScreen extends Screen {
     private void saveChanges() {
         maxStormDebrisPerChunk = parseInt(maxDebrisBox, maxStormDebrisPerChunk);
         cloudRenderDistance = parseInt(cloudDistanceBox, cloudRenderDistance);
+        stormBoostMultiplier = parseDouble(stormBoostMultiplierBox, stormBoostMultiplier);
         tornadoCheckIntervalSec = parseDouble(tornadoCheckIntervalBox, tornadoCheckIntervalSec);
         tornadoBaseSpawnRadiusM = parseDouble(tornadoBaseSpawnRadiusBox, tornadoBaseSpawnRadiusM);
         tornadoMinTempContrastC = parseDouble(tornadoMinTempContrastBox, tornadoMinTempContrastC);
@@ -422,6 +429,7 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.WIND_PUSH_THRESHOLD_MPS.set(windPushThresholdMps);
         AtmoCommonConfig.WIND_PLAYER_PUSH_SCALE.set(windPlayerPushScale);
         AtmoCommonConfig.WIND_ENTITY_PUSH_SCALE.set(windEntityPushScale);
+        AtmoCommonConfig.STORM_SEVERITY_BOOSTER.set(stormBoostMultiplier);
     }
 
 

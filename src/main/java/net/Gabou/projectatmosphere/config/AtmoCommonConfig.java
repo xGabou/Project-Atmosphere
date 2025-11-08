@@ -41,6 +41,7 @@ public class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ModConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
     public static final ModConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
+    public static final ModConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
 
 
 
@@ -69,6 +70,9 @@ public class AtmoCommonConfig {
                 .define("imperialUnits", false);
         builder.pop();
         builder.push("storms");
+        STORM_SEVERITY_BOOSTER = builder
+                .comment("Global multiplier for storm severity (affects wind speed and precipitation intensity)")
+                .defineInRange("stormSeverityBooster", 3.2D, 0.5D, 8.0D);
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);

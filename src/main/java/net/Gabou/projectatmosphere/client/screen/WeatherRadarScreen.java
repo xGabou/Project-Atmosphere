@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.client.screen;
 
-import com.Gabou.sereneseasonsplus.util.IScreen;
+import net.Gabou.gaboulibs.util.IScreen;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;

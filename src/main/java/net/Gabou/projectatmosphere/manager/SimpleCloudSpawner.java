@@ -6,6 +6,8 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.config.AtmoConfigScreen;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
@@ -221,14 +223,24 @@ public class SimpleCloudSpawner {
     }
 
     private static int getSeverity(float stormChance, int daysSince, float instability) {
-        float boost = 1f + 0.07f * daysSince;
-        boost = Math.min(boost, 1.7f);
+        float boost = 0f;
+        if (daysSince <= 2) {
+            boost = 1f/(5-daysSince);
+        } else {
+            boost = 1f + 0.07f * daysSince;
+            boost = Math.min(boost, 1.7f);
+        }
+
 
         float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
 
         // === Smooth Probability Curve ===
-        float weighted = instability * adjustedChance * 4.5f;
-        float raw = (float)(1.0 / (1.0 + Math.exp(-2.3 * (weighted - 1.0)))); // sigmoid
+        return calculateSeverity(daysSince, instability, adjustedChance);
+    }
+
+    private static int calculateSeverity(int daysSince, float instability, float adjustedChance) {
+        double weighted =instability * adjustedChance * AtmoCommonConfig.STORM_SEVERITY_BOOSTER.get();
+        float raw = (float) (1.0 / (1.0 + Math.exp(-2.3 * (weighted - 1.0)))); // sigmoid
 
         // === Temporal Bias Toward 5 + Events ===
         // grows linearly up to 10 days, pushing score upward by ≤ 0.25
@@ -236,7 +248,7 @@ public class SimpleCloudSpawner {
         float biasAdjusted = raw + (0.25f * dayBias * (1f - raw));
 
         // Map 0–1 → 1–7
-        int severity = (int)Math.floor(biasAdjusted * 6.0f) + 1;
+        int severity = (int) Math.floor(biasAdjusted * 6.0f) + 1;
         severity = Math.max(1, Math.min(7, severity));
         return severity;
     }
