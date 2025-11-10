@@ -6,6 +6,9 @@ This file records functionality additions/removals made during development sessi
   - Aurora brightness now scales with Serene Seasons data and is boosted in freezing biomes.
   - Rainbows rely on the Project Atmosphere / Serene Seasons Plus rain helper so they only trigger after custom storms clear.
 - Introduced guarded client mixins plus a rain-state tracker so these integrations activate only when the companion mods are installed.
+- Refined aurora and rainbow compatibility syncing.
+  - Aurora brightness now queries Project Atmosphere’s live temperature data (or active temperature mods) instead of static biome values.
+  - Rainbows receive server-synchronised rainfall intensity from SimpleClouds spawns/despawns, allowing accurate rain stop triggers across dimensions and for joining players.
 
 ## 0.5.5.4 – Non-vanilla biome resolution (2025-10-24)
 - BiomeTempConfig now resolves un-namespaced biome keys by scanning the biome registry.

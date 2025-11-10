@@ -6,14 +6,18 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
+import net.Gabou.projectatmosphere.compat.CompatHandler;
+import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -49,6 +53,10 @@ public class EventHandler {
             SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
         }
 
+        if (CompatHandler.isRainbowsLoaded()) {
+            RainbowRainBridge.sync(serverLevel, generator);
+        }
+
 
         if (!AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
             return;
@@ -68,6 +76,18 @@ public class EventHandler {
         }
 
         tickCounter++;
+    }
+
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+        ServerLevel level = player.serverLevel();
+        if (CompatHandler.isRainbowsLoaded() && level.dimension().equals(event.getTo())) {
+            ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(level);
+            RainbowRainBridge.sendSnapshot(player, level, cloudManager.getCloudGenerator());
+        }
     }
 
     public static void onRegenerate() {

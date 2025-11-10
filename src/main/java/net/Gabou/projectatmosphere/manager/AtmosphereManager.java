@@ -4,9 +4,12 @@ package net.Gabou.projectatmosphere.manager;
 import com.Gabou.sereneseasonsplus.api.SSPApi;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
 import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
+import net.Gabou.projectatmosphere.compat.CompatHandler;
+import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.event.EventHandler;
 import net.Gabou.projectatmosphere.gameplay.WindPhysics;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
@@ -98,6 +101,10 @@ public class AtmosphereManager {
 
         world.getServer().execute(() -> {
             ForecastOrchestrator.onPlayerLogin(player, world);
+            if (CompatHandler.isRainbowsLoaded()) {
+                ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(world);
+                RainbowRainBridge.sendSnapshot(player, world, cloudManager.getCloudGenerator());
+            }
             future.complete(null);
         });
     }
@@ -121,6 +128,9 @@ public class AtmosphereManager {
 
     public static void onRegenerate(ServerLevel world) {
         ProjectAtmosphere.LOGGER.info("Regenerating weather data for all players");
+        if (CompatHandler.isRainbowsLoaded()) {
+            RainbowRainBridge.clear(world.dimension());
+        }
         AsyncAtmosphereService.runWeather(() -> {
             EventHandler.onRegenerate();
             CloudManager.get(world).getCloudGenerator().removeAllClouds();
