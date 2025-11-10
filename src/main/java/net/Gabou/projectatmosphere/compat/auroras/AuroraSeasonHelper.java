@@ -1,12 +1,13 @@
 package net.Gabou.projectatmosphere.compat.auroras;
 
+import net.Gabou.projectatmosphere.compat.temperature.ClientTemperatureResolver;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraft.util.Mth;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonHelper;
 
@@ -47,9 +48,12 @@ public final class AuroraSeasonHelper {
         if (biome.coldEnoughToSnow(pos)) {
             return 1.35f;
         }
-        float baseTemp = biome.getBaseTemperature();
-        float scaled = 1.2f - (baseTemp * 0.6f);
-        return Mth.clamp(scaled, 0.55f, 1.2f);
+        float tempCelsius = ClientTemperatureResolver.getCelsius(level, pos);
+        // Map the PA temperature range (roughly -20°C → 35°C) to a brightness boost.
+        // Colder environments yield brighter auroras while warmer biomes dim them.
+        float normalized = (15.0f - tempCelsius) / 20.0f;
+        float scaled = 0.6f + Mth.clamp(normalized, 0.0f, 1.0f) * 0.75f;
+        return Mth.clamp(scaled, 0.45f, 1.35f);
     }
 
     public static float combinedBoost(Level level, BlockPos pos) {

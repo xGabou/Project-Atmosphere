@@ -34,6 +34,11 @@ public class NetworkHandler {
                 .encoder(BiomeDayTemperaturePacket::encode)
                 .consumerMainThread(BiomeDayTemperaturePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(RainfallUpdatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(RainfallUpdatePacket::decode)
+                .encoder(RainfallUpdatePacket::encode)
+                .consumerMainThread(RainfallUpdatePacket::handle)
+                .add();
 
 
     }

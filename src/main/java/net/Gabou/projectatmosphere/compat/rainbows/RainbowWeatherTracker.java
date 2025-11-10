@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -49,8 +50,11 @@ public final class RainbowWeatherTracker {
         ClientLevel level = minecraft.level;
         ResourceKey<Level> dimension = level.dimension();
         TrackerState state = STATES.computeIfAbsent(dimension, key -> new TrackerState());
-        boolean raining = isRainingAt(level, minecraft.player.blockPosition());
-        state.update(raining);
+        if (!state.isServerAuthoritative()) {
+            boolean raining = isRainingAt(level, minecraft.player.blockPosition());
+            state.applyFallback(raining);
+        }
+        state.step();
     }
 
     private static boolean isRainingAt(ClientLevel level, BlockPos pos) {
@@ -71,21 +75,52 @@ public final class RainbowWeatherTracker {
         return state != null && state.consumeStopFlag();
     }
 
+    public static void applyServerUpdate(ResourceKey<Level> dimension, float rainLevel) {
+        if (!enabled) {
+            return;
+        }
+        TrackerState state = STATES.computeIfAbsent(dimension, key -> new TrackerState());
+        state.setServerTarget(rainLevel);
+    }
+
     private static final class TrackerState {
-        private boolean wasRaining;
+        private static final float STEP = 0.05f;
+
+        private float target;
         private float rainVisual;
         private boolean stopFlag;
+        private boolean serverAuthoritative;
+        private boolean wasTargetRaining;
 
-        void update(boolean raining) {
-            if (wasRaining && !raining) {
+        void setServerTarget(float value) {
+            serverAuthoritative = true;
+            applyTarget(value);
+        }
+
+        void applyFallback(boolean raining) {
+            if (serverAuthoritative) {
+                return;
+            }
+            applyTarget(raining ? 1.0f : 0.0f);
+        }
+
+        private void applyTarget(float value) {
+            float clamped = Mth.clamp(value, 0.0f, 1.0f);
+            if (Math.abs(clamped - target) <= 0.0005f) {
+                return;
+            }
+            boolean newRaining = clamped > 0.01f;
+            if (wasTargetRaining && !newRaining) {
                 stopFlag = true;
             }
-            wasRaining = raining;
-            float target = raining ? 1.0f : 0.0f;
+            wasTargetRaining = newRaining;
+            target = clamped;
+        }
+
+        void step() {
             float delta = target - rainVisual;
-            float step = 0.05f;
-            if (Math.abs(delta) > step) {
-                rainVisual += Math.copySign(step, delta);
+            if (Math.abs(delta) > STEP) {
+                rainVisual += Math.copySign(STEP, delta);
             } else {
                 rainVisual = target;
             }
@@ -97,6 +132,10 @@ public final class RainbowWeatherTracker {
                 return true;
             }
             return false;
+        }
+
+        boolean isServerAuthoritative() {
+            return serverAuthoritative;
         }
     }
 }
