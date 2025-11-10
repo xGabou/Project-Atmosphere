@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.config;
 
-import com.Gabou.sereneseasonsplus.util.IScreen;
+import net.Gabou.gaboulibs.util.IScreen;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
