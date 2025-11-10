@@ -1,6 +1,16 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
+## 0.5.5.7 – Biome-aware sunlight tuning (2025-11-09)
+- Sunlight intensity now scales with each biome’s seasonal temperature ranges, letting hotter climates receive stronger midday heating.
+- Region states keep hourly daily curves sourced from the live controllers so commands and clients can still display day profiles.
+- Build automation skips CurseForge uploads and Discord notifications automatically when their environment tokens are absent.
+
+## 0.5.5.7 – Dynamic atmosphere simulation (2025-11-08)
+- Replaced daily forecast regeneration with a live atmospheric state registry that evolves continuously.
+- Added sunlight, cyclone, cloud, rain, and wind controllers so temperature, humidity, and pressure react to in-game forces.
+- Updated commands and client helpers to report the new dynamic values and removed the legacy daily forecast generator.
+
 ## 0.5.5.7 – Aurora & rainbow integration (2025-11-07)
 - Added optional compatibility hooks for the Auroras and Rainbows mods.
   - Aurora brightness now scales with Serene Seasons data and is boosted in freezing biomes.

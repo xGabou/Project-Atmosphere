@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
@@ -44,17 +45,24 @@ public class DebugAtmoCommand {
             return 0;
         }
 
-        String temps = formatTemps(forecast.getTemperatureDay());
-        String pressures = formatPressures(forecast.getPressureDay());
-        String humidities = formatHumidities(forecast.getHumidityDay());
-        WindVector w = forecast.getWindDay();
+        var state = AtmosphericStateRegistry.getState(forecast.getBiomeKey());
+        float temperature = state != null ? state.getTemperature() : 0f;
+        float humidity = state != null ? state.getHumidityPercent() : 0f;
+        float pressure = state != null ? state.getPressure() : 0f;
+        WindVector w = state != null ? state.getWind() : null;
+        if (w == null) {
+            WindVector[] week = forecast.getWind();
+            if (week != null && week.length > 0) {
+                w = week[0];
+            }
+        }
         String wind = w == null ? "-" : UnitFormatter.formatWindSpeed(w.baseSpeed()) + " at " + String.format("%.0f°", Math.toDegrees(w.angleRadians()));
 
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "Biome: " + biome +
-                        "\n  Temp:     [" + temps + "]" +
-                        "\n  Pressure: [" + pressures + "]" +
-                        "\n  Humidity: [" + humidities + "]" +
+                        "\n  Temp:     " + UnitFormatter.formatTemperature(temperature) +
+                        "\n  Pressure: " + UnitFormatter.formatPressure(pressure) +
+                        "\n  Humidity: " + UnitFormatter.formatHumidity(humidity) +
                         "\n  Wind:     [" + wind + "]"
         ), false);
         return 1;
@@ -287,22 +295,5 @@ public class DebugAtmoCommand {
         return 1;
     }
 
-    private static String formatTemps(float[] arr) {
-        if (arr == null || arr.length == 0) return "-";
-        if (arr.length == 1) return UnitFormatter.formatTemperature(arr[0]);
-        return UnitFormatter.formatTemperature(arr[0]) + ", " + UnitFormatter.formatTemperature(arr[1]);
-    }
-
-    private static String formatPressures(float[] arr) {
-        if (arr == null || arr.length == 0) return "-";
-        if (arr.length == 1) return UnitFormatter.formatPressure(arr[0]);
-        return UnitFormatter.formatPressure(arr[0]) + ", " + UnitFormatter.formatPressure(arr[1]);
-    }
-
-    private static String formatHumidities(float[] arr) {
-        if (arr == null || arr.length == 0) return "-";
-        if (arr.length == 1) return UnitFormatter.formatHumidity(arr[0]);
-        return UnitFormatter.formatHumidity(arr[0]) + ", " + UnitFormatter.formatHumidity(arr[1]);
-    }
 }
 

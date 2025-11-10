@@ -3,6 +3,11 @@ package net.Gabou.projectatmosphere.manager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
+import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
+import net.Gabou.projectatmosphere.modules.atmosphere.RainSystem;
+import net.Gabou.projectatmosphere.modules.atmosphere.SunlightController;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
@@ -67,6 +72,7 @@ public class ForecastOrchestrator {
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
             try {
                 ForecastGenerator.generateForecastForSavedRegion(level);
+                initializeDynamicSystems(level);
                 return true;
             } catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
@@ -74,6 +80,7 @@ public class ForecastOrchestrator {
                 ForecastDataStorage.clearAll(level);
                 ForecastGenerator.clearForecasts();
                 ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
+                initializeDynamicSystems(level);
                 return true;
             }
         }
@@ -87,6 +94,7 @@ public class ForecastOrchestrator {
             ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
         }
 
+        initializeDynamicSystems(level);
         return true;
     }
 
@@ -168,8 +176,11 @@ public class ForecastOrchestrator {
                 ForecastGenerator.generateForecastForRegion(center, level);
             }
 
-            DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
-            ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
+            ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
+                AtmosphericStateRegistry.initializeState(key, forecast);
+                generateWindForecast(key, forecast);
+            });
+            initializeDynamicSystems(level);
         } finally {
             REGENERATING = false;
             Runnable r;
@@ -183,36 +194,20 @@ public class ForecastOrchestrator {
      * Called on profile swap (e.g. midnight transition)
      */
     public static void onSwapDay(ServerLevel level) {
-
-        boolean needsRegen = false;
-
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
-            BiomeForecast forecast = entry.getValue();
-
-            boolean tempInvalid = forecast.getTemperature() == null || forecast.getTemperature().length < 2;
-            boolean humidityInvalid = forecast.getHumidity() == null || forecast.getHumidity().length < 2;
-            boolean pressureInvalid = forecast.getPressure() == null || forecast.getPressure().length < 2;
-            boolean stormInvalid = forecast.getStormChance() == null || forecast.getStormChance().length < 2;
-            boolean windInvalid = forecast.getWind() == null || forecast.getWind().length < 2;
-
-            if (tempInvalid || humidityInvalid || pressureInvalid || stormInvalid || windInvalid) {
-                needsRegen = true;
-                break;
-            }
-        }
-
-        if (needsRegen || ForecastGenerator.getForecastMap().isEmpty()) {
+        if (ForecastGenerator.getForecastMap().isEmpty()) {
             BlockPos spawn = level.getSharedSpawnPos();
-            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing or invalid. Regenerating forecast from spawn...");
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
+            ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
+                AtmosphericStateRegistry.initializeState(key, forecast);
+                generateWindForecast(key, forecast);
+            });
+            initializeDynamicSystems(level);
             return;
         }
 
-        ForecastGenerator.swapToTomorrow();
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
-        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
-
-
+        CycloneManager.onMidnight(level);
+        AtmosphericStateRegistry.rebuildNeighbors();
     }
 
 
@@ -221,8 +216,11 @@ public class ForecastOrchestrator {
      */
     public static void updateForecast(ServerLevel level, BlockPos center) {
         ForecastGenerator.generateForecastForRegion(center, level);
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
-        ForecastGenerator.getForecastMap().forEach(ForecastOrchestrator::generateWindForecast);
+        ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
+            AtmosphericStateRegistry.initializeState(key, forecast);
+            generateWindForecast(key, forecast);
+        });
+        initializeDynamicSystems(level);
     }
 
 
@@ -262,6 +260,12 @@ public class ForecastOrchestrator {
         GlassDamageManager.tick(level);
         if (sandStormLoaded)
             ForecastGenerator.tickSandstormScheduler(level);
+
+        SunlightController.update(level);
+        CycloneManager.update(level);
+        WindVector.update(level);
+        CloudManager.update(level);
+        RainSystem.update(level);
 
         long now = level.getGameTime();
         if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
@@ -315,8 +319,21 @@ public class ForecastOrchestrator {
         activePlayerBiomeKeys.clear();
     }
 
+    private static void initializeDynamicSystems(ServerLevel level) {
+        AtmosphericStateRegistry.rebuildNeighbors();
+        CloudManager.initialize(level);
+        CycloneManager.initialize(level);
+    }
+
     public static void generateWindForecast(BiomeInstanceKey key, BiomeForecast forecast) {
-        WindVector today = forecast.getWindDay();
+        var state = AtmosphericStateRegistry.getState(key);
+        WindVector today = state != null ? state.getWind() : null;
+        if (today == null) {
+            WindVector[] week = forecast.getWind();
+            if (week != null && week.length > 0) {
+                today = week[0];
+            }
+        }
         if (today == null) {
             return;
         }

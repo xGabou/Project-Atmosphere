@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.temperature.command;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.temperature.compat.SereneTempToCelcius;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -55,7 +56,11 @@ public class TemperatureCommandHelper {
     }
 
     public static float[] getDayProfile(BiomeInstanceKey biome) {
-        return ForecastGenerator.getForecastMap().get(biome).getTemperatureDay();
+        var state = AtmosphericStateRegistry.getState(biome);
+        if (state == null) {
+            return new float[0];
+        }
+        return state.getDailyTemperatureProfile();
     }
 
     public static String getCurrentSubSeason(ServerLevel level) {
