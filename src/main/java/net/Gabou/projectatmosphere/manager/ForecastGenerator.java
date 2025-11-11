@@ -16,7 +16,6 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityGenerator;
 import net.Gabou.projectatmosphere.modules.pressure.PressureGenerator;
 import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
-import net.Gabou.projectatmosphere.modules.storm.StormGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.variation.VariationGenerator;
@@ -31,7 +30,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraftforge.network.PacketDistributor;
 import org.apache.commons.lang3.tuple.Pair;
@@ -130,7 +128,6 @@ public class ForecastGenerator {
             avg.setTemperature(averageWeek(list, BiomeForecast::getTemperature));
             avg.setHumidity(averageWeek(list, BiomeForecast::getHumidity));
             avg.setPressure(averageWeek(list, BiomeForecast::getPressure));
-            avg.setStormChance(averageWeek(list, BiomeForecast::getStormChance));
             avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
             avg.setBiomeKey(list.get(0).getBiomeKey());
 
@@ -180,17 +177,6 @@ public class ForecastGenerator {
             avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
         }
     }
-    private static void computeAverageStormChanceWeek() {
-        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
-            List<BiomeForecast> list = entry.getValue();
-            if (list.isEmpty()) continue;
-
-            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
-
-            avg.setStormChance(averageWeek(list, BiomeForecast::getStormChance));
-        }
-    }
-
     public static void groupForecastsByBiome() {
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             ResourceLocation biomeType = entry.getKey().biomeType();
@@ -198,38 +184,34 @@ public class ForecastGenerator {
         }
     }
 
-    private static float interpolate(float base, float minOrMax, float chanceMax) {
-        float t = Mth.clamp(chanceMax - 1.0f, 0f, 1f);
-        return base - t * (base - minOrMax);
-    }
-
-
     private static boolean shouldTriggerSandstorm(
             BiomeInstanceKey key,
             float[][] humidity,
             float[][] pressure,
-            WindVector wind,
-            float[] stormChance
+            WindVector wind
     ) {
         if (!SANDSTORM_BIOMES.contains(key.biomeType())) return false;
-        if (stormChance == null || stormChance.length < 2) return false;
 
-        float chanceMax = stormChance[1];
+        if (humidity == null || humidity.length == 0 || humidity[0].length == 0) return false;
+        if (pressure == null || pressure.length == 0 || pressure[0].length == 0) return false;
+        if (wind == null) return false;
 
         float todayHumidityMin = humidity[0][0];
         float todayPressureMin = pressure[0][0];
         float windSpeed = wind.gustSpeed();
 
+        float dryness = Math.max(0f, 1f - (todayHumidityMin / SANDSTORM_HUMIDITY_THRESHOLD_MAX));
+        float gustiness = Math.max(0f, (windSpeed - SANDSTORM_WIND_THRESHOLD_MIN) /
+                Math.max(1f, SANDSTORM_WIND_THRESHOLD_BASE - SANDSTORM_WIND_THRESHOLD_MIN));
+        float pressureDrop = Math.max(0f, (SANDSTORM_PRESSURE_THRESHOLD_BASE - todayPressureMin) / 20f);
 
-        float humidityThreshold = interpolate(SANDSTORM_HUMIDITY_THRESHOLD_BASE, SANDSTORM_HUMIDITY_THRESHOLD_MAX, chanceMax);
-        float pressureThreshold = interpolate(SANDSTORM_PRESSURE_THRESHOLD_BASE, SANDSTORM_PRESSURE_THRESHOLD_MAX, chanceMax);
-        float windThreshold = interpolate(SANDSTORM_WIND_THRESHOLD_BASE, SANDSTORM_WIND_THRESHOLD_MIN, chanceMax);
+        float severity = (dryness * 0.5f) + (gustiness * 0.3f) + (pressureDrop * 0.2f);
 
-        boolean dryEnough = todayHumidityMin < humidityThreshold;
-        boolean windyEnough = windSpeed > windThreshold;
-        boolean unstablePressure = todayPressureMin < pressureThreshold;
+        boolean dryEnough = todayHumidityMin < SANDSTORM_HUMIDITY_THRESHOLD_BASE || dryness > 0.6f;
+        boolean windyEnough = windSpeed > SANDSTORM_WIND_THRESHOLD_BASE * 0.85f;
+        boolean unstablePressure = todayPressureMin < SANDSTORM_PRESSURE_THRESHOLD_BASE + 2f;
 
-        return dryEnough && windyEnough && unstablePressure;
+        return dryEnough && windyEnough && unstablePressure && severity > 0.55f;
     }
 
 
@@ -259,14 +241,15 @@ public class ForecastGenerator {
                 .filter(entry -> SANDSTORM_BIOMES.contains(entry.getKey().biomeType()))
                 .filter(entry -> {
                     BiomeForecast f = entry.getValue();
-                    return f.getHumidity() != null && f.getPressure() != null && f.getWind() != null;
+                    return f.getHumidity() != null && f.getHumidity().length > 0
+                            && f.getPressure() != null && f.getPressure().length > 0
+                            && f.getWind() != null && f.getWind().length > 0;
                 })
                 .filter(entry -> shouldTriggerSandstorm(
                         entry.getKey(),
                         entry.getValue().getHumidity(),
                         entry.getValue().getPressure(),
-                        entry.getValue().getWind()[0],
-                        entry.getValue().getStormChance()[0]
+                        entry.getValue().getWind()[0]
                 ))
                 .forEach(entry -> {
                     BiomeInstanceKey key = entry.getKey();
@@ -416,19 +399,6 @@ public class ForecastGenerator {
         }
         computeAverageWindWeek();
 
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setStormChance(generateStorm(
-                    entry.getKey(),
-                    level,
-                    entry.getValue().getTemperature(),
-                    entry.getValue().getHumidity(),
-                    entry.getValue().getPressure(),
-                    entry.getValue().getWind(),
-                    season
-            ));
-        }
-        computeAverageStormChanceWeek();
-
         dailyAndSand(level);
 
         long end = System.nanoTime();
@@ -473,11 +443,6 @@ public class ForecastGenerator {
         }
         tickCounter++;
     }
-
-    private static float[][] generateStorm(BiomeInstanceKey key, ServerLevel level, float[][] temperature, float[][] humidity, float[][] pressure, WindVector[] wind, Season season) {
-        return StormGenerator.generateWeeklyStormProfile(key, temperature, humidity, pressure, wind, season);
-    }
-
 
     private static float[][] generateTemperature(BiomeInstanceKey key, ServerLevel level) {
         return SpikeManager.applySpikeLogic(key,
@@ -549,14 +514,6 @@ public class ForecastGenerator {
             return 0.0f;
         }
         return state.getTemperature();
-    }
-
-    static float getStormChanceValue(BiomeInstanceKey key, long tick) {
-        BiomeForecast forecast = getClosestValidForecast(key, ForecastType.STORM);
-        if (forecast == null) return 0.0f;
-        float[] curve = forecast.getStormChanceDay();
-        int minuteOfDay = (int) ((tick % 24000L) / 100L);
-        return curve[Math.min(minuteOfDay, curve.length - 1)];
     }
 
     static float getPressureValue(BiomeInstanceKey key, long tick) {

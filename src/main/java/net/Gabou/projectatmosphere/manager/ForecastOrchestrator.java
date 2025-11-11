@@ -253,7 +253,22 @@ public class ForecastOrchestrator {
     }
 
     public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {
-        return ForecastGenerator.getStormChanceValue(key, tick);
+        var state = AtmosphericStateRegistry.getState(key);
+        if (state == null) {
+            return 0f;
+        }
+
+        float rain = Math.min(1f, state.getRainIntensity());
+        float cloud = state.getCloudCover();
+        float wind = Math.min(1f, state.getWindStrength() / 18f);
+        float lowPressure = Math.min(1f, Math.max(0f, (1013.25f - state.getPressure()) / 55f));
+
+        float combined = (rain * 0.45f)
+                + (cloud * 0.3f)
+                + (wind * 0.15f)
+                + (lowPressure * 0.1f);
+
+        return Math.max(0f, Math.min(1f, combined));
     }
 
     public static void tick(ServerLevel level) {

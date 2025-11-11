@@ -96,7 +96,7 @@ public class WeatherSampler {
 
     public static WeatherStats computeWeatherStats(Set<BiomeInstanceKey> keys, ServerLevel level, long tick) {
         float totalHumidity = 0, totalTemp = 0, totalPressure = 0,
-                totalStormChance = 0;
+                totalStormFactor = 0;
         WindVector totalWind = WindVector.fromBase(0, 0);
         int count = 0;
         Map<ResourceLocation, Integer> biomeFreq = new HashMap<>();
@@ -105,14 +105,14 @@ public class WeatherSampler {
             float humidity = ForecastOrchestrator.getCurrentHumidity(key, tick);
             float temperature = ForecastOrchestrator.getCurrentTemperature(key, tick);
             float pressure = ForecastOrchestrator.getCurrentPressure(key, tick);
-            float stormChanceValue = ForecastOrchestrator.getCurrentStormChance(key,tick);
+            float stormFactor = ForecastOrchestrator.getCurrentStormChance(key, tick);
             WindVector wind = ForecastOrchestrator.getCurrentWind(key, tick);
 
             totalHumidity += humidity;
             totalTemp += temperature;
             totalPressure += pressure;
             totalWind = totalWind.add(wind);
-            totalStormChance += stormChanceValue;
+            totalStormFactor += stormFactor;
             biomeFreq.merge(key.biomeType(), 1, Integer::sum);
             count++;
         }
@@ -129,8 +129,8 @@ public class WeatherSampler {
                 .orElse(keys.iterator().next());
 
 
-        return new WeatherStats(totalHumidity / count, totalTemp / count, totalPressure / count,totalWind.divide(count), dominantKey.biomeType(),dominantKey.samplePos(),totalStormChance/ count);
+        return new WeatherStats(totalHumidity / count, totalTemp / count, totalPressure / count, totalWind.divide(count), dominantKey.biomeType(), dominantKey.samplePos(), totalStormFactor / count);
     }
 
-    public record WeatherStats(float humidity, float temperature, float pressure,WindVector windVector ,ResourceLocation dominantBiome,BlockPos pos,float stormChance) {}
+    public record WeatherStats(float humidity, float temperature, float pressure, WindVector windVector, ResourceLocation dominantBiome, BlockPos pos, float stormFactor) {}
 }

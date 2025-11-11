@@ -10,20 +10,14 @@ public class BiomeForecast {
 
     private BiomeInstanceKey biomeKey;
 
-    private float[][] stormChance;
-
     private float[] temperatureDay;
     private float[] temperatureTomorrow;
     private float[] pressureDay;
-
-    private float[] stormChanceDay;
 
     private WindVector windDay;
     private float[] pressureTomorrow;
     private float[] humidityDay;
     private float[] humidityTomorrow;
-
-    private float[] stormChanceTomorrow;
 
     private WindVector windTomorrow;
 
@@ -34,12 +28,11 @@ public class BiomeForecast {
     public BiomeForecast() {
     }
 
-    public BiomeForecast(float[][] temperature, float[][] pressure, float[][] humidity, WindVector[] wind,float[][] stormChance) {
+    public BiomeForecast(float[][] temperature, float[][] pressure, float[][] humidity, WindVector[] wind) {
         this.temperature = temperature;
         this.pressure = pressure;
         this.humidity = humidity;
         this.wind = wind;
-        this.stormChance = stormChance;
     }
 
     public BiomeInstanceKey getBiomeKey() {
@@ -64,11 +57,7 @@ public class BiomeForecast {
     public WindVector[] getWind() {
         return wind;
     }
-    public float[][] getStormChance() {
-        return stormChance;
-    }
 
-    
     public float[] getTemperatureDay() {
         return temperatureDay;
     }
@@ -89,19 +78,11 @@ public class BiomeForecast {
         return humidityDay;
     }
 
-    public float[] getStormChanceDay() {
-        return stormChanceDay;
-    }
-
     public float[] getHumidityTomorrow() {
         return humidityTomorrow;
     }
 
-    public float[] getStormChanceTomorrow() {
-        return stormChanceTomorrow;
-    }
 
-    
     public void setTemperature(float[][] temperature) {
         this.temperature = temperature;
     }
@@ -118,17 +99,8 @@ public class BiomeForecast {
         this.wind = wind;
     }
 
-    public void setStormChance(float[][] stormChance) {
-        this.stormChance = stormChance;
-    }
-
-    
     public void setTemperatureDay(float[] temperatureDay) {
         this.temperatureDay = temperatureDay;
-    }
-
-    public void setStormChanceDay(float[] stormChanceDay) {
-        this.stormChanceDay = stormChanceDay;
     }
 
     public void setTemperatureTomorrow(float[] temperatureTomorrow) {
@@ -142,10 +114,6 @@ public class BiomeForecast {
     public void setPressureTomorrow(float[] pressureTomorrow) {
         this.pressureTomorrow = pressureTomorrow;
     }
-    public void setStormChanceTomorrow(float[] stormChanceTomorrow) {
-        this.stormChanceTomorrow = stormChanceTomorrow;
-    }
-
     public void setHumidityDay(float[] humidityDay) {
         this.humidityDay = humidityDay;
     }
@@ -172,8 +140,7 @@ public class BiomeForecast {
             case HUMIDITY -> humidityDay != null;
             case TEMPERATURE -> temperatureDay != null;
             case PRESSURE -> pressureDay != null;
-            case WIND -> windDay != null && wind.length > 0;
-            case STORM -> stormChanceDay != null;
+            case WIND -> windDay != null && wind != null && wind.length > 0;
             default -> false;
         };
     }

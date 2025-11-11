@@ -103,7 +103,7 @@ public class SimpleCloudSpawner {
                                 stats.humidity(),
                                 stats.pressure(),
                                 calculateDewPoint(stats.temperature(), stats.humidity()),
-                                stats.stormChance(),
+                                stats.stormFactor(),
                                 level
                         );
                         if (severity <= 0) return null;
@@ -184,7 +184,7 @@ public class SimpleCloudSpawner {
             float humidity,
             float pressure,
             float dewPoint,
-            float stormChance,
+            float stormFactor,
             ServerLevel level
     ) {
         float dewGap = Math.max(0f, temperature - dewPoint);
@@ -225,13 +225,13 @@ public class SimpleCloudSpawner {
             data.setCooldownDaysRemaining(cooldown);
         }
 
-        // During cooldown, clamp stormChance and instability to reduce event frequency
+        // During cooldown, clamp storm factor and instability to reduce event frequency
         if (cooldown > 0) {
-            stormChance *= 0.25f;
+            stormFactor *= 0.25f;
             instability *= 0.5f;
         }
 
-        int severity = getSeverity(stormChance, daysSince, instability);
+        int severity = getSeverity(stormFactor, daysSince, instability);
 
         // Record storm results
         if (severity >= 5) {
@@ -244,7 +244,7 @@ public class SimpleCloudSpawner {
     }
 
 
-    private static int getSeverity(float stormChance, int daysSince, float instability) {
+    private static int getSeverity(float stormFactor, int daysSince, float instability) {
         float boost = 0f;
         if (daysSince <= 2) {
             boost = 1f/(5-daysSince);
@@ -254,7 +254,7 @@ public class SimpleCloudSpawner {
         }
 
 
-        float adjustedChance = Math.min(1f, stormChance * boost * STORM_BIAS);
+        float adjustedChance = Math.min(1f, stormFactor * boost * STORM_BIAS);
 
         // === Smooth Probability Curve ===
         return calculateSeverity(daysSince, instability, adjustedChance);

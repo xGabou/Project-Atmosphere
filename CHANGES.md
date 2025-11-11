@@ -1,6 +1,10 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
+## 0.5.5.7 – Storm factor integration (2025-11-11)
+- Removed the legacy storm chance forecast data in favour of live storm factors so gusts, cloud spawners, and SimpleClouds hooks follow the new cyclone/sunlight-driven core.
+- Wind gust multipliers now scale smoothly with the measured storm factor instead of toggling at a fixed threshold.
+
 ## 0.5.5.7 – Biome-driven cloud evolution (2025-11-10)
 - SimpleClouds regions now sample the biome beneath them to grow in cool, humid climates and dissipate over hot or arid zones.
 - Cloud radius changes gradually each tick with matching lifetime adjustments so long-lived storm systems persist over wet areas and burn out faster in deserts.
