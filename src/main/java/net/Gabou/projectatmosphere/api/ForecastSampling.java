@@ -21,10 +21,6 @@ public final class ForecastSampling {
         return ForecastOrchestrator.getCurrentPressure(key, level.getGameTime());
     }
 
-    public static boolean isStormyClouds(BiomeInstanceKey key, ServerLevel level) {
-        return ForecastOrchestrator.getCurrentStormChance(key, level.getGameTime()) > 0.5f;
-    }
-
     public static float minNeighborPressureHpa(BiomeInstanceKey key, ServerLevel level) {
         BlockPos base = key.samplePos();
         float min = Float.MAX_VALUE;

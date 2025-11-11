@@ -142,7 +142,7 @@ public final class CycloneManager {
             float angle = wind.angleRadians();
             float dx = (float) Math.sin(angle) * speed;
             float dz = (float) Math.cos(angle) * speed;
-            center = center.add(dx, dz);
+            center = center.add(new Vec2(dx,dz));
         }
     }
 }
