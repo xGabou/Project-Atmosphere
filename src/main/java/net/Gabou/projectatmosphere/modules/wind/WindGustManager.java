@@ -11,7 +11,9 @@ public final class WindGustManager {
 
     public static float stormGustMultiplier(BiomeInstanceKey key, ServerLevel lvl) {
         float chance = ForecastOrchestrator.getCurrentStormChance(key, lvl.getGameTime());
-        return chance > 0.5f ? WindConfig.stormGustMult() : 1f;
+        float boost = Math.max(0f, Math.min(1f, chance));
+        float maxMult = WindConfig.stormGustMult();
+        return 1f + (maxMult - 1f) * boost;
     }
 
     public static float maybeStartGust(WindRuntimeState s, WindForecast f, WindForecastPart p, float stormMult, long nowTick) {

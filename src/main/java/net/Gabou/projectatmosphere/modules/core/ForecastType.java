@@ -8,5 +8,4 @@ public enum ForecastType {
     HUMIDITY,
     PRESSURE,
     WIND,
-    STORM,
 }

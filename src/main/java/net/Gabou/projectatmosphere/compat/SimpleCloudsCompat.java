@@ -191,7 +191,7 @@ public class SimpleCloudsCompat {
                         stats.humidity(),
                         stats.pressure(),
                         calculateDewPoint(stats.temperature(), stats.humidity()),
-                        stats.stormChance(),
+                        stats.stormFactor(),
                         level
                 );
                 if (severity <= 0) {

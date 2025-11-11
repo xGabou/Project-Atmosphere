@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.event;
 
-import com.Gabou.sereneseasonsplus.api.SSPApi;
 import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ScAPICloudRegion;
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionNaturallySpawnEvent;
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionRemovedEvent;
@@ -10,23 +9,15 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
-import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.util.WeatherType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.loading.FMLEnvironment;
-import org.checkerframework.checker.units.qual.A;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class SimpleCloudsEventListener {
@@ -62,27 +53,23 @@ public class SimpleCloudsEventListener {
         int z = (int) region.getWorldZ();
         int y = serverLevel.getSeaLevel();
 
-        BiomeForecast forecast  =ForecastGenerator.getClosestValidForecast(AtmosphereUtils.getBiomeKey(serverLevel, new BlockPos(x, y, z)), ForecastType.STORM);
-        if (forecast == null) {
-            return;
-        }
-        BiomeInstanceKey key = forecast.getBiomeKey();
+        BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(serverLevel, new BlockPos(x, y, z));
         // Current sample (fallback-safe) for direction preservation
         var current = WindVector.getOrFallback(key);
         float currentSpeed = current.speedMps();
         float dirDeg = current.directionDeg();
 
         // Storm-based boost
-        float chance = ForecastOrchestrator.getCurrentStormChance(key, serverLevel.getGameTime());
-        if (chance > 0.15f) {
-            // Scale boost with storm chance; cap to avoid absurd values
-            float finalSpeed = getFinalSpeed(chance, currentSpeed, region);
+        float stormFactor = ForecastOrchestrator.getCurrentStormChance(key, serverLevel.getGameTime());
+        if (stormFactor > 0.15f) {
+            // Scale boost with storm activity; cap to avoid absurd values
+            float finalSpeed = getFinalSpeed(stormFactor, currentSpeed, region);
             WindVector.set(key, finalSpeed, dirDeg);
         }
     }
 
-    private static float getFinalSpeed(float chance, float currentSpeed, ScAPICloudRegion region) {
-        float stormBoost = Math.min(12.0f, 3.0f + chance * 12.0f); // 3..15 m/s
+    private static float getFinalSpeed(float stormFactor, float currentSpeed, ScAPICloudRegion region) {
+        float stormBoost = Math.min(12.0f, 3.0f + stormFactor * 12.0f); // 3..15 m/s
         float boosted = Math.max(currentSpeed, stormBoost);
 
         // Extra amplification if a tornado is active in this cloud region vicinity
