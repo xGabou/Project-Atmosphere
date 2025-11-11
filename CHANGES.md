@@ -1,6 +1,11 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
+## 0.5.5.7 – Biome-driven cloud evolution (2025-11-10)
+- SimpleClouds regions now sample the biome beneath them to grow in cool, humid climates and dissipate over hot or arid zones.
+- Cloud radius changes gradually each tick with matching lifetime adjustments so long-lived storm systems persist over wet areas and burn out faster in deserts.
+- Cloud radius multipliers persist through sync/serialization and stay clamped, preventing abrupt pop-in while still allowing clouds to shrink back when conditions stabilise.
+
 ## 0.5.5.7 – Biome-aware sunlight tuning (2025-11-09)
 - Sunlight intensity now scales with each biome’s seasonal temperature ranges, letting hotter climates receive stronger midday heating.
 - Region states keep hourly daily curves sourced from the live controllers so commands and clients can still display day profiles.
