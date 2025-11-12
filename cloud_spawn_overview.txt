@@ -1,0 +1,95 @@
+This file is a concise rewrite of the "cloud spawn overview" information from the previous answer.
+
+---
+
+## 1. Forecasting – the "brain" that tells us what weather should be
+
+| Class | What it does | Where it is called |
+|-------|--------------|-------------------|
+| **ForecastDataStorage** | Keeps the 7‑day forecast for every biome (`temperature`, `humidity`, `pressure`, `stormChance`).  It also stores “average” values that are used to smooth the data. | Called by **AtmosphereManager** whenever a new region needs a forecast. |
+| **DailyForecastGenerator** | When a day changes or a new region is first visited, this class builds the raw forecast curves for a biome (temperature, humidity, etc.).  It also creates a “wind week” that contains the direction & speed for every hour of the day. | Invoked by **ForecastDataStorage.generateForecastForRegion** (which is itself called by AtmosphereManager). |
+| **AtmosphereManager** (server side) | 1. Keeps a map of *active* `CloudRegion`s.<br>2. Periodically (every server tick) calls `tick()` – this method may enqueue new regions to spawn or to remove.<br>3. When a player joins, `onPlayerLogin()` is called; it asks the manager to generate clouds for the 3×3 biome grid around the player. | `onServerTick` of the mod, `PlayerEvent.PlayerLoggedInEvent`, `onServerStopping` (to clean up). |
+
+The “forecast” is basically a set of numerical arrays that the mod later uses to decide *which* cloud type to show.  For example, a high humidity + low temperature week will often result in **Stratus** clouds, while a low humidity + high temperature week will favour **Cumulus**.
+
+---
+
+## 2. Cloud region lifecycle – creation → updates → deletion
+
+| Step | What happens | Key methods & classes |
+|------|--------------|-----------------------|
+| **Creation** | When a region (a 32×32 block chunk of biomes) becomes “active” it must be rendered by the client.  AtmosphereManager decides to spawn it. | `AtmosphereManager.handleCloudRegionToQueue()`, which calls `queueAddCloudRegion()`<br>In turn this calls **SimpleCloudsCompat.spawnCloudInBiome()** |
+| **Dummy placeholder** | To avoid a big spike in memory / CPU, the mod may first create a *dummy* region that contains only the very low‑level “cloud” data (e.g. cloud type, density).  The full region is built later when the client is ready. | `SimpleCloudsCompat.regionDummy()` – returns an `Optional<CloudRegion>` that is a lightweight placeholder. |
+| **Full region** | The mod obtains the full `CloudRegion` from SimpleClouds (or a compatible mod).  It then sets various properties: the cloud type, scale, wind, cloud texture, and other biome‑specific data. | `SimpleCloudsCompat.spawnCloudInBiome()` – this is the “entry point” for all cloud creation.  It delegates to the underlying SimpleClouds API (`CloudGenerator.spawnRegion(...)`). |
+| **Wind** | Wind is calculated from the forecast (`WindVector[] week`) and the current time of day.  The wind influences cloud speed & direction, and it is passed to the region so that the client can animate it. | `WindPhysics` calculates a vector for a given degree, and the forecast data supplies a weekly wind vector. |
+| **Updates** | Every server tick, AtmosphereManager checks if a region’s forecast has changed (day change, temperature shift, etc.).  If so, it triggers a *refresh* – either a full rebuild or a lightweight update of cloud type / density. | `AtmosphereManager.updateForecastAround()` |
+| **Deletion** | When a region moves outside the “active” radius of all players, AtmosphereManager removes it to free resources.  This may be done immediately or delayed until the client finishes rendering it. | `AtmosphereManager.handleCloudRegionToRemove()` / `queueRemoveCloudRegion()` |
+
+---
+
+## 3. The bridge to **SimpleClouds** (or any other cloud renderer)
+
+| Class | Responsibility | Interaction |
+|-------|----------------|-------------|
+| **SimpleCloudsCompat** | Acts as a thin wrapper around the SimpleClouds API so that Project Atmosphere can talk to it in a version‑independent way.  It also handles “initial” generation when the world is first loaded. | Calls `CloudGenerator.spawnRegion(...)` and `CloudGenerator.spawnDummyRegion(...)`. |
+| **SimpleCloudsBridge** | Exposes a handful of static helpers that are used by the rest of the mod, e.g. `getCloudScale()` (used to size cloud layers correctly). | Accessed by **SimpleCloudsCompat** and other managers. |
+| **ModClient** (client side) | Registers the custom particle providers that SimpleClouds uses (e.g. `DebrisParticle`, `WindLeafParticle`). | `ModClient.onRegisterParticles()` registers the providers so the client can render the clouds. |
+| **ClientRenderHook / ClientSyncLock** | Handles the actual rendering logic on the client and ensures that cloud data is synchronized between server and client. | Not directly involved in the “spawn” step but needed for the cloud to actually appear. |
+
+---
+
+## 4. Commands & manual control
+
+| Command | What it does | Trigger |
+|---------|--------------|---------|
+| **/debugatmo spawn <type> <pos>** | Lets a player spawn a specific cloud type manually (cumulus, stratus, etc.). | `DebugAtmoCommand.spawnCloud()` |
+| **/debugatmo dump** | Dumps the current cloud texture to a file for debugging. | `CloudDumpCommand.dumpCloudTexture()` |
+| **/debugatmo set** | (not listed but likely exists) to force a particular forecast value or temperature for testing. | Invoked by command parser. |
+
+---
+
+## 5. High‑level "spawn path" in one sentence
+
+1. **Player logs in** → `AtmosphereManager.onPlayerLogin()` → determine nearby biome keys. 2. For each biome key, **check if a region already exists**; if not, enqueue it. 3. **AtmosphereManager.tick()** processes the queue: it calls `SimpleCloudsCompat.spawnCloudInBiome()`. 4. The call creates either a dummy or full `CloudRegion` via SimpleClouds, sets wind and forecast data, and registers it with the cloud generator. 5. The client receives the region data and renders it. 6. Every tick, the manager may refresh the region if the forecast has changed or remove it if the player leaves the area.
+
+---
+
+## 6. Typical workflow for a new cloud region
+
+```
+player joins → onPlayerLogin → getNearbyBiomeKeys
+   └─> for each key:
+          if (!cloudRegions.contains(key))
+                queueAddCloudRegion(key)
+            
+AtmosphereManager.tick() → process queued regions:
+   for each queued key:
+       WindVector wind = forecast.getWindValue(key, world.getGameTime());
+       CloudRegion region = SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
+       cloudRegions.put(key, region);
+```
+
+- `cloudId` is chosen based on the forecast: e.g., `"cumulus"` or `"stratus"`.
+- `wind` is the vector for the current hour, taken from the 7‑day forecast.
+- The returned `CloudRegion` is a fully‑formed, GPU‑ready object that SimpleClouds will render.
+
+---
+
+## 7. Things to keep in mind
+
+| Issue | Why it matters |
+|-------|----------------|
+| **Compatibility** | If SimpleClouds is not loaded, `SimpleCloudsCompat` will do nothing.  The mod falls back to a “no‑cloud” mode. |
+| **Performance** | Dummy regions are created first to avoid stalling the server; the full region is only built when the client needs it. |
+| **Forecast changes** | Changing the forecast (e.g., by moving to a new biome or at day change) will trigger a region refresh; this may momentarily cause a flicker. |
+| **Client‑only rendering** | The server always spawns *all* regions it considers active; the client only draws the ones it receives via the sync lock. |
+
+---
+
+### Bottom line
+
+*Project Atmosphere* uses a **forecast engine** to decide what the weather should look like.  The **AtmosphereManager** translates that forecast into a set of `CloudRegion` objects, delegating the actual creation to **SimpleClouds** (through `SimpleCloudsCompat`).  Wind, temperature, humidity and other factors are all baked into the region’s data, and the manager keeps the list of active regions in sync with player positions and time of day.  That’s how clouds are spawned, updated and eventually cleaned up in the mod.
+
+---
+
+*Created on: 2025‑11‑11*

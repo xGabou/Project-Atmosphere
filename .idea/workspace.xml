@@ -4,17 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: integrate auroras and rainbows compatibility, enhance storm severity calculations, and update version to 0.5.5.7">
+      <change afterPath="$PROJECT_DIR$/build_dataset.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/cloud_spawn_overview.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SandStormManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradlew" beforeDir="false" afterPath="$PROJECT_DIR$/gradlew" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/dev/nonamecrackers2/simpleclouds/common/cloud/region/CloudRegion.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/ForecastSampling.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/ForecastSampling.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/auroras/AuroraRendererMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/auroras/AuroraRendererMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CycloneManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CycloneManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -52,7 +53,72 @@
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="project-atmosphere" type="f1a62948:ProjectNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="forgegradle prepare runs" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="forgegradle runs" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="help" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="other" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="publishing" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="upload" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Dependencies" type="6de06a37:ExternalSystemViewDefaultContributor$MyDependenciesNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Dependencies" type="6de06a37:ExternalSystemViewDefaultContributor$MyDependenciesNode" />
+                <item name="compileClasspath" type="62daadca:ExternalSystemViewDefaultContributor$DependencyScopeExternalSystemNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Dependencies" type="6de06a37:ExternalSystemViewDefaultContributor$MyDependenciesNode" />
+                <item name="runtimeClasspath" type="62daadca:ExternalSystemViewDefaultContributor$DependencyScopeExternalSystemNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Dependencies" type="6de06a37:ExternalSystemViewDefaultContributor$MyDependenciesNode" />
+                <item name="runtimeClasspath" type="62daadca:ExternalSystemViewDefaultContributor$DependencyScopeExternalSystemNode" />
+                <item name="net.minecraftforge:forge:1.20.1-47.4.9_mapped_official_1.20.1" type="b3323d55:ExternalSystemViewDefaultContributor$DependencyExternalSystemNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Run Configurations" type="7b0102dc:RunConfigurationsNode" />
               </path>
             </expand>
             <select />
@@ -69,8 +135,9 @@
         <option value="shader-template" />
         <option value="Enum" />
         <option value="Record" />
-        <option value="Class" />
         <option value="Interface" />
+        <option value="Python Script" />
+        <option value="Class" />
       </list>
     </option>
   </component>
@@ -82,7 +149,7 @@
     </option>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="Forge-1.20.1" />
+        <entry key="$PROJECT_DIR$" value="Forge-1.20.1-AITEST" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -100,7 +167,19 @@
   }
 }</component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/auroras-1105290/6040671_mapped_official_1.20.1/auroras-1105290-6040671_mapped_official_1.20.1.jar!/auroras/Auroras.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/auroras-1105290/6040671_mapped_official_1.20.1/auroras-1105290-6040671_mapped_official_1.20.1.jar!/auroras/ClientEventHandler.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/auroras-1105290/6040671_mapped_official_1.20.1/auroras-1105290-6040671_mapped_official_1.20.1.jar!/auroras/config/Config.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/auroras-1105290/6040671_mapped_official_1.20.1/auroras-1105290-6040671_mapped_official_1.20.1.jar!/auroras/mixin/client/GameRendererMixin.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/auroras-1105290/6040671_mapped_official_1.20.1/auroras-1105290-6040671_mapped_official_1.20.1.jar!/auroras/mixin/client/LevelRendererMixin.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/auroras-1105290/6040671_mapped_official_1.20.1/auroras-1105290-6040671_mapped_official_1.20.1.jar!/auroras/util/AHelpers.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/auroras-1105290/6040671_mapped_official_1.20.1/auroras-1105290-6040671_mapped_official_1.20.1.jar!/auroras/util/AuroraRenderer.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/legendary-survival-overhaul-840254/6717844_mapped_official_1.20.1/legendary-survival-overhaul-840254-6717844_mapped_official_1.20.1.jar!/sfiomn/legendarysurvivaloverhaul/api/temperature/TemperatureUtil.class" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/curse/maven/rainboows-1121832/6421980_mapped_official_1.20.1/rainboows-1121832-6421980_mapped_official_1.20.1.jar!/rainbows/util/RainbowsRendererParticle.class" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.20.1-47.4.0_mapped_official_1.20.1/forge-1.20.1-47.4.0_mapped_official_1.20.1-sources.jar!/net/minecraft/world/item/Item.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.20.1-47.4.9_mapped_official_1.20.1/forge-1.20.1-47.4.9_mapped_official_1.20.1-sources.jar!/net/minecraft/client/particle/Particle.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.20.1-47.4.9_mapped_official_1.20.1/forge-1.20.1-47.4.9_mapped_official_1.20.1-sources.jar!/net/minecraft/client/particle/SingleQuadParticle.java" root0="SKIP_INSPECTION" />
+    <setting file="jar://$USER_HOME$/.gradle/caches/forge_gradle/minecraft_user_repo/net/minecraftforge/forge/1.20.1-47.4.9_mapped_official_1.20.1/forge-1.20.1-47.4.9_mapped_official_1.20.1-sources.jar!/net/minecraft/client/particle/TextureSheetParticle.java" root0="SKIP_INSPECTION" />
     <setting file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/c1f2266a7d0386d7643879ed1b93f51d29126180/joml-1.10.5-sources.jar!/org/joml/Matrix4f.java" root0="SKIP_INSPECTION" />
   </component>
   <component name="ProblemsViewState">
@@ -110,7 +189,7 @@
   &quot;associatedIndex&quot;: 0
 }</component>
   <component name="ProjectId" id="2wHyCaznG4OiND30AjwMkNjd4Nq" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+  <component name="ProjectLevelVcsManager">
     <OptionsSetting value="false" id="Update" />
     <ConfirmationsSetting value="2" id="Add" />
   </component>
@@ -121,7 +200,6 @@
   "keyToString": {
     "Downloaded.Files.Path.Enabled": "false",
     "Gradle.Build Project-Atmosphere.executor": "Run",
-    "Gradle.C:/Users/matga/Downloads/Project-Atmosphere [createMcpToSrg].executor": "Run",
     "Gradle.Download Sources.executor": "Run",
     "Gradle.G:/Project-Atmosphere [createMcpToSrg].executor": "Run",
     "Gradle.H:/Project-Atmosphere [createMcpToSrg].executor": "Run",
@@ -134,9 +212,13 @@
     "Gradle.Project-Atmosphere [createMcpToSrg].executor": "Run",
     "Gradle.Project-Atmosphere [curseforge1258344].executor": "Run",
     "Gradle.Project-Atmosphere [discordWebhook].executor": "Run",
+    "Gradle.Project-Atmosphere [extractNatives].executor": "Run",
+    "Gradle.Project-Atmosphere [extractSrg].executor": "Run",
     "Gradle.Project-Atmosphere [genIntellijRuns].executor": "Debug",
+    "Gradle.Project-Atmosphere [makeSrcDirs].executor": "Run",
     "Gradle.Project-Atmosphere [modrinth].executor": "Run",
     "Gradle.Project-Atmosphere [runClient].executor": "Debug",
+    "Gradle.Project-Atmosphere [runData].executor": "Debug",
     "Gradle.Project-Atmosphere [runGameTestServer].executor": "Run",
     "Gradle.Project-Atmosphere [runServer].executor": "Debug",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
@@ -163,7 +245,7 @@
     "project.structure.proportion": "0.15",
     "project.structure.side.proportion": "0.6172414",
     "run.code.analysis.last.selected.profile": "pProject Default",
-    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
+    "settings.editor.selected.configurable": "preferences.keymap",
     "vue.rearranger.settings.migration": "true"
   },
   "keyToStringList": {
@@ -227,7 +309,7 @@
       <RunAsTest>false</RunAsTest>
       <method v="2" />
     </configuration>
-    <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+    <configuration name="Project-Atmosphere [makeSrcDirs]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -238,139 +320,7 @@
         </option>
         <option name="taskNames">
           <list>
-            <option value="build" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="build" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="Project-Atmosphere [clean]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="clean" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="Project-Atmosphere [curseforge1258344]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="curseforge1258344" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="Project-Atmosphere [discordWebhook]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="discordWebhook" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="Project-Atmosphere [modrinth]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="modrinth" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
-    <configuration name="Project-Atmosphere [runClient]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" value="" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="runClient" />
+            <option value="makeSrcDirs" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -415,6 +365,50 @@
         <option name="taskNames">
           <list>
             <option value="runClient" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
+    <configuration name="Project-Atmosphere [runData]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="runData" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
+    <configuration name="Project-Atmosphere [runServer]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="runServer" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -429,21 +423,20 @@
       <list>
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
-        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
-        <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
-        <item itemvalue="Gradle.Project-Atmosphere [clean]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runServer]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runData]" />
+        <item itemvalue="Gradle.Project-Atmosphere [makeSrcDirs]" />
       </list>
     </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-84258761d1cc-intellij.indexing.shared.core-IU-243.28141.18" />
-        <option value="bundled-js-predefined-d6986cc7102b-1632447f56bf-JavaScript-IU-243.28141.18" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26830.84" />
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-IU-252.26830.84" />
       </set>
     </attachedChunks>
   </component>
-  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="" />
@@ -582,15 +575,14 @@
       <workItem from="1761852450147" duration="34000" />
       <workItem from="1762206371773" duration="699000" />
       <workItem from="1762531113580" duration="9463000" />
-      <workItem from="1762823051639" duration="2441000" />
-    </task>
-    <task id="LOCAL-00074" summary="feat: add shader support for cloud rendering and implement noise functions">
-      <option name="closed" value="true" />
-      <created>1754538661405</created>
-      <option name="number" value="00074" />
-      <option name="presentableId" value="LOCAL-00074" />
-      <option name="project" value="LOCAL" />
-      <updated>1754538661405</updated>
+      <workItem from="1762641047195" duration="27000" />
+      <workItem from="1762878948616" duration="1088000" />
+      <workItem from="1762880053151" duration="352000" />
+      <workItem from="1762880429629" duration="107000" />
+      <workItem from="1762880552354" duration="1444000" />
+      <workItem from="1762882082854" duration="1486000" />
+      <workItem from="1762885430095" duration="6224000" />
+      <workItem from="1762958966778" duration="12811000" />
     </task>
     <task id="LOCAL-00075" summary="feat: add shader support for cloud rendering and implement noise functions">
       <option name="closed" value="true" />
@@ -976,7 +968,15 @@
       <option name="project" value="LOCAL" />
       <updated>1761170687166</updated>
     </task>
-    <option name="localTasksCounter" value="123" />
+    <task id="LOCAL-00123" summary="feat: integrate auroras and rainbows compatibility, enhance storm severity calculations, and update version to 0.5.5.7">
+      <option name="closed" value="true" />
+      <created>1762641057038</created>
+      <option name="number" value="00123" />
+      <option name="presentableId" value="LOCAL-00123" />
+      <option name="project" value="LOCAL" />
+      <updated>1762641057039</updated>
+    </task>
+    <option name="localTasksCounter" value="124" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1022,7 +1022,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: enhance biome key management for players and optimize tornado checks" />
     <MESSAGE value="feat: improve compatibility logging and refactor mixin structure for weather management" />
     <MESSAGE value="feat: update build configuration and enhance snowstorm management integration" />
     <MESSAGE value="feat: implement global storm history tracking and adjust storm chance based on severe event frequency" />
@@ -1047,7 +1046,8 @@
     <MESSAGE value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
     <MESSAGE value="feat: update barometer and humidimeter models, add hygrometer, and increment version to 0.5.5.4" />
     <MESSAGE value="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands" />
+    <MESSAGE value="feat: integrate auroras and rainbows compatibility, enhance storm severity calculations, and update version to 0.5.5.7" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: integrate auroras and rainbows compatibility, enhance storm severity calculations, and update version to 0.5.5.7" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1105,21 +1105,6 @@
           <line>141</line>
           <option name="timeStamp" value="340" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/nonamecrackers2/simpleclouds/0.7.3+1.20.1-forge_mapped_official_1.20.1/simpleclouds-0.7.3+1.20.1-forge_mapped_official_1.20.1-sources.jar!/dev/nonamecrackers2/simpleclouds/common/cloud/spawning/CloudGenerator.java</url>
-          <line>232</line>
-          <option name="timeStamp" value="360" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/nonamecrackers2/simpleclouds/0.7.3+1.20.1-forge_mapped_official_1.20.1/simpleclouds-0.7.3+1.20.1-forge_mapped_official_1.20.1-sources.jar!/dev/nonamecrackers2/simpleclouds/common/cloud/spawning/CloudGenerator.java</url>
-          <line>223</line>
-          <option name="timeStamp" value="361" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java</url>
-          <line>74</line>
-          <option name="timeStamp" value="363" />
-        </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />
           <option name="timeStamp" value="97" />
@@ -1162,5 +1147,9 @@
         <watch expression="((java.util.concurrent.ConcurrentHashMap)ForecastGenerator.getForecastMap()).entrySet().toArray()[0]" custom="java.util.concurrent.ConcurrentHashMap" />
       </configuration>
     </watches-manager>
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

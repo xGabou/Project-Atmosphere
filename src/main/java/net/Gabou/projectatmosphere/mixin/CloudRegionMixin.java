@@ -104,11 +104,16 @@ public abstract class CloudRegionMixin implements ICloudRegionId {
     @Unique private static final float MIN_RADIUS_MULTIPLIER = 0.7F;
     @Unique private static final float RADIUS_ADJUST_RATE = 0.0025F;
     @Unique private static final int LIFETIME_ADJUST_STEP = 1;
+    @Unique private static final float MINUTES_PER_GAME_TICK = 1.0F / 1200.0F;
+    @Unique private static final float MIN_MINUTES_FOR_ADJUSTMENT = 2.0F;
+    @Unique private static final float MAX_MINUTES_FOR_ADJUSTMENT = 6.0F;
 
     @Unique private int projectatmosphere$initialExistsForTicks;
     @Unique private float projectatmosphere$radiusMultiplier = 1.0F;
     @Unique private float projectatmosphere$radiusMultiplierO = 1.0F;
     @Unique private int projectatmosphere$lifetimeAdjustment;
+    @Unique private BlockPos projectatmosphere$biomeFocusPos;
+    @Unique private float projectatmosphere$focusMinutes;
 
     @Inject(method = "tick", at = @At("TAIL"))
     private void projectatmosphere$applyBiomeGrowth(RandomSource random, Level level, boolean isVisible, float speed, CallbackInfo ci) {
@@ -128,6 +133,9 @@ public abstract class CloudRegionMixin implements ICloudRegionId {
         Biome biome = level.getBiome(pos).value();
         float humidity = biome.getModifiedClimateSettings().downfall();
         float temperature = Mth.clamp(biome.getBaseTemperature() * 50.0F, -20.0F, 50.0F);
+        if (!this.projectatmosphere$hasAccumulatedBiomeMinutes(pos, humidity)) {
+            return;
+        }
 
         boolean isHumid = humidity > 0.75F && temperature >= 0.0F && temperature <= 35.0F;
         boolean isArid = humidity < 0.25F || temperature > 35.0F;
@@ -155,7 +163,31 @@ public abstract class CloudRegionMixin implements ICloudRegionId {
 
         // Apply modified radius
         this.radiusO = this.radius;
-        this.radius = this.initialRadius * this.projectatmosphere$radiusMultiplier;
+        this.radius *= this.projectatmosphere$radiusMultiplier;
+    }
+
+    @Unique
+    // Track real minutes/days spent over the same region before letting the cloud react again.
+    private boolean projectatmosphere$hasAccumulatedBiomeMinutes(BlockPos pos, float humidity) {
+        if (this.projectatmosphere$biomeFocusPos == null || !this.projectatmosphere$biomeFocusPos.equals(pos)) {
+            this.projectatmosphere$biomeFocusPos = pos;
+            this.projectatmosphere$focusMinutes = 0.0F;
+            return false;
+        }
+        this.projectatmosphere$focusMinutes += MINUTES_PER_GAME_TICK;
+        float requiredMinutes = projectatmosphere$getMinutesForHumidity(humidity);
+        if (this.projectatmosphere$focusMinutes < requiredMinutes) {
+            return false;
+        }
+        this.projectatmosphere$focusMinutes -= requiredMinutes;
+        return true;
+    }
+
+    @Unique
+    private float projectatmosphere$getMinutesForHumidity(float humidity) {
+        float humidityFactor = Mth.clamp(humidity, 0.0F, 1.0F);
+        float inverted = 1.0F - humidityFactor;
+        return MIN_MINUTES_FOR_ADJUSTMENT + inverted * (MAX_MINUTES_FOR_ADJUSTMENT - MIN_MINUTES_FOR_ADJUSTMENT);
     }
 
     @Unique

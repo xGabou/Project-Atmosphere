@@ -274,7 +274,7 @@ public class ForecastOrchestrator {
     public static void tick(ServerLevel level) {
         GlassDamageManager.tick(level);
         if (sandStormLoaded)
-            ForecastGenerator.tickSandstormScheduler(level);
+            SandStormManager.tickSandstormScheduler(level);
 
         SunlightController.update(level);
         CycloneManager.update(level);
