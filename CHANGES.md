@@ -1,6 +1,15 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
+## 0.5.5.7 – Cloud persistence tuning (2025-11-13)
+- Clouds now ease toward a humidity-driven target thickness instead of jumping immediately, so growth and dissipation happen over minutes rather than seconds.
+- Dissipation speed scales with biome dryness, letting humid areas keep their systems intact while extreme deserts still erode storms after several minutes of exposure.
+- Rain intensity ramps in slowly alongside thickness, preventing sudden downpours when a cloud first spawns.
+
+## 0.5.5.7 – Cloud spawn throttling (2025-11-12)
+- Added a respawn cooldown to the atmospheric cloud manager so SimpleClouds visuals are not re-created every tick when humidity rapidly crosses the storm threshold.
+- Cloud data now persists through dissipation cycles and only attempts a new spawn once the cooldown elapses, preventing runaway "cloud rave" behaviour.
+
 ## 0.5.5.7 – Storm factor integration (2025-11-11)
 - Removed the legacy storm chance forecast data in favour of live storm factors so gusts, cloud spawners, and SimpleClouds hooks follow the new cyclone/sunlight-driven core.
 - Wind gust multipliers now scale smoothly with the measured storm factor instead of toggling at a fixed threshold.
