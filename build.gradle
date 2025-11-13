@@ -6,13 +6,14 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
     id 'com.matthewprenger.cursegradle' version '1.4.0' // CurseForge uploader
     id "com.modrinth.minotaur" version "2.8.10" // Modrinth uploader
+    id 'maven-publish'
 }
 
 group = mod_group_id
 version = mod_version
 
 base {
-    archivesName = "Forge-Version-"+mod_id
+    archivesName = "Forge-Version-" + mod_id
 }
 
 
@@ -41,8 +42,6 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
-            property 'mixin.env.remapRefMap', 'true'
-            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
 
 
         }
@@ -92,6 +91,23 @@ repositories {
     }
     maven { url "https://maven.theillusivec4.top/" }
     flatDir { dir 'libs' }
+    maven {
+        url = uri("https://maven.pkg.github.com/xGabou/Gabou-s-Libs")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+            password = System.getenv("GITHUB_TOKEN")
+        }
+
+    }
+    maven {
+        name = "Architectury"
+        url = "https://maven.architectury.dev/"
+    }
+
+
+
+
+
 }
 
 
@@ -107,9 +123,14 @@ dependencies {
     implementation fg.deobf("curse.maven:betterdays-895618:7013807")
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
-    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7117649")
+    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7174860")
     implementation fg.deobf("curse.maven:rainboows-1121832:6421980")
     implementation fg.deobf("curse.maven:auroras-1105290:6040671")
+    implementation "io.github.xgabou:gaboulibs_forge:1.2"
+    implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
+
+
+
 //    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))
 
 
@@ -125,7 +146,7 @@ dependencies {
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:15.8.2.26")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:15.8.2.26")
     runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:15.8.2.26")
-    runtimeOnly( fg.deobf("curse.maven:jade-324717:6271651"))
+    runtimeOnly(fg.deobf("curse.maven:jade-324717:6271651"))
     implementation fg.deobf("curse.maven:serene-seasons-291874:6398227")
     implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
     implementation fg.deobf("curse.maven:spark-361579:4738952")
@@ -135,19 +156,19 @@ dependencies {
 
 tasks.named('processResources', ProcessResources).configure {
     def replaceProps = [
-            minecraft_version: minecraft_version,
+            minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
-            forge_version: forge_version,
-            forge_version_range: forge_version_range,
-            loader_version_range: loader_version_range,
-            mod_id: mod_id,
-            mod_name: mod_name,
-            mod_license: mod_license,
-            mod_version: mod_version,
-            mod_authors: mod_authors,
-            mod_description: mod_description,
-            mod_logo_file: logo_file,
-            mod_mixins: mod_mixins,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+            mod_logo_file          : logo_file,
+            mod_mixins             : mod_mixins,
     ]
     inputs.properties replaceProps
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
@@ -182,6 +203,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 import groovy.json.JsonOutput
+
 tasks.register("discordWebhook") {
     doLast {
         def webhookUrl = System.getenv("DISCORD_WEBHOOK_URL")?.trim()
@@ -193,9 +215,9 @@ tasks.register("discordWebhook") {
         def changelogText = rootProject.file("PAchangelog.md").text
 
         def payload = [
-                username: "Build Bot",
-                allowed_mentions: [ parse: ["roles"] ],
-                content: "**New release published!** 🎉\n" +
+                username        : "Build Bot",
+                allowed_mentions: [parse: ["roles"]],
+                content         : "**New release published!** 🎉\n" +
                         "<@&1401956072784269443>\n" + // role mention
                         "Project: ${mod_name}\n" +
                         "Version: v${project.mod_version}-1.20.1\n\n" +
@@ -221,7 +243,7 @@ modrinth {
     changelog = rootProject.file("PAchangelog.md").text
     gameVersions = ["1.20.1"]
     loaders = ["forge"]
-    versionType = "beta"
+    versionType = "alpha"
     dependencies {
         required.project "e0bNACJD"
         required.project "4Al4H3t9"
@@ -237,7 +259,7 @@ if (curseForgeToken) {
         project {
             id = "1258344"
             changelog = rootProject.file("PAchangelog.md")
-            releaseType = "beta" // options: alpha, beta, release
+            releaseType = "alpha" // options: alpha, beta, release
             addGameVersion "1.20.1"
             addGameVersion "Forge"
             mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
@@ -249,6 +271,27 @@ if (curseForgeToken) {
     logger.lifecycle("CURSEFORGE_TOKEN not set; CurseForge upload tasks will be disabled.")
     tasks.matching { it.name.toLowerCase().contains("curseforge") }.configureEach { enabled = false }
 }
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
 
+            groupId = 'net.gabou'          // your group
+            artifactId = 'PA'       // your library name
+            version = project.version              // update per release
+        }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/xGabou/Project-Atmosphere/Forge")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
 
 

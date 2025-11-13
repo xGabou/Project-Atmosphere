@@ -3041,9 +3041,662 @@ public class BiomeTempConfig {
                 new Range(6f, 14f)
         }); // Warm green forest with large zelkova trees
 
+        putAllSeasons("natures_spirit:alpine_clearings", new Range[]{
+                new Range(-10f, 2f),
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(0f, 8f)
+        });
+
+        putAllSeasons("natures_spirit:alpine_highlands", new Range[]{
+                new Range(-12f, 0f),
+                new Range(0f, 8f),
+                new Range(8f, 16f),
+                new Range(-2f, 6f)
+        });
+
+        putAllSeasons("natures_spirit:amber_covert", new Range[]{
+                new Range(-6f, 4f),
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(2f, 10f)
+        });
+
+        putAllSeasons("natures_spirit:arid_highlands", new Range[]{
+                new Range(8f, 18f),
+                new Range(18f, 28f),
+                new Range(28f, 38f),
+                new Range(15f, 25f)
+        });
+
+        putAllSeasons("natures_spirit:arid_savanna", new Range[]{
+                new Range(12f, 22f),
+                new Range(22f, 32f),
+                new Range(32f, 40f),
+                new Range(18f, 28f)
+        });
+
+        putAllSeasons("natures_spirit:aspen_forest", new Range[]{
+                new Range(-4f, 6f),
+                new Range(6f, 14f),
+                new Range(14f, 22f),
+                new Range(4f, 12f)
+        });
+
+        putAllSeasons("natures_spirit:bamboo_wetlands", new Range[]{
+                new Range(18f, 26f),
+                new Range(26f, 32f),
+                new Range(32f, 38f),
+                new Range(20f, 28f)
+        });
+
+        putAllSeasons("natures_spirit:blooming_dunes", new Range[]{
+                new Range(16f, 26f),
+                new Range(26f, 34f),
+                new Range(34f, 44f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("natures_spirit:blooming_highlands", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(20f, 28f),
+                new Range(8f, 16f)
+        });
+
+        putAllSeasons("natures_spirit:blooming_sugi_forest", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(6f, 14f)
+        });
+
+        putAllSeasons("natures_spirit:boreal_taiga", new Range[]{
+                new Range(-18f, -4f),
+                new Range(-4f, 6f),
+                new Range(6f, 16f),
+                new Range(-2f, 6f)
+        });
+
+        putAllSeasons("natures_spirit:carnation_fields", new Range[]{
+                new Range(6f, 14f),
+                new Range(14f, 22f),
+                new Range(22f, 30f),
+                new Range(10f, 18f)
+        });
+
+        putAllSeasons("natures_spirit:chaparral", new Range[]{
+                new Range(6f, 16f),
+                new Range(16f, 24f),
+                new Range(24f, 32f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("natures_spirit:coniferous_covert", new Range[]{
+                new Range(-6f, 4f),
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(2f, 10f)
+        });
+
+        putAllSeasons("natures_spirit:cypress_fields", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(6f, 14f)
+        });
+
+        putAllSeasons("natures_spirit:drylands", new Range[]{
+                new Range(18f, 28f),
+                new Range(28f, 36f),
+                new Range(36f, 46f),
+                new Range(20f, 32f)
+        });
+
+        putAllSeasons("natures_spirit:dusty_slopes", new Range[]{
+                new Range(14f, 24f),
+                new Range(24f, 32f),
+                new Range(32f, 40f),
+                new Range(16f, 26f)
+        });
+
+        putAllSeasons("natures_spirit:fir_forest", new Range[]{
+                new Range(-4f, 6f),
+                new Range(6f, 14f),
+                new Range(14f, 22f),
+                new Range(4f, 12f)
+        });
+
+        putAllSeasons("natures_spirit:floral_ridges", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(20f, 28f),
+                new Range(8f, 16f)
+        });
+
+        putAllSeasons("natures_spirit:flowering_shrubland", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(20f, 28f),
+                new Range(8f, 16f)
+        });
+
+        putAllSeasons("natures_spirit:golden_wilds", new Range[]{
+                new Range(0f, 8f),
+                new Range(8f, 16f),
+                new Range(16f, 24f),
+                new Range(6f, 14f)
+        });
+
+        putAllSeasons("natures_spirit:heather_fields", new Range[]{
+                new Range(0f, 8f),
+                new Range(8f, 16f),
+                new Range(16f, 24f),
+                new Range(6f, 14f)
+        });
+
+        putAllSeasons("natures_spirit:lavender_fields", new Range[]{
+                new Range(8f, 16f),
+                new Range(16f, 24f),
+                new Range(24f, 32f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("natures_spirit:lively_dunes", new Range[]{
+                new Range(16f, 26f),
+                new Range(26f, 34f),
+                new Range(34f, 44f),
+                new Range(20f, 30f)
+        });
+
+        putAllSeasons("natures_spirit:maple_woodlands", new Range[]{
+                new Range(-2f, 8f),
+                new Range(8f, 16f),
+                new Range(16f, 24f),
+                new Range(4f, 14f)
+        });
+
+        putAllSeasons("natures_spirit:marigold_meadows", new Range[]{
+                new Range(4f, 12f),
+                new Range(12f, 20f),
+                new Range(20f, 28f),
+                new Range(8f, 16f)
+        });
+
+        putAllSeasons("natures_spirit:marsh", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 26f),
+                new Range(6f, 14f)
+        });
+
+        putAllSeasons("natures_spirit:oak_savanna", new Range[]{
+                new Range(10f, 20f),
+                new Range(20f, 28f),
+                new Range(28f, 34f),
+                new Range(14f, 24f)
+        });
+
+        putAllSeasons("natures_spirit:prairie", new Range[]{
+                new Range(-2f, 8f),
+                new Range(8f, 18f),
+                new Range(18f, 26f),
+                new Range(6f, 14f)
+        });
+
+        putAllSeasons("natures_spirit:red_peaks", new Range[]{
+                new Range(-8f, 2f),
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(0f, 8f)
+        });
+
+        putAllSeasons("natures_spirit:redwood_forest", new Range[]{
+                new Range(2f, 10f),
+                new Range(10f, 18f),
+                new Range(18f, 24f),
+                new Range(6f, 14f)
+        });
+
+        putAllSeasons("terralith:alpha_islands", new Range[]{
+                new Range(2, 7),   // Winter
+                new Range(9, 15),  // Spring
+                new Range(17, 24), // Summer
+                new Range(10, 16)  // Fall
+        });
+        putAllSeasons("terralith:alpine_grove", new Range[]{
+                new Range(-10, -3),
+                new Range(1, 8),
+                new Range(10, 17),
+                new Range(3, 8)
+        });
+        putAllSeasons("terralith:alpine_highlands", new Range[]{
+                new Range(-15, -5),
+                new Range(-2, 6),
+                new Range(6, 14),
+                new Range(0, 6)
+        });
+        putAllSeasons("terralith:amethyst_canyon", new Range[]{
+                new Range(5, 11),
+                new Range(12, 18),
+                new Range(20, 28),
+                new Range(14, 19)
+        });
+        putAllSeasons("terralith:amethyst_rainforest", new Range[]{
+                new Range(15, 20),
+                new Range(22, 27),
+                new Range(26, 32),
+                new Range(20, 25)
+        });
+        putAllSeasons("terralith:ancient_sands", new Range[]{
+                new Range(10, 20),
+                new Range(20, 28),
+                new Range(30, 42),
+                new Range(22, 30)
+        });
+        putAllSeasons("terralith:arid_highlands", new Range[]{
+                new Range(5, 15),
+                new Range(15, 22),
+                new Range(28, 35),
+                new Range(20, 25)
+        });
+        putAllSeasons("terralith:ashen_savanna", new Range[]{
+                new Range(18, 22),
+                new Range(22, 28),
+                new Range(30, 36),
+                new Range(25, 30)
+        });
+        putAllSeasons("terralith:basalt_cliffs", new Range[]{
+                new Range(2, 6),
+                new Range(8, 14),
+                new Range(15, 22),
+                new Range(10, 15)
+        });
+        putAllSeasons("terralith:birch_taiga", new Range[]{
+                new Range(-8, 0),
+                new Range(4, 10),
+                new Range(14, 22),
+                new Range(7, 13)
+        });
+        putAllSeasons("terralith:blooming_plateau", new Range[]{
+                new Range(0, 5),
+                new Range(10, 17),
+                new Range(22, 30),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:brushland", new Range[]{
+                new Range(5, 10),
+                new Range(15, 22),
+                new Range(30, 38),
+                new Range(18, 25)
+        });
+        putAllSeasons("terralith:bryce_canyon", new Range[]{
+                new Range(0, 5),
+                new Range(10, 17),
+                new Range(28, 35),
+                new Range(15, 22)
+        });
+        putAllSeasons("terralith:caldera", new Range[]{
+                new Range(2, 8),
+                new Range(10, 18),
+                new Range(18, 26),
+                new Range(12, 17)
+        });
+        putAllSeasons("terralith:cloud_forest", new Range[]{
+                new Range(10, 15),
+                new Range(18, 24),
+                new Range(26, 30),
+                new Range(17, 22)
+        });
+        putAllSeasons("terralith:cold_shrubland", new Range[]{
+                new Range(-8, -2),
+                new Range(2, 10),
+                new Range(14, 20),
+                new Range(6, 11)
+        });
+        putAllSeasons("terralith:desert_canyon", new Range[]{
+                new Range(12, 18),
+                new Range(20, 28),
+                new Range(35, 45),
+                new Range(22, 30)
+        });
+        putAllSeasons("terralith:emerald_peaks", new Range[]{
+                new Range(-12, -4),
+                new Range(0, 6),
+                new Range(8, 15),
+                new Range(-2, 5)
+        });
+        putAllSeasons("terralith:forested_highlands", new Range[]{
+                new Range(-5, 2),
+                new Range(5, 12),
+                new Range(15, 22),
+                new Range(8, 14)
+        });
+        putAllSeasons("terralith:frozen_cliffs", new Range[]{
+                new Range(-20, -10),
+                new Range(-8, 0),
+                new Range(0, 5),
+                new Range(-5, 0)
+        });
+        putAllSeasons("terralith:glacial_chasm", new Range[]{
+                new Range(-25, -15),
+                new Range(-10, -5),
+                new Range(-2, 4),
+                new Range(-8, -3)
+        });
+        putAllSeasons("terralith:gravel_desert", new Range[]{
+                new Range(5, 12),
+                new Range(15, 22),
+                new Range(30, 38),
+                new Range(20, 25)
+        });
+        putAllSeasons("terralith:haze_mountain", new Range[]{
+                new Range(0, 4),
+                new Range(10, 16),
+                new Range(20, 28),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:highlands", new Range[]{
+                new Range(0, 5),
+                new Range(8, 15),
+                new Range(20, 26),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:hot_shrubland", new Range[]{
+                new Range(8, 12),
+                new Range(15, 22),
+                new Range(28, 36),
+                new Range(20, 25)
+        });
+        putAllSeasons("terralith:jungle_mountains", new Range[]{
+                new Range(22, 25),
+                new Range(25, 30),
+                new Range(30, 36),
+                new Range(24, 28)
+        });
+        putAllSeasons("terralith:lavender_forest", new Range[]{
+                new Range(5, 10),
+                new Range(12, 18),
+                new Range(22, 28),
+                new Range(14, 20)
+        });
+        putAllSeasons("terralith:mirage_isles", new Range[]{
+                new Range(12, 18),
+                new Range(20, 26),
+                new Range(30, 36),
+                new Range(20, 25)
+        });
+        putAllSeasons("terralith:moonlight_valley", new Range[]{
+                new Range(4, 9),
+                new Range(12, 18),
+                new Range(22, 28),
+                new Range(14, 20)
+        });
+        putAllSeasons("terralith:mountain_steppe", new Range[]{
+                new Range(-5, 2),
+                new Range(5, 12),
+                new Range(18, 24),
+                new Range(10, 16)
+        });
+        putAllSeasons("terralith:rocky_mountains", new Range[]{
+                new Range(-8, 0),
+                new Range(5, 12),
+                new Range(20, 28),
+                new Range(10, 16)
+        });
+        putAllSeasons("terralith:snowy_badlands", new Range[]{
+                new Range(-5, 0),
+                new Range(2, 8),
+                new Range(10, 16),
+                new Range(4, 9)
+        });
+        putAllSeasons("terralith:steppe", new Range[]{
+                new Range(-3, 5),
+                new Range(10, 18),
+                new Range(25, 32),
+                new Range(15, 22)
+        });
+        putAllSeasons("terralith:temperate_highlands", new Range[]{
+                new Range(2, 8),
+                new Range(12, 18),
+                new Range(22, 30),
+                new Range(14, 20)
+        });
+        putAllSeasons("terralith:tropical_jungle", new Range[]{
+                new Range(24, 28),
+                new Range(27, 32),
+                new Range(32, 38),
+                new Range(26, 30)
+        });
+        putAllSeasons("terralith:volcanic_peaks", new Range[]{
+                new Range(10, 16),
+                new Range(15, 22),
+                new Range(25, 32),
+                new Range(18, 25)
+        });
+        putAllSeasons("terralith:volcanic_plains", new Range[]{
+                new Range(12, 18),
+                new Range(18, 24),
+                new Range(28, 36),
+                new Range(20, 26)
+        });
+        putAllSeasons("terralith:weeping_witch_forest", new Range[]{
+                new Range(4, 9),
+                new Range(10, 16),
+                new Range(20, 26),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:windy_snowfields", new Range[]{
+                new Range(-20, -10),
+                new Range(-8, 0),
+                new Range(0, 5),
+                new Range(-6, -1)
+        });
+        putAllSeasons("terralith:windswept_spires", new Range[]{
+                new Range(-5, 0),
+                new Range(5, 10),
+                new Range(16, 22),
+                new Range(8, 14)
+        });
+        putAllSeasons("terralith:winter_taiga", new Range[]{
+                new Range(-15, -5),
+                new Range(-2, 5),
+                new Range(10, 16),
+                new Range(2, 7)
+        });
+        putAllSeasons("terralith:withered_badlands", new Range[]{
+                new Range(5, 10),
+                new Range(15, 22),
+                new Range(28, 36),
+                new Range(18, 24)
+        });
+        putAllSeasons("terralith:wooded_badlands", new Range[]{
+                new Range(5, 10),
+                new Range(12, 18),
+                new Range(25, 32),
+                new Range(16, 22)
+        });
+        putAllSeasons("terralith:yellowstone", new Range[]{
+                new Range(0, 5),
+                new Range(10, 16),
+                new Range(20, 26),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:yosemite_cliffs", new Range[]{
+                new Range(-8, -2),
+                new Range(5, 12),
+                new Range(18, 26),
+                new Range(10, 16)
+        });
+        putAllSeasons("terralith:yosemite_lowlands", new Range[]{
+                new Range(0, 6),
+                new Range(10, 17),
+                new Range(22, 30),
+                new Range(14, 20)
+        });
+        putAllSeasons("terralith:zen_garden", new Range[]{
+                new Range(5, 10),
+                new Range(12, 18),
+                new Range(22, 28),
+                new Range(14, 20)
+        });
+        putAllSeasons("terralith:ancient_dunes", new Range[]{
+                new Range(8, 14),
+                new Range(16, 24),
+                new Range(34, 42),
+                new Range(20, 28)
+        });
+        putAllSeasons("terralith:crimson_gardens", new Range[]{
+                new Range(10, 15),
+                new Range(15, 22),
+                new Range(24, 30),
+                new Range(16, 21)
+        });
+        putAllSeasons("terralith:skylands", new Range[]{
+                new Range(-5, 2),
+                new Range(4, 10),
+                new Range(14, 22),
+                new Range(6, 12)
+        });
+        putAllSeasons("terralith:skylands_forest", new Range[]{
+                new Range(0, 5),
+                new Range(8, 14),
+                new Range(18, 25),
+                new Range(10, 16)
+        });
+        putAllSeasons("terralith:skylands_plateau", new Range[]{
+                new Range(-2, 4),
+                new Range(7, 12),
+                new Range(16, 22),
+                new Range(9, 14)
+        });
+        putAllSeasons("terralith:skylands_valley", new Range[]{
+                new Range(2, 6),
+                new Range(10, 16),
+                new Range(20, 26),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:windswept_archipelago", new Range[]{
+                new Range(6, 10),
+                new Range(12, 18),
+                new Range(24, 30),
+                new Range(16, 22)
+        });
+        putAllSeasons("terralith:oasis", new Range[]{
+                new Range(10, 16),
+                new Range(20, 26),
+                new Range(30, 38),
+                new Range(24, 30)
+        });
+        putAllSeasons("terralith:savanna_slopes", new Range[]{
+                new Range(14, 20),
+                new Range(22, 28),
+                new Range(30, 36),
+                new Range(24, 30)
+        });
+        putAllSeasons("terralith:red_oasis", new Range[]{
+                new Range(10, 16),
+                new Range(20, 26),
+                new Range(32, 40),
+                new Range(24, 30)
+        });
+        putAllSeasons("terralith:glowcave", new Range[]{
+                new Range(8, 12),
+                new Range(14, 20),
+                new Range(22, 28),
+                new Range(16, 22)
+        });
+        putAllSeasons("terralith:overgrown_cliffs", new Range[]{
+                new Range(2, 8),
+                new Range(10, 16),
+                new Range(20, 26),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:lavender_pines", new Range[]{
+                new Range(0, 5),
+                new Range(10, 16),
+                new Range(20, 28),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:rainbow_rainforest", new Range[]{
+                new Range(20, 24),
+                new Range(24, 28),
+                new Range(30, 36),
+                new Range(26, 30)
+        });
+        putAllSeasons("terralith:crystal_canyon", new Range[]{
+                new Range(5, 10),
+                new Range(12, 18),
+                new Range(26, 32),
+                new Range(18, 24)
+        });
+        putAllSeasons("terralith:desert_spires", new Range[]{
+                new Range(10, 16),
+                new Range(20, 28),
+                new Range(35, 44),
+                new Range(22, 30)
+        });
+        putAllSeasons("terralith:ebony_woods", new Range[]{
+                new Range(6, 10),
+                new Range(12, 18),
+                new Range(20, 26),
+                new Range(14, 20)
+        });
+        putAllSeasons("terralith:ancient_forest", new Range[]{
+                new Range(0, 5),
+                new Range(10, 16),
+                new Range(20, 26),
+                new Range(12, 18)
+        });
+        putAllSeasons("terralith:orchid_swamp", new Range[]{
+                new Range(6, 12),
+                new Range(14, 20),
+                new Range(24, 30),
+                new Range(16, 22)
+        });
+        putAllSeasons("terralith:scarlet_forest", new Range[]{
+                new Range(8, 14),
+                new Range(16, 22),
+                new Range(26, 32),
+                new Range(18, 24)
+        });
+        putAllSeasons("terralith:snowy_taiga_valley", new Range[]{
+                new Range(-10, -3),
+                new Range(0, 6),
+                new Range(10, 18),
+                new Range(2, 8)
+        });
+        putAllSeasons("terralith:twilight_peak", new Range[]{
+                new Range(-4, 2),
+                new Range(5, 12),
+                new Range(16, 22),
+                new Range(8, 14)
+        });
+        putAllSeasons("terralith:warm_beach_cliff", new Range[]{
+                new Range(12, 18),
+                new Range(18, 24),
+                new Range(26, 32),
+                new Range(20, 26)
+        });
+        putAllSeasons("terralith:wetland_valley", new Range[]{
+                new Range(8, 14),
+                new Range(14, 20),
+                new Range(22, 28),
+                new Range(16, 22)
+        });
+        putAllSeasons("terralith:windswept_savanna", new Range[]{
+                new Range(12, 18),
+                new Range(20, 26),
+                new Range(30, 36),
+                new Range(22, 28)
+        });
+
+
 
 
     }
+
+
 
 
 

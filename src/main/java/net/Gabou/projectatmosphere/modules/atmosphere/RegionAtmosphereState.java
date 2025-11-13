@@ -28,6 +28,8 @@ public class RegionAtmosphereState {
     private final float[] dailyTemperatureProfile;
     private final float[] dailyHumidityProfile;
     private final float[] dailyPressureProfile;
+    private final float baselineMinTemp;
+    private final float baselineMaxTemp;
 
     private float temperature;
     private float humidity; // normalized 0..1
@@ -50,6 +52,9 @@ public class RegionAtmosphereState {
         this.dailyTemperatureProfile = initialiseDailyCurve(forecast.getTemperatureDay(), baseTemperature);
         this.dailyHumidityProfile = initialiseDailyCurveScaled(forecast.getHumidityDay(), this.humidity, 100f);
         this.dailyPressureProfile = initialiseDailyCurve(forecast.getPressureDay(), basePressure);
+        float[] bounds = computeTemperatureBounds(this.dailyTemperatureProfile, baseTemperature);
+        this.baselineMinTemp = bounds[0];
+        this.baselineMaxTemp = bounds[1];
     }
 
     public static RegionAtmosphereState fromForecast(BiomeInstanceKey key, BiomeForecast forecast) {
@@ -212,6 +217,22 @@ public class RegionAtmosphereState {
         double dz = key.samplePos().getZ() - z;
         return Math.sqrt(dx * dx + dz * dz);
     }
+    public float getBaselineMinTemperature() {
+        return baselineMinTemp;
+    }
+
+    public float getBaselineMaxTemperature() {
+        return baselineMaxTemp;
+    }
+
+    public float getBaselineTemperatureSpan() {
+        return Math.max(0.001f, baselineMaxTemp - baselineMinTemp);
+    }
+
+    public float getSunlightDrivenTemperature(float sunlightFactor) {
+        float clamped = Mth.clamp(sunlightFactor, 0f, 1f);
+        return Mth.lerp(clamped, baselineMinTemp, baselineMaxTemp);
+    }
 
     private static float clampHumidity(float value) {
         return Mth.clamp(value, 0f, 1.2f);
@@ -279,5 +300,28 @@ public class RegionAtmosphereState {
         float lowerValue = source[lower];
         float upperValue = source[upper];
         return lowerValue + (upperValue - lowerValue) * t;
+    }
+
+    private static float[] computeTemperatureBounds(float[] profile, float fallback) {
+        if (profile == null || profile.length == 0) {
+            return new float[]{fallback - 2f, fallback + 2f};
+        }
+        float min = Float.POSITIVE_INFINITY;
+        float max = Float.NEGATIVE_INFINITY;
+        for (float value : profile) {
+            if (Float.isNaN(value)) {
+                continue;
+            }
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+        }
+        if (!Float.isFinite(min) || !Float.isFinite(max)) {
+            return new float[]{fallback - 2f, fallback + 2f};
+        }
+        if (min == max) {
+            min -= 2f;
+            max += 2f;
+        }
+        return new float[]{min, max};
     }
 }

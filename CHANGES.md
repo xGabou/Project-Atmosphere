@@ -1,5 +1,11 @@
-# Project Atmosphere — Developer Change Log
+# Project Atmosphere – Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+
+## 0.6.0.0-pre1 – Cloud region unification (2025-11-14)
+- Rebuilt the atmospheric cloud manager so each SimpleClouds `CloudRegion` now carries its own thickness, rain intensity, and lifecycle instead of duplicating data per biome sample.
+- Region scans now run on `AsyncAtmosphereService`, averaging humidity/temperature for only the biomes under each cloud footprint and projecting the combined cover back to those biomes.
+- Cloud growth and shrink follow humidity and temperature trends while spawn attempts reuse the old `trySpawnClouds` heuristics to find humid hotspots asynchronously before creating regions on the main thread.
+- Sunlight now lerps toward forecast-derived daily min/max temperatures, preventing runaway heat spikes (e.g., 25C -> 139C swings in sparse jungles) while still letting rain, humidity, and wind modules nudge the live value.
 
 ## 0.5.5.7 – Cloud rave pacing (2025-11-14)
 - Clouds no longer react every tick; they now require minutes/days of stability above a biome before the humidity-driven radius/lifetime adjustments kick in, producing a smoother, rave-like rhythm.

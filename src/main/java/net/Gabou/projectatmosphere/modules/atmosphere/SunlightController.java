@@ -24,13 +24,17 @@ public final class SunlightController {
             float biomeScale = state.getBiomeSunlightMultiplier();
             float sunlightFactor = daylight * biomeScale * seasonal;
             sunlightFactor *= Math.max(0f, 1f - cloudCover);
-            sunlightFactor = Math.max(0f, sunlightFactor);
-            state.setSunlight(Math.min(sunlightFactor, 1f));
+            sunlightFactor = Mth.clamp(sunlightFactor, 0f, 1f);
+            state.setSunlight(sunlightFactor);
 
-            state.adjustTemperature(sunlightFactor * 6f);
-            state.adjustHumidity(sunlightFactor * 0.02f);
-            state.adjustTemperature(-cloudCover * 6f);
-            state.adjustHumidity(-rainIntensity * 0.05f);
+            float baseTarget = state.getSunlightDrivenTemperature(sunlightFactor);
+            float rainPenalty = rainIntensity * state.getBaselineTemperatureSpan() * 0.15f;
+            float adjustedTarget = baseTarget - rainPenalty;
+            float blended = Mth.lerp(0.35f, state.getTemperature(), adjustedTarget);
+            state.setTemperature(blended);
+
+            float humidityDelta = (rainIntensity * 0.02f) - (sunlightFactor * 0.01f);
+            state.adjustHumidity(humidityDelta);
 
             state.relaxTowardBase(0.0005f);
             state.recordDailySnapshot(dayTime);

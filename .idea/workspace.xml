@@ -5,8 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: integrate auroras and rainbows compatibility, enhance storm severity calculations, and update version to 0.5.5.7">
+      <change afterPath="$PROJECT_DIR$/src/test/java/Test.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/PAMixinPlugin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/PAMixinPlugin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/RegionAtmosphereState.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/RegionAtmosphereState.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/SunlightController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/SunlightController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/META-INF/mods.toml" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -50,19 +60,7 @@
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="project-atmosphere" type="f1a62948:ProjectNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
-                <item name="forgegradle prepare runs" type="c8890929:TasksNode$1" />
-              </path>
-              <path>
-                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
-                <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="forgegradle runs" type="c8890929:TasksNode$1" />
-              </path>
-              <path>
-                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
-                <item name="Tasks" type="e4a08cd1:TasksNode" />
-                <item name="help" type="c8890929:TasksNode$1" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
@@ -195,6 +193,7 @@
     &quot;Gradle.G:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.H:/Project-Atmosphere [createMcpToSrg].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.H:/Project-Atmosphere [wrapper genIntellijRuns].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [:Test.main()].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [:cpw.mods.bootstraplauncher.BootstrapLauncher.main()].executor&quot;: &quot;Debug&quot;,
     &quot;Gradle.Project-Atmosphere [:net.Gabou.projectatmosphere.tools.FlowMapGenerator.main()].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [:prepareRunClientCompile].executor&quot;: &quot;Run&quot;,
@@ -205,9 +204,11 @@
     &quot;Gradle.Project-Atmosphere [discordWebhook].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [extractNatives].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [extractSrg].executor&quot;: &quot;Run&quot;,
-    &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.Project-Atmosphere [genIntellijRuns].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [makeSrcDirs].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [modrinth].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [publishMavenJavaPublicationToGitHubPackagesRepository].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Project-Atmosphere [publish].executor&quot;: &quot;Run&quot;,
     &quot;Gradle.Project-Atmosphere [runClient].executor&quot;: &quot;Debug&quot;,
     &quot;Gradle.Project-Atmosphere [runData].executor&quot;: &quot;Debug&quot;,
     &quot;Gradle.Project-Atmosphere [runGameTestServer].executor&quot;: &quot;Run&quot;,
@@ -236,7 +237,7 @@
     &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
     &quot;project.structure.side.proportion&quot;: &quot;0.6172414&quot;,
     &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.keymap&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
   &quot;keyToStringList&quot;: {
@@ -278,28 +279,6 @@
     </key>
   </component>
   <component name="RunManager" selected="Gradle.Project-Atmosphere [discordWebhook]">
-    <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
-      <ExternalSystemSettings>
-        <option name="executionName" />
-        <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="externalSystemIdString" value="GRADLE" />
-        <option name="scriptParameters" />
-        <option name="taskDescriptions">
-          <list />
-        </option>
-        <option name="taskNames">
-          <list>
-            <option value="build" />
-          </list>
-        </option>
-        <option name="vmOptions" />
-      </ExternalSystemSettings>
-      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
-      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
-      <DebugAllEnabled>false</DebugAllEnabled>
-      <RunAsTest>false</RunAsTest>
-      <method v="2" />
-    </configuration>
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -388,6 +367,28 @@
       <RunAsTest>false</RunAsTest>
       <method v="2" />
     </configuration>
+    <configuration name="Project-Atmosphere [publishMavenJavaPublicationToGitHubPackagesRepository]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value="publishMavenJavaPublicationToGitHubPackagesRepository" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <method v="2" />
+    </configuration>
     <configuration name="Project-Atmosphere [runClient]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -460,7 +461,7 @@
         <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
         <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
+        <item itemvalue="Gradle.Project-Atmosphere [publishMavenJavaPublicationToGitHubPackagesRepository]" />
       </list>
     </recent_temporary>
   </component>
@@ -620,6 +621,8 @@
       <workItem from="1762958966778" duration="13382000" />
       <workItem from="1762981021741" duration="196000" />
       <workItem from="1762981603903" duration="696000" />
+      <workItem from="1763040829892" duration="3627000" />
+      <workItem from="1763045155472" duration="13972000" />
     </task>
     <task id="LOCAL-00076" summary="fix: update legendary survival overhaul dependency and increase max positions per biome">
       <option name="closed" value="true" />
@@ -1145,10 +1148,6 @@
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />
           <option name="timeStamp" value="97" />
-        </breakpoint>
-        <breakpoint enabled="true" type="java-exception">
-          <properties class="java.lang.NoClassDefFoundError" package="java.lang" />
-          <option name="timeStamp" value="220" />
         </breakpoint>
       </breakpoints>
       <default-breakpoints>

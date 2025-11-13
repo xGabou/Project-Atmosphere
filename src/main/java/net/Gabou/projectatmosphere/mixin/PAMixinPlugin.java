@@ -53,13 +53,14 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String s) {
-        
+
     }
 
     @Override
     public String getRefMapperConfig() {
-        return "";
+        return "projectatmosphere.refmap.json";
     }
+
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
