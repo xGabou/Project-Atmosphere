@@ -1,0 +1,169 @@
+package net.Gabou.projectatmosphere.modules.ocean;
+
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.ocean.influence.AtmosphereFluxInfluence;
+import net.Gabou.projectatmosphere.modules.ocean.influence.BasinPressureMemoryInfluence;
+import net.Gabou.projectatmosphere.modules.ocean.influence.BasinThermalMemoryInfluence;
+import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Detects and updates ocean basins as long-lived dynamic agents.
+ */
+public final class OceanBasinManager {
+    private static final Map<Integer, OceanBasin> BASINS = new ConcurrentHashMap<>();
+    private static final AtomicInteger NEXT_ID = new AtomicInteger();
+    private static volatile CompletableFuture<Void> detectionTask = CompletableFuture.completedFuture(null);
+    private static final AtomicBoolean READY = new AtomicBoolean(false);
+
+    private OceanBasinManager() {
+    }
+
+    public static void initialize(ServerLevel level) {
+        READY.set(false);
+        BASINS.clear();
+        NEXT_ID.set(0);
+        detectionTask.cancel(true);
+        detectionTask = CompletableFuture.supplyAsync(OceanBasinManager::detectBasins, AsyncAtmosphereService.getWeatherExecutor())
+                .thenAccept(basins -> {
+                    BASINS.clear();
+                    for (OceanBasin basin : basins) {
+                        BASINS.put(basin.getId(), basin);
+                    }
+                    READY.set(true);
+                    ProjectAtmosphere.LOGGER.info("[Ocean] Detected {} basins", basins.size());
+                })
+                .exceptionally(ex -> {
+                    ProjectAtmosphere.LOGGER.error("[Ocean] Failed to detect basins", ex);
+                    READY.set(false);
+                    return null;
+                });
+    }
+
+    public static void update(ServerLevel level, Set<BiomeInstanceKey> activeKeys) {
+        if (!READY.get() || AtmosphericStateRegistry.isEmpty()) {
+            return;
+        }
+        if (activeKeys.isEmpty()) {
+            return;
+        }
+        OceanUpdateContext context = new OceanUpdateContext(level, level.getGameTime(), 0.05f / 3600f);
+        for (OceanBasin basin : BASINS.values()) {
+            if (!basin.intersects(activeKeys)) {
+                basin.tick(context, Collections.emptySet());
+                continue;
+            }
+            basin.tick(context, activeKeys);
+        }
+    }
+
+    private static List<OceanBasin> detectBasins() {
+        Collection<RegionAtmosphereState> states = AtmosphericStateRegistry.snapshot();
+        if (states.isEmpty()) {
+            return List.of();
+        }
+        Map<BiomeInstanceKey, RegionAtmosphereState> oceanStates = new HashMap<>();
+        for (RegionAtmosphereState state : states) {
+            if (OceanBiomeClassifier.isOcean(state.getKey().biomeType())) {
+                oceanStates.put(state.getKey(), state);
+            }
+        }
+        if (oceanStates.isEmpty()) {
+            return List.of();
+        }
+
+        Set<BiomeInstanceKey> visited = new HashSet<>();
+        List<OceanBasin> basins = new ArrayList<>();
+        for (RegionAtmosphereState state : oceanStates.values()) {
+            if (visited.contains(state.getKey())) {
+                continue;
+            }
+            basins.add(buildBasin(state.getKey(), oceanStates, visited));
+        }
+        return basins;
+    }
+
+    private static OceanBasin buildBasin(BiomeInstanceKey seed,
+                                         Map<BiomeInstanceKey, RegionAtmosphereState> oceanStates,
+                                         Set<BiomeInstanceKey> visited) {
+        Queue<BiomeInstanceKey> queue = new ArrayDeque<>();
+        queue.add(seed);
+        Set<BiomeInstanceKey> basinCells = new HashSet<>();
+        Map<BiomeInstanceKey, Float> influenceWeights = new HashMap<>();
+        float sumTemp = 0f;
+        float sumHumidity = 0f;
+        float sumPressure = 0f;
+        float sumWindX = 0f;
+        float sumWindZ = 0f;
+        float sumGust = 0f;
+        int count = 0;
+        while (!queue.isEmpty()) {
+            BiomeInstanceKey key = queue.remove();
+            if (!visited.add(key)) {
+                continue;
+            }
+            RegionAtmosphereState state = oceanStates.get(key);
+            if (state == null) {
+                continue;
+            }
+            basinCells.add(key);
+            influenceWeights.put(key, 1f);
+            sumTemp += state.getTemperature();
+            sumHumidity += state.getHumidity();
+            sumPressure += state.getPressure();
+            WindVector wind = state.getWind();
+            if (wind != null) {
+                sumWindX += Math.sin(wind.angleRadians()) * wind.baseSpeed();
+                sumWindZ += Math.cos(wind.angleRadians()) * wind.baseSpeed();
+                sumGust += wind.gustSpeed();
+            }
+            count++;
+            for (BiomeInstanceKey neighbor : AtmosphericStateRegistry.getNeighbors(key)) {
+                if (oceanStates.containsKey(neighbor) && !visited.contains(neighbor)) {
+                    queue.add(neighbor);
+                } else if (!oceanStates.containsKey(neighbor)) {
+                    float weight = influenceWeights.getOrDefault(neighbor, 0f);
+                    influenceWeights.put(neighbor, Math.max(weight, 0.55f));
+                }
+            }
+        }
+        float baseTemp = count == 0 ? 15f : sumTemp / count;
+        float baseHumidity = count == 0 ? 0.9f : sumHumidity / count;
+        float basePressure = count == 0 ? 1013.25f : sumPressure / count;
+        float deepTemp = baseTemp - 2.5f;
+        WindVector windBias = null;
+        if (count > 0) {
+            float avgX = sumWindX / count;
+            float avgZ = sumWindZ / count;
+            float speed = Mth.sqrt(avgX * avgX + avgZ * avgZ) * 0.35f;
+            float angle = (float) Math.atan2(avgX, avgZ);
+            float gust = (sumGust / Math.max(1, count)) * 0.3f;
+            windBias = new WindVector(speed, angle, Math.max(speed, gust));
+        }
+        OceanBasin basin = new OceanBasin(NEXT_ID.getAndIncrement(), basinCells, influenceWeights, baseTemp, baseHumidity, basePressure, deepTemp, windBias);
+        basin.addOceanInfluence(new BasinThermalMemoryInfluence());
+        basin.addOceanInfluence(new BasinPressureMemoryInfluence());
+        basin.addAtmosphereInfluence(new AtmosphereFluxInfluence());
+        return basin;
+    }
+}

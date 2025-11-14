@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.RainSystem;
 import net.Gabou.projectatmosphere.modules.atmosphere.SunlightController;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -277,6 +278,8 @@ public class ForecastOrchestrator {
             SandStormManager.tickSandstormScheduler(level);
 
         SunlightController.update(level);
+        Set<BiomeInstanceKey> activeKeys = getActiveBiomeKeys(level);
+        OceanBasinManager.update(level, activeKeys);
         CycloneManager.update(level);
         WindVector.update(level);
         CloudManager.update(level);
@@ -338,6 +341,7 @@ public class ForecastOrchestrator {
         AtmosphericStateRegistry.rebuildNeighbors();
         CloudManager.initialize(level);
         CycloneManager.initialize(level);
+        OceanBasinManager.initialize(level);
     }
 
     public static void generateWindForecast(BiomeInstanceKey key, BiomeForecast forecast) {
