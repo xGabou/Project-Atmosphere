@@ -24,6 +24,14 @@ public class CompatHandler {
         return ModList.get().isLoaded("rainbows");
     }
 
+    public static boolean isTectonicLoaded() {
+        return ModList.get().isLoaded("tectonic");
+    }
+
+    public static boolean isContinentsLoaded() {
+        return ModList.get().isLoaded("continents");
+    }
+
     public static TemperatureMod getActiveTemperatureMod() {
         if (ModList.get().isLoaded("legendarysurvivaloverhaul")) {
             return TemperatureMod.LEGENDARY_SURVIVAL;
@@ -66,5 +74,11 @@ public class CompatHandler {
         LOGGER.info(isRainbowsLoaded()
                 ? "Rainbows detected – enabling precipitation bridge."
                 : "Rainbows mod not detected.");
+        LOGGER.info(isTectonicLoaded()
+                ? "Tectonic detected – enabling refined ocean geometry."
+                : "Tectonic mod not detected.");
+        LOGGER.info(isContinentsLoaded()
+                ? "Continents detected – enabling refined shoreline geometry."
+                : "Continents mod not detected.");
     }
 }
