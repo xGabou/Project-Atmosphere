@@ -94,7 +94,7 @@ repositories {
     maven {
         url = uri("https://maven.pkg.github.com/xGabou/Gabou-s-Libs")
         credentials {
-            username = System.getenv("GITHUB_ACTOR")
+            username = System.getenv("GITHUB_USER")
             password = System.getenv("GITHUB_TOKEN")
         }
 
@@ -134,6 +134,7 @@ dependencies {
 
 
 //    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))
+    implementation fg.deobf(files("libs/tectonic-3.0.17-forge-1.20.1-dev.jar"))
 
 
     //runtimeOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
