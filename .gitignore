@@ -1,6 +1,7 @@
 /.gradle/
 /build/
 /run/
+/.idea/
 
 /run/config/
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_1_2025_11_21_PM_[Changes]/buildOutputCleanup.lock
