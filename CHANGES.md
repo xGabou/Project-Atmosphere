@@ -1,6 +1,16 @@
 # Project Atmosphere – Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
+## 0.6.0.0-pre2 – Tornado-aware SimpleClouds sync (2025-11-16)
+- Added a public `ITornadoRegion` contract (plus `TornadoDescriptor` and accessor helpers) so controller mods can attach funnel
+  metadata to any SimpleClouds `CloudRegion` and trust the data to serialize across tags, packets, and API events.
+- Extended the existing `CloudRegionMixin` and new API/event mixins to mirror tornado lists through `ScAPICloudRegion` and
+  `CloudRegionTickEvent`, allowing other mods to add/remove funnels without bespoke casts.
+- Injected a client-side SSBO writer for `MultiRegionCloudMeshGenerator` that streams tornado descriptors to a new
+  `CloudTornadoes` buffer and advertises the total count to both compute shaders.
+- Overrode `cloud_regions.comp` and `cube_mesh.comp` so tornado cylinders force full density/fade inside their footprint and
+  punch through noise when voxels fall inside the declared column height.
+
 ## 0.6.0.0-pre2 – Ocean basin integration (2025-11-15)
 - Added a modular ocean basin subsystem that detects contiguous oceanic forecast samples asynchronously and keeps long-lived energy reservoirs in sync with the dynamic core.
 - Introduced polymorphic influence pipelines so basins adjust their own thermal/pressure memory before feeding humidity, pressure, temperature, and wind tendencies into nearby forecast cells.
