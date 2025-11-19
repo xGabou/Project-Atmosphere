@@ -258,7 +258,7 @@ bool isPosValid(float x, float y, float z, int nx, int nz)
     LayerGroup group = layerGroupings.data[regionId];
     float fade = -5.0 * pow(1.0 - info.g, 10.0);
     if (TotalCloudTornadoes > 0 && projectatmosphere$insideTornado(vec3(x, y, z), info.r))
-            return true;
+            return false;
 #if FADE_NEAR_ORIGIN == 1
     float len = distance(vec2(x, z), Origin.xz);
         fade = min(fade, -5.0 * (1.0 - min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0)));

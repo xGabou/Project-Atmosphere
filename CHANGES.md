@@ -10,6 +10,8 @@ This file records functionality additions/removals made during development sessi
   `CloudTornadoes` buffer and advertises the total count to both compute shaders.
 - Overrode `cloud_regions.comp` and `cube_mesh.comp` so tornado cylinders force full density/fade inside their footprint and
   punch through noise when voxels fall inside the declared column height.
+- Fixed the `cube_mesh.comp` neighbor check so tornado interiors are treated as empty space, letting adjacent cubes emit faces
+  and carve a visible funnel cavity.
 
 ## 0.6.0.0-pre2 – Ocean basin integration (2025-11-15)
 - Added a modular ocean basin subsystem that detects contiguous oceanic forecast samples asynchronously and keeps long-lived energy reservoirs in sync with the dynamic core.
