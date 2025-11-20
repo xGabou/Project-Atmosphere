@@ -1,6 +1,6 @@
-package dev.nonamecrackers2.simpleclouds.api.common.event;
+package net.Gabou.projectatmosphere.api.common.event;
 
-import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.TornadoDescriptor;
+import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 
 import java.util.List;
 

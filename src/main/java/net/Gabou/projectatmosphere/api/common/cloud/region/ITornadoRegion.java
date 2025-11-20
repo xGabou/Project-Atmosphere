@@ -1,4 +1,4 @@
-package dev.nonamecrackers2.simpleclouds.api.common.cloud.region;
+package net.Gabou.projectatmosphere.api.common.cloud.region;
 
 import org.jetbrains.annotations.Nullable;
 

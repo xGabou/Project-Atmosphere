@@ -1,15 +1,20 @@
 package net.Gabou.projectatmosphere.mixin;
 
-import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ITornadoRegion;
-import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.TornadoDescriptor;
+import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
+import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.MultiRegionCloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.shader.buffer.ShaderStorageBufferObject;
 import dev.nonamecrackers2.simpleclouds.client.shader.compute.ComputeShader;
+import dev.nonamecrackers2.simpleclouds.common.cloud.CloudInfo;
+import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudGetter;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.minecraft.util.Mth;
 import org.lwjgl.opengl.GL41;
 import org.lwjgl.opengl.GL43;
+import org.joml.Matrix2f;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -17,32 +22,31 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.gen.Invoker;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Mixin(value = MultiRegionCloudMeshGenerator.class, remap = false)
 public abstract class MultiRegionCloudMeshGeneratorMixin {
+    @Unique private static final Logger PROJECTATMOSPHERE$LOGGER = LogManager.getLogger("ProjectAtmosphere/CloudMeshGenerator");
+    @Unique private static final String PROJECTATMOSPHERE$TORNADO_BUFFER_NAME = "CloudTornadoes";
+
     @Shadow @Final public static int MAX_CLOUD_FORMATIONS;
 
     @Shadow protected ComputeShader regionTextureGenerator;
 
-    @Shadow protected ComputeShader shader;
-
     @Shadow protected CloudGetter cloudGetter;
+
+    @Shadow protected CloudInfo[] cachedTypes;
 
     @Unique private static final int PROJECTATMOSPHERE$MAX_TORNADOES = Math.max(1, Integer.getInteger("projectatmosphere.simpleclouds.maxTornadoes", 64));
     @Unique private static final int PROJECTATMOSPHERE$TORNADO_STRIDE = 32;
 
     @Unique private ShaderStorageBufferObject projectatmosphere$tornadoBuffer;
     @Unique private int projectatmosphere$currentTornadoCount;
-
-    @Invoker("lambda$uploadCloudRegionData$4")
-    protected abstract float[] projectatmosphere$invokeRegionUpload(float partialTick, CloudRegion region);
-
-    @Invoker("lambda$uploadCloudRegionData$5")
-    protected abstract boolean projectatmosphere$invokeIsRegionValid(float[] upload);
+    @Unique private boolean projectatmosphere$hasTornadoBlock;
+    @Unique private int projectatmosphere$lastTornadoShaderId = -1;
 
     @Inject(method = "setupShader", at = @At("TAIL"))
     private void projectatmosphere$setupTornadoSsbo(CallbackInfo ci) {
@@ -56,6 +60,10 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         }
         this.projectatmosphere$ensureTornadoBuffer();
         if (this.projectatmosphere$tornadoBuffer == null) {
+            if (this.projectatmosphere$currentTornadoCount != 0) {
+                this.projectatmosphere$currentTornadoCount = 0;
+                this.projectatmosphere$updateTornadoUniforms(0);
+            }
             return;
         }
         List<TornadoUpload> uploads = this.projectatmosphere$collectTornadoUploads(partialTick);
@@ -77,10 +85,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             }, count * PROJECTATMOSPHERE$TORNADO_STRIDE, false);
         }
         this.projectatmosphere$currentTornadoCount = count;
-        this.regionTextureGenerator.forUniform("TotalCloudTornadoes", (name, location) -> GL41.glProgramUniform1i(location, count));
-        if (this.shader != null && this.shader.isValid()) {
-            this.shader.forUniform("TotalCloudTornadoes", (name, location) -> GL41.glProgramUniform1i(location, count));
-        }
+        this.projectatmosphere$updateTornadoUniforms(count);
     }
 
     @Unique
@@ -88,7 +93,10 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (this.regionTextureGenerator == null || this.projectatmosphere$tornadoBuffer != null) {
             return;
         }
-        this.projectatmosphere$tornadoBuffer = this.regionTextureGenerator.createAndBindSSBO("CloudTornadoes", GL43.GL_DYNAMIC_DRAW);
+        if (!this.projectatmosphere$supportsTornadoBuffer()) {
+            return;
+        }
+        this.projectatmosphere$tornadoBuffer = this.regionTextureGenerator.createAndBindSSBO(PROJECTATMOSPHERE$TORNADO_BUFFER_NAME, GL43.GL_DYNAMIC_DRAW);
         if (this.projectatmosphere$tornadoBuffer != null) {
             this.projectatmosphere$tornadoBuffer.allocateBuffer(PROJECTATMOSPHERE$MAX_TORNADOES * PROJECTATMOSPHERE$TORNADO_STRIDE);
         }
@@ -132,8 +140,8 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             return regions;
         }
         for (CloudRegion region : this.cloudGetter.getClouds()) {
-            float[] upload = this.projectatmosphere$invokeRegionUpload(partialTick, region);
-            if (!this.projectatmosphere$invokeIsRegionValid(upload)) {
+            float[] upload = this.projectatmosphere$buildRegionUpload(partialTick, region);
+            if (!this.projectatmosphere$isRegionValid(upload)) {
                 continue;
             }
             regions.add(new RegionUpload(region, upload));
@@ -145,32 +153,72 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     }
 
     @Unique
-    private static final class RegionUpload {
-        private final CloudRegion region;
-        private final float[] data;
-
-        private RegionUpload(CloudRegion region, float[] data) {
-            this.region = region;
-            this.data = data;
-        }
+    private float[] projectatmosphere$buildRegionUpload(float partialTick, CloudRegion region) {
+        Matrix2f transform = region.createTransform(partialTick);
+        int typeIndex = this.projectatmosphere$findCloudTypeIndex(region);
+        return new float[]{
+            region.getPosX(partialTick),
+            region.getPosZ(partialTick),
+            typeIndex,
+            region.getRadius(partialTick),
+            transform.m00,
+            transform.m01,
+            transform.m10,
+            transform.m11
+        };
     }
 
     @Unique
-    private static final class TornadoUpload {
-        private final float typeIndex;
-        private final float centerX;
-        private final float centerZ;
-        private final float radius;
-        private final float bottom;
-        private final float height;
+    private boolean projectatmosphere$isRegionValid(float[] upload) {
+        return upload != null && upload.length > 2 && upload[2] >= 0.0F;
+    }
 
-        private TornadoUpload(float typeIndex, float centerX, float centerZ, float radius, float bottom, float height) {
-            this.typeIndex = typeIndex;
-            this.centerX = centerX;
-            this.centerZ = centerZ;
-            this.radius = radius;
-            this.bottom = bottom;
-            this.height = height;
+    @Unique
+    private int projectatmosphere$findCloudTypeIndex(CloudRegion region) {
+        if (this.cachedTypes == null || this.cachedTypes.length == 0) {
+            return -1;
         }
+        CloudType type = this.cloudGetter.getCloudTypeForId(region.getCloudTypeId());
+        for (int i = 0; i < this.cachedTypes.length; i++) {
+            if (Objects.equals(this.cachedTypes[i], type)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    @Unique
+    private boolean projectatmosphere$supportsTornadoBuffer() {
+        if (this.regionTextureGenerator == null || !this.regionTextureGenerator.isValid()) {
+            return false;
+        }
+        int shaderId = this.regionTextureGenerator.getId();
+        if (shaderId <= 0) {
+            return false;
+        }
+        if (shaderId != this.projectatmosphere$lastTornadoShaderId) {
+            this.projectatmosphere$lastTornadoShaderId = shaderId;
+            int index = GL43.glGetProgramResourceIndex(shaderId, GL43.GL_SHADER_STORAGE_BLOCK, PROJECTATMOSPHERE$TORNADO_BUFFER_NAME);
+            this.projectatmosphere$hasTornadoBlock = index != GL43.GL_INVALID_INDEX;
+            if (!this.projectatmosphere$hasTornadoBlock) {
+                PROJECTATMOSPHERE$LOGGER.warn("Missing '{}' SSBO on shader '{}'; tornado rendering disabled until the shader is updated.", PROJECTATMOSPHERE$TORNADO_BUFFER_NAME, this.regionTextureGenerator.getName());
+            }
+        }
+        return this.projectatmosphere$hasTornadoBlock;
+    }
+
+    @Unique
+    private void projectatmosphere$updateTornadoUniforms(int count) {
+        if (this.regionTextureGenerator != null && this.regionTextureGenerator.isValid()) {
+            this.regionTextureGenerator.forUniform("TotalCloudTornadoes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
+        }
+        ComputeShader shader = this.projectatmosphere$getShader();
+        if (shader != null && shader.isValid()) {
+            shader.forUniform("TotalCloudTornadoes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
+        }
+    }
+    @Unique
+    private ComputeShader projectatmosphere$getShader() {
+        return ((CloudMeshGeneratorAccessor) (Object) this).projectatmosphere$getShader();
     }
 }

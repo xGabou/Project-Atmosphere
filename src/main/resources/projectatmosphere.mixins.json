@@ -12,6 +12,7 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
+    "CloudMeshGeneratorAccessor",
     "MixinSandstormDebugBlocker",
     "OverwriteDesertSound",
     "SimpleCloudsRendererMixin",

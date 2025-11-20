@@ -1,4 +1,6 @@
-package dev.nonamecrackers2.simpleclouds.api.common.cloud.region;
+package net.Gabou.projectatmosphere.api.common.cloud.region;
+
+import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ScAPICloudRegion;
 
 import java.util.List;
 

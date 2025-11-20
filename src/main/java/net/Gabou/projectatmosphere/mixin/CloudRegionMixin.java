@@ -1,10 +1,9 @@
 package net.Gabou.projectatmosphere.mixin;
 
-import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ITornadoRegion;
-import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ScAPICloudRegionTornadoAccess;
-import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.TornadoDescriptor;
+import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
+import net.Gabou.projectatmosphere.api.common.cloud.region.ScAPICloudRegionTornadoAccess;
+import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -17,7 +16,6 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.Vec2;
-import org.joml.Matrix2f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
