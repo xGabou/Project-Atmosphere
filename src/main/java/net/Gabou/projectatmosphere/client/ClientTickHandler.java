@@ -13,6 +13,7 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
+import net.Gabou.projectatmosphere.client.render.SkyEffectState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -21,8 +22,8 @@ import net.minecraft.util.RandomSource;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import sereneseasons.api.season.Season;
-import sereneseasons.api.season.SeasonHelper;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +59,7 @@ public class ClientTickHandler {
         if (!ClientSyncLock.isReady()) return;
         if (Minecraft.getInstance().isPaused()) return;
 
+        SkyEffectState.beginFrame();
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
         Minecraft mc = Minecraft.getInstance();
@@ -144,7 +146,7 @@ public class ClientTickHandler {
     }
 
     public static SimpleParticleType getSeasonalLeafParticle(ClientLevel level, BlockPos pos, RandomSource random) {
-        Season season = getCurrentSeason(level, pos);
+        SeasonStage season = getCurrentSeason(level, pos);
 
         List<SimpleParticleType> candidates = switch (season) {
             case AUTUMN -> List.of(
@@ -166,8 +168,8 @@ public class ClientTickHandler {
         return candidates.isEmpty() ? null : candidates.get(random.nextInt(candidates.size()));
     }
 
-    public static Season getCurrentSeason(ClientLevel level, BlockPos pos) {
-        return SeasonHelper.getSeasonState(level).getSeason();
+    public static SeasonStage getCurrentSeason(ClientLevel level, BlockPos pos) {
+        return SeasonTimeHelper.stage(level);
     }
     public record WindSpawnData(BlockPos pos,
                                 double x, double y, double z,

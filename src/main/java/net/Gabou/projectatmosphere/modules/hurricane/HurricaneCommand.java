@@ -15,9 +15,8 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import sereneseasons.api.season.Season;
-import sereneseasons.api.season.SeasonHelper;
-import sereneseasons.init.ModTags;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 @Mod.EventBusSubscriber
 public class HurricaneCommand {
@@ -32,13 +31,13 @@ public class HurricaneCommand {
                             if (!level.dimension().equals(Level.OVERWORLD)) return 0;
                             var pos = player.blockPosition();
                             var biome = level.getBiome(pos);
-                            if (!biome.is(BiomeTags.IS_OCEAN) && !biome.is(ModTags.Biomes.TROPICAL_BIOMES)) {
+                            if (!biome.is(BiomeTags.IS_OCEAN)) {
                                 ctx.getSource().sendFailure(Component.literal("Hurricanes can only spawn in warm oceans."));
                                 return 0;
                             }
-                            Season.SubSeason sub = SeasonHelper.getSeasonState(level).getSubSeason();
-                            if (sub.ordinal() < Season.SubSeason.LATE_SPRING.ordinal() || sub.ordinal() > Season.SubSeason.EARLY_AUTUMN.ordinal()) {
-                                ctx.getSource().sendFailure(Component.literal("Hurricanes only spawn between late spring and early fall."));
+                            SeasonStage stage = SeasonTimeHelper.stage(level);
+                            if (stage == SeasonStage.WINTER) {
+                                ctx.getSource().sendFailure(Component.literal("Hurricanes only spawn between spring and autumn."));
                                 return 0;
                             }
                             int catInt = IntegerArgumentType.getInteger(ctx, "category");

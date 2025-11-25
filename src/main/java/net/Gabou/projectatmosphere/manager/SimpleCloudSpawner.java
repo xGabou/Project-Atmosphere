@@ -26,8 +26,8 @@ import org.joml.Vector2i;
 
 import java.util.*;
 
-import sereneseasons.api.season.Season;
-import sereneseasons.api.season.SeasonHelper;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MAX_RADIUS;
 import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MIN_RADIUS;
@@ -95,7 +95,7 @@ public class SimpleCloudSpawner {
                         WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sample, level, level.getGameTime());
                         if (stats == null) return null;
 
-                        boolean isWinter = SeasonHelper.getSeasonState(level).getSeason() == Season.WINTER;
+                        boolean isWinter = SeasonTimeHelper.stage(level) == SeasonStage.WINTER;
                         boolean freezing = stats.temperature() <= 0.0F;
 
                         int severity = determineCloudSeverity(

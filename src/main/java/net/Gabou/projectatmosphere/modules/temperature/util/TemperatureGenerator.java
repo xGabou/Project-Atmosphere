@@ -10,12 +10,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import sereneseasons.api.season.SeasonHelper;
-import sereneseasons.init.ModTags;
-import sereneseasons.season.SeasonHooks;
-import sereneseasons.season.SeasonTime;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
-
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 import java.util.Objects;
 import java.util.Random;
@@ -41,13 +38,13 @@ public class TemperatureGenerator {
     public static float[][] generateWeekForecast(ServerLevel level, BlockPos chunkPos, ResourceLocation biomeId) {
         // Step 1: Grab world-dependent values safely
         ForecastBaseData base = AsyncAtmosphereService.callOnMainThread(() -> {
-            int cycleTicks = SeasonHelper.getSeasonState(level).getSeasonCycleTicks();
-            long seasonDuration = SeasonHelper.getSeasonState(level).getSeasonDuration();
-            long dayDuration = SeasonHelper.getSeasonState(level).getDayDuration();
-            SeasonTime st = new SeasonTime(cycleTicks);
-            Season currentSeason = Season.valueOf(st.getSeason().name());
+            int cycleTicks = (int) SeasonTimeHelper.seasonCycleTicks(level);
+            long seasonDuration = SeasonTimeHelper.seasonDuration(level);
+            long dayDuration = SeasonTimeHelper.dayDuration(level);
+            SeasonStage stage = SeasonTimeHelper.stage(level);
+            Season currentSeason = mapSeasonStage(stage);
 
-            float baseTemp = SeasonHooks.getBiomeTemperature(level, level.getBiome(chunkPos), chunkPos);
+            float baseTemp = level.getBiome(chunkPos).value().getBaseTemperature();
             BiomeTempConfig.DailyRange clamp = BiomeTempConfig.getClamp(biomeId, currentSeason);
 
             return new ForecastBaseData(cycleTicks, seasonDuration, dayDuration, currentSeason, baseTemp, clamp);
@@ -246,11 +243,8 @@ public class TemperatureGenerator {
         Registry<Biome> reg = level.registryAccess().registryOrThrow(Registries.BIOME);
         Biome b = reg.get(biomeId);
         if (b == null) return nonTropicalAmp;
-        Boolean bol= reg.getResourceKey(b)
-                .flatMap(reg::getHolder)
-                .map(holder -> holder.is(ModTags.Biomes.TROPICAL_BIOMES))
-                .orElse(false);
-        return bol ? tropicalAmp : nonTropicalAmp;
+        float baseTemp = b.getBaseTemperature();
+        return baseTemp >= 1.2f ? tropicalAmp : nonTropicalAmp;
     }
 
     /**
@@ -265,5 +259,14 @@ public class TemperatureGenerator {
         long day = world.getDayTime() / 24000L;
         int hash = Objects.hash(pos.getX() >> 4, pos.getZ() >> 4, day);
         return ((hash % 200) - 100) / 100f * maxFluctuation;
+    }
+
+    private static Season mapSeasonStage(SeasonStage stage) {
+        return switch (stage) {
+            case WINTER -> Season.WINTER;
+            case AUTUMN -> Season.AUTUMN;
+            case SPRING -> Season.SPRING;
+            default -> Season.SUMMER;
+        };
     }
 }

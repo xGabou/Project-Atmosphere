@@ -4,18 +4,25 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update build configuration to change dependency scope and enhance project structure">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add legacy fallback and debug logging options for tornado rendering">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/dev/nonamecrackers2/simpleclouds/api/common/cloud/region/ITornadoRegion.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/common/cloud/region/ITornadoRegion.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/dev/nonamecrackers2/simpleclouds/api/common/cloud/region/ScAPICloudRegionTornadoAccess.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/common/cloud/region/ScAPICloudRegionTornadoAccess.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/dev/nonamecrackers2/simpleclouds/api/common/cloud/region/TornadoDescriptor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/common/cloud/region/TornadoDescriptor.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/dev/nonamecrackers2/simpleclouds/api/common/event/CloudRegionTickEventTornadoAccess.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/api/common/event/CloudRegionTickEventTornadoAccess.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionTickEventMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudRegionTickEventMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/MultiRegionCloudMeshGeneratorMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/MultiRegionCloudMeshGeneratorMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run-data/logs/debug-1.log.gz" beforeDir="false" afterPath="$PROJECT_DIR$/run-data/logs/debug-1.log.gz" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run-data/logs/debug-2.log.gz" beforeDir="false" afterPath="$PROJECT_DIR$/run-data/logs/debug-2.log.gz" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run-data/logs/debug.log" beforeDir="false" afterPath="$PROJECT_DIR$/run-data/logs/debug.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run-data/logs/latest.log" beforeDir="false" afterPath="$PROJECT_DIR$/run-data/logs/latest.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/DebugAtmoCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/auroras/AuroraSeasonHelper.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/auroras/AuroraSeasonHelper.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/auroras/AuroraRendererMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/auroras/AuroraRendererMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/TemperatureGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/util/TemperatureGenerator.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -82,6 +89,11 @@
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Dependencies" type="6de06a37:ExternalSystemViewDefaultContributor$MyDependenciesNode" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
                 <item name="Run Configurations" type="7b0102dc:RunConfigurationsNode" />
               </path>
             </expand>
@@ -113,7 +125,7 @@
     </option>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="Dynamic-Forge-1.20.1" />
+        <entry key="$PROJECT_DIR$" value="codex/define-tornado-descriptor-interface" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -200,7 +212,7 @@
     "Gradle.Project-Atmosphere [publishMavenJavaPublicationToGitHubPackagesRepository].executor": "Run",
     "Gradle.Project-Atmosphere [publish].executor": "Run",
     "Gradle.Project-Atmosphere [runClient].executor": "Debug",
-    "Gradle.Project-Atmosphere [runData].executor": "Debug",
+    "Gradle.Project-Atmosphere [runData].executor": "Run",
     "Gradle.Project-Atmosphere [runGameTestServer].executor": "Run",
     "Gradle.Project-Atmosphere [runServer].executor": "Debug",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
@@ -213,7 +225,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "extract.method.default.visibility": "private",
-    "git-widget-placeholder": "#83 on codex/define-tornado-descriptor-interface",
+    "git-widget-placeholder": "Dynamic-Forge-1.20.1",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
@@ -268,8 +280,8 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
-    <configuration name="Project-Atmosphere [clean]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [discordWebhook]">
+    <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -280,7 +292,7 @@
         </option>
         <option name="taskNames">
           <list>
-            <option value="clean" />
+            <option value="build" />
           </list>
         </option>
         <option name="vmOptions" />
@@ -425,19 +437,19 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
-        <item itemvalue="Gradle.Project-Atmosphere [clean]" />
         <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
-        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
         <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
+        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
       </list>
     </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.27397.103" />
-        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-IU-252.27397.103" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.28238.7" />
+        <option value="bundled-js-predefined-d6986cc7102b-a71380e98a7c-JavaScript-IU-252.28238.7" />
       </set>
     </attachedChunks>
   </component>
@@ -595,31 +607,8 @@
       <workItem from="1763389162865" duration="643000" />
       <workItem from="1763411384548" duration="1343000" />
       <workItem from="1763426416884" duration="123000" />
-      <workItem from="1763661889470" duration="4424000" />
-    </task>
-    <task id="LOCAL-00078" summary="fix: update legendary survival overhaul dependency and increase max positions per biome">
-      <option name="closed" value="true" />
-      <created>1754600051888</created>
-      <option name="number" value="00078" />
-      <option name="presentableId" value="LOCAL-00078" />
-      <option name="project" value="LOCAL" />
-      <updated>1754600051888</updated>
-    </task>
-    <task id="LOCAL-00079" summary="feat: enhance tornado rendering with improved shader parameters and error handling">
-      <option name="closed" value="true" />
-      <created>1754604869573</created>
-      <option name="number" value="00079" />
-      <option name="presentableId" value="LOCAL-00079" />
-      <option name="project" value="LOCAL" />
-      <updated>1754604869573</updated>
-    </task>
-    <task id="LOCAL-00080" summary="feat: add box tornado shader and rendering support with density calculations">
-      <option name="closed" value="true" />
-      <created>1754608515885</created>
-      <option name="number" value="00080" />
-      <option name="presentableId" value="LOCAL-00080" />
-      <option name="project" value="LOCAL" />
-      <updated>1754608515885</updated>
+      <workItem from="1763661889470" duration="5837000" />
+      <workItem from="1764042371171" duration="4955000" />
     </task>
     <task id="LOCAL-00081" summary="feat: enhance tornado rendering with improved shader parameters and error handling">
       <option name="closed" value="true" />
@@ -989,7 +978,31 @@
       <option name="project" value="LOCAL" />
       <updated>1763162689776</updated>
     </task>
-    <option name="localTasksCounter" value="127" />
+    <task id="LOCAL-00127" summary="feat: enhance tornado integration with SimpleClouds, improve shader support, and update spawn logic">
+      <option name="closed" value="true" />
+      <created>1763666347882</created>
+      <option name="number" value="00127" />
+      <option name="presentableId" value="LOCAL-00127" />
+      <option name="project" value="LOCAL" />
+      <updated>1763666347882</updated>
+    </task>
+    <task id="LOCAL-00128" summary="feat: add accessors for CloudMeshGenerator and implement data structures for tornado and region uploads">
+      <option name="closed" value="true" />
+      <created>1763666362209</created>
+      <option name="number" value="00128" />
+      <option name="presentableId" value="LOCAL-00128" />
+      <option name="project" value="LOCAL" />
+      <updated>1763666362209</updated>
+    </task>
+    <task id="LOCAL-00129" summary="feat: add legacy fallback and debug logging options for tornado rendering">
+      <option name="closed" value="true" />
+      <created>1764044443376</created>
+      <option name="number" value="00129" />
+      <option name="presentableId" value="LOCAL-00129" />
+      <option name="project" value="LOCAL" />
+      <updated>1764044443376</updated>
+    </task>
+    <option name="localTasksCounter" value="130" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1035,9 +1048,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: implement global storm history tracking and adjust storm chance based on severe event frequency" />
-    <MESSAGE value="feat: refactor AsyncAtmosphereService for improved thread management and cloud spawning logic" />
-    <MESSAGE value="feat: enhance compatibility with temperature mods and update configuration settings" />
     <MESSAGE value="feat: disable cloud movement towards player and update related configurations" />
     <MESSAGE value="feat: update AtmoConfigScreen layout and improve widget visibility handling" />
     <MESSAGE value="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects" />
@@ -1060,7 +1070,10 @@
     <MESSAGE value="feat: integrate auroras and rainbows compatibility, enhance storm severity calculations, and update version to 0.5.5.7" />
     <MESSAGE value="feat: update mod version to 0.6.0.0-pre2, enhance sunlight-driven temperature calculations, and add baseline temperature bounds" />
     <MESSAGE value="feat: update build configuration to change dependency scope and enhance project structure" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: update build configuration to change dependency scope and enhance project structure" />
+    <MESSAGE value="feat: enhance tornado integration with SimpleClouds, improve shader support, and update spawn logic" />
+    <MESSAGE value="feat: add accessors for CloudMeshGenerator and implement data structures for tornado and region uploads" />
+    <MESSAGE value="feat: add legacy fallback and debug logging options for tornado rendering" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add legacy fallback and debug logging options for tornado rendering" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

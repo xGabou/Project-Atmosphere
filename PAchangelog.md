@@ -1,13 +1,16 @@
 # Project Atmosphere
 
 ### Added
-- **Terralith and Nature’s Spirits biome support**, enabling the forecast, humidity, and sunlight models to recognise these worldgen packs out of the box.
+- Pluggable season bridge (Serene Seasons by default, PA-for-TFC placeholder otherwise) with a neutral fallback.
+- Aurora/rainbow shader flags and positions on the client so shader packs can react.
 
-### Fixed
-- Improved weather stability logic to avoid rapid cloud cycling or “rave” behavior between biomes.
-- Corrected humidity-to-rain intensity mapping to produce smoother transitions.
-- Cloud region spawning no longer stalls behind stuck async workers, preventing empty skies on fresh worlds.
+### Fixed / Behavior
+- Auroras render only on cold nights; rainbows only when rain stops and rain level is zero.
+- Tornado shader binds live SimpleClouds clouds and densifies alpha/color to remove holes; `/spawnTornado` spawns the shader funnel even without the CloudTornadoes SSBO (unless legacy fallback is enabled).
 
-### Changed / Removed
-- Forecast updates now occur asynchronously, ensuring seamless regional transitions and no TPS impact during major weather changes.
-- Forecast curves were rebalanced to keep daytime highs/lows anchored to realistic seasonal envelopes before wind, humidity, and storm modifiers are applied.
+### Changed
+- Season-dependent systems (auroras, leaves, hurricanes, temperature generation) now use the new season helper instead of hard Serene Seasons calls.
+
+
+PS - Tornadoes might fail to spawn if no cumulonimbus clouds are present yet; the command queues retries until one appears.
+Tornadoes also might fail and tell you that your shaders are out of date if the CloudTornadoes SSBO is missing; enable the legacy fallback in the config in that case. I will continue to work on improving these behaviors in future releases.

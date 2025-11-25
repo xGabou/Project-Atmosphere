@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.compat.auroras;
 
 import net.Gabou.projectatmosphere.compat.temperature.ClientTemperatureResolver;
+import net.Gabou.projectatmosphere.seasons.SeasonSnapshot;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.util.Mth;
@@ -8,11 +11,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import sereneseasons.api.season.Season;
-import sereneseasons.api.season.SeasonHelper;
 
 /**
- * Computes aurora brightness multipliers using Serene Seasons and biome temperature data.
+ * Computes aurora brightness multipliers using the active season provider and biome temperature data.
  */
 @OnlyIn(Dist.CLIENT)
 public final class AuroraSeasonHelper {
@@ -24,19 +25,15 @@ public final class AuroraSeasonHelper {
         if (level == null) {
             return 1.0f;
         }
-        try {
-            Season.SubSeason subSeason = SeasonHelper.getSeasonState(level).getSubSeason();
-            Season season = subSeason.getSeason();
-            return switch (season) {
-                case WINTER -> 1.4f;
-                case AUTUMN -> 1.1f;
-                case SPRING -> 0.85f;
-                case SUMMER -> 0.55f;
-            };
-        } catch (Exception ignored) {
-            // Serene Seasons might not be ready yet on the client – fall back to neutral factor.
-            return 1.0f;
-        }
+        SeasonSnapshot snapshot = SeasonTimeHelper.snapshot(level);
+        SeasonStage stage = snapshot.stage();
+        return switch (stage) {
+            case WINTER -> 1.4f;
+            case AUTUMN -> 1.1f;
+            case SPRING -> 0.85f;
+            case SUMMER -> 0.55f;
+            case NEUTRAL -> 1.0f;
+        };
     }
 
     public static float computeTemperatureFactor(Level level, BlockPos pos) {

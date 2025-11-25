@@ -155,6 +155,7 @@ public class ProjectAtmosphere {
         initModules();
         TornadoProbabilityManager.init();
         event.enqueueWork(() -> {
+            net.Gabou.projectatmosphere.seasons.SeasonBootstrap.initOrCrash();
             SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
             // Load user biome temperature overrides after defaults are initialized
             net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempUserConfig.load();

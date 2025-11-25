@@ -32,8 +32,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import sereneseasons.api.season.Season;
-import sereneseasons.api.season.SeasonHelper;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 public class DebugAtmoCommand {
 
@@ -275,18 +275,12 @@ public class DebugAtmoCommand {
         } catch (IllegalArgumentException e) {
             overwrite = false;
         }
-        if (SeasonHelper.getSeasonState(level).getSeason() != Season.WINTER) {
+        if (SeasonTimeHelper.stage(level) != SeasonStage.WINTER) {
             if (!overwrite) {
                 ctx.getSource().sendFailure(Component.literal("It is not winter."));
                 return 0;
             }
-            try {
-                Object state = SeasonHelper.getSeasonState(level);
-                state.getClass().getMethod("setSeason", Season.class).invoke(state, Season.WINTER);
-            } catch (Exception e) {
-                ctx.getSource().sendFailure(Component.literal("Failed to overwrite season."));
-                return 0;
-            }
+            ctx.getSource().sendSuccess(() -> Component.literal("Proceeding despite non-winter season (no season override available)."), true);
         }
         String cloudId = CloudLibrary.getSnowstormCloudId();
         CloudRegion region = spawnCloud(level, pos, cloudId);

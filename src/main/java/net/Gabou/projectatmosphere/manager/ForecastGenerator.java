@@ -33,8 +33,8 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraftforge.network.PacketDistributor;
 import org.apache.commons.lang3.tuple.Pair;
-import sereneseasons.api.season.Season;
-import sereneseasons.api.season.SeasonHelper;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -189,9 +189,7 @@ public class ForecastGenerator {
         long day = AsyncAtmosphereService.callOnMainThread(
                 () -> level.getDayTime() / 24000L
         );
-        Season season = AsyncAtmosphereService.callOnMainThread(
-                () -> SeasonHelper.getSeasonState(level).getSeason()
-        );
+        SeasonStage season = SeasonTimeHelper.stage(level);
         BiomeSource biomeSource = AsyncAtmosphereService.callOnMainThread(
                 () -> level.getChunkSource().getGenerator().getBiomeSource()
         );
