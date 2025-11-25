@@ -58,29 +58,6 @@ public class TornadoCommand {
                                     (float) Math.toRadians(sample.directionDeg())
                             );
 
-                    if (!SimpleCloudsTornadoSupport.isTornadoSsboSupported()) {
-                        if (AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.get()) {
-                            if (AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get()) {
-                                ProjectAtmosphere.LOGGER.info("Tornado command falling back to legacy mesh tornado: CloudTornadoes SSBO missing, allowLegacyTornadoFallback=true.");
-                            }
-                            TornadoManager.spawnServer(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind);
-                            ctx.getSource().sendSuccess(
-                                    () -> Component.literal("Spawned legacy tornado because the SimpleClouds shader pack lacks the CloudTornadoes SSBO (allowLegacyTornadoFallback=true)."), true);
-                        } else {
-                            if (AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get()) {
-                                ProjectAtmosphere.LOGGER.warn("CloudTornadoes SSBO missing; spawning shader tornado without SimpleClouds funnel data.");
-                            }
-                            TornadoManager.spawnServer(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind);
-                            ctx.getSource().sendSuccess(
-                                    () -> Component.literal("CloudTornadoes SSBO missing; spawned shader tornado without SimpleClouds funnel data."), true);
-                        }
-                        return 1;
-                    }
-
-                    if (AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get()) {
-                        ProjectAtmosphere.LOGGER.info("Tornado command proceeding with shader-driven funnel; CloudTornadoes SSBO detected.");
-                    }
-
                     CloudRegion existing = projectatmosphere$findCumulonimbus(level, tornadoPos);
                     if (existing != null) {
                         if (projectatmosphere$attachDescriptor(level, existing, tornadoPos)) {

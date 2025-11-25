@@ -1,17 +1,6 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
-## 0.6.0.0-pre2 - Tornado fallback guard (2025-11-24)
-- Added a shared SimpleClouds tornado support flag so the shader SSBO probe can inform server-side commands.
-- `/spawnTornado` now falls back to the legacy mesh tornado when the SimpleClouds shader pack lacks the `CloudTornadoes` buffer, preventing invisible funnels on shader packs without the new SSBO.
-- Introduced a `debugTornadoLogging` config toggle for verbose tornado diagnostics (SSBO detection and fallback choices), plus in-game config buttons for the tornado debug and legacy fallback toggles.
-- Tornado shader now prefers SimpleClouds' live cloud render target for its base texture and uses denser alpha/color to eliminate visible holes while the funnel moves.
-- If the `CloudTornadoes` SSBO is missing and legacy fallback is disabled, `/spawnTornado` now still spawns the shader-driven funnel (without SimpleClouds funnel data) instead of blocking.
-
-## 0.6.0.0-pre2 — Forecast fallback guard (2025-11-20)
-- Added null-safe forecast lookup with a zeroed fallback so missing biome keys no longer crash storm chance checks or pointer retrievals, logging the condition instead.
-- Temperature queries now fall back to cached day curves or weekly averages when the live atmospheric state is missing, preventing `NullPointerException` crashes when Serene Seasons asks for temperatures before states are initialised.
-
 ## 0.6.0.0-pre2 – Tornado-aware SimpleClouds sync (2025-11-16)
 - Reworked the `MultiRegionCloudMeshGenerator` tornado mixin to mirror the upstream region packing logic instead of calling
   compiler-generated lambda targets, restoring compatibility with SimpleClouds 0.7.3, using a dedicated `CloudMeshGenerator`

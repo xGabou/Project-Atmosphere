@@ -2,8 +2,6 @@ package net.Gabou.projectatmosphere.mixin;
 
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsTornadoSupport;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.MultiRegionCloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.shader.buffer.ShaderStorageBufferObject;
 import dev.nonamecrackers2.simpleclouds.client.shader.compute.ComputeShader;
@@ -49,7 +47,6 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     @Unique private int projectatmosphere$currentTornadoCount;
     @Unique private boolean projectatmosphere$hasTornadoBlock;
     @Unique private int projectatmosphere$lastTornadoShaderId = -1;
-    @Unique private int projectatmosphere$lastLoggedShaderId = -1;
 
     @Inject(method = "setupShader", at = @At("TAIL"))
     private void projectatmosphere$setupTornadoSsbo(CallbackInfo ci) {
@@ -203,15 +200,6 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             this.projectatmosphere$lastTornadoShaderId = shaderId;
             int index = GL43.glGetProgramResourceIndex(shaderId, GL43.GL_SHADER_STORAGE_BLOCK, PROJECTATMOSPHERE$TORNADO_BUFFER_NAME);
             this.projectatmosphere$hasTornadoBlock = index != GL43.GL_INVALID_INDEX;
-            SimpleCloudsTornadoSupport.setTornadoSsboSupported(this.projectatmosphere$hasTornadoBlock);
-            if (AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get() && this.projectatmosphere$lastLoggedShaderId != shaderId) {
-                this.projectatmosphere$lastLoggedShaderId = shaderId;
-                if (this.projectatmosphere$hasTornadoBlock) {
-                    PROJECTATMOSPHERE$LOGGER.info("CloudTornadoes SSBO detected on shader '{}' (id {}). Tornado SSBO uploads enabled.", this.regionTextureGenerator.getName(), shaderId);
-                } else {
-                    PROJECTATMOSPHERE$LOGGER.info("CloudTornadoes SSBO missing on shader '{}' (id {}); tornado SSBO uploads disabled.", this.regionTextureGenerator.getName(), shaderId);
-                }
-            }
             if (!this.projectatmosphere$hasTornadoBlock) {
                 PROJECTATMOSPHERE$LOGGER.warn("Missing '{}' SSBO on shader '{}'; tornado rendering disabled until the shader is updated.", PROJECTATMOSPHERE$TORNADO_BUFFER_NAME, this.regionTextureGenerator.getName());
             }
