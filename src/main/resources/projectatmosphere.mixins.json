@@ -6,14 +6,17 @@
   "refmap": "projectatmosphere.refmap.json",
   "mixins": [
     "CloudRegionMixin",
+    "CloudRegionTickEventMixin",
     "InfoMixin",
     "SeasonHooksMixin",
     "ServerLevelSnowStormMixin"
   ],
   "client": [
+    "CloudMeshGeneratorAccessor",
     "MixinSandstormDebugBlocker",
     "OverwriteDesertSound",
     "SimpleCloudsRendererMixin",
+    "MultiRegionCloudMeshGeneratorMixin",
     "compat.auroras.AuroraRendererMixin",
     "compat.rainbows.RainbowsRendererParticleMixin"
   ],
