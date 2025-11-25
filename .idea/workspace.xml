@@ -4,15 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update versioning to NeoForge and enhance workspace configuration">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: update version to 0.5.5.7, add storm severity booster configuration, and enhance cloud spawning logic">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/SimpleCloudSpawner.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastGenerator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastPointerRegistry.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastPointerRegistry.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -22,6 +20,9 @@
   </component>
   <component name="ComposerSettings">
     <execution />
+  </component>
+  <component name="CoverageOptionsProvider">
+    <option name="myAddOrReplace" value="0" />
   </component>
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
@@ -226,7 +227,7 @@
       <recent name="net.Gabou.projectatmosphere.client" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
+  <component name="RunManager" selected="Gradle.Project-AtmosphereNeoforge [modrinth]">
     <configuration name="Client" type="Application" factoryName="Application">
       <option name="MAIN_CLASS_NAME" value="net.neoforged.devlaunch.Main" />
       <module name="project-atmosphere.main" />
@@ -445,19 +446,19 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
-        <item itemvalue="Gradle.Project-AtmosphereNeoforge [discordWebhook]" />
         <item itemvalue="Gradle.Project-AtmosphereNeoforge [modrinth]" />
         <item itemvalue="Gradle.Project-AtmosphereNeoforge [curseforge1258344]" />
-        <item itemvalue="Gradle.Project-AtmosphereNeoforge [runClient]" />
+        <item itemvalue="Gradle.Project-AtmosphereNeoforge [discordWebhook]" />
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
+        <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
       </list>
     </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26830.84" />
-        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-IU-252.26830.84" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.28238.7" />
+        <option value="bundled-js-predefined-d6986cc7102b-a71380e98a7c-JavaScript-IU-252.28238.7" />
       </set>
     </attachedChunks>
   </component>
@@ -570,14 +571,11 @@
       <workItem from="1761260787084" duration="11000" />
       <workItem from="1762206380159" duration="1077000" />
       <workItem from="1762531105616" duration="4370000" />
-    </task>
-    <task id="LOCAL-00060" summary="Refactor atmosphere management and enhance cloud spawning; streamline biome key retrieval, update pressure display format, and improve client-side registration for tick handling">
-      <option name="closed" value="true" />
-      <created>1753999778188</created>
-      <option name="number" value="00060" />
-      <option name="presentableId" value="LOCAL-00060" />
-      <option name="project" value="LOCAL" />
-      <updated>1753999778188</updated>
+      <workItem from="1762637891809" duration="893000" />
+      <workItem from="1764014809662" duration="2414000" />
+      <workItem from="1764017979577" duration="2050000" />
+      <workItem from="1764021764157" duration="3433000" />
+      <workItem from="1764049423973" duration="129000" />
     </task>
     <task id="LOCAL-00061" summary="Refactor shader file structure; move tornado shaders to core directory and update workspace settings">
       <option name="closed" value="true" />
@@ -963,7 +961,15 @@
       <option name="project" value="LOCAL" />
       <updated>1761170770461</updated>
     </task>
-    <option name="localTasksCounter" value="109" />
+    <task id="LOCAL-00109" summary="feat: update version to 0.5.5.7, add storm severity booster configuration, and enhance cloud spawning logic">
+      <option name="closed" value="true" />
+      <created>1762638036133</created>
+      <option name="number" value="00109" />
+      <option name="presentableId" value="LOCAL-00109" />
+      <option name="project" value="LOCAL" />
+      <updated>1762638036133</updated>
+    </task>
+    <option name="localTasksCounter" value="110" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1014,7 +1020,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: update tornado rendering parameters and add cone cap functionality" />
     <MESSAGE value="feat: enhance tornado rendering with cloud scene integration and shader improvements" />
     <MESSAGE value="feat: refine tornado rendering with improved height calculations and shader adjustments" />
     <MESSAGE value="feat: enhance tornado management with clear and remove commands, and update biome tracking" />
@@ -1039,7 +1044,8 @@
     <MESSAGE value="feat: update barometer and humidimeter models, add hygrometer, and enhance texture handling" />
     <MESSAGE value="feat: enhance temperature handling by clearing old forecasts and adding overworld checks for commands" />
     <MESSAGE value="feat: update versioning to NeoForge and enhance workspace configuration" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: update versioning to NeoForge and enhance workspace configuration" />
+    <MESSAGE value="feat: update version to 0.5.5.7, add storm severity booster configuration, and enhance cloud spawning logic" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: update version to 0.5.5.7, add storm severity booster configuration, and enhance cloud spawning logic" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1131,5 +1137,16 @@
         <watch expression="((com.google.common.collect.RegularImmutableMap)((CloudTypeDataManager)CloudManager.get(level).cloudSource).cloudTypes).entrySet().toArray()[0]" language="JAVA" custom="com.google.common.collect.RegularImmutableMap,dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager,dev.nonamecrackers2.simpleclouds.common.cloud.CloudTypeDataManager" />
       </configuration>
     </watches-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/project_atmosphere$Project_Atmosphere__runClient_.ic" NAME="Project-Atmosphere [runClient] Coverage Results" MODIFIED="1764031038474" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="true" />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
   </component>
 </project>

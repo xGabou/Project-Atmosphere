@@ -130,6 +130,7 @@ dependencies {
     implementation "curse.maven:auroras-1105290:6040674"
     implementation "curse.maven:rainboows-1121832:6416604"
     implementation "curse.maven:gabous-libs-1367332:7195722"
+    implementation "curse.maven:architectury-api-419699:5786327"
 
 }
 
