@@ -66,9 +66,30 @@ public class TornadoRenderHandler {
 //        });
 //
 //        if (!boundBaseToClouds.get()) {
-            // Fallback: keep existing static tornado texture
+        // Bind the tornado base texture: prefer SimpleClouds' cloud color target, fallback to static texture
+        AtomicBoolean boundBaseToClouds = new AtomicBoolean(false);
+        SimpleCloudsRenderer.getOptionalInstance().ifPresent(scr -> {
+            RenderTarget cloudRT = scr.getCloudTarget();
+            if (cloudRT == null) {
+                ProjectAtmosphere.LOGGER.warn("Cloud render target is null, cannot bind clouds as tornado base texture.");
+                return;
+            }
+            shader.setSampler("Sampler0", cloudRT);
+            shader.setSampler("CloudScene", cloudRT);
+
+            Uniform u = shader.getUniform("ScreenSizeX");
+            Uniform u1 = shader.getUniform("ScreenSizeY");
+            if (u != null && u1 != null) {
+                u.set((float) cloudRT.width);
+                u1.set((float) cloudRT.height);
+            }
+            boundBaseToClouds.set(true);
+        });
+
+        if (!boundBaseToClouds.get()) {
             RenderSystem.setShaderTexture(0, TORNADO_TEXTURE);
-       // }
+            RenderSystem.setShaderTexture(4, TORNADO_TEXTURE);
+        }
         RenderSystem.setShaderTexture(1, FLOWMAP_TEXTURE);
         RenderSystem.setShaderTexture(2, NORMALMAP_TEXTURE);
         RenderSystem.setShaderTexture(3, NOISE_TEXTURE);

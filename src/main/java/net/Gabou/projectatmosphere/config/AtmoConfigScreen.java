@@ -44,6 +44,8 @@ public class AtmoConfigScreen extends Screen {
     private double tornadoIntensityMin;
     private double tornadoIntensityMax;
     private int tornadoCellCooldownMinutes;
+    private boolean tornadoAllowLegacyFallback;
+    private boolean tornadoDebugLogging;
     private double windBaseRetargetSec;
     private double windDirRetargetSec;
     private double windGustMeanSec;
@@ -150,6 +152,8 @@ public class AtmoConfigScreen extends Screen {
         this.tornadoIntensityMin = AtmoCommonConfig.TORNADO_INTENSITY_MIN.get();
         this.tornadoIntensityMax = AtmoCommonConfig.TORNADO_INTENSITY_MAX.get();
         this.tornadoCellCooldownMinutes = AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get();
+        this.tornadoAllowLegacyFallback = AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.get();
+        this.tornadoDebugLogging = AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get();
         this.windBaseRetargetSec = AtmoCommonConfig.WIND_BASE_RETARGET_SEC.get();
         this.windDirRetargetSec = AtmoCommonConfig.WIND_DIR_RETARGET_SEC.get();
         this.windGustMeanSec = AtmoCommonConfig.WIND_GUST_MEAN_SEC.get();
@@ -212,6 +216,16 @@ public class AtmoConfigScreen extends Screen {
 
         addTitle("Tornado", y);
         y += 18;
+        addConfigWidget(Button.builder(toggleLabel("Legacy Tornado Fallback", tornadoAllowLegacyFallback), b -> {
+            tornadoAllowLegacyFallback = !tornadoAllowLegacyFallback;
+            b.setMessage(toggleLabel("Legacy Tornado Fallback", tornadoAllowLegacyFallback));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+        addConfigWidget(Button.builder(toggleLabel("Tornado Debug Logging", tornadoDebugLogging), b -> {
+            tornadoDebugLogging = !tornadoDebugLogging;
+            b.setMessage(toggleLabel("Tornado Debug Logging", tornadoDebugLogging));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
         tornadoCheckIntervalBox = addNumberField(center, y, "Check Interval Sec", Double.toString(tornadoCheckIntervalSec));
         y += 34;
         tornadoBaseSpawnRadiusBox = addNumberField(center, y, "Base Spawn Radius M", Double.toString(tornadoBaseSpawnRadiusM));
@@ -390,6 +404,7 @@ public class AtmoConfigScreen extends Screen {
         tornadoIntensityMin = parseDouble(tornadoIntensityMinBox, tornadoIntensityMin);
         tornadoIntensityMax = parseDouble(tornadoIntensityMaxBox, tornadoIntensityMax);
         tornadoCellCooldownMinutes = parseInt(tornadoCellCooldownBox, tornadoCellCooldownMinutes);
+        // Buttons already toggled booleans; nothing to parse.
         windBaseRetargetSec = parseDouble(windBaseRetargetBox, windBaseRetargetSec);
         windDirRetargetSec = parseDouble(windDirRetargetBox, windDirRetargetSec);
         windGustMeanSec = parseDouble(windGustMeanBox, windGustMeanSec);
@@ -423,6 +438,8 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.TORNADO_INTENSITY_MIN.set(tornadoIntensityMin);
         AtmoCommonConfig.TORNADO_INTENSITY_MAX.set(tornadoIntensityMax);
         AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.set(tornadoCellCooldownMinutes);
+        AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.set(tornadoAllowLegacyFallback);
+        AtmoCommonConfig.TORNADO_DEBUG_LOGGING.set(tornadoDebugLogging);
         AtmoCommonConfig.WIND_BASE_RETARGET_SEC.set(windBaseRetargetSec);
         AtmoCommonConfig.WIND_DIR_RETARGET_SEC.set(windDirRetargetSec);
         AtmoCommonConfig.WIND_GUST_MEAN_SEC.set(windGustMeanSec);

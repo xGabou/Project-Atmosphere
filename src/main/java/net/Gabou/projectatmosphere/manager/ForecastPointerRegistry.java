@@ -22,7 +22,14 @@ public final class ForecastPointerRegistry {
 
     /** Retrieve the forecast pointer for a biome instance, or null if none exists. */
     public static BiomeForecast getPointer(BiomeInstanceKey key) {
-        return POINTERS.getOrDefault(key, ForecastGenerator.getAverageForecast(key.biomeType()));
+        if (key == null) {
+            return null;
+        }
+        BiomeForecast averageForecast = ForecastGenerator.getAverageForecast(key.biomeType());
+        if (averageForecast == null) {
+            return POINTERS.get(key);
+        }
+        return POINTERS.getOrDefault(key, averageForecast);
     }
 
     /** Check whether a biome already has a forecast pointer assigned. */
