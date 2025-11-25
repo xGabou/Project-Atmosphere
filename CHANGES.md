@@ -1,4 +1,4 @@
-# Project Atmosphere – Developer Change Log
+# Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
 ## 0.6.0.0-pre2 – Tornado-aware SimpleClouds sync (2025-11-16)

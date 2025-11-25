@@ -338,10 +338,25 @@ public class ForecastGenerator {
 
     static float getTemperatureValue(BiomeInstanceKey key, long tick) {
         var state = AtmosphericStateRegistry.getState(key);
-        if (state == null) {
-            return 0.0f;
+        if (state != null) {
+            return state.getTemperature();
         }
-        return state.getTemperature();
+
+        BiomeForecast fallback = getClosestValidForecast(key, ForecastType.TEMPERATURE);
+        if (fallback != null) {
+            float[] curve = fallback.getTemperatureDay();
+            if (curve != null && curve.length > 0) {
+                int minuteOfDay = (int) ((tick % 24000L) / 100L);
+                return curve[Math.min(minuteOfDay, curve.length - 1)];
+            }
+
+            float[][] week = fallback.getTemperature();
+            if (week != null && week.length > 0) {
+                return averageDailyMidpoint(week);
+            }
+        }
+
+        return 0.0f;
     }
 
     static float getPressureValue(BiomeInstanceKey key, long tick) {
@@ -361,7 +376,36 @@ public class ForecastGenerator {
     }
 
     public static BiomeForecast getClosestValidForecast(BiomeInstanceKey key, ForecastType type) {
-        return ForecastPointerRegistry.getPointer(key);
+        if (key == null) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Requested forecast with null biome key for type {}", type);
+            return buildFallbackForecast(null);
+        }
+
+        BiomeForecast pointer = ForecastPointerRegistry.getPointer(key);
+        if (pointer != null) {
+            return pointer;
+        }
+
+        BiomeForecast average = getAverageForecast(key.biomeType());
+        if (average != null) {
+            return average;
+        }
+
+        ProjectAtmosphere.LOGGER.warn("[Atmosphere] No forecast data available for {}. Returning fallback.", key);
+        return buildFallbackForecast(key);
+    }
+
+    private static BiomeForecast buildFallbackForecast(BiomeInstanceKey key) {
+        BiomeForecast fallback = new BiomeForecast();
+        fallback.setBiomeKey(key);
+        fallback.setTemperature(new float[7][2]);
+        fallback.setHumidity(new float[7][2]);
+        fallback.setPressure(new float[7][2]);
+        WindVector[] windWeek = new WindVector[7];
+        Arrays.fill(windWeek, WindVector.fromBase(0, 0));
+        fallback.setWind(windWeek);
+        fallback.setWindDay(WindVector.fromBase(0, 0));
+        return fallback;
     }
 
 

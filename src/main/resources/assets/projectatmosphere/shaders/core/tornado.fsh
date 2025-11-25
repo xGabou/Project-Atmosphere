@@ -116,6 +116,7 @@ void main() {
     vec2 pos = vec2(cos(angle), sin(angle)) * radius;
     vec3 shapePos = vec3(pos.x, yWorld, pos.y);
     float density = max(-Shape(shapePos), 0.0);
+    float filledDensity = clamp(density * 1.35, 0.6, 1.5);
 
     // Flow warp
     vec2 flow = texture(FlowMap, texCoord).rg - 0.5;
@@ -133,17 +134,15 @@ void main() {
 
     float k = clamp(DustIntensity, 0.0, 1.0);
     vec3 color = mix(base.rgb, vec3(DustIntensity), k);
-    color = mix(color, cloudTint, 0.25);
-    color *= 0.4 + 0.6 * lighting;
-    color *= 0.5 + n1 * 0.5;
-    color *= 0.5 + 0.5 * density;
+    color = mix(color, cloudTint, 0.35);
+    color *= 0.5 + 0.5 * lighting;
+    color *= 0.7 + 0.3 * filledDensity;
 
     // Alpha uses normalized v (0..1)
-    float alpha = base.a * verticalFade(v);
-    alpha *= mix(0.8, 1.0, texture(NoiseMap, swirlUV * 4.0).r);
-    alpha *= 0.7 + n2 * 0.3;
-    alpha *= density;
-    alpha = clamp(alpha * coreFalloff, 0.9, 1.0);
+    float alphaBase = max(base.a, 0.95);
+    float alpha = alphaBase * verticalFade(v);
+    alpha *= clamp(filledDensity, 0.8, 1.2);
+    alpha = clamp(alpha * coreFalloff, 0.8, 1.0);
 
     fragColor = vec4(color, alpha);
 }

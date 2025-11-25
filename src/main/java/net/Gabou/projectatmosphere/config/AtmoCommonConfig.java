@@ -41,6 +41,8 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MIN;
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
+    public static final ForgeConfigSpec.BooleanValue TORNADO_ALLOW_LEGACY_FALLBACK;
+    public static final ForgeConfigSpec.BooleanValue TORNADO_DEBUG_LOGGING;
 
     public static final ForgeConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
 
@@ -140,6 +142,12 @@ public class AtmoCommonConfig {
         TORNADO_CELL_COOLDOWN_MINUTES = builder
                 .comment("Cooldown in minutes before a cell can spawn another tornado")
                 .defineInRange("cellCooldownMinutes", 20, 0, Integer.MAX_VALUE);
+        TORNADO_ALLOW_LEGACY_FALLBACK = builder
+                .comment("Allow falling back to the legacy mesh tornado when the SimpleClouds shader pack lacks the CloudTornadoes SSBO. Leave false to require the shader-driven funnel.")
+                .define("allowLegacyTornadoFallback", false);
+        TORNADO_DEBUG_LOGGING = builder
+                .comment("Enable verbose tornado logging (SSBO detection, fallback decisions, command outcomes).")
+                .define("debugTornadoLogging", false);
         builder.pop();
         builder.pop();
 

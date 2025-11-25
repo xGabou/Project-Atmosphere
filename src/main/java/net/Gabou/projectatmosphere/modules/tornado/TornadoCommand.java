@@ -8,6 +8,8 @@ import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsTornadoSupport;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
