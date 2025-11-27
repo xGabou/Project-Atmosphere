@@ -123,10 +123,10 @@ dependencies {
     implementation fg.deobf("curse.maven:betterdays-895618:7013807")
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
-    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7174860")
+    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7261562")
     implementation fg.deobf("curse.maven:rainboows-1121832:6421980")
     implementation fg.deobf("curse.maven:auroras-1105290:6040671")
-    implementation "io.github.xgabou:gaboulibs_forge:1.2"
+    implementation fg.deobf("curse.maven:gabous-libs-1367332:7261537")
     implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
     implementation fg.deobf("curse.maven:tectonic-686836:7197834")
     compileOnly fg.deobf("curse.maven:continents-682515:7078247")
@@ -250,7 +250,8 @@ modrinth {
     dependencies {
         required.project "e0bNACJD"
         required.project "4Al4H3t9"
-        optional.project "LtZfKhel"
+        required.project "LtZfKhel"
+        required.project "N8aGZtvj"
     }
     uploadFile = file("build/libs/${archivesBaseName}-${version}.jar")
 }
