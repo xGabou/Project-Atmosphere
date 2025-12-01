@@ -22,8 +22,8 @@ public class ClientSyncLock {
     }
 
     public static void setReady(UUID playerUUID, boolean ready) {
-        
-        ProjectAtmosphere.LOGGER.info("Setting player ready to " + playerUUID);
+        if(ProjectAtmosphere.DEBUG_MODE)
+            ProjectAtmosphere.LOGGER.info("Setting player ready to " + playerUUID);
     }
 
     public static void setReadyForLocalPlayer(boolean ready) {

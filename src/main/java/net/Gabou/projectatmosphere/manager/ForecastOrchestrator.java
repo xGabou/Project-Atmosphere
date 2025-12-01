@@ -125,7 +125,8 @@ public class ForecastOrchestrator {
             }
 
             if (shouldGenerate) {
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Player " + player.getName().getString());
+                if(ProjectAtmosphere.DEBUG_MODE)
+                    ProjectAtmosphere.LOGGER.info("[Atmosphere] Player " + player.getName().getString());
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
@@ -135,7 +136,8 @@ public class ForecastOrchestrator {
 
         long end = System.nanoTime();
         long durationMs = (end - start) / 1_000_000;
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
+        if(ProjectAtmosphere.DEBUG_MODE)
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
 
     }
 
@@ -288,7 +290,8 @@ public class ForecastOrchestrator {
             if (REGENERATING) {
                 runAfterRegen(() -> AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level)));
             } else {
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
+                if(ProjectAtmosphere.DEBUG_MODE)
+                    ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
                 AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level));
             }
         }

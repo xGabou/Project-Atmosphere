@@ -11,7 +11,7 @@ import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.event.EventHandler;
-import net.Gabou.projectatmosphere.gameplay.WindPhysics;
+import net.Gabou.projectatmosphere.gameplay.GustManager;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
@@ -59,7 +59,7 @@ public class AtmosphereManager {
         return allCenterOfMap;
     }
 
-    public static void onServerStarting(ServerLevel world) {
+    public static void onServerStarted(ServerLevel world) {
         playerReadyMap.clear();
         isInitialGenerationDone = ForecastOrchestrator.onServerStart(world);
         count = 0;
@@ -77,7 +77,8 @@ public class AtmosphereManager {
     }
 
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        ProjectAtmosphere.LOGGER.info("Updating forecast Around");
+        if(ProjectAtmosphere.DEBUG_MODE)
+            ProjectAtmosphere.LOGGER.info("Updating forecast Around");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.updateForecast(world, center);
         });
@@ -120,7 +121,8 @@ public class AtmosphereManager {
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        ProjectAtmosphere.LOGGER.info("Swapping profiles and updating weather");
+        if(ProjectAtmosphere.DEBUG_MODE)
+            ProjectAtmosphere.LOGGER.info("Swapping profiles and updating weather");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.onSwapDay(world);
         });
@@ -154,7 +156,7 @@ public class AtmosphereManager {
         // During regeneration, skip dependent ticks to avoid using transient/cleared state
         if (!ForecastOrchestrator.isRegenerating()) {
             ForecastOrchestrator.tick(level);
-            WindPhysics.onServerTick(level);
+            GustManager.onServerTick(level);
             TornadoManager.tick(level);
             HurricaneManager.tick(level);
             SnowstormManager.tick(level);

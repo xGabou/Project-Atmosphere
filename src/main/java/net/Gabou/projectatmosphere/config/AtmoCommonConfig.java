@@ -46,6 +46,8 @@ public class AtmoCommonConfig {
 
     public static final ForgeConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
 
+    public static final ForgeConfigSpec.BooleanValue DEBUG_MODE;
+
 
 
 
@@ -176,6 +178,12 @@ public class AtmoCommonConfig {
         WIND_ENTITY_PUSH_SCALE = builder
                 .comment("Push scale applied to other entities")
                 .defineInRange("entityPushScale", 0.03d, 0d, 1d);
+        builder.pop();
+
+        builder.push("debug");
+        DEBUG_MODE = builder
+                .comment("Enable debug mode for verbose logging and diagnostics")
+                .define("debugMode", false);
         builder.pop();
 
         COMMON_SPEC = builder.build();

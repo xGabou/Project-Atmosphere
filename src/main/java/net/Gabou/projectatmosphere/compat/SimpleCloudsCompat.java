@@ -79,7 +79,8 @@ public class SimpleCloudsCompat {
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Unknown cloud type: {}", cloudId);
             return null;
         }
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawning cloud: " + cloudId);
+        if(ProjectAtmosphere.DEBUG_MODE)
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawning cloud: " + cloudId);
         List<SpawnRegion> Region = generator.getSpawnRegions();
         SpawnRegion targetRegion = Region.iterator().next();
 
@@ -99,10 +100,11 @@ public class SimpleCloudsCompat {
             );
         }
 
-        region.ifPresentOrElse(
+        if(ProjectAtmosphere.DEBUG_MODE)
+            region.ifPresentOrElse(
                 r -> ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawned {} at {}, {} in {}", cloudId, x, z, key.biomeType()),
                 () -> ProjectAtmosphere.LOGGER.warn("[Atmosphere] Failed to spawn {} in {}", cloudId, key.biomeType())
-        );
+            );
         return  region.orElse(null);
     }
 

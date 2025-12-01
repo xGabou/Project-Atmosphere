@@ -36,13 +36,15 @@ public final class BiomeTempUserConfig {
 
             if (Files.notExists(file)) {
                 writeTemplate(file);
-                ProjectAtmosphere.LOGGER.info("Created biome temperature config template at {}", file);
+                if(ProjectAtmosphere.DEBUG_MODE)
+                    ProjectAtmosphere.LOGGER.info("Created biome temperature config template at {}", file);
                 return;
             }
 
             String raw = Files.readString(file, StandardCharsets.UTF_8);
             if (raw.isBlank()) {
-                ProjectAtmosphere.LOGGER.warn("Biome temperature config is empty: {}", file);
+                if(ProjectAtmosphere.DEBUG_MODE)
+                    ProjectAtmosphere.LOGGER.warn("Biome temperature config is empty: {}", file);
                 return;
             }
 
@@ -52,7 +54,8 @@ public final class BiomeTempUserConfig {
                     : null;
 
             if (biomes == null) {
-                ProjectAtmosphere.LOGGER.warn("No 'biomes' object found in {} — nothing to load.", file);
+                if(ProjectAtmosphere.DEBUG_MODE)
+                    ProjectAtmosphere.LOGGER.warn("No 'biomes' object found in {} — nothing to load.", file);
                 return;
             }
 
@@ -61,12 +64,14 @@ public final class BiomeTempUserConfig {
                 String key = e.getKey();
                 ResourceLocation id = parseId(key);
                 if (id == null) {
-                    ProjectAtmosphere.LOGGER.warn("Skipping invalid biome id in config: {}", key);
+                    if(ProjectAtmosphere.DEBUG_MODE)
+                        ProjectAtmosphere.LOGGER.warn("Skipping invalid biome id in config: {}", key);
                     continue;
                 }
 
                 if (!e.getValue().isJsonObject()) {
-                    ProjectAtmosphere.LOGGER.warn("Skipping biome {} because its value is not an object.", key);
+                    if(ProjectAtmosphere.DEBUG_MODE)
+                        ProjectAtmosphere.LOGGER.warn("Skipping biome {} because its value is not an object.", key);
                     continue;
                 }
 
@@ -74,7 +79,8 @@ public final class BiomeTempUserConfig {
 
                 RangeOrAll ro = parseRanges(obj);
                 if (ro == null) {
-                    ProjectAtmosphere.LOGGER.warn("Biome {} entry missing seasons or 'all' range — skipped.", key);
+                    if(ProjectAtmosphere.DEBUG_MODE)
+                        ProjectAtmosphere.LOGGER.warn("Biome {} entry missing seasons or 'all' range — skipped.", key);
                     continue;
                 }
 
@@ -90,9 +96,11 @@ public final class BiomeTempUserConfig {
             }
 
             if (applied > 0) {
-                ProjectAtmosphere.LOGGER.info("Applied {} biome temperature override(s) from {}", applied, file);
+                if(ProjectAtmosphere.DEBUG_MODE)
+                    ProjectAtmosphere.LOGGER.info("Applied {} biome temperature override(s) from {}", applied, file);
             } else {
-                ProjectAtmosphere.LOGGER.info("No biome temperature overrides were applied from {}", file);
+                if(ProjectAtmosphere.DEBUG_MODE)
+                    ProjectAtmosphere.LOGGER.info("No biome temperature overrides were applied from {}", file);
             }
 
         } catch (Exception ex) {

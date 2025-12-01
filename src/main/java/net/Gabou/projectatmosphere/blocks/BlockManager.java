@@ -255,7 +255,9 @@ public class BlockManager {
      * @param radius The radius (in blocks) to affect
      */
     public static void simulateTempesta(ServerLevel level, BlockPos center, int radius) {
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Simulating tempest at {} with radius {}", center, radius);
+        if(ProjectAtmosphere.DEBUG_MODE)
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Simulating tempest at {} with radius {}", center, radius);
+
         AsyncAtmosphereService.runStorm(() -> {
             RandomSource random = level.getRandom();
             int step = radius >= 1000 ? 32 : (radius >= 500 ? 16 : 8);

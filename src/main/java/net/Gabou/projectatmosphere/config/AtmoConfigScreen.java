@@ -55,6 +55,7 @@ public class AtmoConfigScreen extends Screen {
     private double windPlayerPushScale;
     private double windEntityPushScale;
     private double stormBoostMultiplier;
+    private boolean debugMode;
 
     private EditBox maxDebrisBox;
     private int cloudRenderDistance;
@@ -84,6 +85,7 @@ public class AtmoConfigScreen extends Screen {
     private EditBox windPlayerPushScaleBox;
     private EditBox windEntityPushScaleBox;
     private EditBox stormBoostMultiplierBox;
+    private EditBox debugModeBox;
 
     private final List<AbstractWidget> configWidgets = new ArrayList<>();
     private final List<Integer> widgetBaseY = new ArrayList<>();
@@ -127,6 +129,7 @@ public class AtmoConfigScreen extends Screen {
         titles.clear();
         labels.clear();
 
+        this.debugMode = AtmoCommonConfig.DEBUG_MODE.get();
         this.forceSharedExecutor = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get();
         this.stormBoostMultiplier = AtmoCommonConfig.STORM_SEVERITY_BOOSTER.get();
         this.displayUnitsImperial = AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.get();
@@ -277,6 +280,14 @@ public class AtmoConfigScreen extends Screen {
         y += 34;
         windEntityPushScaleBox = addNumberField(center, y, "Entity Push Scale", Double.toString(windEntityPushScale));
         y += 34;
+
+        addTitle("Debug", y);
+        y += 18;
+        addConfigWidget(Button.builder(toggleLabel("Debug mode", debugMode), b -> {
+            debugMode = !debugMode;
+            b.setMessage(toggleLabel("Debug mode", debugMode));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
 
         // Compute scroll range based on the visible viewport between contentTop and contentBottom
         int contentTop = 40;            // Start of scrollable content
@@ -449,6 +460,8 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.WIND_PLAYER_PUSH_SCALE.set(windPlayerPushScale);
         AtmoCommonConfig.WIND_ENTITY_PUSH_SCALE.set(windEntityPushScale);
         AtmoCommonConfig.STORM_SEVERITY_BOOSTER.set(stormBoostMultiplier);
+        AtmoCommonConfig.DEBUG_MODE.set(debugMode);
+        ProjectAtmosphere.DEBUG_MODE = debugMode;
 
         try {
             saveCommonConfigForMod(ProjectAtmosphere.MODID);

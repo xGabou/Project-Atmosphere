@@ -3938,11 +3938,13 @@ public class BiomeTempConfig {
         }
 
         if (matches.isEmpty()) {
-            ProjectAtmosphere.LOGGER.warn("No biome found with path '{}' in registry; defaulting to {}", biomeKey, def);
+            if(ProjectAtmosphere.DEBUG_MODE)
+                ProjectAtmosphere.LOGGER.warn("No biome found with path '{}' in registry; defaulting to {}", biomeKey, def);
             return Set.of(def);
         }
         if (matches.size() > 1) {
-            ProjectAtmosphere.LOGGER.warn("Multiple biomes match path '{}': {} — specify the mod id.", biomeKey, matches);
+            if(ProjectAtmosphere.DEBUG_MODE)
+                ProjectAtmosphere.LOGGER.warn("Multiple biomes match path '{}': {}", biomeKey, matches);
         }
         return matches;
     }

@@ -24,8 +24,10 @@ import net.Gabou.projectatmosphere.network.BiomeDayTemperaturePacket;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -43,16 +45,19 @@ import java.util.stream.Collectors;
 
 public class ForecastGenerator {
 
-    private static final int SAMPLE_STEP = 128;
+    private static final int SAMPLE_STEP = 64;
     static long seed = 0L;
     static final boolean sandStormLoaded = CompatHandler.isSandStormsLoaded();
     public static final int MAX_POSITIONS_PER_BIOME;
+    static final float SEA_LEVEL = AsyncAtmosphereService.callOnMainThread(ProjectAtmosphere::getSeaLevel);
+
+    public static String message = "";
 
     static {
         if (CompatHandler.isToughAsNailsLoaded()) {
-            MAX_POSITIONS_PER_BIOME = 25;
+            MAX_POSITIONS_PER_BIOME = 1250;
         } else {
-            MAX_POSITIONS_PER_BIOME = 40;
+            MAX_POSITIONS_PER_BIOME = 2000;
         }
     }
 
@@ -113,6 +118,7 @@ public class ForecastGenerator {
             avg.setTemperature(averageWeek(list, BiomeForecast::getTemperature));
         }
     }
+
     private static void computeAverageHumidityWeek() {
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
@@ -123,6 +129,7 @@ public class ForecastGenerator {
             avg.setHumidity(averageWeek(list, BiomeForecast::getHumidity));
         }
     }
+
     private static void computeAveragePressureWeek() {
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
@@ -133,6 +140,7 @@ public class ForecastGenerator {
             avg.setPressure(averageWeek(list, BiomeForecast::getPressure));
         }
     }
+
     private static void computeAverageWindWeek() {
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
@@ -143,14 +151,13 @@ public class ForecastGenerator {
             avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
         }
     }
+
     public static void groupForecastsByBiome() {
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             ResourceLocation biomeType = entry.getKey().biomeType();
             grouped.computeIfAbsent(biomeType, k -> new ArrayList<>()).add(entry.getValue());
         }
     }
-
-
 
 
     public static BiomeForecast getAverageForecast(ResourceLocation biomeType) {
@@ -173,7 +180,6 @@ public class ForecastGenerator {
     }
 
 
-
     /**
      * Generates a weekly forecast for the specified region centered at the given position.
      * This method samples biomes in a square area around the center and generates forecasts
@@ -183,45 +189,148 @@ public class ForecastGenerator {
      * @param level  The server level where the region is located.
      */
     static void generateForecastForRegion(BlockPos center, ServerLevel level) {
-        final long start = System.nanoTime();
+        // Local helper class for per-biome accumulation and size checking
+        final class BiomeStats {
+            int count;
+            int minX;
+            int maxX;
+            int minZ;
+            int maxZ;
+            final List<BiomeInstanceKey> samples = new ArrayList<>(MAX_POSITIONS_PER_BIOME);
 
-        // Fetch world-dependent values safely on main
+            BiomeStats(int x, int z) {
+                this.count = 0;
+                this.minX = this.maxX = x;
+                this.minZ = this.maxZ = z;
+            }
+
+            void updateBounds(int x, int z) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (z < minZ) minZ = z;
+                if (z > maxZ) maxZ = z;
+            }
+        }
+
+        final long start = System.nanoTime();
+        // Your “too small” biome threshold (both dimensions < 40 blocks).
+        final int minBiomeWidthBlocks = 40;
+
+        // Optional but recommended: clear shared state for this region if not cleared elsewhere.
+        biomeSamples.clear();
+        biomeSampleCounts.clear();
+        biomeIndex.clear();
+        FORECAST_MAP.clear();
+
+        // --- World-dependent values (must be on main thread) ---
         long day = AsyncAtmosphereService.callOnMainThread(
                 () -> level.getDayTime() / 24000L
         );
-        SeasonStage season = SeasonTimeHelper.stage(level);
+
         BiomeSource biomeSource = AsyncAtmosphereService.callOnMainThread(
                 () -> level.getChunkSource().getGenerator().getBiomeSource()
         );
 
-        // Collect biome samples
-        BiomeSampler sampler = new BiomeSampler(ProjectAtmosphere.seed, level.registryAccess(),biomeSource);
-        for (int dx = -RADIUS; dx <= RADIUS; dx += SAMPLE_STEP) {
-            for (int dz = -RADIUS; dz <= RADIUS; dz += SAMPLE_STEP) {
-                BlockPos samplePos = center.offset(dx, 0, dz);
-                ResourceLocation biomeId = sampler.getBiomeId(samplePos.getX(), samplePos.getY(), samplePos.getZ());
-                if (biomeId.getPath().contains("cave")) continue;
+        // --- Sampling phase ---
+        final long samplingStart = System.nanoTime();
 
-                int count = biomeSampleCounts.getOrDefault(biomeId, 0);
-                if (count >= MAX_POSITIONS_PER_BIOME) continue;
+        final int baseX = center.getX();
+        final int baseY = center.getY();
+        final int baseZ = center.getZ();
 
-                biomeSamples.add(new BiomeInstanceKey(biomeId, samplePos));
-                biomeSampleCounts.put(biomeId, count + 1);
+        final boolean belowSeaLevel = baseY < SEA_LEVEL;
+
+        BiomeSampler sampler = new BiomeSampler(ProjectAtmosphere.seed, level.registryAccess(), biomeSource);
+
+        // Estimate number of samples to reduce resizes.
+        final int samplesPerAxis = (RADIUS * 2) / SAMPLE_STEP + 1;
+        final int estimatedSamples = samplesPerAxis * samplesPerAxis;
+        final Map<ResourceLocation, BiomeStats> biomeStats =
+                new HashMap<>(estimatedSamples / 4 + 16);
+
+        final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+
+        if (!belowSeaLevel) {
+            for (int dx = -RADIUS; dx <= RADIUS; dx += SAMPLE_STEP) {
+                final int x = baseX + dx;
+                for (int dz = -RADIUS; dz <= RADIUS; dz += SAMPLE_STEP) {
+                    final int z = baseZ + dz;
+                    mutablePos.set(x, baseY, z);
+
+                    // Biome lookup (hot path)
+                    ResourceLocation biomeId = sampler.getBiomeId(x, baseY, z);
+
+                    // Skip specific cave biomes
+                    String path = biomeId.getPath();
+                    if (path.equals("lush_caves")
+                            || path.equals("dripstone_caves")
+                            || path.equals("deep_dark")) {
+                        continue;
+                    }
+
+                    // Accumulate per-biome stats
+                    BiomeStats stats = biomeStats.get(biomeId);
+                    if (stats == null) {
+                        stats = new BiomeStats(x, z);
+                        biomeStats.put(biomeId, stats);
+                    } else {
+                        stats.updateBounds(x, z);
+                    }
+
+                    // Limit number of stored positions per biome
+                    if (stats.count < MAX_POSITIONS_PER_BIOME) {
+                        // Store immutable position only when we actually keep this sample
+                        BiomeInstanceKey key = new BiomeInstanceKey(biomeId, mutablePos.immutable());
+                        stats.samples.add(key);
+                        stats.count++;
+                    }
+                }
             }
         }
+        // If below sea level, no sampling is done at all, which is equivalent to
+        // your old behavior where every sample was skipped (no entries added).
 
-        // Build biome index
-        biomeIndex = biomeSamples.stream()
-                .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType));
+        // Flatten per-biome stats into the shared structures,
+        // dropping biomes that are too small (both dimensions < minBiomeWidthBlocks).
+        for (Map.Entry<ResourceLocation, BiomeStats> entry : biomeStats.entrySet()) {
+            ResourceLocation biomeId = entry.getKey();
+            BiomeStats stats = entry.getValue();
 
-        // Forecast generation
+            int widthX = stats.maxX - stats.minX;
+            int widthZ = stats.maxZ - stats.minZ;
+
+            // Discard tiny "island" biomes.
+            if (widthX < minBiomeWidthBlocks && widthZ < minBiomeWidthBlocks) {
+                continue;
+            }
+
+            biomeSampleCounts.put(biomeId, stats.count);
+            biomeSamples.addAll(stats.samples);
+        }
+
+        // Build biome index without streams to reduce allocations.
+        for (BiomeInstanceKey key : biomeSamples) {
+            biomeIndex
+                    .computeIfAbsent(key.biomeType(), k -> new ArrayList<>())
+                    .add(key);
+        }
+
+        final long samplingEnd = System.nanoTime();
+
+        // --- Forecast generation phase (temperature / TAN) ---
+        final long forecastStart = samplingEnd;
+
         if (CompatHandler.isToughAsNailsLoaded()) {
-            Set<ResourceLocation> processed = new HashSet<>();
+            // Process each biome only once (as before) using a Set.
+            Set<ResourceLocation> processed = new HashSet<>(biomeIndex.size());
             for (BiomeInstanceKey key : biomeSamples) {
                 ResourceLocation biomeId = key.biomeType();
-                if (!processed.add(biomeId)) continue; // already handled this biome
+                if (!processed.add(biomeId)) {
+                    continue; // already handled this biome
+                }
 
-                long sampleTime = System.currentTimeMillis();
+                long perBiomeStart = System.nanoTime();
+
                 float[][] forecast = ToughAsNailsCompat.injectForecastForTAN(key, level);
 
                 BiomeForecast bf = new BiomeForecast();
@@ -230,14 +339,19 @@ public class ForecastGenerator {
                 bf.setBiomeKey(key);
                 putForecast(key, bf);
 
-                long endTime = System.currentTimeMillis();
-                ProjectAtmosphere.LOGGER.info(
-                        "[Atmosphere] Tough as Nail forecast for " + biomeId + " at " + key.samplePos() +
-                                " took " + (endTime - sampleTime) + " ms"
-                );
+                if (ProjectAtmosphere.DEBUG_MODE) {
+                    long perBiomeEnd = System.nanoTime();
+                    long micros = (perBiomeEnd - perBiomeStart) / 1_000L;
+                    ProjectAtmosphere.LOGGER.info(
+                            "[Atmosphere] Tough As Nails forecast for " + biomeId +
+                                    " at " + key.samplePos() +
+                                    " took " + micros + " µs"
+                    );
+                }
             }
             groupForecastsByBiome();
         } else {
+            // Per-sample temperature generation (kept for semantic equivalence).
             for (BiomeInstanceKey key : biomeSamples) {
                 BiomeForecast forecast = new BiomeForecast();
                 forecast.setTemperature(generateTemperature(key, level));
@@ -247,31 +361,73 @@ public class ForecastGenerator {
             groupForecastsByBiome();
         }
 
+        // Compute temperature averages as before.
         computeAverageTemperatureWeek();
 
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setHumidity(generateHumidity(entry.getKey(), level, day));
-        }
-        computeAverageHumidityWeek();
+        final long forecastEnd = System.nanoTime();
 
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setPressure(generatePressure(entry.getKey(), day));
-        }
-        computeAveragePressureWeek();
+        // --- Post-processing: humidity, pressure, wind ---
+        final long postStart = forecastEnd;
 
+        // Single pass over FORECAST_MAP to set all three fields.
+// 1) Humidity first
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            entry.getValue().setWind(generateWind(entry.getKey()));
+            BiomeInstanceKey key = entry.getKey();
+            BiomeForecast forecast = entry.getValue();
+
+            forecast.setHumidity(generateHumidity(key, level, day));
+        }
+        computeAverageHumidityWeek(); // now any global humidity info is valid
+
+// 2) Then pressure
+        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+            BiomeInstanceKey key = entry.getKey();
+            BiomeForecast forecast = entry.getValue();
+
+            forecast.setPressure(generatePressure(key, day));
+        }
+        computeAveragePressureWeek(); // pressure averages now valid too
+        WindGenerator.buildNeighborIndex(getBiomeSamples());
+
+// 3) Finally wind, with access to humidity (+ averages) and pressure
+        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+            BiomeInstanceKey key = entry.getKey();
+            BiomeForecast forecast = entry.getValue();
+
+            // generateWind can now safely read:
+            // - forecast.getHumidity()
+            // - forecast.getPressure()
+            // - any global humidity/pressure averages computed above
+            forecast.setWind(generateWind(key));
         }
         computeAverageWindWeek();
 
+
+        // NOTE: if dailyAndSand touches world state directly, it may need
+        // AsyncAtmosphereService.callOnMainThread as well.
         SandStormManager.dailyAndSand(level);
 
-        long end = System.nanoTime();
-        long durationMs = (end - start) / 1_000_000;
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast region generation took " + durationMs + " ms.");
+        final long end = System.nanoTime();
+
+        long totalMs = (end - start) / 1_000_000L;
+
+        if (ProjectAtmosphere.DEBUG_MODE) {
+            long samplingMs = (samplingEnd - samplingStart) / 1_000_000L;
+            long forecastMs = (forecastEnd - forecastStart) / 1_000_000L;
+            long postMs = (end - postStart) / 1_000_000L;
+            String message = "[Atmosphere] Forecast region generation took " + totalMs + " ms. " +
+                    "sampling=" + samplingMs + " ms, forecast=" + forecastMs + " ms, post=" + postMs + " ms. " +
+                    "samples=" + biomeSamples.size() + ", biomes=" + biomeIndex.size();
+
+            ProjectAtmosphere.LOGGER.info(message);
+            ForecastGenerator.message = message;
+        } else {
+            ProjectAtmosphere.LOGGER.info(
+                    "[Atmosphere] Forecast region generation took " + totalMs +
+                            " ms for " + biomeSamples.size() + " samples across " + biomeIndex.size() + " biomes."
+            );
+        }
     }
-
-
 
 
     private static float[][] generateTemperature(BiomeInstanceKey key, ServerLevel level) {
@@ -297,6 +453,7 @@ public class ForecastGenerator {
     public static Map<BiomeInstanceKey, BiomeForecast> getForecastMap() {
         return FORECAST_MAP;
     }
+
     static void clearForecasts() {
         FORECAST_MAP.clear();
         grouped.clear();
@@ -323,7 +480,6 @@ public class ForecastGenerator {
     static BiomeForecast getForecast(BiomeInstanceKey key) {
         return FORECAST_MAP.get(key);
     }
-
 
 
     static float getHumidityValue(BiomeInstanceKey key, long tick) {
@@ -374,11 +530,6 @@ public class ForecastGenerator {
     }
 
     public static BiomeForecast getClosestValidForecast(BiomeInstanceKey key, ForecastType type) {
-        if (key == null) {
-            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Requested forecast with null biome key for type {}", type);
-            return buildFallbackForecast(null);
-        }
-
         BiomeForecast pointer = ForecastPointerRegistry.getPointer(key);
         if (pointer != null) {
             return pointer;
@@ -509,10 +660,6 @@ public class ForecastGenerator {
 
         return result;
     }
-
-
-
-
 
 
     private static float deriveRepresentativeTemperature(BiomeForecast avg) {

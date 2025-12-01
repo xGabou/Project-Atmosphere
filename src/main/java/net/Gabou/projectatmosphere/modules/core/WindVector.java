@@ -61,6 +61,9 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
             }
             Delta delta = deltas.computeIfAbsent(state.getKey(), k -> new Delta());
             for (BiomeInstanceKey neighborKey : neighbors) {
+                if (neighborKey == null) {
+                    continue;
+                }
                 RegionAtmosphereState neighbor = AtmosphericStateRegistry.getState(neighborKey);
                 if (neighbor == null) continue;
                 float mixingFactor = 0.02f * strength;

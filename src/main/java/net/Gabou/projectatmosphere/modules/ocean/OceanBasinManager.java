@@ -51,7 +51,8 @@ public final class OceanBasinManager {
                         BASINS.put(basin.getId(), basin);
                     }
                     READY.set(true);
-                    ProjectAtmosphere.LOGGER.info("[Ocean] Detected {} basins", basins.size());
+                    if(ProjectAtmosphere.DEBUG_MODE)
+                        ProjectAtmosphere.LOGGER.info("[Ocean] Detected {} basins", basins.size());
                 })
                 .exceptionally(ex -> {
                     ProjectAtmosphere.LOGGER.error("[Ocean] Failed to detect basins", ex);

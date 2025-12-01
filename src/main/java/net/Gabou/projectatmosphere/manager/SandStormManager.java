@@ -110,7 +110,8 @@ public class SandStormManager {
                     scheduledStormPhase = computeStormPhase(forecast);
                     scheduledStormTime = baseTime + randomOffset;
 
-                    ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in biome {} (phase: {})",
+                    if(ProjectAtmosphere.DEBUG_MODE)
+                        ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in biome {} (phase: {})",
                             scheduledStormTime, selected.biomeType(), scheduledStormPhase);
                     for (ServerPlayer player : level.players()) {
 
@@ -140,8 +141,8 @@ public class SandStormManager {
         if (scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
             SandStormAPI. startSandstorm(scheduledStormPhase, scheduledStormBiome);
 
-
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
+            if(ProjectAtmosphere.DEBUG_MODE)
+                ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
                     scheduledStormBiome.biomeType(), scheduledStormPhase);
 
             scheduledStormBiome = null;
@@ -154,7 +155,8 @@ public class SandStormManager {
                 ProjectAtmosphere.LOGGER.warn("[Atmosphere] No sandstorm biomes found, but storm is active!");
                 return;
             }
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Sandstorm active in {} biomes: {}", sandStorms.size(), sandStorms);
+            if(ProjectAtmosphere.DEBUG_MODE)
+                ProjectAtmosphere.LOGGER.info("[Atmosphere] Sandstorm active in {} biomes: {}", sandStorms.size(), sandStorms);
             AsyncAtmosphereService.runStorm(() -> {
                 for (BiomeInstanceKey biome : sandStorms) {
 

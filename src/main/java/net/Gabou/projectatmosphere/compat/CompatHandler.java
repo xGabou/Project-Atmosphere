@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.compat;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraftforge.fml.ModList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -59,6 +60,9 @@ public class CompatHandler {
 
     public static void init() {
         TemperatureMod mod = getActiveTemperatureMod();
+        if(!ProjectAtmosphere.DEBUG_MODE)
+            return;
+
         switch (mod) {
             case LEGENDARY_SURVIVAL -> LOGGER.info("Legendary Survival Overhaul loaded");
             case TOUGH_AS_NAILS -> LOGGER.info("Tough As Nails loaded");

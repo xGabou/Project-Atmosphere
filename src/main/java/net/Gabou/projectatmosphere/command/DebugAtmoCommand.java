@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
@@ -168,6 +169,22 @@ public class DebugAtmoCommand {
                                     return 1;
                                 })
                         )
+                        .then(Commands.literal("debugmode")
+                                .then(Commands.argument("value", BoolArgumentType.bool())
+                                        .executes(ctx -> {
+                                            boolean value = BoolArgumentType.getBool(ctx, "value");
+                                            ProjectAtmosphere.DEBUG_MODE = value;
+
+                                            ctx.getSource().sendSuccess(
+                                                    () -> Component.literal("Project Atmosphere debug mode set to: " + value),
+                                                    true
+                                            );
+
+                                            return 1;
+                                        })
+                                )
+                        )
+
         );
     }
 
@@ -180,7 +197,7 @@ public class DebugAtmoCommand {
             LOGGER.warn("Cloud ID is null, cannot spawn cloud.");
             return null;
         }
-        if(!level.dimension().equals(Level.OVERWORLD)) {
+        if (!level.dimension().equals(Level.OVERWORLD)) {
             return null;
         }
 

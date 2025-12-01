@@ -18,6 +18,7 @@ import net.minecraft.locale.Language;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -50,11 +51,13 @@ public class ProjectAtmosphere {
 
     public static final float DEFAULT_REGION_RADIUS = 700F; 
 
-    public static final int DEFAULT_RADIUS = 10000;
+    public static final int DEFAULT_RADIUS = 100000;
     public static long seed;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);
-
+    public static boolean DEBUG_MODE = true;
+    private static float seaLevel;
+    private static boolean seaLevelInitialized = false;
 
 
 
@@ -119,8 +122,10 @@ public class ProjectAtmosphere {
     public static void onServerStarted(ServerStartedEvent event) {
         MinecraftServer server = event.getServer();
         ServerLevel overworld = server.overworld();
-        AtmosphereManager.onServerStarting(overworld);
-        ProjectAtmosphere.LOGGER.info("BiomeSampler initialized with live biome source.");
+        AtmosphereManager.onServerStarted(overworld);
+        initSeaLevel(overworld);
+        if(ProjectAtmosphere.DEBUG_MODE)
+            ProjectAtmosphere.LOGGER.info("BiomeSampler initialized with live biome source.");
     }
 
 
@@ -151,7 +156,8 @@ public class ProjectAtmosphere {
     }
 
     private void setup(final FMLCommonSetupEvent event) {
-        LOGGER.info("Setting up Project Atmosphere (Common)");
+        if(ProjectAtmosphere.DEBUG_MODE)
+            LOGGER.info("Setting up Project Atmosphere (Common)");
         initModules();
         TornadoProbabilityManager.init();
         event.enqueueWork(() -> {
@@ -166,7 +172,8 @@ public class ProjectAtmosphere {
 
     private void clientSetup(final FMLClientSetupEvent event, FMLJavaModLoadingContext context) {
         event.enqueueWork(() -> {
-            LOGGER.info("Setting up Project Atmosphere (Client)");
+            if(ProjectAtmosphere.DEBUG_MODE)
+                LOGGER.info("Setting up Project Atmosphere (Client)");
             ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS,context);
             Map<String, String> translations = Language.getInstance().getLanguageData();
             translations.put("sandstorm.debug.blocked", "Nothing to report. Stay alert.");
@@ -193,7 +200,8 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        LOGGER.info("Player logged in!");
+        if(ProjectAtmosphere.DEBUG_MODE)
+            LOGGER.info("Player logged in!");
         AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
 
 
@@ -210,13 +218,30 @@ public class ProjectAtmosphere {
     }
 
     private static void sendInfo() {
-        LOGGER.info("All modules subsystems have been initialized (Serene Seasons detected).");
+        if(ProjectAtmosphere.DEBUG_MODE)
+            LOGGER.info("All modules subsystems have been initialized (Serene Seasons detected).");
     }
 
     private static void isSereneLoaded() {
         if (!ModList.get().isLoaded("sereneseasons")) {
-            LOGGER.info("Serene Seasons is not found—skipping all modules subsystems.");
+            if(ProjectAtmosphere.DEBUG_MODE)
+                LOGGER.info("Serene Seasons is not found—skipping all modules subsystems.");
         }
+    }
+
+    static void initSeaLevel(Level level) {
+        if (!seaLevelInitialized) {
+            seaLevel = level.getSeaLevel();
+            seaLevelInitialized = true;
+        }
+    }
+
+    public static float getSeaLevel() {
+        if (!seaLevelInitialized) {
+            LOGGER.warn("Sea level requested before initialization; defaulting to 60f.");
+            return 60f;
+        }
+        return seaLevel;
     }
 
 

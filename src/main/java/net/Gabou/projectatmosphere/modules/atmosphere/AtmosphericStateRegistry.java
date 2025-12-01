@@ -7,6 +7,7 @@ import net.minecraft.util.RandomSource;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +28,9 @@ public final class AtmosphericStateRegistry {
     }
 
     public static RegionAtmosphereState getState(BiomeInstanceKey key) {
+        if (key == null) {
+            return null;
+        }
         return STATES.get(key);
     }
 
@@ -45,19 +49,28 @@ public final class AtmosphericStateRegistry {
 
     public static void rebuildNeighbors() {
         List<BiomeInstanceKey> keys = new ArrayList<>(STATES.keySet());
-        NEIGHBORS.clear();
+        Map<BiomeInstanceKey, List<BiomeInstanceKey>> rebuilt = new HashMap<>(keys.size());
         for (int i = 0; i < keys.size(); i++) {
             BiomeInstanceKey a = keys.get(i);
-            List<BiomeInstanceKey> listA = NEIGHBORS.computeIfAbsent(a, k -> new ArrayList<>());
+            if (a == null || a.samplePos() == null) {
+                continue;
+            }
+            List<BiomeInstanceKey> listA = rebuilt.computeIfAbsent(a, k -> new ArrayList<>());
             for (int j = i + 1; j < keys.size(); j++) {
                 BiomeInstanceKey b = keys.get(j);
+                if (b == null || b.samplePos() == null) {
+                    continue;
+                }
                 double dist = a.samplePos().distToCenterSqr(b.samplePos().getX(), b.samplePos().getY(), b.samplePos().getZ());
                 if (dist <= NEIGHBOR_RADIUS_SQR) {
                     listA.add(b);
-                    NEIGHBORS.computeIfAbsent(b, k -> new ArrayList<>()).add(a);
+                    rebuilt.computeIfAbsent(b, k -> new ArrayList<>()).add(a);
                 }
             }
         }
+
+        NEIGHBORS.clear();
+        rebuilt.forEach((key, neighbors) -> NEIGHBORS.put(key, List.copyOf(neighbors)));
     }
 
     public static List<BiomeInstanceKey> getNeighbors(BiomeInstanceKey key) {

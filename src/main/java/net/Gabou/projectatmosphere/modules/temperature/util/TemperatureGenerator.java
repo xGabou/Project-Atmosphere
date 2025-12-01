@@ -23,8 +23,8 @@ public class TemperatureGenerator {
     private static final float IN_MIN = -0.5f;
     private static final float IN_MAX =  2.0f;
     private static final float DEN    = (IN_MAX - IN_MIN);
-    private static final float SEA_LEVEL = 63f;
     private static final float LAPSE_RATE = -0.0065f;
+    static final float SEA_LEVEL = AsyncAtmosphereService.callOnMainThread(ProjectAtmosphere::getSeaLevel);
 
     /**
      * Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM),

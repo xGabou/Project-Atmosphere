@@ -10,9 +10,11 @@ import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
@@ -31,6 +33,7 @@ public class EventHandler {
 
     private static int tickCounter = 0;
 
+    private static boolean hasDisplayedMessage = false;
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.level.isClientSide || !(event.level instanceof ServerLevel serverLevel)) {
@@ -55,6 +58,10 @@ public class EventHandler {
 
         if (CompatHandler.isRainbowsLoaded()) {
             RainbowRainBridge.sync(serverLevel, generator);
+        }
+        if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
+            hasDisplayedMessage = true;
+            serverLevel.players().forEach(player -> {player.sendSystemMessage(Component.literal(ForecastGenerator.message) );});
         }
 
 

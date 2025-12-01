@@ -16,7 +16,9 @@ public class ParticleAtlasDebugger {
     public static void onStitch(TextureStitchEvent.Post event) {
         if (!event.getAtlas().location().equals(TextureAtlas.LOCATION_PARTICLES)) return;
         Set<ResourceLocation> loaded = event.getAtlas().getTextureLocations();
-        ProjectAtmosphere.LOGGER.info(">>> Particle atlas contains {} sprites:", loaded.size());
-        loaded.forEach(loc -> ProjectAtmosphere.LOGGER.info("  - {}", loc));
+        if(ProjectAtmosphere.DEBUG_MODE){
+            ProjectAtmosphere.LOGGER.info(">>> Particle atlas contains {} sprites:", loaded.size());
+            loaded.forEach(loc -> ProjectAtmosphere.LOGGER.info("  - {}", loc));
+        }
     }
 }
