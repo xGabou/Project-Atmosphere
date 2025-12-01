@@ -9,7 +9,6 @@ import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.RainSystem;
 import net.Gabou.projectatmosphere.modules.atmosphere.SunlightController;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
-import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -20,10 +19,7 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
-import net.Gabou.projectatmosphere.modules.wind.FloatRange;
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
-import net.Gabou.projectatmosphere.modules.wind.WindForecast;
-import net.Gabou.projectatmosphere.modules.wind.WindForecastPart;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -73,6 +69,7 @@ public class ForecastOrchestrator {
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
             try {
                 ForecastGenerator.generateForecastForSavedRegion(level);
+                WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
                 initializeDynamicSystems(level);
                 return true;
             } catch (Exception e) {
@@ -81,6 +78,7 @@ public class ForecastOrchestrator {
                 ForecastDataStorage.clearAll(level);
                 ForecastGenerator.clearForecasts();
                 ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
+                WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
                 initializeDynamicSystems(level);
                 return true;
             }
@@ -94,7 +92,7 @@ public class ForecastOrchestrator {
         } else {
             ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
         }
-
+        WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
         initializeDynamicSystems(level);
         return true;
     }
@@ -179,8 +177,8 @@ public class ForecastOrchestrator {
 
             ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
                 AtmosphericStateRegistry.initializeState(key, forecast);
-                generateWindForecast(key, forecast);
             });
+            WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
             initializeDynamicSystems(level);
         } finally {
             REGENERATING = false;
@@ -201,8 +199,8 @@ public class ForecastOrchestrator {
             ForecastGenerator.generateForecastForRegion(spawn, level);
             ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
                 AtmosphericStateRegistry.initializeState(key, forecast);
-                generateWindForecast(key, forecast);
             });
+            WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
             initializeDynamicSystems(level);
             return;
         }
@@ -217,10 +215,8 @@ public class ForecastOrchestrator {
      */
     public static void updateForecast(ServerLevel level, BlockPos center) {
         ForecastGenerator.generateForecastForRegion(center, level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
-            AtmosphericStateRegistry.initializeState(key, forecast);
-            generateWindForecast(key, forecast);
-        });
+        ForecastGenerator.getForecastMap().forEach((key, forecast) -> AtmosphericStateRegistry.initializeState(key, forecast));
+        WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
         initializeDynamicSystems(level);
     }
 
@@ -283,6 +279,7 @@ public class ForecastOrchestrator {
         CycloneManager.update(level);
         WindVector.update(level);
         CloudManager.update(level);
+        WindEngine.tick(level, activeKeys);
         RainSystem.update(level);
 
         long now = level.getGameTime();
@@ -342,42 +339,6 @@ public class ForecastOrchestrator {
         CloudManager.initialize(level);
         CycloneManager.initialize(level);
         OceanBasinManager.initialize(level);
-    }
-
-    public static void generateWindForecast(BiomeInstanceKey key, BiomeForecast forecast) {
-        var state = AtmosphericStateRegistry.getState(key);
-        WindVector today = state != null ? state.getWind() : null;
-        if (today == null) {
-            WindVector[] week = forecast.getWind();
-            if (week != null && week.length > 0) {
-                today = week[0];
-            }
-        }
-        if (today == null) {
-            return;
-        }
-
-        float baseMax = today.baseSpeed();
-        float gustMax = today.gustSpeed();
-        float dirDeg = (float) Math.toDegrees(today.angleRadians());
-        float gustProbValue = gustMax > baseMax ? 0.3f : 0f;
-
-        java.util.EnumMap<WindForecastPart, FloatRange> base = new java.util.EnumMap<>(WindForecastPart.class);
-        java.util.EnumMap<WindForecastPart, FloatRange> gust = new java.util.EnumMap<>(WindForecastPart.class);
-        java.util.EnumMap<WindForecastPart, Float> prob = new java.util.EnumMap<>(WindForecastPart.class);
-        java.util.EnumMap<WindForecastPart, FloatRange> dir = new java.util.EnumMap<>(WindForecastPart.class);
-
-        float[] stageScale = {0.3f, 1.0f, 0.8f, 0.6f, 0.4f, 0.2f};
-        WindForecastPart[] parts = WindForecastPart.values();
-        for (int i = 0; i < parts.length; i++) {
-            float scale = stageScale[i];
-            base.put(parts[i], new FloatRange(0f, baseMax * scale));
-            gust.put(parts[i], new FloatRange(0f, gustMax * scale));
-            prob.put(parts[i], gustProbValue);
-            dir.put(parts[i], new FloatRange(dirDeg - 15f, dirDeg + 15f));
-        }
-
-        WindEngine.putForecast(key, new WindForecast(base, gust, prob, dir));
     }
 
 

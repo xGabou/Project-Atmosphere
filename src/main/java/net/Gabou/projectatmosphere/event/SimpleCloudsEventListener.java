@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.wind.WindEngine;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -54,10 +55,9 @@ public class SimpleCloudsEventListener {
         int y = serverLevel.getSeaLevel();
 
         BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(serverLevel, new BlockPos(x, y, z));
-        // Current sample (fallback-safe) for direction preservation
-        var current = WindVector.getOrFallback(key);
-        float currentSpeed = current.speedMps();
-        float dirDeg = current.directionDeg();
+        WindVector current = WindEngine.getCurrentHighWindVector(key, serverLevel.getGameTime());
+        float currentSpeed = current.baseSpeed();
+        float dirDeg = (float) Math.toDegrees(current.angleRadians());
 
         // Storm-based boost
         float stormFactor = ForecastOrchestrator.getCurrentStormChance(key, serverLevel.getGameTime());

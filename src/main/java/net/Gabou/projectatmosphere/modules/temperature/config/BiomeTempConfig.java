@@ -3691,6 +3691,148 @@ public class BiomeTempConfig {
                 new Range(22, 28)
         });
 
+        // TerraFirmaCraft – main biomes
+        putAllSeasons("tfc:ocean", new Range[]{
+                new Range(-2f, 8f),
+                new Range(4f, 14f),
+                new Range(12f, 24f),
+                new Range(6f, 16f)
+        });
+        putAllSeasons("tfc:deep_ocean", new Range[]{
+                new Range(-4f, 6f),
+                new Range(2f, 12f),
+                new Range(10f, 20f),
+                new Range(4f, 14f)
+        });
+        putAllSeasons("tfc:plains", new Range[]{
+                new Range(-6f, 8f),
+                new Range(4f, 18f),
+                new Range(14f, 30f),
+                new Range(6f, 20f)
+        });
+        putAllSeasons("tfc:high_plains", new Range[]{
+                new Range(-10f, 4f),
+                new Range(-2f, 16f),
+                new Range(10f, 26f),
+                new Range(2f, 18f)
+        });
+        putAllSeasons("tfc:swamp", new Range[]{
+                new Range(0f, 12f),
+                new Range(8f, 22f),
+                new Range(16f, 32f),
+                new Range(8f, 22f)
+        });
+        putAllSeasons("tfc:mountains", new Range[]{
+                new Range(-16f, -2f),
+                new Range(-8f, 8f),
+                new Range(2f, 18f),
+                new Range(-6f, 10f)
+        });
+        putAllSeasons("tfc:rolling_hills", new Range[]{
+                new Range(-4f, 10f),
+                new Range(6f, 20f),
+                new Range(14f, 28f),
+                new Range(6f, 20f)
+        });
+        putAllSeasons("tfc:high_hills", new Range[]{
+                new Range(-12f, 2f),
+                new Range(-2f, 14f),
+                new Range(8f, 24f),
+                new Range(-4f, 12f)
+        });
+        putAllSeasons("tfc:mountain_range", new Range[]{
+                new Range(-18f, -4f),
+                new Range(-10f, 6f),
+                new Range(0f, 16f),
+                new Range(-8f, 8f)
+        });
+        putAllSeasons("tfc:salt_swamp", new Range[]{
+                new Range(4f, 16f),
+                new Range(10f, 24f),
+                new Range(18f, 34f),
+                new Range(10f, 24f)
+        });
+        putAllSeasons("tfc:peat_bog", new Range[]{
+                new Range(-6f, 8f),
+                new Range(2f, 18f),
+                new Range(10f, 26f),
+                new Range(2f, 18f)
+        });
+
+        // TerraFirmaCraft – technical biomes
+        putAllSeasons("tfc:river", new Range[]{
+                new Range(-2f, 10f),
+                new Range(6f, 18f),
+                new Range(12f, 26f),
+                new Range(6f, 18f)
+        });
+        putAllSeasons("tfc:beach", new Range[]{
+                new Range(2f, 14f),
+                new Range(8f, 22f),
+                new Range(16f, 30f),
+                new Range(8f, 22f)
+        });
+        putAllSeasons("tfc:gravel_beach", new Range[]{
+                new Range(0f, 12f),
+                new Range(6f, 20f),
+                new Range(14f, 28f),
+                new Range(6f, 20f)
+        });
+        putAllSeasons("tfc:lake", new Range[]{
+                new Range(-2f, 10f),
+                new Range(6f, 18f),
+                new Range(12f, 26f),
+                new Range(6f, 18f)
+        });
+        putAllSeasons("tfc:shore", new Range[]{
+                new Range(2f, 12f),
+                new Range(8f, 20f),
+                new Range(14f, 28f),
+                new Range(8f, 20f)
+        });
+        putAllSeasons("tfc:high_hills_edge", new Range[]{
+                new Range(-8f, 6f),
+                new Range(0f, 16f),
+                new Range(10f, 24f),
+                new Range(-2f, 14f)
+        });
+        putAllSeasons("tfc:mountain_edge", new Range[]{
+                new Range(-10f, 2f),
+                new Range(-2f, 12f),
+                new Range(6f, 20f),
+                new Range(-4f, 10f)
+        });
+        putAllSeasons("tfc:mountain_range_edge", new Range[]{
+                new Range(-14f, 0f),
+                new Range(-6f, 10f),
+                new Range(4f, 18f),
+                new Range(-6f, 8f)
+        });
+        putAllSeasons("tfc:foothills", new Range[]{
+                new Range(-6f, 8f),
+                new Range(2f, 18f),
+                new Range(12f, 26f),
+                new Range(4f, 18f)
+        });
+        putAllSeasons("tfc:lakeshore", new Range[]{
+                new Range(0f, 12f),
+                new Range(8f, 20f),
+                new Range(14f, 28f),
+                new Range(8f, 20f)
+        });
+        putAllSeasons("tfc:riverbank", new Range[]{
+                new Range(-2f, 10f),
+                new Range(6f, 18f),
+                new Range(12f, 26f),
+                new Range(6f, 18f)
+        });
+        putAllSeasons("tfc:estuary", new Range[]{
+                new Range(2f, 14f),
+                new Range(10f, 22f),
+                new Range(16f, 30f),
+                new Range(10f, 22f)
+        });
+
 
 
 
@@ -3774,6 +3916,11 @@ public class BiomeTempConfig {
             }
         }
 
+        ProjectAtmosphere.LOGGER.warn(
+                "Biome key '{}' is missing a namespace; assuming minecraft:{} when unique. " +
+                        "Prefer explicit ids such as minecraft:desert or biomesoplenty:bayou to avoid ambiguity.",
+                biomeKey, biomeKey);
+
         // Default to minecraft namespace first
         ResourceLocation def = ResourceLocation.withDefaultNamespace(biomeKey);
 
@@ -3795,7 +3942,7 @@ public class BiomeTempConfig {
             return Set.of(def);
         }
         if (matches.size() > 1) {
-            ProjectAtmosphere.LOGGER.info("Multiple biomes match path '{}': {}", biomeKey, matches);
+            ProjectAtmosphere.LOGGER.warn("Multiple biomes match path '{}': {} — specify the mod id.", biomeKey, matches);
         }
         return matches;
     }

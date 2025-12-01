@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.*;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.world.phys.Vec3;
 
 public class WindLeafParticle extends TextureSheetParticle {
 
@@ -47,9 +48,17 @@ public class WindLeafParticle extends TextureSheetParticle {
         } catch (Throwable ignored) {
         }
 
-        
+
+        Vec3 push = WindParticlePusher.computeWindPush(this.level, new Vec3(this.x, this.y, this.z));
+        if (push.lengthSqr() > 0.0) {
+            this.xd += push.x;
+            this.yd += push.y;
+            this.zd += push.z;
+        }
+
+
         this.oRoll = this.roll;
-        this.roll += 0.02f + random.nextFloat() * 0.01f; 
+        this.roll += 0.02f + random.nextFloat() * 0.01f;
 
         
         if (this.age % 5 == 0) {
