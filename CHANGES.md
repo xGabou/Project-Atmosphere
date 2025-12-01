@@ -95,6 +95,12 @@ This file records functionality additions/removals made during development sessi
 - In-game config screen adds an “Imperial Units” toggle under Display.
 - Regeneration safety: clearing/regenerating forecasts now pauses dependent ticks (wind physics, tornado/hurricane/snowstorm managers), and defers scheduled tornado checks until regeneration completes.
 
+## Unreleased — Unified wind stack
+- Rebuilt wind handling into a high/low layer model with gust-aware forecasts and runtime smoothing that mirrors the other environment modules.
+- Added tornado-aware low wind forces plus helpers to apply combined wind, gust, and suction/rotation/lift to players.
+- Wired SimpleClouds and forecast orchestration to consume the new wind API while preserving existing forecast generation inputs.
+- Ground-level wind particles near players now receive directional pushes when the airflow is unobstructed, keeping leaves and streaks aligned with live wind samples.
+
 ## 0.5.4.4 — Added weatherdebug cloud command (2025-10-17)
 - Added command: `/weatherdebug cloud <id>`
   - Spawns the specified SimpleClouds cloud at the player’s position/biome.

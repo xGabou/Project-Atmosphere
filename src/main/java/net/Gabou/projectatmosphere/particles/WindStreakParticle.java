@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.particles;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.*;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.world.phys.Vec3;
 
 public class WindStreakParticle extends TextureSheetParticle {
     private final SpriteSet sprites;
@@ -40,6 +41,13 @@ public class WindStreakParticle extends TextureSheetParticle {
         try {
             this.setSpriteFromAge(this.sprites);
         } catch (Throwable ignored) {
+        }
+
+        Vec3 push = WindParticlePusher.computeWindPush(this.level, new Vec3(this.x, this.y, this.z));
+        if (push.lengthSqr() > 0.0) {
+            this.xd += push.x;
+            this.yd += push.y;
+            this.zd += push.z;
         }
 
         // Fade in first quarter of life
