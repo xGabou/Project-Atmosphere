@@ -1,5 +1,10 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+
+## Unreleased – Biome naming and TFC coverage
+- `BiomeTempConfig` now warns when biome keys are provided without a namespace (e.g., `minecraft:desert`, `biomesoplenty:bayou`) so config stays tied to the right mod IDs.
+- Added TerraFirmaCraft main and technical biome temperature curves (oceans, plains, mountains, rivers, beaches, edges, and estuaries) to keep climate sampling consistent in modded worlds.
+
 ## 0.6.0.0-pre3 - Sky effects + season bridge (2025-11-24)
 - Tornado shader now binds live SimpleClouds cloud color as its base texture (fallback to static) and densifies alpha/color to remove moving holes; `/spawnTornado` no longer blocks when `CloudTornadoes` SSBO is missing (spawns shader funnel unless legacy fallback is explicitly enabled).
 - Added a pluggable season time helper (neutral default) and refactored client season consumers (auroras, leaves, hurricanes, temperature generation) to rely on it instead of Serene Seasons directly.
