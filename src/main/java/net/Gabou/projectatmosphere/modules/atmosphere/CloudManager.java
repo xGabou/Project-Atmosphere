@@ -13,10 +13,13 @@ import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.BiasedToBottomInt;
@@ -43,7 +46,7 @@ import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.determineCl
  */
 public final class CloudManager {
     private static final Map<Integer, RegionCloudData> REGION_DATA = new ConcurrentHashMap<>();
-    private static final Set<BiomeInstanceKey> ACTIVE_BIOMES = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<RegionInstanceKey> ACTIVE_REGIONS = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private static final AtomicBoolean REGION_SCAN_IN_FLIGHT = new AtomicBoolean();
     private static final AtomicBoolean SPAWN_SCAN_IN_FLIGHT = new AtomicBoolean();
@@ -82,7 +85,7 @@ public final class CloudManager {
 
     public static void initialize(ServerLevel level) {
         REGION_DATA.clear();
-        ACTIVE_BIOMES.clear();
+        ACTIVE_REGIONS.clear();
         lastRegionSampleTick = 0L;
         lastSpawnTick = 0L;
         REGION_SCAN_IN_FLIGHT.set(false);
@@ -91,13 +94,13 @@ public final class CloudManager {
 
     public static void update(ServerLevel level) {
         if (!SimpleCloudsCompat.getIsInit()) {
-            fadeInactiveBiomes(Collections.emptySet());
+            fadeInactiveRegions(Collections.emptySet());
             return;
         }
 
         CloudGenerator generator = SimpleCloudsCompat.generator;
         if (generator == null) {
-            fadeInactiveBiomes(Collections.emptySet());
+            fadeInactiveRegions(Collections.emptySet());
             return;
         }
 
@@ -246,12 +249,12 @@ public final class CloudManager {
         CloudGenerator generator = SimpleCloudsCompat.generator;
         if (generator == null) {
             REGION_DATA.clear();
-            fadeInactiveBiomes(Collections.emptySet());
+            fadeInactiveRegions(Collections.emptySet());
             return;
         }
 
         Map<Integer, CloudRegion> regionIndex = indexCloudRegions(generator);
-        Map<BiomeInstanceKey, BiomeContribution> contributions = new HashMap<>();
+        Map<RegionInstanceKey, BiomeContribution> contributions = new HashMap<>();
         Set<Integer> observed = new HashSet<>();
 
         for (RegionSample sample : samples) {
@@ -295,13 +298,13 @@ public final class CloudManager {
         REGION_DATA.keySet().removeIf(id -> !observed.contains(id));
     }
 
-    private static void applyBiomeContributions(Map<BiomeInstanceKey, BiomeContribution> contributions) {
+    private static void applyBiomeContributions(Map<RegionInstanceKey, BiomeContribution> contributions) {
         if (contributions.isEmpty()) {
-            fadeInactiveBiomes(Collections.emptySet());
+            fadeInactiveRegions(Collections.emptySet());
             return;
         }
 
-        Set<BiomeInstanceKey> touched = new HashSet<>();
+        Set<RegionInstanceKey> touched = new HashSet<>();
         contributions.forEach((key, value) -> {
             RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
             if (state == null) {
@@ -312,18 +315,18 @@ public final class CloudManager {
             state.setCloudCover(cover);
             state.setRainIntensity(rain);
             touched.add(key);
-            ACTIVE_BIOMES.add(key);
+            ACTIVE_REGIONS.add(key);
         });
 
-        fadeInactiveBiomes(touched);
+        fadeInactiveRegions(touched);
     }
 
-    private static void fadeInactiveBiomes(Set<BiomeInstanceKey> refreshed) {
-        if (ACTIVE_BIOMES.isEmpty()) {
+    private static void fadeInactiveRegions(Set<RegionInstanceKey> refreshed) {
+        if (ACTIVE_REGIONS.isEmpty()) {
             return;
         }
-        List<BiomeInstanceKey> toRemove = new ArrayList<>();
-        for (BiomeInstanceKey key : ACTIVE_BIOMES) {
+        List<RegionInstanceKey> toRemove = new ArrayList<>();
+        for (RegionInstanceKey key : ACTIVE_REGIONS) {
             if (refreshed.contains(key)) {
                 continue;
             }
@@ -340,7 +343,7 @@ public final class CloudManager {
                 toRemove.add(key);
             }
         }
-        toRemove.forEach(ACTIVE_BIOMES::remove);
+        toRemove.forEach(ACTIVE_REGIONS::remove);
     }
 
     private static void scheduleSpawnAttempt(ServerLevel level, CloudGenerator generator) {
@@ -387,6 +390,12 @@ public final class CloudManager {
             return null;
         }
 
+        List<BlockPos> players = level.players().stream().map(ServerPlayer::blockPosition).toList();
+        if (players.isEmpty()) {
+            return null;
+        }
+        final double MAX_SPAWN_DIST_SQ = 20000d * 20000d;
+
         long tick = level.getGameTime();
         SpawnCandidate best = null;
         float bestScore = 0f;
@@ -396,6 +405,19 @@ public final class CloudManager {
             SpawnRegion region = regions.get(SPAWN_RANDOM.nextInt(regions.size()));
             Vector2i point = SpawnRegion.getRandomPointInRegion(region, SPAWN_RANDOM);
             int radius = BiasedToBottomInt.of(SimpleCloudsCompat.MIN_RADIUS, SimpleCloudsCompat.MAX_RADIUS).sample(SPAWN_RANDOM);
+
+            boolean tooFar = true;
+            for (BlockPos playerPos : players) {
+                double dx = point.x - playerPos.getX();
+                double dz = point.y - playerPos.getZ();
+                if ((dx * dx + dz * dz) <= MAX_SPAWN_DIST_SQ) {
+                    tooFar = false;
+                    break;
+                }
+            }
+            if (tooFar) {
+                continue;
+            }
 
             Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInArea(point.x, point.y, radius, level);
             WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, level, tick);
@@ -613,7 +635,7 @@ public final class CloudManager {
             float dewPoint,
             List<Footprint> footprint
     ) {
-        record Footprint(BiomeInstanceKey key, float weight) {
+        record Footprint(RegionInstanceKey key, float weight) {
         }
     }
 

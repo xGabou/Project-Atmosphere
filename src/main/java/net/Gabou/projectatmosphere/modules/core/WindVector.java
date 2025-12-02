@@ -2,13 +2,17 @@ package net.Gabou.projectatmosphere.modules.core;
 
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 
 public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
-    private static final Map<BiomeInstanceKey, WindSample> CURRENT = new HashMap<>();
+    private static final Map<RegionInstanceKey, WindSample> CURRENT = new HashMap<>();
 
     public WindVector add(WindVector other) {
         return new WindVector(
@@ -43,26 +47,26 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
 
     public static void update(ServerLevel level) {
         if (AtmosphericStateRegistry.getActiveStates().isEmpty()) return;
-        Map<BiomeInstanceKey,RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
-        Set<BiomeInstanceKey> activeKeys = AtmosphericStateRegistry.getActiveStates();
-        Map<BiomeInstanceKey,List<BiomeInstanceKey>> neighborsMap = AtmosphericStateRegistry.getNeighborsAsMap();
+        Map<RegionInstanceKey, RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
+        Set<RegionInstanceKey> activeKeys = AtmosphericStateRegistry.getActiveStates();
+        Map<RegionInstanceKey, List<RegionInstanceKey>> neighborsMap = AtmosphericStateRegistry.getNeighborsAsMap();
 
-        Map<BiomeInstanceKey, Delta> deltas = new HashMap<>();
+        Map<RegionInstanceKey, Delta> deltas = new HashMap<>();
 
         // process only active states
-        for (BiomeInstanceKey key : activeKeys) {
+        for (RegionInstanceKey key : activeKeys) {
             RegionAtmosphereState state = states.get(key);
             if (state == null) continue;
 
             float strength = state.getWindStrength();
             if (strength <= 0.01f) continue;
 
-            List<BiomeInstanceKey> neighbors = neighborsMap.getOrDefault(key, List.of());
+            List<RegionInstanceKey> neighbors = neighborsMap.getOrDefault(key, List.of());
             if (neighbors.isEmpty()) continue;
 
             Delta delta = deltas.computeIfAbsent(key, k -> new Delta());
 
-            for (BiomeInstanceKey neighborKey : neighbors) {
+            for (RegionInstanceKey neighborKey : neighbors) {
                 // Only mix with active ones OR all?  Choose.
                 RegionAtmosphereState neighbor = states.get(neighborKey);
                 if (neighbor == null) continue;
@@ -76,7 +80,7 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
 
         // Apply deltas to only active states
         for (var entry : deltas.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
+            RegionInstanceKey key = entry.getKey();
             RegionAtmosphereState state = states.get(key);
             if (state == null) continue;
 
@@ -87,7 +91,7 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
         }
 
         // Wind jitter for active states
-        for (BiomeInstanceKey key : activeKeys) {
+        for (RegionInstanceKey key : activeKeys) {
             RegionAtmosphereState state = states.get(key);
             if (state == null) continue;
 
@@ -103,11 +107,11 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
     }
 
 
-    public static void set(BiomeInstanceKey key, float effectiveSpeed, float directionDeg) {
+    public static void set(RegionInstanceKey key, float effectiveSpeed, float directionDeg) {
         CURRENT.put(key, new WindSample(effectiveSpeed, directionDeg));
     }
 
-    public static WindSample getOrFallback(BiomeInstanceKey key) {
+    public static WindSample getOrFallback(RegionInstanceKey key) {
         return CURRENT.computeIfAbsent(key, k -> randomSample(new Random()));
     }
 

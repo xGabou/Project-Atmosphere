@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -202,7 +202,7 @@ public final class CycloneManager {
     private record CycloneStep(boolean remove, List<CycloneDelta> deltas) {
     }
 
-    private record CycloneDelta(BiomeInstanceKey key,
+    private record CycloneDelta(RegionInstanceKey key,
                                 float temperatureDelta,
                                 float humidityDelta,
                                 float pressureDelta,

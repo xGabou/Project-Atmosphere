@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.modules.ocean.influence.BasinPressureMemoryIn
 import net.Gabou.projectatmosphere.modules.ocean.influence.BasinThermalMemoryInfluence;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 
@@ -68,13 +69,23 @@ public final class OceanBasinManager {
         if (activeKeys.isEmpty()) {
             return;
         }
+        Set<RegionInstanceKey> activeRegions = new HashSet<>();
+        for (BiomeInstanceKey key : activeKeys) {
+            RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+            if (regionKey != null) {
+                activeRegions.add(regionKey);
+            }
+        }
+        if (activeRegions.isEmpty()) {
+            return;
+        }
         OceanUpdateContext context = new OceanUpdateContext(level, level.getGameTime(), 0.05f / 3600f);
         for (OceanBasin basin : BASINS.values()) {
-            if (!basin.intersects(activeKeys)) {
+            if (!basin.intersects(activeRegions)) {
                 basin.tick(context, Collections.emptySet());
                 continue;
             }
-            basin.tick(context, activeKeys);
+            basin.tick(context, activeRegions);
         }
     }
 
@@ -83,9 +94,9 @@ public final class OceanBasinManager {
         if (states.isEmpty()) {
             return List.of();
         }
-        Map<BiomeInstanceKey, RegionAtmosphereState> oceanStates = new HashMap<>();
+        Map<RegionInstanceKey, RegionAtmosphereState> oceanStates = new HashMap<>();
         for (RegionAtmosphereState state : states) {
-            if (OceanBiomeClassifier.isOcean(state.getKey().biomeType())) {
+            if (state.getDominantBiome() != null && OceanBiomeClassifier.isOcean(state.getDominantBiome())) {
                 oceanStates.put(state.getKey(), state);
             }
         }
@@ -93,7 +104,7 @@ public final class OceanBasinManager {
             return List.of();
         }
 
-        Set<BiomeInstanceKey> visited = new HashSet<>();
+        Set<RegionInstanceKey> visited = new HashSet<>();
         List<OceanBasin> basins = new ArrayList<>();
         for (RegionAtmosphereState state : oceanStates.values()) {
             if (visited.contains(state.getKey())) {
@@ -104,13 +115,13 @@ public final class OceanBasinManager {
         return basins;
     }
 
-    private static OceanBasin buildBasin(BiomeInstanceKey seed,
-                                         Map<BiomeInstanceKey, RegionAtmosphereState> oceanStates,
-                                         Set<BiomeInstanceKey> visited) {
-        Queue<BiomeInstanceKey> queue = new ArrayDeque<>();
+    private static OceanBasin buildBasin(RegionInstanceKey seed,
+                                         Map<RegionInstanceKey, RegionAtmosphereState> oceanStates,
+                                         Set<RegionInstanceKey> visited) {
+        Queue<RegionInstanceKey> queue = new ArrayDeque<>();
         queue.add(seed);
-        Set<BiomeInstanceKey> basinCells = new HashSet<>();
-        Map<BiomeInstanceKey, Float> influenceWeights = new HashMap<>();
+        Set<RegionInstanceKey> basinCells = new HashSet<>();
+        Map<RegionInstanceKey, Float> influenceWeights = new HashMap<>();
         float sumTemp = 0f;
         float sumHumidity = 0f;
         float sumPressure = 0f;
@@ -119,7 +130,7 @@ public final class OceanBasinManager {
         float sumGust = 0f;
         int count = 0;
         while (!queue.isEmpty()) {
-            BiomeInstanceKey key = queue.remove();
+            RegionInstanceKey key = queue.remove();
             if (!visited.add(key)) {
                 continue;
             }
@@ -139,7 +150,7 @@ public final class OceanBasinManager {
                 sumGust += wind.gustSpeed();
             }
             count++;
-            for (BiomeInstanceKey neighbor : AtmosphericStateRegistry.getNeighbors(key)) {
+            for (RegionInstanceKey neighbor : AtmosphericStateRegistry.getNeighbors(key)) {
                 if (oceanStates.containsKey(neighbor) && !visited.contains(neighbor)) {
                     queue.add(neighbor);
                 } else if (!oceanStates.containsKey(neighbor)) {

@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
@@ -47,7 +48,8 @@ public final class WindEngine {
 
             WindVector.WindSample sample = new WindVector.WindSample(Math.max(low.baseSpeed(), low.gustSpeed()),
                     (float) Math.toDegrees(low.angleRadians()));
-            WindVector.set(key, sample.speedMps(), sample.directionDeg());
+            RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
+            WindVector.set(regionKey, sample.speedMps(), sample.directionDeg());
         }
     }
 

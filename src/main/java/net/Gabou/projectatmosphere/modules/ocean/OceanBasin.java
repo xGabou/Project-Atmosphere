@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.modules.ocean;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
@@ -19,8 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class OceanBasin {
     private final int id;
-    private final Set<BiomeInstanceKey> oceanCells;
-    private final Map<BiomeInstanceKey, Float> influenceWeights;
+    private final Set<RegionInstanceKey> oceanCells;
+    private final Map<RegionInstanceKey, Float> influenceWeights;
     private final List<OceanInfluence> basinInfluences = new ArrayList<>();
     private final List<AtmosVolumeInfluence> atmosphereInfluences = new ArrayList<>();
 
@@ -37,8 +37,8 @@ public final class OceanBasin {
     private WindVector windBias;
 
     OceanBasin(int id,
-               Set<BiomeInstanceKey> oceanCells,
-               Map<BiomeInstanceKey, Float> influenceWeights,
+               Set<RegionInstanceKey> oceanCells,
+               Map<RegionInstanceKey, Float> influenceWeights,
                float baseSurfaceTemperature,
                float baseHumidity,
                float basePressure,
@@ -131,11 +131,11 @@ public final class OceanBasin {
         this.windBias = Objects.requireNonNullElse(windBias, WindVector.fromBase(0f, 0f));
     }
 
-    public Set<BiomeInstanceKey> getOceanCells() {
+    public Set<RegionInstanceKey> getOceanCells() {
         return oceanCells;
     }
 
-    public Map<BiomeInstanceKey, Float> getInfluenceWeights() {
+    public Map<RegionInstanceKey, Float> getInfluenceWeights() {
         return influenceWeights;
     }
 
@@ -147,15 +147,15 @@ public final class OceanBasin {
         atmosphereInfluences.add(influence);
     }
 
-    public void tick(OceanUpdateContext context, Set<BiomeInstanceKey> activeKeys) {
+    public void tick(OceanUpdateContext context, Set<RegionInstanceKey> activeKeys) {
         for (OceanInfluence influence : basinInfluences) {
             influence.applyTo(this, context);
         }
         if (atmosphereInfluences.isEmpty() || activeKeys.isEmpty()) {
             return;
         }
-        for (Map.Entry<BiomeInstanceKey, Float> entry : influenceWeights.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
+        for (Map.Entry<RegionInstanceKey, Float> entry : influenceWeights.entrySet()) {
+            RegionInstanceKey key = entry.getKey();
             if (!activeKeys.contains(key)) {
                 continue;
             }
@@ -171,11 +171,11 @@ public final class OceanBasin {
         }
     }
 
-    public boolean intersects(Set<BiomeInstanceKey> activeKeys) {
+    public boolean intersects(Set<RegionInstanceKey> activeKeys) {
         if (activeKeys.isEmpty()) {
             return false;
         }
-        for (BiomeInstanceKey key : activeKeys) {
+        for (RegionInstanceKey key : activeKeys) {
             if (influenceWeights.containsKey(key)) {
                 return true;
             }

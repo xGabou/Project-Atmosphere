@@ -1,29 +1,38 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import org.jetbrains.annotations.Unmodifiable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class AtmosphericStateRegistry {
-    private static final Map<BiomeInstanceKey, RegionAtmosphereState> STATES = new ConcurrentHashMap<>();
-    private static final Map<BiomeInstanceKey, List<BiomeInstanceKey>> NEIGHBORS = new ConcurrentHashMap<>();
-    private static final Set<BiomeInstanceKey> ACTIVE = ConcurrentHashMap.newKeySet();
-
-    private static final double NEIGHBOR_RADIUS_SQR = 256.0 * 256.0;
+    private static final Map<RegionInstanceKey, RegionAtmosphereState> STATES = new ConcurrentHashMap<>();
+    private static final Map<RegionInstanceKey, List<RegionInstanceKey>> NEIGHBORS = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey, RegionInstanceKey> LEGACY_INDEX = new ConcurrentHashMap<>();
+    private static final Set<RegionInstanceKey> ACTIVE = ConcurrentHashMap.newKeySet();
 
     private AtmosphericStateRegistry() {
     }
 
-    public static Set<BiomeInstanceKey> getActiveStates() {
+    public static Set<RegionInstanceKey> getActiveStates() {
         return ACTIVE;
     }
+
     public static void rebuildActiveStates(ServerLevel level) {
         ACTIVE.clear();
         int radius = 1000;
@@ -31,35 +40,59 @@ public final class AtmosphericStateRegistry {
 
         for (ServerPlayer player : level.players()) {
             BlockPos p = player.blockPosition();
-
-            for (BiomeInstanceKey key : STATES.keySet()) {
-                BlockPos sample = key.samplePos();
-                if (sample == null) continue;
-
-                double dx = sample.getX() - p.getX();
-                double dz = sample.getZ() - p.getZ();
+            for (RegionAtmosphereState state : STATES.values()) {
+                BlockPos anchor = state.getPosition();
+                if (anchor == null) {
+                    continue;
+                }
+                double dx = anchor.getX() - p.getX();
+                double dz = anchor.getZ() - p.getZ();
                 if ((dx * dx + dz * dz) <= r2) {
-                    ACTIVE.add(key);
+                    ACTIVE.add(state.getKey());
                 }
             }
         }
     }
 
-    public static void replaceActiveStates(Set<BiomeInstanceKey> next) {
+    public static void replaceActiveStates(Set<RegionInstanceKey> next) {
         ACTIVE.clear();
         if (next != null) {
             ACTIVE.addAll(next);
         }
     }
 
-
-    public static RegionAtmosphereState initializeState(BiomeInstanceKey key, BiomeForecast forecast) {
+    public static RegionAtmosphereState initializeState(RegionInstanceKey key, ForecastRegion forecast) {
+        forecast.finalizeAggregation();
         RegionAtmosphereState state = RegionAtmosphereState.fromForecast(key, forecast);
         STATES.put(key, state);
+        indexLegacyKeys(forecast);
         return state;
     }
 
-    public static RegionAtmosphereState getState(BiomeInstanceKey key) {
+    public static RegionAtmosphereState initializeState(BiomeInstanceKey key, ForecastRegion forecast) {
+        RegionInstanceKey regionKey = forecast.getKey();
+        indexLegacyKeys(forecast);
+        return initializeState(regionKey, forecast);
+    }
+
+    private static void indexLegacyKeys(ForecastRegion region) {
+        RegionInstanceKey regionKey = region.getKey();
+        for (BiomeInstanceKey sample : region.getSamples()) {
+            if (sample != null) {
+                LEGACY_INDEX.put(sample, regionKey);
+            }
+        }
+    }
+
+    public static RegionAtmosphereState getState(RegionInstanceKey key) {
+        if (key == null) {
+            return null;
+        }
+        return STATES.get(key);
+    }
+
+    public static RegionAtmosphereState getState(BiomeInstanceKey biomeKey) {
+        RegionInstanceKey key = resolveRegionKey(biomeKey);
         if (key == null) {
             return null;
         }
@@ -69,11 +102,28 @@ public final class AtmosphericStateRegistry {
     public static Collection<RegionAtmosphereState> getStates() {
         return STATES.values();
     }
-    public static Map<BiomeInstanceKey,RegionAtmosphereState> getStatesAsMap(){
+
+    public static Map<RegionInstanceKey, RegionAtmosphereState> getStatesAsMap() {
         return STATES;
     }
-    public static Map<BiomeInstanceKey,List<BiomeInstanceKey>> getNeighborsAsMap(){
+
+    public static Map<RegionInstanceKey, List<RegionInstanceKey>> getNeighborsAsMap() {
         return NEIGHBORS;
+    }
+
+    /**
+     * Legacy compatibility view mapping biome sample keys to their owning region states.
+     * This should be used only by code paths that have not yet been converted to region keys.
+     */
+    public static Map<BiomeInstanceKey, RegionAtmosphereState> getLegacyBiomeStateIndex() {
+        Map<BiomeInstanceKey, RegionAtmosphereState> map = new HashMap<>(LEGACY_INDEX.size());
+        LEGACY_INDEX.forEach((biomeKey, regionKey) -> {
+            RegionAtmosphereState state = STATES.get(regionKey);
+            if (state != null) {
+                map.put(biomeKey, state);
+            }
+        });
+        return map;
     }
 
     public static boolean isEmpty() {
@@ -83,36 +133,57 @@ public final class AtmosphericStateRegistry {
     public static void clear() {
         STATES.clear();
         NEIGHBORS.clear();
+        LEGACY_INDEX.clear();
+        ACTIVE.clear();
     }
 
+    /**
+     * Recomputes region neighbors using grid adjacency. Regions only link to the 8
+     * immediate surrounding cells to keep mixing stable and predictable.
+     */
     public static void rebuildNeighbors() {
-        List<BiomeInstanceKey> keys = new ArrayList<>(STATES.keySet());
-        Map<BiomeInstanceKey, List<BiomeInstanceKey>> rebuilt = new HashMap<>(keys.size());
-        for (int i = 0; i < keys.size(); i++) {
-            BiomeInstanceKey a = keys.get(i);
-            if (a == null || a.samplePos() == null) {
-                continue;
+        Map<RegionInstanceKey, List<RegionInstanceKey>> rebuilt = new HashMap<>(STATES.size());
+        for (RegionInstanceKey key : STATES.keySet()) {
+            List<RegionInstanceKey> neighbors = new ArrayList<>(8);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) {
+                        continue;
+                    }
+                    RegionInstanceKey neighbor = key.neighbor(dx, dz);
+                    if (STATES.containsKey(neighbor)) {
+                        neighbors.add(neighbor);
+                    }
+                }
             }
-            List<BiomeInstanceKey> listA = rebuilt.computeIfAbsent(a, k -> new ArrayList<>());
-            for (int j = i + 1; j < keys.size(); j++) {
-                BiomeInstanceKey b = keys.get(j);
-                if (b == null || b.samplePos() == null) {
-                    continue;
-                }
-                double dist = a.samplePos().distToCenterSqr(b.samplePos().getX(), b.samplePos().getY(), b.samplePos().getZ());
-                if (dist <= NEIGHBOR_RADIUS_SQR) {
-                    listA.add(b);
-                    rebuilt.computeIfAbsent(b, k -> new ArrayList<>()).add(a);
-                }
+            if (!neighbors.isEmpty()) {
+                rebuilt.put(key, List.copyOf(neighbors));
             }
         }
-
         NEIGHBORS.clear();
-        rebuilt.forEach((key, neighbors) -> NEIGHBORS.put(key, List.copyOf(neighbors)));
+        NEIGHBORS.putAll(rebuilt);
     }
 
-    public static List<BiomeInstanceKey> getNeighbors(BiomeInstanceKey key) {
+    public static List<RegionInstanceKey> getNeighbors(RegionInstanceKey key) {
         return NEIGHBORS.getOrDefault(key, List.of());
+    }
+
+    public static List<BiomeInstanceKey> getBiomeNeighbors(BiomeInstanceKey biomeKey) {
+        RegionInstanceKey regionKey = resolveRegionKey(biomeKey);
+        if (regionKey == null) {
+            return List.of();
+        }
+        List<RegionInstanceKey> regionNeighbors = getNeighbors(regionKey);
+        if (regionNeighbors.isEmpty()) {
+            return List.of();
+        }
+        List<BiomeInstanceKey> result = new ArrayList<>();
+        LEGACY_INDEX.forEach((legacyKey, region) -> {
+            if (regionNeighbors.contains(region)) {
+                result.add(legacyKey);
+            }
+        });
+        return result;
     }
 
     public static Optional<RegionAtmosphereState> getRandomState(RandomSource random) {
@@ -121,6 +192,16 @@ public final class AtmosphericStateRegistry {
         }
         List<RegionAtmosphereState> list = new ArrayList<>(STATES.values());
         return Optional.of(list.get(random.nextInt(list.size())));
+    }
+
+    public static Set<BiomeInstanceKey> getActiveBiomeKeys() {
+        Set<BiomeInstanceKey> activeBiomes = new HashSet<>();
+        LEGACY_INDEX.forEach((biomeKey, regionKey) -> {
+            if (ACTIVE.contains(regionKey)) {
+                activeBiomes.add(biomeKey);
+            }
+        });
+        return activeBiomes;
     }
 
     public static RegionAtmosphereState findNearest(double x, double z) {
@@ -136,7 +217,22 @@ public final class AtmosphericStateRegistry {
         return nearest;
     }
 
+    @Unmodifiable
     public static List<RegionAtmosphereState> snapshot() {
         return Collections.unmodifiableList(new ArrayList<>(STATES.values()));
+    }
+
+    public static RegionInstanceKey resolveRegionKey(BiomeInstanceKey biomeKey) {
+        if (biomeKey == null) {
+            return null;
+        }
+        RegionInstanceKey mapped = LEGACY_INDEX.get(biomeKey);
+        if (mapped != null) {
+            return mapped;
+        }
+        if (biomeKey.samplePos() == null) {
+            return null;
+        }
+        return RegionInstanceKey.from(biomeKey.samplePos());
     }
 }

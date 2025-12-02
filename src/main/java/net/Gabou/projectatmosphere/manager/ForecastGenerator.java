@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.event.BiomeChangeManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityGenerator;
@@ -25,6 +26,7 @@ import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -55,9 +57,9 @@ public class ForecastGenerator {
 
     static {
         if (CompatHandler.isToughAsNailsLoaded()) {
-            MAX_POSITIONS_PER_BIOME = 1250;
+            MAX_POSITIONS_PER_BIOME = 500;
         } else {
-            MAX_POSITIONS_PER_BIOME = 2000;
+            MAX_POSITIONS_PER_BIOME = 1000;
         }
     }
 
@@ -77,6 +79,7 @@ public class ForecastGenerator {
 
 
     static final Map<BiomeInstanceKey, BiomeForecast> FORECAST_MAP = new ConcurrentHashMap<>();
+    static final Map<RegionInstanceKey, ForecastRegion> REGION_FORECASTS = new ConcurrentHashMap<>();
 
     private static final Map<ResourceLocation, List<BiomeForecast>> grouped = new ConcurrentHashMap<>();
 
@@ -176,6 +179,7 @@ public class ForecastGenerator {
 
 
     static void generateForecastForSavedRegion(ServerLevel level) {
+        buildRegionForecasts();
         SandStormManager.dailyAndSand(level);
     }
 
@@ -405,6 +409,7 @@ public class ForecastGenerator {
 
         // NOTE: if dailyAndSand touches world state directly, it may need
         // AsyncAtmosphereService.callOnMainThread as well.
+        buildRegionForecasts();
         SandStormManager.dailyAndSand(level);
 
         final long end = System.nanoTime();
@@ -449,13 +454,36 @@ public class ForecastGenerator {
         return WindGenerator.generateWindWeek(key);
     }
 
+    private static void buildRegionForecasts() {
+        REGION_FORECASTS.clear();
+        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+            BiomeInstanceKey biomeKey = entry.getKey();
+            if (biomeKey == null || biomeKey.samplePos() == null) {
+                continue;
+            }
+            RegionInstanceKey regionKey = RegionInstanceKey.from(biomeKey.samplePos());
+            ForecastRegion region = REGION_FORECASTS.computeIfAbsent(regionKey, key -> new ForecastRegion(key, biomeKey.samplePos()));
+            region.addBiomeForecast(biomeKey, entry.getValue());
+        }
+        for (ForecastRegion region : REGION_FORECASTS.values()) {
+            region.finalizeAggregation();
+            AtmosphericStateRegistry.initializeState(region.getKey(), region);
+        }
+        AtmosphericStateRegistry.rebuildNeighbors();
+    }
+
 
     public static Map<BiomeInstanceKey, BiomeForecast> getForecastMap() {
         return FORECAST_MAP;
     }
 
+    public static Map<RegionInstanceKey, ForecastRegion> getRegionForecasts() {
+        return REGION_FORECASTS;
+    }
+
     static void clearForecasts() {
         FORECAST_MAP.clear();
+        REGION_FORECASTS.clear();
         grouped.clear();
         biomeSamples.clear();
         biomeIndex.clear();
@@ -472,8 +500,6 @@ public class ForecastGenerator {
         if (biomeSamples.add(key)) {
             biomeSampleCounts.put(key.biomeType(), biomeSampleCounts.getOrDefault(key.biomeType(), 0) + 1);
         }
-        AtmosphericStateRegistry.initializeState(key, forecast);
-
     }
 
 

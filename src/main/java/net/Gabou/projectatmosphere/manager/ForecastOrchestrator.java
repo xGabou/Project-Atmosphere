@@ -177,9 +177,6 @@ public class ForecastOrchestrator {
                 ForecastGenerator.generateForecastForRegion(center, level);
             }
 
-            ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
-                AtmosphericStateRegistry.initializeState(key, forecast);
-            });
             WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
             initializeDynamicSystems(level);
         } finally {
@@ -199,9 +196,6 @@ public class ForecastOrchestrator {
             BlockPos spawn = level.getSharedSpawnPos();
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
-            ForecastGenerator.getForecastMap().forEach((key, forecast) -> {
-                AtmosphericStateRegistry.initializeState(key, forecast);
-            });
             WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
             initializeDynamicSystems(level);
             return;
@@ -217,7 +211,6 @@ public class ForecastOrchestrator {
      */
     public static void updateForecast(ServerLevel level, BlockPos center) {
         ForecastGenerator.generateForecastForRegion(center, level);
-        ForecastGenerator.getForecastMap().forEach((key, forecast) -> AtmosphericStateRegistry.initializeState(key, forecast));
         WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
         initializeDynamicSystems(level);
     }
@@ -300,7 +293,7 @@ public class ForecastOrchestrator {
     }
 
     public static Set<BiomeInstanceKey> getActiveBiomeKeys(ServerLevel level) {
-        Set<BiomeInstanceKey> active = new HashSet<>(AtmosphericStateRegistry.getActiveStates());
+        Set<BiomeInstanceKey> active = new HashSet<>(AtmosphericStateRegistry.getActiveBiomeKeys());
         if (active.isEmpty() && !activePlayerBiomeKeys.isEmpty()) {
             activePlayerBiomeKeys.values().forEach(active::addAll);
         }
@@ -312,7 +305,7 @@ public class ForecastOrchestrator {
         Set<BiomeInstanceKey> active = new HashSet<>();
         BlockPos pos = player.blockPosition();
         double radiusSq = 1000d * 1000d;
-        for (BiomeInstanceKey key : AtmosphericStateRegistry.getActiveStates()) {
+        for (BiomeInstanceKey key : AtmosphericStateRegistry.getActiveBiomeKeys()) {
             BlockPos sample = key.samplePos();
             if (sample != null && sample.distToCenterSqr(pos.getX(), pos.getY(), pos.getZ()) <= radiusSq) {
                 active.add(key);

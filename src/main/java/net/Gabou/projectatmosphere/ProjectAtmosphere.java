@@ -49,9 +49,9 @@ import java.util.Objects;
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class ProjectAtmosphere {
 
-    public static final float DEFAULT_REGION_RADIUS = 700F; 
+    public static final float DEFAULT_REGION_RADIUS = 1500F;
 
-    public static final int DEFAULT_RADIUS = 100000;
+    public static final int DEFAULT_RADIUS = 50000;
     public static long seed;
     public static final String MODID = "projectatmosphere";
     public static final Logger LOGGER = LogManager.getLogger(MODID);

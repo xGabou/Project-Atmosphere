@@ -100,6 +100,12 @@ This file records functionality additions/removals made during development sessi
   - If no match is found, falls back to `minecraft:<path>` and logs a warning.
   - Applies to `putAllSeasons`, `putConstSeasons`, and `mirrorBiome`.
 
+## Unreleased — Forecast regions grid
+- Introduced `RegionInstanceKey` grid mapping and `ForecastRegion` aggregates to replace biome-scoped forecasts.
+- Atmospheric state registry and region state now operate per forecast region while keeping legacy biome lookups mapped to their owning regions.
+- Forecast generation now groups biome samples into region forecasts before seeding atmospheric states; SimpleClouds and cyclone/cloud sampling apply updates against region states.
+- Public API now exposes region-centric forecasts via `AtmoApi#getWeatherForecast`, aligning cloud speed sync with region identifiers.
+
 ## 0.5.5.2 — Imperial Units Mode (2025-10-19)
 - Added config option `display.imperialUnits` to toggle display units.
 - Overlay and commands now respect units:

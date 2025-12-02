@@ -1,21 +1,23 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Range;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.Map;
 
 /**
- * Holds the live atmospheric state for a sampled biome region.
- * Values are expressed in intuitive units (°C, % humidity, hPa, m/s).
+ * Holds the live atmospheric state for a sampled region.
+ * Values are expressed in intuitive units (랍C, % humidity, hPa, m/s).
  */
 public class RegionAtmosphereState {
     private static final int DAILY_SLOTS = 240;
@@ -24,7 +26,9 @@ public class RegionAtmosphereState {
     private static final float MIN_PRESSURE_HPA = 870f;
     private static final float MAX_PRESSURE_HPA = 1080f;
 
-    private final BiomeInstanceKey key;
+    private final RegionInstanceKey key;
+    private final BlockPos anchor;
+    private final ResourceLocation dominantBiome;
     private final float baseTemperature;
     private final float baseHumidity; // normalized 0..1
     private final float basePressure;
@@ -43,8 +47,10 @@ public class RegionAtmosphereState {
     private float sunlight;
     private float rainIntensity;
 
-    RegionAtmosphereState(BiomeInstanceKey key, BiomeForecast forecast, float baseTemperature, float baseHumidity, float basePressure, WindVector wind) {
+    RegionAtmosphereState(RegionInstanceKey key, BlockPos anchor, ForecastRegion forecastRegion, ResourceLocation dominantBiome, float baseTemperature, float baseHumidity, float basePressure, WindVector wind) {
         this.key = key;
+        this.anchor = anchor == null ? key.center() : anchor;
+        this.dominantBiome = dominantBiome;
         this.baseTemperature = baseTemperature;
         this.baseHumidity = clampHumidity(baseHumidity);
         this.basePressure = basePressure;
@@ -52,27 +58,51 @@ public class RegionAtmosphereState {
         this.humidity = clampHumidity(baseHumidity);
         this.pressure = basePressure;
         this.wind = wind;
-        this.biomeSunlightMultiplier = computeBiomeSunlightMultiplier(key.biomeType());
-        this.dailyTemperatureProfile = initialiseDailyCurve(forecast.getTemperatureDay(), baseTemperature);
-        this.dailyHumidityProfile = initialiseDailyCurveScaled(forecast.getHumidityDay(), this.humidity, 100f);
-        this.dailyPressureProfile = initialiseDailyCurve(forecast.getPressureDay(), basePressure);
+        this.biomeSunlightMultiplier = computeBiomeSunlightMultiplier(dominantBiome);
+        this.dailyTemperatureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getTemperature(), baseTemperature), baseTemperature);
+        this.dailyHumidityProfile = initialiseDailyCurveScaled(deriveDailyCurve(forecastRegion.getHumidity(), baseHumidity * 100f), this.humidity, 100f);
+        this.dailyPressureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getPressure(), basePressure), basePressure);
         float[] bounds = computeTemperatureBounds(this.dailyTemperatureProfile, baseTemperature);
         this.baselineMinTemp = bounds[0];
         this.baselineMaxTemp = bounds[1];
     }
 
-    public static RegionAtmosphereState fromForecast(BiomeInstanceKey key, BiomeForecast forecast) {
-        float temperature = averageDailyValue(forecast.getTemperature(), 15f);
-        float humidity = averageDailyValue(forecast.getHumidity(), 60f) / 100f;
-        float pressure = averageDailyValue(forecast.getPressure(), 1013.25f);
+    public static RegionAtmosphereState fromForecast(RegionInstanceKey key, ForecastRegion forecastRegion) {
+        float temperature = averageDailyValue(forecastRegion.getTemperature(), 15f);
+        float humidity = averageDailyValue(forecastRegion.getHumidity(), 60f) / 100f;
+        float pressure = averageDailyValue(forecastRegion.getPressure(), 1013.25f);
         WindVector wind = null;
-        if (forecast.getWind() != null && forecast.getWind().length > 0) {
-            wind = forecast.getWind()[0];
+        if (forecastRegion.getWind() != null && forecastRegion.getWind().length > 0) {
+            wind = forecastRegion.getWind()[0];
         }
         if (wind == null) {
             wind = WindVector.fromBase(1f, 0f);
         }
-        return new RegionAtmosphereState(key, forecast, temperature, humidity, pressure, wind);
+        ResourceLocation dominantBiome = selectDominantBiome(forecastRegion.getBiomeWeights());
+        return new RegionAtmosphereState(key, forecastRegion.getAnchor(), forecastRegion, dominantBiome, temperature, humidity, pressure, wind);
+    }
+
+    /**
+     * Legacy compatibility path: wraps a biome forecast into a region forecast using the default grid.
+     */
+    @Deprecated
+    public static RegionAtmosphereState fromForecast(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
+        ForecastRegion region = new ForecastRegion(RegionInstanceKey.from(biomeKey.samplePos()));
+        region.addBiomeForecast(biomeKey, forecast);
+        region.finalizeAggregation();
+        return fromForecast(region.getKey(), region);
+    }
+
+    private static ResourceLocation selectDominantBiome(Map<ResourceLocation, Integer> weights) {
+        ResourceLocation dominant = null;
+        int best = Integer.MIN_VALUE;
+        for (Map.Entry<ResourceLocation, Integer> entry : weights.entrySet()) {
+            if (entry.getValue() > best) {
+                best = entry.getValue();
+                dominant = entry.getKey();
+            }
+        }
+        return dominant;
     }
 
     private static float averageDailyValue(@Nullable float[][] week, float fallback) {
@@ -94,12 +124,16 @@ public class RegionAtmosphereState {
         return count == 0 ? fallback : sum / count;
     }
 
-    public BiomeInstanceKey getKey() {
+    public RegionInstanceKey getKey() {
         return key;
     }
 
     public BlockPos getPosition() {
-        return key.samplePos();
+        return anchor;
+    }
+
+    public ResourceLocation getDominantBiome() {
+        return dominantBiome;
     }
 
     public float getTemperature() {
@@ -217,10 +251,11 @@ public class RegionAtmosphereState {
     }
 
     public double distanceTo(double x, double z) {
-        double dx = key.samplePos().getX() - x;
-        double dz = key.samplePos().getZ() - z;
+        double dx = anchor.getX() - x;
+        double dz = anchor.getZ() - z;
         return Math.sqrt(dx * dx + dz * dz);
     }
+
     public float getBaselineMinTemperature() {
         return baselineMinTemp;
     }
@@ -242,7 +277,10 @@ public class RegionAtmosphereState {
         return Mth.clamp(value, 0f, 1.2f);
     }
 
-    private static float computeBiomeSunlightMultiplier(ResourceLocation biomeId) {
+    private static float computeBiomeSunlightMultiplier(@Nullable ResourceLocation biomeId) {
+        if (biomeId == null) {
+            return 1f;
+        }
         float sum = 0f;
         int samples = 0;
         for (Season season : Season.values()) {
@@ -280,6 +318,21 @@ public class RegionAtmosphereState {
         }
         float[] arr = new float[DAILY_SLOTS];
         Arrays.fill(arr, Mth.clamp(normalizedFallback, 0f, 1.2f));
+        return arr;
+    }
+
+    private static float[] deriveDailyCurve(@Nullable float[][] week, float fallback) {
+        float[] arr = new float[24];
+        if (week == null || week.length == 0 || week[0] == null || week[0].length == 0) {
+            Arrays.fill(arr, fallback);
+            return arr;
+        }
+        float dayMin = week[0][0];
+        float dayMax = week[0][Math.min(1, week[0].length - 1)];
+        for (int hour = 0; hour < arr.length; hour++) {
+            float phase = (float) Math.sin(((hour - 6) / 24f) * (float) (Math.PI * 2)) * 0.5f + 0.5f;
+            arr[hour] = Mth.lerp(phase, dayMin, dayMax);
+        }
         return arr;
     }
 

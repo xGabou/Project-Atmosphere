@@ -84,7 +84,7 @@ public class SandStormManager {
                 });
 
 
-        FORECAST_MAP.forEach(AtmosphericStateRegistry::initializeState);
+        REGION_FORECASTS.forEach(AtmosphericStateRegistry::initializeState);
 
         computeAverageForecastsByBiomeType();
         FORECAST_MAP.forEach(ForecastPointerRegistry::setPointer);

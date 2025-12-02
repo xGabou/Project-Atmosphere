@@ -2,10 +2,10 @@ package net.Gabou.projectatmosphere.api;
 
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.WeatherType;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -32,10 +32,15 @@ public class AtmoApi {
      * Gets the weather forecast for the given position and level.
      * @param level The server level to sample
      * @param pos The position in the world
-     * @return The BiomeForecast for that position
+     * @return The ForecastRegion for that position
      */
-    public BiomeForecast getWeatherForecast(ServerLevel level, BlockPos pos, ForecastType forecastType) {
-        return ForecastGenerator.getClosestValidForecast(AtmosphereUtils.getBiomeKey(level, pos),forecastType);
+    public ForecastRegion getWeatherForecast(ServerLevel level, BlockPos pos, ForecastType forecastType) {
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region != null) {
+            return region;
+        }
+        return ForecastGenerator.getRegionForecasts().getOrDefault(regionKey.neighbor(0, 0), null);
     }
 
     /**
