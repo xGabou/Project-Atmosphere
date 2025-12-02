@@ -10,7 +10,6 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -226,10 +225,7 @@ public class SimpleCloudsCompat {
         }
     }
 
-
-
-
-
-
-
+    public static double getCloudScale() {
+        return SimpleCloudsConstants.CLOUD_SCALE;
+    }
 }

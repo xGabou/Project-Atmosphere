@@ -11,6 +11,10 @@ import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegionId;
+import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.region.RegionOrchestratorBootstrap;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
@@ -37,6 +41,8 @@ public class ForecastOrchestrator {
     // Global regeneration gate: when true, dependents should skip or defer work
     private static volatile boolean REGENERATING = false;
     private static final java.util.concurrent.ConcurrentLinkedQueue<Runnable> POST_REGEN_QUEUE = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+    private static RegionForecastOrchestrator REGION_ORCHESTRATOR;
 
     public static boolean isRegenerating() {
         return REGENERATING;
@@ -65,6 +71,7 @@ public class ForecastOrchestrator {
         ForecastDataStorage.loadAll(level);
         TornadoStorageManager.load(level);
         ForecastGenerator.seed = level.getSeed();
+        REGION_ORCHESTRATOR = RegionOrchestratorBootstrap.bootstrap(level);
 
         if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
             try {
@@ -105,6 +112,7 @@ public class ForecastOrchestrator {
         ForecastDataStorage.saveAll(level);
         TornadoStorageManager.save(level);
         ForecastGenerator.clearForecasts();
+        REGION_ORCHESTRATOR = null;
     }
 
     /**
@@ -146,6 +154,17 @@ public class ForecastOrchestrator {
      */
     public static void regenerateAround(ServerLevel level, BlockPos pos) {
         updateForecast(level, pos);
+    }
+
+    public static RegionForecastOrchestrator getRegionOrchestrator(ServerLevel level) {
+        if (REGION_ORCHESTRATOR == null) {
+            REGION_ORCHESTRATOR = RegionOrchestratorBootstrap.bootstrap(level);
+        }
+        return REGION_ORCHESTRATOR;
+    }
+
+    public static ForecastRegion getRegionForecast(ServerLevel level, BlockPos pos) {
+        return getRegionOrchestrator(level).resolve(pos, level.dimension());
     }
 
     /**
@@ -224,10 +243,32 @@ public class ForecastOrchestrator {
     }
 
     /**
+     * Region-based temperature sampling. Preferred over biome APIs.
+     */
+    public static float getCurrentTemperature(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
+            return 0f;
+        }
+        return region.sampleTemperature(REGION_ORCHESTRATOR.toRegionLocal(pos), tick);
+    }
+
+    /**
      * Get humidity for any biome
      */
     public static float getCurrentHumidity(BiomeInstanceKey key, long tick) {
         return ForecastGenerator.getHumidityValue(key, tick);
+    }
+
+    /**
+     * Region-based humidity sampling. Preferred over biome APIs.
+     */
+    public static float getCurrentHumidity(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
+            return 0f;
+        }
+        return region.sampleHumidity(REGION_ORCHESTRATOR.toRegionLocal(pos), tick);
     }
 
     /**
@@ -238,10 +279,32 @@ public class ForecastOrchestrator {
     }
 
     /**
+     * Region-based pressure sampling. Preferred over biome APIs.
+     */
+    public static float getCurrentPressure(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
+            return 0f;
+        }
+        return region.samplePressure(tick);
+    }
+
+    /**
      * Get wind for any biome
      */
     public static WindVector getCurrentWind(BiomeInstanceKey key, long tick) {
         return ForecastGenerator.getWindValue(key, tick);
+    }
+
+    /**
+     * Region-based wind sampling. Preferred over biome APIs.
+     */
+    public static WindVector getCurrentWind(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
+            return WindVector.fromBase(0f, 0f);
+        }
+        return region.sampleWind(tick);
     }
 
     public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {
@@ -261,6 +324,17 @@ public class ForecastOrchestrator {
                 + (lowPressure * 0.1f);
 
         return Math.max(0f, Math.min(1f, combined));
+    }
+
+    /**
+     * Region-based storm factor sampling. Preferred over biome APIs.
+     */
+    public static float getCurrentStormChance(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
+            return 0f;
+        }
+        return region.sampleStorm(tick);
     }
 
     public static void tick(ServerLevel level) {

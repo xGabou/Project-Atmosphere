@@ -1,11 +1,11 @@
 package net.Gabou.projectatmosphere.api;
 
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
-import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegionId;
 import net.Gabou.projectatmosphere.util.WeatherType;
-import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -35,12 +35,14 @@ public class AtmoApi {
      * @return The ForecastRegion for that position
      */
     public ForecastRegion getWeatherForecast(ServerLevel level, BlockPos pos, ForecastType forecastType) {
-        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
-        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
-        if (region != null) {
-            return region;
-        }
-        return ForecastGenerator.getRegionForecasts().getOrDefault(regionKey.neighbor(0, 0), null);
+        return ForecastOrchestrator.getRegionForecast(level, pos);
+    }
+
+    /**
+     * Region-id based accessor for callers that already have a region key.
+     */
+    public ForecastRegion getWeatherForecast(ServerLevel level, ForecastRegionId regionId) {
+        return ForecastOrchestrator.getRegionOrchestrator(level).ensureLoaded(regionId);
     }
 
     /**

@@ -1,0 +1,124 @@
+package net.Gabou.projectatmosphere.modules.region;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+
+/**
+ * Coordinates creation, loading, and runtime access to ForecastRegion instances.
+ */
+public final class RegionForecastOrchestrator {
+    private final RegionIndex regionIndex;
+    private final RegionPersistence persistence;
+    private final BiomeForecastGenerator biomeGenerator;
+    private final Map<ForecastRegionId, ForecastRegion> regions = new ConcurrentHashMap<>();
+
+    public RegionForecastOrchestrator(RegionIndex regionIndex,
+                                      RegionPersistence persistence,
+                                      BiomeForecastGenerator biomeGenerator) {
+        this.regionIndex = regionIndex;
+        this.persistence = persistence;
+        this.biomeGenerator = biomeGenerator;
+    }
+
+    public ForecastRegion resolve(BlockPos pos, ResourceKey<Level> dimension) {
+        ForecastRegionId id = regionIndex.regionFor(pos, dimension);
+        return ensureLoaded(id);
+    }
+
+    public ForecastRegion ensureLoaded(ForecastRegionId id) {
+        return regions.computeIfAbsent(id, this::loadOrGenerate);
+    }
+
+    private ForecastRegion loadOrGenerate(ForecastRegionId id) {
+        Optional<BiomeFallbackSnapshot> fb = persistence.loadFallback(id);
+        if (fb.isPresent()) {
+            return fromFallback(fb.get());
+        }
+        return generateFromBiomes(id);
+    }
+
+    private ForecastRegion fromFallback(BiomeFallbackSnapshot fb) {
+        ForecastRegion.Section[] sections = fb.toSections();
+        RegionCurves curves = aggregateSections(sections);
+        ForecastRegion region = new ForecastRegion(fb.id(), fb.sourceBiomes(), sections, curves, fb);
+        region.clearBiomeForecasts();
+        return region;
+    }
+
+    private ForecastRegion generateFromBiomes(ForecastRegionId id) {
+        List<BiomeInstanceKey> biomes = regionIndex.biomesFor(id);
+        ForecastRegion.Section[] sections = sliceIntoEight(biomes);
+        RegionCurves curves = aggregateSections(sections);
+        BiomeFallbackSnapshot fb = persistence.saveFallback(id, sections, biomes);
+        ForecastRegion region = new ForecastRegion(id, biomes, sections, curves, fb);
+        region.clearBiomeForecasts();
+        return region;
+    }
+
+    public void tick(long gameTime) {
+        // Hook for per-tick advancement (diffusion, cloud state, gusts) keyed by region id.
+    }
+
+    private RegionCurves aggregateSections(ForecastRegion.Section[] sections) {
+        WeightedCurve temperature = WeightedCurve.empty();
+        WeightedCurve humidity = WeightedCurve.empty();
+        WeightedCurve pressure = WeightedCurve.empty();
+        WeightedCurve storm = WeightedCurve.empty();
+        WeightedWindCurve wind = WeightedWindCurve.empty();
+        for (ForecastRegion.Section section : sections) {
+            BiomeForecastSnapshot snapshot = section.snapshot();
+            if (snapshot == null) {
+                continue;
+            }
+            temperature.add(section.factor(), snapshot.temperatureCurve());
+            humidity.add(section.factor(), snapshot.humidityCurve());
+            pressure.add(section.factor(), snapshot.pressureCurve());
+            // Storm curve currently absent in BiomeForecast; keep zeroed via WeightedCurve.
+            wind.add(section.factor(), snapshot.windCurve());
+        }
+        float[][] tempWeek = temperature.normalize();
+        float[][] humidityWeek = humidity.normalize();
+        float[][] pressureWeek = pressure.normalize();
+        WindVector[] windWeek = wind.normalize();
+        float[] stormWeek = flattenTwoColumn(storm.normalize());
+        return new DefaultRegionCurves(tempWeek, humidityWeek, pressureWeek, windWeek, stormWeek);
+    }
+
+    private ForecastRegion.Section[] sliceIntoEight(List<BiomeInstanceKey> biomes) {
+        ForecastRegion.Section[] out = new ForecastRegion.Section[8];
+        for (int i = 0; i < out.length; i++) {
+            BiomeForecastSnapshot snap = biomeGenerator.generateSlice(biomes, i);
+            float factor = Math.max(0f, biomeGenerator.factorForSlice(biomes, i));
+            out[i] = new ForecastRegion.Section(factor, snap);
+        }
+        return out;
+    }
+
+    private static float[] flattenTwoColumn(float[][] curve) {
+        if (curve == null || curve.length == 0) {
+            return new float[0];
+        }
+        float[] result = new float[curve.length];
+        for (int i = 0; i < curve.length; i++) {
+            float[] row = curve[i];
+            if (row == null || row.length == 0) {
+                result[i] = 0f;
+            } else {
+                result[i] = row[0];
+            }
+        }
+        return result;
+    }
+
+    public Vec3 toRegionLocal(BlockPos pos) {
+        return new Vec3(pos.getX() & 0x7F, pos.getY(), pos.getZ() & 0x7F);
+    }
+}

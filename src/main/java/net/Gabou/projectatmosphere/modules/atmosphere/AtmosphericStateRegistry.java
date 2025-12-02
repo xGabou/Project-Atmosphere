@@ -2,6 +2,9 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegionId;
+import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
+import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -21,15 +24,15 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class AtmosphericStateRegistry {
-    private static final Map<RegionInstanceKey, RegionAtmosphereState> STATES = new ConcurrentHashMap<>();
-    private static final Map<RegionInstanceKey, List<RegionInstanceKey>> NEIGHBORS = new ConcurrentHashMap<>();
-    private static final Map<BiomeInstanceKey, RegionInstanceKey> LEGACY_INDEX = new ConcurrentHashMap<>();
-    private static final Set<RegionInstanceKey> ACTIVE = ConcurrentHashMap.newKeySet();
+    private static final Map<ForecastRegionId, RegionAtmosphereState> STATES = new ConcurrentHashMap<>();
+    private static final Map<ForecastRegionId, List<ForecastRegionId>> NEIGHBORS = new ConcurrentHashMap<>();
+    private static final Map<BiomeInstanceKey, ForecastRegionId> LEGACY_INDEX = new ConcurrentHashMap<>();
+    private static final Set<ForecastRegionId> ACTIVE = ConcurrentHashMap.newKeySet();
 
     private AtmosphericStateRegistry() {
     }
 
-    public static Set<RegionInstanceKey> getActiveStates() {
+    public static Set<ForecastRegionId> getActiveStates() {
         return ACTIVE;
     }
 
@@ -48,43 +51,45 @@ public final class AtmosphericStateRegistry {
                 double dx = anchor.getX() - p.getX();
                 double dz = anchor.getZ() - p.getZ();
                 if ((dx * dx + dz * dz) <= r2) {
-                    ACTIVE.add(state.getKey());
+                    ACTIVE.add(state.getRegionId());
                 }
             }
         }
     }
 
-    public static void replaceActiveStates(Set<RegionInstanceKey> next) {
+    public static void replaceActiveStates(Set<ForecastRegionId> next) {
         ACTIVE.clear();
         if (next != null) {
             ACTIVE.addAll(next);
         }
     }
 
-    public static RegionAtmosphereState initializeState(RegionInstanceKey key, ForecastRegion forecast) {
+    public static RegionAtmosphereState initializeState(ForecastRegionId id, ForecastRegion forecast) {
         forecast.finalizeAggregation();
-        RegionAtmosphereState state = RegionAtmosphereState.fromForecast(key, forecast);
-        STATES.put(key, state);
+        RegionAtmosphereState state = RegionAtmosphereState.fromForecast(id, forecast);
+        STATES.put(id, state);
         indexLegacyKeys(forecast);
         return state;
     }
 
     public static RegionAtmosphereState initializeState(BiomeInstanceKey key, ForecastRegion forecast) {
-        RegionInstanceKey regionKey = forecast.getKey();
+        ForecastRegionId regionId = RegionAdapters.fromBiomeKey(key,
+                net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.ResourceLocation.withDefaultNamespace("overworld")));
         indexLegacyKeys(forecast);
-        return initializeState(regionKey, forecast);
+        return initializeState(regionId, forecast);
     }
 
     private static void indexLegacyKeys(ForecastRegion region) {
-        RegionInstanceKey regionKey = region.getKey();
+        ForecastRegionId regionId = RegionAdapters.fromRegionInstance(region.getKey(),
+                net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.ResourceLocation.withDefaultNamespace("overworld")));
         for (BiomeInstanceKey sample : region.getSamples()) {
             if (sample != null) {
-                LEGACY_INDEX.put(sample, regionKey);
+                LEGACY_INDEX.put(sample, regionId);
             }
         }
     }
 
-    public static RegionAtmosphereState getState(RegionInstanceKey key) {
+    public static RegionAtmosphereState getState(ForecastRegionId key) {
         if (key == null) {
             return null;
         }
@@ -92,7 +97,7 @@ public final class AtmosphericStateRegistry {
     }
 
     public static RegionAtmosphereState getState(BiomeInstanceKey biomeKey) {
-        RegionInstanceKey key = resolveRegionKey(biomeKey);
+        ForecastRegionId key = resolveRegionKey(biomeKey);
         if (key == null) {
             return null;
         }
@@ -103,11 +108,11 @@ public final class AtmosphericStateRegistry {
         return STATES.values();
     }
 
-    public static Map<RegionInstanceKey, RegionAtmosphereState> getStatesAsMap() {
+    public static Map<ForecastRegionId, RegionAtmosphereState> getStatesAsMap() {
         return STATES;
     }
 
-    public static Map<RegionInstanceKey, List<RegionInstanceKey>> getNeighborsAsMap() {
+    public static Map<ForecastRegionId, List<ForecastRegionId>> getNeighborsAsMap() {
         return NEIGHBORS;
     }
 
@@ -142,15 +147,15 @@ public final class AtmosphericStateRegistry {
      * immediate surrounding cells to keep mixing stable and predictable.
      */
     public static void rebuildNeighbors() {
-        Map<RegionInstanceKey, List<RegionInstanceKey>> rebuilt = new HashMap<>(STATES.size());
-        for (RegionInstanceKey key : STATES.keySet()) {
-            List<RegionInstanceKey> neighbors = new ArrayList<>(8);
+        Map<ForecastRegionId, List<ForecastRegionId>> rebuilt = new HashMap<>(STATES.size());
+        for (ForecastRegionId key : STATES.keySet()) {
+            List<ForecastRegionId> neighbors = new ArrayList<>(8);
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     if (dx == 0 && dz == 0) {
                         continue;
                     }
-                    RegionInstanceKey neighbor = key.neighbor(dx, dz);
+                    ForecastRegionId neighbor = new ForecastRegionId(key.rx() + dx, key.rz() + dz, key.dimension());
                     if (STATES.containsKey(neighbor)) {
                         neighbors.add(neighbor);
                     }
@@ -164,16 +169,16 @@ public final class AtmosphericStateRegistry {
         NEIGHBORS.putAll(rebuilt);
     }
 
-    public static List<RegionInstanceKey> getNeighbors(RegionInstanceKey key) {
+    public static List<ForecastRegionId> getNeighbors(ForecastRegionId key) {
         return NEIGHBORS.getOrDefault(key, List.of());
     }
 
     public static List<BiomeInstanceKey> getBiomeNeighbors(BiomeInstanceKey biomeKey) {
-        RegionInstanceKey regionKey = resolveRegionKey(biomeKey);
+        ForecastRegionId regionKey = resolveRegionKey(biomeKey);
         if (regionKey == null) {
             return List.of();
         }
-        List<RegionInstanceKey> regionNeighbors = getNeighbors(regionKey);
+        List<ForecastRegionId> regionNeighbors = getNeighbors(regionKey);
         if (regionNeighbors.isEmpty()) {
             return List.of();
         }

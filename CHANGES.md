@@ -1,5 +1,8 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Region forecast refactor blueprint
+- Added `doc/forecast-region-refactor.md` outlining the region-first forecast architecture, eight-section aggregation, migration map (biome→region), module-specific API changes, fallback JSON flow, and SynLightController deprecation/reintegration guidance.
+- Introduced region orchestrator scaffolding (`modules/region`) plus legacy bootstrap/adapters and added region-based sampling APIs in `ForecastOrchestrator`, `AtmoApi`, and `ForecastSampling` with deprecated biome wrappers.
 ## Unreleased — Async active-region scheduler
 - Added `AtmosphericUpdateScheduler` to refresh only player-proximate states every 20 ticks and batch passive regions through a round-robin queue every 100 ticks using `AsyncAtmosphereService`.
 - Sunlight/rain/relaxation now apply as clamped deltas on the main thread after async computation, with stronger sunlight blending and per-variable safety clamps (temperature floored at -273.15C, pressure limited to 870–1080 hPa).

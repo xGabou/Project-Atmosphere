@@ -10,7 +10,8 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * Packet for transmitting per-biome daily temperature forecasts to the client.
+ * Packet for transmitting per-region daily temperature forecasts to the client.
+ * Retains biome map shape for backward compatibility on the client cache.
  */
 public class BiomeDayTemperaturePacket {
     private final Map<ResourceLocation, float[]> temperatureDayMap;
@@ -45,7 +46,7 @@ public class BiomeDayTemperaturePacket {
     }
 
     /**
-     * Handles incoming biome day temperature data on the client.
+     * Handles incoming daily temperature data on the client.
      * Clears old forecasts before inserting new ones to prevent stale data.
      */
     public static void handle(BiomeDayTemperaturePacket msg, Supplier<NetworkEvent.Context> ctx) {

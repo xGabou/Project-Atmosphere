@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.modules.temperature.spike;
 
 import com.google.gson.*;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegionId;
+import net.Gabou.projectatmosphere.modules.region.RegionIdCodec;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.StorageUtils;
@@ -24,19 +26,20 @@ public class SpikeStateStorage {
     public static void saveAll(ServerLevel world) {
             JsonObject root = new JsonObject();
 
-            for (Map.Entry<BiomeInstanceKey, SpikeState> entry : SpikeManager.getAllStates().entrySet()) {
+            for (Map.Entry<ForecastRegionId, SpikeState> entry : SpikeManager.getAllStates().entrySet()) {
                 JsonObject data = new JsonObject();
                 SpikeState state = entry.getValue();
 
-                data.addProperty("biome", entry.getKey().biomeType().toString());
-                data.add("pos", AtmosphereUtils.serializeBlockPos(entry.getKey().samplePos()));
+                data.addProperty("rx", entry.getKey().rx());
+                data.addProperty("rz", entry.getKey().rz());
+                data.addProperty("dim", entry.getKey().dimension().location().toString());
 
                 data.addProperty("daysSinceLastSpike", state.daysSinceLastSpike);
                 data.addProperty("remainingSpikeDays", state.remainingSpikeDays);
                 data.addProperty("currentSpikeDay", state.currentSpikeDay);
                 data.addProperty("spikeMagnitude", state.spikeMagnitude);
 
-                root.add(entry.getKey().toString(), data);
+                root.add(entry.getKey().rx() + "," + entry.getKey().rz() + "@" + entry.getKey().dimension().location(), data);
             }
 
             try {
@@ -60,15 +63,16 @@ public class SpikeStateStorage {
 
             try (Reader r = Files.newBufferedReader(SAVE_PATH)) {
                 JsonObject root = GSON.fromJson(r, JsonObject.class);
-                Map<BiomeInstanceKey, SpikeState> loaded = new HashMap<>();
+                Map<ForecastRegionId, SpikeState> loaded = new HashMap<>();
 
                 for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
                     JsonObject obj = entry.getValue().getAsJsonObject();
 
-                    ResourceLocation biome = ResourceLocation.parse(obj.get("biome").getAsString());
-                    BlockPos pos = AtmosphereUtils.deserializeBlockPos(obj.get("pos").getAsJsonObject());
-
-                    BiomeInstanceKey key = new BiomeInstanceKey(biome, pos);
+                    int rx = obj.get("rx").getAsInt();
+                    int rz = obj.get("rz").getAsInt();
+                    ResourceLocation dim = ResourceLocation.parse(obj.get("dim").getAsString());
+                    ForecastRegionId key = new ForecastRegionId(rx, rz,
+                            net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, dim));
 
                     SpikeState state = new SpikeState();
                     state.daysSinceLastSpike = obj.get("daysSinceLastSpike").getAsInt();
