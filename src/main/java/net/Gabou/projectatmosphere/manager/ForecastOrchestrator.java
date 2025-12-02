@@ -4,11 +4,11 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler;
 import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
-import net.Gabou.projectatmosphere.modules.atmosphere.RainSystem;
-import net.Gabou.projectatmosphere.modules.atmosphere.SunlightController;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -113,7 +113,7 @@ public class ForecastOrchestrator {
     public static void onPlayerLogin(ServerPlayer player, ServerLevel level) {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
-        getNearbyBiomeKeys(level, player, 500);
+        getNearbyBiomeKeys(level, player, 1000);
         long start = System.nanoTime();
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
             boolean shouldGenerate = true;
@@ -271,18 +271,19 @@ public class ForecastOrchestrator {
     }
 
     public static void tick(ServerLevel level) {
+        if(isRegenerating())
+            return;
         GlassDamageManager.tick(level);
         if (sandStormLoaded)
             SandStormManager.tickSandstormScheduler(level);
 
-        SunlightController.update(level);
+        AtmosphericUpdateScheduler.tick(level);
         Set<BiomeInstanceKey> activeKeys = getActiveBiomeKeys(level);
         OceanBasinManager.update(level, activeKeys);
         CycloneManager.update(level);
         WindVector.update(level);
         CloudManager.update(level);
         WindEngine.tick(level, activeKeys);
-        RainSystem.update(level);
 
         long now = level.getGameTime();
         if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
@@ -299,19 +300,25 @@ public class ForecastOrchestrator {
     }
 
     public static Set<BiomeInstanceKey> getActiveBiomeKeys(ServerLevel level) {
-        return activePlayerBiomeKeys.values().stream()
-                .flatMap(Set::stream)
-                .collect(Collectors.toSet());
+        Set<BiomeInstanceKey> active = new HashSet<>(AtmosphericStateRegistry.getActiveStates());
+        if (active.isEmpty() && !activePlayerBiomeKeys.isEmpty()) {
+            activePlayerBiomeKeys.values().forEach(active::addAll);
+        }
+        return active;
     }
 
 
     public static Set<BiomeInstanceKey> getActiveBiomeKeysForPlayer(ServerLevel level, ServerPlayer player) {
-        UUID uuid = player.getUUID();
-        if (activePlayerBiomeKeys.containsKey(uuid)) {
-            return activePlayerBiomeKeys.get(uuid);
-
+        Set<BiomeInstanceKey> active = new HashSet<>();
+        BlockPos pos = player.blockPosition();
+        double radiusSq = 1000d * 1000d;
+        for (BiomeInstanceKey key : AtmosphericStateRegistry.getActiveStates()) {
+            BlockPos sample = key.samplePos();
+            if (sample != null && sample.distToCenterSqr(pos.getX(), pos.getY(), pos.getZ()) <= radiusSq) {
+                active.add(key);
+            }
         }
-        return Collections.emptySet();
+        return active;
 
     }
 

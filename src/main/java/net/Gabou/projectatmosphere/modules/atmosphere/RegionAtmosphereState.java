@@ -19,6 +19,10 @@ import java.util.Arrays;
  */
 public class RegionAtmosphereState {
     private static final int DAILY_SLOTS = 240;
+    private static final float MIN_TEMPERATURE_C = -273.15f;
+    private static final float MAX_REASONABLE_TEMPERATURE_C = 70f;
+    private static final float MIN_PRESSURE_HPA = 870f;
+    private static final float MAX_PRESSURE_HPA = 1080f;
 
     private final BiomeInstanceKey key;
     private final float baseTemperature;
@@ -103,11 +107,11 @@ public class RegionAtmosphereState {
     }
 
     public void setTemperature(float temperature) {
-        this.temperature = temperature;
+        this.temperature = clampTemperature(temperature);
     }
 
     public void adjustTemperature(float delta) {
-        temperature += delta;
+        setTemperature(this.temperature + delta);
     }
 
     public float getHumidity() {
@@ -131,7 +135,7 @@ public class RegionAtmosphereState {
     }
 
     public void setPressure(float pressure) {
-        this.pressure = Mth.clamp(pressure, 870f, 1085f);
+        this.pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
     }
 
     public void adjustPressure(float delta) {
@@ -209,7 +213,7 @@ public class RegionAtmosphereState {
         humidity += (baseHumidity - humidity) * factor;
         pressure += (basePressure - pressure) * factor;
         humidity = clampHumidity(humidity);
-        pressure = Mth.clamp(pressure, 870f, 1085f);
+        pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
     }
 
     public double distanceTo(double x, double z) {
@@ -323,5 +327,14 @@ public class RegionAtmosphereState {
             max += 2f;
         }
         return new float[]{min, max};
+    }
+
+    private float clampTemperature(float value) {
+        float ceiling = Math.max(MAX_REASONABLE_TEMPERATURE_C, baselineMaxTemp + 25f);
+        float clamped = Math.max(MIN_TEMPERATURE_C, Math.min(value, ceiling));
+        if (!Float.isFinite(clamped)) {
+            return Math.max(MIN_TEMPERATURE_C, Math.min(baseTemperature, ceiling));
+        }
+        return clamped;
     }
 }

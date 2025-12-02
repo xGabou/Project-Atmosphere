@@ -5,10 +5,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
     private static final Map<BiomeInstanceKey, WindSample> CURRENT = new HashMap<>();
@@ -45,27 +42,31 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
     }
 
     public static void update(ServerLevel level) {
-        if (AtmosphericStateRegistry.isEmpty()) {
-            return;
-        }
+        if (AtmosphericStateRegistry.getActiveStates().isEmpty()) return;
+        Map<BiomeInstanceKey,RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
+        Set<BiomeInstanceKey> activeKeys = AtmosphericStateRegistry.getActiveStates();
+        Map<BiomeInstanceKey,List<BiomeInstanceKey>> neighborsMap = AtmosphericStateRegistry.getNeighborsAsMap();
 
         Map<BiomeInstanceKey, Delta> deltas = new HashMap<>();
-        for (RegionAtmosphereState state : AtmosphericStateRegistry.getStates()) {
+
+        // process only active states
+        for (BiomeInstanceKey key : activeKeys) {
+            RegionAtmosphereState state = states.get(key);
+            if (state == null) continue;
+
             float strength = state.getWindStrength();
-            if (strength <= 0.01f) {
-                continue;
-            }
-            List<BiomeInstanceKey> neighbors = AtmosphericStateRegistry.getNeighbors(state.getKey());
-            if (neighbors.isEmpty()) {
-                continue;
-            }
-            Delta delta = deltas.computeIfAbsent(state.getKey(), k -> new Delta());
+            if (strength <= 0.01f) continue;
+
+            List<BiomeInstanceKey> neighbors = neighborsMap.getOrDefault(key, List.of());
+            if (neighbors.isEmpty()) continue;
+
+            Delta delta = deltas.computeIfAbsent(key, k -> new Delta());
+
             for (BiomeInstanceKey neighborKey : neighbors) {
-                if (neighborKey == null) {
-                    continue;
-                }
-                RegionAtmosphereState neighbor = AtmosphericStateRegistry.getState(neighborKey);
+                // Only mix with active ones OR all?  Choose.
+                RegionAtmosphereState neighbor = states.get(neighborKey);
                 if (neighbor == null) continue;
+
                 float mixingFactor = 0.02f * strength;
                 delta.temperature += (neighbor.getTemperature() - state.getTemperature()) * mixingFactor;
                 delta.humidity += (neighbor.getHumidity() - state.getHumidity()) * (0.03f * strength);
@@ -73,26 +74,34 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
             }
         }
 
-        deltas.forEach((key, delta) -> {
-            RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
-            if (state != null) {
-                state.adjustTemperature(delta.temperature);
-                state.adjustHumidity(delta.humidity);
-                state.adjustPressure(delta.pressure);
-            }
-        });
+        // Apply deltas to only active states
+        for (var entry : deltas.entrySet()) {
+            BiomeInstanceKey key = entry.getKey();
+            RegionAtmosphereState state = states.get(key);
+            if (state == null) continue;
 
-        for (RegionAtmosphereState state : AtmosphericStateRegistry.getStates()) {
+            Delta d = entry.getValue();
+            state.adjustTemperature(d.temperature);
+            state.adjustHumidity(d.humidity);
+            state.adjustPressure(d.pressure);
+        }
+
+        // Wind jitter for active states
+        for (BiomeInstanceKey key : activeKeys) {
+            RegionAtmosphereState state = states.get(key);
+            if (state == null) continue;
+
             WindVector wind = state.getWind();
-            if (wind == null) {
-                continue;
-            }
+            if (wind == null) continue;
+
             float jitter = (level.random.nextFloat() - 0.5f) * 0.02f;
             float speed = Math.max(0f, wind.baseSpeed() + jitter);
             float angle = wind.angleRadians() + (level.random.nextFloat() - 0.5f) * 0.01f;
+
             state.setWind(new WindVector(speed, angle, Math.max(speed, wind.gustSpeed())));
         }
     }
+
 
     public static void set(BiomeInstanceKey key, float effectiveSpeed, float directionDeg) {
         CURRENT.put(key, new WindSample(effectiveSpeed, directionDeg));

@@ -2,24 +2,56 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
+import org.jetbrains.annotations.Unmodifiable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class AtmosphericStateRegistry {
     private static final Map<BiomeInstanceKey, RegionAtmosphereState> STATES = new ConcurrentHashMap<>();
     private static final Map<BiomeInstanceKey, List<BiomeInstanceKey>> NEIGHBORS = new ConcurrentHashMap<>();
+    private static final Set<BiomeInstanceKey> ACTIVE = ConcurrentHashMap.newKeySet();
+
     private static final double NEIGHBOR_RADIUS_SQR = 256.0 * 256.0;
 
     private AtmosphericStateRegistry() {
     }
+
+    public static Set<BiomeInstanceKey> getActiveStates() {
+        return ACTIVE;
+    }
+    public static void rebuildActiveStates(ServerLevel level) {
+        ACTIVE.clear();
+        int radius = 1000;
+        int r2 = radius * radius;
+
+        for (ServerPlayer player : level.players()) {
+            BlockPos p = player.blockPosition();
+
+            for (BiomeInstanceKey key : STATES.keySet()) {
+                BlockPos sample = key.samplePos();
+                if (sample == null) continue;
+
+                double dx = sample.getX() - p.getX();
+                double dz = sample.getZ() - p.getZ();
+                if ((dx * dx + dz * dz) <= r2) {
+                    ACTIVE.add(key);
+                }
+            }
+        }
+    }
+
+    public static void replaceActiveStates(Set<BiomeInstanceKey> next) {
+        ACTIVE.clear();
+        if (next != null) {
+            ACTIVE.addAll(next);
+        }
+    }
+
 
     public static RegionAtmosphereState initializeState(BiomeInstanceKey key, BiomeForecast forecast) {
         RegionAtmosphereState state = RegionAtmosphereState.fromForecast(key, forecast);
@@ -36,6 +68,12 @@ public final class AtmosphericStateRegistry {
 
     public static Collection<RegionAtmosphereState> getStates() {
         return STATES.values();
+    }
+    public static Map<BiomeInstanceKey,RegionAtmosphereState> getStatesAsMap(){
+        return STATES;
+    }
+    public static Map<BiomeInstanceKey,List<BiomeInstanceKey>> getNeighborsAsMap(){
+        return NEIGHBORS;
     }
 
     public static boolean isEmpty() {
