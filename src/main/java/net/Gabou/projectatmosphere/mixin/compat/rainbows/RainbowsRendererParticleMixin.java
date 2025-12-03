@@ -47,8 +47,8 @@ public abstract class RainbowsRendererParticleMixin {
      * when rain stops, depending on Project Atmosphere’s tracker.
      */
     @Inject(
-            method = "render(Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/Camera;F)V",
-            at = @At(value = "INVOKE", target = "Ljava/lang/Math;sin(D)D")
+            method = "render",
+            at = @At("HEAD")
     )
     private void projectatmosphere$triggerWhenRainStops(VertexConsumer buffer,
                                                         net.minecraft.client.Camera camera,
