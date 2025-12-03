@@ -1,19 +1,24 @@
 # Project Atmosphere
 
 ### Added
-- Refreshed wind module (partial overhaul, more improvements coming)
-### Fixed / Behavior
-- Fixed crash related to wind updates
-### Changed
-- Increased forecast radius from 10 000 blocks to 50 000 blocks
-- Improved overall performance of weather and atmosphere calculations
-- Reduced biome sampling step from 128 blocks to 64 blocks for much higher accuracy
-- Increased maximum number of biome forecasts from 40 to 1000 to support large worlds and modpacks
-- Increased default cloud region size from 700 blocks to 1500 blocks for better cloud coverage in large worlds
+- Region-first plumbing: region orchestrator scaffolding, region-based sampling APIs, and unified region key (`RegionInstanceKey`) across wind/state/spike/orchestrator.
 
-## PS: 
-- This version might have bugs related to the new wind module. Please report any issues you encounter on my Discord server.
-- I observed that clouds seems to pile up in the same area after a while...
-- Irrealistic forecast should be gone, but let me know if you still see them.
-- Also, performance should be better, but if you notice any lag spikes related to weather updates, please inform me.
-### Thank you for your support and feedback!
+### Changed
+- Spikes are region-only (removed from biome generation); player movement tracking is region-based (regen when entering a new region or moving ~80% of region size).
+- Cloud sampling uses region centers; far clouds culled; SimpleClouds spawns hard-capped at 10k from players and biased closer.
+- Removed pattern cloud type
+
+### Fixed
+- Partial fix for cloud coverage.
+
+### Notes
+- Region-first runtime: unified region key and region-based APIs simplify lookups and reduce biome churn.
+- Region-only spikes and region movement tracking reduce regen spam (regen on new region or ~80% region-size move).
+- Cloud behavior: sampling uses region centers, far clouds culled, SimpleClouds spawns hard-capped at 10k and biased toward nearby players to keep cloud effects relevant.
+- Next steps: further optimize region management, enhance cloud dynamics, and refine spike integration with biome features.
+
+
+## AS ALWAYS UPDATING TO THIS VERSION REQUIRES DELETING YOUR OVERWORLD FOLDER (created by Project Atmosphere) TO AVOID ISSUES WITH THE NEW REGION SYSTEM.
+- Go to your worlds folder and delete the "overworld" folder to allow the new region system to generate fresh regions.
+- Note that this will reset the current forecast and could introduce desynced weather effects if the forecast isn't regenerated properly. (/temperature regenerate)
+

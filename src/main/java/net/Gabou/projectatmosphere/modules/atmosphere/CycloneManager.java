@@ -4,7 +4,9 @@ import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec2;
@@ -66,7 +68,13 @@ public final class CycloneManager {
         if (!cooldownPassed(now)) {
             return;
         }
-        spawnCyclone(level);
+        // Precompute nearby region candidates
+        List<RegionAtmosphereState> candidates = findNearbyStates(level);
+
+        if (candidates.isEmpty()) {
+            return; // no valid region nearby → skip all
+        }
+        spawnCyclone(level, candidates);
     }
 
     private static boolean cooldownPassed(long now) {
@@ -75,26 +83,73 @@ public final class CycloneManager {
 
     private static void spawnInitialCyclones(ServerLevel level) {
         RandomSource random = level.random;
-        int count = 3 + random.nextInt(2);
+        int count = 3 + random.nextInt(6);
+
+        // Precompute nearby region candidates
+        List<RegionAtmosphereState> candidates = findNearbyStates(level);
+
+        if (candidates.isEmpty()) {
+            return; // no valid region nearby → skip all
+        }
+
         for (int i = 0; i < count; i++) {
-            spawnCyclone(level);
+            spawnCyclone(level, candidates);
         }
     }
 
-    private static void spawnCyclone(ServerLevel level) {
+
+    private static void spawnCyclone(ServerLevel level, List<RegionAtmosphereState> candidates) {
         RandomSource random = level.random;
-        var stateOpt = AtmosphericStateRegistry.getRandomState(random);
-        if (stateOpt.isEmpty()) {
+
+        if (candidates == null || candidates.isEmpty()) {
             return;
         }
-        RegionAtmosphereState state = stateOpt.get();
+
+        // Pick one candidate directly
+        RegionAtmosphereState state = candidates.get(random.nextInt(candidates.size()));
+
         float radius = 180f + random.nextFloat() * 140f;
         float intensity = 0.4f + random.nextFloat() * 0.4f;
         float pressureDrop = 5f + random.nextFloat() * 10f;
         long lifetime = 24000L + random.nextInt(24000);
-        ACTIVE_CYCLONES.add(new Cyclone(new Vec2(state.getPosition().getX(), state.getPosition().getZ()), radius, intensity, pressureDrop, lifetime));
+
+        ACTIVE_CYCLONES.add(new Cyclone(
+                new Vec2(state.getPosition().getX(), state.getPosition().getZ()),
+                radius,
+                intensity,
+                pressureDrop,
+                lifetime
+        ));
+
         lastSpawnTick = level.getDayTime();
     }
+    private static List<RegionAtmosphereState> findNearbyStates(ServerLevel level) {
+        List<BlockPos> players = level.players().stream()
+                .map(ServerPlayer::blockPosition)
+                .toList();
+
+        if (players.isEmpty()) return List.of();
+
+        final double MAX_DIST_SQ = 5000d * 5000d;
+
+        return AtmosphericStateRegistry.snapshot().stream()
+                .filter(state -> {
+                    BlockPos pos = state.getPosition();
+                    if (pos == null) return false;
+
+                    for (BlockPos player : players) {
+                        double dx = pos.getX() - player.getX();
+                        double dz = pos.getZ() - player.getZ();
+                        if ((dx * dx + dz * dz) <= MAX_DIST_SQ) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })
+                .toList();
+    }
+
+
 
     private static final class Cyclone {
         private Vec2 center;

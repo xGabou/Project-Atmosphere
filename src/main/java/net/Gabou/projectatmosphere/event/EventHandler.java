@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.minecraft.core.BlockPos;
@@ -34,6 +35,13 @@ public class EventHandler {
     private static int tickCounter = 0;
 
     private static boolean hasDisplayedMessage = false;
+
+    private static boolean wasRegenerating = false;
+
+    private static boolean finishedRegenerating = true;
+
+    private static int cloudBoosterTicks = 0;
+
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.level.isClientSide || !(event.level instanceof ServerLevel serverLevel)) {
@@ -51,9 +59,17 @@ public class EventHandler {
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
         CloudGenerator generator = cloudManager.getCloudGenerator();
         AtmosphereManager.tick(serverLevel);
+        if(ForecastOrchestrator.isRegenerating()) {
+            finishedRegenerating = false;
+        } else if (!finishedRegenerating) {
+            wasRegenerating = true;
+        }
 
-        if (generator.getTicksTillNextGen() <= 0) {
+        if (generator.getTicksTillNextGen()-cloudBoosterTicks <= 0 || wasRegenerating) {
             SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
+            wasRegenerating = false;
+            finishedRegenerating = true;
+            cloudBoosterTicks = 0;
         }
 
         if (CompatHandler.isRainbowsLoaded()) {
@@ -80,6 +96,10 @@ public class EventHandler {
             }
 
 
+        }
+        if(generator.getClouds().size()<=3)
+        {
+            cloudBoosterTicks = cloudBoosterTicks+5;
         }
 
         tickCounter++;

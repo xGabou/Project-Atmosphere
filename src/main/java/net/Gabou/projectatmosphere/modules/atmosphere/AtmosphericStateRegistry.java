@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
+import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -48,7 +50,7 @@ public final class AtmosphericStateRegistry {
                 double dx = anchor.getX() - p.getX();
                 double dz = anchor.getZ() - p.getZ();
                 if ((dx * dx + dz * dz) <= r2) {
-                    ACTIVE.add(state.getKey());
+                    ACTIVE.add(state.getRegionId());
                 }
             }
         }
@@ -61,25 +63,25 @@ public final class AtmosphericStateRegistry {
         }
     }
 
-    public static RegionAtmosphereState initializeState(RegionInstanceKey key, ForecastRegion forecast) {
+    public static RegionAtmosphereState initializeState(RegionInstanceKey id, ForecastRegion forecast) {
         forecast.finalizeAggregation();
-        RegionAtmosphereState state = RegionAtmosphereState.fromForecast(key, forecast);
-        STATES.put(key, state);
+        RegionAtmosphereState state = RegionAtmosphereState.fromForecast(id, forecast);
+        STATES.put(id, state);
         indexLegacyKeys(forecast);
         return state;
     }
 
     public static RegionAtmosphereState initializeState(BiomeInstanceKey key, ForecastRegion forecast) {
-        RegionInstanceKey regionKey = forecast.getKey();
+        RegionInstanceKey regionId = forecast.getKey();
         indexLegacyKeys(forecast);
-        return initializeState(regionKey, forecast);
+        return initializeState(regionId, forecast);
     }
 
     private static void indexLegacyKeys(ForecastRegion region) {
-        RegionInstanceKey regionKey = region.getKey();
+        RegionInstanceKey regionId = region.getKey();
         for (BiomeInstanceKey sample : region.getSamples()) {
             if (sample != null) {
-                LEGACY_INDEX.put(sample, regionKey);
+                LEGACY_INDEX.put(sample, regionId);
             }
         }
     }
@@ -150,7 +152,7 @@ public final class AtmosphericStateRegistry {
                     if (dx == 0 && dz == 0) {
                         continue;
                     }
-                    RegionInstanceKey neighbor = key.neighbor(dx, dz);
+                    RegionInstanceKey neighbor = new RegionInstanceKey(key.regionX() + dx, key.regionZ() + dz, key.regionSize());
                     if (STATES.containsKey(neighbor)) {
                         neighbors.add(neighbor);
                     }

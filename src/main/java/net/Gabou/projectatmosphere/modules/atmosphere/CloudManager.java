@@ -25,14 +25,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.BiasedToBottomInt;
 import org.joml.Vector2i;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -55,9 +48,10 @@ public final class CloudManager {
     private static final int SPAWN_ATTEMPT_INTERVAL_TICKS = 200;
     private static final int MAX_SPAWN_SCAN_ATTEMPTS = 6;
 
-    private static final float HUMIDITY_MIN_FOR_THICKNESS = 0.65f;
-    private static final float HUMIDITY_MAX_FOR_THICKNESS = 1.05f;
-    private static final float RAIN_BIRTH_THRESHOLD = 0.9f;
+    private static final float HUMIDITY_MIN_FOR_THICKNESS = 0.35f;
+    private static final float HUMIDITY_MAX_FOR_THICKNESS = 0.85f;
+
+    private static final float RAIN_BIRTH_THRESHOLD = 0.55f;
 
     private static final float THICKNESS_GROWTH_RATE = 0.25f;
     private static final float THICKNESS_DECAY_RATE = 0.08f;
@@ -134,9 +128,15 @@ public final class CloudManager {
             return;
         }
 
+        List<BlockPos> players = level.players().stream().map(ServerPlayer::blockPosition).toList();
+        if (players.isEmpty()) {
+            REGION_SCAN_IN_FLIGHT.set(false);
+            return;
+        }
+
         AsyncAtmosphereService.runWithCallback(
                 PoolType.WEATHER,
-                () -> computeSamples(descriptors),
+                () -> computeSamples(descriptors, players),
                 samples -> {
                     try {
                         applySamples(level, samples);
@@ -164,18 +164,33 @@ public final class CloudManager {
         return descriptors;
     }
 
-    private static List<RegionSample> computeSamples(List<RegionDescriptor> descriptors) {
+    private static List<RegionSample> computeSamples(List<RegionDescriptor> descriptors, List<BlockPos> players) {
         List<RegionAtmosphereState> states = AtmosphericStateRegistry.snapshot();
         List<RegionSample> samples = new ArrayList<>(descriptors.size());
         for (RegionDescriptor descriptor : descriptors) {
+            // Cull far clouds: skip if center is farther than 6000 blocks from all players.
+            boolean nearAnyPlayer = false;
+            for (BlockPos p : players) {
+                double dx = descriptor.worldX() - p.getX();
+                double dz = descriptor.worldZ() - p.getZ();
+                if ((dx * dx + dz * dz) <= 6000d * 6000d) {
+                    nearAnyPlayer = true;
+                    break;
+                }
+            }
+            if (!nearAnyPlayer) {
+                continue;
+            }
             samples.add(sampleRegion(descriptor, states));
         }
         return samples;
     }
 
     private static RegionSample sampleRegion(RegionDescriptor descriptor, List<RegionAtmosphereState> states) {
+        double regionRadius = RegionInstanceKey.DEFAULT_REGION_SIZE;
         double radius = Math.max(16d, descriptor.radius());
         double radiusSq = radius * radius;
+        double regionRadiusSq = regionRadius * regionRadius;
         double centerX = descriptor.worldX();
         double centerZ = descriptor.worldZ();
 
@@ -188,20 +203,25 @@ public final class CloudManager {
         List<RegionSample.Footprint> footprint = new ArrayList<>();
 
         for (RegionAtmosphereState state : states) {
-            double dist = state.distanceTo(centerX, centerZ);
-            if (dist > radius) {
+            BlockPos anchor = state.getPosition();
+            if (anchor == null) {
                 continue;
             }
-
-            float weight = 1f - (float) (dist * dist / radiusSq);
+            double dx = anchor.getX() - centerX;
+            double dz = anchor.getZ() - centerZ;
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            if(Objects.equals(state.getRegionId(), new RegionInstanceKey(-2, -2)))
+                ProjectAtmosphere.LOGGER.info("CloudManager: Sampling region {}, distance to center: {}", state.getRegionId(), dist);
+            if (dist > radius+regionRadius) {
+                continue;
+            }
+            float weight = 1f - (float) (dist * dist / regionRadiusSq);
             weight = Mth.clamp(weight, 0.05f, 1f);
-
             humiditySum += state.getHumidity() * weight;
             temperatureSum += state.getTemperature() * weight;
             pressureSum += state.getPressure() * weight;
             rainSum += state.getRainIntensity() * weight;
             weightSum += weight;
-
             footprint.add(new RegionSample.Footprint(state.getKey(), weight));
         }
 
@@ -314,6 +334,10 @@ public final class CloudManager {
             float rain = Mth.clamp(value.rainIntensity, 0f, 1f);
             state.setCloudCover(cover);
             state.setRainIntensity(rain);
+            if (ProjectAtmosphere.DEBUG_MODE && key.regionX() == -2 && key.regionZ() == -2 && key.regionSize() == RegionInstanceKey.DEFAULT_REGION_SIZE) {
+                ProjectAtmosphere.LOGGER.info("[CloudManager] Region {} cover={} rain={} (thicknessSum={}, contributions={})",
+                        key, cover, rain, value.cloudCover, value.rainIntensity);
+            }
             touched.add(key);
             ACTIVE_REGIONS.add(key);
         });
@@ -372,7 +396,7 @@ public final class CloudManager {
 
         AsyncAtmosphereService.runWithCallback(
                 PoolType.WEATHER,
-                () -> new SpawnSearchResult(findSpawnCandidate(level, regions, config, remaining)),
+                () -> new SpawnSearchResult(findSpawnCandidate(level, generator.getClouds().size(), regions, config, remaining)),
                 result -> {
                     try {
                         if (result.candidate() != null) {
@@ -385,7 +409,7 @@ public final class CloudManager {
         );
     }
 
-    private static SpawnCandidate findSpawnCandidate(ServerLevel level, List<SpawnRegion> regions, CloudSpawningConfig config, int remaining) {
+    private static SpawnCandidate findSpawnCandidate(ServerLevel level, int currentCloudRegions, List<SpawnRegion> regions, CloudSpawningConfig config, int remaining) {
         if (regions.isEmpty()) {
             return null;
         }
@@ -394,7 +418,11 @@ public final class CloudManager {
         if (players.isEmpty()) {
             return null;
         }
-        final double MAX_SPAWN_DIST_SQ = 20000d * 20000d;
+        // Hard cap: never spawn beyond 10,000 blocks from any player.
+        final double HARD_MAX_DIST_SQ = 10000d * 10000d;
+        // Distance policy: force very close when cloud count is low, otherwise cap to 5000 blocks.
+        final double MAX_SPAWN_DIST_SQ = (currentCloudRegions < 3 ? 3000d : 5000d) * (currentCloudRegions < 3 ? 3000d : 5000d);
+        final double PREFERRED_DIST_SQ = 3000d * 3000d;
 
         long tick = level.getGameTime();
         SpawnCandidate best = null;
@@ -410,7 +438,8 @@ public final class CloudManager {
             for (BlockPos playerPos : players) {
                 double dx = point.x - playerPos.getX();
                 double dz = point.y - playerPos.getZ();
-                if ((dx * dx + dz * dz) <= MAX_SPAWN_DIST_SQ) {
+                double distSq = dx * dx + dz * dz;
+                if (distSq <= HARD_MAX_DIST_SQ && distSq <= MAX_SPAWN_DIST_SQ) {
                     tooFar = false;
                     break;
                 }
@@ -448,6 +477,16 @@ public final class CloudManager {
 
             float humidityNorm = humidityPercent / 100f;
             float score = humidityNorm * 0.6f + (severity / 7f) * 0.4f;
+            // Prefer closer to players: boost if within preferred distance.
+            for (BlockPos playerPos : players) {
+                double dx = point.x - playerPos.getX();
+                double dz = point.y - playerPos.getZ();
+                double distSq = dx * dx + dz * dz;
+                if (distSq <= PREFERRED_DIST_SQ) {
+                    score += 0.2f;
+                    break;
+                }
+            }
             if (freezing && severity >= 6) {
                 score += 0.15f;
             }

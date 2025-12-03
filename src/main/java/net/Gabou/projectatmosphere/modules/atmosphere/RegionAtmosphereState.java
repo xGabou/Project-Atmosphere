@@ -2,11 +2,11 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Range;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -26,7 +26,8 @@ public class RegionAtmosphereState {
     private static final float MIN_PRESSURE_HPA = 870f;
     private static final float MAX_PRESSURE_HPA = 1080f;
 
-    private final RegionInstanceKey key;
+    private final net.Gabou.projectatmosphere.util.RegionInstanceKey regionId;
+    private final net.Gabou.projectatmosphere.util.RegionInstanceKey legacyKey;
     private final BlockPos anchor;
     private final ResourceLocation dominantBiome;
     private final float baseTemperature;
@@ -47,9 +48,10 @@ public class RegionAtmosphereState {
     private float sunlight;
     private float rainIntensity;
 
-    RegionAtmosphereState(RegionInstanceKey key, BlockPos anchor, ForecastRegion forecastRegion, ResourceLocation dominantBiome, float baseTemperature, float baseHumidity, float basePressure, WindVector wind) {
-        this.key = key;
-        this.anchor = anchor == null ? key.center() : anchor;
+    RegionAtmosphereState(net.Gabou.projectatmosphere.util.RegionInstanceKey id, BlockPos anchor, ForecastRegion forecastRegion, ResourceLocation dominantBiome, float baseTemperature, float baseHumidity, float basePressure, WindVector wind) {
+        this.regionId = id;
+        this.legacyKey = id;
+        this.anchor = anchor == null ? legacyKey.center() : anchor;
         this.dominantBiome = dominantBiome;
         this.baseTemperature = baseTemperature;
         this.baseHumidity = clampHumidity(baseHumidity);
@@ -67,7 +69,7 @@ public class RegionAtmosphereState {
         this.baselineMaxTemp = bounds[1];
     }
 
-    public static RegionAtmosphereState fromForecast(RegionInstanceKey key, ForecastRegion forecastRegion) {
+    public static RegionAtmosphereState fromForecast(net.Gabou.projectatmosphere.util.RegionInstanceKey id, ForecastRegion forecastRegion) {
         float temperature = averageDailyValue(forecastRegion.getTemperature(), 15f);
         float humidity = averageDailyValue(forecastRegion.getHumidity(), 60f) / 100f;
         float pressure = averageDailyValue(forecastRegion.getPressure(), 1013.25f);
@@ -79,7 +81,7 @@ public class RegionAtmosphereState {
             wind = WindVector.fromBase(1f, 0f);
         }
         ResourceLocation dominantBiome = selectDominantBiome(forecastRegion.getBiomeWeights());
-        return new RegionAtmosphereState(key, forecastRegion.getAnchor(), forecastRegion, dominantBiome, temperature, humidity, pressure, wind);
+        return new RegionAtmosphereState(id, forecastRegion.getAnchor(), forecastRegion, dominantBiome, temperature, humidity, pressure, wind);
     }
 
     /**
@@ -87,7 +89,7 @@ public class RegionAtmosphereState {
      */
     @Deprecated
     public static RegionAtmosphereState fromForecast(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
-        ForecastRegion region = new ForecastRegion(RegionInstanceKey.from(biomeKey.samplePos()));
+        ForecastRegion region = new ForecastRegion(net.Gabou.projectatmosphere.util.RegionInstanceKey.from(biomeKey.samplePos()));
         region.addBiomeForecast(biomeKey, forecast);
         region.finalizeAggregation();
         return fromForecast(region.getKey(), region);
@@ -124,8 +126,16 @@ public class RegionAtmosphereState {
         return count == 0 ? fallback : sum / count;
     }
 
-    public RegionInstanceKey getKey() {
-        return key;
+    public net.Gabou.projectatmosphere.util.RegionInstanceKey getRegionId() {
+        return regionId;
+    }
+
+    /**
+     * Legacy view for components still expecting RegionInstanceKey.
+     */
+    @Deprecated
+    public net.Gabou.projectatmosphere.util.RegionInstanceKey getKey() {
+        return legacyKey;
     }
 
     public BlockPos getPosition() {

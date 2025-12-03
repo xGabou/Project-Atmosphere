@@ -73,11 +73,7 @@ public class ProjectAtmosphere {
         ModSounds.register(modEventBus);
         NetworkHandler.init();
 
-        SimpleCloudsConstants.SPAWN_RADIUS = Math.round(
-                DEFAULT_RADIUS / DEFAULT_REGION_RADIUS *
-                        SimpleCloudsConstants.CLOUD_SCALE *
-                        ForecastGenerator.MAX_POSITIONS_PER_BIOME
-        );
+        SimpleCloudsConstants.SPAWN_RADIUS = Math.min(DEFAULT_RADIUS/5,10000);
 
         modEventBus.addListener(this::setup);
         modEventBus.addListener((FMLClientSetupEvent event) -> {
@@ -96,6 +92,7 @@ public class ProjectAtmosphere {
         ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);
+        SeasonTracker.register();
 
     }
 

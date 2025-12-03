@@ -436,10 +436,9 @@ public class ForecastGenerator {
 
 
     private static float[][] generateTemperature(BiomeInstanceKey key, ServerLevel level) {
-        return SpikeManager.applySpikeLogic(key,
-                VariationGenerator.applyVariationToWeek(
-                        TemperatureGenerator.generateWeekForecast(level, key.samplePos(), key.biomeType())
-                ));
+        return VariationGenerator.applyVariationToWeek(
+                TemperatureGenerator.generateWeekForecast(level, key.samplePos(), key.biomeType())
+        );
     }
 
     private static float[][] generateHumidity(BiomeInstanceKey key, ServerLevel level, Long day) {

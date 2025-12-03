@@ -10,7 +10,6 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -123,6 +122,15 @@ public class SimpleCloudsCompat {
     ) {
         float x = biomeKey.samplePos().getX();
         float z = biomeKey.samplePos().getZ();
+        // Hard cap: skip spawn if candidate is farther than 10k from all players
+        boolean nearPlayer = level.players().stream().anyMatch(p -> {
+            double dx = x - p.getX();
+            double dz = z - p.getZ();
+            return (dx * dx + dz * dz) <= 10000d * 10000d;
+        });
+        if (!nearPlayer) {
+            return Optional.empty();
+        }
         float windAngleRad = wind.angleRadians();
         float dx = (float) Math.sin(windAngleRad);
         float dz = (float) Math.cos(windAngleRad);
@@ -226,10 +234,7 @@ public class SimpleCloudsCompat {
         }
     }
 
-
-
-
-
-
-
+    public static double getCloudScale() {
+        return SimpleCloudsConstants.CLOUD_SCALE;
+    }
 }

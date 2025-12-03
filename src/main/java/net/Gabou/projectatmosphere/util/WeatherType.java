@@ -36,7 +36,7 @@ public enum WeatherType {
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "matrix"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "overcast"), RAIN);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "pathway"), NONE);
-        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "pattern"), NONE);
+        //CLOUD_MAP.put(new ResourceLocation("simpleclouds", "pattern"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "real_itty_bitty"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "severe_cumulonimbus"), THUNDERSTORM);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "severe_nimbostratus"), THUNDERSTORM);

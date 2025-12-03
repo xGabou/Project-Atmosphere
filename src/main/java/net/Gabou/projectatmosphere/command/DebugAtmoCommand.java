@@ -20,6 +20,7 @@ import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.UnitFormatter;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -40,23 +41,13 @@ public class DebugAtmoCommand {
 
     public static final Logger LOGGER = LogManager.getLogger("DebugAtmoCommand");
 
-    private static int sendForecast(CommandContext<CommandSourceStack> ctx, BiomeForecast forecast, ResourceLocation biome) {
-        if (forecast == null) {
-            ctx.getSource().sendFailure(Component.literal("No forecast found for biome: " + biome));
-            return 0;
-        }
+    private static int sendForecast(CommandContext<CommandSourceStack> ctx, BlockPos pos, ResourceLocation biome) {
 
-        var state = AtmosphericStateRegistry.getState(forecast.getBiomeKey());
+        var state = AtmosphericStateRegistry.getState(RegionInstanceKey.from(pos));
         float temperature = state != null ? state.getTemperature() : 0f;
         float humidity = state != null ? state.getHumidityPercent() : 0f;
         float pressure = state != null ? state.getPressure() : 0f;
         WindVector w = state != null ? state.getWind() : null;
-        if (w == null) {
-            WindVector[] week = forecast.getWind();
-            if (week != null && week.length > 0) {
-                w = week[0];
-            }
-        }
         String wind = w == null ? "-" : UnitFormatter.formatWindSpeed(w.baseSpeed()) + " at " + String.format("%.0f°", Math.toDegrees(w.angleRadians()));
 
         ctx.getSource().sendSuccess(() -> Component.literal(
@@ -83,8 +74,7 @@ public class DebugAtmoCommand {
                                     ResourceLocation biome = world.registryAccess()
                                             .registryOrThrow(Registries.BIOME)
                                             .getKey(world.getBiome(pos).value());
-                                    BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
-                                    return sendForecast(ctx, forecast, biome);
+                                    return sendForecast(ctx, pos, biome);
                                 })
                                 .then(Commands.argument("biome", ResourceLocationArgument.id())
                                         .executes(ctx -> {
@@ -94,8 +84,7 @@ public class DebugAtmoCommand {
                                             }
                                             ResourceLocation biome = ResourceLocationArgument.getId(ctx, "biome");
                                             BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
-                                            BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(new BiomeInstanceKey(biome, pos), ForecastType.WIND);
-                                            return sendForecast(ctx, forecast, biome);
+                                            return sendForecast(ctx,pos, biome);
                                         })
                                 )
                         )
