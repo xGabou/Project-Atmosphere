@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.seasons;
 
+import net.Gabou.projectatmosphere.event.SeasonTracker;
 import net.minecraft.world.level.Level;
 import sereneseasons.api.season.SeasonHelper;
 
@@ -7,6 +8,12 @@ import sereneseasons.api.season.SeasonHelper;
  * Season delegate backed by Serene Seasons.
  */
 public class SereneSeasonsSeasonDelegate implements SeasonTimeDelegate {
+
+    public SereneSeasonsSeasonDelegate() {
+        SeasonTracker.register();
+    }
+
+
     @Override
     public SeasonSnapshot snapshot(Level level) {
         if (level == null) {

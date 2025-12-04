@@ -5,10 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: refactor to region-based architecture with unified RegionInstanceKey and new region sampling APIs">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EclipticTracker.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/seasons/EclipticSeasonsSeasonDelegate.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/region/LegacyRegionIndex.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/region/LegacyRegionPersistence.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/ProjectAtmosphere.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/seasons/SeasonBootstrap.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/seasons/SeasonBootstrap.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/seasons/SereneSeasonsSeasonDelegate.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/seasons/SereneSeasonsSeasonDelegate.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/seasons/TfcPlaceholderSeasonDelegate.java" beforeDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -607,6 +611,7 @@
       <workItem from="1764526381783" duration="4779000" />
       <workItem from="1764628356016" duration="13292000" />
       <workItem from="1764682433668" duration="27632000" />
+      <workItem from="1764808455576" duration="5148000" />
     </task>
     <task id="LOCAL-00087" summary="feat: implement cloud and tornado management on world regeneration">
       <option name="closed" value="true" />
@@ -1148,11 +1153,6 @@
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/command/TemperatureCommands.java</url>
           <line>132</line>
           <option name="timeStamp" value="414" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SeasonTracker.java</url>
-          <line>15</line>
-          <option name="timeStamp" value="438" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />

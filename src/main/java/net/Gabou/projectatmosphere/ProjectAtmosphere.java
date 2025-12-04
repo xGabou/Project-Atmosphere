@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
@@ -92,8 +93,7 @@ public class ProjectAtmosphere {
         ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);
-        SeasonTracker.register();
-
+        SeasonBootstrap.initOrCrash();
     }
 
 
@@ -158,7 +158,7 @@ public class ProjectAtmosphere {
         initModules();
         TornadoProbabilityManager.init();
         event.enqueueWork(() -> {
-            net.Gabou.projectatmosphere.seasons.SeasonBootstrap.initOrCrash();
+
             SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
             // Load user biome temperature overrides after defaults are initialized
             net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempUserConfig.load();
