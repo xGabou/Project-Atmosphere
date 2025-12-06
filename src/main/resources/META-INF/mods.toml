@@ -54,5 +54,12 @@ versionRange = "*"
 ordering = "AFTER"
 side = "BOTH"
 
+[[dependencies."${mod_id}"]]
+modId = "gaboulibs"
+mandatory = true
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
 
 

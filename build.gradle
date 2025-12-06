@@ -250,8 +250,8 @@ modrinth {
     loaders = ["forge"]
     versionType = "beta"
     dependencies {
-        required.project "e0bNACJD"
-        required.project "4Al4H3t9"
+        optional.project "e0bNACJD"
+        optional.project "4Al4H3t9"
         required.project "LtZfKhel"
         required.project "N8aGZtvj"
     }

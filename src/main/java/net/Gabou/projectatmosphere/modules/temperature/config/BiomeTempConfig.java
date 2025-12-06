@@ -17,6 +17,15 @@ import java.util.LinkedHashSet;
 public class BiomeTempConfig {
     public enum Season {WINTER, SPRING, SUMMER, AUTUMN}
 
+    public BiomeTempConfig getINSTANCE()
+    {
+        return INSTANCE;
+    }
+
+    private static final BiomeTempConfig INSTANCE = new BiomeTempConfig();
+
+    private BiomeTempConfig() {}
+
     /**
      * Simple min/max °C pair.
      */
@@ -3832,6 +3841,147 @@ public class BiomeTempConfig {
                 new Range(16f, 30f),
                 new Range(10f, 22f)
         });
+
+        putAllSeasons("tfc:inverted_badlands", new Range[]{
+                new Range(6f, 20f),
+                new Range(12f, 26f),
+                new Range(20f, 34f),
+                new Range(10f, 24f)
+        });
+
+        putAllSeasons("tfc:mountain_lake", new Range[]{
+                new Range(-2f, 10f),
+                new Range(6f, 18f),
+                new Range(12f, 24f),
+                new Range(4f, 16f)
+        });
+
+        putAllSeasons("tfc:low_canyons", new Range[]{
+                new Range(10f, 24f),
+                new Range(16f, 30f),
+                new Range(22f, 36f),
+                new Range(14f, 26f)
+        });
+
+        putAllSeasons("tfc:ocean_reef", new Range[]{
+                new Range(10f, 20f),
+                new Range(14f, 24f),
+                new Range(18f, 28f),
+                new Range(12f, 22f)
+        });
+
+        putAllSeasons("tfc:volcanic_oceanic_mountains", new Range[]{
+                new Range(4f, 16f),
+                new Range(10f, 22f),
+                new Range(18f, 30f),
+                new Range(8f, 20f)
+        });
+
+        putAllSeasons("tfc:volcanic_mountains", new Range[]{
+                new Range(2f, 14f),
+                new Range(8f, 20f),
+                new Range(16f, 28f),
+                new Range(6f, 18f)
+        });
+
+        putAllSeasons("tfc:tidal_flats", new Range[]{
+                new Range(8f, 20f),
+                new Range(14f, 26f),
+                new Range(20f, 32f),
+                new Range(10f, 22f)
+        });
+
+        putAllSeasons("tfc:oceanic_mountains", new Range[]{
+                new Range(2f, 14f),
+                new Range(8f, 20f),
+                new Range(14f, 26f),
+                new Range(6f, 18f)
+        });
+
+        putAllSeasons("tfc:deep_ocean_trench", new Range[]{
+                new Range(2f, 10f),
+                new Range(6f, 14f),
+                new Range(10f, 18f),
+                new Range(4f, 12f)
+        });
+
+        putAllSeasons("tfc:lowlands", new Range[]{
+                new Range(6f, 18f),
+                new Range(12f, 24f),
+                new Range(18f, 30f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("tfc:volcanic_mountain_lake", new Range[]{
+                new Range(0f, 12f),
+                new Range(8f, 20f),
+                new Range(14f, 26f),
+                new Range(6f, 16f)
+        });
+
+        putAllSeasons("tfc:badlands", new Range[]{
+                new Range(10f, 22f),
+                new Range(16f, 28f),
+                new Range(24f, 38f),
+                new Range(12f, 24f)
+        });
+
+        putAllSeasons("tfc:plateau_lake", new Range[]{
+                new Range(2f, 14f),
+                new Range(10f, 22f),
+                new Range(16f, 28f),
+                new Range(8f, 18f)
+        });
+
+        putAllSeasons("tfc:oceanic_mountain_lake", new Range[]{
+                new Range(0f, 12f),
+                new Range(8f, 20f),
+                new Range(14f, 24f),
+                new Range(6f, 16f)
+        });
+
+        putAllSeasons("tfc:old_mountains", new Range[]{
+                new Range(0f, 12f),
+                new Range(6f, 18f),
+                new Range(12f, 24f),
+                new Range(4f, 16f)
+        });
+
+        putAllSeasons("tfc:plateau", new Range[]{
+                new Range(6f, 18f),
+                new Range(12f, 24f),
+                new Range(18f, 30f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("tfc:volcanic_oceanic_mountain_lake", new Range[]{
+                new Range(0f, 12f),
+                new Range(8f, 20f),
+                new Range(14f, 26f),
+                new Range(6f, 16f)
+        });
+
+        putAllSeasons("tfc:hills", new Range[]{
+                new Range(6f, 18f),
+                new Range(12f, 24f),
+                new Range(18f, 30f),
+                new Range(10f, 20f)
+        });
+
+        putAllSeasons("tfc:old_mountain_lake", new Range[]{
+                new Range(0f, 12f),
+                new Range(8f, 20f),
+                new Range(14f, 24f),
+                new Range(6f, 16f)
+        });
+
+        putAllSeasons("tfc:highlands", new Range[]{
+                new Range(4f, 16f),
+                new Range(10f, 22f),
+                new Range(16f, 28f),
+                new Range(8f, 18f)
+        });
+
 
 
 
