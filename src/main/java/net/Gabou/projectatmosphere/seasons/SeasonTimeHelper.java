@@ -15,11 +15,25 @@ public final class SeasonTimeHelper {
     private static final AtomicReference<SeasonTimeDelegate> DELEGATE =
             new AtomicReference<>(new NeutralDelegate());
 
+    private static boolean sereneSeasonsPresent = false;
+
     private SeasonTimeHelper() {
+    }
+
+    public static boolean isSereneSeasonsPresent() {
+        return sereneSeasonsPresent;
     }
 
     public static void setDelegate(SeasonTimeDelegate delegate) {
         if (delegate == null) return;
+        try {
+            if (delegate instanceof SereneSeasonsSeasonDelegate) {
+                sereneSeasonsPresent = true;
+            }
+        }
+        catch (Exception e) {
+            LOGGER.warn("Failed to detect Serene Seasons presence.", e);
+        }
         DELEGATE.set(delegate);
         LOGGER.info("Season time delegate set to '{}'.", delegate.getClass().getName());
     }

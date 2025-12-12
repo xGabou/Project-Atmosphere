@@ -1,11 +1,10 @@
 # Project Atmosphere
 
 ### Added
-- Missing TFC's biomes
 ### Changed
 
 ### Fixed
-
+- PA still referencing Serene Seasons Plus directly instead of through the API, causing crashes when SSP is not present.
 ### Notes
 
 ## ~~AS ALWAYS UPDATING TO THIS VERSION REQUIRES DELETING YOUR OVERWORLD FOLDER (created by Project Atmosphere) TO AVOID ISSUES WITH THE NEW REGION SYSTEM.~~

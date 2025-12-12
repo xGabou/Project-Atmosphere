@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.manager;
 
 
-import com.Gabou.sereneseasonsplus.api.SSPApi;
+
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
@@ -19,6 +19,10 @@ import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureComman
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.wind.WindCommand;
 import net.Gabou.projectatmosphere.modules.wind.WindForces;
+import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
+import net.Gabou.projectatmosphere.seasons.SeasonProviderRegistry;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
+import net.Gabou.projectatmosphere.seasons.SereneSeasonsSeasonDelegate;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.CloudRegionQueue;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
@@ -213,8 +217,8 @@ public class AtmosphereManager {
             return;
         }
         cloudRegions.add(cloudRegion);
-        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()))
-            SSPApi.getINSTANCE().onSimpleCloudsSpawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()) && SeasonTimeHelper.isSereneSeasonsPresent())
+            SereneSeasonsSeasonDelegate.handleRainStarted(level, cloudRegion);
 
     }
 
@@ -224,8 +228,8 @@ public class AtmosphereManager {
         }
 
         cloudRegions.remove(cloudRegion);
-        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()))
-            SSPApi.getINSTANCE().onCloudsDespawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()) && SeasonTimeHelper.isSereneSeasonsPresent())
+            SereneSeasonsSeasonDelegate.handleRainEnded(level, cloudRegion);
 
     }
 

@@ -1,8 +1,12 @@
 package net.Gabou.projectatmosphere.seasons;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.event.SeasonTracker;
+import net.Gabou.projectatmosphere.util.ICloudRegionId;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import sereneseasons.api.season.SeasonHelper;
+import com.Gabou.sereneseasonsplus.api.SSPApi;
 
 /**
  * Season delegate backed by Serene Seasons.
@@ -44,5 +48,14 @@ public class SereneSeasonsSeasonDelegate implements SeasonTimeDelegate {
     @Override
     public long dayDuration(Level level) {
         return level == null ? 24000L : SeasonHelper.getSeasonState(level).getDayDuration();
+    }
+
+
+    public static void  handleRainStarted(ServerLevel level, CloudRegion cloudRegion) {
+        SSPApi.getINSTANCE().onSimpleCloudsSpawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+    }
+
+    public static void handleRainEnded(ServerLevel level, CloudRegion cloudRegion) {
+        SSPApi.getINSTANCE().onCloudsDespawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
     }
 }
