@@ -59,6 +59,8 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue WIND_PUSH_THRESHOLD_MPS;
     public static final ForgeConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
     public static final ForgeConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
+    public static final ForgeConfigSpec.BooleanValue TELEMETRY_ENABLED;
+    public static final ForgeConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -178,6 +180,15 @@ public class AtmoCommonConfig {
         WIND_ENTITY_PUSH_SCALE = builder
                 .comment("Push scale applied to other entities")
                 .defineInRange("entityPushScale", 0.03d, 0d, 1d);
+        builder.pop();
+
+        builder.push("telemetry");
+        TELEMETRY_ENABLED = builder
+                .comment("Enable lightweight telemetry collection for diagnostics")
+                .define("enableTelemetry", true);
+        TELEMETRY_RETENTION_DAYS = builder
+                .comment("Number of days to retain exported telemetry archives before pruning")
+                .defineInRange("telemetryRetentionDays", 14, 0, 365);
         builder.pop();
 
         builder.push("debug");
