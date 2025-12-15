@@ -8,9 +8,15 @@ import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudCreated;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudDied;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudTickSummary;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PrecipitationDecisionTrace;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -25,6 +31,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.BiasedToBottomInt;
 import org.joml.Vector2i;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,6 +46,9 @@ import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.determineCl
  */
 public final class CloudManager {
     private static final Map<Integer, RegionCloudData> REGION_DATA = new ConcurrentHashMap<>();
+    private static final Map<Integer, Long> CLOUD_BIRTH_TICK = new ConcurrentHashMap<>();
+    private static final Map<Integer, Vector2i> CLOUD_LAST_POS = new ConcurrentHashMap<>();
+    private static final Map<Integer, ResourceLocation> CLOUD_TYPES = new ConcurrentHashMap<>();
     private static final Set<RegionInstanceKey> ACTIVE_REGIONS = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private static final AtomicBoolean REGION_SCAN_IN_FLIGHT = new AtomicBoolean();
@@ -80,6 +90,9 @@ public final class CloudManager {
     public static void initialize(ServerLevel level) {
         REGION_DATA.clear();
         ACTIVE_REGIONS.clear();
+        CLOUD_BIRTH_TICK.clear();
+        CLOUD_LAST_POS.clear();
+        CLOUD_TYPES.clear();
         lastRegionSampleTick = 0L;
         lastSpawnTick = 0L;
         REGION_SCAN_IN_FLIGHT.set(false);
@@ -285,6 +298,15 @@ public final class CloudManager {
             observed.add(sample.id());
 
             RegionCloudData data = REGION_DATA.computeIfAbsent(sample.id(), ignored -> new RegionCloudData());
+            if (AtmoCommonConfig.TELEMETRY_ENABLED.get() && !CLOUD_BIRTH_TICK.containsKey(sample.id())) {
+                CLOUD_BIRTH_TICK.put(sample.id(), level.getGameTime());
+                CLOUD_TYPES.put(sample.id(), sample.cloudType());
+                recordCloudCreated(level, sample);
+            }
+            if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+                CLOUD_LAST_POS.put(sample.id(), new Vector2i((int) sample.worldX(), (int) sample.worldZ()));
+                recordCloudTick(level, sample, data);
+            }
             data.updateFromSample(sample, region);
 
             for (RegionSample.Footprint footprint : sample.footprint()) {
@@ -297,6 +319,11 @@ public final class CloudManager {
             }
         }
 
+        if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+            REGION_DATA.keySet().stream()
+                    .filter(id -> !observed.contains(id))
+                    .forEach(id -> recordCloudDeath(level, id));
+        }
         pruneMissingRegions(observed);
         applyBiomeContributions(contributions);
     }
@@ -313,9 +340,15 @@ public final class CloudManager {
     private static void pruneMissingRegions(Set<Integer> observed) {
         if (observed.isEmpty()) {
             REGION_DATA.clear();
+            CLOUD_BIRTH_TICK.clear();
+            CLOUD_LAST_POS.clear();
+            CLOUD_TYPES.clear();
             return;
         }
         REGION_DATA.keySet().removeIf(id -> !observed.contains(id));
+        CLOUD_BIRTH_TICK.keySet().removeIf(id -> !observed.contains(id));
+        CLOUD_LAST_POS.keySet().removeIf(id -> !observed.contains(id));
+        CLOUD_TYPES.keySet().removeIf(id -> !observed.contains(id));
     }
 
     private static void applyBiomeContributions(Map<RegionInstanceKey, BiomeContribution> contributions) {
@@ -400,6 +433,7 @@ public final class CloudManager {
                 result -> {
                     try {
                         if (result.candidate() != null) {
+                            recordPrecipitationDecision(level, result.candidate());
                             spawnCandidate(level, generator, result.candidate());
                         }
                     } finally {
@@ -538,6 +572,95 @@ public final class CloudManager {
                 region,
                 candidate.stats().windVector()
         );
+    }
+
+    private static void recordCloudCreated(ServerLevel level, RegionSample sample) {
+        if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+            return;
+        }
+        Vector2i lastPos = new Vector2i((int) sample.worldX(), (int) sample.worldZ());
+        String biomeId = sample.footprint().isEmpty() ? "unknown" : sample.footprint().get(0).key().toString();
+        TelemetryCollector.get().recordCloudEvent(new CloudCreated(
+                String.valueOf(sample.id()),
+                sample.cloudType().toString(),
+                "spawn_scan",
+                level.dimension().location().toString(),
+                lastPos.x() >> 4,
+                lastPos.y() >> 4,
+                level.getSeaLevel(),
+                sample.avgRainIntensity(),
+                sample.avgRainIntensity() > 0f,
+                biomeId
+        ));
+    }
+
+    private static void recordCloudTick(ServerLevel level, RegionSample sample, RegionCloudData data) {
+        if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+            return;
+        }
+        Vector2i lastPos = new Vector2i((int) sample.worldX(), (int) sample.worldZ());
+        TelemetryCollector.get().recordCloudEvent(new CloudTickSummary(
+                String.valueOf(sample.id()),
+                lastPos.x() >> 4,
+                lastPos.y() >> 4,
+                0f,
+                data.getRainIntensity() > 0f,
+                data.getThickness(),
+                0f
+        ));
+    }
+
+    private static void recordCloudDeath(ServerLevel level, int id) {
+        if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+            return;
+        }
+        long birth = CLOUD_BIRTH_TICK.getOrDefault(id, level.getGameTime());
+        Vector2i pos = CLOUD_LAST_POS.get(id);
+        TelemetryCollector.get().recordCloudEvent(new CloudDied(
+                String.valueOf(id),
+                pos == null ? 0 : pos.x() >> 4,
+                pos == null ? 0 : pos.y() >> 4,
+                (level.getGameTime() - birth) / 20f,
+                "despawn"
+        ));
+        CLOUD_BIRTH_TICK.remove(id);
+        CLOUD_LAST_POS.remove(id);
+        CLOUD_TYPES.remove(id);
+    }
+
+    private static void recordPrecipitationDecision(ServerLevel level, SpawnCandidate candidate) {
+        if (!AtmoCommonConfig.TELEMETRY_ENABLED.get() || candidate == null) {
+            return;
+        }
+        WeatherSampler.WeatherStats stats = candidate.stats();
+        if (stats == null) {
+            return;
+        }
+        List<String> passed = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        if (stats.humidity() >= HUMIDITY_SPAWN_THRESHOLD_PERCENT) {
+            passed.add("humidity_threshold");
+        } else {
+            failed.add("humidity_threshold");
+        }
+        float dewPoint = calculateDewPoint(stats.temperature(), stats.humidity());
+        boolean allowed = failed.isEmpty();
+
+        TelemetryCollector.get().recordDecision(new PrecipitationDecisionTrace(
+                Instant.now(),
+                stats.dominantBiome().toString(),
+                stats.pos().getX() >> 4,
+                stats.pos().getZ() >> 4,
+                stats.temperature(),
+                stats.humidity(),
+                stats.pressure(),
+                dewPoint,
+                stats.stormFactor(),
+                allowed,
+                stats.humidity() / 100f,
+                passed,
+                failed
+        ));
     }
 
     private static String selectCloudId(int severity, boolean freezing) {
