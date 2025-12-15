@@ -51,6 +51,10 @@ public class BiomeTempConfig {
      */
     public static final Map<Season, Map<ResourceLocation, DailyRange>> SEASON_CLAMPS;
 
+    private static final ResourceLocation DEFAULT_BIOME =
+            new ResourceLocation("minecraft:plains");
+
+
     static {
 
         SEASON_RANGES = new EnumMap<>(Season.class);
@@ -4111,22 +4115,81 @@ public class BiomeTempConfig {
         return new DailyRange(minMin, avgNight, avgDay, maxMax);
     }
 
+    private static ResourceLocation resolveByNameMatch(
+            ResourceLocation searched,
+            Map<ResourceLocation, ?> declared
+    ) {
+        String searchedPath = searched.getPath();
+
+        for (ResourceLocation declaredBiome : declared.keySet()) {
+            String declaredPath = declaredBiome.getPath();
+            if (searchedPath.contains(declaredPath)) {
+                return declaredBiome;
+            }
+        }
+
+        return DEFAULT_BIOME;
+    }
+
+
     /**
-     * Retrieve the min/max °C for a given biome and season.
+     * Retrieve the min max °C for a given biome and season.
      */
     public static Range getRange(ResourceLocation biome, Season season) {
-        if (!SEASON_RANGES.getOrDefault(season, Map.of()).containsKey(biome)) {
-            ProjectAtmosphere.LOGGER.warn("❌ No temperature range defined for biome {}", biome);
+        Map<ResourceLocation, Range> seasonMap = SEASON_RANGES.get(season);
+
+        if (seasonMap == null) {
+            ProjectAtmosphere.LOGGER.error("No season map defined for {}", season);
+            return SEASON_RANGES.get(Season.SUMMER).get(DEFAULT_BIOME);
         }
-        return SEASON_RANGES.getOrDefault(season, Map.of())
-                .getOrDefault(biome, new Range(0f, 0f));
+
+        Range exact = seasonMap.get(biome);
+        if (exact != null) {
+            return exact;
+        }
+
+        ResourceLocation resolved = resolveByNameMatch(biome, seasonMap);
+
+        if (resolved != null && seasonMap.containsKey(resolved)) {
+            mirrorBiome(biome.toString(), resolved.toString());
+            return seasonMap.get(biome);
+        }
+
+        ProjectAtmosphere.LOGGER.warn("No temperature range for biome {} in {}", biome, season);
+        mirrorBiome(biome.toString(), DEFAULT_BIOME.toString());
+        return seasonMap.get(biome);
     }
+
+
+
 
     /**
      * Retrieve the daily clamp for a given biome and season.
      */
     public static DailyRange getClamp(ResourceLocation biome, Season season) {
-        return SEASON_CLAMPS.getOrDefault(season, Map.of())
-                .getOrDefault(biome, new DailyRange(0f, 0f, 0f, 0f));
+        Map<ResourceLocation, DailyRange> seasonMap = SEASON_CLAMPS.get(season);
+
+        if (seasonMap == null) {
+            ProjectAtmosphere.LOGGER.error("No clamp map defined for {}", season);
+            return SEASON_CLAMPS.get(Season.SUMMER).get(DEFAULT_BIOME);
+        }
+
+        DailyRange exact = seasonMap.get(biome);
+        if (exact != null) {
+            return exact;
+        }
+
+        ResourceLocation resolved = resolveByNameMatch(biome, seasonMap);
+
+        if (resolved != null && seasonMap.containsKey(resolved)) {
+            mirrorBiome(biome.toString(), resolved.toString());
+            return seasonMap.get(biome);
+        }
+
+        mirrorBiome(biome.toString(), DEFAULT_BIOME.toString());
+        return seasonMap.get(biome);
     }
+
+
+
 }
