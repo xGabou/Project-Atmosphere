@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.async.PoolType;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.AnomalyMarker;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -8,6 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -36,6 +41,7 @@ public final class AtmosphericUpdateScheduler {
     private static final AtomicBoolean ACTIVE_IN_FLIGHT = new AtomicBoolean();
     private static final AtomicBoolean PASSIVE_IN_FLIGHT = new AtomicBoolean();
     private static final ArrayDeque<RegionInstanceKey> PASSIVE_QUEUE = new ArrayDeque<>();
+    private static final Set<RegionInstanceKey> REPORTED_ANOMALIES = ConcurrentHashMap.newKeySet();
 
     private static long lastActiveTick = -ACTIVE_INTERVAL_TICKS;
     private static long lastPassiveTick = 0L;
@@ -268,6 +274,22 @@ public final class AtmosphericUpdateScheduler {
             if (mode == UpdateMode.ACTIVE) {
                 state.recordDailySnapshot(dayTime);
             }
+            if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+                recordAnomalies(state);
+            }
+        }
+    }
+
+    private static void recordAnomalies(RegionAtmosphereState state) {
+        float temperature = state.getTemperature();
+        boolean outlier = temperature < -80f || temperature > 80f;
+        if (outlier && REPORTED_ANOMALIES.add(state.getRegionId())) {
+            TelemetryCollector.get().recordAnomaly(new AnomalyMarker(
+                    Instant.now(),
+                    "temperature_outlier",
+                    state.getRegionId().toString(),
+                    Map.of("temperature", temperature)
+            ));
         }
     }
 

@@ -4,7 +4,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ChannelSummary;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.DayCurve;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ForecastSnapshot;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.Modifiers;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -98,6 +104,9 @@ public final class RegionForecastOrchestrator {
         for (int i = 0; i < out.length; i++) {
             BiomeForecastSnapshot snap = biomeGenerator.generateSlice(biomes, i);
             float factor = Math.max(0f, biomeGenerator.factorForSlice(biomes, i));
+            if (AtmoCommonConfig.TELEMETRY_ENABLED.get() && snap != null) {
+                recordForecastSnapshot(snap, i);
+            }
             out[i] = new ForecastRegion.Section(factor, snap);
         }
         return out;
@@ -117,6 +126,57 @@ public final class RegionForecastOrchestrator {
             }
         }
         return result;
+    }
+
+    private static void recordForecastSnapshot(BiomeForecastSnapshot snap, int dayIndex) {
+        ChannelSummary temp = summarizeCurve(snap.temperatureCurve());
+        ChannelSummary humidity = summarizeCurve(snap.humidityCurve());
+        ChannelSummary pressure = summarizeCurve(snap.pressureCurve());
+        DayCurve curve = deriveDayCurve(snap.temperatureCurve());
+        ForecastSnapshot snapshot = new ForecastSnapshot(
+                snap.biomeKey().biomeType().toString(),
+                snap.biomeKey().samplePos() == null ? 0 : snap.biomeKey().samplePos().getX() >> 4,
+                snap.biomeKey().samplePos() == null ? 0 : snap.biomeKey().samplePos().getZ() >> 4,
+                dayIndex,
+                temp,
+                humidity,
+                pressure,
+                new ChannelSummary(0f, 0f),
+                curve,
+                new Modifiers(false, null, null, false, null)
+        );
+        TelemetryCollector.get().recordForecastSnapshot(snapshot);
+    }
+
+    private static ChannelSummary summarizeCurve(float[][] curve) {
+        if (curve == null || curve.length == 0) {
+            return new ChannelSummary(0f, 0f);
+        }
+        float min = Float.MAX_VALUE;
+        float max = -Float.MAX_VALUE;
+        for (float[] row : curve) {
+            if (row == null) {
+                continue;
+            }
+            for (float v : row) {
+                min = Math.min(min, v);
+                max = Math.max(max, v);
+            }
+        }
+        if (min == Float.MAX_VALUE) {
+            return new ChannelSummary(0f, 0f);
+        }
+        return new ChannelSummary(min, max);
+    }
+
+    private static DayCurve deriveDayCurve(float[][] curve) {
+        if (curve == null || curve.length == 0 || curve[0] == null || curve[0].length == 0) {
+            return new DayCurve(null, null, null, null);
+        }
+        float[] day = curve[0];
+        Float morning = day.length > 0 ? day[0] : null;
+        Float afternoon = day.length > 1 ? day[1] : null;
+        return new DayCurve(morning, afternoon, afternoon, morning);
     }
 
     public Vec3 toRegionLocal(BlockPos pos) {

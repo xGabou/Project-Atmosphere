@@ -26,7 +26,6 @@ import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -41,7 +40,6 @@ public class ClientTickHandler {
     private static int tickCounter = 0;
     private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
     private static final Set<Integer> culledRegionIds = new HashSet<>();
-
     private static final double CLOUD_RENDER_DISTANCE = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
 
     private static int getRegionId(CloudRegion region) {
@@ -143,6 +141,7 @@ public class ClientTickHandler {
                 }
             }
         }
+
     }
 
     public static SimpleParticleType getSeasonalLeafParticle(ClientLevel level, BlockPos pos, RandomSource random) {
