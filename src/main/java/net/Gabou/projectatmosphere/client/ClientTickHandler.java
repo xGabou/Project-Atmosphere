@@ -9,10 +9,6 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
-import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
-import net.Gabou.projectatmosphere.telemetry.TelemetryModels.DominantBiomeOccupancy;
-import net.Gabou.projectatmosphere.telemetry.TelemetryModels.OccupiedChunk;
-import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PlayerExperienceSample;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -29,12 +25,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -49,10 +40,6 @@ public class ClientTickHandler {
     private static int tickCounter = 0;
     private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
     private static final Set<Integer> culledRegionIds = new HashSet<>();
-    private static final Map<Long, Long> chunkOccupancyTicks = new LinkedHashMap<>();
-
-    private static final long CLIENT_SESSION_START_MS = System.currentTimeMillis();
-
     private static final double CLOUD_RENDER_DISTANCE = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
 
     private static int getRegionId(CloudRegion region) {
@@ -155,79 +142,6 @@ public class ClientTickHandler {
             }
         }
 
-        if (mc.level != null && mc.player != null && AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
-            recordTelemetry(mc);
-        }
-    }
-
-    private static void recordTelemetry(Minecraft mc) {
-        BlockPos pos = mc.player.blockPosition();
-        long gameTime = mc.level.getGameTime();
-        long key = chunkKey(pos.getX() >> 4, pos.getZ() >> 4);
-        chunkOccupancyTicks.merge(key, 1L, Long::sum);
-
-        if (tickCounter % 200 == 0) {
-            recordPlayerSample(mc, pos, gameTime);
-        }
-        if (tickCounter % 1200 == 0) {
-            emitDominantBiomeOccupancy(gameTime);
-        }
-    }
-
-    private static void recordPlayerSample(Minecraft mc, BlockPos pos, long gameTime) {
-        TelemetryCollector collector = TelemetryCollector.get();
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
-        float temperature = ForecastOrchestrator.getCurrentTemperature(key, gameTime);
-        float humidity = ForecastOrchestrator.getCurrentHumidity(key, gameTime);
-        float pressure = ForecastOrchestrator.getCurrentPressure(key, gameTime);
-        WindVector wind = ForecastOrchestrator.getCurrentWind(key, gameTime);
-        float windStrength = wind.baseSpeed();
-        float windDirection = wind.angleRadians();
-        boolean isRaining = CloudManager.get(mc.level).isRainingAt(pos);
-        boolean temperatureOutOfRange = temperature < -60f || temperature > 60f;
-
-        PlayerExperienceSample sample = new PlayerExperienceSample(
-                gameTime / 24000L,
-                gameTime % 24000L,
-                (System.currentTimeMillis() - CLIENT_SESSION_START_MS) / 1000L,
-                mc.level.dimension().location().toString(),
-                pos.getX() >> 4,
-                pos.getZ() >> 4,
-                key.biomeType().toString(),
-                temperature,
-                humidity,
-                pressure,
-                windStrength,
-                windDirection,
-                mc.level.isRaining(),
-                mc.level.isThundering(),
-                isRaining ? "RAINING" : "CLEAR",
-                temperatureOutOfRange,
-                false,
-                false
-        );
-        collector.recordPlayerSample(sample);
-    }
-
-    private static void emitDominantBiomeOccupancy(long gameTime) {
-        if (chunkOccupancyTicks.isEmpty()) {
-            return;
-        }
-        List<OccupiedChunk> top = new ArrayList<>();
-        chunkOccupancyTicks.entrySet().stream()
-                .sorted(Map.Entry.<Long, Long>comparingByValue(Comparator.naturalOrder()).reversed())
-                .limit(5)
-                .forEach(entry -> {
-                    int cx = (int) (entry.getKey() >> 32);
-                    int cz = (int) (entry.getKey().longValue());
-                    long seconds = entry.getValue() / 20L;
-                    top.add(new OccupiedChunk(cx, cz, seconds));
-                });
-        TelemetryCollector.get().recordDominantBiome(new DominantBiomeOccupancy(gameTime / 24000L, top));
-    }
-
-    private static long chunkKey(int chunkX, int chunkZ) {
-        return ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
     }
 
     public static SimpleParticleType getSeasonalLeafParticle(ClientLevel level, BlockPos pos, RandomSource random) {

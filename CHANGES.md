@@ -126,7 +126,7 @@ This file records functionality additions/removals made during development sessi
 - Added tornado-aware low wind forces plus helpers to apply combined wind, gust, and suction/rotation/lift to players.
 - Wired SimpleClouds and forecast orchestration to consume the new wind API while preserving existing forecast generation inputs.
 - Ground-level wind particles near players now receive directional pushes when the airflow is unobstructed, keeping leaves and streaks aligned with live wind samples.
-- Client telemetry now records player weather samples, dominant chunk occupancy, forecast snapshots, cloud lifecycle events, precipitation gate decisions, and temperature anomalies for `/pa debug export`.
+- Server-side telemetry now records player weather samples, dominant chunk occupancy, forecast snapshots, cloud lifecycle events, precipitation gate decisions, and temperature anomalies for `/pa debug export`.
 
 ## 0.5.4.4 — Added weatherdebug cloud command (2025-10-17)
 - Added command: `/weatherdebug cloud <id>`
