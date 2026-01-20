@@ -13,9 +13,8 @@ public final class SunlightController {
         }
 
         long dayTime = level.getDayTime();
-        float sunAngle = level.getSunAngle(1f);
-        float daylight = baseDaylightCurve(sunAngle);
-        float seasonal = seasonalTilt(level);
+        float daylight = baseDaylightCurve(dayTime);
+        float seasonal = seasonalTilt(dayTime);
 
         for (RegionAtmosphereState state : AtmosphericStateRegistry.getStates()) {
             float cloudCover = state.getCloudCover();
@@ -41,15 +40,17 @@ public final class SunlightController {
         }
     }
 
-    private static float baseDaylightCurve(float sunAngle) {
-        float cosine = (float) Math.cos(sunAngle);
-        float daylight = Mth.clamp(cosine, 0f, 1f);
+    private static float baseDaylightCurve(long dayTime) {
+        long time = dayTime % 24000L;
+        float dayProgress = time / 12000f;
+        float daylight = (float) Math.sin(Math.PI * dayProgress);
+        daylight = Mth.clamp(daylight, 0f, 1f);
         return daylight * daylight;
     }
 
-    private static float seasonalTilt(ServerLevel level) {
-        long day = level.getDayTime() / 24000L;
+    private static float seasonalTilt(long dayTime) {
+        long day = dayTime / 24000L;
         float seasonProgress = (day % 96L) / 96f;
-        return 0.85f + 0.15f * Mth.cos(seasonProgress * (float) (Math.PI * 2));
+        return 0.7f + 0.3f * Mth.cos(seasonProgress * (float) (Math.PI * 2));
     }
 }

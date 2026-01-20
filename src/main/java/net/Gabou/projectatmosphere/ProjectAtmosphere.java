@@ -62,7 +62,8 @@ public class ProjectAtmosphere {
 
 
 
-    public ProjectAtmosphere(FMLJavaModLoadingContext context) {
+    public ProjectAtmosphere() {
+        FMLJavaModLoadingContext context = FMLJavaModLoadingContext.get();
         LOGGER.info("Project Atmosphere is loading!");
         IEventBus modEventBus = context.getModEventBus();
 

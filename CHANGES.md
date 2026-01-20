@@ -1,5 +1,19 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Pressure and sunlight tuning
+- Clamped generated pressures and live state pressures to stay above 900 hPa, keeping readings out of unrealistic lows.
+- Reapplied seasonal temperature clamps after daily variation so winter highs stay within biome bounds.
+- Updated sunlight curve/seasonal tilt to give more realistic midday strength and stronger winter dimming.
+- Fixed cloud telemetry helpers to match the updated CloudTickSummary signature.
+- Prevented forecast saves from being deleted on load so worlds reuse stored forecasts across restarts.
+- Added wind bending for campfire and furnace smoke particles.
+- Extended wind bending to ash, dust, snowflake, and cloud particles.
+- Expanded telemetry to retain cloud history and log periodic region forecast/state samples for debugging.
+- Guarded CloudManager sampling log behind debug mode.
+- Limited missing-forecast warnings to log once per biome.
+- Added crafting recipes for dust/sand layers and fixed the thermometer recipe output.
+- Updated storm siren timing to warn on severity 7 storms and to stay active while tornados are within 500 blocks.
+- Replaced per-particle wind mixins with a single Particle mixin to avoid shadow mapping crashes.
 ## Unreleased - Region forecast refactor blueprint
 - Region key unified to `RegionInstanceKey` (removed `ForecastRegionId`); wind/spike/state/orchestrator/networking updated to the unified key.
 - Added region orchestrator scaffolding (`modules/region`) and region-based sampling APIs in `ForecastOrchestrator`, `AtmoApi`, and `ForecastSampling`.

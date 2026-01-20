@@ -20,6 +20,8 @@ import java.util.Random;
 public class PressureGenerator {
 
     public static final float PRESSION_MOYENNE = 1013.25f; 
+    private static final float MIN_PRESSURE_HPA = 900f;
+    private static final float MAX_PRESSURE_HPA = 1080f;
     public static float[][] generateWeekForecast(BiomeInstanceKey key,Long day) {
 
         ResourceLocation biome = key.biomeType();
@@ -61,8 +63,8 @@ public class PressureGenerator {
             float min = center - variation + offset;
             float max = center + offset;
 
-            week[d][0] = Math.max(870f, Math.min(min, 1080f));
-            week[d][1] = Math.max(870f, Math.min(max, 1080f));
+            week[d][0] = Math.max(MIN_PRESSURE_HPA, Math.min(min, MAX_PRESSURE_HPA));
+            week[d][1] = Math.max(MIN_PRESSURE_HPA, Math.min(max, MAX_PRESSURE_HPA));
         }
         return week;
     }

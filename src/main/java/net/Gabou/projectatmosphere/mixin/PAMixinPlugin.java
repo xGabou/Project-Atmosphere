@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.mixin;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 
 import java.util.List;
 import java.util.Set;
@@ -29,6 +30,9 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
     }
 
     private boolean isAurorasLoaded() {
+        if (!FMLEnvironment.dist.isClient()) {
+            return false;
+        }
         if (AURORASLOADED != null) return AURORASLOADED;
         AURORASLOADED = isClassPresent("auroras.Auroras");
         System.out.println("[Project Atmosphere] Auroras detected: " + AURORASLOADED);
@@ -36,6 +40,9 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
     }
 
     private boolean isRainbowsLoaded() {
+        if (!FMLEnvironment.dist.isClient()) {
+            return false;
+        }
         if (RAINBOWSLOADED != null) return RAINBOWSLOADED;
         RAINBOWSLOADED = isClassPresent("rainbows.Rainbows");
         System.out.println("[Project Atmosphere] Rainbows detected: " + RAINBOWSLOADED);
@@ -64,6 +71,9 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (!FMLEnvironment.dist.isClient() && mixinClassName.contains(".client.")) {
+            return false;
+        }
         if (mixinClassName.endsWith("OverwriteDesertSound") && !isSandStormLoaded()) {
             return false;
         }

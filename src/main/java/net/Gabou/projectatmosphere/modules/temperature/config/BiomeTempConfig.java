@@ -3985,6 +3985,20 @@ public class BiomeTempConfig {
                 new Range(16f, 28f),
                 new Range(8f, 18f)
         });
+        putAllSeasons("tfc:canyons", new Range[]{
+                new Range(-10f, 2f),
+                new Range(2f, 14f),
+                new Range(18f, 36f),
+                new Range(4f, 18f)
+        });
+
+        putAllSeasons("tfc:salt_marsh", new Range[]{
+                new Range(-6f, 6f),
+                new Range(2f, 16f),
+                new Range(14f, 28f),
+                new Range(4f, 18f)
+        });
+
 
 
 

@@ -158,6 +158,65 @@ public final class TelemetryModels {
         }
     }
 
+    public static final class RegionForecastSample {
+        public final String recordType;
+        public final long gameDay;
+        public final long timeOfDay;
+        public final String dimensionId;
+        public final String regionId;
+        public final int regionX;
+        public final int regionZ;
+        public final int regionSize;
+        public final String dominantBiomeId;
+        public final int anchorChunkX;
+        public final int anchorChunkZ;
+        public final ChannelSummary temperature;
+        public final ChannelSummary humidity;
+        public final ChannelSummary pressure;
+        public final float expectedWindSpeed;
+        public final Float expectedWindDirectionDegrees;
+        public final float currentTemperature;
+        public final float currentHumidity;
+        public final float currentPressure;
+        public final float currentWindSpeed;
+        public final Float currentWindDirectionDegrees;
+        public final float currentCloudCover;
+        public final float currentRainIntensity;
+
+        public RegionForecastSample(long gameDay, long timeOfDay, String dimensionId, String regionId,
+                                    int regionX, int regionZ, int regionSize, String dominantBiomeId,
+                                    int anchorChunkX, int anchorChunkZ,
+                                    ChannelSummary temperature, ChannelSummary humidity, ChannelSummary pressure,
+                                    float expectedWindSpeed, Float expectedWindDirectionDegrees,
+                                    float currentTemperature, float currentHumidity, float currentPressure,
+                                    float currentWindSpeed, Float currentWindDirectionDegrees,
+                                    float currentCloudCover, float currentRainIntensity) {
+            this.recordType = "region_forecast_sample";
+            this.gameDay = gameDay;
+            this.timeOfDay = timeOfDay;
+            this.dimensionId = dimensionId;
+            this.regionId = regionId;
+            this.regionX = regionX;
+            this.regionZ = regionZ;
+            this.regionSize = regionSize;
+            this.dominantBiomeId = dominantBiomeId;
+            this.anchorChunkX = anchorChunkX;
+            this.anchorChunkZ = anchorChunkZ;
+            this.temperature = temperature;
+            this.humidity = humidity;
+            this.pressure = pressure;
+            this.expectedWindSpeed = expectedWindSpeed;
+            this.expectedWindDirectionDegrees = expectedWindDirectionDegrees;
+            this.currentTemperature = currentTemperature;
+            this.currentHumidity = currentHumidity;
+            this.currentPressure = currentPressure;
+            this.currentWindSpeed = currentWindSpeed;
+            this.currentWindDirectionDegrees = currentWindDirectionDegrees;
+            this.currentCloudCover = currentCloudCover;
+            this.currentRainIntensity = currentRainIntensity;
+        }
+    }
+
     public static final class ChannelSummary {
         public final float min;
         public final float max;
@@ -238,22 +297,27 @@ public final class TelemetryModels {
 
     public static final class CloudTickSummary implements CloudEvent {
         public final String cloudId;
+        public final String cloudType;
         public final int chunkX;
         public final int chunkZ;
-        public final float velocityMagnitude;
+        public final Float headingDegrees;
+        public final Float speedBlocksPerSecond;
         public final boolean precipitationActive;
         public final float intensity;
-        public final float lifetimeRemaining;
+        public final Float lifetimeSeconds;
 
-        public CloudTickSummary(String cloudId, int chunkX, int chunkZ, float velocityMagnitude,
-                                boolean precipitationActive, float intensity, float lifetimeRemaining) {
+        public CloudTickSummary(String cloudId, String cloudType, int chunkX, int chunkZ,
+                                Float headingDegrees, Float speedBlocksPerSecond,
+                                boolean precipitationActive, float intensity, Float lifetimeSeconds) {
             this.cloudId = cloudId;
+            this.cloudType = cloudType;
             this.chunkX = chunkX;
             this.chunkZ = chunkZ;
-            this.velocityMagnitude = velocityMagnitude;
+            this.headingDegrees = headingDegrees;
+            this.speedBlocksPerSecond = speedBlocksPerSecond;
             this.precipitationActive = precipitationActive;
             this.intensity = intensity;
-            this.lifetimeRemaining = lifetimeRemaining;
+            this.lifetimeSeconds = lifetimeSeconds;
         }
 
         @Override
@@ -370,6 +434,69 @@ public final class TelemetryModels {
             this.anomalyType = anomalyType;
             this.relatedSampleId = relatedSampleId;
             this.contextData = contextData;
+        }
+    }
+
+    public static final class BiomeAverage {
+        public final String recordType;
+        public final String biomeId;
+        public final int regionCount;
+        public final float averageTemperature;
+        public final float averageHumidity;
+        public final float averagePressure;
+        public final float averageWindSpeed;
+        public final Float averageWindDirectionDegrees;
+        public final float averageCloudCover;
+        public final float averageRainIntensity;
+
+        public BiomeAverage(String biomeId, int regionCount, float averageTemperature, float averageHumidity,
+                            float averagePressure, float averageWindSpeed, Float averageWindDirectionDegrees,
+                            float averageCloudCover, float averageRainIntensity) {
+            this.recordType = "biome_average";
+            this.biomeId = biomeId;
+            this.regionCount = regionCount;
+            this.averageTemperature = averageTemperature;
+            this.averageHumidity = averageHumidity;
+            this.averagePressure = averagePressure;
+            this.averageWindSpeed = averageWindSpeed;
+            this.averageWindDirectionDegrees = averageWindDirectionDegrees;
+            this.averageCloudCover = averageCloudCover;
+            this.averageRainIntensity = averageRainIntensity;
+        }
+    }
+
+    public static final class ActiveRegionForecast {
+        public final String recordType;
+        public final String regionId;
+        public final int regionX;
+        public final int regionZ;
+        public final int regionSize;
+        public final String dominantBiomeId;
+        public final int anchorChunkX;
+        public final int anchorChunkZ;
+        public final ChannelSummary temperature;
+        public final ChannelSummary humidity;
+        public final ChannelSummary pressure;
+        public final float expectedWindSpeed;
+        public final Float expectedWindDirectionDegrees;
+
+        public ActiveRegionForecast(String regionId, int regionX, int regionZ, int regionSize, String dominantBiomeId,
+                                    int anchorChunkX, int anchorChunkZ,
+                                    ChannelSummary temperature, ChannelSummary humidity, ChannelSummary pressure,
+                                    float expectedWindSpeed, Float expectedWindDirectionDegrees) {
+            this.recordType = "active_region_forecast";
+            this.regionId = regionId;
+            this.regionX = regionX;
+            this.regionZ = regionZ;
+            this.regionSize = regionSize;
+            this.dominantBiomeId = dominantBiomeId;
+            this.anchorChunkX = anchorChunkX;
+            this.anchorChunkZ = anchorChunkZ;
+            this.temperature = temperature;
+            this.humidity = humidity;
+            this.pressure = pressure;
+            this.expectedWindSpeed = expectedWindSpeed;
+            this.expectedWindDirectionDegrees = expectedWindDirectionDegrees;
         }
     }
 }

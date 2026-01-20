@@ -23,7 +23,7 @@ public class RegionAtmosphereState {
     private static final int DAILY_SLOTS = 240;
     private static final float MIN_TEMPERATURE_C = -273.15f;
     private static final float MAX_REASONABLE_TEMPERATURE_C = 70f;
-    private static final float MIN_PRESSURE_HPA = 870f;
+    private static final float MIN_PRESSURE_HPA = 900f;
     private static final float MAX_PRESSURE_HPA = 1080f;
 
     private final net.Gabou.projectatmosphere.util.RegionInstanceKey regionId;

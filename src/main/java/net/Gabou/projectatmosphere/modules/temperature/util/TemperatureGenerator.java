@@ -26,6 +26,14 @@ public class TemperatureGenerator {
     private static final float LAPSE_RATE = -0.0065f;
     static final float SEA_LEVEL = AsyncAtmosphereService.callOnMainThread(ProjectAtmosphere::getSeaLevel);
 
+    public static BiomeTempConfig.DailyRange getSeasonClamp(ServerLevel level, ResourceLocation biomeId) {
+        return AsyncAtmosphereService.callOnMainThread(() -> {
+            SeasonStage stage = SeasonTimeHelper.stage(level);
+            Season season = mapSeasonStage(stage);
+            return BiomeTempConfig.getClamp(biomeId, season);
+        });
+    }
+
     /**
      * Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM),
      * incorporating random noise and seasonal effects.

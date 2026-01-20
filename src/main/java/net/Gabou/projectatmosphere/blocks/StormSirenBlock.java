@@ -3,8 +3,6 @@ package net.Gabou.projectatmosphere.blocks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.util.WeatherSampler;
 import net.Gabou.projectatmosphere.registry.ModSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -26,9 +24,9 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Block that acts as a storm siren. Periodically samples the surrounding
@@ -38,8 +36,14 @@ import java.util.Set;
 public class StormSirenBlock extends Block {
 
     public static final EnumProperty<DoubleBlockHalf> HALF = BlockStateProperties.DOUBLE_BLOCK_HALF;
-    private static final int CHECK_RADIUS = 400;
-    private static final float INTENSITY_THRESHOLD = 6.0f;
+    private static final int CHECK_INTERVAL_TICKS = 40;
+    private static final int STORM_WARNING_RADIUS = 500;
+    private static final int TORNADO_WARNING_RADIUS = 500;
+    private static final int STORM_WARNING_DURATION_TICKS = 200;
+    private static final int TORNADO_SOUND_INTERVAL_TICKS = 40;
+    private static final float INTENSITY_THRESHOLD = 7.0f;
+    private static final Map<Long, Long> STORM_COOLDOWNS = new ConcurrentHashMap<>();
+    private static final Map<Long, Long> TORNADO_LAST_SOUND = new ConcurrentHashMap<>();
 
     public StormSirenBlock(Properties properties) {
         super(properties);
@@ -100,7 +104,7 @@ public class StormSirenBlock extends Block {
     public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
         super.onPlace(state, level, pos, oldState, isMoving);
         if (!level.isClientSide && state.getValue(HALF) == DoubleBlockHalf.LOWER) {
-            level.scheduleTick(pos, this, 200);
+            level.scheduleTick(pos, this, CHECK_INTERVAL_TICKS);
         }
     }
 
@@ -110,19 +114,53 @@ public class StormSirenBlock extends Block {
             return;
         }
 
-        List<CloudRegion> lst = CloudManager.get(level).getClouds().stream()
-                .filter(cloudRegion -> CloudLibrary.getSeverityFromRessourceLocation(cloudRegion.getCloudTypeId()) >= 6)
-                .toList();
+        long now = level.getGameTime();
+        long posKey = pos.asLong();
 
-        if (!lst.isEmpty() && lst.stream().anyMatch(cloudRegion -> {
-            double dx = cloudRegion.getWorldX() - pos.getX();
-            double dz = cloudRegion.getWorldZ() - pos.getZ();
-            return dx * dx + dz * dz < CHECK_RADIUS * CHECK_RADIUS;
-        })) {
-            level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
+        if (isTornadoNearby(level, pos)) {
+            long lastSound = TORNADO_LAST_SOUND.getOrDefault(posKey, Long.valueOf(TORNADO_SOUND_INTERVAL_TICKS));
+            if (now - lastSound >= TORNADO_SOUND_INTERVAL_TICKS) {
+                level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
+                TORNADO_LAST_SOUND.put(posKey, now);
+            }
+        } else {
+            TORNADO_LAST_SOUND.remove(posKey);
         }
 
-        level.scheduleTick(pos, this, 200);
+        if (isSevereStormNearby(level, pos)) {
+            long nextAllowed = STORM_COOLDOWNS.getOrDefault(posKey, 0L);
+            if (now >= nextAllowed) {
+                level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
+                STORM_COOLDOWNS.put(posKey, now + STORM_WARNING_DURATION_TICKS);
+            }
+        }
+
+        level.scheduleTick(pos, this, CHECK_INTERVAL_TICKS);
+    }
+
+    private static boolean isTornadoNearby(ServerLevel level, BlockPos pos) {
+        double radiusSq = TORNADO_WARNING_RADIUS * TORNADO_WARNING_RADIUS;
+        return net.Gabou.projectatmosphere.modules.tornado.TornadoManager.getActiveTornadoes().stream()
+                .anyMatch(tornado -> {
+                    double dx = tornado.position.x - pos.getX();
+                    double dz = tornado.position.z - pos.getZ();
+                    return dx * dx + dz * dz <= radiusSq;
+                });
+    }
+
+    private static boolean isSevereStormNearby(ServerLevel level, BlockPos pos) {
+        List<CloudRegion> clouds = CloudManager.get(level).getClouds().stream()
+                .filter(cloudRegion -> CloudLibrary.getSeverityFromRessourceLocation(cloudRegion.getCloudTypeId()) >= INTENSITY_THRESHOLD)
+                .toList();
+        if (clouds.isEmpty()) {
+            return false;
+        }
+        double radiusSq = STORM_WARNING_RADIUS * STORM_WARNING_RADIUS;
+        return clouds.stream().anyMatch(cloudRegion -> {
+            double dx = cloudRegion.getWorldX() - pos.getX();
+            double dz = cloudRegion.getWorldZ() - pos.getZ();
+            return dx * dx + dz * dz <= radiusSq;
+        });
     }
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {

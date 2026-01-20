@@ -48,9 +48,15 @@ public class ForecastDataStorage {
     }
 
     public static void loadAll(ServerLevel world) {
-        clearAll(world);
+        clearCache();
         loadPlayerCenters(world);
         loadForecastMap(world);
+    }
+
+    private static void clearCache() {
+        playerData.clear();
+        hasForecastData = false;
+        hasCenterData = false;
     }
 
     public static boolean  hasForecastData() {

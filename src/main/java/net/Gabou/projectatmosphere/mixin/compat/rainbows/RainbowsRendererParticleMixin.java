@@ -11,12 +11,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import rainbows.util.RainbowsRendererParticle;
 
 /**
  * Adjusts rainbow rendering to follow Project Atmosphere weather.
  */
-@Mixin(value = RainbowsRendererParticle.class, remap = false)
+@Mixin(targets = "rainbows.util.RainbowsRendererParticle", remap = false)
 public abstract class RainbowsRendererParticleMixin {
 
     @Shadow public double rainbowTick;

@@ -15,6 +15,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudCreated;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudDied;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudEvolved;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudTickSummary;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PrecipitationDecisionTrace;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -48,6 +49,7 @@ public final class CloudManager {
     private static final Map<Integer, RegionCloudData> REGION_DATA = new ConcurrentHashMap<>();
     private static final Map<Integer, Long> CLOUD_BIRTH_TICK = new ConcurrentHashMap<>();
     private static final Map<Integer, Vector2i> CLOUD_LAST_POS = new ConcurrentHashMap<>();
+    private static final Map<Integer, Long> CLOUD_LAST_SAMPLE_TICK = new ConcurrentHashMap<>();
     private static final Map<Integer, ResourceLocation> CLOUD_TYPES = new ConcurrentHashMap<>();
     private static final Set<RegionInstanceKey> ACTIVE_REGIONS = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -92,6 +94,7 @@ public final class CloudManager {
         ACTIVE_REGIONS.clear();
         CLOUD_BIRTH_TICK.clear();
         CLOUD_LAST_POS.clear();
+        CLOUD_LAST_SAMPLE_TICK.clear();
         CLOUD_TYPES.clear();
         lastRegionSampleTick = 0L;
         lastSpawnTick = 0L;
@@ -224,7 +227,9 @@ public final class CloudManager {
             double dz = anchor.getZ() - centerZ;
             double dist = Math.sqrt(dx * dx + dz * dz);
             if(Objects.equals(state.getRegionId(), new RegionInstanceKey(-2, -2)))
+            if (AtmoCommonConfig.DEBUG_MODE.get()) {
                 ProjectAtmosphere.LOGGER.info("CloudManager: Sampling region {}, distance to center: {}", state.getRegionId(), dist);
+            }
             if (dist > radius+regionRadius) {
                 continue;
             }
@@ -298,14 +303,23 @@ public final class CloudManager {
             observed.add(sample.id());
 
             RegionCloudData data = REGION_DATA.computeIfAbsent(sample.id(), ignored -> new RegionCloudData());
+            Vector2i previousPos = CLOUD_LAST_POS.get(sample.id());
+            Long previousTick = CLOUD_LAST_SAMPLE_TICK.get(sample.id());
+            ResourceLocation previousType = CLOUD_TYPES.get(sample.id());
             if (AtmoCommonConfig.TELEMETRY_ENABLED.get() && !CLOUD_BIRTH_TICK.containsKey(sample.id())) {
                 CLOUD_BIRTH_TICK.put(sample.id(), level.getGameTime());
                 CLOUD_TYPES.put(sample.id(), sample.cloudType());
+                CLOUD_LAST_SAMPLE_TICK.put(sample.id(), level.getGameTime());
                 recordCloudCreated(level, sample);
             }
             if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+                if (previousType != null && !previousType.equals(sample.cloudType())) {
+                    recordCloudEvolution(level, sample, previousType);
+                }
+                recordCloudTick(level, sample, data, previousPos, previousTick);
+                CLOUD_TYPES.put(sample.id(), sample.cloudType());
                 CLOUD_LAST_POS.put(sample.id(), new Vector2i((int) sample.worldX(), (int) sample.worldZ()));
-                recordCloudTick(level, sample, data);
+                CLOUD_LAST_SAMPLE_TICK.put(sample.id(), level.getGameTime());
             }
             data.updateFromSample(sample, region);
 
@@ -594,19 +608,67 @@ public final class CloudManager {
         ));
     }
 
-    private static void recordCloudTick(ServerLevel level, RegionSample sample, RegionCloudData data) {
+    private static void recordCloudTick(ServerLevel level, RegionSample sample, RegionCloudData data, Vector2i previousPos, Long previousTick) {
         if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
             return;
         }
         Vector2i lastPos = new Vector2i((int) sample.worldX(), (int) sample.worldZ());
+        Float headingDegrees = null;
+        Float speedBlocksPerSecond = null;
+        if (previousPos != null && previousTick != null) {
+            long deltaTicks = Math.max(0L, level.getGameTime() - previousTick);
+            if (deltaTicks > 0L) {
+                float dx = lastPos.x() - previousPos.x();
+                float dz = lastPos.y() - previousPos.y();
+                headingDegrees = (float) Math.toDegrees(Math.atan2(dz, dx));
+                float distance = (float) Math.sqrt(dx * dx + dz * dz);
+                float seconds = deltaTicks / 20f;
+                speedBlocksPerSecond = distance / Math.max(0.001f, seconds);
+            }
+        }
+        Float lifetimeSeconds = null;
+        Long birth = CLOUD_BIRTH_TICK.get(sample.id());
+        if (birth != null) {
+            lifetimeSeconds = (level.getGameTime() - birth) / 20f;
+        }
         TelemetryCollector.get().recordCloudEvent(new CloudTickSummary(
                 String.valueOf(sample.id()),
+                sample.cloudType().toString(),
                 lastPos.x() >> 4,
                 lastPos.y() >> 4,
-                0f,
+                headingDegrees,
+                speedBlocksPerSecond,
                 data.getRainIntensity() > 0f,
                 data.getThickness(),
-                0f
+                lifetimeSeconds
+        ));
+    }
+
+    private static void recordCloudEvolution(ServerLevel level, RegionSample sample, ResourceLocation previousType) {
+        if (!AtmoCommonConfig.TELEMETRY_ENABLED.get() || previousType == null) {
+            return;
+        }
+        Map<String, Object> before = new HashMap<>();
+        before.put("cloudType", previousType.toString());
+        before.put("rainIntensity", sample.avgRainIntensity());
+        before.put("humidity", sample.avgHumidityPercent());
+        before.put("temperature", sample.avgTemperature());
+        before.put("pressure", sample.avgPressure());
+
+        Map<String, Object> after = new HashMap<>();
+        after.put("cloudType", sample.cloudType().toString());
+        after.put("rainIntensity", sample.avgRainIntensity());
+        after.put("humidity", sample.avgHumidityPercent());
+        after.put("temperature", sample.avgTemperature());
+        after.put("pressure", sample.avgPressure());
+
+        TelemetryCollector.get().recordCloudEvent(new CloudEvolved(
+                String.valueOf(sample.id()),
+                previousType.toString(),
+                sample.cloudType().toString(),
+                "type_change",
+                before,
+                after
         ));
     }
 

@@ -17,6 +17,7 @@
     "OverwriteDesertSound",
     "SimpleCloudsRendererMixin",
     "MultiRegionCloudMeshGeneratorMixin",
+    "client.particle.WindBentParticleMixin",
     "compat.auroras.AuroraRendererMixin",
     "compat.rainbows.RainbowsRendererParticleMixin"
   ],

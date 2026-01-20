@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.mixin.compat.auroras;
 
-import auroras.util.AuroraRenderer;
 import net.Gabou.projectatmosphere.compat.auroras.AuroraSeasonHelper;
 import net.Gabou.projectatmosphere.client.render.SkyEffectState;
 import net.Gabou.projectatmosphere.compat.temperature.ClientTemperatureResolver;
@@ -15,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 /**
  * Safely scales aurora brightness using Project Atmosphere seasonal boosts.
  */
-@Mixin(value = AuroraRenderer.class, remap = false)
+@Mixin(targets = "auroras.util.AuroraRenderer", remap = false)
 public abstract class AuroraRendererMixin {
 
     /**

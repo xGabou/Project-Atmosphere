@@ -1,25 +1,29 @@
 package net.Gabou.projectatmosphere.telemetry;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
+import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.DominantBiomeOccupancy;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ChannelSummary;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.OccupiedChunk;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PlayerExperienceSample;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.RegionForecastSample;
 import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -29,6 +33,8 @@ public final class ServerTelemetrySampler {
     private static final Map<Long, Long> CHUNK_OCCUPANCY_TICKS = new LinkedHashMap<>();
     private static final List<OccupiedChunk> TOP_BUFFER = new ArrayList<>(5);
     private static final long SERVER_SESSION_START_MS = System.currentTimeMillis();
+    private static final int REGION_FORECAST_SAMPLE_INTERVAL_TICKS = 1200;
+    private static long lastRegionForecastSampleTick = -REGION_FORECAST_SAMPLE_INTERVAL_TICKS;
 
     private ServerTelemetrySampler() {
     }
@@ -58,6 +64,10 @@ public final class ServerTelemetrySampler {
         if (gameTime % 1200 == 0) {
             emitDominantBiomeOccupancy(gameTime);
         }
+        if (gameTime - lastRegionForecastSampleTick >= REGION_FORECAST_SAMPLE_INTERVAL_TICKS) {
+            lastRegionForecastSampleTick = gameTime;
+            recordRegionForecasts(level, gameTime);
+        }
     }
 
     private static void recordPlayerSample(ServerLevel level, ServerPlayer player, BlockPos pos, long gameTime) {
@@ -66,7 +76,7 @@ public final class ServerTelemetrySampler {
         float humidity = ForecastOrchestrator.getCurrentHumidity(key, gameTime);
         float pressure = ForecastOrchestrator.getCurrentPressure(key, gameTime);
         WindVector wind = ForecastOrchestrator.getCurrentWind(key, gameTime);
-        boolean isRaining = CloudManager.get(level).isRainingAt(pos);
+        boolean isRaining = level.isRainingAt(pos);
         boolean temperatureOutOfRange = temperature < -60f || temperature > 60f;
 
         PlayerExperienceSample sample = new PlayerExperienceSample(
@@ -107,6 +117,116 @@ public final class ServerTelemetrySampler {
                     TOP_BUFFER.add(new OccupiedChunk(cx, cz, seconds));
                 });
         TelemetryCollector.get().recordDominantBiome(new DominantBiomeOccupancy(gameTime / 24000L, List.copyOf(TOP_BUFFER)));
+    }
+
+    private static void recordRegionForecasts(ServerLevel level, long gameTime) {
+        Map<RegionInstanceKey, ForecastRegion> forecasts = ForecastGenerator.getRegionForecasts();
+        if (forecasts.isEmpty()) {
+            return;
+        }
+        var active = AtmosphericStateRegistry.getActiveStates();
+        Set<RegionInstanceKey> targets = active.isEmpty()
+                ? new java.util.HashSet<>(AtmosphericStateRegistry.getStatesAsMap().keySet())
+                : new java.util.HashSet<>(active);
+        if (targets.isEmpty()) {
+            return;
+        }
+
+        long day = gameTime / 24000L;
+        long timeOfDay = gameTime % 24000L;
+        String dimensionId = level.dimension().location().toString();
+
+        for (RegionInstanceKey key : targets) {
+            ForecastRegion region = forecasts.get(key);
+            if (region == null) {
+                continue;
+            }
+            RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+            if (state == null) {
+                continue;
+            }
+
+            ChannelSummary temperature = summarizeWeek(region.getTemperature());
+            ChannelSummary humidity = summarizeWeek(region.getHumidity());
+            ChannelSummary pressure = summarizeWeek(region.getPressure());
+
+            WindVector[] windWeek = region.getWind();
+            WindVector expectedWind = windWeek != null && windWeek.length > 0 ? windWeek[0] : region.getWindDay();
+            float expectedWindSpeed = expectedWind == null ? 0f : Math.max(0f, expectedWind.baseSpeed());
+            Float expectedWindDirection = expectedWind == null ? null
+                    : Mth.wrapDegrees((float) Math.toDegrees(expectedWind.angleRadians()));
+
+            WindVector currentWind = state.getWind();
+            float currentWindSpeed = currentWind == null ? 0f : Math.max(0f, currentWind.baseSpeed());
+            Float currentWindDirection = currentWind == null ? null
+                    : Mth.wrapDegrees((float) Math.toDegrees(currentWind.angleRadians()));
+
+            int anchorChunkX = region.getAnchor() == null ? 0 : region.getAnchor().getX() >> 4;
+            int anchorChunkZ = region.getAnchor() == null ? 0 : region.getAnchor().getZ() >> 4;
+            String dominantBiome = selectDominantBiome(region.getBiomeWeights());
+
+            RegionForecastSample sample = new RegionForecastSample(
+                    day,
+                    timeOfDay,
+                    dimensionId,
+                    key.toString(),
+                    key.regionX(),
+                    key.regionZ(),
+                    key.regionSize(),
+                    dominantBiome,
+                    anchorChunkX,
+                    anchorChunkZ,
+                    temperature,
+                    humidity,
+                    pressure,
+                    expectedWindSpeed,
+                    expectedWindDirection,
+                    state.getTemperature(),
+                    state.getHumidity(),
+                    state.getPressure(),
+                    currentWindSpeed,
+                    currentWindDirection,
+                    state.getCloudCover(),
+                    state.getRainIntensity()
+            );
+            TelemetryCollector.get().recordRegionForecastSample(sample);
+        }
+    }
+
+    private static ChannelSummary summarizeWeek(float[][] curve) {
+        if (curve == null || curve.length == 0) {
+            return new ChannelSummary(0f, 0f);
+        }
+        float min = Float.MAX_VALUE;
+        float max = -Float.MAX_VALUE;
+        for (float[] day : curve) {
+            if (day == null || day.length == 0) {
+                continue;
+            }
+            for (float value : day) {
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+            }
+        }
+        if (min == Float.MAX_VALUE) {
+            return new ChannelSummary(0f, 0f);
+        }
+        return new ChannelSummary(min, max);
+    }
+
+    private static String selectDominantBiome(Map<ResourceLocation, Integer> weights) {
+        if (weights == null || weights.isEmpty()) {
+            return "unknown";
+        }
+        ResourceLocation best = null;
+        int bestWeight = Integer.MIN_VALUE;
+        for (Map.Entry<ResourceLocation, Integer> entry : weights.entrySet()) {
+            if (entry.getValue() != null && entry.getValue() > bestWeight) {
+                best = entry.getKey();
+                bestWeight = entry.getValue();
+            }
+        }
+        return best == null ? "unknown" : best.toString();
     }
 
     private static long chunkKey(int chunkX, int chunkZ) {

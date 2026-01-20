@@ -82,6 +82,7 @@ public class ForecastGenerator {
     static final Map<RegionInstanceKey, ForecastRegion> REGION_FORECASTS = new ConcurrentHashMap<>();
 
     private static final Map<ResourceLocation, List<BiomeForecast>> grouped = new ConcurrentHashMap<>();
+    private static final Set<ResourceLocation> WARNED_MISSING_FORECASTS = ConcurrentHashMap.newKeySet();
 
     public static Map<ResourceLocation, List<BiomeInstanceKey>> getBiomeIndex() {
         return Collections.unmodifiableMap(biomeIndex);
@@ -436,9 +437,9 @@ public class ForecastGenerator {
 
 
     private static float[][] generateTemperature(BiomeInstanceKey key, ServerLevel level) {
-        return VariationGenerator.applyVariationToWeek(
-                TemperatureGenerator.generateWeekForecast(level, key.samplePos(), key.biomeType())
-        );
+        float[][] base = TemperatureGenerator.generateWeekForecast(level, key.samplePos(), key.biomeType());
+        var clamp = TemperatureGenerator.getSeasonClamp(level, key.biomeType());
+        return VariationGenerator.applyVariationToWeek(base, clamp);
     }
 
     private static float[][] generateHumidity(BiomeInstanceKey key, ServerLevel level, Long day) {
@@ -565,7 +566,9 @@ public class ForecastGenerator {
             return average;
         }
 
-        ProjectAtmosphere.LOGGER.warn("[Atmosphere] No forecast data available for {}. Returning fallback.", key);
+        if (WARNED_MISSING_FORECASTS.add(key.biomeType())) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] No forecast data available for {}. Returning fallback.", key);
+        }
         return buildFallbackForecast(key);
     }
 

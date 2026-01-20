@@ -10,5 +10,5 @@
     "R": { "item": "minecraft:redstone" },
     "I": { "item": "minecraft:iron_ingot" }
   },
-  "result": { "item": "projectatmosphere:thermometer" }
+  "result": { "item": "projectatmosphere:thermometer_block" }
 }
