@@ -57,8 +57,10 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue WIND_GUST_DECAY_MPS;
     public static final ForgeConfigSpec.DoubleValue WIND_STORM_GUST_MULT;
     public static final ForgeConfigSpec.DoubleValue WIND_PUSH_THRESHOLD_MPS;
+    public static final ForgeConfigSpec.DoubleValue WIND_PUSH_RAMP_MPS;
     public static final ForgeConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
     public static final ForgeConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
+    public static final ForgeConfigSpec.DoubleValue WIND_PARTICLE_BEND_STRENGTH;
     public static final ForgeConfigSpec.BooleanValue TELEMETRY_ENABLED;
     public static final ForgeConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
 
@@ -174,12 +176,18 @@ public class AtmoCommonConfig {
         WIND_PUSH_THRESHOLD_MPS = builder
                 .comment("Minimum wind speed to push entities")
                 .defineInRange("pushThresholdMps", 6.0d, 0d, 100d);
+        WIND_PUSH_RAMP_MPS = builder
+                .comment("Soft-start range above the threshold where wind push ramps up")
+                .defineInRange("pushRampMps", 8.0d, 0d, 100d);
         WIND_PLAYER_PUSH_SCALE = builder
                 .comment("Push scale applied to players")
                 .defineInRange("playerPushScale", 0.04d, 0d, 1d);
         WIND_ENTITY_PUSH_SCALE = builder
                 .comment("Push scale applied to other entities")
                 .defineInRange("entityPushScale", 0.03d, 0d, 1d);
+        WIND_PARTICLE_BEND_STRENGTH = builder
+                .comment("Blend strength for steering wind-bent particles per tick")
+                .defineInRange("particleBendStrength", 0.08d, 0d, 1d);
         builder.pop();
 
         builder.push("telemetry");

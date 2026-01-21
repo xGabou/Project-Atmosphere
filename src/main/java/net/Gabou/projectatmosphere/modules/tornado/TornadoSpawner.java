@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
 
 public final class TornadoSpawner {
@@ -24,8 +25,9 @@ public final class TornadoSpawner {
     private static BlockPos pickSpawnPosNear(BiomeInstanceKey key, ServerLevel level, float radius) {
         BlockPos base = key.samplePos();
         int r = (int) radius;
-        int dx = level.random.nextInt(-r, r + 1);
-        int dz = level.random.nextInt(-r, r + 1);
+        RandomSource random = RandomSource.create();
+        int dx = random.nextInt(-r, r + 1);
+        int dz = random.nextInt(-r, r + 1);
         int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
                 base.getX() + dx, base.getZ() + dz);
         return new BlockPos(base.getX() + dx, y, base.getZ() + dz);

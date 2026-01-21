@@ -75,7 +75,7 @@ public class SandStormManager {
                         entry.getKey(),
                         entry.getValue().getHumidity(),
                         entry.getValue().getPressure(),
-                        entry.getValue().getWind()[0]
+                        ForecastOrchestrator.getForecastWind(entry.getKey(), level.getDayTime())
                 ))
                 .forEach(entry -> {
                     BiomeInstanceKey key = entry.getKey();
@@ -103,7 +103,7 @@ public class SandStormManager {
                     long randomOffset = 1000 + level.random.nextInt(9000);
 
                     scheduledStormBiome = selected;
-                    scheduledStormPhase = computeStormPhase(forecast);
+                    scheduledStormPhase = computeStormPhase(forecast, ForecastOrchestrator.getForecastWind(selected, level.getDayTime()));
                     scheduledStormTime = baseTime + randomOffset;
 
                     if(ProjectAtmosphere.DEBUG_MODE)
@@ -158,7 +158,7 @@ public class SandStormManager {
 
                     SandStormAPI.blowSandInBiome(level,
                             biome,
-                            getWindValue(biome, level.getDayTime()));
+                            ForecastOrchestrator.getWind(biome, level.getDayTime()));
 
                 }
             });
@@ -197,8 +197,8 @@ public class SandStormManager {
         return dryEnough && windyEnough && unstablePressure && severity > 0.55f;
     }
 
-    static SandstormPhase computeStormPhase(BiomeForecast forecast) {
-        float wind = forecast.getWind()[0].baseSpeed();
+    static SandstormPhase computeStormPhase(BiomeForecast forecast, WindVector windVector) {
+        float wind = windVector.baseSpeed();
         float pressure = forecast.getPressure()[0][0];
         float humidity = forecast.getHumidity()[0][0];
 

@@ -13,6 +13,7 @@ import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 
 
 public final class TornadoProbabilityManager {
@@ -26,6 +27,7 @@ public final class TornadoProbabilityManager {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         long now = level.getGameTime();
         if (!TornadoSpawnScheduler.isSlotAvailable(now)) return;
+        RandomSource random = RandomSource.create();
         for (BiomeInstanceKey key : ForecastOrchestrator.getActiveBiomeKeys(level)) {//TODO fill this first
             if (!isStormy(key, level)) continue;
             if (isCellOnCooldown(key, level, now)) continue;
@@ -34,7 +36,7 @@ public final class TornadoProbabilityManager {
             float riskMin = AtmoCommonConfig.TORNADO_RISK_MIN_TO_CONSIDER.get().floatValue();
             if (risk < riskMin) continue;
             float chance = AtmoCommonConfig.TORNADO_BASE_TRIGGER_CHANCE.get().floatValue() * risk;
-            if (level.random.nextFloat() < chance) {
+            if (random.nextFloat() < chance) {
                 float intensity = map(risk,
                         riskMin,
                         riskMin + 4f,

@@ -106,7 +106,7 @@ public class WeatherSampler {
             float temperature = ForecastOrchestrator.getCurrentTemperature(key, tick);
             float pressure = ForecastOrchestrator.getCurrentPressure(key, tick);
             float stormFactor = ForecastOrchestrator.getCurrentStormChance(key, tick);
-            WindVector wind = ForecastOrchestrator.getCurrentWind(key, tick);
+            WindVector wind = ForecastOrchestrator.getWind(key, tick);
 
             totalHumidity += humidity;
             totalTemp += temperature;

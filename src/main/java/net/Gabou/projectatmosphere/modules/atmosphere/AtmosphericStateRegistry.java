@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
-import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
 import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;

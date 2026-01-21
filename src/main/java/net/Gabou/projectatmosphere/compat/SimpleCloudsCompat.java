@@ -132,7 +132,7 @@ public class SimpleCloudsCompat {
             return Optional.empty();
         }
         float windAngleRad = wind.angleRadians();
-        float dx = (float) Math.sin(windAngleRad);
+        float dx = (float) -Math.sin(windAngleRad);
         float dz = (float) Math.cos(windAngleRad);
         Vec2 direction = new Vec2(dx, dz).normalized();
         float rotation = windAngleRad + (float) Math.PI;

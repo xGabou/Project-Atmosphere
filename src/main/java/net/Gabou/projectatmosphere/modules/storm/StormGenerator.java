@@ -37,6 +37,7 @@ public class StormGenerator {
             float rhAvg = (humidity[day][0] + humidity[day][1]) / 2f;
             float pressureAvg = (pressure[day][0] + pressure[day][1]) / 2f;
 
+            // Forecast generator intentionally uses the weekly forecast wind, not dynamic state wind.
             float windStrength = (wind != null && wind.length > day) ? wind[day].baseSpeed() : 0f;
 
             if (tempAvg > 24f) stormScore += 0.1f;

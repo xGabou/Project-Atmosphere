@@ -9,6 +9,7 @@ import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -139,7 +140,8 @@ public class SandStormAPI {
         if (sandBlocks.isEmpty()) return;
 
         
-        int countToMove = Mth.clamp(10 + level.random.nextInt(21), 1, sandBlocks.size());
+        RandomSource random = RandomSource.create();
+        int countToMove = Mth.clamp(10 + random.nextInt(21), 1, sandBlocks.size());
         Collections.shuffle(sandBlocks);
 
 

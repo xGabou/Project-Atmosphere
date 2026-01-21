@@ -47,8 +47,8 @@ public class DebugAtmoCommand {
         float temperature = state != null ? state.getTemperature() : 0f;
         float humidity = state != null ? state.getHumidityPercent() : 0f;
         float pressure = state != null ? state.getPressure() : 0f;
-        WindVector w = state != null ? state.getWind() : null;
-        String wind = w == null ? "-" : UnitFormatter.formatWindSpeed(w.baseSpeed()) + " at " + String.format("%.0f°", Math.toDegrees(w.angleRadians()));
+        var windVector = ForecastOrchestrator.getWind(new BiomeInstanceKey(biome, pos), ctx.getSource().getLevel().getGameTime());
+        String wind = windVector == null ? "-" : UnitFormatter.formatWindSpeed(windVector.baseSpeed()) + " at " + String.format("%.0f°", Math.toDegrees(windVector.angleRadians()));
 
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "Biome: " + biome +
@@ -197,7 +197,7 @@ public class DebugAtmoCommand {
         }
 
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        WindVector wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
+        WindVector wind = ForecastOrchestrator.getWind(key, level.getGameTime());
         return SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
     }
 

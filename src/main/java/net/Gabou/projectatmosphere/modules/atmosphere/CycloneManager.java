@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.async.PoolType;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -46,7 +47,7 @@ public final class CycloneManager {
         for (Cyclone cyclone : new ArrayList<>(ACTIVE_CYCLONES)) {
             AsyncAtmosphereService.runWithCallback(
                     PoolType.WEATHER,
-                    () -> cyclone.tick(snapshot),
+                    () -> cyclone.tick(snapshot, dayTime),
                     result -> {
                         if (result == null) {
                             return;
@@ -167,12 +168,12 @@ public final class CycloneManager {
             this.lifetimeTicks = lifetimeTicks;
         }
 
-        private CycloneStep tick(List<RegionAtmosphereState> snapshot) {
+        private CycloneStep tick(List<RegionAtmosphereState> snapshot, long gameTime) {
             List<CycloneDelta> deltas = List.of();
             if (counter++ % 20 == 0) {
                 deltas = applyEffects(snapshot);
             }
-            drift(snapshot);
+            drift(snapshot, gameTime);
             lifetimeTicks--;
             intensity *= 0.9995f;
             if (lifetimeTicks <= 0 || intensity < 0.05f) {
@@ -207,15 +208,12 @@ public final class CycloneManager {
             return deltas;
         }
 
-        private void drift(List<RegionAtmosphereState> states) {
+        private void drift(List<RegionAtmosphereState> states, long gameTime) {
             RegionAtmosphereState nearest = findNearest(states, center.x, center.y);
             if (nearest == null) {
                 return;
             }
-            WindVector wind = nearest.getWind();
-            if (wind == null) {
-                return;
-            }
+            WindVector wind = ForecastOrchestrator.getWind(nearest.getKey(), gameTime);
             float speed = Math.max(0.05f, wind.baseSpeed() * 0.02f);
             float angle = wind.angleRadians();
             float dx = (float) Math.sin(angle) * speed;

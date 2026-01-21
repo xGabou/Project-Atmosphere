@@ -234,13 +234,14 @@ public class WindGenerator {
             }
 
             Pavg /= count;
-            float dP = Math.abs(Pavg - Pself);
+            float dPHpa = Math.abs(Pavg - Pself);
+            float dPPa = dPHpa * 100f;
 
             float densityFactor = (float) (airDensity[d] / 1.225f);
             float normalizedAltitude = Math.min(altitude / 256f, 1f);
             float altitudeFactor = 0.5f + 0.5f * normalizedAltitude;
 
-            float speed = (float) Math.sqrt(2 * dP / densityFactor) * biomeFactor * altitudeFactor * SPEED_SCALING;
+            float speed = (float) Math.sqrt(2 * dPPa / densityFactor) * biomeFactor * altitudeFactor * SPEED_SCALING;
             speed = Mth.clamp(speed, 1.2f, 60f);
 
             int hash = selfKey.hashCode();

@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.particles;
 
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.modules.wind.WindConfig;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.*;
 import net.minecraft.core.particles.SimpleParticleType;
@@ -9,6 +9,7 @@ import net.minecraft.world.phys.Vec3;
 public class WindLeafParticle extends TextureSheetParticle {
 
     private final SpriteSet sprites;
+    private static final float WIND_WEIGHT = 1.2f;
 
     private static final double DESIRED_TRAVEL_BLOCKS = 40.0;
     protected WindLeafParticle(ClientLevel world, double x, double y, double z,
@@ -49,11 +50,16 @@ public class WindLeafParticle extends TextureSheetParticle {
         }
 
 
-        Vec3 push = WindParticlePusher.computeWindPush(this.level, new Vec3(this.x, this.y, this.z));
-        if (push.lengthSqr() > 0.0) {
-            this.xd += push.x;
-            this.yd += push.y;
-            this.zd += push.z;
+        Vec3 target = WindParticlePusher.computeWindPush(this.level, new Vec3(this.x, this.y, this.z));
+        if (target.lengthSqr() > 0.0) {
+            float lerp = WindConfig.particleBendStrength() / WIND_WEIGHT;
+            if (lerp > 1.0f) {
+                lerp = 1.0f;
+            }
+            double nextX = this.xd + (target.x - this.xd) * lerp;
+            double nextZ = this.zd + (target.z - this.zd) * lerp;
+            this.xd = nextX * this.friction;
+            this.zd = nextZ * this.friction;
         }
 
 

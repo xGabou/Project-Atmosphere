@@ -8,7 +8,8 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.SharedConstants;
@@ -212,13 +213,11 @@ public final class TelemetryCollector {
             acc.pressure += state.getPressure();
             acc.cloudCover += state.getCloudCover();
             acc.rainIntensity += state.getRainIntensity();
-            WindVector wind = state.getWind();
-            if (wind != null) {
-                float speed = wind.baseSpeed();
-                acc.windSpeed += speed;
-                acc.windX += speed * (float) Math.cos(wind.angleRadians());
-                acc.windZ += speed * (float) Math.sin(wind.angleRadians());
-            }
+            WindVector wind = ForecastOrchestrator.getWind(state.getKey(), 0L);
+            float speed = wind.baseSpeed();
+            acc.windSpeed += speed;
+            acc.windX += speed * (float) Math.cos(wind.angleRadians());
+            acc.windZ += speed * (float) Math.sin(wind.angleRadians());
         }
         List<BiomeAverage> out = new ArrayList<>(accumulators.size());
         accumulators.forEach((biomeId, acc) -> {
@@ -267,10 +266,9 @@ public final class TelemetryCollector {
             ChannelSummary temperature = summarizeWeek(region.getTemperature());
             ChannelSummary humidity = summarizeWeek(region.getHumidity());
             ChannelSummary pressure = summarizeWeek(region.getPressure());
-            WindVector[] windWeek = region.getWind();
-            WindVector wind = windWeek != null && windWeek.length > 0 ? windWeek[0] : region.getWindDay();
-            float windSpeed = wind == null ? 0f : Math.max(0f, wind.baseSpeed());
-            Float windDirection = wind == null ? null : Mth.wrapDegrees((float) Math.toDegrees(wind.angleRadians()));
+            WindVector wind = ForecastOrchestrator.getForecastWind(region.getKey(), 0L);
+            float windSpeed = Math.max(0f, wind.baseSpeed());
+            Float windDirection = Mth.wrapDegrees((float) Math.toDegrees(wind.angleRadians()));
             int anchorChunkX = region.getAnchor() == null ? 0 : region.getAnchor().getX() >> 4;
             int anchorChunkZ = region.getAnchor() == null ? 0 : region.getAnchor().getZ() >> 4;
             String dominantBiome = selectDominantBiome(region.getBiomeWeights());

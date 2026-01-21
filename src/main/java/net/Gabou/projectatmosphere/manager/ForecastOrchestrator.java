@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler;
 import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
+import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 public class ForecastOrchestrator {
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = ForecastGenerator.RADIUS / 2;
     private static long lastTornadoCheckTick = 0;
+    private static final WindVector SAFE_DEFAULT_WIND = WindVector.fromBase(1f, 0f);
 
     // Global regeneration gate: when true, dependents should skip or defer work
     private static volatile boolean REGENERATING = false;
@@ -292,19 +294,132 @@ public class ForecastOrchestrator {
     /**
      * Get wind for any biome
      */
+    @Deprecated
     public static WindVector getCurrentWind(BiomeInstanceKey key, long tick) {
-        return ForecastGenerator.getWindValue(key, tick);
+        return getWind(key, tick);
     }
 
     /**
      * Region-based wind sampling. Preferred over biome APIs.
      */
+    @Deprecated
     public static WindVector getCurrentWind(ServerLevel level, BlockPos pos, long tick) {
-        ForecastRegion region = getRegionForecast(level, pos);
-        if (region == null) {
-            return WindVector.fromBase(0f, 0f);
+        return getWind(level, pos, tick);
+    }
+
+    /**
+     * Canonical wind selector: dynamic state if available, forecast fallback, then safe default.
+     */
+    public static WindVector getWind(BiomeInstanceKey key, long tick) {
+        if (key == null) {
+            return SAFE_DEFAULT_WIND;
         }
-        return region.sampleWind(tick);
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        return selectWind(regionKey, tick);
+    }
+
+    /**
+     * Canonical wind selector: dynamic state if available, forecast fallback, then safe default.
+     */
+    public static WindVector getWind(ServerLevel level, BlockPos pos, long tick) {
+        if (pos == null) {
+            return SAFE_DEFAULT_WIND;
+        }
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        return selectWind(regionKey, tick);
+    }
+
+    /**
+     * Canonical wind selector: dynamic state if available, forecast fallback, then safe default.
+     */
+    public static WindVector getWind(RegionInstanceKey regionKey, long tick) {
+        return selectWind(regionKey, tick);
+    }
+
+    /**
+     * Explicit forecast wind access (no dynamic state).
+     */
+    public static WindVector getForecastWind(BiomeInstanceKey key, long tick) {
+        if (key == null) {
+            return SAFE_DEFAULT_WIND;
+        }
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        return getForecastWind(regionKey, tick);
+    }
+
+    /**
+     * Explicit forecast wind access (no dynamic state).
+     */
+    public static WindVector getForecastWind(ServerLevel level, BlockPos pos, long tick) {
+        if (pos == null) {
+            return SAFE_DEFAULT_WIND;
+        }
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        return getForecastWind(regionKey, tick);
+    }
+
+    /**
+     * Explicit forecast wind access (no dynamic state).
+     */
+    public static WindVector getForecastWind(RegionInstanceKey regionKey, long tick) {
+        WindVector forecast = getForecastWindInternal(regionKey, tick);
+        return forecast == null ? SAFE_DEFAULT_WIND : forecast;
+    }
+
+    private static WindVector selectWind(RegionInstanceKey regionKey, long tick) {
+        WindVector dynamic = getDynamicWind(regionKey);
+        if (dynamic != null) {
+            return dynamic;
+        }
+        WindVector forecast = getForecastWindInternal(regionKey, tick);
+        if (forecast != null) {
+            return forecast;
+        }
+        return SAFE_DEFAULT_WIND;
+    }
+
+    private static WindVector getDynamicWind(RegionInstanceKey regionKey) {
+        if (regionKey == null) {
+            return null;
+        }
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state == null) {
+            return null;
+        }
+        WindVector wind = state.getWind();
+        return isDynamicAvailable(wind) ? wind : null;
+    }
+
+    private static WindVector getForecastWindInternal(RegionInstanceKey regionKey, long tick) {
+        if (regionKey == null) {
+            return null;
+        }
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region == null) {
+            return null;
+        }
+        WindVector[] windWeek = region.getWind();
+        if (windWeek == null || windWeek.length == 0) {
+            return null;
+        }
+        WindVector wind = region.sampleWind(tick);
+        return isValidWind(wind) ? wind : null;
+    }
+
+    private static boolean isDynamicAvailable(WindVector wind) {
+        if (!isValidWind(wind)) {
+            return false;
+        }
+        return wind.baseSpeed() > 0f || wind.gustSpeed() > 0f;
+    }
+
+    private static boolean isValidWind(WindVector wind) {
+        if (wind == null) {
+            return false;
+        }
+        return Float.isFinite(wind.baseSpeed())
+                && Float.isFinite(wind.gustSpeed())
+                && Float.isFinite(wind.angleRadians());
     }
 
     public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {

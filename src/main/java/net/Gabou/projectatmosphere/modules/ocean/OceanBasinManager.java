@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.ocean;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -45,7 +46,8 @@ public final class OceanBasinManager {
         BASINS.clear();
         NEXT_ID.set(0);
         detectionTask.cancel(true);
-        detectionTask = CompletableFuture.supplyAsync(OceanBasinManager::detectBasins, AsyncAtmosphereService.getWeatherExecutor())
+        long sampleTime = level.getGameTime();
+        detectionTask = CompletableFuture.supplyAsync(() -> detectBasins(sampleTime), AsyncAtmosphereService.getWeatherExecutor())
                 .thenAccept(basins -> {
                     BASINS.clear();
                     for (OceanBasin basin : basins) {
@@ -89,7 +91,7 @@ public final class OceanBasinManager {
         }
     }
 
-    private static List<OceanBasin> detectBasins() {
+    private static List<OceanBasin> detectBasins(long gameTime) {
         Collection<RegionAtmosphereState> states = AtmosphericStateRegistry.snapshot();
         if (states.isEmpty()) {
             return List.of();
@@ -110,14 +112,15 @@ public final class OceanBasinManager {
             if (visited.contains(state.getKey())) {
                 continue;
             }
-            basins.add(buildBasin(state.getKey(), oceanStates, visited));
+            basins.add(buildBasin(state.getKey(), oceanStates, visited, gameTime));
         }
         return basins;
     }
 
     private static OceanBasin buildBasin(RegionInstanceKey seed,
                                          Map<RegionInstanceKey, RegionAtmosphereState> oceanStates,
-                                         Set<RegionInstanceKey> visited) {
+                                         Set<RegionInstanceKey> visited,
+                                         long gameTime) {
         Queue<RegionInstanceKey> queue = new ArrayDeque<>();
         queue.add(seed);
         Set<RegionInstanceKey> basinCells = new HashSet<>();
@@ -143,12 +146,10 @@ public final class OceanBasinManager {
             sumTemp += state.getTemperature();
             sumHumidity += state.getHumidity();
             sumPressure += state.getPressure();
-            WindVector wind = state.getWind();
-            if (wind != null) {
-                sumWindX += Math.sin(wind.angleRadians()) * wind.baseSpeed();
-                sumWindZ += Math.cos(wind.angleRadians()) * wind.baseSpeed();
-                sumGust += wind.gustSpeed();
-            }
+            WindVector wind = ForecastOrchestrator.getWind(key, gameTime);
+            sumWindX += Math.sin(wind.angleRadians()) * wind.baseSpeed();
+            sumWindZ += Math.cos(wind.angleRadians()) * wind.baseSpeed();
+            sumGust += wind.gustSpeed();
             count++;
             for (RegionInstanceKey neighbor : AtmosphericStateRegistry.getNeighbors(key)) {
                 if (oceanStates.containsKey(neighbor) && !visited.contains(neighbor)) {

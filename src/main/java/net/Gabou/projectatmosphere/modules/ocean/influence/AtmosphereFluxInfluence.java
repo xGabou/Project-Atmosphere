@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.ocean.influence;
 
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.AtmosVolumeInfluence;
 import net.Gabou.projectatmosphere.modules.ocean.AtmosphericVolume;
@@ -51,7 +52,7 @@ public final class AtmosphereFluxInfluence implements AtmosVolumeInfluence {
         float pressureDelta = (targetPressure - state.getPressure()) * pressureCoupling * weight;
         state.adjustPressure(pressureDelta);
 
-        WindVector wind = state.getWind();
+        WindVector wind = ForecastOrchestrator.getWind(state.getKey(), context.gameTime());
         WindVector bias = basin.getWindBias();
         if (wind != null && bias != null && (bias.baseSpeed() > 0.01f || bias.gustSpeed() > 0.01f)) {
             float mix = windMixing * weight;

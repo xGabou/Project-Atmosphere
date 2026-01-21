@@ -119,7 +119,7 @@ public class ClientTickHandler {
                 long gameTime = mc.level.getGameTime();
                 BiomeInstanceKey key = new BiomeInstanceKey(
                         AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
-                WindVector wind = ForecastOrchestrator.getCurrentWind(key, gameTime);
+                WindVector wind = ForecastOrchestrator.getWind(key, gameTime);
                 float speed = WindMath.getSmoothGustedSpeed(wind, gameTime);
 
                 if (speed >= 2.0f) {
@@ -177,8 +177,8 @@ public class ClientTickHandler {
 
     private static WindSpawnData computeWindSpawn(BlockPos pos, WindVector wind, float speed) {
         float angle = wind.angleRadians();
-        double dx = Math.cos(angle);
-        double dz = Math.sin(angle);
+        double dx = -Math.sin(angle);
+        double dz = Math.cos(angle);
 
         double minDist = 20.0;
         double maxDist = 100.0;

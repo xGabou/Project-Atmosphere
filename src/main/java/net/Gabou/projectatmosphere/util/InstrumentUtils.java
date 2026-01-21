@@ -25,7 +25,7 @@ public class InstrumentUtils {
         BiomeInstanceKey key = new BiomeInstanceKey(
                 AtmosphereUtils.getBiomeLocation(pos, level), pos
         );
-        WindVector wind = ForecastOrchestrator.getCurrentWind(key, level.getDayTime());
+        WindVector wind = ForecastOrchestrator.getWind(key, level.getDayTime());
         String msg = "Wind: " + UnitFormatter.formatWindSpeed(wind.baseSpeed()) +
                 " at " + String.format("%.0f°", Math.toDegrees(wind.angleRadians()));
         HUDOverlayRenderer.showTemperatureOverlay(msg);
@@ -91,4 +91,3 @@ public class InstrumentUtils {
         HUDOverlayRenderer.showTemperatureOverlay(msg);
     }
 }
-

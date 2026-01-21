@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.particles;
 
+import net.Gabou.projectatmosphere.modules.wind.WindConfig;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.*;
 import net.minecraft.core.particles.SimpleParticleType;
@@ -7,6 +8,7 @@ import net.minecraft.world.phys.Vec3;
 
 public class WindStreakParticle extends TextureSheetParticle {
     private final SpriteSet sprites;
+    private static final float WIND_WEIGHT = 0.9f;
 
     protected WindStreakParticle(ClientLevel world, double x, double y, double z,
                                  double xSpeed, double ySpeed, double zSpeed,
@@ -43,11 +45,16 @@ public class WindStreakParticle extends TextureSheetParticle {
         } catch (Throwable ignored) {
         }
 
-        Vec3 push = WindParticlePusher.computeWindPush(this.level, new Vec3(this.x, this.y, this.z));
-        if (push.lengthSqr() > 0.0) {
-            this.xd += push.x;
-            this.yd += push.y;
-            this.zd += push.z;
+        Vec3 target = WindParticlePusher.computeWindPush(this.level, new Vec3(this.x, this.y, this.z));
+        if (target.lengthSqr() > 0.0) {
+            float lerp = WindConfig.particleBendStrength() / WIND_WEIGHT;
+            if (lerp > 1.0f) {
+                lerp = 1.0f;
+            }
+            double nextX = this.xd + (target.x - this.xd) * lerp;
+            double nextZ = this.zd + (target.z - this.zd) * lerp;
+            this.xd = nextX * this.friction;
+            this.zd = nextZ * this.friction;
         }
 
         // Fade in first quarter of life
@@ -59,9 +66,6 @@ public class WindStreakParticle extends TextureSheetParticle {
             this.alpha = (this.lifetime - this.age) / (this.lifetime / 4f);
         }
 
-        // Add small wobble to make streaks feel alive
-        this.xd += (random.nextFloat() - 0.5f) * 0.001f;
-        this.zd += (random.nextFloat() - 0.5f) * 0.001f;
     }
 
     @Override

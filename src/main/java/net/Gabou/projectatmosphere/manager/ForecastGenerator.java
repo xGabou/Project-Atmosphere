@@ -11,7 +11,7 @@ import net.Gabou.projectatmosphere.event.BiomeChangeManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
-import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityGenerator;

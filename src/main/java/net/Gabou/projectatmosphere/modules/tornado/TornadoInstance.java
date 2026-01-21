@@ -9,6 +9,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -186,6 +187,7 @@ public class TornadoInstance {
         final BlockPos min = center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, 0, -intRadius - DEBRIS_RANGE_EXTENSION);
         final BlockPos max = center.offset( intRadius + DEBRIS_RANGE_EXTENSION, 3 + intRadius,  intRadius + DEBRIS_RANGE_EXTENSION);
 
+        RandomSource random = RandomSource.create();
         it.unimi.dsi.fastutil.longs.LongArrayList toDestroy = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
         it.unimi.dsi.fastutil.longs.LongArrayList toDestroyGlass = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
 
@@ -214,7 +216,7 @@ public class TornadoInstance {
                     final double t = Mth.clamp((outerSq - distSq) * invBand, 0.0, 1.0);
                     final float p = (float) (t * pMax);
 
-                    if (level.random.nextFloat() < p) {
+                    if (random.nextFloat() < p) {
                         toDestroyGlass.add(pos.asLong());
                     }
                 }

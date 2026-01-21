@@ -14,12 +14,15 @@ import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
+import net.Gabou.projectatmosphere.modules.wind.WindForces;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -115,6 +118,42 @@ public class EventHandler {
             ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(level);
             RainbowRainBridge.sendSnapshot(player, level, cloudManager.getCloudGenerator());
         }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || event.side.isClient()) {
+            return;
+        }
+        if (!(event.player instanceof ServerPlayer player)) {
+            return;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!AtmosphereManager.isInitialGenerationDone || ForecastOrchestrator.isRegenerating()) {
+            return;
+        }
+        if (!level.dimension().equals(Level.OVERWORLD)) {
+            return;
+        }
+        WindForces.applyToPlayer(level, player, 1.0f);
+    }
+
+    @SubscribeEvent
+    public static void onLivingTick(LivingEvent.LivingTickEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide || entity instanceof ServerPlayer) {
+            return;
+        }
+        if (!(entity.level() instanceof ServerLevel level)) {
+            return;
+        }
+        if (!AtmosphereManager.isInitialGenerationDone || ForecastOrchestrator.isRegenerating()) {
+            return;
+        }
+        if (!level.dimension().equals(Level.OVERWORLD)) {
+            return;
+        }
+        WindForces.applyToEntity(level, entity, 1.0f);
     }
 
     public static void onRegenerate() {

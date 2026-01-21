@@ -32,8 +32,8 @@ public class WindMath {
      */
     public static BlockPos getWindOffset(WindVector wind) {
         float angle = wind.angleRadians(); 
-        double dx = Math.cos(angle);
-        double dz = Math.sin(angle);
+        double dx = -Math.sin(angle);
+        double dz = Math.cos(angle);
 
         int offsetX = (int) Math.signum(dx);
         int offsetZ = (int) Math.signum(dz);

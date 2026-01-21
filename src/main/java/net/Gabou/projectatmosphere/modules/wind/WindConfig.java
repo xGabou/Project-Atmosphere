@@ -29,12 +29,20 @@ public final class WindConfig {
         return AtmoCommonConfig.WIND_PUSH_THRESHOLD_MPS.get().floatValue();
     }
 
+    public static float pushRampMps() {
+        return AtmoCommonConfig.WIND_PUSH_RAMP_MPS.get().floatValue();
+    }
+
     public static float playerPushScale() {
         return AtmoCommonConfig.WIND_PLAYER_PUSH_SCALE.get().floatValue();
     }
 
     public static float entityPushScale() {
         return AtmoCommonConfig.WIND_ENTITY_PUSH_SCALE.get().floatValue();
+    }
+
+    public static float particleBendStrength() {
+        return AtmoCommonConfig.WIND_PARTICLE_BEND_STRENGTH.get().floatValue();
     }
 }
 

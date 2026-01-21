@@ -56,7 +56,7 @@ public class WeatherVaneBlock extends InstrumentBlock {
     @Override
     public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        WindVector wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
+        WindVector wind = ForecastOrchestrator.getWind(key, level.getGameTime());
         Direction dir = Direction.fromYRot((float) Math.toDegrees(wind.angleRadians())).getOpposite();
         if (dir != state.getValue(FACING)) {
             level.setBlock(pos, state.setValue(FACING, dir), 2);

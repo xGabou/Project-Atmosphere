@@ -62,7 +62,7 @@ public class BlockManager {
      */
     public static void spawnDust(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
-        WindVector windVector = ForecastOrchestrator.getCurrentWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
+        WindVector windVector = ForecastOrchestrator.getWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
         float windStrength = windVector.baseSpeed();
         int maxSpawn = Math.min(10, (int) (windStrength * 8));
 
@@ -108,7 +108,7 @@ public class BlockManager {
      */
     public static void spawnSand(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
-        WindVector windVector = ForecastOrchestrator.getCurrentWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
+        WindVector windVector = ForecastOrchestrator.getWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
         float windStrength = windVector.baseSpeed();
         int maxSpawn = Math.min(10, (int) (windStrength * 8));
 
@@ -259,7 +259,7 @@ public class BlockManager {
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simulating tempest at {} with radius {}", center, radius);
 
         AsyncAtmosphereService.runStorm(() -> {
-            RandomSource random = level.getRandom();
+            RandomSource random = RandomSource.create();
             int step = radius >= 1000 ? 32 : (radius >= 500 ? 16 : 8);
             int dustChance = 10;
             int debrisChance = 20;

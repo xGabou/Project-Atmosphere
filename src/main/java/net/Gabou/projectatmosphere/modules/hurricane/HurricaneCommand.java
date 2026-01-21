@@ -43,7 +43,7 @@ public class HurricaneCommand {
                             int catInt = IntegerArgumentType.getInteger(ctx, "category");
                             HurricaneCategory cat = HurricaneCategory.fromId(catInt);
                             BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-                            var wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
+                            var wind = ForecastOrchestrator.getWind(key, level.getGameTime());
                             SimpleCloudsCompat.spawnCloudInBiome("custom_cumulonimbus", key, level, null, wind);
                             Vec3 spawnPos = new Vec3(player.getX(), level.getSeaLevel(), player.getZ());
                             HurricaneManager.spawnServer(level, spawnPos, 40f, wind, cat);

@@ -18,7 +18,6 @@ import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.wind.WindCommand;
-import net.Gabou.projectatmosphere.modules.wind.WindForces;
 import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
 import net.Gabou.projectatmosphere.seasons.SeasonProviderRegistry;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
@@ -165,9 +164,6 @@ public class AtmosphereManager {
             TornadoManager.tick(level);
             HurricaneManager.tick(level);
             SnowstormManager.tick(level);
-            for (ServerPlayer p : level.players()) {
-                WindForces.applyToPlayer(level, p, 1.0f);
-            }
         } else {
             // Still advance orchestrator's internal timing (e.g., tornado check scheduling) safely
             ForecastOrchestrator.tick(level);

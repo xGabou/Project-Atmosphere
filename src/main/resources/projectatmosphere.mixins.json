@@ -14,10 +14,11 @@
   "client": [
     "CloudMeshGeneratorAccessor",
     "MixinSandstormDebugBlocker",
+    "MultiRegionCloudMeshGeneratorMixin",
     "OverwriteDesertSound",
     "SimpleCloudsRendererMixin",
-    "MultiRegionCloudMeshGeneratorMixin",
-    "client.particle.WindBentParticleMixin",
+    "client.particle.ParticleMotionAccessor",
+    "client.particle.WindBentParticleEngineMixin",
     "compat.auroras.AuroraRendererMixin",
     "compat.rainbows.RainbowsRendererParticleMixin"
   ],

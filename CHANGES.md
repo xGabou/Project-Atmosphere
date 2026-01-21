@@ -1,5 +1,20 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Wind force tuning
+- Apply Weather2-style wind steering (velocity targeting) after player input, using base wind above 11.1 m/s with capped drift.
+- Apply exposure checks (sky visibility, water/lava, horizontal collision) before influencing players or other living entities.
+- Use the canonical wind selector at the entity position and align wind direction vectors across particles, clouds, and forces.
+## Unreleased - Async random safety
+- Replaced off-thread uses of server-level random state with local RandomSource instances in storm/sand/tornado/cloud helpers to prevent LegacyRandomSource thread violations.
+## Unreleased - Wind push damping
+- Added a push ramp to soften player wind force near the threshold.
+## Unreleased - Wind particle bending
+- Wind-bent particles now resample wind per tick and smoothly steer toward the current wind vector using a configurable bend strength.
+## Unreleased - Forecast region unification
+- Merged legacy region aggregation into the region ForecastRegion model, updated registry/telemetry/orchestrator consumers, and removed the duplicate core class.
+## Unreleased - Wind selection and pressure units
+- Added a canonical wind selector (dynamic -> forecast -> safe default), deprecated ambiguous wind getters, and updated runtime wind consumers (HUD, particles, clouds, sandstorms, telemetry, ocean/cyclone) to use it.
+- Converted wind pressure deltas from hPa to Pa in the speed equation so generated wind magnitudes use consistent physical units.
 ## Unreleased - Pressure and sunlight tuning
 - Clamped generated pressures and live state pressures to stay above 900 hPa, keeping readings out of unrealistic lows.
 - Reapplied seasonal temperature clamps after daily variation so winter highs stay within biome bounds.

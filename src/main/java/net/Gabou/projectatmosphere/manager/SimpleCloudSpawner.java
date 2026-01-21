@@ -187,6 +187,7 @@ public class SimpleCloudSpawner {
             float stormFactor,
             ServerLevel level
     ) {
+        RandomSource random = RandomSource.create();
         float dewGap = Math.max(0f, temperature - dewPoint);
         float dewGapFactor = 1.0f - Math.min(dewGap / 12.0f, 1.0f);
 
@@ -215,7 +216,7 @@ public class SimpleCloudSpawner {
 
         // If we hit 4 severe storms, start a cooldown of 3–5 days
         if (recentStreak >= 4 && cooldown <= 0) {
-            cooldown = 3 + level.random.nextInt(3); // 3–5 days cooldown
+            cooldown = 3 + random.nextInt(3); // 3–5 days cooldown
             data.setCooldownDaysRemaining(cooldown);
         }
 
@@ -277,8 +278,11 @@ public class SimpleCloudSpawner {
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level), player.blockPosition());
-        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty", key, level, null, ForecastOrchestrator.getCurrentWind(key, level.getGameTime()));
+        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty", key, level, null, ForecastOrchestrator.getWind(key, level.getGameTime()));
     }
 
 
 }
+
+
+

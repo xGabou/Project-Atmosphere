@@ -8,7 +8,7 @@ import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.modules.core.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.DominantBiomeOccupancy;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ChannelSummary;
@@ -75,7 +75,7 @@ public final class ServerTelemetrySampler {
         float temperature = ForecastOrchestrator.getCurrentTemperature(key, gameTime);
         float humidity = ForecastOrchestrator.getCurrentHumidity(key, gameTime);
         float pressure = ForecastOrchestrator.getCurrentPressure(key, gameTime);
-        WindVector wind = ForecastOrchestrator.getCurrentWind(key, gameTime);
+        WindVector wind = ForecastOrchestrator.getWind(key, gameTime);
         boolean isRaining = level.isRainingAt(pos);
         boolean temperatureOutOfRange = temperature < -60f || temperature > 60f;
 
@@ -150,16 +150,13 @@ public final class ServerTelemetrySampler {
             ChannelSummary humidity = summarizeWeek(region.getHumidity());
             ChannelSummary pressure = summarizeWeek(region.getPressure());
 
-            WindVector[] windWeek = region.getWind();
-            WindVector expectedWind = windWeek != null && windWeek.length > 0 ? windWeek[0] : region.getWindDay();
-            float expectedWindSpeed = expectedWind == null ? 0f : Math.max(0f, expectedWind.baseSpeed());
-            Float expectedWindDirection = expectedWind == null ? null
-                    : Mth.wrapDegrees((float) Math.toDegrees(expectedWind.angleRadians()));
+            WindVector expectedWind = ForecastOrchestrator.getForecastWind(key, gameTime);
+            float expectedWindSpeed = Math.max(0f, expectedWind.baseSpeed());
+            Float expectedWindDirection = Mth.wrapDegrees((float) Math.toDegrees(expectedWind.angleRadians()));
 
-            WindVector currentWind = state.getWind();
-            float currentWindSpeed = currentWind == null ? 0f : Math.max(0f, currentWind.baseSpeed());
-            Float currentWindDirection = currentWind == null ? null
-                    : Mth.wrapDegrees((float) Math.toDegrees(currentWind.angleRadians()));
+            WindVector currentWind = ForecastOrchestrator.getWind(key, gameTime);
+            float currentWindSpeed = Math.max(0f, currentWind.baseSpeed());
+            Float currentWindDirection = Mth.wrapDegrees((float) Math.toDegrees(currentWind.angleRadians()));
 
             int anchorChunkX = region.getAnchor() == null ? 0 : region.getAnchor().getX() >> 4;
             int anchorChunkZ = region.getAnchor() == null ? 0 : region.getAnchor().getZ() >> 4;
