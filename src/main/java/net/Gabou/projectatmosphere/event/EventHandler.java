@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
@@ -62,6 +63,7 @@ public class EventHandler {
         ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
         CloudGenerator generator = cloudManager.getCloudGenerator();
         AtmosphereManager.tick(serverLevel);
+        AtmosphereWorldEffectsManager.tick(serverLevel);
         if(ForecastOrchestrator.isRegenerating()) {
             finishedRegenerating = false;
         } else if (!finishedRegenerating) {
@@ -141,7 +143,7 @@ public class EventHandler {
     @SubscribeEvent
     public static void onLivingTick(LivingEvent.LivingTickEvent event) {
         LivingEntity entity = event.getEntity();
-        if (entity.level().isClientSide || entity instanceof ServerPlayer) {
+        if (entity.level().isClientSide) {
             return;
         }
         if (!(entity.level() instanceof ServerLevel level)) {
@@ -151,6 +153,10 @@ public class EventHandler {
             return;
         }
         if (!level.dimension().equals(Level.OVERWORLD)) {
+            return;
+        }
+        AtmosphereWorldEffectsManager.applyCloudCoverEffects(level, entity);
+        if (entity instanceof ServerPlayer) {
             return;
         }
         WindForces.applyToEntity(level, entity, 1.0f);

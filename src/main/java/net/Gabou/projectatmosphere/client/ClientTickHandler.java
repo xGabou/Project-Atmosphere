@@ -69,27 +69,17 @@ public class ClientTickHandler {
             List<CloudRegion> regions = manager.getCloudGenerator().getClouds();
             double playerX = mc.player.getX();
             double playerZ = mc.player.getZ();
+            Set<Integer> nextCulled = new HashSet<>();
             for (CloudRegion region : regions) {
                 double dx = region.getWorldX() - playerX;
                 double dz = region.getWorldZ() - playerZ;
                 double distSq = dx * dx + dz * dz;
                 if (distSq > CLOUD_RENDER_DISTANCE * CLOUD_RENDER_DISTANCE) {
-                    culledRegionIds.add(getRegionId(region));
+                    nextCulled.add(getRegionId(region));
                 }
             }
-            if (!culledRegionIds.isEmpty()) {
-                culledRegionIds.removeIf(id -> {
-                    for (CloudRegion region : regions) {
-                        if (getRegionId(region) == id) {
-                            double dx = region.getWorldX() - playerX;
-                            double dz = region.getWorldZ() - playerZ;
-                            double distSq = dx * dx + dz * dz;
-                            return distSq <= CLOUD_RENDER_DISTANCE * CLOUD_RENDER_DISTANCE;
-                        }
-                    }
-                    return true;
-                });
-            }
+            culledRegionIds.clear();
+            culledRegionIds.addAll(nextCulled);
         }
 
         if (mc.level != null) {

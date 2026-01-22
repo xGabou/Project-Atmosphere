@@ -7,14 +7,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BiomeClientTemperatureCache {
-    private static final Map<ResourceLocation, float[]> DAILY_FORECASTS = new ConcurrentHashMap<>();
+    private static volatile Map<ResourceLocation, float[]> DAILY_FORECASTS = new ConcurrentHashMap<>();
 
     /**
      * Updates the client-side forecast cache with the new per-biome daily temperature arrays.
      */
     public static void updateDayForecasts(Map<ResourceLocation, float[]> newData) {
-        DAILY_FORECASTS.clear();
-        DAILY_FORECASTS.putAll(newData);
+        Map<ResourceLocation, float[]> next = new ConcurrentHashMap<>(newData.size());
+        next.putAll(newData);
+        DAILY_FORECASTS = next;
     }
 
     /**
@@ -28,6 +29,7 @@ public class BiomeClientTemperatureCache {
     public static float getTemperature(ResourceLocation biome, Level level) {
         float[] arr = DAILY_FORECASTS.get(biome);
         if (arr == null || arr.length == 0) return 0.5F;
+        if (level == null) return arr[0];
 
         // Convert in-game time (ticks) → array index
         long timeOfDay = level.getDayTime() % 24000L;
@@ -43,16 +45,16 @@ public class BiomeClientTemperatureCache {
      *
      * @param biome The biome ID.
      * @param level The client level.
-     * @return True if freezing (temperature < 0.15F)
+     * @return True if freezing (temperature < 0.0F)
      */
     public static boolean isFreezing(ResourceLocation biome, Level level) {
-        return getTemperature(biome, level) < 0.15F;
+        return getTemperature(biome, level) < 0.0F;
     }
 
     /**
      * Clears all cached forecast data.
      */
     public static void clear() {
-        DAILY_FORECASTS.clear();
+        DAILY_FORECASTS = new ConcurrentHashMap<>();
     }
 }

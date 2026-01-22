@@ -4,12 +4,53 @@ This file records functionality additions/removals made during development sessi
 - Apply Weather2-style wind steering (velocity targeting) after player input, using base wind above 11.1 m/s with capped drift.
 - Apply exposure checks (sky visibility, water/lava, horizontal collision) before influencing players or other living entities.
 - Use the canonical wind selector at the entity position and align wind direction vectors across particles, clouds, and forces.
+- Added a ramp factor so near-threshold winds apply negligible steering and no noticeable slow-down.
+- Wind drift now adds a directional component without slowing existing player movement.
+- Players now receive intermittent gust impulses instead of continuous wind steering, preserving control in normal winds.
+- Creative/spectator players are immune to wind gusts, and gust impulses no longer reduce current player speed.
+- Sprinting players now ignore gusts unless winds reach extreme thresholds.
+- Surface wind sampling now uses the low-wind layer (not high aloft) and no longer treats gust headroom as always-on speed.
+- Reduced default wind push scales and player gust caps by ~3x for gentler movement impact.
+## Unreleased - Stability and sync fixes
+- Active region detection now uses region membership (plus accurate radius checks) so player-owned regions are always marked active.
+- Instruments now read live atmospheric state values on the server to keep temperature, humidity, and pressure consistent with wind and effects.
+- Client temperature cache updates are now atomic to prevent transient stale reads.
+- Season changes now regenerate forecasts without wiping cloud entities, and server ticks detect season transitions across providers.
+- Freezing and snow placement now follow Project Atmosphere temperatures so ice/snow match displayed readings.
+## Unreleased - Weatherdebug readout alignment
+- /pa weatherdebug forecast now uses the region-sampled temperature, humidity, and pressure so values match the thermometer readout.
+## Unreleased - Weather world effects
+- Added a weather snapshot API plus world-effects manager that samples Project Atmosphere conditions near players.
+- Dense cloud cover now suppresses sun-burning mob ignition and speeds fire cooldown under heavy overcast.
+- Rain intensity sampling can extinguish fire/campfires and fill cauldrons (snow or water) without chunk-wide scans.
+- Added modder hooks via `AtmosphereWorldEffect` registration and `AtmosphereWeatherTickEvent`.
+- Skips per-tick world-effect sampling when no rain is present near players and no custom effects are registered.
+## Unreleased - Forecast region fallback recovery
+- Guarded region slice generation to ensure biome keys are present on forecasts.
+- Detect fallback regions containing only min/max clamp values and regenerate them from the initial biome forecasts.
+## Unreleased - Thermometer temperature sync
+- Restored client temperature day forecast sync so thermometer displays real values instead of the fallback 0.5.
+## Unreleased - Instrument readouts on servers
+- Instrument items/blocks now send server-side readouts to the client overlay so multiplayer no longer shows default values.
+## Unreleased - Storm siren throttle
+- Storm sirens now play the severe-storm sound only once per continuous storm event instead of looping every cooldown tick.
+## Unreleased - Cloud drift divergence
+- Added per-cloud direction bias, slow wobble, and slight speed variance during CloudRegion ticks to prevent visual stacking of parallel cloud trajectories.
+## Unreleased - Temperature clamp diagnostics
+- Log a debug warning with a stack trace when temperature clamps hit the safety ceiling to pinpoint runaway sources.
+## Unreleased - Command namespace
+- Moved Project Atmosphere server commands under the `/pa` root (for example `/pa temperature`, `/pa windSpeed`, `/pa spawnTornado`).
+## Unreleased - Wind mixing clamp
+- Clamped wind-driven neighbor mixing factors and deltas to prevent extreme temperature spikes from propagating.
 ## Unreleased - Async random safety
 - Replaced off-thread uses of server-level random state with local RandomSource instances in storm/sand/tornado/cloud helpers to prevent LegacyRandomSource thread violations.
 ## Unreleased - Wind push damping
 - Added a push ramp to soften player wind force near the threshold.
 ## Unreleased - Wind particle bending
 - Wind-bent particles now resample wind per tick and smoothly steer toward the current wind vector using a configurable bend strength.
+- Cached per-tick wind samples by region for particle steering to reduce client overhead.
+## Unreleased - Cloud culling optimization
+- Simplified client cloud culling to a single pass per tick to avoid quadratic scans.
 ## Unreleased - Forecast region unification
 - Merged legacy region aggregation into the region ForecastRegion model, updated registry/telemetry/orchestrator consumers, and removed the duplicate core class.
 ## Unreleased - Wind selection and pressure units

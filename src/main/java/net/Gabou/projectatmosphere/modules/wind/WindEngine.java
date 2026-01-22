@@ -49,10 +49,10 @@ public final class WindEngine {
 
             RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionId);
             if (state != null) {
-                state.setWind(high);
+                state.setWind(low);
             }
 
-            WindVector.WindSample sample = new WindVector.WindSample(Math.max(low.baseSpeed(), low.gustSpeed()),
+            WindVector.WindSample sample = new WindVector.WindSample(low.baseSpeed(),
                     (float) Math.toDegrees(low.angleRadians()));
             RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
             WindVector.set(regionKey, sample.speedMps(), sample.directionDeg());

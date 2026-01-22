@@ -5,6 +5,7 @@
   "plugin": "net.Gabou.projectatmosphere.mixin.PAMixinPlugin",
   "refmap": "projectatmosphere.refmap.json",
   "mixins": [
+    "BiomeFreezingMixin",
     "CloudRegionMixin",
     "CloudRegionTickEventMixin",
     "InfoMixin",

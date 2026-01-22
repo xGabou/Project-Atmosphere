@@ -115,23 +115,41 @@ public final class AtmosphericUpdateScheduler {
         int radius = 1000;
         int r2 = radius * radius;
         Set<RegionInstanceKey> active = new HashSet<>();
-        Map<RegionInstanceKey, RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
         for (RegionInstanceKey key : keys) {
-            RegionAtmosphereState state = states.get(key);
-            if (state == null || state.getPosition() == null) {
+            if (key == null) {
                 continue;
             }
-            BlockPos sample = state.getPosition();
             for (BlockPos playerPos : players) {
-                double dx = sample.getX() - playerPos.getX();
-                double dz = sample.getZ() - playerPos.getZ();
-                if ((dx * dx + dz * dz) <= r2) {
+                if (key.contains(playerPos) || isWithinRegionRadius(key, playerPos, r2)) {
                     active.add(key);
                     break;
                 }
             }
         }
         return active;
+    }
+
+    private static boolean isWithinRegionRadius(RegionInstanceKey key, BlockPos pos, int radiusSquared) {
+        int size = key.regionSize();
+        int minX = key.regionX() * size;
+        int minZ = key.regionZ() * size;
+        int maxX = minX + size - 1;
+        int maxZ = minZ + size - 1;
+        int px = pos.getX();
+        int pz = pos.getZ();
+        int dx = 0;
+        int dz = 0;
+        if (px < minX) {
+            dx = minX - px;
+        } else if (px > maxX) {
+            dx = px - maxX;
+        }
+        if (pz < minZ) {
+            dz = minZ - pz;
+        } else if (pz > maxZ) {
+            dz = pz - maxZ;
+        }
+        return (dx * dx + dz * dz) <= radiusSquared;
     }
 
     private static void schedulePassive(ServerLevel level) {

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.temperature.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -34,7 +35,11 @@ public class TemperatureCommands {
     };
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("temperature")
+        dispatcher.register(build());
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> build() {
+        return Commands.literal("temperature")
                         .then(Commands.literal("forecast")
                                 .executes(ctx -> {
                                     Player player = ctx.getSource().getPlayerOrException();
@@ -148,18 +153,17 @@ public class TemperatureCommands {
                                 .executes(ctx -> {
                                     ctx.getSource().sendSuccess(() -> Component.literal(
                                             "[Temperature Commands Help]\n" +
-                                                    "/temperature forecast - Show 7-day forecast for your current biome.\n" +
-                                                    "/temperature get <biome|current> - Display the current temperature at a specific biome and tick.\n" +
-                                                    "/temperature dayprofile - View the 240-point daily temperature curve.\n" +
-                                                    "/temperature getseason - Show the current Serene Seasons sub-season.\n" +
-                                                    "/temperature gettemp - Raw and converted temperatures.\n" +
-                                                    "/temperature regenerate - Clear forecast cache and regenerate missing data.\n" +
-                                                    "/temperature resetSpikes - Clear spike simulation state cache."
+                                                    "/pa temperature forecast - Show 7-day forecast for your current biome.\n" +
+                                                    "/pa temperature get <biome|current> - Display the current temperature at a specific biome and tick.\n" +
+                                                    "/pa temperature dayprofile - View the 240-point daily temperature curve.\n" +
+                                                    "/pa temperature getseason - Show the current Serene Seasons sub-season.\n" +
+                                                    "/pa temperature gettemp - Raw and converted temperatures.\n" +
+                                                    "/pa temperature regenerate - Clear forecast cache and regenerate missing data.\n" +
+                                                    "/pa temperature resetSpikes - Clear spike simulation state cache."
                                     ), false);
 
                                     return 1;
                                 }))
-        );
+        ;
     }
 }
-

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
@@ -15,8 +16,11 @@ import java.util.Arrays;
 
 public class WindCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        
-        dispatcher.register(Commands.literal("windSpeed")
+        dispatcher.register(build());
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> build() {
+        return Commands.literal("windSpeed")
                 .then(Commands.literal("get") 
                         .executes(ctx -> {
                             Player player = ctx.getSource().getPlayerOrException();
@@ -31,7 +35,6 @@ public class WindCommand {
 
                             return 1; 
                         })
-                )
-        );
+                );
     }
 }

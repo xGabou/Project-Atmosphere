@@ -6,21 +6,17 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.command.DebugAtmoCommand;
-import net.Gabou.projectatmosphere.command.SpawnCloudCommand;
+import net.Gabou.projectatmosphere.command.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.event.EventHandler;
-import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
-import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
-import net.Gabou.projectatmosphere.modules.wind.WindCommand;
 import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
 import net.Gabou.projectatmosphere.seasons.SeasonProviderRegistry;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SereneSeasonsSeasonDelegate;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.CloudRegionQueue;
@@ -45,6 +41,7 @@ public class AtmosphereManager {
      * Key: Player UUID, Value: CompletableFuture that completes when the player is ready
      */
     private static final Map<UUID, CompletableFuture<Void>> playerReadyMap = new ConcurrentHashMap<>();
+    private static final Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, SeasonStage> lastSeasonStage = new ConcurrentHashMap<>();
 
     private static List<CloudRegion> cloudRegions = new ArrayList<>();
 
@@ -64,15 +61,18 @@ public class AtmosphereManager {
 
     public static void onServerStarted(ServerLevel world) {
         playerReadyMap.clear();
+        lastSeasonStage.clear();
         isInitialGenerationDone = ForecastOrchestrator.onServerStart(world);
         count = 0;
         CloudRegionQueue.clear();
         cloudRegions = new ArrayList<>(CloudManager.get(world).getClouds());
+        recordSeasonStage(world);
     }
 
     public static void onServerStopping(ServerLevel world) {
         ForecastOrchestrator.onServerStop(world);
         playerReadyMap.clear();
+        lastSeasonStage.clear();
         isInitialGenerationDone = false;
         count = 0;
         CloudRegionQueue.clear();
@@ -89,13 +89,7 @@ public class AtmosphereManager {
     }
 
     public static void onRegisterCommands(final RegisterCommandsEvent event) {
-
-        TemperatureCommands.register(event.getDispatcher());
-        HumidityCommand.register(event.getDispatcher());
-        PressureCommand.register(event.getDispatcher());
-        WindCommand.register(event.getDispatcher());
-        SpawnCloudCommand.register(event.getDispatcher());
-        DebugAtmoCommand.register(event.getDispatcher());
+        ProjectAtmosphereCommands.register(event.getDispatcher());
     }
 
 
@@ -151,13 +145,15 @@ public class AtmosphereManager {
 
 
     public static void onSeasonChange(ServerLevel world) {
-        onRegenerate(world);
+        recordSeasonStage(world);
+        AsyncAtmosphereService.runWeather(() -> ForecastOrchestrator.regenerateForSeason(world));
     }
 
 
     private static int count;
 
     public static void tick(ServerLevel level) {
+        checkSeasonTransition(level);
         // During regeneration, skip dependent ticks to avoid using transient/cleared state
         if (!ForecastOrchestrator.isRegenerating()) {
             ForecastOrchestrator.tick(level);
@@ -205,6 +201,28 @@ public class AtmosphereManager {
                 }
 
             }
+        }
+    }
+
+    private static void checkSeasonTransition(ServerLevel level) {
+        SeasonStage stage = SeasonTimeHelper.stage(level);
+        if (stage == null) {
+            return;
+        }
+        SeasonStage previous = lastSeasonStage.get(level.dimension());
+        if (previous == null) {
+            lastSeasonStage.put(level.dimension(), stage);
+            return;
+        }
+        if (previous != stage) {
+            onSeasonChange(level);
+        }
+    }
+
+    private static void recordSeasonStage(ServerLevel level) {
+        SeasonStage stage = SeasonTimeHelper.stage(level);
+        if (stage != null) {
+            lastSeasonStage.put(level.dimension(), stage);
         }
     }
 

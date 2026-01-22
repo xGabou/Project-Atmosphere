@@ -406,6 +406,7 @@ public class ForecastGenerator {
             forecast.setWind(generateWind(key));
         }
         computeAverageWindWeek();
+        computeAverageForecastsByBiomeType();
 
 
         // NOTE: if dailyAndSand touches world state directly, it may need

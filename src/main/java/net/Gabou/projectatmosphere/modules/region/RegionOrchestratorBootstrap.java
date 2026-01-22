@@ -26,6 +26,9 @@ public final class RegionOrchestratorBootstrap {
                 if (forecast == null) {
                     return null;
                 }
+                if (forecast.getBiomeKey() == null) {
+                    forecast.setBiomeKey(key);
+                }
                 return BiomeForecastSnapshot.from(forecast);
             }
 

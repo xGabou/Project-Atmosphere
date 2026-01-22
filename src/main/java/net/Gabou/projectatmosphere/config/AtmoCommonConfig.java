@@ -61,6 +61,25 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
     public static final ForgeConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
     public static final ForgeConfigSpec.DoubleValue WIND_PARTICLE_BEND_STRENGTH;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_WIND_THRESHOLD_MPS;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_MAX_GUST_BPT;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_CHANCE_SCALE;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_CHANCE_DIVIDER;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_STRENGTH_SCALE;
+    public static final ForgeConfigSpec.IntValue PLAYER_GUST_DURATION_MIN;
+    public static final ForgeConfigSpec.IntValue PLAYER_GUST_DURATION_MAX;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_ANGLE_VARIANCE_DEG;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_EXTREME_THRESHOLD_MPS;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_EXTREME_CHANCE_MULT;
+    public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_EXTREME_STRENGTH_MULT;
+    public static final ForgeConfigSpec.BooleanValue WORLD_EFFECTS_ENABLED;
+    public static final ForgeConfigSpec.IntValue WORLD_EFFECT_SAMPLES_PER_PLAYER;
+    public static final ForgeConfigSpec.IntValue WORLD_EFFECT_SAMPLE_RADIUS;
+    public static final ForgeConfigSpec.DoubleValue CLOUD_BURN_PREVENT_THRESHOLD;
+    public static final ForgeConfigSpec.DoubleValue CLOUD_FIRE_DAMP_THRESHOLD;
+    public static final ForgeConfigSpec.IntValue CLOUD_FIRE_DAMP_TICKS;
+    public static final ForgeConfigSpec.DoubleValue FIRE_EXTINGUISH_BASE_CHANCE;
+    public static final ForgeConfigSpec.DoubleValue CAULDRON_FILL_BASE_CHANCE;
     public static final ForgeConfigSpec.BooleanValue TELEMETRY_ENABLED;
     public static final ForgeConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
 
@@ -181,13 +200,73 @@ public class AtmoCommonConfig {
                 .defineInRange("pushRampMps", 8.0d, 0d, 100d);
         WIND_PLAYER_PUSH_SCALE = builder
                 .comment("Push scale applied to players")
-                .defineInRange("playerPushScale", 0.04d, 0d, 1d);
+                .defineInRange("playerPushScale", 0.013333333333d, 0d, 1d);
         WIND_ENTITY_PUSH_SCALE = builder
                 .comment("Push scale applied to other entities")
-                .defineInRange("entityPushScale", 0.03d, 0d, 1d);
+                .defineInRange("entityPushScale", 0.01d, 0d, 1d);
         WIND_PARTICLE_BEND_STRENGTH = builder
                 .comment("Blend strength for steering wind-bent particles per tick")
                 .defineInRange("particleBendStrength", 0.08d, 0d, 1d);
+        PLAYER_WIND_THRESHOLD_MPS = builder
+                .comment("Minimum base wind speed (m/s) before player gusts can occur")
+                .defineInRange("playerWindThresholdMps", 11.1d, 0d, 100d);
+        PLAYER_MAX_GUST_BPT = builder
+                .comment("Maximum per-tick gust impulse for players (blocks per tick)")
+                .defineInRange("playerMaxGustBpt", 0.002d, 0d, 0.2d);
+        PLAYER_GUST_CHANCE_SCALE = builder
+                .comment("Scale for gust chance once wind exceeds the threshold")
+                .defineInRange("playerGustChanceScale", 0.03d, 0d, 1d);
+        PLAYER_GUST_CHANCE_DIVIDER = builder
+                .comment("Divider for excess wind when computing gust chance (m/s)")
+                .defineInRange("playerGustChanceDivider", 15d, 1d, 100d);
+        PLAYER_GUST_STRENGTH_SCALE = builder
+                .comment("Strength scale applied to excess wind for player gusts")
+                .defineInRange("playerGustStrengthScale", 0.006666666667d, 0d, 1d);
+        PLAYER_GUST_DURATION_MIN = builder
+                .comment("Minimum gust duration for players (ticks)")
+                .defineInRange("playerGustDurationMin", 10, 1, 200);
+        PLAYER_GUST_DURATION_MAX = builder
+                .comment("Maximum gust duration for players (ticks)")
+                .defineInRange("playerGustDurationMax", 40, 1, 200);
+        PLAYER_GUST_ANGLE_VARIANCE_DEG = builder
+                .comment("Angle variance applied to gust direction (degrees)")
+                .defineInRange("playerGustAngleVarianceDeg", 10d, 0d, 45d);
+        PLAYER_GUST_EXTREME_THRESHOLD_MPS = builder
+                .comment("Wind speed at which extreme gust multipliers kick in (m/s)")
+                .defineInRange("playerGustExtremeThresholdMps", 30d, 0d, 100d);
+        PLAYER_GUST_EXTREME_CHANCE_MULT = builder
+                .comment("Multiplier applied to gust chance in extreme winds")
+                .defineInRange("playerGustExtremeChanceMult", 2.5d, 1d, 10d);
+        PLAYER_GUST_EXTREME_STRENGTH_MULT = builder
+                .comment("Multiplier applied to max gust strength in extreme winds")
+                .defineInRange("playerGustExtremeStrengthMult", 2.0d, 1d, 10d);
+        builder.pop();
+
+        builder.push("worldEffects");
+        WORLD_EFFECTS_ENABLED = builder
+                .comment("Enable Project Atmosphere world effects (cloud burn suppression, rain extinguish, cauldron filling)")
+                .define("enabled", true);
+        WORLD_EFFECT_SAMPLES_PER_PLAYER = builder
+                .comment("Random sample count per player per tick for weather world effects")
+                .defineInRange("samplesPerPlayerPerTick", 12, 0, 128);
+        WORLD_EFFECT_SAMPLE_RADIUS = builder
+                .comment("Sampling radius in blocks around each player")
+                .defineInRange("sampleRadiusBlocks", 64, 8, 512);
+        CLOUD_BURN_PREVENT_THRESHOLD = builder
+                .comment("Cloud cover threshold above which sun-burning mobs stop igniting")
+                .defineInRange("cloudBurnPreventionThreshold", 0.75d, 0d, 1d);
+        CLOUD_FIRE_DAMP_THRESHOLD = builder
+                .comment("Cloud cover threshold above which burning mobs cool down faster")
+                .defineInRange("cloudFireDampThreshold", 0.90d, 0d, 1d);
+        CLOUD_FIRE_DAMP_TICKS = builder
+                .comment("Extra fire ticks removed per tick when clouds are very dense")
+                .defineInRange("cloudFireDampTicks", 4, 0, 200);
+        FIRE_EXTINGUISH_BASE_CHANCE = builder
+                .comment("Base chance per sample to extinguish fire/campfires when raining (scaled by rain intensity)")
+                .defineInRange("fireExtinguishBaseChance", 0.12d, 0d, 1d);
+        CAULDRON_FILL_BASE_CHANCE = builder
+                .comment("Base chance per sample to fill cauldrons when raining (scaled by rain intensity)")
+                .defineInRange("cauldronFillBaseChance", 0.06d, 0d, 1d);
         builder.pop();
 
         builder.push("telemetry");

@@ -2,18 +2,15 @@ package net.Gabou.projectatmosphere.mixin;
 
 import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.dimension.DimensionType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import sereneseasons.season.SeasonHooks;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
 /**
@@ -52,13 +49,15 @@ public class SeasonHooksMixin {
             }
 
         }
-        else if (level.getClass().getName().equals("net.minecraft.client.multiplayer.ClientLevel")) {
+        else if ("net.minecraft.client.multiplayer.ClientLevel".equals(level.getClass().getName())) {
             try {
-                var biomeKey = ((LevelReader) level).getBiome(pos).unwrapKey().orElse(null);
-                if (biomeKey != null) {
-                    boolean freezing = BiomeClientTemperatureCache.isFreezing(biomeKey.location(), null);
-                    cir.setReturnValue(!freezing);
-                    cir.cancel();
+                if (level instanceof Level clientLevel) {
+                    var biomeKey = clientLevel.getBiome(pos).unwrapKey().orElse(null);
+                    if (biomeKey != null) {
+                        boolean freezing = BiomeClientTemperatureCache.isFreezing(biomeKey.location(), clientLevel);
+                        cir.setReturnValue(!freezing);
+                        cir.cancel();
+                    }
                 }
             } catch (Throwable ignored) {
                 // Client-only context not available on server

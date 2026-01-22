@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
@@ -14,6 +16,7 @@ import net.minecraft.util.Mth;
 import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Holds the live atmospheric state for a sampled region.
@@ -25,6 +28,8 @@ public class RegionAtmosphereState {
     private static final float MAX_REASONABLE_TEMPERATURE_C = 70f;
     private static final float MIN_PRESSURE_HPA = 900f;
     private static final float MAX_PRESSURE_HPA = 1080f;
+    private static final long CLAMP_LOG_COOLDOWN_MS = 10000L;
+    private static final Map<net.Gabou.projectatmosphere.util.RegionInstanceKey, Long> LAST_CLAMP_LOG = new ConcurrentHashMap<>();
 
     private final net.Gabou.projectatmosphere.util.RegionInstanceKey regionId;
     private final net.Gabou.projectatmosphere.util.RegionInstanceKey legacyKey;
@@ -151,7 +156,9 @@ public class RegionAtmosphereState {
     }
 
     public void setTemperature(float temperature) {
-        this.temperature = clampTemperature(temperature);
+        float clamped = clampTemperature(temperature);
+        maybeLogTemperatureClamp(temperature, clamped);
+        this.temperature = clamped;
     }
 
     public void adjustTemperature(float delta) {
@@ -399,5 +406,32 @@ public class RegionAtmosphereState {
             return Math.max(MIN_TEMPERATURE_C, Math.min(baseTemperature, ceiling));
         }
         return clamped;
+    }
+
+    private void maybeLogTemperatureClamp(float original, float clamped) {
+        if (!AtmoCommonConfig.DEBUG_MODE.get()) {
+            return;
+        }
+        if (Float.isFinite(original) && Math.abs(original - clamped) < 0.01f) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long last = LAST_CLAMP_LOG.get(regionId);
+        if (last != null && (now - last) < CLAMP_LOG_COOLDOWN_MS) {
+            return;
+        }
+        LAST_CLAMP_LOG.put(regionId, now);
+        ProjectAtmosphere.LOGGER.warn(
+                "[Atmosphere] Temperature clamp applied. region={} biome={} anchor={} base={} baselineMin={} baselineMax={} input={} clamped={}",
+                regionId,
+                dominantBiome,
+                anchor,
+                baseTemperature,
+                baselineMinTemp,
+                baselineMaxTemp,
+                original,
+                clamped,
+                new RuntimeException("Temperature clamp trace")
+        );
     }
 }

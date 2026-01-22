@@ -39,6 +39,11 @@ public class NetworkHandler {
                 .encoder(RainfallUpdatePacket::encode)
                 .consumerMainThread(RainfallUpdatePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(InstrumentReadoutPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(InstrumentReadoutPacket::decode)
+                .encoder(InstrumentReadoutPacket::encode)
+                .consumerMainThread(InstrumentReadoutPacket::handle)
+                .add();
 
 
     }

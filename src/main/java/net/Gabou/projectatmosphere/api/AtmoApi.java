@@ -1,13 +1,17 @@
 package net.Gabou.projectatmosphere.api;
 
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsManager;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 
 /**
  * Public-facing API for accessing Project Atmosphere forecasts and current weather.
@@ -49,11 +53,59 @@ public class AtmoApi {
      * Gets the current weather conditions at the given position.
      * @param level The server level
      * @param pos The position
-     * @return A WeatherSnapshot representing current conditions (to be defined)
+     * @return A WeatherSnapshot representing current conditions
      */
-    public Object getCurrentWeather(ServerLevel level, BlockPos pos) {
+    public WeatherSnapshot getCurrentWeather(ServerLevel level, BlockPos pos) {
+        return getWeatherSnapshot(level, pos, level.getGameTime());
+    }
 
-        return CloudManager.get(level).getCloudTypeAtPosition(pos.getX(), pos.getZ());
+    /**
+     * Snapshot accessor for current weather at a position.
+     */
+    public WeatherSnapshot getWeatherSnapshot(ServerLevel level, BlockPos pos, long gameTime) {
+        if (level == null || pos == null) {
+            return new WeatherSnapshot(0f, 0f, 0f, 0f, 0f, false, false);
+        }
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+
+        float cloudCover = 0f;
+        float rainIntensity = 0f;
+        float temperature;
+        if (state != null) {
+            cloudCover = state.getCloudCover();
+            rainIntensity = state.getRainIntensity();
+            temperature = state.getTemperature();
+        } else {
+            temperature = ForecastOrchestrator.getCurrentTemperature(level, pos, gameTime);
+        }
+
+        WindVector wind = ForecastOrchestrator.getWind(regionKey, gameTime);
+        float windSpeed = wind == null ? 0f : wind.baseSpeed();
+        float windAngle = wind == null ? 0f : wind.angleRadians();
+
+        float stormFactor;
+        if (state != null) {
+            float rain = Math.min(1f, state.getRainIntensity());
+            float cloud = state.getCloudCover();
+            float windStrength = Math.min(1f, state.getWindStrength() / 18f);
+            float lowPressure = Math.min(1f, Math.max(0f, (1013.25f - state.getPressure()) / 55f));
+            stormFactor = (rain * 0.45f)
+                    + (cloud * 0.3f)
+                    + (windStrength * 0.15f)
+                    + (lowPressure * 0.1f);
+            stormFactor = Math.max(0f, Math.min(1f, stormFactor));
+        } else {
+            stormFactor = 0f;
+        }
+        boolean storming = rainIntensity >= 0.6f || stormFactor >= 0.7f;
+        boolean snowing = rainIntensity > 0f && temperature <= 0f;
+
+        return new WeatherSnapshot(cloudCover, rainIntensity, temperature, windSpeed, windAngle, storming, snowing);
+    }
+
+    public void registerWorldEffect(AtmosphereWorldEffect effect) {
+        AtmosphereWorldEffectsManager.registerWorldEffect(effect);
     }
 
 
@@ -65,7 +117,8 @@ public class AtmoApi {
      */
     public boolean isRainingOrThundering(ServerLevel level, BlockPos pos) {
 
-        return WeatherType.isRainy(CloudManager.get(level).getCloudTypeAtPosition(pos.getX(), pos.getZ()).getKey().id());
+        WeatherSnapshot snapshot = getWeatherSnapshot(level, pos, level.getGameTime());
+        return snapshot.rainIntensity() > 0f || snapshot.isStorming();
     }
 
     /**

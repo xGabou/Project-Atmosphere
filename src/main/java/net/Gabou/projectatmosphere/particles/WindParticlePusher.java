@@ -2,14 +2,15 @@ package net.Gabou.projectatmosphere.particles;
 
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 /**
  * Shared helper to sample wind and return a target velocity in blocks per tick.
@@ -21,6 +22,8 @@ public final class WindParticlePusher {
     private static final double NEAR_PLAYER_RADIUS = 24.0;
     private static final double LINE_OF_SIGHT_CHECK = 4.0;
     private static final double MPS_TO_BLOCKS_PER_TICK = 1.0 / 20.0;
+    private static final Map<RegionInstanceKey, WindVector> WIND_CACHE = new ConcurrentHashMap<>();
+    private static volatile long WIND_CACHE_TICK = Long.MIN_VALUE;
 
     private WindParticlePusher() { }
 
@@ -31,8 +34,13 @@ public final class WindParticlePusher {
         }
 
         BlockPos samplePos = BlockPos.containing(position);
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(samplePos, level), samplePos);
-        WindVector wind = ForecastOrchestrator.getWind(key, level.getGameTime());
+        long gameTime = level.getGameTime();
+        if (gameTime != WIND_CACHE_TICK) {
+            WIND_CACHE.clear();
+            WIND_CACHE_TICK = gameTime;
+        }
+        RegionInstanceKey regionKey = RegionInstanceKey.from(samplePos);
+        WindVector wind = WIND_CACHE.computeIfAbsent(regionKey, key -> ForecastOrchestrator.getWind(key, gameTime));
 
         float effectiveSpeed = Math.max(wind.baseSpeed(), wind.gustSpeed());
         if (effectiveSpeed < 0.25f) {

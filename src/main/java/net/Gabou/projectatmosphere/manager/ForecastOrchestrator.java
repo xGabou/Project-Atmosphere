@@ -210,6 +210,52 @@ public class ForecastOrchestrator {
     }
 
     /**
+     * Regenerates forecasts on season change without wiping cloud entities or player centers.
+     */
+    public static void regenerateForSeason(ServerLevel level) {
+        if (level == null) {
+            return;
+        }
+        REGENERATING = true;
+        try {
+            ForecastGenerator.clearForecasts();
+            clearActiveBiomeKeys();
+            List<BlockPos> centers = new ArrayList<>();
+            if (!ForecastDataStorage.playerData.isEmpty()) {
+                centers.addAll(ForecastDataStorage.playerData.values());
+            } else {
+                centers.add(level.getSharedSpawnPos());
+            }
+
+            Set<BlockPos> uniqueCenters = new HashSet<>();
+            for (BlockPos center : centers) {
+                boolean tooClose = false;
+                for (BlockPos existingCenter : uniqueCenters) {
+                    if (existingCenter.distManhattan(center) < MIN_DISTANCE_BETWEEN_CENTERS) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (!tooClose) {
+                    uniqueCenters.add(center);
+                }
+            }
+
+            for (BlockPos center : uniqueCenters) {
+                ForecastGenerator.generateForecastForRegion(center, level);
+            }
+            WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
+            initializeDynamicSystems(level);
+        } finally {
+            REGENERATING = false;
+            Runnable r;
+            while ((r = POST_REGEN_QUEUE.poll()) != null) {
+                try { r.run(); } catch (Throwable ignored) { }
+            }
+        }
+    }
+
+    /**
      * Called on profile swap (e.g. midnight transition)
      */
     public static void onSwapDay(ServerLevel level) {

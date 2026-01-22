@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 
 import java.util.HashMap;
 import java.util.List;
@@ -13,6 +14,10 @@ import java.util.Set;
 
 public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
     private static final Map<RegionInstanceKey, WindSample> CURRENT = new HashMap<>();
+    private static final float MAX_WIND_MIX_FACTOR = 0.05f;
+    private static final float MAX_TEMP_MIX_DELTA = 5f;
+    private static final float MAX_HUMIDITY_MIX_DELTA = 0.08f;
+    private static final float MAX_PRESSURE_MIX_DELTA = 6f;
 
     public WindVector add(WindVector other) {
         return new WindVector(
@@ -71,10 +76,17 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
                 RegionAtmosphereState neighbor = states.get(neighborKey);
                 if (neighbor == null) continue;
 
-                float mixingFactor = 0.02f * strength;
-                delta.temperature += (neighbor.getTemperature() - state.getTemperature()) * mixingFactor;
-                delta.humidity += (neighbor.getHumidity() - state.getHumidity()) * (0.03f * strength);
-                delta.pressure += (neighbor.getPressure() - state.getPressure()) * (0.05f * strength);
+                float mixingFactor = Mth.clamp(0.02f * strength, 0f, MAX_WIND_MIX_FACTOR);
+                float humidityFactor = Mth.clamp(0.03f * strength, 0f, MAX_WIND_MIX_FACTOR);
+                float pressureFactor = Mth.clamp(0.05f * strength, 0f, MAX_WIND_MIX_FACTOR);
+
+                float tempDelta = (neighbor.getTemperature() - state.getTemperature()) * mixingFactor;
+                float humidityDelta = (neighbor.getHumidity() - state.getHumidity()) * humidityFactor;
+                float pressureDelta = (neighbor.getPressure() - state.getPressure()) * pressureFactor;
+
+                delta.temperature += Mth.clamp(tempDelta, -MAX_TEMP_MIX_DELTA, MAX_TEMP_MIX_DELTA);
+                delta.humidity += Mth.clamp(humidityDelta, -MAX_HUMIDITY_MIX_DELTA, MAX_HUMIDITY_MIX_DELTA);
+                delta.pressure += Mth.clamp(pressureDelta, -MAX_PRESSURE_MIX_DELTA, MAX_PRESSURE_MIX_DELTA);
             }
         }
 
@@ -85,9 +97,9 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
             if (state == null) continue;
 
             Delta d = entry.getValue();
-            state.adjustTemperature(d.temperature);
-            state.adjustHumidity(d.humidity);
-            state.adjustPressure(d.pressure);
+            state.adjustTemperature(Mth.clamp(d.temperature, -MAX_TEMP_MIX_DELTA, MAX_TEMP_MIX_DELTA));
+            state.adjustHumidity(Mth.clamp(d.humidity, -MAX_HUMIDITY_MIX_DELTA, MAX_HUMIDITY_MIX_DELTA));
+            state.adjustPressure(Mth.clamp(d.pressure, -MAX_PRESSURE_MIX_DELTA, MAX_PRESSURE_MIX_DELTA));
         }
 
         // Wind jitter for active states

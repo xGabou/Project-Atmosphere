@@ -39,10 +39,9 @@ public class StormSirenBlock extends Block {
     private static final int CHECK_INTERVAL_TICKS = 40;
     private static final int STORM_WARNING_RADIUS = 500;
     private static final int TORNADO_WARNING_RADIUS = 500;
-    private static final int STORM_WARNING_DURATION_TICKS = 200;
     private static final int TORNADO_SOUND_INTERVAL_TICKS = 40;
     private static final float INTENSITY_THRESHOLD = 7.0f;
-    private static final Map<Long, Long> STORM_COOLDOWNS = new ConcurrentHashMap<>();
+    private static final Map<Long, Boolean> STORM_ACTIVE = new ConcurrentHashMap<>();
     private static final Map<Long, Long> TORNADO_LAST_SOUND = new ConcurrentHashMap<>();
 
     public StormSirenBlock(Properties properties) {
@@ -127,12 +126,13 @@ public class StormSirenBlock extends Block {
             TORNADO_LAST_SOUND.remove(posKey);
         }
 
-        if (isSevereStormNearby(level, pos)) {
-            long nextAllowed = STORM_COOLDOWNS.getOrDefault(posKey, 0L);
-            if (now >= nextAllowed) {
-                level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
-                STORM_COOLDOWNS.put(posKey, now + STORM_WARNING_DURATION_TICKS);
-            }
+        boolean severeStorm = isSevereStormNearby(level, pos);
+        boolean wasSevere = STORM_ACTIVE.getOrDefault(posKey, false);
+        if (severeStorm && !wasSevere) {
+            level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
+            STORM_ACTIVE.put(posKey, true);
+        } else if (!severeStorm && wasSevere) {
+            STORM_ACTIVE.remove(posKey);
         }
 
         level.scheduleTick(pos, this, CHECK_INTERVAL_TICKS);

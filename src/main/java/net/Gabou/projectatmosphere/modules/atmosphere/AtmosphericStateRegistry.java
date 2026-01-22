@@ -43,17 +43,41 @@ public final class AtmosphericStateRegistry {
         for (ServerPlayer player : level.players()) {
             BlockPos p = player.blockPosition();
             for (RegionAtmosphereState state : STATES.values()) {
-                BlockPos anchor = state.getPosition();
-                if (anchor == null) {
+                if (state == null) {
                     continue;
                 }
-                double dx = anchor.getX() - p.getX();
-                double dz = anchor.getZ() - p.getZ();
-                if ((dx * dx + dz * dz) <= r2) {
-                    ACTIVE.add(state.getRegionId());
+                RegionInstanceKey key = state.getRegionId();
+                if (key == null) {
+                    continue;
+                }
+                if (key.contains(p) || isWithinRegionRadius(key, p, r2)) {
+                    ACTIVE.add(key);
                 }
             }
         }
+    }
+
+    private static boolean isWithinRegionRadius(RegionInstanceKey key, BlockPos pos, int radiusSquared) {
+        int size = key.regionSize();
+        int minX = key.regionX() * size;
+        int minZ = key.regionZ() * size;
+        int maxX = minX + size - 1;
+        int maxZ = minZ + size - 1;
+        int px = pos.getX();
+        int pz = pos.getZ();
+        int dx = 0;
+        int dz = 0;
+        if (px < minX) {
+            dx = minX - px;
+        } else if (px > maxX) {
+            dx = px - maxX;
+        }
+        if (pz < minZ) {
+            dz = minZ - pz;
+        } else if (pz > maxZ) {
+            dz = pz - maxZ;
+        }
+        return (dx * dx + dz * dz) <= radiusSquared;
     }
 
     public static void replaceActiveStates(Set<RegionInstanceKey> next) {

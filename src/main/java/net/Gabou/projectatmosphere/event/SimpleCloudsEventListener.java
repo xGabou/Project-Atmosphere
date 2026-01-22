@@ -15,14 +15,22 @@ import net.Gabou.projectatmosphere.modules.wind.WindEngine;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec2;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class SimpleCloudsEventListener {
+    private static final float CLOUD_DIRECTION_VARIANCE_RAD = 0.15f;
+    private static final float CLOUD_DIRECTION_WOBBLE_RAD = 0.06f;
+    private static final float CLOUD_SPEED_VARIANCE = 0.12f;
+    private static final int CLOUD_DRIFT_PERIOD_TICKS = 24000;
+    private static final float TWO_PI = (float) (Math.PI * 2.0);
 
     @SubscribeEvent
     public static void onCloudRegionSpawn(CloudRegionNaturallySpawnEvent event) {
@@ -68,6 +76,8 @@ public class SimpleCloudsEventListener {
             float finalSpeed = getFinalSpeed(stormFactor, currentSpeed, region);
             WindVector.set(regionKey, finalSpeed, dirDeg);
         }
+
+        applyCloudShear(event, current, serverLevel.getGameTime());
     }
 
     private static float getFinalSpeed(float stormFactor, float currentSpeed, ScAPICloudRegion region) {
@@ -95,5 +105,40 @@ public class SimpleCloudsEventListener {
 
     @SubscribeEvent
     public static void onModifyCloudSpeed(ModifyCloudSpeedEvent event) {
+    }
+
+    private static void applyCloudShear(CloudRegionTickEvent event, WindVector wind, long gameTime) {
+        ScAPICloudRegion region = event.getCloudRegion();
+        int id = getStableCloudId(region);
+        float baseOffset = (hashToUnit(id) - 0.5f) * 2.0f * CLOUD_DIRECTION_VARIANCE_RAD;
+        float wobblePhase = hashToUnit(id * 31 + 7) * TWO_PI;
+        float wobble = Mth.sin((gameTime / (float) CLOUD_DRIFT_PERIOD_TICKS) * TWO_PI + wobblePhase) * CLOUD_DIRECTION_WOBBLE_RAD;
+        float angle = wind.angleRadians() + baseOffset + wobble;
+        Vec2 direction = new Vec2((float) -Math.sin(angle), (float) Math.cos(angle));
+        if (direction.length() > 0.001f) {
+            event.setModifiedMovementDirection(direction.normalized());
+        }
+
+        float speedScale = 1.0f + (hashToUnit(id * 13 + 101) - 0.5f) * 2.0f * CLOUD_SPEED_VARIANCE;
+        float baseMaxSpeed = region.getMaxSpeed();
+        float scaledSpeed = Math.max(0.001f, baseMaxSpeed * speedScale);
+        event.setModifiedMaxSpeed(scaledSpeed);
+    }
+
+    private static int getStableCloudId(ScAPICloudRegion region) {
+        if (region instanceof ICloudRegionId id) {
+            return id.projectatmosphere$getId();
+        }
+        return System.identityHashCode(region);
+    }
+
+    private static float hashToUnit(int value) {
+        int x = value;
+        x ^= (x >>> 16);
+        x *= 0x7feb352d;
+        x ^= (x >>> 15);
+        x *= 0x846ca68b;
+        x ^= (x >>> 16);
+        return (x & 0x7fffffff) / (float) Integer.MAX_VALUE;
     }
 }
