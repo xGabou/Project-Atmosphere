@@ -287,7 +287,6 @@ public class ForecastGenerator {
 
     private static void dailyAndSand(ServerLevel level) {
         DailyForecastGenerator.scheduleAll(level, FORECAST_MAP);
-        FORECAST_MAP.forEach(ForecastOrchestrator::generateWindForecast);
 
         computeAverageForecastsByBiomeType();
         FORECAST_MAP.forEach(ForecastPointerRegistry::setPointer);
@@ -387,6 +386,7 @@ public class ForecastGenerator {
             entry.getValue().setWind(generateWind(entry.getKey()));
         }
         computeAverageWindWeek();
+        computeAverageForecastsByBiomeType();
 
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             entry.getValue().setStormChance(generateStorm(

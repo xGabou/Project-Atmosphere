@@ -26,6 +26,11 @@ public class CompatHandler {
         return ModList.get().isLoaded("sandstorm");
     }
 
+    public static boolean isRainbowsLoaded() {
+        // CurseForge project is "rainboows" but mod id may vary between forks.
+        return ModList.get().isLoaded("rainboows") || ModList.get().isLoaded("rainbows");
+    }
+
 
 
     public static boolean isToughAsNailsLoaded() {

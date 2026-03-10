@@ -30,5 +30,17 @@ public class NetworkHandler {
                 BiomeDayTemperaturePacket.STREAM_CODEC,
                 BiomeDayTemperaturePacket::handle
         );
+
+        registrar.playToClient(
+                InstrumentReadoutPacket.TYPE,
+                InstrumentReadoutPacket.STREAM_CODEC,
+                InstrumentReadoutPacket::handle
+        );
+
+        registrar.playToClient(
+                RainfallUpdatePacket.TYPE,
+                RainfallUpdatePacket.STREAM_CODEC,
+                RainfallUpdatePacket::handle
+        );
     }
 }

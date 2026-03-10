@@ -1,29 +1,19 @@
 package net.Gabou.projectatmosphere.config;
 
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.common.ModConfigSpec;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.config.ModConfigEvent;
-import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+public final class AtmoCommonConfig {
+    public static final ModConfigSpec COMMON_SPEC;
 
-
-
-
-public class AtmoCommonConfig {
     public static final ModConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ModConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
+
     public static final ModConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ModConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
     public static final ModConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
     public static final ModConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
     public static final ModConfigSpec.BooleanValue DAMAGE_GLASS_ON_TORNADO;
+
     public static final ModConfigSpec.DoubleValue TORNADO_CHECK_INTERVAL_SEC;
     public static final ModConfigSpec.DoubleValue TORNADO_BASE_SPAWN_RADIUS_M;
     public static final ModConfigSpec.DoubleValue TORNADO_MIN_TEMP_CONTRAST_C;
@@ -40,10 +30,9 @@ public class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MIN;
     public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ModConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
+
     public static final ModConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
     public static final ModConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
-
-
 
     public static final ModConfigSpec.DoubleValue WIND_BASE_RETARGET_SEC;
     public static final ModConfigSpec.DoubleValue WIND_DIR_RETARGET_SEC;
@@ -51,11 +40,40 @@ public class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue WIND_GUST_DECAY_MPS;
     public static final ModConfigSpec.DoubleValue WIND_STORM_GUST_MULT;
     public static final ModConfigSpec.DoubleValue WIND_PUSH_THRESHOLD_MPS;
+    public static final ModConfigSpec.DoubleValue WIND_PUSH_RAMP_MPS;
     public static final ModConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
     public static final ModConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
+    public static final ModConfigSpec.DoubleValue WIND_PARTICLE_BEND_STRENGTH;
+
+    public static final ModConfigSpec.DoubleValue PLAYER_WIND_THRESHOLD_MPS;
+    public static final ModConfigSpec.DoubleValue PLAYER_MAX_GUST_BPT;
+    public static final ModConfigSpec.DoubleValue PLAYER_GUST_CHANCE_SCALE;
+    public static final ModConfigSpec.DoubleValue PLAYER_GUST_CHANCE_DIVIDER;
+    public static final ModConfigSpec.DoubleValue PLAYER_GUST_STRENGTH_SCALE;
+    public static final ModConfigSpec.IntValue PLAYER_GUST_DURATION_MIN;
+    public static final ModConfigSpec.IntValue PLAYER_GUST_DURATION_MAX;
+    public static final ModConfigSpec.DoubleValue PLAYER_GUST_ANGLE_VARIANCE_DEG;
+    public static final ModConfigSpec.DoubleValue PLAYER_GUST_EXTREME_THRESHOLD_MPS;
+    public static final ModConfigSpec.DoubleValue PLAYER_GUST_EXTREME_CHANCE_MULT;
+    public static final ModConfigSpec.DoubleValue PLAYER_GUST_EXTREME_STRENGTH_MULT;
+
+    public static final ModConfigSpec.BooleanValue WORLD_EFFECTS_ENABLED;
+    public static final ModConfigSpec.IntValue WORLD_EFFECT_SAMPLES_PER_PLAYER;
+    public static final ModConfigSpec.IntValue WORLD_EFFECT_SAMPLE_RADIUS;
+    public static final ModConfigSpec.DoubleValue CLOUD_BURN_PREVENT_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue CLOUD_FIRE_DAMP_THRESHOLD;
+    public static final ModConfigSpec.IntValue CLOUD_FIRE_DAMP_TICKS;
+    public static final ModConfigSpec.DoubleValue FIRE_EXTINGUISH_BASE_CHANCE;
+    public static final ModConfigSpec.DoubleValue CAULDRON_FILL_BASE_CHANCE;
+
+    public static final ModConfigSpec.BooleanValue TELEMETRY_ENABLED;
+    public static final ModConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
+
+    public static final ModConfigSpec.BooleanValue DEBUG_MODE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+
         builder.push("performance");
         FORCE_SHARED_EXECUTOR = builder
                 .comment("Force use of shared executor for all async tasks, regardless of CPU count")
@@ -64,11 +82,13 @@ public class AtmoCommonConfig {
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
         builder.pop();
+
         builder.push("display");
         DISPLAY_UNITS_IMPERIAL = builder
                 .comment("Display values in imperial units (F, mph, inHg) instead of metric (C, m/s, hPa)")
                 .define("imperialUnits", false);
         builder.pop();
+
         builder.push("storms");
         STORM_SEVERITY_BOOSTER = builder
                 .comment("Global multiplier for storm severity (affects wind speed and precipitation intensity)")
@@ -88,6 +108,7 @@ public class AtmoCommonConfig {
         DAMAGE_GLASS_ON_TORNADO = builder
                 .comment("Enable glass damage when a tornado passes over it")
                 .define("damageGlassOnTornado", true);
+
         builder.push("tornado");
         TORNADO_CHECK_INTERVAL_SEC = builder
                 .comment("Seconds between tornado spawn checks")
@@ -138,7 +159,8 @@ public class AtmoCommonConfig {
                 .comment("Cooldown in minutes before a cell can spawn another tornado")
                 .defineInRange("cellCooldownMinutes", 20, 0, Integer.MAX_VALUE);
         builder.pop();
-        builder.pop();
+
+        builder.pop(); // storms
 
         builder.push("wind");
         WIND_BASE_RETARGET_SEC = builder
@@ -159,17 +181,99 @@ public class AtmoCommonConfig {
         WIND_PUSH_THRESHOLD_MPS = builder
                 .comment("Minimum wind speed to push entities")
                 .defineInRange("pushThresholdMps", 6.0d, 0d, 100d);
+        WIND_PUSH_RAMP_MPS = builder
+                .comment("Wind speed ramp around the threshold for smoothing (m/s)")
+                .defineInRange("pushRampMps", 5.0d, 0d, 100d);
         WIND_PLAYER_PUSH_SCALE = builder
                 .comment("Push scale applied to players")
-                .defineInRange("playerPushScale", 0.04d, 0d, 1d);
+                .defineInRange("playerPushScale", 0.013333333333d, 0d, 1d);
         WIND_ENTITY_PUSH_SCALE = builder
                 .comment("Push scale applied to other entities")
-                .defineInRange("entityPushScale", 0.03d, 0d, 1d);
+                .defineInRange("entityPushScale", 0.01d, 0d, 1d);
+        WIND_PARTICLE_BEND_STRENGTH = builder
+                .comment("Blend strength for steering wind-bent particles per tick")
+                .defineInRange("particleBendStrength", 0.08d, 0d, 1d);
+
+        PLAYER_WIND_THRESHOLD_MPS = builder
+                .comment("Minimum base wind speed (m/s) before player gusts can occur")
+                .defineInRange("playerWindThresholdMps", 11.1d, 0d, 100d);
+        PLAYER_MAX_GUST_BPT = builder
+                .comment("Maximum per-tick gust impulse for players (blocks per tick)")
+                .defineInRange("playerMaxGustBpt", 0.002d, 0d, 0.2d);
+        PLAYER_GUST_CHANCE_SCALE = builder
+                .comment("Scale for gust chance once wind exceeds the threshold")
+                .defineInRange("playerGustChanceScale", 0.03d, 0d, 1d);
+        PLAYER_GUST_CHANCE_DIVIDER = builder
+                .comment("Divider for excess wind when computing gust chance (m/s)")
+                .defineInRange("playerGustChanceDivider", 15d, 1d, 100d);
+        PLAYER_GUST_STRENGTH_SCALE = builder
+                .comment("Strength scale applied to excess wind for player gusts")
+                .defineInRange("playerGustStrengthScale", 0.006666666667d, 0d, 1d);
+        PLAYER_GUST_DURATION_MIN = builder
+                .comment("Minimum gust duration for players (ticks)")
+                .defineInRange("playerGustDurationMin", 10, 1, 200);
+        PLAYER_GUST_DURATION_MAX = builder
+                .comment("Maximum gust duration for players (ticks)")
+                .defineInRange("playerGustDurationMax", 40, 1, 200);
+        PLAYER_GUST_ANGLE_VARIANCE_DEG = builder
+                .comment("Angle variance applied to gust direction (degrees)")
+                .defineInRange("playerGustAngleVarianceDeg", 10d, 0d, 45d);
+        PLAYER_GUST_EXTREME_THRESHOLD_MPS = builder
+                .comment("Wind speed at which extreme gust multipliers kick in (m/s)")
+                .defineInRange("playerGustExtremeThresholdMps", 30d, 0d, 100d);
+        PLAYER_GUST_EXTREME_CHANCE_MULT = builder
+                .comment("Multiplier applied to gust chance in extreme winds")
+                .defineInRange("playerGustExtremeChanceMult", 2.5d, 1d, 10d);
+        PLAYER_GUST_EXTREME_STRENGTH_MULT = builder
+                .comment("Multiplier applied to max gust strength in extreme winds")
+                .defineInRange("playerGustExtremeStrengthMult", 2.0d, 1d, 10d);
+        builder.pop();
+
+        builder.push("worldEffects");
+        WORLD_EFFECTS_ENABLED = builder
+                .comment("Enable Project Atmosphere world effects (cloud burn suppression, rain extinguish, cauldron filling)")
+                .define("enabled", true);
+        WORLD_EFFECT_SAMPLES_PER_PLAYER = builder
+                .comment("Random sample count per player per tick for weather world effects")
+                .defineInRange("samplesPerPlayerPerTick", 12, 0, 128);
+        WORLD_EFFECT_SAMPLE_RADIUS = builder
+                .comment("Sampling radius in blocks around each player")
+                .defineInRange("sampleRadiusBlocks", 64, 8, 512);
+        CLOUD_BURN_PREVENT_THRESHOLD = builder
+                .comment("Cloud cover threshold above which sun-burning mobs stop igniting")
+                .defineInRange("cloudBurnPreventionThreshold", 0.75d, 0d, 1d);
+        CLOUD_FIRE_DAMP_THRESHOLD = builder
+                .comment("Cloud cover threshold above which burning mobs cool down faster")
+                .defineInRange("cloudFireDampThreshold", 0.90d, 0d, 1d);
+        CLOUD_FIRE_DAMP_TICKS = builder
+                .comment("Extra fire ticks removed per tick when clouds are very dense")
+                .defineInRange("cloudFireDampTicks", 4, 0, 200);
+        FIRE_EXTINGUISH_BASE_CHANCE = builder
+                .comment("Base chance per sample to extinguish fire/campfires when raining (scaled by rain intensity)")
+                .defineInRange("fireExtinguishBaseChance", 0.12d, 0d, 1d);
+        CAULDRON_FILL_BASE_CHANCE = builder
+                .comment("Base chance per sample to fill cauldrons when raining (scaled by rain intensity)")
+                .defineInRange("cauldronFillBaseChance", 0.06d, 0d, 1d);
+        builder.pop();
+
+        builder.push("telemetry");
+        TELEMETRY_ENABLED = builder
+                .comment("Enable lightweight telemetry collection for diagnostics")
+                .define("enableTelemetry", true);
+        TELEMETRY_RETENTION_DAYS = builder
+                .comment("Number of days to retain exported telemetry archives before pruning")
+                .defineInRange("telemetryRetentionDays", 14, 0, 365);
+        builder.pop();
+
+        builder.push("debug");
+        DEBUG_MODE = builder
+                .comment("Enable debug mode for verbose logging and diagnostics")
+                .define("debugMode", false);
         builder.pop();
 
         COMMON_SPEC = builder.build();
     }
 
-    public static final ModConfigSpec COMMON_SPEC;
+    private AtmoCommonConfig() { }
 }
 

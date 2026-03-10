@@ -1,80 +1,97 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
+import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.RegionIdCodec;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
+/**
+ * Central wind orchestrator. Maintains forecasts and runtime states for both high and low wind layers.
+ */
 public final class WindEngine {
-    private static final Map<BiomeInstanceKey, WindForecast> FORECASTS = new HashMap<>();
-    private static final Map<BiomeInstanceKey, WindRuntimeState> STATES = new HashMap<>();
+    private static final Map<RegionInstanceKey, WindForecast> FORECASTS = new HashMap<>();
+    private static final Map<RegionInstanceKey, WindRuntimeState> STATES = new HashMap<>();
 
     private WindEngine() { }
 
-    public static void init() {
-        // load storage if needed
+    public static void rebuildFromForecasts(Map<BiomeInstanceKey, BiomeForecast> biomeForecasts) {
+        FORECASTS.clear();
+        biomeForecasts.forEach((key, forecast) -> {
+            RegionInstanceKey id = RegionIdCodec.ofBlockPos(key.samplePos());
+            FORECASTS.put(id, WindForecast.fromBiomeForecast(forecast));
+        });
     }
 
-    public static WindRuntimeState getOrCreateRuntime(BiomeInstanceKey key, ServerLevel level) {
-        return STATES.computeIfAbsent(key, k -> new WindRuntimeState());
-    }
-
-    public static void tick(ServerLevel level) {
-        WindForecastPart part = resolvePart(level);
+    public static void tick(ServerLevel level, Set<BiomeInstanceKey> activeKeys) {
         long now = level.getGameTime();
-        for (Map.Entry<BiomeInstanceKey, WindRuntimeState> entry : STATES.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            WindRuntimeState state = entry.getValue();
-            WindForecast forecast = FORECASTS.get(key);
+        for (BiomeInstanceKey key : activeKeys) {
+            RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
+            WindForecast forecast = FORECASTS.get(regionId);
             if (forecast == null) {
-                WindVector.WindSample sample = WindVector.getOrFallback(key);
-                WindVector.set(key, sample.speedMps(), sample.directionDeg());
                 continue;
             }
-            if (state.getNextRetargetTick() <= now) {
-                FloatRange base = forecast.getBaseRanges().get(part);
-                if (base != null) {
-                    state.setTargetBaseSpeed(base.random(new java.util.Random()));
-                }
-                FloatRange dir = forecast.getDirRangesDeg().get(part);
-                if (dir != null) {
-                    state.setTargetDirectionDeg(dir.random(new java.util.Random()));
-                }
-                state.setNextRetargetTick(now + (long) (WindConfig.baseRetargetSec() * 20));
-            }
-            float speed = state.getCurrentBaseSpeed() + (state.getTargetBaseSpeed() - state.getCurrentBaseSpeed()) * 0.1f;
-            state.setCurrentBaseSpeed(speed);
-            float dirCur = state.getCurrentDirectionDeg() + (state.getTargetDirectionDeg() - state.getCurrentDirectionDeg()) * 0.1f;
-            state.setCurrentDirectionDeg(dirCur);
+            WindRuntimeState runtime = STATES.computeIfAbsent(regionId, k -> new WindRuntimeState());
+            float stormChance = ForecastOrchestrator.getCurrentStormChance(key, now);
 
-            WindGustManager.tick(state, forecast, part, key, level, now);
-            float effective = state.getCurrentBaseSpeed() + state.getCurrentGustSpeed();
-            WindVector.set(key, effective, state.getCurrentDirectionDeg());
+            WindVector high = HighWindModel.sample(forecast, runtime, now);
+            WindVector low = LowWindModel.sample(forecast, runtime, now, stormChance);
+
+            RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionId);
+            if (state != null) {
+                state.setWind(low);
+            }
+
+            WindVector.WindSample sample = new WindVector.WindSample(low.baseSpeed(),
+                    (float) Math.toDegrees(low.angleRadians()));
+            RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
+            WindVector.set(regionKey, sample.speedMps(), sample.directionDeg());
         }
     }
 
-    public static WindForecast getForecast(BiomeInstanceKey key) {
-        return FORECASTS.get(key);
+    public static WindVector getCurrentHighWindVector(BiomeInstanceKey key, long worldTime) {
+        RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
+        return getCurrentHighWindVector(regionId, worldTime);
     }
 
-    public static void putForecast(BiomeInstanceKey key, WindForecast forecast) {
-        FORECASTS.put(key, forecast);
+    public static WindVector getCurrentHighWindVector(RegionInstanceKey regionId, long worldTime) {
+        WindRuntimeState runtime = STATES.computeIfAbsent(regionId, k -> new WindRuntimeState());
+        WindForecast forecast = FORECASTS.get(regionId);
+        if (forecast == null) {
+            return WindVector.fromBase(0f, 0f);
+        }
+        return HighWindModel.sample(forecast, runtime, worldTime);
     }
 
-    public static WindForecastPart resolvePart(ServerLevel level) {
-        long time = level.getDayTime() % 24000L;
-        if (time < 4000L) return WindForecastPart.MORNING;
-        if (time < 8000L) return WindForecastPart.NOON;
-        if (time < 12000L) return WindForecastPart.AFTERNOON;
-        if (time < 16000L) return WindForecastPart.EVENING;
-        if (time < 20000L) return WindForecastPart.MIDNIGHT;
-        return WindForecastPart.NIGHT;
+    public static WindVector getCurrentLowWindVector(BiomeInstanceKey key, long worldTime) {
+        RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
+        return getCurrentLowWindVector(regionId, worldTime, ForecastOrchestrator.getCurrentStormChance(key, worldTime));
     }
 
-    public static void syncToClients(BiomeInstanceKey key, ServerLevel level) {
-        // networking stub
+    public static WindVector getCurrentLowWindVector(RegionInstanceKey regionId, long worldTime, float stormChance) {
+        WindRuntimeState runtime = STATES.computeIfAbsent(regionId, k -> new WindRuntimeState());
+        WindForecast forecast = FORECASTS.get(regionId);
+        if (forecast == null) {
+            return WindVector.fromBase(0f, 0f);
+        }
+        return LowWindModel.sample(forecast, runtime, worldTime, stormChance);
+    }
+
+    public static boolean isGustActive(BiomeInstanceKey key) {
+        WindRuntimeState runtime = STATES.get(RegionIdCodec.ofBlockPos(key.samplePos()));
+        return runtime != null && runtime.isGustActive();
+    }
+
+    public static TornadoWindModel.TornadoForces getCurrentTornadoForce(Vec3 position) {
+        return TornadoWindModel.compute(position);
     }
 }
-

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.api;
 
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
 public final class WindVectorApi {
@@ -9,8 +10,12 @@ public final class WindVectorApi {
     public record WindSample(float speedMps, float directionDeg) {}
 
     public static WindSample getSurface(BiomeInstanceKey key) {
+        if (key == null || key.samplePos() == null) {
+            return new WindSample(0f, 0f);
+        }
+        RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
         net.Gabou.projectatmosphere.modules.core.WindVector.WindSample w =
-                net.Gabou.projectatmosphere.modules.core.WindVector.getOrFallback(key);
+                net.Gabou.projectatmosphere.modules.core.WindVector.getOrFallback(regionKey);
         return new WindSample(w.speedMps(), w.directionDeg());
     }
 

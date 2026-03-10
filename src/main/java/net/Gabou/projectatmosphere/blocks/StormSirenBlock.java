@@ -3,20 +3,30 @@ package net.Gabou.projectatmosphere.blocks;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.util.WeatherSampler;
 import net.Gabou.projectatmosphere.registry.ModSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Block that acts as a storm siren. Periodically samples the surrounding
@@ -24,37 +34,140 @@ import java.util.Set;
  * storm is nearby.
  */
 public class StormSirenBlock extends Block {
-    private static final int CHECK_RADIUS = 400;
-    private static final float INTENSITY_THRESHOLD = 6.0f;
+
+    public static final EnumProperty<DoubleBlockHalf> HALF = BlockStateProperties.DOUBLE_BLOCK_HALF;
+    private static final int CHECK_INTERVAL_TICKS = 40;
+    private static final int STORM_WARNING_RADIUS = 500;
+    private static final int TORNADO_WARNING_RADIUS = 500;
+    private static final int TORNADO_SOUND_INTERVAL_TICKS = 40;
+    private static final float INTENSITY_THRESHOLD = 7.0f;
+    private static final Map<Long, Boolean> STORM_ACTIVE = new ConcurrentHashMap<>();
+    private static final Map<Long, Long> TORNADO_LAST_SOUND = new ConcurrentHashMap<>();
 
     public StormSirenBlock(Properties properties) {
         super(properties);
+        this.registerDefaultState(this.defaultBlockState().setValue(HALF, DoubleBlockHalf.LOWER));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(HALF);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        BlockPos pos = ctx.getClickedPos();
+        Level level = ctx.getLevel();
+
+        if (pos.getY() < level.getMaxBuildHeight() - 1 && level.getBlockState(pos.above()).canBeReplaced(ctx)) {
+            return this.defaultBlockState().setValue(HALF, DoubleBlockHalf.LOWER);
+        }
+
+        return null;
+    }
+
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
+        level.setBlock(
+                pos.above(),
+                this.defaultBlockState().setValue(HALF, DoubleBlockHalf.UPPER),
+                3
+        );
+    }
+
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        DoubleBlockHalf half = state.getValue(HALF);
+
+        if (half == DoubleBlockHalf.UPPER) {
+            BlockPos below = pos.below();
+            BlockState belowState = level.getBlockState(below);
+
+            if (belowState.getBlock() == this) {
+                level.destroyBlock(below, !player.isCreative());
+            }
+
+        } else {
+            BlockPos above = pos.above();
+            BlockState aboveState = level.getBlockState(above);
+
+            if (aboveState.getBlock() == this) {
+                level.destroyBlock(above, false);
+            }
+        }
+
+        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override
     public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
         super.onPlace(state, level, pos, oldState, isMoving);
-        if (!level.isClientSide) {
-            level.scheduleTick(pos, this, 200); // 200 ticks = 10 seconds
+        if (!level.isClientSide && state.getValue(HALF) == DoubleBlockHalf.LOWER) {
+            level.scheduleTick(pos, this, CHECK_INTERVAL_TICKS);
         }
     }
 
     @Override
     public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        List<CloudRegion> lst = CloudManager.get(level).getClouds().stream().filter(cloudRegion -> CloudLibrary.getSeverityFromRessourceLocation(cloudRegion.getCloudTypeId())>=7).toList();
-        if(lst.isEmpty()) {
-            level.scheduleTick(pos, this, 200); // 200 ticks = 10 seconds
+        if (state.getValue(HALF) == DoubleBlockHalf.UPPER) {
             return;
         }
-        if (lst.stream().anyMatch(cloudRegion -> {
+
+        long now = level.getGameTime();
+        long posKey = pos.asLong();
+
+        if (isTornadoNearby(level, pos)) {
+            long lastSound = TORNADO_LAST_SOUND.getOrDefault(posKey, Long.valueOf(TORNADO_SOUND_INTERVAL_TICKS));
+            if (now - lastSound >= TORNADO_SOUND_INTERVAL_TICKS) {
+                level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
+                TORNADO_LAST_SOUND.put(posKey, now);
+            }
+        } else {
+            TORNADO_LAST_SOUND.remove(posKey);
+        }
+
+        boolean severeStorm = isSevereStormNearby(level, pos);
+        boolean wasSevere = STORM_ACTIVE.getOrDefault(posKey, false);
+        if (severeStorm && !wasSevere) {
+            level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
+            STORM_ACTIVE.put(posKey, true);
+        } else if (!severeStorm && wasSevere) {
+            STORM_ACTIVE.remove(posKey);
+        }
+
+        level.scheduleTick(pos, this, CHECK_INTERVAL_TICKS);
+    }
+
+    private static boolean isTornadoNearby(ServerLevel level, BlockPos pos) {
+        double radiusSq = TORNADO_WARNING_RADIUS * TORNADO_WARNING_RADIUS;
+        return net.Gabou.projectatmosphere.modules.tornado.TornadoManager.getActiveTornadoes().stream()
+                .anyMatch(tornado -> {
+                    double dx = tornado.position.x - pos.getX();
+                    double dz = tornado.position.z - pos.getZ();
+                    return dx * dx + dz * dz <= radiusSq;
+                });
+    }
+
+    private static boolean isSevereStormNearby(ServerLevel level, BlockPos pos) {
+        List<CloudRegion> clouds = CloudManager.get(level).getClouds().stream()
+                .filter(cloudRegion -> CloudLibrary.getSeverityFromRessourceLocation(cloudRegion.getCloudTypeId()) >= INTENSITY_THRESHOLD)
+                .toList();
+        if (clouds.isEmpty()) {
+            return false;
+        }
+        double radiusSq = STORM_WARNING_RADIUS * STORM_WARNING_RADIUS;
+        return clouds.stream().anyMatch(cloudRegion -> {
             double dx = cloudRegion.getWorldX() - pos.getX();
             double dz = cloudRegion.getWorldZ() - pos.getZ();
-            return dx * dx + dz * dz < CHECK_RADIUS * CHECK_RADIUS;
-        })) {
-            level.playSound(null, pos, ModSounds.WEATHER_SIREN.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
-        }
-        level.scheduleTick(pos, this, 200); // 200 ticks = 10 seconds
-
+            return dx * dx + dz * dz <= radiusSq;
+        });
     }
+    @Override
+    public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        return Shapes.empty();
+    }
+
+
+
 }
 

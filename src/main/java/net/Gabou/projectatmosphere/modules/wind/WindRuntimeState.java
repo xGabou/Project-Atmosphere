@@ -1,36 +1,60 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
 public final class WindRuntimeState {
-    private float currentBaseSpeed;
-    private float currentGustSpeed;
-    private float currentDirectionDeg;
+    private float currentHighSpeed;
+    private float currentHighDirectionDeg;
+    private float currentLowSpeed;
+    private float currentLowDirectionDeg;
+    private float currentGustBonus;
+    private boolean gustActive;
     private long gustEndTick;
-    private float targetBaseSpeed;
-    private float targetDirectionDeg;
-    private long nextRetargetTick;
 
-    public float getCurrentBaseSpeed() {
-        return currentBaseSpeed;
+    public float getCurrentHighSpeed() {
+        return currentHighSpeed;
     }
 
-    public void setCurrentBaseSpeed(float currentBaseSpeed) {
-        this.currentBaseSpeed = currentBaseSpeed;
+    public void setCurrentHighSpeed(float currentHighSpeed) {
+        this.currentHighSpeed = currentHighSpeed;
     }
 
-    public float getCurrentGustSpeed() {
-        return currentGustSpeed;
+    public float getCurrentHighDirectionDeg() {
+        return currentHighDirectionDeg;
     }
 
-    public void setCurrentGustSpeed(float currentGustSpeed) {
-        this.currentGustSpeed = currentGustSpeed;
+    public void setCurrentHighDirectionDeg(float currentHighDirectionDeg) {
+        this.currentHighDirectionDeg = currentHighDirectionDeg;
     }
 
-    public float getCurrentDirectionDeg() {
-        return currentDirectionDeg;
+    public float getCurrentLowSpeed() {
+        return currentLowSpeed;
     }
 
-    public void setCurrentDirectionDeg(float currentDirectionDeg) {
-        this.currentDirectionDeg = currentDirectionDeg;
+    public void setCurrentLowSpeed(float currentLowSpeed) {
+        this.currentLowSpeed = currentLowSpeed;
+    }
+
+    public float getCurrentLowDirectionDeg() {
+        return currentLowDirectionDeg;
+    }
+
+    public void setCurrentLowDirectionDeg(float currentLowDirectionDeg) {
+        this.currentLowDirectionDeg = currentLowDirectionDeg;
+    }
+
+    public float getCurrentGustBonus() {
+        return currentGustBonus;
+    }
+
+    public void setCurrentGustBonus(float currentGustBonus) {
+        this.currentGustBonus = currentGustBonus;
+    }
+
+    public boolean isGustActive() {
+        return gustActive;
+    }
+
+    public void setGustActive(boolean gustActive) {
+        this.gustActive = gustActive;
     }
 
     public long getGustEndTick() {
@@ -39,30 +63,6 @@ public final class WindRuntimeState {
 
     public void setGustEndTick(long gustEndTick) {
         this.gustEndTick = gustEndTick;
-    }
-
-    public float getTargetBaseSpeed() {
-        return targetBaseSpeed;
-    }
-
-    public void setTargetBaseSpeed(float targetBaseSpeed) {
-        this.targetBaseSpeed = targetBaseSpeed;
-    }
-
-    public float getTargetDirectionDeg() {
-        return targetDirectionDeg;
-    }
-
-    public void setTargetDirectionDeg(float targetDirectionDeg) {
-        this.targetDirectionDeg = targetDirectionDeg;
-    }
-
-    public long getNextRetargetTick() {
-        return nextRetargetTick;
-    }
-
-    public void setNextRetargetTick(long nextRetargetTick) {
-        this.nextRetargetTick = nextRetargetTick;
     }
 }
 

@@ -11,7 +11,8 @@ group = mod_group_id
 version = mod_version
 
 base {
-    archivesName = mod_id
+    // Include MC + loader in the jar name so NeoForge artifacts are distinct from Forge builds.
+    archivesName = "${mod_id}-${minecraft_version}-neoforge"
 }
 repositories {
     maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
@@ -180,7 +181,13 @@ idea {
     }
 }
 modrinth {
-    token = System.getenv("MODRINTH_TOKEN")
+    // Avoid failing local builds when secrets aren't present.
+    def modrinthToken = System.getenv("MODRINTH_TOKEN")
+    if (!modrinthToken) {
+        project.logger.lifecycle("MODRINTH_TOKEN not set; Modrinth publish tasks will be disabled.")
+        tasks.matching { it.name.toLowerCase().contains("modrinth") }.configureEach { enabled = false }
+    }
+    token = modrinthToken
     projectId = "qIWoLcKJ" // from your Modrinth project URL
     versionNumber = "NeoForge-${project.version}"
     versionName = "Project Atmosphere ${mod_version}"
@@ -195,17 +202,23 @@ modrinth {
     }
     uploadFile = file("build/libs/${archivesBaseName}-${version}.jar")
 }
-curseforge {
-    apiKey = System.getenv("CURSEFORGE_TOKEN")
+def curseforgeToken = System.getenv("CURSEFORGE_TOKEN")
+if (!curseforgeToken) {
+    project.logger.lifecycle("CURSEFORGE_TOKEN not set; CurseForge upload tasks will be disabled.")
+    tasks.matching { it.name.toLowerCase().contains("curseforge") }.configureEach { enabled = false }
+} else {
+    curseforge {
+        apiKey = curseforgeToken
 
-    project {
-        id = "1258344"
-        changelog = rootProject.file("PAchangelog.md")
-        releaseType = "beta" // options: alpha, beta, release
-        addGameVersion "1.21.1"
-        addGameVersion "NeoForge"
-        mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
-            displayName = "NeoForge-${version}"
+        project {
+            id = "1258344"
+            changelog = rootProject.file("PAchangelog.md")
+            releaseType = "beta" // options: alpha, beta, release
+            addGameVersion "1.21.1"
+            addGameVersion "NeoForge"
+            mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
+                displayName = "NeoForge-${version}"
+            }
         }
     }
 }
@@ -236,5 +249,3 @@ tasks.register("discordWebhook") {
         }
     }
 }
-
-

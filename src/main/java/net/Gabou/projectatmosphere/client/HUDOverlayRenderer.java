@@ -9,12 +9,8 @@ import net.neoforged.neoforge.common.NeoForge;
 
 public class HUDOverlayRenderer {
 
-    private static String temperatureMessage = null;
-    private static long displayUntil = 0;
-
     public static void showTemperatureOverlay(String msg) {
-        temperatureMessage = msg;
-        displayUntil = System.currentTimeMillis() + 3000; // show for 3s
+        OverlayMessageState.show(msg, 3000L);
     }
 
     public static void register() {
@@ -22,8 +18,9 @@ public class HUDOverlayRenderer {
     }
 
     private static void onRenderOverlay(RenderGuiEvent.Post event) {
-        if (temperatureMessage == null || System.currentTimeMillis() > displayUntil) {
-            temperatureMessage = null;
+        String message = OverlayMessageState.getMessage();
+        if (message == null || System.currentTimeMillis() > OverlayMessageState.getDisplayUntilMillis()) {
+            OverlayMessageState.clear();
             return;
         }
 
@@ -34,9 +31,9 @@ public class HUDOverlayRenderer {
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         int screenHeight = mc.getWindow().getGuiScaledHeight();
 
-        int x = (screenWidth - font.width(temperatureMessage)) / 2;
+        int x = (screenWidth - font.width(message)) / 2;
         int y = screenHeight - 60;
 
-        guiGraphics.drawString(font, temperatureMessage, x, y, 0xFFFFFF, true);
+        guiGraphics.drawString(font, message, x, y, 0xFFFFFF, true);
     }
 }
