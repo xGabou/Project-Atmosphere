@@ -24,6 +24,9 @@ This file records functionality additions/removals made during development sessi
 - Client temperature cache updates are now atomic to prevent transient stale reads.
 - Season changes now regenerate forecasts without wiping cloud entities, and server ticks detect season transitions across providers.
 - Freezing and snow placement now follow Project Atmosphere temperatures so ice/snow match displayed readings.
+- Exact biome lookups now prefer region state/region forecasts before falling back to legacy biome forecasts, preventing cave-biome misses from forcing neutral weather values.
+- Forecast sampling no longer anchors itself below sea level during region generation, reducing cave-only biome captures when regeneration starts underground.
+- Missing-forecast warnings are throttled to log once per biome type instead of spamming every lookup.
 ## Unreleased - Weatherdebug readout alignment
 - /pa weatherdebug forecast now uses the region-sampled temperature, humidity, and pressure so values match the thermometer readout.
 ## Unreleased - Weather world effects

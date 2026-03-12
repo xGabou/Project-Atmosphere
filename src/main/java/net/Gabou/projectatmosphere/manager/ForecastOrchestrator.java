@@ -324,6 +324,14 @@ public class ForecastOrchestrator {
      * Get temperature for any biome
      */
     public static float getCurrentTemperature(BiomeInstanceKey key, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+        if (state != null) {
+            return state.getTemperature();
+        }
+        ForecastRegion region = resolveRegionForecast(key);
+        if (region != null && key != null && key.samplePos() != null) {
+            return region.sampleTemperature(Vec3.atCenterOf(key.samplePos()), tick);
+        }
         return ForecastGenerator.getTemperatureValue(key, tick);
     }
 
@@ -343,6 +351,14 @@ public class ForecastOrchestrator {
      * Get humidity for any biome
      */
     public static float getCurrentHumidity(BiomeInstanceKey key, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+        if (state != null) {
+            return state.getHumidity();
+        }
+        ForecastRegion region = resolveRegionForecast(key);
+        if (region != null && key != null && key.samplePos() != null) {
+            return region.sampleHumidity(Vec3.atCenterOf(key.samplePos()), tick);
+        }
         return ForecastGenerator.getHumidityValue(key, tick);
     }
 
@@ -362,6 +378,14 @@ public class ForecastOrchestrator {
      * Get pressure for any biome
      */
     public static float getCurrentPressure(BiomeInstanceKey key, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+        if (state != null) {
+            return state.getPressure();
+        }
+        ForecastRegion region = resolveRegionForecast(key);
+        if (region != null) {
+            return region.samplePressure(tick);
+        }
         return ForecastGenerator.getPressureValue(key, tick);
     }
 
@@ -538,6 +562,21 @@ public class ForecastOrchestrator {
         WindVector.WindSample sample = WindVector.getOrFallback(regionKey);
         float angle = (float) Math.toRadians(sample.directionDeg());
         return new WindVector(sample.speedMps(), angle, sample.speedMps());
+    }
+
+    private static ForecastRegion resolveRegionForecast(BiomeInstanceKey key) {
+        if (key == null) {
+            return null;
+        }
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        if (regionKey == null || REGION_ORCHESTRATOR == null) {
+            return null;
+        }
+        try {
+            return REGION_ORCHESTRATOR.ensureLoaded(regionKey);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private static WindVector getDynamicWind(RegionInstanceKey regionKey) {

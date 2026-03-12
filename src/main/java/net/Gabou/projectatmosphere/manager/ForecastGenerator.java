@@ -100,6 +100,7 @@ public class ForecastGenerator {
     static final Map<BiomeInstanceKey, BiomeForecast> FORECAST_MAP = new ConcurrentHashMap<>();
 
     private static final Map<ResourceLocation, List<BiomeForecast>> grouped = new ConcurrentHashMap<>();
+    private static final Set<ResourceLocation> REPORTED_MISSING_FORECASTS = ConcurrentHashMap.newKeySet();
 
     public static Map<ResourceLocation, List<BiomeInstanceKey>> getBiomeIndex() {
         return Collections.unmodifiableMap(biomeIndex);
@@ -316,9 +317,10 @@ public class ForecastGenerator {
 
         // Collect biome samples
         BiomeSampler sampler = new BiomeSampler(ProjectAtmosphere.seed, level.registryAccess(),biomeSource);
+        int sampleY = Math.max(level.getSeaLevel(), center.getY());
         for (int dx = -RADIUS; dx <= RADIUS; dx += SAMPLE_STEP) {
             for (int dz = -RADIUS; dz <= RADIUS; dz += SAMPLE_STEP) {
-                BlockPos samplePos = center.offset(dx, 0, dz);
+                BlockPos samplePos = new BlockPos(center.getX() + dx, sampleY, center.getZ() + dz);
                 ResourceLocation biomeId = sampler.getBiomeId(samplePos.getX(), samplePos.getY(), samplePos.getZ());
                 if (biomeId.getPath().contains("cave")) continue;
 
@@ -530,6 +532,7 @@ public class ForecastGenerator {
         biomeIndex.clear();
         biomeSampleCounts.clear();
         AVERAGE_FORECASTS.clear();
+        REPORTED_MISSING_FORECASTS.clear();
         scheduledStormBiome = null;
         scheduledStormTime = -1L;
         ForecastPointerRegistry.clear();
@@ -617,9 +620,20 @@ public class ForecastGenerator {
             return average;
         }
 
-        ProjectAtmosphere.LOGGER.warn("[Atmosphere] No forecast data available for {}. Returning fallback.", key);
+        warnMissingForecastOnce(key);
         return buildFallbackForecast(key);
     }
+
+    private static void warnMissingForecastOnce(BiomeInstanceKey key) {
+        if (key == null || key.biomeType() == null) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] No forecast data available for {}. Returning fallback.", key);
+            return;
+        }
+        if (REPORTED_MISSING_FORECASTS.add(key.biomeType())) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] No forecast data available for {}. Returning fallback.", key);
+        }
+    }
+
     private static BiomeForecast buildFallbackForecast(BiomeInstanceKey key) {
         BiomeForecast fallback = new BiomeForecast();
         fallback.setBiomeKey(key);
