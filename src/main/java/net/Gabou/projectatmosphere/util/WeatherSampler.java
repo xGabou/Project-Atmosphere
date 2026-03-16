@@ -1,21 +1,26 @@
 package net.Gabou.projectatmosphere.util;
 
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
-import net.Gabou.projectatmosphere.async.BiomeSampler;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
-public class WeatherSampler {
+public final class WeatherSampler {
+    private static final ResourceLocation DEFAULT_BIOME = ResourceLocation.fromNamespaceAndPath("minecraft", "plains");
 
-    public static Set<BiomeInstanceKey> sampleBiomesInRegion(SpawnRegion region, ServerLevel level) {
-        Set<BiomeInstanceKey> keys = new HashSet<>();
+    private WeatherSampler() {
+    }
+
+    public static Map<RegionInstanceKey, Integer> sampleRegionsInRegion(SpawnRegion region, ServerLevel level) {
+        Map<RegionInstanceKey, Integer> weights = new HashMap<>();
 
         int baseX = region.x() << 4;
         int baseZ = region.z() << 4;
@@ -23,114 +28,140 @@ public class WeatherSampler {
         for (int dx = 0; dx < 16; dx += 4) {
             for (int dz = 0; dz < 16; dz += 4) {
                 BlockPos pos = new BlockPos(baseX + dx, level.getSeaLevel(), baseZ + dz);
-                level.getBiome(pos).unwrapKey().ifPresent(key ->
-                        keys.add(new BiomeInstanceKey(key.location(), pos))
-                );
+                weights.merge(RegionInstanceKey.from(pos), 1, Integer::sum);
             }
         }
-        return keys;
+        return weights;
     }
-    public static Set<BiomeInstanceKey> sampleBiomesInArea(int centerX, int centerZ, int radius, ServerLevel level) {
-        Set<BiomeInstanceKey> result = new HashSet<>();
+
+    public static Map<RegionInstanceKey, Integer> sampleRegionsInArea(int centerX, int centerZ, int radius, ServerLevel level) {
+        Map<RegionInstanceKey, Integer> result = new HashMap<>();
         int step = 24;
         int radiusSq = radius * radius;
 
-        BlockPos center = new BlockPos(centerX, level.getSeaLevel(), centerZ);
-
-        // Build sampler once per call
-        BiomeSampler sampler = new BiomeSampler(level.getSeed(), level.registryAccess(),level.getChunkSource().getGenerator().getBiomeSource());
-
         for (int dx = -radius; dx <= radius; dx += step) {
             for (int dz = -radius; dz <= radius; dz += step) {
-                if (dx * dx + dz * dz > radiusSq)
+                if (dx * dx + dz * dz > radiusSq) {
                     continue;
+                }
 
                 BlockPos pos = new BlockPos(centerX + dx, level.getSeaLevel(), centerZ + dz);
-
-                // Async-safe biome lookup
-                ResourceLocation biomeId = sampler.getBiomeId(pos.getX(), pos.getY(), pos.getZ());
-
-                BiomeInstanceKey bestMatch = null;
-                double bestDistSq = Double.MAX_VALUE;
-
-                // Only check candidates of this biome type
-                List<BiomeInstanceKey> candidates = ForecastGenerator.getBiomeIndex().get(biomeId);
-                if (candidates != null) {
-                    for (BiomeInstanceKey known : candidates) {
-                        if (known.samplePos().closerThan(center, radius)) {
-                            double distSq = known.samplePos().distSqr(pos);
-                            if (distSq < bestDistSq) {
-                                bestDistSq = distSq;
-                                bestMatch = known;
-                            }
-                        }
-                    }
-                }
-
-                if (bestMatch != null) {
-                    result.add(bestMatch);
-                } else {
-                    // Only add a fallback key if no nearby one of the same biome already exists
-                    boolean tooClose = result.stream().anyMatch(existing ->
-                            existing.biomeType().equals(biomeId) &&
-                                    existing.samplePos().distSqr(pos) < 100 * 100
-                    );
-
-                    if (!tooClose) {
-                        result.add(new BiomeInstanceKey(biomeId, pos));
-                    }
-                }
+                result.merge(RegionInstanceKey.from(pos), 1, Integer::sum);
             }
         }
 
         return result;
     }
 
+    public static WeatherStats computeWeatherStats(Map<RegionInstanceKey, Integer> regionWeights, long tick) {
+        if (regionWeights == null || regionWeights.isEmpty()) {
+            return null;
+        }
 
+        float totalHumidity = 0f;
+        float totalTemp = 0f;
+        float totalPressure = 0f;
+        float totalStormFactor = 0f;
+        float totalWindX = 0f;
+        float totalWindZ = 0f;
+        float totalGust = 0f;
+        int totalWeight = 0;
+        RegionInstanceKey dominantRegion = null;
+        int dominantWeight = Integer.MIN_VALUE;
 
+        for (Map.Entry<RegionInstanceKey, Integer> entry : regionWeights.entrySet()) {
+            RegionInstanceKey key = entry.getKey();
+            int weight = entry.getValue() == null ? 0 : entry.getValue();
+            if (key == null || weight <= 0) {
+                continue;
+            }
 
-
-
-
-
-
-    public static WeatherStats computeWeatherStats(Set<BiomeInstanceKey> keys, ServerLevel level, long tick) {
-        float totalHumidity = 0, totalTemp = 0, totalPressure = 0,
-                totalStormFactor = 0;
-        WindVector totalWind = WindVector.fromBase(0, 0);
-        int count = 0;
-        Map<ResourceLocation, Integer> biomeFreq = new HashMap<>();
-
-        for (BiomeInstanceKey key : keys) {
             float humidity = ForecastOrchestrator.getCurrentHumidity(key, tick);
             float temperature = ForecastOrchestrator.getCurrentTemperature(key, tick);
             float pressure = ForecastOrchestrator.getCurrentPressure(key, tick);
             float stormFactor = ForecastOrchestrator.getCurrentStormChance(key, tick);
             WindVector wind = ForecastOrchestrator.getWind(key, tick);
 
-            totalHumidity += humidity;
-            totalTemp += temperature;
-            totalPressure += pressure;
-            totalWind = totalWind.add(wind);
-            totalStormFactor += stormFactor;
-            biomeFreq.merge(key.biomeType(), 1, Integer::sum);
-            count++;
+            totalHumidity += humidity * weight;
+            totalTemp += temperature * weight;
+            totalPressure += pressure * weight;
+            totalStormFactor += stormFactor * weight;
+            totalWindX += (float) Math.cos(wind.angleRadians()) * wind.baseSpeed() * weight;
+            totalWindZ += (float) Math.sin(wind.angleRadians()) * wind.baseSpeed() * weight;
+            totalGust += wind.gustSpeed() * weight;
+            totalWeight += weight;
+
+            if (weight > dominantWeight) {
+                dominantWeight = weight;
+                dominantRegion = key;
+            }
         }
 
-        if (count == 0) return null;
+        if (dominantRegion == null || totalWeight <= 0) {
+            return null;
+        }
 
-        
-        BiomeInstanceKey dominantKey = keys.stream()
-                .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType))
-                .entrySet()
-                .stream()
-                .max(Map.Entry.comparingByValue(Comparator.comparingInt(List::size)))
-                .map(entry -> entry.getValue().get(0)) 
-                .orElse(keys.iterator().next());
+        float avgWindSpeed = (float) Math.sqrt(totalWindX * totalWindX + totalWindZ * totalWindZ) / totalWeight;
+        float avgWindAngle = (float) Math.atan2(totalWindZ, totalWindX);
+        WindVector averageWind = new WindVector(avgWindSpeed, avgWindAngle, totalGust / totalWeight);
 
-
-        return new WeatherStats(totalHumidity / count, totalTemp / count, totalPressure / count, totalWind.divide(count), dominantKey.biomeType(), dominantKey.samplePos(), totalStormFactor / count);
+        return new WeatherStats(
+                totalHumidity / totalWeight,
+                totalTemp / totalWeight,
+                totalPressure / totalWeight,
+                averageWind,
+                dominantRegion,
+                resolveDominantBiome(dominantRegion),
+                resolveAnchor(dominantRegion),
+                totalStormFactor / totalWeight
+        );
     }
 
-    public record WeatherStats(float humidity, float temperature, float pressure, WindVector windVector, ResourceLocation dominantBiome, BlockPos pos, float stormFactor) {}
+    private static ResourceLocation resolveDominantBiome(RegionInstanceKey regionKey) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null && state.getDominantBiome() != null) {
+            return state.getDominantBiome();
+        }
+
+        var region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region == null || region.getBiomeWeights().isEmpty()) {
+            return DEFAULT_BIOME;
+        }
+
+        ResourceLocation dominant = null;
+        int bestWeight = Integer.MIN_VALUE;
+        for (Map.Entry<ResourceLocation, Integer> entry : region.getBiomeWeights().entrySet()) {
+            if (entry.getValue() > bestWeight) {
+                dominant = entry.getKey();
+                bestWeight = entry.getValue();
+            }
+        }
+        return dominant == null ? DEFAULT_BIOME : dominant;
+    }
+
+    private static BlockPos resolveAnchor(RegionInstanceKey regionKey) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null && state.getPosition() != null) {
+            return state.getPosition();
+        }
+
+        var region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region != null && region.getAnchor() != null) {
+            return region.getAnchor();
+        }
+
+        return regionKey.center();
+    }
+
+    public record WeatherStats(
+            float humidity,
+            float temperature,
+            float pressure,
+            WindVector windVector,
+            RegionInstanceKey dominantRegion,
+            ResourceLocation dominantBiome,
+            BlockPos pos,
+            float stormFactor
+    ) {
+    }
 }

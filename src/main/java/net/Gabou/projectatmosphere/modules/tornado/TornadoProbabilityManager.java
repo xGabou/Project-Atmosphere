@@ -10,7 +10,9 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -28,7 +30,7 @@ public final class TornadoProbabilityManager {
         long now = level.getGameTime();
         if (!TornadoSpawnScheduler.isSlotAvailable(now)) return;
         RandomSource random = RandomSource.create();
-        for (BiomeInstanceKey key : ForecastOrchestrator.getActiveBiomeKeys(level)) {//TODO fill this first
+        for (RegionInstanceKey key : ForecastOrchestrator.getActiveRegions(level)) {
             if (!isStormy(key, level)) continue;
             if (isCellOnCooldown(key, level, now)) continue;
 
@@ -51,11 +53,11 @@ public final class TornadoProbabilityManager {
         }
     }
 
-    public static float computeRisk(BiomeInstanceKey key, ServerLevel level, long nowTick) {
+    public static float computeRisk(RegionInstanceKey key, ServerLevel level, long nowTick) {
         float risk = 0f;
 
-        float tempSurface = ForecastSampling.getTemperatureC(key, level);
-        float humidity = ForecastSampling.getHumidityPercent(key, level);
+        float tempSurface = ForecastSampling.getTemperatureC(key, level.getGameTime());
+        float humidity = ForecastSampling.getHumidityPercent(key, level.getGameTime());
         float tempAloft = tempSurface -
                 (AtmoCommonConfig.TORNADO_LAPSE_RATE_C_PER_100M.get().floatValue() *
                         (AtmoCommonConfig.TORNADO_ALOFT_DELTA_H_M.get().floatValue() / 100f));
@@ -63,13 +65,13 @@ public final class TornadoProbabilityManager {
         risk += (tempContrast / 10f);
         if (humidity >= AtmoCommonConfig.TORNADO_HUMIDITY_MIN_PERCENT.get().floatValue()) risk += 1f;
 
-        float pHere = ForecastSampling.getPressureHpa(key, level);
-        float pNear = ForecastSampling.minNeighborPressureHpa(key, level);
+        float pHere = ForecastSampling.getPressureHpa(key, level.getGameTime());
+        float pNear = ForecastSampling.minNeighborPressureHpa(key, level.getGameTime());
         float pDiff = Math.abs(pHere - pNear) * AtmoCommonConfig.TORNADO_PRESSURE_GRADIENT_GAIN.get().floatValue();
         risk += Math.min(pDiff,
                 AtmoCommonConfig.TORNADO_PRESSURE_GRADIENT_CAP.get().floatValue());
 
-        WindVectorApi.WindSample wSurf = WindVectorApi.getOrFallback(key);
+        WindVectorApi.WindSample wSurf = WindVectorApi.getOrFallback(key, level.getGameTime());
         WindVectorApi.WindSample wAloft = WindVectorApi.getAloftProxy(key, level);
         float speedDiff = Math.abs(wSurf.speedMps() - wAloft.speedMps());
         float dirDiff = minimalAngleDiffDeg(wSurf.directionDeg(), wAloft.directionDeg());
@@ -84,14 +86,32 @@ public final class TornadoProbabilityManager {
         return risk;
     }
 
-    public static boolean isCellOnCooldown(BiomeInstanceKey key, ServerLevel level, long nowTick) {
+    @Deprecated
+    public static float computeRisk(BiomeInstanceKey key, ServerLevel level, long nowTick) {
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        if (regionKey == null) {
+            return 0f;
+        }
+        return computeRisk(regionKey, level, nowTick);
+    }
+
+    public static boolean isCellOnCooldown(RegionInstanceKey key, ServerLevel level, long nowTick) {
         return TornadoStorageManager.isOnCooldown(key, nowTick);
     }
 
-    private static boolean isStormy(BiomeInstanceKey key, ServerLevel level) {
+    @Deprecated
+    public static boolean isCellOnCooldown(BiomeInstanceKey key, ServerLevel level, long nowTick) {
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        if (regionKey == null) {
+            return false;
+        }
+        return isCellOnCooldown(regionKey, level, nowTick);
+    }
+
+    private static boolean isStormy(RegionInstanceKey key, ServerLevel level) {
         ServerCloudManager manager = (ServerCloudManager) CloudManager.get(level);
         CloudGenerator generator = manager.getCloudGenerator();
-        BlockPos pos = key.samplePos();
+        BlockPos pos = key.center();
         for (CloudRegion region : generator.getClouds()) {
             int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
             if (severity < 7) continue;

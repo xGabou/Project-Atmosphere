@@ -1,13 +1,10 @@
 package net.Gabou.projectatmosphere.util;
 
-import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
-import net.Gabou.projectatmosphere.compat.ColdSweatCompat;
-import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.LegendarySurvivalCompat;
-import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.network.InstrumentReadoutPacket;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.minecraft.core.BlockPos;
@@ -18,7 +15,6 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.network.PacketDistributor;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
 public class InstrumentUtils {
 
@@ -31,6 +27,9 @@ public class InstrumentUtils {
             return;
         }
         BlockPos pos = player.blockPosition();
+        if (!ensureForecastReady(serverLevel, serverPlayer, pos)) {
+            return;
+        }
         WindVector wind = ForecastOrchestrator.getWind(serverLevel, pos, serverLevel.getDayTime());
         String msg = "Wind: " + UnitFormatter.formatWindSpeed(wind.baseSpeed()) +
                 " at " + String.format("%.0f\u00B0", Math.toDegrees(wind.angleRadians()));
@@ -46,8 +45,10 @@ public class InstrumentUtils {
             return;
         }
         BlockPos pos = player.blockPosition();
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, serverLevel), pos);
-        float temp = ForecastOrchestrator.getCurrentTemperature(key, serverLevel.getGameTime());
+        if (!ensureForecastReady(serverLevel, serverPlayer, pos)) {
+            return;
+        }
+        float temp = ForecastOrchestrator.getCurrentTemperature(serverLevel, pos, serverLevel.getGameTime());
         String msg = "Current temperature: " + UnitFormatter.formatTemperature(temp);
         send(serverPlayer, msg);
     }
@@ -61,10 +62,11 @@ public class InstrumentUtils {
             return;
         }
         BlockPos pos = player.blockPosition();
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, serverLevel), pos);
-        float humidity = ForecastOrchestrator.getCurrentHumidity(key, serverLevel.getGameTime());
-        String msg = humidity < 0.01f ? "Humidity: Loading..." :
-                "Current humidity: " + UnitFormatter.formatHumidity(humidity);
+        if (!ensureForecastReady(serverLevel, serverPlayer, pos)) {
+            return;
+        }
+        float humidity = ForecastOrchestrator.getCurrentHumidity(serverLevel, pos, serverLevel.getGameTime());
+        String msg = "Current humidity: " + UnitFormatter.formatHumidity(humidity);
         send(serverPlayer, msg);
     }
 
@@ -77,8 +79,10 @@ public class InstrumentUtils {
             return;
         }
         BlockPos pos = player.blockPosition();
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, serverLevel), pos);
-        double pressure = ForecastOrchestrator.getCurrentPressure(key, serverLevel.getGameTime());
+        if (!ensureForecastReady(serverLevel, serverPlayer, pos)) {
+            return;
+        }
+        double pressure = ForecastOrchestrator.getCurrentPressure(serverLevel, pos, serverLevel.getGameTime());
         String msg = "Current pressure: " + UnitFormatter.formatPressure(pressure);
         send(serverPlayer, msg);
     }
@@ -106,57 +110,39 @@ public class InstrumentUtils {
         NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new InstrumentReadoutPacket(message));
     }
 
+    private static boolean ensureForecastReady(ServerLevel level, ServerPlayer player, BlockPos pos) {
+        if (!AtmosphereManager.isInitialGenerationDone || ForecastOrchestrator.isRegenerating()) {
+            send(player, "Forecast not ready.");
+            return false;
+        }
+        if (!AtmosphereManager.isPlayerReady(player.getUUID())) {
+            send(player, "Forecast not ready.");
+            return false;
+        }
+        ForecastRegion region = ForecastOrchestrator.getRegionForecast(level, pos);
+        if (region == null) {
+            send(player, "Forecast not ready.");
+            return false;
+        }
+        return true;
+    }
+
     @OnlyIn(Dist.CLIENT)
     private static final class ClientDisplay {
         private static void displayWind(Level level, Player player) {
-            BlockPos pos = player.blockPosition();
-            BiomeInstanceKey key = new BiomeInstanceKey(
-                    AtmosphereUtils.getBiomeLocation(pos, level), pos
-            );
-            WindVector wind = ForecastOrchestrator.getWind(key, level.getDayTime());
-            String msg = "Wind: " + UnitFormatter.formatWindSpeed(wind.baseSpeed()) +
-                    " at " + String.format("%.0f\u00B0", Math.toDegrees(wind.angleRadians()));
-            HUDOverlayRenderer.showTemperatureOverlay(msg);
+            HUDOverlayRenderer.showTemperatureOverlay("Forecast not ready.");
         }
 
         private static void displayTemperature(Level level, Player player) {
-            BlockPos pos = player.blockPosition();
-            float temp;
-
-            switch (CompatHandler.getActiveTemperatureMod()) {
-                case LEGENDARY_SURVIVAL -> temp = LegendarySurvivalCompat.getLiveTemperature(level, pos);
-                case TOUGH_AS_NAILS -> temp = ToughAsNailsCompat.getLiveTemperatureTAN(level, pos);
-                case COLD_SWEAT -> temp = ColdSweatCompat.getLiveTemperatureColdSweat(level, pos);
-                default -> temp = getForecastTemperature(level, pos);
-            }
-
-            String msg = "Current temperature: " + UnitFormatter.formatTemperature(temp);
-            HUDOverlayRenderer.showTemperatureOverlay(msg);
-        }
-
-        private static float getForecastTemperature(Level level, BlockPos pos) {
-            return BiomeClientTemperatureCache.getTemperature(AtmosphereUtils.getBiomeLocation(pos, level), level);
+            HUDOverlayRenderer.showTemperatureOverlay("Forecast not ready.");
         }
 
         private static void displayHumidity(Level level, Player player) {
-            BlockPos pos = player.blockPosition();
-            BiomeInstanceKey key = new BiomeInstanceKey(
-                    AtmosphereUtils.getBiomeLocation(pos, level), pos
-            );
-            float humidity = ForecastOrchestrator.getCurrentHumidity(key, level.getDayTime());
-            String msg = humidity < 0.01f ? "Humidity: Loading..." :
-                    "Current humidity: " + UnitFormatter.formatHumidity(humidity);
-            HUDOverlayRenderer.showTemperatureOverlay(msg);
+            HUDOverlayRenderer.showTemperatureOverlay("Forecast not ready.");
         }
 
         private static void displayPressure(Level level, Player player) {
-            BlockPos pos = player.blockPosition();
-            BiomeInstanceKey key = new BiomeInstanceKey(
-                    AtmosphereUtils.getBiomeLocation(pos, level), pos
-            );
-            double pressure = ForecastOrchestrator.getCurrentPressure(key, level.getDayTime());
-            String msg = "Current pressure: " + UnitFormatter.formatPressure(pressure);
-            HUDOverlayRenderer.showTemperatureOverlay(msg);
+            HUDOverlayRenderer.showTemperatureOverlay("Forecast not ready.");
         }
 
         private static void displayStorm(Level level, Player player) {

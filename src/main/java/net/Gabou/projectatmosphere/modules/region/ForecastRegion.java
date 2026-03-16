@@ -62,12 +62,12 @@ public final class ForecastRegion {
         this(id, null, sourceBiomes, sections, curves, fallbackSnapshot);
     }
 
-    private ForecastRegion(RegionInstanceKey id,
-                           @Nullable BlockPos anchor,
-                           List<BiomeInstanceKey> sourceBiomes,
-                           Section[] sections,
-                           RegionCurves curves,
-                           BiomeFallbackSnapshot fallbackSnapshot) {
+    public ForecastRegion(RegionInstanceKey id,
+                          @Nullable BlockPos anchor,
+                          List<BiomeInstanceKey> sourceBiomes,
+                          Section[] sections,
+                          RegionCurves curves,
+                          BiomeFallbackSnapshot fallbackSnapshot) {
         this.id = id;
         this.sourceBiomes = sourceBiomes == null ? List.of() : List.copyOf(sourceBiomes);
         this.sections = sections == null ? new Section[0] : sections.clone();

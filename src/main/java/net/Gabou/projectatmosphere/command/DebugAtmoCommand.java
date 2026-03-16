@@ -9,12 +9,9 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
@@ -45,14 +42,16 @@ public class DebugAtmoCommand {
 
         ServerLevel level = ctx.getSource().getLevel();
         long tick = level.getGameTime();
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
         float temperature = ForecastOrchestrator.getCurrentTemperature(level, pos, tick);
         float humidity = ForecastOrchestrator.getCurrentHumidity(level, pos, tick);
         float pressure = ForecastOrchestrator.getCurrentPressure(level, pos, tick);
-        var windVector = ForecastOrchestrator.getWind(new BiomeInstanceKey(biome, pos), tick);
+        var windVector = ForecastOrchestrator.getWind(regionKey, tick);
         String wind = windVector == null ? "-" : UnitFormatter.formatWindSpeed(windVector.baseSpeed()) + " at " + String.format("%.0f°", Math.toDegrees(windVector.angleRadians()));
 
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "Biome: " + biome +
+                        "\n  Region:   " + regionKey +
                         "\n  Temp:     " + UnitFormatter.formatTemperature(temperature) +
                         "\n  Pressure: " + UnitFormatter.formatPressure(pressure) +
                         "\n  Humidity: " + UnitFormatter.formatHumidity(humidity) +
@@ -201,7 +200,7 @@ public class DebugAtmoCommand {
         }
 
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        WindVector wind = ForecastOrchestrator.getWind(key, level.getGameTime());
+        WindVector wind = ForecastOrchestrator.getWind(level, pos, level.getGameTime());
         return SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
     }
 

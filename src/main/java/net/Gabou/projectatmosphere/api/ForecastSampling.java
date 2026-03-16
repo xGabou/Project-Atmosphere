@@ -62,6 +62,10 @@ public final class ForecastSampling {
     }
 
     public static float minNeighborPressureHpa(BiomeInstanceKey key, ServerLevel level) {
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        if (regionKey != null) {
+            return minNeighborPressureHpa(regionKey, level.getGameTime());
+        }
         BlockPos base = key.samplePos();
         if (base == null) {
             return getPressureHpa(key, level);
@@ -79,6 +83,17 @@ public final class ForecastSampling {
             if (p < min) min = p;
         }
         return min == Float.MAX_VALUE ? getPressureHpa(level, pos) : min;
+    }
+
+    public static float minNeighborPressureHpa(RegionInstanceKey regionKey, long tick) {
+        float min = Float.MAX_VALUE;
+        for (RegionInstanceKey neighbor : AtmosphericStateRegistry.getNeighbors(regionKey)) {
+            float pressure = getPressureHpa(neighbor, tick);
+            if (pressure < min) {
+                min = pressure;
+            }
+        }
+        return min == Float.MAX_VALUE ? getPressureHpa(regionKey, tick) : min;
     }
 }
 

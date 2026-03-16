@@ -13,8 +13,6 @@ import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -63,14 +61,13 @@ public class SimpleCloudsEventListener {
         int z = (int) region.getWorldZ();
         int y = serverLevel.getSeaLevel();
 
-        BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(serverLevel, new BlockPos(x, y, z));
-        RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
-        WindVector current = WindEngine.getCurrentHighWindVector(key, serverLevel.getGameTime());
+        RegionInstanceKey regionKey = RegionInstanceKey.from(new BlockPos(x, y, z));
+        WindVector current = WindEngine.getCurrentHighWindVector(regionKey, serverLevel.getGameTime());
         float currentSpeed = current.baseSpeed();
         float dirDeg = (float) Math.toDegrees(current.angleRadians());
 
         // Storm-based boost
-        float stormFactor = ForecastOrchestrator.getCurrentStormChance(key, serverLevel.getGameTime());
+        float stormFactor = ForecastOrchestrator.getCurrentStormChance(regionKey, serverLevel.getGameTime());
         if (stormFactor > 0.15f) {
             // Scale boost with storm activity; cap to avoid absurd values
             float finalSpeed = getFinalSpeed(stormFactor, currentSpeed, region);

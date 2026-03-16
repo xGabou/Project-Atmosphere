@@ -2,12 +2,13 @@ package net.Gabou.projectatmosphere.modules.pressure;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
-import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.minecraft.core.BlockPos;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.Arrays;
@@ -22,16 +23,20 @@ public class PressureCommand {
                 .then(Commands.literal("get") 
                         .executes(ctx -> {
                             Player player = ctx.getSource().getPlayerOrException();
-                            BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
+                            ServerLevel level = (ServerLevel) player.level();
+                            BlockPos pos = player.blockPosition();
+                            ForecastRegion region = ForecastOrchestrator.getRegionForecast(level, pos);
+                            if (region == null || region.getPressure() == null) {
+                                ctx.getSource().sendFailure(Component.literal("No region pressure forecast available."));
+                                return 0;
+                            }
 
-                            
-                            float[][] forecastArr = ForecastGenerator.getForecastMap().get(biome).getPressure();
+                            float[][] forecastArr = region.getPressure();
                             String forecast = Arrays.deepToString(forecastArr);
 
-                            
                             ctx.getSource().sendSuccess(() -> Component.literal(forecast), false);
 
-                            return 1; 
+                            return 1;
                         })
                 );
     }

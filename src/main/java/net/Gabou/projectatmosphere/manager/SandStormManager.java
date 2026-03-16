@@ -7,9 +7,12 @@ import net.Gabou.projectatmosphere.event.BiomeChangeManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -18,6 +21,7 @@ import net.minecraft.sounds.SoundEvent;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,6 +38,7 @@ public class SandStormManager {
 
     private static final float SANDSTORM_PRESSURE_THRESHOLD_BASE = 1005f;
     private static final float SANDSTORM_PRESSURE_THRESHOLD_MAX = 1015f;
+    static RegionInstanceKey scheduledStormRegion = null;
     static BiomeInstanceKey scheduledStormBiome = null;
     static SandstormPhase scheduledStormPhase = null;
     static long scheduledStormTime = -1L;
@@ -46,6 +51,7 @@ public class SandStormManager {
             ResourceLocation.fromNamespaceAndPath("minecraft", "desert"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "badlands")
     );
+    private static final Set<RegionInstanceKey> SANDSTORM_REGIONS = ConcurrentHashMap.newKeySet();
     private static final Set<BiomeInstanceKey> SANDSTORM_FORECASTS = ConcurrentHashMap.newKeySet();
 
     public static Set<BiomeInstanceKey> getSandstormForecasts() {
@@ -53,7 +59,9 @@ public class SandStormManager {
     }
 
     static void clearSandstormForecasts() {
+        SANDSTORM_REGIONS.clear();
         SANDSTORM_FORECASTS.clear();
+        scheduledStormRegion = null;
         scheduledStormBiome = null;
         scheduledStormPhase = null;
         scheduledStormTime = -1L;
@@ -63,55 +71,56 @@ public class SandStormManager {
     static void dailyAndSand(ServerLevel level) {
         clearSandstormForecasts();
 
-        FORECAST_MAP.entrySet().stream()
-                .filter(entry -> SANDSTORM_BIOMES.contains(entry.getKey().biomeType()))
-                .filter(entry -> {
-                    BiomeForecast f = entry.getValue();
-                    return f.getHumidity() != null && f.getHumidity().length > 0
-                            && f.getPressure() != null && f.getPressure().length > 0
-                            && f.getWind() != null && f.getWind().length > 0;
-                })
-                .filter(entry -> shouldTriggerSandstorm(
-                        entry.getKey(),
-                        entry.getValue().getHumidity(),
-                        entry.getValue().getPressure(),
-                        ForecastOrchestrator.getForecastWind(entry.getKey(), level.getDayTime())
-                ))
-                .forEach(entry -> {
-                    BiomeInstanceKey key = entry.getKey();
-                    entry.getValue().setSandstormExpected(true);
-                    SANDSTORM_FORECASTS.add(key);
-                });
+        REGION_FORECASTS.forEach((regionKey, region) -> {
+            if (!supportsSandstorm(region)) {
+                return;
+            }
+            if (!hasSandstormCurves(region)) {
+                return;
+            }
+            WindVector forecastWind = ForecastOrchestrator.getForecastWind(regionKey, level.getDayTime());
+            if (!shouldTriggerSandstorm(region, forecastWind)) {
+                return;
+            }
+            SANDSTORM_REGIONS.add(regionKey);
+            BiomeInstanceKey representative = resolveSandstormBiome(region);
+            if (representative != null) {
+                SANDSTORM_FORECASTS.add(representative);
+                BiomeForecast forecast = FORECAST_MAP.get(representative);
+                if (forecast != null) {
+                    forecast.setSandstormExpected(true);
+                }
+            }
+        });
 
 
         REGION_FORECASTS.forEach(AtmosphericStateRegistry::initializeState);
 
         computeAverageForecastsByBiomeType();
-        FORECAST_MAP.forEach(ForecastPointerRegistry::setPointer);
 
         if (!sandStormLoaded) return;
-        if (!SandStormAPI.isSandstormActive() && scheduledStormBiome == null && !SANDSTORM_FORECASTS.isEmpty()) {
-            BiomeInstanceKey selected = SANDSTORM_FORECASTS.stream()
-                    .skip(level.random.nextInt(SANDSTORM_FORECASTS.size()))
+        if (!SandStormAPI.isSandstormActive() && scheduledStormRegion == null && !SANDSTORM_REGIONS.isEmpty()) {
+            RegionInstanceKey selected = SANDSTORM_REGIONS.stream()
+                    .skip(level.random.nextInt(SANDSTORM_REGIONS.size()))
                     .findFirst()
                     .orElse(null);
 
             if (selected != null) {
-                BiomeForecast forecast = FORECAST_MAP.get(selected);
-                if (forecast != null) {
+                ForecastRegion region = REGION_FORECASTS.get(selected);
+                BiomeInstanceKey representative = region == null ? null : resolveSandstormBiome(region);
+                if (region != null && representative != null) {
                     long baseTime = (level.getDayTime() / 24000L) * 24000L;
                     long randomOffset = 1000 + level.random.nextInt(9000);
 
-                    scheduledStormBiome = selected;
-                    scheduledStormPhase = computeStormPhase(forecast, ForecastOrchestrator.getForecastWind(selected, level.getDayTime()));
+                    scheduledStormRegion = selected;
+                    scheduledStormBiome = representative;
+                    scheduledStormPhase = computeStormPhase(region, ForecastOrchestrator.getForecastWind(selected, level.getDayTime()));
                     scheduledStormTime = baseTime + randomOffset;
 
                     if(ProjectAtmosphere.DEBUG_MODE)
-                        ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in biome {} (phase: {})",
-                            scheduledStormTime, selected.biomeType(), scheduledStormPhase);
+                        ProjectAtmosphere.LOGGER.info("[Atmosphere] Scheduled sandstorm at tick {} in region {} via biome {} (phase: {})",
+                            scheduledStormTime, selected, representative.biomeType(), scheduledStormPhase);
                     for (ServerPlayer player : level.players()) {
-
-
                         boolean lastBiomeFlag = BiomeChangeManager
                                 .getLastBiome()
                                 .getOrDefault(player.getUUID(), Pair.of(null, false))
@@ -122,8 +131,6 @@ public class SandStormManager {
                                 Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(), null);
                             }
                         }
-
-
                     }
                 }
             }
@@ -134,13 +141,14 @@ public class SandStormManager {
 
     static void tickSandstormScheduler(ServerLevel level) {
 
-        if (scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
+        if (scheduledStormRegion != null && scheduledStormBiome != null && level.getDayTime() >= scheduledStormTime) {
             SandStormAPI. startSandstorm(scheduledStormPhase, scheduledStormBiome);
 
             if(ProjectAtmosphere.DEBUG_MODE)
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in biome {} with phase {}",
-                    scheduledStormBiome.biomeType(), scheduledStormPhase);
+                ProjectAtmosphere.LOGGER.info("[Atmosphere] Triggered sandstorm in region {} via biome {} with phase {}",
+                    scheduledStormRegion, scheduledStormBiome.biomeType(), scheduledStormPhase);
 
+            scheduledStormRegion = null;
             scheduledStormBiome = null;
             scheduledStormTime = -1L;
             scheduledStormPhase = null;
@@ -167,13 +175,11 @@ public class SandStormManager {
         }
         tickCounter++;
     }
-    static boolean shouldTriggerSandstorm(
-            BiomeInstanceKey key,
-            float[][] humidity,
-            float[][] pressure,
-            WindVector wind
-    ) {
-        if (!SANDSTORM_BIOMES.contains(key.biomeType())) return false;
+    static boolean shouldTriggerSandstorm(ForecastRegion region, WindVector wind) {
+        if (!supportsSandstorm(region)) return false;
+
+        float[][] humidity = region.getHumidity();
+        float[][] pressure = region.getPressure();
 
         if (humidity == null || humidity.length == 0 || humidity[0].length == 0) return false;
         if (pressure == null || pressure.length == 0 || pressure[0].length == 0) return false;
@@ -197,15 +203,54 @@ public class SandStormManager {
         return dryEnough && windyEnough && unstablePressure && severity > 0.55f;
     }
 
-    static SandstormPhase computeStormPhase(BiomeForecast forecast, WindVector windVector) {
+    static SandstormPhase computeStormPhase(ForecastRegion region, WindVector windVector) {
         float wind = windVector.baseSpeed();
-        float pressure = forecast.getPressure()[0][0];
-        float humidity = forecast.getHumidity()[0][0];
+        float pressure = region.getPressure()[0][0];
+        float humidity = region.getHumidity()[0][0];
 
         if (wind > 35 && pressure < 980 && humidity < 0.15f) return SandstormPhase.PHASE_5;
         if (wind > 30) return SandstormPhase.PHASE_4;
         if (wind > 25) return SandstormPhase.PHASE_3;
         if (wind > 20) return SandstormPhase.PHASE_2;
         return SandstormPhase.PHASE_1;
+    }
+
+    private static boolean supportsSandstorm(ForecastRegion region) {
+        if (region == null) {
+            return false;
+        }
+        for (ResourceLocation biome : region.getBiomeWeights().keySet()) {
+            if (SANDSTORM_BIOMES.contains(biome)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasSandstormCurves(ForecastRegion region) {
+        return region.getHumidity() != null && region.getHumidity().length > 0
+                && region.getPressure() != null && region.getPressure().length > 0
+                && region.getWind() != null && region.getWind().length > 0;
+    }
+
+    private static BiomeInstanceKey resolveSandstormBiome(ForecastRegion region) {
+        if (region == null) {
+            return null;
+        }
+        List<BiomeInstanceKey> samples = region.getSamples();
+        for (BiomeInstanceKey sample : samples) {
+            if (sample != null && SANDSTORM_BIOMES.contains(sample.biomeType())) {
+                return sample;
+            }
+        }
+        ResourceLocation dominant = region.getBiomeWeights().keySet().stream()
+                .filter(SANDSTORM_BIOMES::contains)
+                .findFirst()
+                .orElse(null);
+        if (dominant == null) {
+            return null;
+        }
+        BlockPos anchor = region.getAnchor() == null ? region.getKey().center() : region.getAnchor();
+        return new BiomeInstanceKey(dominant, anchor);
     }
 }

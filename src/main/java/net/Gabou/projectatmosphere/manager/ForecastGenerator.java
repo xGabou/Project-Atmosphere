@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.BiomeForecastSnapshot;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityGenerator;
@@ -477,6 +478,21 @@ public class ForecastGenerator {
         return REGION_FORECASTS;
     }
 
+    public static void putRegionForecast(ForecastRegion region) {
+        if (region == null || region.getKey() == null) {
+            return;
+        }
+        region.finalizeAggregation();
+        REGION_FORECASTS.put(region.getKey(), region);
+        AtmosphericStateRegistry.initializeState(region.getKey(), region);
+        hydrateLegacyBiomeForecasts(region);
+    }
+
+    public static void rebuildLoadedForecastIndexes() {
+        groupForecastsByBiome();
+        groupBiomeByType();
+    }
+
     static void clearForecasts() {
         FORECAST_MAP.clear();
         REGION_FORECASTS.clear();
@@ -487,7 +503,6 @@ public class ForecastGenerator {
         AVERAGE_FORECASTS.clear();
         AtmosphericStateRegistry.clear();
         SandStormManager.clearSandstormForecasts();
-        ForecastPointerRegistry.clear();
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Cleared all forecasts and samples.");
     }
 
@@ -552,9 +567,9 @@ public class ForecastGenerator {
     }
 
     public static BiomeForecast getClosestValidForecast(BiomeInstanceKey key, ForecastType type) {
-        BiomeForecast pointer = ForecastPointerRegistry.getPointer(key);
-        if (pointer != null) {
-            return pointer;
+        BiomeForecast direct = FORECAST_MAP.get(key);
+        if (direct != null) {
+            return direct;
         }
 
         BiomeForecast average = getAverageForecast(key.biomeType());
@@ -579,6 +594,55 @@ public class ForecastGenerator {
         fallback.setWind(windWeek);
         fallback.setWindDay(WindVector.fromBase(0, 0));
         return fallback;
+    }
+
+    private static void hydrateLegacyBiomeForecasts(ForecastRegion region) {
+        List<BiomeInstanceKey> sources = region.sourceBiomes();
+        if (sources != null && !sources.isEmpty()) {
+            for (BiomeInstanceKey key : sources) {
+                if (key == null || key.samplePos() == null || key.biomeType() == null) {
+                    continue;
+                }
+                putForecast(key, buildLegacyForecastFromRegion(region, key));
+            }
+            return;
+        }
+
+        for (ForecastRegion.Section section : region.sections()) {
+            BiomeForecastSnapshot snapshot = section.snapshot();
+            if (snapshot == null || snapshot.biomeKey() == null) {
+                continue;
+            }
+            putForecast(snapshot.biomeKey(), buildLegacyForecastFromRegion(region, snapshot.biomeKey()));
+        }
+    }
+
+    private static BiomeForecast buildLegacyForecastFromRegion(ForecastRegion region, BiomeInstanceKey key) {
+        BiomeForecast forecast = new BiomeForecast();
+        forecast.setBiomeKey(key);
+        forecast.setTemperature(copyWeek(region.getTemperature()));
+        forecast.setHumidity(copyWeek(region.getHumidity()));
+        forecast.setPressure(copyWeek(region.getPressure()));
+        forecast.setWind(copyWindWeek(region.getWind()));
+        if (forecast.getWind() != null && forecast.getWind().length > 0) {
+            forecast.setWindDay(forecast.getWind()[0]);
+        }
+        return forecast;
+    }
+
+    private static float[][] copyWeek(float[][] week) {
+        if (week == null) {
+            return null;
+        }
+        float[][] copy = new float[week.length][];
+        for (int i = 0; i < week.length; i++) {
+            copy[i] = week[i] == null ? null : Arrays.copyOf(week[i], week[i].length);
+        }
+        return copy;
+    }
+
+    private static WindVector[] copyWindWeek(WindVector[] week) {
+        return week == null ? null : Arrays.copyOf(week, week.length);
     }
 
 

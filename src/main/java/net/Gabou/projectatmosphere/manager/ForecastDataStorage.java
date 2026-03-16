@@ -1,47 +1,53 @@
 package net.Gabou.projectatmosphere.manager;
 
 import com.google.gson.*;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.FileRegionPersistence;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.StorageUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 public class ForecastDataStorage {
     private static final String FILE_NAME = "forecast_centers.json";
     private static final String FORECAST_FILE = "biome_forecasts.json";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static boolean hasForecastData;
+    private static boolean hasRegionForecastData;
     private static boolean hasCenterData;
 
     public static final Map<UUID, BlockPos> playerData = new ConcurrentHashMap<>();
 
-    
     public static void saveAll(ServerLevel world) {
         savePlayerCenters(world);
-        saveForecastMap(world);
+        saveRegionForecasts(world);
     }
 
     public static void clearAll(ServerLevel world) {
         playerData.clear();
         hasForecastData = false;
+        hasRegionForecastData = false;
         hasCenterData = false;
 
-        
         try {
             Files.deleteIfExists(getSavePath(world, FILE_NAME));
             Files.deleteIfExists(getSavePath(world, FORECAST_FILE));
+            deleteDirectoryIfExists(StorageUtils.getPerWorldSavePath(world, "region_forecasts"));
+            deleteDirectoryIfExists(StorageUtils.getPerWorldSavePath(world, "region_fallbacks"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -50,18 +56,26 @@ public class ForecastDataStorage {
     public static void loadAll(ServerLevel world) {
         clearCache();
         loadPlayerCenters(world);
-        loadForecastMap(world);
+        if (!loadRegionForecasts(world)) {
+            loadForecastMap(world);
+        }
     }
 
     private static void clearCache() {
         playerData.clear();
         hasForecastData = false;
+        hasRegionForecastData = false;
         hasCenterData = false;
     }
 
-    public static boolean  hasForecastData() {
+    public static boolean hasForecastData() {
         return hasForecastData;
     }
+
+    public static boolean hasRegionForecastData() {
+        return hasRegionForecastData;
+    }
+
     public static boolean hasCenterData() {
         return hasCenterData;
     }
@@ -91,8 +105,10 @@ public class ForecastDataStorage {
 
     private static void loadPlayerCenters(ServerLevel world) {
         Path path = getSavePath(world, FILE_NAME);
-        if (!Files.exists(path)) return;
-        hasCenterData= Files.exists(StorageUtils.getPerWorldSavePath(world, "forecast_centers.json"));
+        if (!Files.exists(path)) {
+            return;
+        }
+        hasCenterData = Files.exists(StorageUtils.getPerWorldSavePath(world, "forecast_centers.json"));
 
         try (Reader r = Files.newBufferedReader(path)) {
             JsonObject root = GSON.fromJson(r, JsonObject.class);
@@ -109,40 +125,49 @@ public class ForecastDataStorage {
         }
     }
 
-    private static void saveForecastMap(ServerLevel world) {
-        JsonObject root = new JsonObject();
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
+    private static void saveRegionForecasts(ServerLevel world) {
+        FileRegionPersistence persistence = new FileRegionPersistence(world);
+        for (ForecastRegion region : ForecastGenerator.getRegionForecasts().values()) {
+            persistence.saveRegion(region);
+        }
+        hasForecastData = !ForecastGenerator.getRegionForecasts().isEmpty();
+        hasRegionForecastData = hasForecastData;
+    }
 
-            JsonObject obj = new JsonObject();
-            obj.addProperty("biome", key.biomeType().toString());
-            obj.addProperty("x", key.samplePos().getX());
-            obj.addProperty("y", key.samplePos().getY());
-            obj.addProperty("z", key.samplePos().getZ());
-
-            obj.add("temperature", serializeWeek(forecast.getTemperature()));
-            obj.add("pressure", serializeWeek(forecast.getPressure()));
-            obj.add("humidity", serializeWeek(forecast.getHumidity()));
-            obj.add("wind", serializeWinds(forecast.getWind()));
-
-            root.add(key.toString(), obj);
+    private static boolean loadRegionForecasts(ServerLevel world) {
+        FileRegionPersistence persistence = new FileRegionPersistence(world);
+        if (!persistence.hasRegionData()) {
+            return false;
         }
 
-        try {
-            Path path = getSavePath(world, FORECAST_FILE);
-            try (Writer w = Files.newBufferedWriter(path)) {
-                GSON.toJson(root, w);
+        int loaded = 0;
+        for (var regionId : persistence.listRegionIds()) {
+            var region = persistence.loadRegion(regionId);
+            if (region.isEmpty()) {
+                continue;
             }
-        } catch (IOException ex) {
-            ex.printStackTrace();
+            ForecastGenerator.putRegionForecast(region.get());
+            loaded++;
         }
+
+        if (loaded == 0) {
+            return false;
+        }
+
+        ForecastGenerator.rebuildLoadedForecastIndexes();
+        SandStormManager.dailyAndSand(world);
+        hasForecastData = true;
+        hasRegionForecastData = true;
+        return true;
     }
 
     private static void loadForecastMap(ServerLevel world) {
         Path path = getSavePath(world, FORECAST_FILE);
-        if (!Files.exists(path)) return;
+        if (!Files.exists(path)) {
+            return;
+        }
         hasForecastData = Files.exists(StorageUtils.getPerWorldSavePath(world, "biome_forecasts.json"));
+        hasRegionForecastData = false;
 
         try (Reader r = Files.newBufferedReader(path)) {
             JsonObject root = GSON.fromJson(r, JsonObject.class);
@@ -176,17 +201,25 @@ public class ForecastDataStorage {
         return StorageUtils.getPerWorldSavePath(world, fileName);
     }
 
-    
-    private static JsonArray serializeWeek(float[][] week) {
-        JsonArray array = new JsonArray();
-        if (week == null) return array;
-        for (float[] pair : week) {
-            JsonArray pairArr = new JsonArray();
-            pairArr.add(pair[0]);
-            pairArr.add(pair[1]);
-            array.add(pairArr);
+    private static void deleteDirectoryIfExists(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return;
         }
-        return array;
+        try (Stream<Path> stream = Files.walk(directory)) {
+            stream.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException io) {
+                throw io;
+            }
+            throw e;
+        }
     }
 
     /**
@@ -223,21 +256,6 @@ public class ForecastDataStorage {
             return 0f;
         }
     }
-
-
-    private static JsonArray serializeWinds(WindVector[] winds) {
-        JsonArray array = new JsonArray();
-        if (winds == null) return array;
-        for (WindVector wind : winds) {
-            JsonObject obj = new JsonObject();
-            obj.addProperty("speed", wind.baseSpeed());
-            obj.addProperty("angle", wind.angleRadians());
-            obj.addProperty("gustSpeed", wind.gustSpeed());
-            array.add(obj);
-        }
-        return array;
-    }
-
 
     /**
      * Deserializes a WindVector array from a JsonArray.

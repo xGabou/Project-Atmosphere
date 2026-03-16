@@ -126,13 +126,15 @@ dependencies {
     implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7325179")
     compileOnly fg.deobf("curse.maven:rainboows-1121832:6421980")
     compileOnly fg.deobf("curse.maven:auroras-1105290:6040671")
-    implementation fg.deobf("curse.maven:gabous-libs-1367332:7261537")
+    implementation fg.deobf("curse.maven:gabous-libs-1367332:7519775")
     implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
     implementation fg.deobf("curse.maven:tectonic-686836:7197834")
     compileOnly fg.deobf("curse.maven:continents-682515:7078247")
     implementation fg.deobf("curse.maven:lithostitched-936015:6742615")
     compileOnly fg.deobf("curse.maven:ecliptic-seasons-1118306:7274743")
     compileOnly fg.deobf("curse.maven:project-atmosphere-for-tfc-1391548:7261639")
+    compileOnly fg.deobf("curse.maven:dynamictrees-252818:7502488")
+    //implementation "curse.maven:nolijium-969602:6264798"
 
 
 //    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))

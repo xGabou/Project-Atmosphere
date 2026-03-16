@@ -14,6 +14,7 @@ import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.storm.GlobalStormHistoryData;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -91,8 +92,8 @@ public class SimpleCloudSpawner {
             AsyncAtmosphereService.runWithCallback(
                     PoolType.WEATHER,
                     () -> {
-                        Set<BiomeInstanceKey> sample = WeatherSampler.sampleBiomesInArea(point.x, point.y, radius, level);
-                        WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sample, level, level.getGameTime());
+                        Map<RegionInstanceKey, Integer> sampledRegions = WeatherSampler.sampleRegionsInArea(point.x, point.y, radius, level);
+                        WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sampledRegions, level.getGameTime());
                         if (stats == null) return null;
 
                         boolean isWinter = SeasonTimeHelper.stage(level) == SeasonStage.WINTER;
@@ -132,11 +133,10 @@ public class SimpleCloudSpawner {
                             return;
                         }
 
-                        BiomeInstanceKey biomeKey = new BiomeInstanceKey(request.stats().dominantBiome(), request.stats().pos());
                         Optional<CloudRegion> dummyOpt = SimpleCloudsCompat.createRegion(
 
                                 info,
-                                biomeKey,
+                                request.stats().dominantRegion(),
                                 level,
                                 random,
                                 request.stats().windVector(),
@@ -147,9 +147,9 @@ public class SimpleCloudSpawner {
                         CloudRegion dummy = dummyOpt.get();
                         dummy.setRadius(request.radius());
 
-                        SimpleCloudsCompat.spawnCloudInBiome(
+                        SimpleCloudsCompat.spawnCloudInRegion(
                                 request.cloudId(),
-                                biomeKey,
+                                request.stats().dominantRegion(),
                                 level,
                                 dummy,
                                 request.stats().windVector()
@@ -278,7 +278,8 @@ public class SimpleCloudSpawner {
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level), player.blockPosition());
-        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty", key, level, null, ForecastOrchestrator.getWind(key, level.getGameTime()));
+        RegionInstanceKey regionKey = RegionInstanceKey.from(player.blockPosition());
+        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty", key, level, null, ForecastOrchestrator.getWind(regionKey, level.getGameTime()));
     }
 
 

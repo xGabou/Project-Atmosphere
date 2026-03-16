@@ -63,7 +63,7 @@ public abstract class InstrumentBlock extends HorizontalDirectionalBlock impleme
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos,
                                  Player player, InteractionHand hand, BlockHitResult hit) {
-        if (!level.isClientSide) {
+        if (level.isClientSide) {
             display(level, player);
         }
         return  InteractionResult.SUCCESS;

@@ -5,8 +5,8 @@ import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.region.RegionIdCodec;
-import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -33,16 +33,23 @@ public final class WindEngine {
         });
     }
 
-    public static void tick(ServerLevel level, Set<BiomeInstanceKey> activeKeys) {
+    public static void rebuildFromRegions(Map<RegionInstanceKey, ForecastRegion> regionForecasts) {
+        FORECASTS.clear();
+        regionForecasts.forEach((key, forecast) -> FORECASTS.put(key, WindForecast.fromRegionForecast(forecast)));
+    }
+
+    public static void tick(ServerLevel level, Set<RegionInstanceKey> activeKeys) {
         long now = level.getGameTime();
-        for (BiomeInstanceKey key : activeKeys) {
-            RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
+        for (RegionInstanceKey regionId : activeKeys) {
+            if (regionId == null) {
+                continue;
+            }
             WindForecast forecast = FORECASTS.get(regionId);
             if (forecast == null) {
                 continue;
             }
             WindRuntimeState runtime = STATES.computeIfAbsent(regionId, k -> new WindRuntimeState());
-            float stormChance = ForecastOrchestrator.getCurrentStormChance(key, now);
+            float stormChance = ForecastOrchestrator.getCurrentStormChance(regionId, now);
 
             WindVector high = HighWindModel.sample(forecast, runtime, now);
             WindVector low = LowWindModel.sample(forecast, runtime, now, stormChance);
@@ -54,8 +61,7 @@ public final class WindEngine {
 
             WindVector.WindSample sample = new WindVector.WindSample(low.baseSpeed(),
                     (float) Math.toDegrees(low.angleRadians()));
-            RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
-            WindVector.set(regionKey, sample.speedMps(), sample.directionDeg());
+            WindVector.set(regionId, sample.speedMps(), sample.directionDeg());
         }
     }
 

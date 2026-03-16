@@ -5,7 +5,6 @@ import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -112,8 +111,8 @@ public class BiomeChangeManager {
         BlockPos currentPos = player.blockPosition();
         ForecastDataStorage.playerData.put(uuid, currentPos);
         lastBiome.put(uuid, Pair.of(currentBiome, isDesert(currentBiome)));
-        ForecastOrchestrator.clearActiveBiomeKeysForPlayer(player);
-        ForecastOrchestrator.getNearbyBiomeKeys(player.serverLevel(), player, 500);
+        ForecastOrchestrator.clearActiveRegionsForPlayer(player);
+        ForecastOrchestrator.getNearbyRegions(player.serverLevel(), player, 500);
         AtmosphereManager.updateForecastAround(player.serverLevel(), currentPos);
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
                 "[Atmosphere] Entered region " + region + ". Forecast regenerated."

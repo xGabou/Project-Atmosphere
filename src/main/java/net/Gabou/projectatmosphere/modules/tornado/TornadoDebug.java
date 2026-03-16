@@ -7,7 +7,7 @@ import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -30,8 +30,9 @@ public final class TornadoDebug {
                                         return 0;
                                     }
                                     var key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+                                    RegionInstanceKey regionKey = RegionInstanceKey.from(player.blockPosition());
 
-                                    WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(key);
+                                    WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
                                     net.Gabou.projectatmosphere.modules.core.WindVector wind =
                                             net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(
                                                     sample.speedMps(),
@@ -61,7 +62,7 @@ public final class TornadoDebug {
                                         ctx.getSource().sendFailure(Component.literal("Tornado risk is only available in the Overworld."));
                                         return 0;
                                     }
-                                    BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+                                    RegionInstanceKey key = RegionInstanceKey.from(player.blockPosition());
                                     float risk = TornadoProbabilityManager.computeRisk(key, level, level.getGameTime());
                                     ctx.getSource().sendSuccess(
                                             () -> Component.literal("Risk: " + risk), false);
@@ -76,7 +77,7 @@ public final class TornadoDebug {
                                                 ctx.getSource().sendFailure(Component.literal("Tornado spawning is only available in the Overworld."));
                                                 return 0;
                                             }
-                                            BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+                                            RegionInstanceKey key = RegionInstanceKey.from(player.blockPosition());
                                             float intensity = FloatArgumentType.getFloat(ctx, "intensity");
                                             TornadoSpawner.spawn(key, level, intensity);
                                             ctx.getSource().sendSuccess(
@@ -92,7 +93,7 @@ public final class TornadoDebug {
                                                 ctx.getSource().sendFailure(Component.literal("Tornado cooldown reset is only available in the Overworld."));
                                                 return 0;
                                             }
-                                            BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
+                                            RegionInstanceKey key = RegionInstanceKey.from(player.blockPosition());
                                             TornadoStorageManager.setCooldown(key, 0);
                                             ctx.getSource().sendSuccess(
                                                     () -> Component.literal("Cooldown cleared."), true);

@@ -1,5 +1,22 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Forecast refactor phase 6 runtime cleanup
+- Replaced biome-key cloud/weather area sampling with region-first sampling in `WeatherSampler`, and updated cloud spawn candidate selection to aggregate temperature, humidity, pressure, wind, and storm factors directly from `RegionInstanceKey` runtime state.
+- Migrated SimpleClouds runtime integration to region-first helpers for cloud creation/spawning and cloud tick wind/storm sampling, keeping biome-key spawn entry points only as explicit compatibility edges where external APIs still require them.
+- Removed dead biome-key runtime compatibility scaffolding that was no longer used in live server execution, including `ForecastPointerRegistry`, active-player biome fallback tracking in `ForecastOrchestrator`, and unused legacy biome views in `AtmosphericStateRegistry`.
+## Unreleased - Forecast refactor phase 4/5 closure
+- Switched forecast bootstrap, season regeneration, manual regeneration, and missing-forecast recovery to rebuild wind runtime state from primary `RegionInstanceKey` forecasts instead of the legacy biome forecast map.
+- Removed the unused legacy biome-forecast save writer from `ForecastDataStorage`; region saves remain the only write path while `biome_forecasts.json` stays as a read-only migration/import fallback.
+- Moved remaining server command/debug wind consumers (`weatherdebug`, `/windSpeed`, hurricane spawn, tornado spawn/debug cloud seeding) onto region-first wind sampling while preserving biome-key adapters only where external cloud spawn integration still requires them.
+## Unreleased - Forecast refactor phase 5 region-first persistence
+- Added primary region-first persistence for forecast saves under `region_forecasts`, including bulk region discovery and load-time integrity validation for weekly temperature, humidity, pressure, wind, and storm data.
+- Migrated startup/shutdown forecast persistence to prefer region saves while keeping legacy `biome_forecasts.json` and legacy region fallback files as read-only compatibility/import paths.
+- Hydrated legacy biome-key compatibility structures from loaded region forecasts so existing runtime systems can keep using biome-key adapters while persistence moves to `RegionInstanceKey` first.
+- Added direct wind forecast rebuild support from region forecasts so server bootstrap no longer depends on legacy biome-save hydration when region saves are present.
+- Moved active runtime scheduling toward region keys by switching wind ticking, ocean basin updates, tornado cooldown/risk flow, and nearby-player active tracking to `RegionInstanceKey`-first paths while keeping deprecated biome adapters for compatibility.
+- Hardened seasonal tree Dynamic Trees integration so the accessor is loaded reflectively only when the `dynamictrees` mod is present, and downgraded the DT development dependency to `compileOnly` so missing DT no longer blocks normal launches.
+- Converted sandstorm forecast detection/scheduling to use region forecasts internally, resolving a representative biome sample only at the compatibility edge where the external sandstorm API still requires biome keys.
+- Updated humidity/pressure debug commands and tornado debug actions to stop reading player-position biome forecasts directly and prefer region-first forecast/runtime access.
 ## Unreleased - Forecast refactor phase 4 wind API definition
 - Added a minimal region-first wind forecast API (`WindForecastApi`) with direction and speed accessors, plus a default server implementation (`RegionWindForecastApi`) backed by `ForecastOrchestrator`.
 ## Unreleased - Forecast refactor phase 3 region-first sampling

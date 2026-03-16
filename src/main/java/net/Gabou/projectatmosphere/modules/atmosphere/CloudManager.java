@@ -19,7 +19,6 @@ import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudEvolved;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudTickSummary;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PrecipitationDecisionTrace;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
@@ -496,8 +495,8 @@ public final class CloudManager {
                 continue;
             }
 
-            Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInArea(point.x, point.y, radius, level);
-            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, level, tick);
+            Map<RegionInstanceKey, Integer> sampledRegions = WeatherSampler.sampleRegionsInArea(point.x, point.y, radius, level);
+            WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sampledRegions, tick);
             if (stats == null) {
                 continue;
             }
@@ -552,8 +551,8 @@ public final class CloudManager {
             return;
         }
 
-        BiomeInstanceKey key = new BiomeInstanceKey(candidate.stats().dominantBiome(), candidate.stats().pos());
-        if (generator.getCloudAtWorldPosition(key.samplePos().getX(), key.samplePos().getZ()) != null) {
+        BlockPos anchor = candidate.stats().pos();
+        if (generator.getCloudAtWorldPosition(anchor.getX(), anchor.getZ()) != null) {
             return;
         }
 
@@ -566,7 +565,7 @@ public final class CloudManager {
 
         Optional<CloudRegion> dummy = SimpleCloudsCompat.createRegion(
                 info,
-                key,
+                candidate.stats().dominantRegion(),
                 level,
                 level.random,
                 candidate.stats().windVector(),
@@ -579,9 +578,9 @@ public final class CloudManager {
         CloudRegion region = dummy.get();
         region.setRadius(candidate.radius());
 
-        SimpleCloudsCompat.spawnCloudInBiome(
+        SimpleCloudsCompat.spawnCloudInRegion(
                 candidate.cloudId(),
-                key,
+                candidate.stats().dominantRegion(),
                 level,
                 region,
                 candidate.stats().windVector()

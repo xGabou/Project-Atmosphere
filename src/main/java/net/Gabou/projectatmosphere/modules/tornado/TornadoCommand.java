@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -45,7 +46,8 @@ public class TornadoCommand {
                     BiomeInstanceKey key = new BiomeInstanceKey(
                             AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
                             player.blockPosition());
-                    WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(key);
+                    RegionInstanceKey regionKey = RegionInstanceKey.from(player.blockPosition());
+                    WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
                     net.Gabou.projectatmosphere.modules.core.WindVector wind =
                             net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(
                                     sample.speedMps(),

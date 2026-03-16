@@ -52,6 +52,20 @@ public final class RegionForecastOrchestrator {
     }
 
     private ForecastRegion loadOrGenerate(RegionInstanceKey id) {
+        Optional<ForecastRegion> persisted = persistence.loadRegion(id);
+        if (persisted.isPresent()) {
+            ForecastRegion region = persisted.get();
+            CorruptionReport report = detectCorruption(region);
+            if (report.corrupted()) {
+                ProjectAtmosphere.LOGGER.warn(
+                        "[Atmosphere] Region {} primary save appears corrupted ({}). Falling back to migration path.",
+                        id,
+                        report.message()
+                );
+            } else {
+                return region;
+            }
+        }
         Optional<BiomeFallbackSnapshot> fb = persistence.loadFallback(id);
         if (fb.isPresent()) {
             ForecastRegion region = fromFallback(fb.get());
@@ -64,6 +78,7 @@ public final class RegionForecastOrchestrator {
                 );
                 return generateFromBiomes(id);
             }
+            persistence.saveRegion(region);
             return region;
         }
         return generateFromBiomes(id);
@@ -81,9 +96,10 @@ public final class RegionForecastOrchestrator {
         List<BiomeInstanceKey> biomes = regionIndex.biomesFor(id);
         ForecastRegion.Section[] sections = sliceIntoEight(biomes);
         RegionCurves curves = aggregateSections(sections);
-        BiomeFallbackSnapshot fb = persistence.saveFallback(id, sections, biomes);
+        BiomeFallbackSnapshot fb = new BiomeFallbackSnapshot(id, biomes, sections);
         ForecastRegion region = new ForecastRegion(id, biomes, sections, curves, fb);
         region.clearBiomeForecasts();
+        persistence.saveRegion(region);
         return region;
     }
 

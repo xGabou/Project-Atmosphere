@@ -41,6 +41,13 @@ versionRange = "*"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
+modId = "dynamictrees"
+mandatory = false
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
 modId = "sandstorm"
 mandatory = false
 versionRange = "*"

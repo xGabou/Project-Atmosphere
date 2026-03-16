@@ -33,6 +33,10 @@ public class CompatHandler {
         return ModList.get().isLoaded("continents");
     }
 
+    public static boolean isDynamicTreesLoaded() {
+        return ModList.get().isLoaded("dynamictrees");
+    }
+
     public static TemperatureMod getActiveTemperatureMod() {
         if (ModList.get().isLoaded("legendarysurvivaloverhaul")) {
             return TemperatureMod.LEGENDARY_SURVIVAL;
@@ -84,5 +88,8 @@ public class CompatHandler {
         LOGGER.info(isContinentsLoaded()
                 ? "Continents detected – enabling refined shoreline geometry."
                 : "Continents mod not detected.");
+        LOGGER.info(isDynamicTreesLoaded()
+                ? "Dynamic Trees detected - enabling seasonal tree integration."
+                : "Dynamic Trees not detected.");
     }
 }

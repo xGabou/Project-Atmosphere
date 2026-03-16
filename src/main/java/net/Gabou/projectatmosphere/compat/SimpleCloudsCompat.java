@@ -13,7 +13,9 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -24,8 +26,8 @@ import org.joml.Vector2i;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.calculateDewPoint;
 import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.determineCloudSeverity;
@@ -64,7 +66,20 @@ public class SimpleCloudsCompat {
     }
 
     public static CloudRegion spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
+        if (key == null || key.samplePos() == null) {
+            return null;
+        }
+        return spawnCloud(cloudId, key.samplePos(), key.biomeType(), level, dummy, windVector);
+    }
 
+    public static CloudRegion spawnCloudInRegion(String cloudId, RegionInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
+        if (key == null) {
+            return null;
+        }
+        return spawnCloud(cloudId, key.center(), null, level, dummy, windVector);
+    }
+
+    private static CloudRegion spawnCloud(String cloudId, BlockPos anchor, @Nullable ResourceLocation biomeId, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
 
         if (!isInit) {
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] SimpleClouds is not ready yet, cannot spawn cloud: {}", cloudId);
@@ -95,14 +110,14 @@ public class SimpleCloudsCompat {
         } else {
             region = generator.spawnCloud(() -> info, spawnConfig.getSpawnInterval().sample(random), spawnConfig.getMaxRegions(), level,
                     (spawnInfo, playerX, playerZ, realX, realZ, rand, grow) ->
-                            createRegion(spawnInfo, key, level, rand, windVector, generator)
+                            createRegion(spawnInfo, anchor, level, rand, windVector, generator)
             );
         }
 
         if(ProjectAtmosphere.DEBUG_MODE)
             region.ifPresentOrElse(
-                r -> ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawned {} at {}, {} in {}", cloudId, x, z, key.biomeType()),
-                () -> ProjectAtmosphere.LOGGER.warn("[Atmosphere] Failed to spawn {} in {}", cloudId, key.biomeType())
+                r -> ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawned {} at {}, {} near {}", cloudId, x, z, biomeId == null ? anchor : biomeId),
+                () -> ProjectAtmosphere.LOGGER.warn("[Atmosphere] Failed to spawn {} near {}", cloudId, biomeId == null ? anchor : biomeId)
             );
         return  region.orElse(null);
     }
@@ -120,8 +135,36 @@ public class SimpleCloudsCompat {
             WindVector wind,
             CloudGenerator generator
     ) {
-        float x = biomeKey.samplePos().getX();
-        float z = biomeKey.samplePos().getZ();
+        if (biomeKey == null || biomeKey.samplePos() == null) {
+            return Optional.empty();
+        }
+        return createRegion(info, biomeKey.samplePos(), level, random, wind, generator);
+    }
+
+    public static Optional<CloudRegion> createRegion(
+            SpawnInfo info,
+            RegionInstanceKey regionKey,
+            ServerLevel level,
+            RandomSource random,
+            WindVector wind,
+            CloudGenerator generator
+    ) {
+        if (regionKey == null) {
+            return Optional.empty();
+        }
+        return createRegion(info, regionKey.center(), level, random, wind, generator);
+    }
+
+    public static Optional<CloudRegion> createRegion(
+            SpawnInfo info,
+            BlockPos anchor,
+            ServerLevel level,
+            RandomSource random,
+            WindVector wind,
+            CloudGenerator generator
+    ) {
+        float x = anchor.getX();
+        float z = anchor.getZ();
         // Hard cap: skip spawn if candidate is farther than 10k from all players
         boolean nearPlayer = level.players().stream().anyMatch(p -> {
             double dx = x - p.getX();
@@ -191,8 +234,8 @@ public class SimpleCloudsCompat {
                 if (intersectsOther)
                     continue;
 
-                Set<BiomeInstanceKey> keys = WeatherSampler.sampleBiomesInArea(pos.x, pos.y, sharedRadius, level);
-                WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(keys, level, level.getGameTime());
+                Map<RegionInstanceKey, Integer> regionsInArea = WeatherSampler.sampleRegionsInArea(pos.x, pos.y, sharedRadius, level);
+                WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(regionsInArea, level.getGameTime());
                 if (stats == null)
                     continue;
 
@@ -215,7 +258,7 @@ public class SimpleCloudsCompat {
 
                 Optional<CloudRegion> cloudFormation = createRegion(
                         selected,
-                        new BiomeInstanceKey(stats.dominantBiome(), stats.pos()),
+                        stats.dominantRegion(),
                         level,
                         random,
                         stats.windVector(),

@@ -9,7 +9,6 @@ import net.Gabou.projectatmosphere.modules.ocean.influence.AtmosphereFluxInfluen
 import net.Gabou.projectatmosphere.modules.ocean.influence.BasinPressureMemoryInfluence;
 import net.Gabou.projectatmosphere.modules.ocean.influence.BasinThermalMemoryInfluence;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -64,19 +63,9 @@ public final class OceanBasinManager {
                 });
     }
 
-    public static void update(ServerLevel level, Set<BiomeInstanceKey> activeKeys) {
+    public static void update(ServerLevel level, Set<RegionInstanceKey> activeRegions) {
         if (!READY.get() || AtmosphericStateRegistry.isEmpty()) {
             return;
-        }
-        if (activeKeys.isEmpty()) {
-            return;
-        }
-        Set<RegionInstanceKey> activeRegions = new HashSet<>();
-        for (BiomeInstanceKey key : activeKeys) {
-            RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-            if (regionKey != null) {
-                activeRegions.add(regionKey);
-            }
         }
         if (activeRegions.isEmpty()) {
             return;

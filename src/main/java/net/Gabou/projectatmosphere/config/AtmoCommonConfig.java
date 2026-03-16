@@ -72,6 +72,31 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_EXTREME_THRESHOLD_MPS;
     public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_EXTREME_CHANCE_MULT;
     public static final ForgeConfigSpec.DoubleValue PLAYER_GUST_EXTREME_STRENGTH_MULT;
+    public static final ForgeConfigSpec.IntValue WIND_LEAF_PARTICLE_RADIUS_BLOCKS;
+    public static final ForgeConfigSpec.IntValue WIND_LEAF_PARTICLE_SCAN_UP;
+    public static final ForgeConfigSpec.IntValue WIND_LEAF_PARTICLE_SCAN_DOWN;
+    public static final ForgeConfigSpec.IntValue WIND_LEAF_PARTICLE_ATTEMPTS_PER_TICK;
+    public static final ForgeConfigSpec.DoubleValue WIND_LEAF_PARTICLE_CHANCE_PER_CANDIDATE;
+    public static final ForgeConfigSpec.IntValue WIND_LEAF_PARTICLE_MIN_FOLIAGE_NEIGHBORS;
+    public static final ForgeConfigSpec.BooleanValue WIND_LEAF_PARTICLE_REQUIRE_LOG_BELOW;
+    public static final ForgeConfigSpec.IntValue WIND_LEAF_PARTICLE_MAX_LOG_SEARCH_DEPTH;
+    public static final ForgeConfigSpec.BooleanValue SEASONAL_TREES_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue SEASONAL_TREES_DYNAMIC_TREES_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue SEASONAL_TREES_VANILLA_ENABLED;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_LEAF_DROP_DAYS;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_LEAF_REGROW_DAYS;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_TRANSITION_COOLDOWN_DAYS;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_TRANSITION_OFFSET_DAYS;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_SPREAD_CHANCE_PER_DAY;
+    public static final ForgeConfigSpec.IntValue SEASONAL_TREES_SPREAD_RADIUS_BLOCKS;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_VIGOR_REGEN_PER_DAY;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_VIGOR_MIN_FOR_SPREAD;
+    public static final ForgeConfigSpec.IntValue SEASONAL_TREES_MAX_ACTIVE_SEEDS;
+    public static final ForgeConfigSpec.IntValue SEASONAL_TREES_SEED_LIFETIME_TICKS;
+    public static final ForgeConfigSpec.DoubleValue SEASONAL_TREES_SEED_BASE_SPEED;
+    public static final ForgeConfigSpec.BooleanValue SEASONAL_TREES_WIND_TRANSPORT_ENABLED;
+    public static final ForgeConfigSpec.IntValue SEASONAL_TREES_BUDGET_PER_TICK;
+    public static final ForgeConfigSpec.IntValue SEASONAL_TREES_SCAN_BUDGET_PER_TICK;
     public static final ForgeConfigSpec.BooleanValue WORLD_EFFECTS_ENABLED;
     public static final ForgeConfigSpec.IntValue WORLD_EFFECT_SAMPLES_PER_PLAYER;
     public static final ForgeConfigSpec.IntValue WORLD_EFFECT_SAMPLE_RADIUS;
@@ -240,6 +265,86 @@ public class AtmoCommonConfig {
         PLAYER_GUST_EXTREME_STRENGTH_MULT = builder
                 .comment("Multiplier applied to max gust strength in extreme winds")
                 .defineInRange("playerGustExtremeStrengthMult", 2.0d, 1d, 10d);
+        builder.pop();
+        builder.push("leafParticles");
+        WIND_LEAF_PARTICLE_RADIUS_BLOCKS = builder
+                .comment("Sampling radius in blocks around the player for wind-driven leaf particles")
+                .defineInRange("radiusBlocks", 32, 4, 128);
+        WIND_LEAF_PARTICLE_SCAN_UP = builder
+                .comment("Vertical scan range above the player for canopy sampling")
+                .defineInRange("verticalScanUp", 12, 0, 64);
+        WIND_LEAF_PARTICLE_SCAN_DOWN = builder
+                .comment("Vertical scan range below the player for canopy sampling")
+                .defineInRange("verticalScanDown", 12, 0, 64);
+        WIND_LEAF_PARTICLE_ATTEMPTS_PER_TICK = builder
+                .comment("Number of canopy sampling attempts per client tick")
+                .defineInRange("attemptsPerTick", 2, 0, 32);
+        WIND_LEAF_PARTICLE_CHANCE_PER_CANDIDATE = builder
+                .comment("Chance per valid canopy candidate to spawn a particle")
+                .defineInRange("chancePerCandidate", 0.03d, 0d, 1d);
+        WIND_LEAF_PARTICLE_MIN_FOLIAGE_NEIGHBORS = builder
+                .comment("Minimum foliage blocks required in a 3x3x3 neighborhood to accept a canopy candidate")
+                .defineInRange("minFoliageNeighbors", 6, 1, 27);
+        WIND_LEAF_PARTICLE_REQUIRE_LOG_BELOW = builder
+                .comment("Require at least one log block below the canopy candidate")
+                .define("requireLogBelow", true);
+        WIND_LEAF_PARTICLE_MAX_LOG_SEARCH_DEPTH = builder
+                .comment("Maximum depth to search for a log block below the canopy candidate")
+                .defineInRange("maxLogSearchDepth", 8, 1, 32);
+        builder.pop();
+
+        builder.push("seasonalTrees");
+        SEASONAL_TREES_ENABLED = builder
+                .comment("Enable seasonal tree leaf transitions and spreading")
+                .define("enabled", true);
+        SEASONAL_TREES_DYNAMIC_TREES_ENABLED = builder
+                .comment("Enable Dynamic Trees support (preferred)")
+                .define("dynamicTreesEnabled", true);
+        SEASONAL_TREES_VANILLA_ENABLED = builder
+                .comment("Enable conservative vanilla tree support (off by default)")
+                .define("vanillaEnabled", false);
+        SEASONAL_TREES_LEAF_DROP_DAYS = builder
+                .comment("In-game days for leaves to drop during autumn")
+                .defineInRange("leafDropDays", 4.0d, 0.1d, 40d);
+        SEASONAL_TREES_LEAF_REGROW_DAYS = builder
+                .comment("In-game days for leaves to regrow during spring")
+                .defineInRange("leafRegrowDays", 4.0d, 0.1d, 40d);
+        SEASONAL_TREES_TRANSITION_COOLDOWN_DAYS = builder
+                .comment("Cooldown in days before a tree can restart a season transition")
+                .defineInRange("transitionCooldownDays", 2.0d, 0d, 40d);
+        SEASONAL_TREES_TRANSITION_OFFSET_DAYS = builder
+                .comment("Max random offset in days applied to per-tree seasonal transitions")
+                .defineInRange("transitionOffsetDays", 2.0d, 0d, 20d);
+        SEASONAL_TREES_SPREAD_CHANCE_PER_DAY = builder
+                .comment("Chance per in-game day for mature trees to attempt spreading")
+                .defineInRange("spreadChancePerDay", 0.02d, 0d, 1d);
+        SEASONAL_TREES_SPREAD_RADIUS_BLOCKS = builder
+                .comment("Baseline spread radius in blocks for local seed dispersal")
+                .defineInRange("spreadRadiusBlocks", 12, 1, 128);
+        SEASONAL_TREES_VIGOR_REGEN_PER_DAY = builder
+                .comment("Base vigor regeneration per in-game day")
+                .defineInRange("vigorRegenPerDay", 0.05d, 0d, 1d);
+        SEASONAL_TREES_VIGOR_MIN_FOR_SPREAD = builder
+                .comment("Minimum vigor required before a tree can spread")
+                .defineInRange("vigorMinForSpread", 0.55d, 0d, 1d);
+        SEASONAL_TREES_MAX_ACTIVE_SEEDS = builder
+                .comment("Maximum number of active seed particles (wind transport) per world")
+                .defineInRange("maxActiveSeeds", 256, 0, 10000);
+        SEASONAL_TREES_SEED_LIFETIME_TICKS = builder
+                .comment("Seed particle lifetime in ticks before attempting to plant")
+                .defineInRange("seedLifetimeTicks", 400, 20, 72000);
+        SEASONAL_TREES_SEED_BASE_SPEED = builder
+                .comment("Base speed multiplier for wind-transported seeds")
+                .defineInRange("seedBaseSpeed", 0.15d, 0d, 5d);
+        SEASONAL_TREES_WIND_TRANSPORT_ENABLED = builder
+                .comment("Enable wind-based seed transport when Project Atmosphere is installed")
+                .define("windTransportEnabled", true);
+        SEASONAL_TREES_BUDGET_PER_TICK = builder
+                .comment("Maximum number of tree updates per tick")
+                .defineInRange("budgetPerTick", 80, 1, 10000);
+        SEASONAL_TREES_SCAN_BUDGET_PER_TICK = builder
+                .comment("Maximum number of chunk scan steps per tick")
+                .defineInRange("scanBudgetPerTick", 120, 1, 20000);
         builder.pop();
 
         builder.push("worldEffects");
