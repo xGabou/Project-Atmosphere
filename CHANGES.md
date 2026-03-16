@@ -1,5 +1,19 @@
-# Project Atmosphere — Developer Change Log
+﻿# Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Dynamic Trees hibernation state
+- Added a seasonal tree Hibernating leaf state (with legacy bare-state migration) to model winter dormancy without killing Dynamic Trees.
+- Dynamic Trees autumn/spring transitions now swap foliage to/from bare leaves using deterministic progress-based selection instead of leaf aging, preventing leafless deaths while still thinning canopies.
+- Dynamic Trees seasonal transitions now apply a small initial progress step so autumn leaf drop is visible even before per-tree offsets elapse.
+## Unreleased - Region forecast stability diagnostics
+- Added `/weatherdebug regionforecast` to print active region forecast summaries (bounds, dimension, update tick, readings, readiness flags) to chat and server logs.
+- Clamped humidity outputs to 0â€“100% with stacktrace logging for invalid values, covering generation, persistence, aggregation, sampling, and display.
+- Prevented incremental forecast generation from clearing shared maps, added mutation tracing for forecast/region maps, and locked forecast writes to reduce unexpected resets.
+- Instruments now resolve region forecasts for temperature, humidity, pressure, and wind; readiness gating returns a clear "Forecast not ready" message instead of blank output.
+## Unreleased - Seasonal trees host election
+- Added a shared seasonal trees core with chunk-scoped persistence, deterministic tick budgets, and Dynamic Trees-ready hooks plus PA wind seed transport.
+- Gated seasonal trees initialization behind gaboulibs host election and an init guard so PA only registers host-side listeners.
+## Unreleased - Dynamic Trees dormancy
+- Seasonal Trees now applies a Dynamic Trees dormancy pass that removes compatible leaves without leaf aging, with debug logging of affected leaf counts.
 ## Unreleased - Wind force tuning
 - Apply Weather2-style wind steering (velocity targeting) after player input, using base wind above 11.1 m/s with capped drift.
 - Apply exposure checks (sky visibility, water/lava, horizontal collision) before influencing players or other living entities.
@@ -11,7 +25,14 @@ This file records functionality additions/removals made during development sessi
 - Sprinting players now ignore gusts unless winds reach extreme thresholds.
 - Surface wind sampling now uses the low-wind layer (not high aloft) and no longer treats gust headroom as always-on speed.
 - Reduced default wind push scales and player gust caps by ~3x for gentler movement impact.
+## Unreleased - Leaf particle canopy sampling
+- Wind leaf particles now sample tagged foliage (with heuristics for Dynamic Trees), validate nearby canopy density and logs below, and spawn from tree canopies using new sampling config knobs.
+## Unreleased - Dynamic Trees dormancy safety
+- Dynamic Trees dormancy no longer strips leaves to air; it only swaps to Dynamic Trees' bare leaves when available, preventing leafless trees from dying during hibernation.
+- Dynamic Trees scanning now accepts branch hits near the heightmap surface to register more trees for seasonal updates.
+- Dynamic Trees seasonal recovery now restores active foliage before spring/summer growth pulses, ensuring leaves come back after winter.
 ## Unreleased - Stability and sync fixes
+- Cyclone initialization now uses a thread-safe RNG to avoid LegacyRandomSource threading crashes.
 - Active region detection now uses region membership (plus accurate radius checks) so player-owned regions are always marked active.
 - Instruments now read live atmospheric state values on the server to keep temperature, humidity, and pressure consistent with wind and effects.
 - Client temperature cache updates are now atomic to prevent transient stale reads.

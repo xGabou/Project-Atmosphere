@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.HumidityGuard;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -172,7 +173,16 @@ public final class ForecastRegion {
         if (curves == null) {
             return 0f;
         }
-        return curves.sampleHumidity(inRegionPos, gameTime, sections);
+        float sample = curves.sampleHumidity(inRegionPos, gameTime, sections);
+        return HumidityGuard.clampPercent(
+                sample,
+                0f,
+                "ForecastRegion.sampleHumidity",
+                id,
+                null,
+                null,
+                anchor
+        );
     }
 
     public float samplePressure(long gameTime) {
@@ -247,7 +257,15 @@ public final class ForecastRegion {
         }
 
         temperature = clampWeek(averageWeek(biomeForecasts, BiomeForecast::getTemperature), MIN_TEMPERATURE_C, MAX_TEMPERATURE_C);
-        humidity = clampWeek(averageWeek(biomeForecasts, BiomeForecast::getHumidity), MIN_HUMIDITY, MAX_HUMIDITY);
+        humidity = HumidityGuard.clampWeekPercent(
+                averageWeek(biomeForecasts, BiomeForecast::getHumidity),
+                0f,
+                "ForecastRegion.finalizeAggregation",
+                id,
+                null,
+                null,
+                anchor
+        );
         pressure = clampWeek(averageWeek(biomeForecasts, BiomeForecast::getPressure), MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
         wind = averageWindWeek(biomeForecasts, BiomeForecast::getWind);
         windDay = wind.length > 0 ? wind[0] : WindVector.fromBase(0f, 0f);

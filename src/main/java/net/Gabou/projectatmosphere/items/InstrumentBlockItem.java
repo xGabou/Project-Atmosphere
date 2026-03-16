@@ -32,7 +32,7 @@ public abstract class InstrumentBlockItem extends BlockItem implements Instrumen
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
         if (player != null && !player.isShiftKeyDown()) {
-            if (!context.getLevel().isClientSide) {
+            if (context.getLevel().isClientSide) {
                 display(context.getLevel(), player);
             }
             return InteractionResult.SUCCESS;
@@ -54,7 +54,7 @@ public abstract class InstrumentBlockItem extends BlockItem implements Instrumen
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
 
         if (!player.isShiftKeyDown()) {
-            if (!level.isClientSide) {
+            if (level.isClientSide) {
                 display(level, player);
             }
             return InteractionResultHolder.success(player.getItemInHand(hand));

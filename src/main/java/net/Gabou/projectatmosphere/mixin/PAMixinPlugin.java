@@ -74,10 +74,10 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
         if (!FMLEnvironment.dist.isClient() && mixinClassName.contains(".client.")) {
             return false;
         }
-        if (mixinClassName.endsWith("OverwriteDesertSound") && !isSandStormLoaded()) {
+        if (mixinClassName.endsWith("OverwriteDesertSound") && isSandStormLoaded()) {
             return false;
         }
-        if (mixinClassName.endsWith("MixinSandstormDebugBlocker") && !isSandStormLoaded()) {
+        if (mixinClassName.endsWith("MixinSandstormDebugBlocker") && isSandStormLoaded()) {
             return false;
         }
         if (mixinClassName.contains("compat.auroras") && !isAurorasLoaded()) {

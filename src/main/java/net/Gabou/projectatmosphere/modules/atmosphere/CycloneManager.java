@@ -73,9 +73,10 @@ public final class CycloneManager {
         List<RegionAtmosphereState> candidates = findNearbyStates(level);
 
         if (candidates.isEmpty()) {
-            return; // no valid region nearby → skip all
+            return; // no valid region nearby -> skip all
         }
-        spawnCyclone(level, candidates);
+        RandomSource random = createRandom(level);
+        spawnCyclone(level, candidates, random);
     }
 
     private static boolean cooldownPassed(long now) {
@@ -83,25 +84,23 @@ public final class CycloneManager {
     }
 
     private static void spawnInitialCyclones(ServerLevel level) {
-        RandomSource random = level.random;
+        RandomSource random = createRandom(level);
         int count = 3 + random.nextInt(6);
 
         // Precompute nearby region candidates
         List<RegionAtmosphereState> candidates = findNearbyStates(level);
 
         if (candidates.isEmpty()) {
-            return; // no valid region nearby → skip all
+            return; // no valid region nearby -> skip all
         }
 
         for (int i = 0; i < count; i++) {
-            spawnCyclone(level, candidates);
+            spawnCyclone(level, candidates, random);
         }
     }
 
 
-    private static void spawnCyclone(ServerLevel level, List<RegionAtmosphereState> candidates) {
-        RandomSource random = level.random;
-
+    private static void spawnCyclone(ServerLevel level, List<RegionAtmosphereState> candidates, RandomSource random) {
         if (candidates == null || candidates.isEmpty()) {
             return;
         }
@@ -123,6 +122,11 @@ public final class CycloneManager {
         ));
 
         lastSpawnTick = level.getDayTime();
+    }
+
+    private static RandomSource createRandom(ServerLevel level) {
+        long seed = level.getSeed() ^ (level.getDayTime() * 31L);
+        return RandomSource.create(seed);
     }
     private static List<RegionAtmosphereState> findNearbyStates(ServerLevel level) {
         List<BlockPos> players = level.players().stream()

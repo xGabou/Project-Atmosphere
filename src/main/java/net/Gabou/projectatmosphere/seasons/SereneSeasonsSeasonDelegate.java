@@ -15,6 +15,7 @@ public class SereneSeasonsSeasonDelegate implements SeasonTimeDelegate {
 
     public SereneSeasonsSeasonDelegate() {
         SeasonTracker.register();
+        SeasonTracker.registerSeasonalTrees();
     }
 
 

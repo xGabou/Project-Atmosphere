@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Range;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.HumidityGuard;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -52,6 +53,7 @@ public class RegionAtmosphereState {
     private float cloudCover;
     private float sunlight;
     private float rainIntensity;
+    private long lastUpdateTick = -1L;
 
     RegionAtmosphereState(net.Gabou.projectatmosphere.util.RegionInstanceKey id, BlockPos anchor, ForecastRegion forecastRegion, ResourceLocation dominantBiome, float baseTemperature, float baseHumidity, float basePressure, WindVector wind) {
         this.regionId = id;
@@ -59,10 +61,10 @@ public class RegionAtmosphereState {
         this.anchor = anchor == null ? legacyKey.center() : anchor;
         this.dominantBiome = dominantBiome;
         this.baseTemperature = baseTemperature;
-        this.baseHumidity = clampHumidity(baseHumidity);
+        this.baseHumidity = clampHumidityWithContext(baseHumidity, "RegionAtmosphereState.init.baseHumidity");
         this.basePressure = basePressure;
         this.temperature = baseTemperature;
-        this.humidity = clampHumidity(baseHumidity);
+        this.humidity = clampHumidityWithContext(baseHumidity, "RegionAtmosphereState.init.humidity");
         this.pressure = basePressure;
         this.wind = wind;
         this.biomeSunlightMultiplier = computeBiomeSunlightMultiplier(dominantBiome);
@@ -170,11 +172,20 @@ public class RegionAtmosphereState {
     }
 
     public float getHumidityPercent() {
-        return humidity * 100f;
+        float percent = humidity * 100f;
+        return HumidityGuard.clampPercent(
+                percent,
+                0f,
+                "RegionAtmosphereState.getHumidityPercent",
+                regionId,
+                dominantBiome,
+                null,
+                anchor
+        );
     }
 
     public void setHumidity(float humidity) {
-        this.humidity = clampHumidity(humidity);
+        this.humidity = clampHumidityWithContext(humidity, "RegionAtmosphereState.setHumidity");
     }
 
     public void adjustHumidity(float delta) {
@@ -263,7 +274,7 @@ public class RegionAtmosphereState {
         temperature += (baseTemperature - temperature) * factor;
         humidity += (baseHumidity - humidity) * factor;
         pressure += (basePressure - pressure) * factor;
-        humidity = clampHumidity(humidity);
+        humidity = clampHumidityWithContext(humidity, "RegionAtmosphereState.relaxTowardBase");
         pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
     }
 
@@ -290,8 +301,8 @@ public class RegionAtmosphereState {
         return Mth.lerp(clamped, baselineMinTemp, baselineMaxTemp);
     }
 
-    private static float clampHumidity(float value) {
-        return Mth.clamp(value, 0f, 1.2f);
+    private float clampHumidityWithContext(float value, String context) {
+        return HumidityGuard.clampNormalized(value, 0f, context, regionId, dominantBiome, null, anchor);
     }
 
     private static float computeBiomeSunlightMultiplier(@Nullable ResourceLocation biomeId) {
@@ -325,16 +336,16 @@ public class RegionAtmosphereState {
         return arr;
     }
 
-    private static float[] initialiseDailyCurveScaled(@Nullable float[] source, float normalizedFallback, float scale) {
+    private float[] initialiseDailyCurveScaled(@Nullable float[] source, float normalizedFallback, float scale) {
         if (source != null && source.length > 0) {
             float[] resampled = resampleDailyCurve(source);
             for (int i = 0; i < resampled.length; i++) {
-                resampled[i] = Mth.clamp(resampled[i] / scale, 0f, 1.2f);
+                resampled[i] = clampHumidityWithContext(resampled[i] / scale, "RegionAtmosphereState.dailyHumidityProfile");
             }
             return resampled;
         }
         float[] arr = new float[DAILY_SLOTS];
-        Arrays.fill(arr, Mth.clamp(normalizedFallback, 0f, 1.2f));
+        Arrays.fill(arr, clampHumidityWithContext(normalizedFallback, "RegionAtmosphereState.dailyHumidityProfile"));
         return arr;
     }
 
@@ -406,6 +417,14 @@ public class RegionAtmosphereState {
             return Math.max(MIN_TEMPERATURE_C, Math.min(baseTemperature, ceiling));
         }
         return clamped;
+    }
+
+    public long getLastUpdateTick() {
+        return lastUpdateTick;
+    }
+
+    public void markUpdated(long tick) {
+        this.lastUpdateTick = tick;
     }
 
     private void maybeLogTemperatureClamp(float original, float clamped) {

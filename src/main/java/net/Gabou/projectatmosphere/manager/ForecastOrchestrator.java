@@ -17,6 +17,7 @@ import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.region.RegionOrchestratorBootstrap;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.HumidityGuard;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneState;
@@ -85,7 +86,7 @@ public class ForecastOrchestrator {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
 
                 ForecastDataStorage.clearAll(level);
-                ForecastGenerator.clearForecasts();
+                ForecastGenerator.clearForecasts("load-failure");
                 ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
                 WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
                 initializeDynamicSystems(level);
@@ -113,7 +114,7 @@ public class ForecastOrchestrator {
     public static void onServerStop(ServerLevel level) {
         ForecastDataStorage.saveAll(level);
         TornadoStorageManager.save(level);
-        ForecastGenerator.clearForecasts();
+        ForecastGenerator.clearForecasts("server-stop");
         REGION_ORCHESTRATOR = null;
     }
 
@@ -175,7 +176,7 @@ public class ForecastOrchestrator {
     public static void clearAndRegenerate(ServerLevel level) {
         REGENERATING = true;
         try {
-            ForecastGenerator.clearForecasts();
+            ForecastGenerator.clearForecasts("manual-regenerate");
             clearActiveBiomeKeys();
             ForecastDataStorage.playerData.clear();
             List<ServerPlayer> players = AsyncAtmosphereService.callOnMainThread(level::players);
@@ -218,7 +219,7 @@ public class ForecastOrchestrator {
         }
         REGENERATING = true;
         try {
-            ForecastGenerator.clearForecasts();
+            ForecastGenerator.clearForecasts("season-regenerate");
             clearActiveBiomeKeys();
             List<BlockPos> centers = new ArrayList<>();
             if (!ForecastDataStorage.playerData.isEmpty()) {
@@ -305,7 +306,17 @@ public class ForecastOrchestrator {
      * Get humidity for any biome
      */
     public static float getCurrentHumidity(BiomeInstanceKey key, long tick) {
-        return ForecastGenerator.getHumidityValue(key, tick);
+        float humidity = ForecastGenerator.getHumidityValue(key, tick);
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        return HumidityGuard.clampPercent(
+                humidity,
+                0f,
+                "ForecastOrchestrator.getCurrentHumidity(biome)",
+                regionKey,
+                key == null ? null : key.biomeType(),
+                null,
+                key == null ? null : key.samplePos()
+        );
     }
 
     /**
@@ -316,7 +327,16 @@ public class ForecastOrchestrator {
         if (region == null) {
             return 0f;
         }
-        return region.sampleHumidity(REGION_ORCHESTRATOR.toRegionLocal(pos), tick);
+        float humidity = region.sampleHumidity(REGION_ORCHESTRATOR.toRegionLocal(pos), tick);
+        return HumidityGuard.clampPercent(
+                humidity,
+                0f,
+                "ForecastOrchestrator.getCurrentHumidity(region)",
+                region.getKey(),
+                null,
+                level.dimension(),
+                pos
+        );
     }
 
     /**
@@ -440,7 +460,13 @@ public class ForecastOrchestrator {
         if (regionKey == null) {
             return null;
         }
-        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        ForecastRegion region = null;
+        if (REGION_ORCHESTRATOR != null) {
+            region = REGION_ORCHESTRATOR.ensureLoaded(regionKey);
+        }
+        if (region == null) {
+            region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        }
         if (region == null) {
             return null;
         }

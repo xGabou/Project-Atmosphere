@@ -14,8 +14,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.HumidityGuard;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.StorageUtils;
 import net.minecraft.core.BlockPos;
@@ -42,6 +44,22 @@ public final class FileRegionPersistence implements RegionPersistence {
         }
         try (Reader r = Files.newBufferedReader(path)) {
             JsonObject root = gson.fromJson(r, JsonObject.class);
+            if (root.has("rx") && root.has("rz")) {
+                int rx = root.get("rx").getAsInt();
+                int rz = root.get("rz").getAsInt();
+                int size = root.has("regionSize") ? root.get("regionSize").getAsInt() : id.regionSize();
+                if (rx != id.regionX() || rz != id.regionZ() || size != id.regionSize()) {
+                    ProjectAtmosphere.LOGGER.error(
+                            "[Atmosphere] Region fallback key mismatch. expected={} file=region[{},{}]@{} thread={}",
+                            id,
+                            rx,
+                            rz,
+                            size,
+                            Thread.currentThread().getName(),
+                            new RuntimeException("Region key stability check failed")
+                    );
+                }
+            }
             List<BiomeInstanceKey> sourceBiomes = new ArrayList<>();
             JsonArray biomesArr = root.getAsJsonArray("biomes");
             if (biomesArr != null) {
@@ -70,6 +88,15 @@ public final class FileRegionPersistence implements RegionPersistence {
                     BiomeInstanceKey key = new BiomeInstanceKey(biome, pos);
                     float[][] temp = deserialize2d(obj.getAsJsonArray("temperature"));
                     float[][] hum = deserialize2d(obj.getAsJsonArray("humidity"));
+                    hum = HumidityGuard.clampWeekPercent(
+                            hum,
+                            0f,
+                            "FileRegionPersistence.loadFallback",
+                            id,
+                            biome,
+                            null,
+                            pos
+                    );
                     float[][] pressure = deserialize2d(obj.getAsJsonArray("pressure"));
                     WindVector[] wind = deserializeWindWeek(obj.getAsJsonArray("wind"));
                     snapshot = new BiomeForecastSnapshot(key, temp, hum, pressure, wind);

@@ -83,14 +83,17 @@ public class ForecastGenerator {
 
     private static final Map<ResourceLocation, List<BiomeForecast>> grouped = new ConcurrentHashMap<>();
     private static final Set<ResourceLocation> WARNED_MISSING_FORECASTS = ConcurrentHashMap.newKeySet();
+    private static final Object FORECAST_LOCK = new Object();
 
     public static Map<ResourceLocation, List<BiomeInstanceKey>> getBiomeIndex() {
         return Collections.unmodifiableMap(biomeIndex);
     }
 
     public static void groupBiomeByType() {
+        int before = biomeIndex.size();
         biomeIndex = biomeSamples.stream()
                 .collect(Collectors.groupingBy(BiomeInstanceKey::biomeType));
+        traceMutation("biomeIndex", "rebuild", null, before, biomeIndex.size());
     }
 
     static void computeAverageForecastsByBiomeType() {
@@ -157,10 +160,13 @@ public class ForecastGenerator {
     }
 
     public static void groupForecastsByBiome() {
+        int before = grouped.size();
+        grouped.clear();
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             ResourceLocation biomeType = entry.getKey().biomeType();
             grouped.computeIfAbsent(biomeType, k -> new ArrayList<>()).add(entry.getValue());
         }
+        traceMutation("grouped", "rebuild", null, before, grouped.size());
     }
 
 
@@ -194,6 +200,12 @@ public class ForecastGenerator {
      * @param level  The server level where the region is located.
      */
     static void generateForecastForRegion(BlockPos center, ServerLevel level) {
+        synchronized (FORECAST_LOCK) {
+            generateForecastForRegionInternal(center, level);
+        }
+    }
+
+    private static void generateForecastForRegionInternal(BlockPos center, ServerLevel level) {
         // Local helper class for per-biome accumulation and size checking
         final class BiomeStats {
             int count;
@@ -221,11 +233,8 @@ public class ForecastGenerator {
         // Your “too small” biome threshold (both dimensions < 40 blocks).
         final int minBiomeWidthBlocks = 40;
 
-        // Optional but recommended: clear shared state for this region if not cleared elsewhere.
-        biomeSamples.clear();
-        biomeSampleCounts.clear();
-        biomeIndex.clear();
-        FORECAST_MAP.clear();
+        int beforeSamples = biomeSamples.size();
+        int beforeForecasts = FORECAST_MAP.size();
 
         // --- World-dependent values (must be on main thread) ---
         long day = AsyncAtmosphereService.callOnMainThread(
@@ -297,6 +306,7 @@ public class ForecastGenerator {
 
         // Flatten per-biome stats into the shared structures,
         // dropping biomes that are too small (both dimensions < minBiomeWidthBlocks).
+        Set<BiomeInstanceKey> newSamples = new HashSet<>();
         for (Map.Entry<ResourceLocation, BiomeStats> entry : biomeStats.entrySet()) {
             ResourceLocation biomeId = entry.getKey();
             BiomeStats stats = entry.getValue();
@@ -309,11 +319,16 @@ public class ForecastGenerator {
                 continue;
             }
 
-            biomeSampleCounts.put(biomeId, stats.count);
-            biomeSamples.addAll(stats.samples);
+            for (BiomeInstanceKey sample : stats.samples) {
+                if (biomeSamples.add(sample)) {
+                    newSamples.add(sample);
+                    biomeSampleCounts.merge(biomeId, 1, Integer::sum);
+                }
+            }
         }
 
         // Build biome index without streams to reduce allocations.
+        biomeIndex.clear();
         for (BiomeInstanceKey key : biomeSamples) {
             biomeIndex
                     .computeIfAbsent(key.biomeType(), k -> new ArrayList<>())
@@ -327,8 +342,8 @@ public class ForecastGenerator {
 
         if (CompatHandler.isToughAsNailsLoaded()) {
             // Process each biome only once (as before) using a Set.
-            Set<ResourceLocation> processed = new HashSet<>(biomeIndex.size());
-            for (BiomeInstanceKey key : biomeSamples) {
+            Set<ResourceLocation> processed = new HashSet<>();
+            for (BiomeInstanceKey key : newSamples) {
                 ResourceLocation biomeId = key.biomeType();
                 if (!processed.add(biomeId)) {
                     continue; // already handled this biome
@@ -357,7 +372,7 @@ public class ForecastGenerator {
             groupForecastsByBiome();
         } else {
             // Per-sample temperature generation (kept for semantic equivalence).
-            for (BiomeInstanceKey key : biomeSamples) {
+            for (BiomeInstanceKey key : newSamples) {
                 BiomeForecast forecast = new BiomeForecast();
                 forecast.setTemperature(generateTemperature(key, level));
                 forecast.setBiomeKey(key);
@@ -376,28 +391,32 @@ public class ForecastGenerator {
 
         // Single pass over FORECAST_MAP to set all three fields.
 // 1) Humidity first
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
-
+        for (BiomeInstanceKey key : newSamples) {
+            BiomeForecast forecast = FORECAST_MAP.get(key);
+            if (forecast == null) {
+                continue;
+            }
             forecast.setHumidity(generateHumidity(key, level, day));
         }
         computeAverageHumidityWeek(); // now any global humidity info is valid
 
 // 2) Then pressure
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
-
+        for (BiomeInstanceKey key : newSamples) {
+            BiomeForecast forecast = FORECAST_MAP.get(key);
+            if (forecast == null) {
+                continue;
+            }
             forecast.setPressure(generatePressure(key, day));
         }
         computeAveragePressureWeek(); // pressure averages now valid too
         WindGenerator.buildNeighborIndex(getBiomeSamples());
 
 // 3) Finally wind, with access to humidity (+ averages) and pressure
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
+        for (BiomeInstanceKey key : newSamples) {
+            BiomeForecast forecast = FORECAST_MAP.get(key);
+            if (forecast == null) {
+                continue;
+            }
 
             // generateWind can now safely read:
             // - forecast.getHumidity()
@@ -413,6 +432,9 @@ public class ForecastGenerator {
         // AsyncAtmosphereService.callOnMainThread as well.
         buildRegionForecasts();
         SandStormManager.dailyAndSand(level);
+
+        traceMutation("biomeSamples", "update", null, beforeSamples, biomeSamples.size());
+        traceMutation("FORECAST_MAP", "update", null, beforeForecasts, FORECAST_MAP.size());
 
         final long end = System.nanoTime();
 
@@ -456,19 +478,25 @@ public class ForecastGenerator {
     }
 
     private static void buildRegionForecasts() {
-        REGION_FORECASTS.clear();
+        Map<RegionInstanceKey, ForecastRegion> next = new ConcurrentHashMap<>();
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeInstanceKey biomeKey = entry.getKey();
             if (biomeKey == null || biomeKey.samplePos() == null) {
                 continue;
             }
             RegionInstanceKey regionKey = RegionInstanceKey.from(biomeKey.samplePos());
-            ForecastRegion region = REGION_FORECASTS.computeIfAbsent(regionKey, key -> new ForecastRegion(key, biomeKey.samplePos()));
+            ForecastRegion region = next.computeIfAbsent(regionKey, key -> new ForecastRegion(key, biomeKey.samplePos()));
             region.addBiomeForecast(biomeKey, entry.getValue());
         }
-        for (ForecastRegion region : REGION_FORECASTS.values()) {
+        for (ForecastRegion region : next.values()) {
             region.finalizeAggregation();
             AtmosphericStateRegistry.initializeState(region.getKey(), region);
+        }
+        for (Map.Entry<RegionInstanceKey, ForecastRegion> entry : next.entrySet()) {
+            int before = REGION_FORECASTS.size();
+            ForecastRegion previous = REGION_FORECASTS.put(entry.getKey(), entry.getValue());
+            int after = REGION_FORECASTS.size();
+            traceMutation("REGION_FORECASTS", previous == null ? "put" : "replace", entry.getKey(), before, after);
         }
         AtmosphericStateRegistry.rebuildNeighbors();
     }
@@ -482,7 +510,21 @@ public class ForecastGenerator {
         return REGION_FORECASTS;
     }
 
-    static void clearForecasts() {
+    static void clearForecasts(String reason) {
+        synchronized (FORECAST_LOCK) {
+            clearForecastsInternal(reason);
+        }
+    }
+
+    private static void clearForecastsInternal(String reason) {
+        int beforeForecasts = FORECAST_MAP.size();
+        int beforeRegions = REGION_FORECASTS.size();
+        int beforeGrouped = grouped.size();
+        int beforeSamples = biomeSamples.size();
+        int beforeIndex = biomeIndex.size();
+        int beforeCounts = biomeSampleCounts.size();
+        int beforeAvg = AVERAGE_FORECASTS.size();
+
         FORECAST_MAP.clear();
         REGION_FORECASTS.clear();
         grouped.clear();
@@ -493,13 +535,34 @@ public class ForecastGenerator {
         AtmosphericStateRegistry.clear();
         SandStormManager.clearSandstormForecasts();
         ForecastPointerRegistry.clear();
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Cleared all forecasts and samples.");
+
+        traceMutation("FORECAST_MAP", "clear", null, beforeForecasts, FORECAST_MAP.size());
+        traceMutation("REGION_FORECASTS", "clear", null, beforeRegions, REGION_FORECASTS.size());
+        traceMutation("grouped", "clear", null, beforeGrouped, grouped.size());
+        traceMutation("biomeSamples", "clear", null, beforeSamples, biomeSamples.size());
+        traceMutation("biomeIndex", "clear", null, beforeIndex, biomeIndex.size());
+        traceMutation("biomeSampleCounts", "clear", null, beforeCounts, biomeSampleCounts.size());
+        traceMutation("AVERAGE_FORECASTS", "clear", null, beforeAvg, AVERAGE_FORECASTS.size());
+        ProjectAtmosphere.LOGGER.info(
+                "[Atmosphere] Cleared all forecasts and samples. reason={} thread={}",
+                reason,
+                Thread.currentThread().getName()
+        );
     }
 
     static void putForecast(BiomeInstanceKey key, BiomeForecast forecast) {
-        FORECAST_MAP.put(key, forecast);
-        if (biomeSamples.add(key)) {
-            biomeSampleCounts.put(key.biomeType(), biomeSampleCounts.getOrDefault(key.biomeType(), 0) + 1);
+        if (key == null || forecast == null) {
+            return;
+        }
+        synchronized (FORECAST_LOCK) {
+            int before = FORECAST_MAP.size();
+            BiomeForecast previous = FORECAST_MAP.put(key, forecast);
+            int after = FORECAST_MAP.size();
+            RegionInstanceKey regionKey = key.samplePos() == null ? null : RegionInstanceKey.from(key.samplePos());
+            traceMutation("FORECAST_MAP", previous == null ? "put" : "replace", regionKey, before, after);
+            if (biomeSamples.add(key)) {
+                biomeSampleCounts.put(key.biomeType(), biomeSampleCounts.getOrDefault(key.biomeType(), 0) + 1);
+            }
         }
     }
 
@@ -723,6 +786,18 @@ public class ForecastGenerator {
             count++;
         }
         return count == 0 ? 0f : sum / count;
+    }
+
+    private static void traceMutation(String mapName, String action, RegionInstanceKey regionKey, int before, int after) {
+        ProjectAtmosphere.LOGGER.info(
+                "[Atmosphere] {} {} region={} size {}->{} thread={}",
+                mapName,
+                action,
+                regionKey,
+                before,
+                after,
+                Thread.currentThread().getName()
+        );
     }
 
 }

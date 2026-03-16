@@ -116,6 +116,7 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     //implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7027745")
     implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
+    //implementation fg.deobf(files("libs/simpleclouds-0.7.3+1.20.1-forge.jar"))
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
     implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
     compileOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
@@ -126,13 +127,15 @@ dependencies {
     implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7325179")
     compileOnly fg.deobf("curse.maven:rainboows-1121832:6421980")
     compileOnly fg.deobf("curse.maven:auroras-1105290:6040671")
-    implementation fg.deobf("curse.maven:gabous-libs-1367332:7261537")
+    implementation fg.deobf("curse.maven:gabous-libs-1367332:7519775")
     implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
     implementation fg.deobf("curse.maven:tectonic-686836:7197834")
     compileOnly fg.deobf("curse.maven:continents-682515:7078247")
     implementation fg.deobf("curse.maven:lithostitched-936015:6742615")
     compileOnly fg.deobf("curse.maven:ecliptic-seasons-1118306:7274743")
     compileOnly fg.deobf("curse.maven:project-atmosphere-for-tfc-1391548:7261639")
+    implementation fg.deobf("curse.maven:dynamictrees-252818:7502488")
+    //implementation "curse.maven:nolijium-969602:6264798"
 
 
 //    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))

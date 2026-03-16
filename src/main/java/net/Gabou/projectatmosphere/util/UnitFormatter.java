@@ -37,7 +37,15 @@ public final class UnitFormatter {
     }
 
     public static String formatHumidity(float percent) {
-        return String.format(Locale.US, "%.1f%%", percent);
+        float clamped = HumidityGuard.clampPercent(
+                percent,
+                0f,
+                "UnitFormatter.formatHumidity",
+                null,
+                null,
+                null,
+                null
+        );
+        return String.format(Locale.US, "%.1f%%", clamped);
     }
 }
-

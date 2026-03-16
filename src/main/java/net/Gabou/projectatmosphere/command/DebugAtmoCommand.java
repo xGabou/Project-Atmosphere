@@ -9,13 +9,16 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -36,6 +39,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
+import net.minecraft.server.level.ServerPlayer;
+
+import java.util.UUID;
 
 public class DebugAtmoCommand {
 
@@ -58,6 +64,73 @@ public class DebugAtmoCommand {
                         "\n  Humidity: " + UnitFormatter.formatHumidity(humidity) +
                         "\n  Wind:     [" + wind + "]"
         ), false);
+        return 1;
+    }
+
+    private static int sendRegionForecast(CommandContext<CommandSourceStack> ctx) {
+        ServerLevel level = ctx.getSource().getLevel();
+        BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
+        long tick = level.getGameTime();
+
+        RegionForecastOrchestrator orchestrator = ForecastOrchestrator.getRegionOrchestrator(level);
+        RegionInstanceKey expectedKey = RegionInstanceKey.from(pos);
+        ForecastRegion region = orchestrator == null ? null : orchestrator.resolve(pos, level.dimension());
+        RegionInstanceKey regionKey = region == null ? expectedKey : region.getKey();
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+
+        int size = regionKey == null ? RegionInstanceKey.DEFAULT_REGION_SIZE : regionKey.regionSize();
+        int minX = regionKey == null ? pos.getX() : regionKey.regionX() * size;
+        int minZ = regionKey == null ? pos.getZ() : regionKey.regionZ() * size;
+        int maxX = minX + size - 1;
+        int maxZ = minZ + size - 1;
+
+        String dimensionId = level.dimension().location().toString();
+        UUID playerId = null;
+        try {
+            ServerPlayer player = ctx.getSource().getPlayerOrException();
+            playerId = player.getUUID();
+        } catch (Exception ignored) {
+        }
+
+        boolean initialReady = AtmosphereManager.isInitialGenerationDone;
+        boolean playerReady = playerId != null && AtmosphereManager.isPlayerReady(playerId);
+        boolean regenerating = ForecastOrchestrator.isRegenerating();
+        boolean cloudsReady = SimpleCloudsCompat.getIsInit();
+
+        if (region == null) {
+            String message = "RegionForecast missing\n" +
+                    "  Dimension: " + dimensionId +
+                    "\n  PlayerPos: " + pos +
+                    "\n  QueriedKey: " + expectedKey +
+                    "\n  Reason: region resolve returned null" +
+                    "\n  Ready: initial=" + initialReady + ", player=" + playerReady + ", regenerating=" + regenerating + ", clouds=" + cloudsReady;
+            ctx.getSource().sendFailure(Component.literal(message));
+            ProjectAtmosphere.LOGGER.info(message);
+            return 0;
+        }
+
+        float temperature = region.sampleTemperature(orchestrator.toRegionLocal(pos), tick);
+        float humidity = region.sampleHumidity(orchestrator.toRegionLocal(pos), tick);
+        float pressure = region.samplePressure(tick);
+        WindVector wind = region.sampleWind(tick);
+        String windText = wind == null ? "-" :
+                UnitFormatter.formatWindSpeed(wind.baseSpeed()) + " at " + String.format("%.0f\u00B0", Math.toDegrees(wind.angleRadians()));
+
+        long lastUpdate = state == null ? -1L : state.getLastUpdateTick();
+
+        String message = "RegionForecast\n" +
+                "  Region: " + regionKey +
+                "\n  Bounds: x=" + minX + ".." + maxX + ", z=" + minZ + ".." + maxZ +
+                "\n  Dimension: " + dimensionId +
+                "\n  PlayerPos: " + pos +
+                "\n  LastUpdateTick: " + lastUpdate + " (now=" + tick + ")" +
+                "\n  Temp:     " + UnitFormatter.formatTemperature(temperature) +
+                "\n  Humidity: " + UnitFormatter.formatHumidity(humidity) +
+                "\n  Pressure: " + UnitFormatter.formatPressure(pressure) +
+                "\n  Wind:     [" + windText + "]" +
+                "\n  Ready: initial=" + initialReady + ", player=" + playerReady + ", regenerating=" + regenerating + ", clouds=" + cloudsReady;
+        ctx.getSource().sendSuccess(() -> Component.literal(message), false);
+        ProjectAtmosphere.LOGGER.info(message);
         return 1;
     }
 
@@ -92,6 +165,10 @@ public class DebugAtmoCommand {
                             return sendForecast(ctx, pos, biome);
                         })
                 )
+        );
+
+        root.then(Commands.literal("regionforecast")
+                .executes(DebugAtmoCommand::sendRegionForecast)
         );
 
         root.then(Commands.literal("cpu")

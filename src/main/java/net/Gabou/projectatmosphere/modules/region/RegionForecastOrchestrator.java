@@ -13,6 +13,7 @@ import net.Gabou.projectatmosphere.telemetry.TelemetryModels.DayCurve;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ForecastSnapshot;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.Modifiers;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.HumidityGuard;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -44,16 +45,24 @@ public final class RegionForecastOrchestrator {
 
     public ForecastRegion resolve(BlockPos pos, ResourceKey<Level> dimension) {
         RegionInstanceKey id = regionIndex.regionFor(pos, dimension);
+        validateKey(id, pos, dimension);
         return ensureLoaded(id);
     }
 
     public ForecastRegion ensureLoaded(RegionInstanceKey id) {
-        return regions.computeIfAbsent(id, this::loadOrGenerate);
+        int before = regions.size();
+        ForecastRegion region = regions.computeIfAbsent(id, this::loadOrGenerate);
+        int after = regions.size();
+        if (after != before) {
+            traceRegionMutation("init", id, before, after);
+        }
+        return region;
     }
 
     private ForecastRegion loadOrGenerate(RegionInstanceKey id) {
         Optional<BiomeFallbackSnapshot> fb = persistence.loadFallback(id);
         if (fb.isPresent()) {
+            traceRegionMutation("load", id, regions.size(), regions.size());
             ForecastRegion region = fromFallback(fb.get());
             CorruptionReport report = detectCorruption(region);
             if (report.corrupted()) {
@@ -66,12 +75,13 @@ public final class RegionForecastOrchestrator {
             }
             return region;
         }
+        traceRegionMutation("generate", id, regions.size(), regions.size());
         return generateFromBiomes(id);
     }
 
     private ForecastRegion fromFallback(BiomeFallbackSnapshot fb) {
         ForecastRegion.Section[] sections = fb.toSections();
-        RegionCurves curves = aggregateSections(sections);
+        RegionCurves curves = aggregateSections(fb.id(), sections);
         ForecastRegion region = new ForecastRegion(fb.id(), fb.sourceBiomes(), sections, curves, fb);
         region.clearBiomeForecasts();
         return region;
@@ -80,8 +90,9 @@ public final class RegionForecastOrchestrator {
     private ForecastRegion generateFromBiomes(RegionInstanceKey id) {
         List<BiomeInstanceKey> biomes = regionIndex.biomesFor(id);
         ForecastRegion.Section[] sections = sliceIntoEight(biomes);
-        RegionCurves curves = aggregateSections(sections);
+        RegionCurves curves = aggregateSections(id, sections);
         BiomeFallbackSnapshot fb = persistence.saveFallback(id, sections, biomes);
+        traceRegionMutation("save", id, regions.size(), regions.size());
         ForecastRegion region = new ForecastRegion(id, biomes, sections, curves, fb);
         region.clearBiomeForecasts();
         return region;
@@ -91,7 +102,7 @@ public final class RegionForecastOrchestrator {
         // Hook for per-tick advancement (diffusion, cloud state, gusts) keyed by region id.
     }
 
-    private RegionCurves aggregateSections(ForecastRegion.Section[] sections) {
+    private RegionCurves aggregateSections(RegionInstanceKey regionId, ForecastRegion.Section[] sections) {
         WeightedCurve temperature = WeightedCurve.empty();
         WeightedCurve humidity = WeightedCurve.empty();
         WeightedCurve pressure = WeightedCurve.empty();
@@ -109,7 +120,15 @@ public final class RegionForecastOrchestrator {
             wind.add(section.factor(), snapshot.windCurve());
         }
         float[][] tempWeek = temperature.normalize();
-        float[][] humidityWeek = humidity.normalize();
+        float[][] humidityWeek = HumidityGuard.clampWeekPercent(
+                humidity.normalize(),
+                0f,
+                "RegionForecastOrchestrator.aggregateSections",
+                regionId,
+                null,
+                null,
+                null
+        );
         float[][] pressureWeek = pressure.normalize();
         WindVector[] windWeek = wind.normalize();
         float[] stormWeek = flattenTwoColumn(storm.normalize());
@@ -256,5 +275,32 @@ public final class RegionForecastOrchestrator {
         int minX = rik.regionX() * rik.regionSize();
         int minZ = rik.regionZ() * rik.regionSize();
         return new Vec3(pos.getX() - minX, pos.getY(), pos.getZ() - minZ);
+    }
+
+    private void validateKey(RegionInstanceKey id, BlockPos pos, ResourceKey<Level> dimension) {
+        if (id == null || pos == null) {
+            return;
+        }
+        if (!id.contains(pos)) {
+            ProjectAtmosphere.LOGGER.error(
+                    "[Atmosphere] Region key mismatch. key={} pos={} dimension={} thread={}",
+                    id,
+                    pos,
+                    dimension == null ? "null" : dimension.location(),
+                    Thread.currentThread().getName(),
+                    new RuntimeException("Region key stability check failed")
+            );
+        }
+    }
+
+    private void traceRegionMutation(String action, RegionInstanceKey id, int before, int after) {
+        ProjectAtmosphere.LOGGER.info(
+                "[Atmosphere] RegionForecast {} region={} size {}->{} thread={}",
+                action,
+                id,
+                before,
+                after,
+                Thread.currentThread().getName()
+        );
     }
 }

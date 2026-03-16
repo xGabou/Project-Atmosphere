@@ -1,9 +1,12 @@
 package net.Gabou.projectatmosphere.manager;
 
 import com.google.gson.*;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.HumidityGuard;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.StorageUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -110,6 +113,11 @@ public class ForecastDataStorage {
     }
 
     private static void saveForecastMap(ServerLevel world) {
+        ProjectAtmosphere.LOGGER.info(
+                "[Atmosphere] Saving biome forecasts: entries={} thread={}",
+                ForecastGenerator.getForecastMap().size(),
+                Thread.currentThread().getName()
+        );
         JsonObject root = new JsonObject();
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
             BiomeInstanceKey key = entry.getKey();
@@ -146,6 +154,11 @@ public class ForecastDataStorage {
 
         try (Reader r = Files.newBufferedReader(path)) {
             JsonObject root = GSON.fromJson(r, JsonObject.class);
+            ProjectAtmosphere.LOGGER.info(
+                    "[Atmosphere] Loading biome forecasts: entries={} thread={}",
+                    root.size(),
+                    Thread.currentThread().getName()
+            );
 
             for (var entry : root.entrySet()) {
                 JsonObject obj = entry.getValue().getAsJsonObject();
@@ -156,7 +169,17 @@ public class ForecastDataStorage {
                 BiomeForecast forecast = new BiomeForecast();
                 forecast.setTemperature(deserializeWeek(obj.getAsJsonArray("temperature")));
                 forecast.setPressure(deserializeWeek(obj.getAsJsonArray("pressure")));
-                forecast.setHumidity(deserializeWeek(obj.getAsJsonArray("humidity")));
+                float[][] humidity = deserializeWeek(obj.getAsJsonArray("humidity"));
+                humidity = HumidityGuard.clampWeekPercent(
+                        humidity,
+                        0f,
+                        "ForecastDataStorage.loadForecastMap",
+                        RegionInstanceKey.from(pos),
+                        biome,
+                        world.dimension(),
+                        pos
+                );
+                forecast.setHumidity(humidity);
                 forecast.setWind(deserializeWinds(obj.getAsJsonArray("wind")));
                 if (obj.has("stormChance")) {
                     // legacy field retained for backward compatibility; no longer stored

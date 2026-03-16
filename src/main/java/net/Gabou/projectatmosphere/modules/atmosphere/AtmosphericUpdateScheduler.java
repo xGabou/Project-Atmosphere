@@ -289,6 +289,7 @@ public final class AtmosphericUpdateScheduler {
             if (delta.relaxFactor() > 0f) {
                 state.relaxTowardBase(delta.relaxFactor());
             }
+            state.markUpdated(dayTime);
             if (mode == UpdateMode.ACTIVE) {
                 state.recordDailySnapshot(dayTime);
             }

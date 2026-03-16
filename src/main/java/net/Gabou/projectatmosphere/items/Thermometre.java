@@ -24,7 +24,6 @@ public class Thermometre extends InstrumentBlockItem {
      * @param level  the world in which the player resides
      * @param player the player using the item
      */
-    @OnlyIn(Dist.CLIENT)
     @Override
     public void display(Level level, Player player) {
         InstrumentUtils.displayTemperature(level, player);

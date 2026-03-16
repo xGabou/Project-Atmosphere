@@ -6,6 +6,8 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.HumidityGuard;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -31,6 +33,7 @@ public class HumidityGenerator {
     public static float[][] generateWeekForecast(ServerLevel level, BiomeInstanceKey b, Long day) {
         BlockPos pos = b.samplePos();
         ResourceLocation biomeId = b.biomeType();
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
 
         // Step 1: fetch unsafe data on main
         BiomeData baseData = AsyncAtmosphereService.callOnMainThread(() -> {
@@ -68,8 +71,24 @@ public class HumidityGenerator {
             finalMin += noise;
             finalMax += noise;
 
-            humWeek[d][0] = Math.max(0f, Math.min(finalMin, MAX_HUMIDITY));
-            humWeek[d][1] = Math.max(0f, Math.min(finalMax, MAX_HUMIDITY));
+            humWeek[d][0] = HumidityGuard.clampPercent(
+                    finalMin,
+                    baseData.baseRH,
+                    "HumidityGenerator.week.min",
+                    regionKey,
+                    biomeId,
+                    level.dimension(),
+                    pos
+            );
+            humWeek[d][1] = HumidityGuard.clampPercent(
+                    finalMax,
+                    baseData.baseRH,
+                    "HumidityGenerator.week.max",
+                    regionKey,
+                    biomeId,
+                    level.dimension(),
+                    pos
+            );
         }
 
         return humWeek;
