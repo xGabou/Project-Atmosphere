@@ -287,6 +287,10 @@ public class ForecastOrchestrator {
      * Get temperature for any biome
      */
     public static float getCurrentTemperature(BiomeInstanceKey key, long tick) {
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        if (regionKey != null) {
+            return getCurrentTemperature(regionKey, tick);
+        }
         return ForecastGenerator.getTemperatureValue(key, tick);
     }
 
@@ -305,6 +309,10 @@ public class ForecastOrchestrator {
      * Get humidity for any biome
      */
     public static float getCurrentHumidity(BiomeInstanceKey key, long tick) {
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        if (regionKey != null) {
+            return getCurrentHumidity(regionKey, tick);
+        }
         return ForecastGenerator.getHumidityValue(key, tick);
     }
 
@@ -323,6 +331,10 @@ public class ForecastOrchestrator {
      * Get pressure for any biome
      */
     public static float getCurrentPressure(BiomeInstanceKey key, long tick) {
+        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        if (regionKey != null) {
+            return getCurrentPressure(regionKey, tick);
+        }
         return ForecastGenerator.getPressureValue(key, tick);
     }
 
@@ -335,6 +347,51 @@ public class ForecastOrchestrator {
             return 0f;
         }
         return region.samplePressure(tick);
+    }
+
+    /**
+     * Region-key temperature sampling. Phase 3 target API for runtime consumers.
+     */
+    public static float getCurrentTemperature(RegionInstanceKey regionKey, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            return state.getTemperature();
+        }
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region != null) {
+            return region.sampleTemperature(new Vec3(regionKey.regionSize() / 2.0, 0.0, regionKey.regionSize() / 2.0), tick);
+        }
+        return 0f;
+    }
+
+    /**
+     * Region-key humidity sampling. Phase 3 target API for runtime consumers.
+     */
+    public static float getCurrentHumidity(RegionInstanceKey regionKey, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            return state.getHumidityPercent();
+        }
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region != null) {
+            return region.sampleHumidity(new Vec3(regionKey.regionSize() / 2.0, 0.0, regionKey.regionSize() / 2.0), tick);
+        }
+        return 0f;
+    }
+
+    /**
+     * Region-key pressure sampling. Phase 3 target API for runtime consumers.
+     */
+    public static float getCurrentPressure(RegionInstanceKey regionKey, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            return state.getPressure();
+        }
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region != null) {
+            return region.samplePressure(tick);
+        }
+        return 0f;
     }
 
     /**

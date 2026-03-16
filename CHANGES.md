@@ -1,5 +1,7 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Forecast refactor phase 3 region-first sampling
+- Added region-key sampling APIs for temperature, humidity, and pressure in `ForecastOrchestrator`, and migrated `ForecastSampling` to prefer `RegionInstanceKey` resolution while keeping biome-key overloads as compatibility wrappers.
 ## Unreleased - Forecast refactor phase 2 foundations
 - Started Phase 2 implementation by unifying region orchestrator bootstrap on `LegacyBiomeForecastGenerator`, centralizing region-local coordinate conversion, and hardening forecast regeneration to clear stale grouped/average caches before rebuilding dependent forecast passes.
 ## Unreleased - Forecast refactor phase 1 specification
