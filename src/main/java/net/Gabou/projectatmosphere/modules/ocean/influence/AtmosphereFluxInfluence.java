@@ -11,6 +11,7 @@ import net.minecraft.util.Mth;
  * Applies slow fluxes of humidity, pressure and temperature to atmospheric cells.
  */
 public final class AtmosphereFluxInfluence implements AtmosVolumeInfluence {
+    public static final float DEFAULT_HUMIDITY_COUPLING = 0.004f;
     private final float humidityCoupling;
     private final float temperatureCoupling;
     private final float pressureCoupling;
@@ -24,7 +25,15 @@ public final class AtmosphereFluxInfluence implements AtmosVolumeInfluence {
     }
 
     public AtmosphereFluxInfluence() {
-        this(0.004f, 0.003f, 0.0025f, 0.002f);
+        this(DEFAULT_HUMIDITY_COUPLING, 0.003f, 0.0025f, 0.002f);
+    }
+
+    public static float computeHumidityDelta(float humidityTarget, float currentHumidity, float weight, boolean oceanCell) {
+        float humidityDelta = (humidityTarget - currentHumidity) * DEFAULT_HUMIDITY_COUPLING * weight;
+        if (oceanCell) {
+            humidityDelta *= 1.8f;
+        }
+        return humidityDelta;
     }
 
     @Override
@@ -33,13 +42,6 @@ public final class AtmosphereFluxInfluence implements AtmosVolumeInfluence {
         var state = volume.state();
         float weight = volume.weight();
         boolean oceanCell = volume.oceanCell();
-
-        float humidityTarget = basin.getHumidityReservoir();
-        float humidityDelta = (humidityTarget - state.getHumidity()) * humidityCoupling * weight;
-        if (oceanCell) {
-            humidityDelta *= 1.8f;
-        }
-        state.adjustHumidity(humidityDelta);
 
         float targetTemperature = basin.getSurfaceTemperature();
         if (!oceanCell) {

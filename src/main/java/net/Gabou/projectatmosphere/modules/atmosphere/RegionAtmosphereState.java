@@ -39,6 +39,9 @@ public class RegionAtmosphereState {
     private final float baseHumidity; // normalized 0..1
     private final float basePressure;
     private final float biomeSunlightMultiplier;
+    private final float[] forecastTemperatureProfile;
+    private final float[] forecastHumidityProfile;
+    private final float[] forecastPressureProfile;
     private final float[] dailyTemperatureProfile;
     private final float[] dailyHumidityProfile;
     private final float[] dailyPressureProfile;
@@ -66,10 +69,13 @@ public class RegionAtmosphereState {
         this.pressure = basePressure;
         this.wind = wind;
         this.biomeSunlightMultiplier = computeBiomeSunlightMultiplier(dominantBiome);
-        this.dailyTemperatureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getTemperature(), baseTemperature), baseTemperature);
-        this.dailyHumidityProfile = initialiseDailyCurveScaled(deriveDailyCurve(forecastRegion.getHumidity(), baseHumidity * 100f), this.humidity, 100f);
-        this.dailyPressureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getPressure(), basePressure), basePressure);
-        float[] bounds = computeTemperatureBounds(this.dailyTemperatureProfile, baseTemperature);
+        this.forecastTemperatureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getTemperature(), baseTemperature), baseTemperature);
+        this.forecastHumidityProfile = initialiseDailyCurveScaled(deriveDailyCurve(forecastRegion.getHumidity(), baseHumidity * 100f), this.humidity, 100f);
+        this.forecastPressureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getPressure(), basePressure), basePressure);
+        this.dailyTemperatureProfile = forecastTemperatureProfile.clone();
+        this.dailyHumidityProfile = forecastHumidityProfile.clone();
+        this.dailyPressureProfile = forecastPressureProfile.clone();
+        float[] bounds = computeTemperatureBounds(this.forecastTemperatureProfile, baseTemperature);
         this.baselineMinTemp = bounds[0];
         this.baselineMaxTemp = bounds[1];
     }
@@ -259,11 +265,28 @@ public class RegionAtmosphereState {
         return dailyPressureProfile.clone();
     }
 
+    public float getTargetHumidity(long dayTime) {
+        if (forecastHumidityProfile.length == 0) {
+            return humidity;
+        }
+        float position = (float) Math.floorMod(dayTime, 24000L) / 100f;
+        if (position >= forecastHumidityProfile.length - 1f) {
+            return clampHumidity(forecastHumidityProfile[forecastHumidityProfile.length - 1]);
+        }
+        return clampHumidity(interpolate(forecastHumidityProfile, position));
+    }
+
     public void relaxTowardBase(float factor) {
         temperature += (baseTemperature - temperature) * factor;
         humidity += (baseHumidity - humidity) * factor;
         pressure += (basePressure - pressure) * factor;
         humidity = clampHumidity(humidity);
+        pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+    }
+
+    public void relaxTemperatureAndPressureTowardBase(float factor) {
+        temperature += (baseTemperature - temperature) * factor;
+        pressure += (basePressure - pressure) * factor;
         pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
     }
 

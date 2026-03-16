@@ -4,6 +4,9 @@ import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.AnomalyMarker;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.HumidityBudgetSample;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -17,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +38,6 @@ public final class AtmosphericUpdateScheduler {
     private static final int PASSIVE_BATCH_SIZE = 1000;
 
     private static final float COOLING_SCALE = 3f;
-    private static final float HUMIDITY_DRAIN = 0.2f;
     private static final float PRESSURE_RESTORE = 1.5f;
     private static final float RAIN_FADE = 0.01f;
 
@@ -69,20 +72,21 @@ public final class AtmosphericUpdateScheduler {
             ACTIVE_IN_FLIGHT.set(false);
             return;
         }
-        List<StateView> snapshot = snapshotStates(activeKeys);
+        long dayTime = level.getDayTime();
+        List<StateView> snapshot = snapshotStates(activeKeys, dayTime);
         if (snapshot.isEmpty()) {
             ACTIVE_IN_FLIGHT.set(false);
             return;
         }
-        long dayTime = level.getDayTime();
         float daylight = baseDaylightCurve(dayTime);
         float seasonal = seasonalTilt(dayTime);
+        String dimensionId = level.dimension().location().toString();
         AsyncAtmosphereService.runWithCallback(
                 PoolType.WEATHER,
                 () -> computeDeltas(snapshot, daylight, seasonal, UpdateMode.ACTIVE),
                 deltas -> {
                     try {
-                        applyDeltas(deltas, dayTime, UpdateMode.ACTIVE);
+                        applyDeltas(deltas, dayTime, dimensionId, UpdateMode.ACTIVE);
                     } finally {
                         ACTIVE_IN_FLIGHT.set(false);
                     }
@@ -163,20 +167,21 @@ public final class AtmosphericUpdateScheduler {
             PASSIVE_IN_FLIGHT.set(false);
             return;
         }
-        List<StateView> snapshot = snapshotStates(batchKeys);
+        long dayTime = level.getDayTime();
+        List<StateView> snapshot = snapshotStates(batchKeys, dayTime);
         if (snapshot.isEmpty()) {
             PASSIVE_IN_FLIGHT.set(false);
             return;
         }
-        long dayTime = level.getDayTime();
         float daylight = baseDaylightCurve(dayTime);
         float seasonal = seasonalTilt(dayTime);
+        String dimensionId = level.dimension().location().toString();
         AsyncAtmosphereService.runWithCallback(
                 PoolType.WEATHER,
                 () -> computeDeltas(snapshot, daylight, seasonal, UpdateMode.PASSIVE),
                 deltas -> {
                     try {
-                        applyDeltas(deltas, dayTime, UpdateMode.PASSIVE);
+                        applyDeltas(deltas, dayTime, dimensionId, UpdateMode.PASSIVE);
                     } finally {
                         PASSIVE_IN_FLIGHT.set(false);
                     }
@@ -208,7 +213,7 @@ public final class AtmosphericUpdateScheduler {
         return batch;
     }
 
-    private static List<StateView> snapshotStates(Collection<RegionInstanceKey> keys) {
+    private static List<StateView> snapshotStates(Collection<RegionInstanceKey> keys, long dayTime) {
         Map<RegionInstanceKey, RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
         List<StateView> views = new ArrayList<>(keys.size());
         for (RegionInstanceKey key : keys) {
@@ -224,9 +229,11 @@ public final class AtmosphericUpdateScheduler {
                     state.getCloudCover(),
                     state.getSunlight(),
                     state.getRainIntensity(),
+                    state.getTargetHumidity(dayTime),
                     state.getBiomeSunlightMultiplier(),
                     state.getBaselineMinTemperature(),
-                    state.getBaselineMaxTemperature()
+                    state.getBaselineMaxTemperature(),
+                    state.getDominantBiome() == null ? "unknown" : state.getDominantBiome().toString()
             ));
         }
         return views;
@@ -248,11 +255,27 @@ public final class AtmosphericUpdateScheduler {
 
             float clampedRain = Math.min(1f, view.rainIntensity());
             float rainTemperatureDelta = -clampedRain * COOLING_SCALE * mode.scale();
-            float rainHumidityDelta = -clampedRain * HUMIDITY_DRAIN * mode.scale();
             float rainPressureDelta = clampedRain * PRESSURE_RESTORE * mode.scale();
+            float oceanFlux = 0f;
+            float windTransport = 0f;
+            if (mode.transportAccumulationTicks() > 0f) {
+                oceanFlux = OceanBasinManager.estimateHumidityFlux(view.key(), view.humidity()) * mode.transportAccumulationTicks();
+                windTransport = WindVector.estimateHumidityTransport(view.key()) * mode.transportAccumulationTicks();
+            }
 
-            float humidityDelta = ((view.rainIntensity() * 0.02f) - (sunlightFactor * 0.01f)) * mode.scale();
-            humidityDelta += rainHumidityDelta;
+            HumidityBudget humidityBudget = HumidityBudgetService.compute(
+                    view.humidity(),
+                    view.targetHumidity(),
+                    sunlightFactor,
+                    view.cloudCover(),
+                    view.rainIntensity(),
+                    view.dominantBiomeId(),
+                    oceanFlux,
+                    windTransport,
+                    mode.scale(),
+                    mode.humidityBudgetScale()
+            );
+            float humidityDelta = humidityBudget.netDelta();
 
             float temperatureDelta = clampDelta(sunlightTemperatureDelta + rainTemperatureDelta, -20f, 20f);
             humidityDelta = clampDelta(humidityDelta, -0.35f, 0.35f);
@@ -267,18 +290,22 @@ public final class AtmosphericUpdateScheduler {
                     pressureDelta,
                     sunlightFactor,
                     rainFade,
-                    mode.relaxFactor()
+                    mode.relaxFactor(),
+                    view.targetHumidity(),
+                    humidityBudget,
+                    view.dominantBiomeId()
             ));
         }
         return deltas;
     }
 
-    private static void applyDeltas(List<StateDelta> deltas, long dayTime, UpdateMode mode) {
+    private static void applyDeltas(List<StateDelta> deltas, long dayTime, String dimensionId, UpdateMode mode) {
         for (StateDelta delta : deltas) {
             RegionAtmosphereState state = AtmosphericStateRegistry.getState(delta.key());
             if (state == null) {
                 continue;
             }
+            float humidityBefore = state.getHumidity();
             state.setSunlight(delta.sunlight());
             state.adjustTemperature(delta.temperatureDelta());
             state.adjustHumidity(delta.humidityDelta());
@@ -287,15 +314,55 @@ public final class AtmosphericUpdateScheduler {
                 state.dampenRain(delta.rainFade());
             }
             if (delta.relaxFactor() > 0f) {
-                state.relaxTowardBase(delta.relaxFactor());
+                state.relaxTemperatureAndPressureTowardBase(delta.relaxFactor());
             }
             if (mode == UpdateMode.ACTIVE) {
                 state.recordDailySnapshot(dayTime);
             }
             if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+                if (mode == UpdateMode.ACTIVE) {
+                    recordHumidityBudget(state, delta, humidityBefore, dayTime, dimensionId, mode);
+                }
                 recordAnomalies(state);
             }
         }
+    }
+
+    private static void recordHumidityBudget(RegionAtmosphereState state,
+                                             StateDelta delta,
+                                             float humidityBefore,
+                                             long dayTime,
+                                             String dimensionId,
+                                             UpdateMode mode) {
+        RegionInstanceKey key = state.getRegionId();
+        if (key == null) {
+            return;
+        }
+        HumidityBudget budget = delta.humidityBudget();
+        TelemetryCollector.get().recordHumidityBudgetSample(new HumidityBudgetSample(
+                dayTime / 24000L,
+                Math.floorMod(dayTime, 24000L),
+                dimensionId,
+                key.toString(),
+                key.regionX(),
+                key.regionZ(),
+                key.regionSize(),
+                delta.dominantBiomeId(),
+                mode.name().toLowerCase(Locale.ROOT),
+                delta.targetHumidity(),
+                humidityBefore,
+                state.getHumidity(),
+                state.getCloudCover(),
+                state.getRainIntensity(),
+                budget.solarDrying(),
+                budget.biomeEvaporation(),
+                budget.oceanFlux(),
+                budget.rainExchange(),
+                budget.windTransport(),
+                budget.forecastRestore(),
+                budget.precipitationSink(),
+                budget.netDelta()
+        ));
     }
 
     private static void recordAnomalies(RegionAtmosphereState state) {
@@ -337,9 +404,11 @@ public final class AtmosphericUpdateScheduler {
             float cloudCover,
             float sunlight,
             float rainIntensity,
+            float targetHumidity,
             float sunlightMultiplier,
             float baselineMin,
-            float baselineMax
+            float baselineMax,
+            String dominantBiomeId
     ) {
     }
 
@@ -350,24 +419,32 @@ public final class AtmosphericUpdateScheduler {
             float pressureDelta,
             float sunlight,
             float rainFade,
-            float relaxFactor
+            float relaxFactor,
+            float targetHumidity,
+            HumidityBudget humidityBudget,
+            String dominantBiomeId
     ) {
     }
 
     private enum UpdateMode {
-        ACTIVE(1f, 0.0005f, 0.6f, 1f),
-        PASSIVE(0.35f, 0.0002f, 0.45f, 0.5f);
+        ACTIVE(1f, 0.0005f, 0.6f, 1f, 1f, ACTIVE_INTERVAL_TICKS),
+        PASSIVE(0.35f, 0.0002f, 0.45f, 0.5f, 0.45f, 0f);
 
         private final float scale;
         private final float relaxFactor;
         private final float blend;
         private final float rainFadeScale;
+        private final float humidityBudgetScale;
+        private final float transportAccumulationTicks;
 
-        UpdateMode(float scale, float relaxFactor, float blend, float rainFadeScale) {
+        UpdateMode(float scale, float relaxFactor, float blend, float rainFadeScale, float humidityBudgetScale,
+                   float transportAccumulationTicks) {
             this.scale = scale;
             this.relaxFactor = relaxFactor;
             this.blend = blend;
             this.rainFadeScale = rainFadeScale;
+            this.humidityBudgetScale = humidityBudgetScale;
+            this.transportAccumulationTicks = transportAccumulationTicks;
         }
 
         float scale() {
@@ -384,6 +461,14 @@ public final class AtmosphericUpdateScheduler {
 
         float rainFadeScale() {
             return rainFadeScale;
+        }
+
+        float humidityBudgetScale() {
+            return humidityBudgetScale;
+        }
+
+        float transportAccumulationTicks() {
+            return transportAccumulationTicks;
         }
     }
 }

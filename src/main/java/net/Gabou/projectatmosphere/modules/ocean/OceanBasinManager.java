@@ -80,6 +80,27 @@ public final class OceanBasinManager {
         }
     }
 
+    public static float estimateHumidityFlux(RegionInstanceKey key, float currentHumidity) {
+        if (!READY.get() || key == null) {
+            return 0f;
+        }
+        float total = 0f;
+        for (OceanBasin basin : BASINS.values()) {
+            Float rawWeight = basin.getInfluenceWeights().get(key);
+            if (rawWeight == null) {
+                continue;
+            }
+            float weight = Mth.clamp(rawWeight, 0f, 1.5f);
+            total += AtmosphereFluxInfluence.computeHumidityDelta(
+                    basin.getHumidityReservoir(),
+                    currentHumidity,
+                    weight,
+                    basin.getOceanCells().contains(key)
+            );
+        }
+        return total;
+    }
+
     private static List<OceanBasin> detectBasins(long gameTime) {
         Collection<RegionAtmosphereState> states = AtmosphericStateRegistry.snapshot();
         if (states.isEmpty()) {

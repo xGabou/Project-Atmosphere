@@ -1,5 +1,22 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Runtime atmosphere coupling design study
+- Added `doc/runtime-atmosphere-coupling-study.md`, a companion design study focused on the runtime coupling problem between forecast targets, dynamic temperature/pressure forcing, cyclone/ocean/wind effects, and the visible cloud/rain layer, including diagnosis from recent telemetry, solution tradeoffs, RDCU, MDD, UML diagrams, case studies, phased implementation, risks, and acceptance criteria.
+## Unreleased - Humidity budget phase 3 ocean and wind integration
+- Added explicit Stage 3 humidity-budget integration for ocean and wind by exposing `OceanBasinManager.estimateHumidityFlux(...)` and `WindVector.estimateHumidityTransport(...)`, then feeding those terms into `AtmosphericUpdateScheduler` as `oceanFlux` and `windTransport` for active-region humidity updates.
+- Removed direct humidity mutation from `AtmosphereFluxInfluence` and `WindVector.update` so ocean and wind no longer double-apply humidity outside the scheduler budget while their other responsibilities remain intact.
+- Updated the humidity stage tracker so the rollout now stands at stage `3/4` completed, leaving only the future cloud-water extension stage.
+## Unreleased - Humidity budget phase 2 scheduler rewrite
+- Reworked `AtmosphericUpdateScheduler` humidity updates to use an explicit Stage 2 humidity budget calculation instead of the old anonymous delta, adding named terms for solar drying, biome evaporation, rain exchange, forecast restore, and a weak precipitation sink.
+- Added `HumiditySourceProfile` and `HumidityBudgetService` so humidity behavior is now derived from the regional climate target plus biome moisture bias rather than a single global drying rule.
+- Split immutable forecast daily profiles from mutable runtime snapshot profiles in `RegionAtmosphereState`, ensuring `getTargetHumidity(dayTime)` remains anchored to the forecast curve instead of drifting as live humidity snapshots are recorded.
+- Stopped the scheduler from restoring humidity a second time through `relaxTowardBase`; post-update base relaxation now only applies to temperature and pressure in the scheduler path.
+## Unreleased - Humidity budget phase A instrumentation
+- Added a runtime `HumidityBudget` scaffold plus `RegionAtmosphereState.getTargetHumidity(dayTime)` so the humidity rework now has an explicit diagnostic model and a forecast-derived target available at runtime.
+- Added `humidity_budget.jsonl` telemetry export with per-region active-update humidity budget samples, including target humidity, before/after runtime humidity, and the current decomposition of solar drying, rain exchange, precipitation sink, and net delta.
+- Added `doc/humidity-moisture-budget-stages.md` to track the rollout as a staged plan with the current status marked as stage `1/4` completed and the remaining stages explained.
+## Unreleased - Humidity budget design study
+- Added `doc/humidity-moisture-budget-study.md`, a dedicated design study for the runtime humidity rework covering the problem diagnosis from telemetry, the target product/architecture vision, solution tradeoffs, RDCU, MDD, UML diagrams, case studies, implementation phases, risks, and acceptance criteria for a hybrid forecast-anchored moisture-budget model.
 ## Unreleased - Forecast refactor phase 6 runtime cleanup
 - Replaced biome-key cloud/weather area sampling with region-first sampling in `WeatherSampler`, and updated cloud spawn candidate selection to aggregate temperature, humidity, pressure, wind, and storm factors directly from `RegionInstanceKey` runtime state.
 - Migrated SimpleClouds runtime integration to region-first helpers for cloud creation/spawning and cloud tick wind/storm sampling, keeping biome-key spawn entry points only as explicit compatibility edges where external APIs still require them.

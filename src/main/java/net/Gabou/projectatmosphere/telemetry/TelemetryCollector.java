@@ -47,6 +47,7 @@ public final class TelemetryCollector {
     private static final int DEFAULT_FORECAST_CAP = 90;  // 3 dominant biomes x 30 days
     private static final int DEFAULT_CLOUD_EVENT_CAP = 1024;
     private static final int DEFAULT_REGION_FORECAST_CAP = 480;
+    private static final int DEFAULT_HUMIDITY_BUDGET_CAP = 2048;
     private static final int DEFAULT_DECISION_CAP = 128;
     private static final int DEFAULT_ANOMALY_CAP = 64;
 
@@ -56,6 +57,7 @@ public final class TelemetryCollector {
     private final TelemetryRingBuffer<DominantBiomeOccupancy> dominantBiomes;
     private final TelemetryRingBuffer<ForecastSnapshot> forecasts;
     private final TelemetryRingBuffer<RegionForecastSample> regionForecasts;
+    private final TelemetryRingBuffer<HumidityBudgetSample> humidityBudgets;
     private final TelemetryRingBuffer<CloudEvent> cloudEvents;
     private final TelemetryRingBuffer<PrecipitationDecisionTrace> precipitationDecisions;
     private final TelemetryRingBuffer<AnomalyMarker> anomalies;
@@ -67,6 +69,7 @@ public final class TelemetryCollector {
         this.dominantBiomes = new TelemetryRingBuffer<>(30); // last 30 days
         this.forecasts = new TelemetryRingBuffer<>(DEFAULT_FORECAST_CAP);
         this.regionForecasts = new TelemetryRingBuffer<>(DEFAULT_REGION_FORECAST_CAP);
+        this.humidityBudgets = new TelemetryRingBuffer<>(DEFAULT_HUMIDITY_BUDGET_CAP);
         this.cloudEvents = new TelemetryRingBuffer<>(DEFAULT_CLOUD_EVENT_CAP);
         this.precipitationDecisions = new TelemetryRingBuffer<>(DEFAULT_DECISION_CAP);
         this.anomalies = new TelemetryRingBuffer<>(DEFAULT_ANOMALY_CAP);
@@ -93,6 +96,10 @@ public final class TelemetryCollector {
 
     public synchronized void recordRegionForecastSample(RegionForecastSample sample) {
         regionForecasts.add(sample);
+    }
+
+    public synchronized void recordHumidityBudgetSample(HumidityBudgetSample sample) {
+        humidityBudgets.add(sample);
     }
 
     public synchronized void recordCloudEvent(CloudEvent event) {
@@ -122,6 +129,7 @@ public final class TelemetryCollector {
                 dominantBiomes.snapshot(),
                 forecasts.snapshot(),
                 regionForecasts.snapshot(),
+                humidityBudgets.snapshot(),
                 cloudEvents.snapshot(),
                 precipitationDecisions.snapshot(),
                 anomalies.snapshot(),
@@ -142,6 +150,7 @@ public final class TelemetryCollector {
         writeJsonLines(outputDir.resolve("dominant_biomes.jsonl"), snapshot.dominantBiomes());
         writeJsonLines(outputDir.resolve("forecast_snapshots.jsonl"), snapshot.forecasts());
         writeJsonLines(outputDir.resolve("region_forecast_samples.jsonl"), snapshot.regionForecastSamples());
+        writeJsonLines(outputDir.resolve("humidity_budget.jsonl"), snapshot.humidityBudgetSamples());
         writeJsonLines(outputDir.resolve("cloud_events.jsonl"), snapshot.cloudEvents());
         writeJsonLines(outputDir.resolve("precipitation_traces.jsonl"), snapshot.precipitationTraces());
         writeJsonLines(outputDir.resolve("anomalies.jsonl"), snapshot.anomalies());
@@ -191,7 +200,7 @@ public final class TelemetryCollector {
                 Collections.unmodifiableMap(selectedValues),
                 Collections.unmodifiableList(compatMods),
                 null,
-                "1.1"
+                "1.2"
         );
     }
 
@@ -346,6 +355,7 @@ public final class TelemetryCollector {
                                     List<DominantBiomeOccupancy> dominantBiomes,
                                     List<ForecastSnapshot> forecasts,
                                     List<RegionForecastSample> regionForecastSamples,
+                                    List<HumidityBudgetSample> humidityBudgetSamples,
                                     List<CloudEvent> cloudEvents,
                                     List<PrecipitationDecisionTrace> precipitationTraces,
                                     List<AnomalyMarker> anomalies,

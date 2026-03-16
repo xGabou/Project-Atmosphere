@@ -217,6 +217,64 @@ public final class TelemetryModels {
         }
     }
 
+    public static final class HumidityBudgetSample {
+        public final String recordType;
+        public final long gameDay;
+        public final long timeOfDay;
+        public final String dimensionId;
+        public final String regionId;
+        public final int regionX;
+        public final int regionZ;
+        public final int regionSize;
+        public final String dominantBiomeId;
+        public final String updateMode;
+        public final float targetHumidity;
+        public final float humidityBefore;
+        public final float humidityAfter;
+        public final float cloudCover;
+        public final float rainIntensity;
+        public final float solarDrying;
+        public final float biomeEvaporation;
+        public final float oceanFlux;
+        public final float rainExchange;
+        public final float windTransport;
+        public final float forecastRestore;
+        public final float precipitationSink;
+        public final float netDelta;
+
+        public HumidityBudgetSample(long gameDay, long timeOfDay, String dimensionId, String regionId,
+                                    int regionX, int regionZ, int regionSize, String dominantBiomeId,
+                                    String updateMode, float targetHumidity, float humidityBefore,
+                                    float humidityAfter, float cloudCover, float rainIntensity,
+                                    float solarDrying, float biomeEvaporation, float oceanFlux,
+                                    float rainExchange, float windTransport, float forecastRestore,
+                                    float precipitationSink, float netDelta) {
+            this.recordType = "humidity_budget_sample";
+            this.gameDay = gameDay;
+            this.timeOfDay = timeOfDay;
+            this.dimensionId = dimensionId;
+            this.regionId = regionId;
+            this.regionX = regionX;
+            this.regionZ = regionZ;
+            this.regionSize = regionSize;
+            this.dominantBiomeId = dominantBiomeId;
+            this.updateMode = updateMode;
+            this.targetHumidity = targetHumidity;
+            this.humidityBefore = humidityBefore;
+            this.humidityAfter = humidityAfter;
+            this.cloudCover = cloudCover;
+            this.rainIntensity = rainIntensity;
+            this.solarDrying = solarDrying;
+            this.biomeEvaporation = biomeEvaporation;
+            this.oceanFlux = oceanFlux;
+            this.rainExchange = rainExchange;
+            this.windTransport = windTransport;
+            this.forecastRestore = forecastRestore;
+            this.precipitationSink = precipitationSink;
+            this.netDelta = netDelta;
+        }
+    }
+
     public static final class ChannelSummary {
         public final float min;
         public final float max;
