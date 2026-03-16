@@ -8,10 +8,7 @@ import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCommand;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempUserConfig;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoCommand;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoDebug;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -21,7 +18,6 @@ import net.Gabou.projectatmosphere.util.TickCounter;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.locale.Language;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -46,7 +42,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.event.*;
 
-import java.util.Map;
 import java.util.Objects;
 
 @Mod(ProjectAtmosphere.MODID)
@@ -94,9 +89,6 @@ public class ProjectAtmosphere {
         NeoForge.EVENT_BUS.register(EventHandler.class);
 
         NeoForge.EVENT_BUS.addListener(TickCounter::onServerTick);
-        NeoForge.EVENT_BUS.addListener(TornadoDebug::register);
-        NeoForge.EVENT_BUS.addListener(TornadoCommand::register);
-        NeoForge.EVENT_BUS.addListener(HurricaneCommand::register);
     }
 
 

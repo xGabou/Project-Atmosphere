@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -37,4 +36,3 @@ public record SyncWindPacket(float speed, float angle, float gust)
         });
     }
 }
-

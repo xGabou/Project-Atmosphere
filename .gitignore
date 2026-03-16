@@ -30,8 +30,6 @@
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_54_PM_[Changes]/fileHashes.lock
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]1/fileHashes.lock
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]2/fileHashes.lock
-/gradle/wrapper/gradle-wrapper.jar
-/gradle/wrapper/gradle-wrapper.properties
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_1_2025_11_21_PM_[Changes]/md5-checksums.bin
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_54_PM_[Changes]/md5-checksums.bin
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]1/md5-checksums.bin
@@ -52,3 +50,5 @@
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM__Changes_2.xml
 /.idea/
 /.idea/
+
+.ai/

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.humidity;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -13,8 +14,11 @@ import java.util.Arrays;
 
 public class HumidityCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        
-        dispatcher.register(Commands.literal("humidity")
+        dispatcher.register(build());
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> build() {
+        return Commands.literal("humidity")
                 .then(Commands.literal("get") 
                         .executes(ctx -> {
                             Player player = ctx.getSource().getPlayerOrException();
@@ -29,7 +33,6 @@ public class HumidityCommand {
 
                             return 1; 
                         })
-                )
-        );
+                );
     }
 }
