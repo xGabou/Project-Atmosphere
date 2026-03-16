@@ -1,5 +1,7 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Forecast refactor phase 2 foundations
+- Started Phase 2 implementation by unifying region orchestrator bootstrap on `LegacyBiomeForecastGenerator`, centralizing region-local coordinate conversion, and hardening forecast regeneration to clear stale grouped/average caches before rebuilding dependent forecast passes.
 ## Unreleased - Forecast refactor phase 1 specification
 - Added a complete Phase 1 technical specification for forecast refactoring, including current-state diagnosis, use-case catalog (RDCU), target domain model (MDD), UML class/sequence/activity diagrams, and a concrete migration plan toward RegionInstanceKey-first architecture.
 ## Unreleased - Wind force tuning

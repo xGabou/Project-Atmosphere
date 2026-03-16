@@ -252,9 +252,7 @@ public final class RegionForecastOrchestrator {
     }
 
     public Vec3 toRegionLocal(BlockPos pos) {
-        RegionInstanceKey rik = RegionInstanceKey.from(pos);
-        int minX = rik.regionX() * rik.regionSize();
-        int minZ = rik.regionZ() * rik.regionSize();
-        return new Vec3(pos.getX() - minX, pos.getY(), pos.getZ() - minZ);
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        return RegionAdapters.toRegionLocal(pos, regionKey);
     }
 }
