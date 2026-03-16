@@ -157,6 +157,7 @@ public class ForecastGenerator {
     }
 
     public static void groupForecastsByBiome() {
+        grouped.clear();
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             ResourceLocation biomeType = entry.getKey().biomeType();
             grouped.computeIfAbsent(biomeType, k -> new ArrayList<>()).add(entry.getValue());
@@ -226,6 +227,8 @@ public class ForecastGenerator {
         biomeSampleCounts.clear();
         biomeIndex.clear();
         FORECAST_MAP.clear();
+        grouped.clear();
+        AVERAGE_FORECASTS.clear();
 
         // --- World-dependent values (must be on main thread) ---
         long day = AsyncAtmosphereService.callOnMainThread(
@@ -373,40 +376,7 @@ public class ForecastGenerator {
 
         // --- Post-processing: humidity, pressure, wind ---
         final long postStart = forecastEnd;
-
-        // Single pass over FORECAST_MAP to set all three fields.
-// 1) Humidity first
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
-
-            forecast.setHumidity(generateHumidity(key, level, day));
-        }
-        computeAverageHumidityWeek(); // now any global humidity info is valid
-
-// 2) Then pressure
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
-
-            forecast.setPressure(generatePressure(key, day));
-        }
-        computeAveragePressureWeek(); // pressure averages now valid too
-        WindGenerator.buildNeighborIndex(getBiomeSamples());
-
-// 3) Finally wind, with access to humidity (+ averages) and pressure
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
-            BiomeInstanceKey key = entry.getKey();
-            BiomeForecast forecast = entry.getValue();
-
-            // generateWind can now safely read:
-            // - forecast.getHumidity()
-            // - forecast.getPressure()
-            // - any global humidity/pressure averages computed above
-            forecast.setWind(generateWind(key));
-        }
-        computeAverageWindWeek();
-        computeAverageForecastsByBiomeType();
+        computeDependentForecasts(level, day);
 
 
         // NOTE: if dailyAndSand touches world state directly, it may need
@@ -434,6 +404,31 @@ public class ForecastGenerator {
                             " ms for " + biomeSamples.size() + " samples across " + biomeIndex.size() + " biomes."
             );
         }
+    }
+
+    private static void computeDependentForecasts(ServerLevel level, long day) {
+        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+            BiomeInstanceKey key = entry.getKey();
+            BiomeForecast forecast = entry.getValue();
+            forecast.setHumidity(generateHumidity(key, level, day));
+        }
+        computeAverageHumidityWeek();
+
+        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+            BiomeInstanceKey key = entry.getKey();
+            BiomeForecast forecast = entry.getValue();
+            forecast.setPressure(generatePressure(key, day));
+        }
+        computeAveragePressureWeek();
+
+        WindGenerator.buildNeighborIndex(getBiomeSamples());
+        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
+            BiomeInstanceKey key = entry.getKey();
+            BiomeForecast forecast = entry.getValue();
+            forecast.setWind(generateWind(key));
+        }
+        computeAverageWindWeek();
+        computeAverageForecastsByBiomeType();
     }
 
 
