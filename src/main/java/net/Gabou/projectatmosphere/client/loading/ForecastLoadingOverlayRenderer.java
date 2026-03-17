@@ -5,15 +5,12 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.GenericMessageScreen;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.util.FastColor;
 import net.minecraft.util.Mth;
 
 public final class ForecastLoadingOverlayRenderer {
     private static final String TITLE = "Project Atmosphere";
     private static final String[] DOTS = {"", ".", "..", "..."};
-    private static final String WAITING_HINT = "Large modpacks or slower CPUs can take longer.";
     private static final int PANEL_FILL_TOP = FastColor.ARGB32.color(214, 9, 14, 20);
     private static final int PANEL_FILL_BOTTOM = FastColor.ARGB32.color(198, 15, 20, 28);
     private static final int PANEL_OUTLINE = FastColor.ARGB32.color(255, 110, 158, 214);
@@ -32,10 +29,6 @@ public final class ForecastLoadingOverlayRenderer {
     }
 
     public static void render(GuiGraphics guiGraphics) {
-        if (shouldHideForCurrentScreen()) {
-            return;
-        }
-
         ForecastLoadingState.Snapshot snapshot = ensureActiveSnapshot();
         if (!snapshot.active()) {
             return;
@@ -49,14 +42,12 @@ public final class ForecastLoadingOverlayRenderer {
 
         String stageLabel = snapshot.stage().displayName();
         String detail = buildDetail(snapshot, now);
-        String hint = buildHint(snapshot);
         int titleWidth = font.width(TITLE);
         int stageWidth = font.width(stageLabel);
         int detailWidth = detail == null ? 0 : font.width(detail);
-        int hintWidth = hint == null ? 0 : font.width(hint);
-        int contentWidth = Math.max(Math.max(Math.max(titleWidth, stageWidth), detailWidth), hintWidth);
+        int contentWidth = Math.max(Math.max(titleWidth, stageWidth), detailWidth);
         int panelWidth = Mth.clamp(contentWidth + 34, 220, 300);
-        int panelHeight = hint == null ? (detail == null ? 48 : 60) : 72;
+        int panelHeight = detail == null ? 48 : 60;
 
         int left = (screenWidth - panelWidth) / 2;
         int top = Math.max(18, (screenHeight / 2) - panelHeight - 34);
@@ -74,9 +65,6 @@ public final class ForecastLoadingOverlayRenderer {
         if (detail != null) {
             int detailColor = snapshot.subtext() == null ? TEXT_COLOR : SUBTEXT_COLOR;
             guiGraphics.drawCenteredString(font, detail, screenWidth / 2, titleY + 24, detailColor);
-        }
-        if (hint != null) {
-            guiGraphics.drawCenteredString(font, hint, screenWidth / 2, titleY + 36, SUBTEXT_COLOR);
         }
 
         int barLeft = left + 14;
@@ -119,13 +107,6 @@ public final class ForecastLoadingOverlayRenderer {
         return snapshot.message() + DOTS[(int) ((now / 350L) % DOTS.length)];
     }
 
-    private static String buildHint(ForecastLoadingState.Snapshot snapshot) {
-        if (snapshot.stage() == ForecastLoadingStage.WAITING_FOR_SERVER) {
-            return WAITING_HINT;
-        }
-        return null;
-    }
-
     private static ForecastLoadingState.Snapshot ensureActiveSnapshot() {
         ForecastLoadingState.Snapshot snapshot = ForecastLoadingState.snapshot();
         if (!snapshot.active() && !ClientSyncLock.isReady()) {
@@ -139,16 +120,5 @@ public final class ForecastLoadingOverlayRenderer {
             snapshot = ForecastLoadingState.snapshot();
         }
         return snapshot;
-    }
-
-    private static boolean shouldHideForCurrentScreen() {
-        Minecraft minecraft = Minecraft.getInstance();
-        Screen screen = minecraft.screen;
-        if (!(screen instanceof GenericMessageScreen)) {
-            return false;
-        }
-
-        String title = screen.getTitle().getString().toLowerCase();
-        return title.contains("saving world");
     }
 }
