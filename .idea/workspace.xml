@@ -4,12 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement forecast loading system with overlay rendering and state management">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/loading/ForecastLoadingOverlayRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/loading/ForecastLoadingOverlayRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/LoadingScreenMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/LoadingScreenMixin.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -65,6 +64,12 @@
                 <item name="project-atmosphere" type="f1a62948:ProjectNode" />
                 <item name="Tasks" type="e4a08cd1:TasksNode" />
                 <item name="other" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="project-atmosphere" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="publishing" type="c8890929:TasksNode$1" />
               </path>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
@@ -290,7 +295,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [modrinth]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -462,11 +467,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
+        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
         <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
-        <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
         <item itemvalue="Gradle.Project-Atmosphere [build]" />
-        <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
       </list>
     </recent_temporary>
   </component>
@@ -662,15 +667,7 @@
       <workItem from="1773710460528" duration="6882000" />
       <workItem from="1773758621019" duration="857000" />
       <workItem from="1773772374959" duration="115000" />
-      <workItem from="1773772515564" duration="969000" />
-    </task>
-    <task id="LOCAL-00096" summary="feat: enhance compatibility with temperature mods and update configuration settings">
-      <option name="closed" value="true" />
-      <created>1756219615038</created>
-      <option name="number" value="00096" />
-      <option name="presentableId" value="LOCAL-00096" />
-      <option name="project" value="LOCAL" />
-      <updated>1756219615038</updated>
+      <workItem from="1773772515564" duration="1835000" />
     </task>
     <task id="LOCAL-00097" summary="feat: add cloud render distance configuration and improve weather task execution">
       <option name="closed" value="true" />
@@ -1056,7 +1053,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773772425462</updated>
     </task>
-    <option name="localTasksCounter" value="145" />
+    <task id="LOCAL-00145" summary="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues">
+      <option name="closed" value="true" />
+      <created>1773773490993</created>
+      <option name="number" value="00145" />
+      <option name="presentableId" value="LOCAL-00145" />
+      <option name="project" value="LOCAL" />
+      <updated>1773773490994</updated>
+    </task>
+    <option name="localTasksCounter" value="146" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1105,7 +1110,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: update version to 0.5.5.0, change release type to beta, and adjust cloud storminess parameters" />
     <MESSAGE value="feat: update version to 0.5.5.2, adjust memory settings, and refine changelog structure" />
     <MESSAGE value="feat: add imperial units display option for temperature, wind speed, and pressure" />
     <MESSAGE value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
@@ -1130,7 +1134,8 @@
     <MESSAGE value="feat: implement cloud-water exchange system, enhance humidity budget with cloud-water tracking, and update telemetry for cloud-water metrics" />
     <MESSAGE value="feat: implement cloud probe item for cloud region detection and enhance forecast loading overlay" />
     <MESSAGE value="feat: implement forecast loading system with overlay rendering and state management" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: implement forecast loading system with overlay rendering and state management" />
+    <MESSAGE value="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

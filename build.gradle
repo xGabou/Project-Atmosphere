@@ -17,7 +17,7 @@ def githubPackagesToken = System.getenv("GITHUB_TOKEN")?.trim()
 def hasGithubPackagesCredentials = githubPackagesUser && githubPackagesToken
 
 base {
-    archivesName = "Forge-Version-" + mod_id
+    archivesName = "Forge-" + mod_id
 }
 
 
