@@ -184,6 +184,7 @@ public final class ServerTelemetrySampler {
                     currentWindSpeed,
                     currentWindDirection,
                     state.getCloudCover(),
+                    state.getCloudWater(),
                     state.getRainIntensity()
             );
             TelemetryCollector.get().recordRegionForecastSample(sample);

@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.AnomalyMarker;
+import net.Gabou.projectatmosphere.telemetry.TelemetryModels.AtmosphereCouplingSample;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.HumidityBudgetSample;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
@@ -38,13 +39,25 @@ public final class AtmosphericUpdateScheduler {
     private static final int PASSIVE_BATCH_SIZE = 1000;
 
     private static final float COOLING_SCALE = 3f;
+    private static final float TEMPERATURE_TARGET_RESTORE = 0.04f;
+    private static final float TEMPERATURE_GUARD_THRESHOLD_C = 6f;
+    private static final float TEMPERATURE_GUARD_EXCESS_FACTOR = 0.15f;
+    private static final float TEMPERATURE_GUARD_MAX_DELTA = 3f;
     private static final float PRESSURE_RESTORE = 1.5f;
+    private static final float PRESSURE_TARGET_RESTORE = 0.015f;
+    private static final float PRESSURE_GUARD_THRESHOLD_HPA = 8f;
+    private static final float PRESSURE_GUARD_EXCESS_FACTOR = 0.12f;
+    private static final float PRESSURE_GUARD_MAX_DELTA = 2.5f;
+    private static final float CYCLONE_CLOUD_FLOOR_DECAY_ACTIVE = 0.02f;
+    private static final float CYCLONE_RAIN_FLOOR_DECAY_ACTIVE = 0.03f;
+    private static final float CYCLONE_CLOUD_FLOOR_DECAY_PASSIVE = 0.008f;
+    private static final float CYCLONE_RAIN_FLOOR_DECAY_PASSIVE = 0.012f;
     private static final float RAIN_FADE = 0.01f;
 
     private static final AtomicBoolean ACTIVE_IN_FLIGHT = new AtomicBoolean();
     private static final AtomicBoolean PASSIVE_IN_FLIGHT = new AtomicBoolean();
     private static final ArrayDeque<RegionInstanceKey> PASSIVE_QUEUE = new ArrayDeque<>();
-    private static final Set<RegionInstanceKey> REPORTED_ANOMALIES = ConcurrentHashMap.newKeySet();
+    private static final Set<String> REPORTED_ANOMALIES = ConcurrentHashMap.newKeySet();
 
     private static long lastActiveTick = -ACTIVE_INTERVAL_TICKS;
     private static long lastPassiveTick = 0L;
@@ -227,9 +240,12 @@ public final class AtmosphericUpdateScheduler {
                     state.getHumidity(),
                     state.getPressure(),
                     state.getCloudCover(),
+                    state.getCloudWater(),
                     state.getSunlight(),
                     state.getRainIntensity(),
+                    state.getTargetTemperature(dayTime),
                     state.getTargetHumidity(dayTime),
+                    state.getTargetPressure(dayTime),
                     state.getBiomeSunlightMultiplier(),
                     state.getBaselineMinTemperature(),
                     state.getBaselineMaxTemperature(),
@@ -252,10 +268,28 @@ public final class AtmosphericUpdateScheduler {
             float adjustedTarget = baseTarget - rainPenalty;
             float blendedTarget = Mth.lerp(mode.blend(), view.temperature(), adjustedTarget);
             float sunlightTemperatureDelta = (blendedTarget - view.temperature()) * mode.scale();
+            float temperatureForecastRestore = (view.targetTemperature() - view.temperature()) * TEMPERATURE_TARGET_RESTORE * mode.scale();
+            float temperatureDeviation = view.targetTemperature() - view.temperature();
+            float temperatureGuardDelta = 0f;
+            float temperatureDeviationAbs = Math.abs(temperatureDeviation);
+            if (temperatureDeviationAbs > TEMPERATURE_GUARD_THRESHOLD_C) {
+                float excess = temperatureDeviationAbs - TEMPERATURE_GUARD_THRESHOLD_C;
+                float guardMagnitude = Math.min(TEMPERATURE_GUARD_MAX_DELTA, excess * TEMPERATURE_GUARD_EXCESS_FACTOR);
+                temperatureGuardDelta = Math.signum(temperatureDeviation) * guardMagnitude * mode.scale();
+            }
 
             float clampedRain = Math.min(1f, view.rainIntensity());
             float rainTemperatureDelta = -clampedRain * COOLING_SCALE * mode.scale();
             float rainPressureDelta = clampedRain * PRESSURE_RESTORE * mode.scale();
+            float pressureForecastRestore = (view.targetPressure() - view.pressure()) * PRESSURE_TARGET_RESTORE * mode.scale();
+            float pressureDeviation = view.targetPressure() - view.pressure();
+            float pressureGuardDelta = 0f;
+            float pressureDeviationAbs = Math.abs(pressureDeviation);
+            if (pressureDeviationAbs > PRESSURE_GUARD_THRESHOLD_HPA) {
+                float excess = pressureDeviationAbs - PRESSURE_GUARD_THRESHOLD_HPA;
+                float guardMagnitude = Math.min(PRESSURE_GUARD_MAX_DELTA, excess * PRESSURE_GUARD_EXCESS_FACTOR);
+                pressureGuardDelta = Math.signum(pressureDeviation) * guardMagnitude * mode.scale();
+            }
             float oceanFlux = 0f;
             float windTransport = 0f;
             if (mode.transportAccumulationTicks() > 0f) {
@@ -276,10 +310,23 @@ public final class AtmosphericUpdateScheduler {
                     mode.humidityBudgetScale()
             );
             float humidityDelta = humidityBudget.netDelta();
+            CloudWaterExchange cloudWaterExchange = CloudWaterService.compute(
+                    Mth.clamp(view.humidity() + humidityDelta, 0f, 1.2f),
+                    view.targetHumidity(),
+                    view.cloudWater(),
+                    view.cloudCover(),
+                    view.rainIntensity()
+            );
+            humidityDelta += cloudWaterExchange.humidityDelta();
 
-            float temperatureDelta = clampDelta(sunlightTemperatureDelta + rainTemperatureDelta, -20f, 20f);
+            float temperatureDelta = clampDelta(
+                    sunlightTemperatureDelta + rainTemperatureDelta + temperatureForecastRestore + temperatureGuardDelta,
+                    -20f,
+                    20f
+            );
             humidityDelta = clampDelta(humidityDelta, -0.35f, 0.35f);
-            float pressureDelta = clampDelta(rainPressureDelta, -15f, 15f);
+            float cloudWaterDelta = clampDelta(cloudWaterExchange.cloudWaterDelta(), -0.08f, 0.08f);
+            float pressureDelta = clampDelta(rainPressureDelta + pressureForecastRestore + pressureGuardDelta, -15f, 15f);
 
             float rainFade = RAIN_FADE * mode.rainFadeScale();
 
@@ -291,8 +338,12 @@ public final class AtmosphericUpdateScheduler {
                     sunlightFactor,
                     rainFade,
                     mode.relaxFactor(),
+                    view.targetTemperature(),
                     view.targetHumidity(),
+                    view.targetPressure(),
                     humidityBudget,
+                    cloudWaterDelta,
+                    cloudWaterExchange,
                     view.dominantBiomeId()
             ));
         }
@@ -306,10 +357,19 @@ public final class AtmosphericUpdateScheduler {
                 continue;
             }
             float humidityBefore = state.getHumidity();
+            float cloudWaterBefore = state.getCloudWater();
+            float temperatureBefore = state.getTemperature();
+            float pressureBefore = state.getPressure();
             state.setSunlight(delta.sunlight());
             state.adjustTemperature(delta.temperatureDelta());
             state.adjustHumidity(delta.humidityDelta());
+            state.adjustCloudWater(delta.cloudWaterDelta());
             state.adjustPressure(delta.pressureDelta());
+            if (mode == UpdateMode.ACTIVE) {
+                state.decayCycloneVisualFloor(CYCLONE_CLOUD_FLOOR_DECAY_ACTIVE, CYCLONE_RAIN_FLOOR_DECAY_ACTIVE);
+            } else {
+                state.decayCycloneVisualFloor(CYCLONE_CLOUD_FLOOR_DECAY_PASSIVE, CYCLONE_RAIN_FLOOR_DECAY_PASSIVE);
+            }
             if (delta.rainFade() > 0f) {
                 state.dampenRain(delta.rainFade());
             }
@@ -321,16 +381,56 @@ public final class AtmosphericUpdateScheduler {
             }
             if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
                 if (mode == UpdateMode.ACTIVE) {
-                    recordHumidityBudget(state, delta, humidityBefore, dayTime, dimensionId, mode);
+                    recordAtmosphereCoupling(state, delta, temperatureBefore, pressureBefore, humidityBefore, dayTime, dimensionId, mode);
+                    recordHumidityBudget(state, delta, humidityBefore, cloudWaterBefore, dayTime, dimensionId, mode);
                 }
-                recordAnomalies(state);
+                recordAnomalies(state, dayTime);
             }
         }
+    }
+
+    private static void recordAtmosphereCoupling(RegionAtmosphereState state,
+                                                 StateDelta delta,
+                                                 float temperatureBefore,
+                                                 float pressureBefore,
+                                                 float humidityBefore,
+                                                 long dayTime,
+                                                 String dimensionId,
+                                                 UpdateMode mode) {
+        RegionInstanceKey key = state.getRegionId();
+        if (key == null) {
+            return;
+        }
+        TelemetryCollector.get().recordAtmosphereCouplingSample(new AtmosphereCouplingSample(
+                dayTime / 24000L,
+                Math.floorMod(dayTime, 24000L),
+                dimensionId,
+                key.toString(),
+                key.regionX(),
+                key.regionZ(),
+                key.regionSize(),
+                delta.dominantBiomeId(),
+                mode.name().toLowerCase(Locale.ROOT),
+                delta.targetTemperature(),
+                delta.targetPressure(),
+                delta.targetHumidity(),
+                temperatureBefore,
+                state.getTemperature(),
+                pressureBefore,
+                state.getPressure(),
+                humidityBefore,
+                state.getHumidity(),
+                state.getCloudCover(),
+                state.getRainIntensity(),
+                delta.temperatureDelta(),
+                delta.pressureDelta()
+        ));
     }
 
     private static void recordHumidityBudget(RegionAtmosphereState state,
                                              StateDelta delta,
                                              float humidityBefore,
+                                             float cloudWaterBefore,
                                              long dayTime,
                                              String dimensionId,
                                              UpdateMode mode) {
@@ -339,6 +439,7 @@ public final class AtmosphericUpdateScheduler {
             return;
         }
         HumidityBudget budget = delta.humidityBudget();
+        CloudWaterExchange exchange = delta.cloudWaterExchange();
         TelemetryCollector.get().recordHumidityBudgetSample(new HumidityBudgetSample(
                 dayTime / 24000L,
                 Math.floorMod(dayTime, 24000L),
@@ -352,6 +453,8 @@ public final class AtmosphericUpdateScheduler {
                 delta.targetHumidity(),
                 humidityBefore,
                 state.getHumidity(),
+                cloudWaterBefore,
+                state.getCloudWater(),
                 state.getCloudCover(),
                 state.getRainIntensity(),
                 budget.solarDrying(),
@@ -361,19 +464,64 @@ public final class AtmosphericUpdateScheduler {
                 budget.windTransport(),
                 budget.forecastRestore(),
                 budget.precipitationSink(),
-                budget.netDelta()
+                exchange.condensation(),
+                exchange.reEvaporation(),
+                exchange.precipitationDraw(),
+                delta.humidityDelta()
         ));
     }
 
-    private static void recordAnomalies(RegionAtmosphereState state) {
+    private static void recordAnomalies(RegionAtmosphereState state, long dayTime) {
         float temperature = state.getTemperature();
-        boolean outlier = temperature < -80f || temperature > 80f;
-        if (outlier && REPORTED_ANOMALIES.add(state.getRegionId())) {
+        String temperatureKey = state.getRegionId() + ":temperature_outlier";
+        if ((temperature < -80f || temperature > 80f) && REPORTED_ANOMALIES.add(temperatureKey)) {
             TelemetryCollector.get().recordAnomaly(new AnomalyMarker(
                     Instant.now(),
                     "temperature_outlier",
                     state.getRegionId().toString(),
                     Map.of("temperature", temperature)
+            ));
+        }
+
+        float targetTemperature = state.getTargetTemperature(dayTime);
+        float temperatureDeviation = Math.abs(targetTemperature - state.getTemperature());
+        boolean hiddenTemperatureDrift = temperatureDeviation > TEMPERATURE_GUARD_THRESHOLD_C
+                && state.getCloudCover() < 0.1f
+                && state.getRainIntensity() < 0.05f;
+        String driftKey = state.getRegionId() + ":temperature_drift_from_target";
+        if (hiddenTemperatureDrift && REPORTED_ANOMALIES.add(driftKey)) {
+            TelemetryCollector.get().recordAnomaly(new AnomalyMarker(
+                    Instant.now(),
+                    "temperature_drift_from_target",
+                    state.getRegionId().toString(),
+                    Map.of(
+                            "temperature", state.getTemperature(),
+                            "targetTemperature", targetTemperature,
+                            "temperatureDeviation", temperatureDeviation,
+                            "cloudCover", state.getCloudCover(),
+                            "rainIntensity", state.getRainIntensity()
+                    )
+            ));
+        }
+
+        float targetPressure = state.getTargetPressure(dayTime);
+        float pressureDeviation = Math.abs(targetPressure - state.getPressure());
+        boolean hiddenPressureDrift = pressureDeviation > PRESSURE_GUARD_THRESHOLD_HPA
+                && state.getCloudCover() < 0.05f
+                && state.getRainIntensity() < 0.02f;
+        String pressureKey = state.getRegionId() + ":pressure_drift_no_visible_weather";
+        if (hiddenPressureDrift && REPORTED_ANOMALIES.add(pressureKey)) {
+            TelemetryCollector.get().recordAnomaly(new AnomalyMarker(
+                    Instant.now(),
+                    "pressure_drift_no_visible_weather",
+                    state.getRegionId().toString(),
+                    Map.of(
+                            "pressure", state.getPressure(),
+                            "targetPressure", targetPressure,
+                            "pressureDeviation", pressureDeviation,
+                            "cloudCover", state.getCloudCover(),
+                            "rainIntensity", state.getRainIntensity()
+                    )
             ));
         }
     }
@@ -402,9 +550,12 @@ public final class AtmosphericUpdateScheduler {
             float humidity,
             float pressure,
             float cloudCover,
+            float cloudWater,
             float sunlight,
             float rainIntensity,
+            float targetTemperature,
             float targetHumidity,
+            float targetPressure,
             float sunlightMultiplier,
             float baselineMin,
             float baselineMax,
@@ -420,8 +571,12 @@ public final class AtmosphericUpdateScheduler {
             float sunlight,
             float rainFade,
             float relaxFactor,
+            float targetTemperature,
             float targetHumidity,
+            float targetPressure,
             HumidityBudget humidityBudget,
+            float cloudWaterDelta,
+            CloudWaterExchange cloudWaterExchange,
             String dominantBiomeId
     ) {
     }

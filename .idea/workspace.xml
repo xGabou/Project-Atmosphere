@@ -4,15 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement seasonal trees module with dynamic and vanilla tree types, add season phase management, and integrate region-based forecasts">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement humidity budget model with ocean and wind integration, add telemetry support for humidity budget samples, and update atmospheric update scheduler">
       <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/PAchangelog.md" beforeDir="false" afterPath="$PROJECT_DIR$/PAchangelog.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc/humidity-moisture-budget-stages.md" beforeDir="false" afterPath="$PROJECT_DIR$/doc/humidity-moisture-budget-stages.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/doc/humidity-moisture-budget-study.md" beforeDir="false" afterPath="$PROJECT_DIR$/doc/humidity-moisture-budget-study.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/AtmosphericUpdateScheduler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/AtmosphericUpdateScheduler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CycloneManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CycloneManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/RegionAtmosphereState.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/RegionAtmosphereState.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/WindVector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/WindVector.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/ocean/OceanBasinManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/ocean/OceanBasinManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/ocean/influence/AtmosphereFluxInfluence.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/ocean/influence/AtmosphereFluxInfluence.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/telemetry/ServerTelemetrySampler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/telemetry/ServerTelemetrySampler.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/telemetry/TelemetryCollector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/telemetry/TelemetryCollector.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/telemetry/TelemetryModels.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/telemetry/TelemetryModels.java" afterDir="false" />
     </list>
@@ -276,7 +278,7 @@
       <recent name="net.Gabou.projectatmosphere.entity" />
     </key>
   </component>
-  <component name="RunManager" selected="Gradle.Project-Atmosphere [build]">
+  <component name="RunManager" selected="Gradle.Project-Atmosphere [runClient]">
     <configuration name="Project-Atmosphere [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
         <option name="executionName" />
@@ -448,8 +450,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [runClient]" />
+        <item itemvalue="Gradle.Project-Atmosphere [build]" />
         <item itemvalue="Gradle.Project-Atmosphere [modrinth]" />
         <item itemvalue="Gradle.Project-Atmosphere [discordWebhook]" />
         <item itemvalue="Gradle.Project-Atmosphere [curseforge1258344]" />
@@ -645,14 +647,6 @@
       <workItem from="1769008648949" duration="30521000" />
       <workItem from="1769096812184" duration="6500000" />
       <workItem from="1769121718999" duration="1628000" />
-    </task>
-    <task id="LOCAL-00092" summary="feat: improve compatibility logging and refactor mixin structure for weather management">
-      <option name="closed" value="true" />
-      <created>1755524512517</created>
-      <option name="number" value="00092" />
-      <option name="presentableId" value="LOCAL-00092" />
-      <option name="project" value="LOCAL" />
-      <updated>1755524512518</updated>
     </task>
     <task id="LOCAL-00093" summary="feat: update build configuration and enhance snowstorm management integration">
       <option name="closed" value="true" />
@@ -1038,7 +1032,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773692221091</updated>
     </task>
-    <option name="localTasksCounter" value="141" />
+    <task id="LOCAL-00141" summary="feat: implement humidity budget model with ocean and wind integration, add telemetry support for humidity budget samples, and update atmospheric update scheduler">
+      <option name="closed" value="true" />
+      <created>1773696647805</created>
+      <option name="number" value="00141" />
+      <option name="presentableId" value="LOCAL-00141" />
+      <option name="project" value="LOCAL" />
+      <updated>1773696647805</updated>
+    </task>
+    <option name="localTasksCounter" value="142" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1087,7 +1089,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: add crafting recipes for anemometer, barometer, hygrometer, storm siren, thermometer, and weather vane" />
     <MESSAGE value="feat: add WeatherType enum and update weather checks in AtmoApi" />
     <MESSAGE value="feat: implement cloud region management with unique IDs and enhance weather type handling" />
     <MESSAGE value="feat: add new cloud types and enhance weather parameters for rain and storm effects" />
@@ -1112,7 +1113,8 @@
     <MESSAGE value="feat: unify wind handling by replacing current wind getters with a canonical forecast wind selector, enhance wind particle bending, and improve wind force application for entities" />
     <MESSAGE value="feat: enhance seasonal tree management, add humidity clamping, and improve region forecast stability" />
     <MESSAGE value="feat: implement seasonal trees module with dynamic and vanilla tree types, add season phase management, and integrate region-based forecasts" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: implement seasonal trees module with dynamic and vanilla tree types, add season phase management, and integrate region-based forecasts" />
+    <MESSAGE value="feat: implement humidity budget model with ocean and wind integration, add telemetry support for humidity budget samples, and update atmospheric update scheduler" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: implement humidity budget model with ocean and wind integration, add telemetry support for humidity budget samples, and update atmospheric update scheduler" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

@@ -13,7 +13,7 @@ La cible proposee est un modele **hybride budget d'humidite + ancrage climatolog
 - budget explicite des sources, puits et transports d'humidite ;
 - conservation locale approximative a l'echelle de la region ;
 - retour controle vers la courbe forecast journaliere pour stabiliser le systeme ;
-- separation conceptuelle entre humidite d'air et phenomenes precipitant, avec possibilite d'introduire plus tard un stock de `cloud water`.
+- separation conceptuelle entre humidite d'air et phenomenes precipitant, avec une premiere implementation d'un stock de `cloud water`.
 
 Cette approche remplace le modele "heuristiques libres + micro-correction" par un modele "climat guide + ecarts transitoires explicables".
 
@@ -552,7 +552,7 @@ Travaux :
 2. Distinguer clairement `windTransport` du simple bruit de diffusion.
 3. Ajuster le scheduler pour sommer des termes nommes plutot que des deltas implicites.
 
-### Phase D - Extension future cloud water
+### Phase D - Extension cloud water minimale
 
 Objectif :
 - enrichir le modele sans casser l'architecture.
@@ -562,7 +562,12 @@ Travaux :
 2. Convertir humidite disponible -> condensation -> pluie.
 3. Reinjecter un effet local sur la basse atmosphere.
 
-Cette phase est volontairement differee.
+Statut d'implementation :
+- realise sous forme d'une premiere tranche minimale ;
+- `cloudWater` est stocke dans `RegionAtmosphereState` ;
+- l'echange humidite <-> cloud water est calcule dans le scheduler via des termes nommes `condensation`, `reEvaporation` et `precipitationDraw` ;
+- `CloudManager` aligne le stock de `cloudWater` avec la couverture nuageuse et la pluie visibles ;
+- cette tranche ne constitue pas encore une microphysique complete des nuages.
 
 ---
 
@@ -652,3 +657,33 @@ Ce choix :
 - evite les hard floors et le tuning opaque.
 
 Ce document sert de reference de conception avant implementation.
+
+---
+
+## 13) Etat d'implementation au 2026-03-16
+
+Le plan en quatre etapes de cette etude est maintenant implemente.
+
+Synthese :
+- Stage 1 : instrumentation et telemetrie du budget d'humidite ;
+- Stage 2 : remplacement de l'ancien delta humidite par un budget explicite ancre forecast ;
+- Stage 3 : integration explicite des termes `oceanFlux` et `windTransport` ;
+- Stage 4 : extension minimale `cloudWater` avec condensation, re-evaporation et tirage precipitant.
+
+Artefacts principaux :
+- `RegionAtmosphereState` expose la cible forecast et stocke desormais `cloudWater` ;
+- `AtmosphericUpdateScheduler` applique le budget d'humidite puis l'echange humidity/cloud-water ;
+- `CloudWaterService` et `CloudWaterExchange` formalisent le nouveau couplage ;
+- `CloudManager` alimente et dissipe `cloudWater` en fonction de l'activite nuageuse visible ;
+- la telemetrie exporte maintenant les termes du budget et l'etat `cloudWater`.
+
+Verification realisee :
+- JDK runtime : `java -version` = `17.0.17` ;
+- JDK compiler : `javac -version` = `17.0.17` ;
+- build : `.\gradlew.bat build` reussi ;
+- controle de patch : `git diff --check` sans erreur de whitespace, uniquement des avertissements de fin de ligne CRLF/LF.
+
+Limites connues :
+- aucun test automatique dedie n'existe dans le repo ;
+- aucun boot de session Minecraft complete n'a ete execute dans cette passe de verification ;
+- la phase suivante releve du tuning et de la validation gameplay, pas d'une nouvelle etape structurelle du design.

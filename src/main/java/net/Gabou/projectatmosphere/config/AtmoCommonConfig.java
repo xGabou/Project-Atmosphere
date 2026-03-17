@@ -296,13 +296,13 @@ public class AtmoCommonConfig {
         builder.push("seasonalTrees");
         SEASONAL_TREES_ENABLED = builder
                 .comment("Enable seasonal tree leaf transitions and spreading")
-                .define("enabled", true);
+                .define("enabled", false);
         SEASONAL_TREES_DYNAMIC_TREES_ENABLED = builder
                 .comment("Enable Dynamic Trees support (preferred)")
-                .define("dynamicTreesEnabled", true);
+                .define("dynamicTreesEnabled", false);
         SEASONAL_TREES_VANILLA_ENABLED = builder
                 .comment("Enable conservative vanilla tree support (off by default)")
-                .define("vanillaEnabled", false);
+                .define("vanillaEnabled", true);
         SEASONAL_TREES_LEAF_DROP_DAYS = builder
                 .comment("In-game days for leaves to drop during autumn")
                 .defineInRange("leafDropDays", 4.0d, 0.1d, 40d);

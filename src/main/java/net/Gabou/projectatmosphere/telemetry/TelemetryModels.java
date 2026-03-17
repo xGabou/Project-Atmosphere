@@ -181,6 +181,7 @@ public final class TelemetryModels {
         public final float currentWindSpeed;
         public final Float currentWindDirectionDegrees;
         public final float currentCloudCover;
+        public final float currentCloudWater;
         public final float currentRainIntensity;
 
         public RegionForecastSample(long gameDay, long timeOfDay, String dimensionId, String regionId,
@@ -190,7 +191,7 @@ public final class TelemetryModels {
                                     float expectedWindSpeed, Float expectedWindDirectionDegrees,
                                     float currentTemperature, float currentHumidity, float currentPressure,
                                     float currentWindSpeed, Float currentWindDirectionDegrees,
-                                    float currentCloudCover, float currentRainIntensity) {
+                                    float currentCloudCover, float currentCloudWater, float currentRainIntensity) {
             this.recordType = "region_forecast_sample";
             this.gameDay = gameDay;
             this.timeOfDay = timeOfDay;
@@ -213,6 +214,7 @@ public final class TelemetryModels {
             this.currentWindSpeed = currentWindSpeed;
             this.currentWindDirectionDegrees = currentWindDirectionDegrees;
             this.currentCloudCover = currentCloudCover;
+            this.currentCloudWater = currentCloudWater;
             this.currentRainIntensity = currentRainIntensity;
         }
     }
@@ -231,6 +233,8 @@ public final class TelemetryModels {
         public final float targetHumidity;
         public final float humidityBefore;
         public final float humidityAfter;
+        public final float cloudWaterBefore;
+        public final float cloudWaterAfter;
         public final float cloudCover;
         public final float rainIntensity;
         public final float solarDrying;
@@ -240,15 +244,20 @@ public final class TelemetryModels {
         public final float windTransport;
         public final float forecastRestore;
         public final float precipitationSink;
+        public final float condensation;
+        public final float reEvaporation;
+        public final float precipitationDraw;
         public final float netDelta;
 
         public HumidityBudgetSample(long gameDay, long timeOfDay, String dimensionId, String regionId,
                                     int regionX, int regionZ, int regionSize, String dominantBiomeId,
                                     String updateMode, float targetHumidity, float humidityBefore,
-                                    float humidityAfter, float cloudCover, float rainIntensity,
+                                    float humidityAfter, float cloudWaterBefore, float cloudWaterAfter,
+                                    float cloudCover, float rainIntensity,
                                     float solarDrying, float biomeEvaporation, float oceanFlux,
                                     float rainExchange, float windTransport, float forecastRestore,
-                                    float precipitationSink, float netDelta) {
+                                    float precipitationSink, float condensation, float reEvaporation,
+                                    float precipitationDraw, float netDelta) {
             this.recordType = "humidity_budget_sample";
             this.gameDay = gameDay;
             this.timeOfDay = timeOfDay;
@@ -262,6 +271,8 @@ public final class TelemetryModels {
             this.targetHumidity = targetHumidity;
             this.humidityBefore = humidityBefore;
             this.humidityAfter = humidityAfter;
+            this.cloudWaterBefore = cloudWaterBefore;
+            this.cloudWaterAfter = cloudWaterAfter;
             this.cloudCover = cloudCover;
             this.rainIntensity = rainIntensity;
             this.solarDrying = solarDrying;
@@ -271,7 +282,68 @@ public final class TelemetryModels {
             this.windTransport = windTransport;
             this.forecastRestore = forecastRestore;
             this.precipitationSink = precipitationSink;
+            this.condensation = condensation;
+            this.reEvaporation = reEvaporation;
+            this.precipitationDraw = precipitationDraw;
             this.netDelta = netDelta;
+        }
+    }
+
+    public static final class AtmosphereCouplingSample {
+        public final String recordType;
+        public final long gameDay;
+        public final long timeOfDay;
+        public final String dimensionId;
+        public final String regionId;
+        public final int regionX;
+        public final int regionZ;
+        public final int regionSize;
+        public final String dominantBiomeId;
+        public final String updateMode;
+        public final float targetTemperature;
+        public final float targetPressure;
+        public final float targetHumidity;
+        public final float temperatureBefore;
+        public final float temperatureAfter;
+        public final float pressureBefore;
+        public final float pressureAfter;
+        public final float humidityBefore;
+        public final float humidityAfter;
+        public final float cloudCover;
+        public final float rainIntensity;
+        public final float scheduledTemperatureDelta;
+        public final float scheduledPressureDelta;
+
+        public AtmosphereCouplingSample(long gameDay, long timeOfDay, String dimensionId, String regionId,
+                                        int regionX, int regionZ, int regionSize, String dominantBiomeId,
+                                        String updateMode, float targetTemperature, float targetPressure,
+                                        float targetHumidity, float temperatureBefore, float temperatureAfter,
+                                        float pressureBefore, float pressureAfter, float humidityBefore,
+                                        float humidityAfter, float cloudCover, float rainIntensity,
+                                        float scheduledTemperatureDelta, float scheduledPressureDelta) {
+            this.recordType = "atmosphere_coupling_sample";
+            this.gameDay = gameDay;
+            this.timeOfDay = timeOfDay;
+            this.dimensionId = dimensionId;
+            this.regionId = regionId;
+            this.regionX = regionX;
+            this.regionZ = regionZ;
+            this.regionSize = regionSize;
+            this.dominantBiomeId = dominantBiomeId;
+            this.updateMode = updateMode;
+            this.targetTemperature = targetTemperature;
+            this.targetPressure = targetPressure;
+            this.targetHumidity = targetHumidity;
+            this.temperatureBefore = temperatureBefore;
+            this.temperatureAfter = temperatureAfter;
+            this.pressureBefore = pressureBefore;
+            this.pressureAfter = pressureAfter;
+            this.humidityBefore = humidityBefore;
+            this.humidityAfter = humidityAfter;
+            this.cloudCover = cloudCover;
+            this.rainIntensity = rainIntensity;
+            this.scheduledTemperatureDelta = scheduledTemperatureDelta;
+            this.scheduledPressureDelta = scheduledPressureDelta;
         }
     }
 

@@ -376,10 +376,11 @@ public final class CloudManager {
             if (state == null) {
                 return;
             }
-            float cover = Mth.clamp(value.cloudCover, 0f, 1f);
-            float rain = Mth.clamp(value.rainIntensity, 0f, 1f);
+            float cover = Math.max(Mth.clamp(value.cloudCover, 0f, 1f), state.getCycloneCloudFloor());
+            float rain = Math.max(Mth.clamp(value.rainIntensity, 0f, 1f), state.getCycloneRainFloor());
             state.setCloudCover(cover);
             state.setRainIntensity(rain);
+            state.setCloudWater(Math.max(state.getCloudWater(), cover * 0.35f + rain * 0.65f));
             if (ProjectAtmosphere.DEBUG_MODE && key.regionX() == -2 && key.regionZ() == -2 && key.regionSize() == RegionInstanceKey.DEFAULT_REGION_SIZE) {
                 ProjectAtmosphere.LOGGER.info("[CloudManager] Region {} cover={} rain={} (thicknessSum={}, contributions={})",
                         key, cover, rain, value.cloudCover, value.rainIntensity);
@@ -405,11 +406,14 @@ public final class CloudManager {
                 toRemove.add(key);
                 continue;
             }
-            float newCover = Math.max(0f, state.getCloudCover() - PASSIVE_CLOUD_DECAY);
-            float newRain = Math.max(0f, state.getRainIntensity() - PASSIVE_RAIN_DECAY);
+            float newCover = Math.max(state.getCycloneCloudFloor(), state.getCloudCover() - PASSIVE_CLOUD_DECAY);
+            float newRain = Math.max(state.getCycloneRainFloor(), state.getRainIntensity() - PASSIVE_RAIN_DECAY);
             state.setCloudCover(newCover);
             state.setRainIntensity(newRain);
-            if (newCover <= 0.001f && newRain <= 0.001f) {
+            state.setCloudWater(Math.max(0f, state.getCloudWater() - Math.max(PASSIVE_CLOUD_DECAY, PASSIVE_RAIN_DECAY) * 0.5f));
+            if (newCover <= 0.001f && newRain <= 0.001f
+                    && state.getCycloneCloudFloor() <= 0.001f
+                    && state.getCycloneRainFloor() <= 0.001f) {
                 toRemove.add(key);
             }
         }

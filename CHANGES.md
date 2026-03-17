@@ -1,7 +1,34 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Release notes refresh
+- Replaced `PAchangelog.md` with updated platform-ready release notes for Discord, CurseForge, and Modrinth covering the current `0.8.0.0` forecast/runtime refactor, telemetry, coupling, and compatibility work.
+## Unreleased - Telemetry Instant serialization fix
+- Registered explicit Gson adapters for `java.time.Instant` in `TelemetryCollector`, serializing timestamps as ISO-8601 strings instead of relying on blocked reflective field access under JDK 17.
+- This fixes telemetry export/runtime failures caused by `InaccessibleObjectException` when exporting anomaly and precipitation trace records.
+## Unreleased - Runtime atmosphere coupling phase D cyclone/cloud reconciliation
+- Added retained cyclone visual floors on `RegionAtmosphereState` for cloud cover and rain intensity, so cyclone forcing now has an explicit ownership channel instead of relying on transient direct writes that later get overwritten.
+- Updated `CycloneManager` to push cloud/rain floors into the region state while still applying the immediate pressure, humidity, and temperature deltas, and to seed cloud-water from that forcing.
+- Updated `CloudManager` to merge sampled cloud/rain values against the retained cyclone floors and to preserve those floors during passive fade-out, preventing low-pressure cyclone regions from immediately losing their visible weather when SimpleClouds sampling runs afterward.
+## Unreleased - Runtime atmosphere coupling phase C temperature anchor
+- Added a forecast-temperature restore term and a soft excess-deviation guard in `AtmosphericUpdateScheduler`, so warm and cold regions now converge back toward the forecast temperature target instead of relying almost entirely on sunlight blending and tiny base relaxation.
+- Added a `temperature_drift_from_target` anomaly marker for regions that remain far from their forecast temperature target under near-clear, low-rain conditions, making hidden temperature drift visible in telemetry exports.
+- Kept the change scoped to scheduler temperature control only; cyclone/cloud ownership reconciliation remains a separate follow-up tranche.
+## Unreleased - Runtime atmosphere coupling phase B pressure anchor
+- Added a forecast-pressure restore term and a soft excess-deviation guard in `AtmosphericUpdateScheduler`, so runtime pressure now trends back toward the forecast climatology instead of free-drifting for long periods after dynamic forcing.
+- Added a telemetry anomaly marker for `pressure_drift_no_visible_weather`, emitted when a region remains far from its target pressure while cloud cover and rain stay near zero, to surface hidden pressure/weather desynchronization directly in exports.
+- Kept the intervention scoped to pressure only for this tranche, leaving the later temperature/cyclone-cloud ownership work for the next coupling phase.
+## Unreleased - Runtime atmosphere coupling phase A instrumentation
+- Added forecast-derived `getTargetTemperature(dayTime)` and `getTargetPressure(dayTime)` accessors in `RegionAtmosphereState`, alongside the existing humidity target, so runtime telemetry can compare current state against immutable climatology profiles instead of mutable daily snapshots.
+- Added `atmosphere_coupling.jsonl` telemetry export with active-region samples capturing target vs current temperature, pressure, and humidity plus the scheduler-applied temperature and pressure deltas for each update.
+- Wired `AtmosphericUpdateScheduler` active updates to emit the new coupling telemetry before anomaly recording, giving a direct diagnostic stream for temperature/pressure drift investigations.
 ## Unreleased - Runtime atmosphere coupling design study
 - Added `doc/runtime-atmosphere-coupling-study.md`, a companion design study focused on the runtime coupling problem between forecast targets, dynamic temperature/pressure forcing, cyclone/ocean/wind effects, and the visible cloud/rain layer, including diagnosis from recent telemetry, solution tradeoffs, RDCU, MDD, UML diagrams, case studies, phased implementation, risks, and acceptance criteria.
+## Unreleased - Humidity budget phase 4 cloud-water extension
+- Added explicit condensed-moisture tracking via `cloudWater` on `RegionAtmosphereState`, plus `CloudWaterExchange` and `CloudWaterService` to model condensation, re-evaporation, and precipitation draw as named runtime terms.
+- Integrated the cloud-water exchange step into `AtmosphericUpdateScheduler` after the Stage 3 humidity budget so live humidity now couples to condensed cloud moisture without rewriting the temperature/pressure update path.
+- Seeded and faded regional `cloudWater` from `CloudManager` based on cloud cover and rain intensity, and expanded telemetry exports to include cloud-water state in both region forecast samples and humidity-budget diagnostics.
+- Updated the humidity stage tracker so the rollout now stands at stage `4/4` completed.
+- Added `doc/humidity-moisture-budget-verification.md` and updated the design study so the implementation state, verification results, and Stage 4 documentation are aligned.
 ## Unreleased - Humidity budget phase 3 ocean and wind integration
 - Added explicit Stage 3 humidity-budget integration for ocean and wind by exposing `OceanBasinManager.estimateHumidityFlux(...)` and `WindVector.estimateHumidityTransport(...)`, then feeding those terms into `AtmosphericUpdateScheduler` as `oceanFlux` and `windTransport` for active-region humidity updates.
 - Removed direct humidity mutation from `AtmosphereFluxInfluence` and `WindVector.update` so ocean and wind no longer double-apply humidity outside the scheduler budget while their other responsibilities remain intact.

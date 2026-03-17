@@ -1,6 +1,6 @@
 # Humidity Moisture Budget - Stages
 
-Current stage: **3/4 completed**
+Current stage: **4/4 completed**
 
 This file tracks the implementation rollout for the humidity moisture-budget rework described in `doc/humidity-moisture-budget-study.md`.
 
@@ -70,7 +70,7 @@ Delivered:
 
 ## Stage 4/4 - Cloud-water extension
 
-Status: **Pending**
+Status: **Completed**
 
 Goal:
 - prepare a richer humidity-to-cloud-to-precipitation pipeline.
@@ -82,3 +82,10 @@ Scope:
 
 Expected outcome:
 - cleaner long-term evolution of cloud and rain behavior without collapsing the low-level humidity model.
+
+Delivered:
+- added explicit `cloudWater` state to `RegionAtmosphereState`;
+- introduced `CloudWaterExchange` and `CloudWaterService` so condensation, re-evaporation, and precipitation draw are modeled as named terms;
+- integrated cloud-water exchange into `AtmosphericUpdateScheduler` after the humidity budget step while keeping temperature and pressure behavior unchanged;
+- seeded and decayed `cloudWater` through `CloudManager` so visible cloud activity and condensed regional moisture stay aligned;
+- extended telemetry with cloud-water fields in `region_forecast_samples.jsonl` and the humidity-budget stream.

@@ -1,39 +1,52 @@
-## Project Atmosphere
+# Project Atmosphere 0.8.0.0
 
-### Changed
-- Reworked wind handling across the mod to remove inconsistencies and ensure all systems use the same wind source and direction convention.
-- Wind particles now sample wind every tick at their own position and smoothly steer toward it, producing real bending instead of straight trajectories.
-- Player wind influence now uses Weather2-style steering applied after input, with a noticeable effect only above 11.1 m/s.
-- Non-player living entities use a separate steering path with optional gust blending and higher drift caps.
-- Wind direction vectors are now consistent across particles, entity forces, and SimpleClouds cloud drift.
-- Cloud regions now apply a stable per-cloud direction bias plus slow wobble and slight speed variance to reduce apparent stacking.
-- Temperature clamping now logs a debug warning with context and stack trace to track runaway sources.
-- Server commands are now registered under the `/pa` root (for example `/pa temperature` and `/pa spawnTornado`).
-- Wind-driven neighbor mixing now clamps its factors and deltas to stop runaway temperature spikes from spreading.
-- Added weather snapshot and world-effects hooks, including rain-driven fire/campfire extinguish, cauldron filling, and dense-cloud sunburn suppression.
-- Region fallback generation now ensures biome keys are present and regenerates any regions that contain only min/max clamp values.
-- Wind steering now ramps near the threshold so low winds no longer slow the player.
-- World effects skip sampling when no rain is present and no custom effects are registered, reducing tick load.
-- Wind drift now applies as a directional add without reducing existing player speed.
-- Player wind now uses intermittent gust impulses (no conveyor steering), with configurable thresholds and caps.
-- Wind particle steering now caches region wind samples per tick to reduce client overhead.
-- Client cloud culling now uses a single pass per tick to avoid quadratic scans.
-- Creative/spectator players are immune to wind gusts, and gust impulses no longer reduce current player speed.
-- Sprinting players now ignore gusts unless winds reach extreme thresholds.
-- Surface wind now comes from the low-wind layer and no longer treats gust headroom as baseline speed.
-- Reduced default wind push scales and player gust caps by ~3x for gentler movement impact.
-- Thermometer now syncs the client day-forecast temperature so it no longer shows the 0.5 fallback.
-- Instrument readouts now use server-side values in multiplayer instead of showing default client fallbacks.
-- Storm sirens now play the severe-storm sound only once per continuous storm event.
+Project Atmosphere `0.8.0.0` continues the large internal refactor of the forecast and runtime systems, focusing on simulation stability, improved diagnostics, and better atmosphere state correctness.
 
-### Fixed
-- Fixed a wind particle crash.
-- Fixed wind speed being far too low due to a unit mismatch in the wind equation (hPa vs Pa), which was suppressing the computed wind magnitude.
-- Fixed a 90° wind direction offset caused by inconsistent sin/cos mapping between systems.
-- Fixed wind fallback behavior and cleaned up wind selection usage to reduce edge-case inconsistencies.
-- Wind forces now respect exposure, skipping entities in water or lava, under cover, or colliding horizontally.
+This update stabilizes the new region-first runtime architecture while introducing deeper telemetry tools and improved safeguards for live atmospheric evolution.
 
-### Notes
-- Storms have been observed spawning again in testing (cumulus clouds and a wall cloud), so storm generation appears to be working correctly.
-- Please report any unusual wind behavior, particle issues, or storm spawning problems so I can continue monitoring and tuning.
+> **Note:**  
+> This update is **temporarily incompatible with PA x TFC**.  
+> A compatibility update is already planned and will restore support soon.
 
+---
+
+## Changes
+
+### Forecast and Runtime
+- Continued the transition to a **region-first forecast runtime architecture**.
+- Reduced reliance on legacy biome-key runtime systems.
+- Forecast baselines have been stabilized as part of the ongoing refactor.
+
+### Atmosphere Simulation
+- Added **humidity budget instrumentation**, including ocean and wind integration.
+- Completed the **cloud-water coupling system** for humidity simulation.
+- Added **pressure restore toward forecast targets** with soft deviation guards and anomaly reporting.
+- Added **temperature restore toward forecast targets** with soft deviation guards and anomaly reporting.
+- Reworked **cyclone and cloud ownership logic** so cyclone-driven storm visuals are no longer immediately overwritten by cloud sampling.
+
+### Telemetry and Debugging
+- Added new telemetry exports for **atmosphere coupling**, including target vs live values for:
+    - Temperature
+    - Pressure
+    - Humidity
+- Added **humidity budget diagnostics** and improved tracking of cloud-water interactions.
+- Added anomaly markers to help diagnose **pressure and temperature drift** during runtime.
+
+### Compatibility
+- **Dynamic Trees compatibility remains optional**, allowing the mod to load normally even if Dynamic Trees is not installed.(This module is a work in progress you should always disable it)
+
+### Fixes
+- Fixed a **telemetry export crash on JDK 17** caused by Gson reflective access to `java.time.Instant`.  
+  Explicit serialization for `Instant` is now used.
+
+---
+
+## Notes
+- This release contains **no client or HUD changes**.
+- Build verified successfully on **JDK 17**.
+
+---
+
+## Ongoing Work
+- Forecast generation is now in a stable state.
+- Current tuning work focuses on **live runtime evolution**, particularly temperature and humidity oscillations observed in some active regions.
