@@ -11,7 +11,9 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
-    "SimpleCloudsRendererMixin"
+    "SimpleCloudsRendererMixin",
+    "client.LoadingScreenMixin",
+    "client.LoadingOverlayMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -45,6 +45,10 @@ public class ModItems {
             ITEMS.register("weather_radar",
                     () -> new WeatherRadarItem(new Item.Properties()));
 
+    public static final DeferredHolder<Item, Item> CLOUD_PROBE =
+            ITEMS.register("cloud_probe",
+                    () -> new CloudProbeItem(new Item.Properties()));
+
     // === Custom tools (Balais) ===
     public static final DeferredHolder<Item, Item> WOOD_BALAI =
             ITEMS.register("balai_bois",

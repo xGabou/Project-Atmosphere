@@ -5,6 +5,8 @@ import dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
+import net.Gabou.projectatmosphere.client.loading.ClientForecastLoadingLifecycle;
+import net.Gabou.projectatmosphere.client.loading.ClientForecastLoadingWorkQueue;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
@@ -161,6 +163,8 @@ public class ProjectAtmosphere {
         event.enqueueWork(() -> {
             LOGGER.info("Setting up Project Atmosphere (Client)");
             NeoForge.EVENT_BUS.register(ClientTickHandler.class);
+            NeoForge.EVENT_BUS.register(ClientForecastLoadingLifecycle.class);
+            NeoForge.EVENT_BUS.register(ClientForecastLoadingWorkQueue.class);
             ClientOnlyRegistrar.registerClient(modEventBus);
             ItemBlockRenderTypes.setRenderLayer(ModBlocks.BAROMETER_BLOCK.get(), RenderType.translucent());
             ItemBlockRenderTypes.setRenderLayer(ModBlocks.THERMOMETER_BLOCK.get(), RenderType.translucent());

@@ -30,6 +30,11 @@ public class NetworkHandler {
                 BiomeDayTemperaturePacket.STREAM_CODEC,
                 BiomeDayTemperaturePacket::handle
         );
+        registrar.playToClient(
+                ForecastLoadingStatusPacket.TYPE,
+                ForecastLoadingStatusPacket.STREAM_CODEC,
+                ForecastLoadingStatusPacket::handle
+        );
 
         registrar.playToClient(
                 InstrumentReadoutPacket.TYPE,

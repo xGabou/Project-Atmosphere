@@ -174,6 +174,14 @@ public class ForecastGenerator {
         PacketDistributor.sendToAllPlayers(new BiomeDayTemperaturePacket(map));
     }
 
+    public static Map<ResourceLocation, float[]> createDailyTemperatureSnapshotForSync() {
+        return createDailyTemperatureSnapshot();
+    }
+
+    public static void sendDailyForecastsToPlayer(ServerPlayer player, Map<ResourceLocation, float[]> snapshot) {
+        PacketDistributor.sendToPlayer(player, new BiomeDayTemperaturePacket(snapshot));
+    }
+
     private static void computeAverageTemperatureWeek() {
         for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
             List<BiomeForecast> list = entry.getValue();
@@ -892,6 +900,54 @@ public class ForecastGenerator {
         }
 
         return result;
+    }
+
+    private static Map<ResourceLocation, float[]> createDailyTemperatureSnapshot() {
+        Map<ResourceLocation, float[]> snapshot = new HashMap<>(AVERAGE_FORECASTS.size());
+        for (Map.Entry<ResourceLocation, BiomeForecast> entry : AVERAGE_FORECASTS.entrySet()) {
+            float[] curve = entry.getValue().getTemperatureDay();
+            if (curve != null && curve.length > 0) {
+                snapshot.put(entry.getKey(), Arrays.copyOf(curve, curve.length));
+                continue;
+            }
+
+            float[][] week = entry.getValue().getTemperature();
+            if (week == null || week.length == 0) {
+                snapshot.put(entry.getKey(), new float[]{0.0F});
+                continue;
+            }
+
+            float representative = averageDailyMidpoint(week);
+            snapshot.put(entry.getKey(), buildFlatCurve(representative));
+        }
+        return snapshot;
+    }
+
+    private static float[] buildFlatCurve(float value) {
+        float[] arr = new float[24];
+        Arrays.fill(arr, value);
+        return arr;
+    }
+
+    private static float averageDailyMidpoint(float[][] week) {
+        if (week == null || week.length == 0) {
+            return 0.0F;
+        }
+
+        float sum = 0.0F;
+        int count = 0;
+        for (float[] day : week) {
+            if (day == null || day.length == 0) {
+                continue;
+            }
+            if (day.length == 1) {
+                sum += day[0];
+            } else {
+                sum += (day[0] + day[Math.min(1, day.length - 1)]) * 0.5F;
+            }
+            count++;
+        }
+        return count == 0 ? 0.0F : sum / count;
     }
 
 

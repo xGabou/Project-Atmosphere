@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
+import net.Gabou.projectatmosphere.client.loading.ClientForecastLoadingWorkQueue;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -61,9 +61,6 @@ public record BiomeDayTemperaturePacket(Map<ResourceLocation, float[]> temperatu
      * Clears old forecasts before inserting new ones to prevent stale data.
      */
     public static void handle(BiomeDayTemperaturePacket pkt, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> {
-            BiomeClientTemperatureCache.clear(); // clear old data first
-            BiomeClientTemperatureCache.updateDayForecasts(pkt.temperatureDayMap());
-        });
+        ctx.enqueueWork(() -> ClientForecastLoadingWorkQueue.queueForecastSnapshot(pkt.temperatureDayMap(), "biome_day_temperature_packet"));
     }
 }

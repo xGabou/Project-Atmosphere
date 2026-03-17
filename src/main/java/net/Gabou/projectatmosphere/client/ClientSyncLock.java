@@ -1,39 +1,35 @@
 package net.Gabou.projectatmosphere.client;
 
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 public class ClientSyncLock {
+    private static volatile boolean ready;
 
     public static boolean isReady() {
-        LocalPlayer player = Minecraft.getInstance().player;
-        if (player == null) return false;
-        return isPlayerReady(player.getUUID());
+        return ready;
     }
 
     public static boolean isPlayerReady(UUID playerUUID) {
-        return AtmosphereManager.isPlayerReady(playerUUID);
+        return ready;
     }
 
     public static void setReady(UUID playerUUID, boolean ready) {
-        
-        ProjectAtmosphere.LOGGER.info("Setting player ready to " + playerUUID);
+        ClientSyncLock.ready = ready;
     }
 
     public static void setReadyForLocalPlayer(boolean ready) {
         LocalPlayer player = Minecraft.getInstance().player;
         if (player != null) {
             setReady(player.getUUID(), ready);
+            return;
         }
+        ClientSyncLock.ready = ready;
     }
 
     public static void clear() {
-        
+        ready = false;
     }
 }

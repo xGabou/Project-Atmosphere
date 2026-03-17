@@ -1,5 +1,9 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Dynamic Forge forecast loading merge
+- Ported the Dynamic-Forge forecast sync flow onto NeoForge 1.21.1 using NeoForge payload registration, including staged forecast-loading status packets, batched client cache hydration, and a local client readiness lock.
+- Added a forecast loading overlay on NeoForge loading screens plus client lifecycle hooks so multiplayer login waits for the forecast cache before enabling weather-driven client systems.
+- Added the `cloud_probe` debug item and its item model, and updated the English/French item translations to cover the new tool.
 ## Unreleased - NeoForge 1.21.1 build fixes
 - Added a Gradle wrapper pinned to 8.8 so IntelliJ/Gradle does not default to Gradle 9 (incompatible with the current NeoForge toolchain).
 - Updated the build artifact name to include the MC version and `-neoforge` suffix (for example `projectatmosphere-1.21.1-neoforge-<version>.jar`) so it is distinct from Forge jars.
