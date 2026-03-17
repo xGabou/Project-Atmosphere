@@ -12,6 +12,10 @@ plugins {
 group = mod_group_id
 version = mod_version
 
+def githubPackagesUser = (System.getenv("GITHUB_USER") ?: System.getenv("GITHUB_ACTOR"))?.trim()
+def githubPackagesToken = System.getenv("GITHUB_TOKEN")?.trim()
+def hasGithubPackagesCredentials = githubPackagesUser && githubPackagesToken
+
 base {
     archivesName = "Forge-Version-" + mod_id
 }
@@ -91,13 +95,14 @@ repositories {
     }
     maven { url "https://maven.theillusivec4.top/" }
     flatDir { dir 'libs' }
-    maven {
-        url = uri("https://maven.pkg.github.com/xGabou/Gabou-s-Libs")
-        credentials {
-            username = System.getenv("GITHUB_USER")
-            password = System.getenv("GITHUB_TOKEN")
+    if (hasGithubPackagesCredentials) {
+        maven {
+            url = uri("https://maven.pkg.github.com/xGabou/Gabou-s-Libs")
+            credentials {
+                username = githubPackagesUser
+                password = githubPackagesToken
+            }
         }
-
     }
     maven {
         name = "Architectury"
@@ -191,7 +196,7 @@ tasks.named('jar', Jar).configure {
                 "Specification-Vendor"    : mod_authors,
                 "Specification-Version"   : "1",
                 "Implementation-Title"    : project.name,
-                "Implementation-Version"  : project.jar.archiveVersion,
+                "Implementation-Version"  : project.version,
                 "Implementation-Vendor"   : mod_authors,
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
@@ -210,7 +215,7 @@ tasks.withType(JavaCompile).configureEach {
     ]
 }
 
-import groovy.json.JsonOutput
+def releaseJarFile = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
 
 tasks.register("discordWebhook") {
     doLast {
@@ -258,7 +263,7 @@ modrinth {
         required.project "LtZfKhel"
         required.project "N8aGZtvj"
     }
-    uploadFile = file("build/libs/${archivesBaseName}-${version}.jar")
+    uploadFile = releaseJarFile.get().asFile
 }
 def curseForgeToken = System.getenv("CURSEFORGE_TOKEN")?.trim()
 if (curseForgeToken) {
@@ -271,7 +276,7 @@ if (curseForgeToken) {
             releaseType = "beta" // options: alpha, beta, release
             addGameVersion "1.20.1"
             addGameVersion "Forge"
-            mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
+            mainArtifact(releaseJarFile.get().asFile) {
                 displayName = "Forge-${version}"
             }
         }
@@ -292,15 +297,21 @@ publishing {
     }
 
     repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/xGabou/Project-Atmosphere/Forge")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+        if (hasGithubPackagesCredentials) {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/xGabou/Project-Atmosphere/Forge")
+                credentials {
+                    username = githubPackagesUser
+                    password = githubPackagesToken
+                }
             }
         }
     }
+}
+
+if (!hasGithubPackagesCredentials) {
+    logger.lifecycle("GitHub package credentials not set; skipping private GitHub Maven repositories.")
 }
 
 

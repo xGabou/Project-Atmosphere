@@ -1,5 +1,12 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Gradle sync fix
+- Removed the duplicate mid-script `import groovy.json.JsonOutput` from `build.gradle`, which could stop the Gradle script from compiling during IDE sync.
+- Replaced legacy archive/version references with Gradle 8-safe values for the jar manifest plus the Modrinth and CurseForge artifact paths.
+- Made the optional private GitHub Maven repository and publishing target conditional on GitHub package credentials so local sync does not fail when `GITHUB_USER`/`GITHUB_ACTOR` and `GITHUB_TOKEN` are unset.
+- Restored the missing root Gradle wrapper files under `gradle/wrapper/` and pinned them to Gradle 8.8, preventing IDE sync from drifting to Gradle 9.
+- Updated IntelliJ project settings to use the existing `temurin-17 (2)` SDK for Gradle import and changed the leftover module bytecode target from Java 21 back to Java 17.
+- Stopped the forecast loading overlay from injecting into `ProgressScreen` and `GenericDirtMessageScreen`, so it no longer renders during save-world and generic dirt/progress screens while still appearing on actual world-loading screens.
 ## Unreleased - Release notes refresh
 - Replaced `PAchangelog.md` with updated platform-ready release notes for Discord, CurseForge, and Modrinth covering the current `0.8.0.0` forecast/runtime refactor, telemetry, coupling, and compatibility work.
 ## Unreleased - Telemetry Instant serialization fix
