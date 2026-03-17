@@ -4,6 +4,7 @@ This file records functionality additions/removals made during development sessi
 - Ported the Dynamic-Forge forecast sync flow onto NeoForge 1.21.1 using NeoForge payload registration, including staged forecast-loading status packets, batched client cache hydration, and a local client readiness lock.
 - Added a forecast loading overlay on NeoForge loading screens plus client lifecycle hooks so multiplayer login waits for the forecast cache before enabling weather-driven client systems.
 - Matched the NeoForge loading overlay behavior back to the Dynamic-Forge source and restored the original compact panel sizing.
+- Reintroduced the loading hint with a shorter line so the waiting stage still explains slow startup cases without expanding the panel as much.
 - Added the `cloud_probe` debug item and its item model, and updated the English/French item translations to cover the new tool.
 ## Unreleased - NeoForge 1.21.1 build fixes
 - Added a Gradle wrapper pinned to 8.8 so IntelliJ/Gradle does not default to Gradle 9 (incompatible with the current NeoForge toolchain).
