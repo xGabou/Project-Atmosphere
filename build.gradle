@@ -132,6 +132,7 @@ dependencies {
     compileOnly fg.deobf("curse.maven:continents-682515:7078247")
     implementation fg.deobf("curse.maven:lithostitched-936015:6742615")
     compileOnly fg.deobf("curse.maven:ecliptic-seasons-1118306:7274743")
+
     compileOnly fg.deobf("curse.maven:project-atmosphere-for-tfc-1391548:7261639")
     compileOnly fg.deobf("curse.maven:dynamictrees-252818:7502488")
     //implementation "curse.maven:nolijium-969602:6264798"
