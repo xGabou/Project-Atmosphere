@@ -12,6 +12,8 @@ public final class ForecastLoadingOverlayRenderer {
     private static final String TITLE = "Project Atmosphere";
     private static final String[] DOTS = {"", ".", "..", "..."};
     private static final String WAITING_HINT = "Large modpacks may take longer.";
+    private static final int PANEL_TOP_MARGIN = 14;
+    private static final int PANEL_TOP_BIAS = 84;
     private static final int PANEL_FILL_TOP = FastColor.ARGB32.color(214, 9, 14, 20);
     private static final int PANEL_FILL_BOTTOM = FastColor.ARGB32.color(198, 15, 20, 28);
     private static final int PANEL_OUTLINE = FastColor.ARGB32.color(255, 110, 158, 214);
@@ -53,7 +55,7 @@ public final class ForecastLoadingOverlayRenderer {
         int panelHeight = hint == null ? (detail == null ? 48 : 60) : 72;
 
         int left = (screenWidth - panelWidth) / 2;
-        int top = Math.max(18, (screenHeight / 2) - panelHeight - 34);
+        int top = Math.max(PANEL_TOP_MARGIN, (screenHeight / 2) - panelHeight - PANEL_TOP_BIAS);
         int right = left + panelWidth;
         int bottom = top + panelHeight;
 

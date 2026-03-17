@@ -11,8 +11,7 @@ group = mod_group_id
 version = mod_version
 
 base {
-    // Include MC + loader in the jar name so NeoForge artifacts are distinct from Forge builds.
-    archivesName = "${mod_id}-${minecraft_version}-neoforge"
+    archivesName = "NeoForge-" + mod_id
 }
 repositories {
     maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
@@ -194,7 +193,7 @@ modrinth {
     changelog = rootProject.file("PAchangelog.md").text
     gameVersions = ["1.21.1"]
     loaders = ["neoforge"]
-    versionType = "beta"
+    versionType = "alpha"
     dependencies {
         required.project "e0bNACJD"
         required.project "4Al4H3t9"
@@ -213,7 +212,7 @@ if (!curseforgeToken) {
         project {
             id = "1258344"
             changelog = rootProject.file("PAchangelog.md")
-            releaseType = "beta" // options: alpha, beta, release
+            releaseType = "alpha" // options: alpha, beta, release
             addGameVersion "1.21.1"
             addGameVersion "NeoForge"
             mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
