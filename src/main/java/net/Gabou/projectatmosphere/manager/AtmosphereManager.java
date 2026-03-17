@@ -9,10 +9,13 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.command.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
+import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
+import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
 import net.Gabou.projectatmosphere.seasons.SeasonProviderRegistry;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
@@ -32,6 +35,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import net.minecraftforge.network.PacketDistributor;
 
 public class AtmosphereManager {
 
@@ -100,6 +104,23 @@ public class AtmosphereManager {
 
         world.getServer().execute(() -> {
             ForecastOrchestrator.onPlayerLogin(player, world);
+            Map<net.minecraft.resources.ResourceLocation, float[]> forecastSnapshot = ForecastGenerator.createDailyTemperatureSnapshotForSync();
+            int forecastProfileCount = forecastSnapshot.size();
+            NetworkHandler.CHANNEL.send(
+                    PacketDistributor.PLAYER.with(() -> player),
+                    ForecastLoadingStatusPacket.status(
+                            ForecastLoadingStage.RECEIVING_FORECAST_DATA,
+                            null,
+                            forecastProfileCount > 0 ? forecastProfileCount + " biome profiles queued" : "Preparing forecast snapshot",
+                            0.42F,
+                            "player_login_forecast_snapshot"
+                    )
+            );
+            ForecastGenerator.sendDailyForecastsToPlayer(player, forecastSnapshot);
+            NetworkHandler.CHANNEL.send(
+                    PacketDistributor.PLAYER.with(() -> player),
+                    ForecastLoadingStatusPacket.ready("player_login_ready")
+            );
             if (CompatHandler.isRainbowsLoaded()) {
                 ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(world);
                 RainbowRainBridge.sendSnapshot(player, world, cloudManager.getCloudGenerator());

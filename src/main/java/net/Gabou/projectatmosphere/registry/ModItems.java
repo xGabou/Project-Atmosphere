@@ -34,6 +34,9 @@ public class ModItems {
     public static final RegistryObject<Item> WEATHER_RADAR = ITEMS.register("weather_radar",
             () -> new WeatherRadarItem(new Item.Properties()));
 
+    public static final RegistryObject<Item> CLOUD_PROBE = ITEMS.register("cloud_probe",
+            () -> new CloudProbeItem(new Item.Properties().stacksTo(1)));
+
 
 
     public static final RegistryObject<Item> WOOD_BALAI = ITEMS.register("balai_bois",

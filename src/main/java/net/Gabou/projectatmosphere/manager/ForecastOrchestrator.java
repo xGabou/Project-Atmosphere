@@ -3,6 +3,8 @@ package net.Gabou.projectatmosphere.manager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
+import net.Gabou.projectatmosphere.client.loading.IntegratedForecastLoadingBridge;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler;
 import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
@@ -25,6 +27,8 @@ import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
+import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
+import net.Gabou.projectatmosphere.network.NetworkHandler;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -34,6 +38,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import net.minecraftforge.network.PacketDistributor;
 
 public class ForecastOrchestrator {
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = ForecastGenerator.RADIUS / 2;
@@ -69,6 +74,12 @@ public class ForecastOrchestrator {
      * Called when the server starts
      */
     public static boolean onServerStart(ServerLevel level) {
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                "Loading atmosphere systems",
+                0.1F,
+                "server_start_begin"
+        );
         ForecastDataStorage.loadAll(level);
         TornadoStorageManager.load(level);
         ForecastGenerator.seed = level.getSeed();
@@ -77,11 +88,29 @@ public class ForecastOrchestrator {
         if (ForecastDataStorage.hasForecastData()) {
             try {
                 if (ForecastDataStorage.hasRegionForecastData()) {
+                    IntegratedForecastLoadingBridge.update(
+                            ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                            "Loading saved forecast regions",
+                            0.18F,
+                            "server_start_saved_regions"
+                    );
                     WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
                 } else {
+                    IntegratedForecastLoadingBridge.update(
+                            ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                            "Rebuilding saved forecast regions",
+                            0.18F,
+                            "server_start_rebuild_saved_regions"
+                    );
                     ForecastGenerator.generateForecastForSavedRegion(level);
                     WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
                 }
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                        "Initializing weather systems",
+                        0.88F,
+                        "server_start_initialize_systems"
+                );
                 initializeDynamicSystems(level);
                 return true;
             } catch (Exception e) {
@@ -89,8 +118,20 @@ public class ForecastOrchestrator {
 
                 ForecastDataStorage.clearAll(level);
                 ForecastGenerator.clearForecasts();
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                        "Rebuilding forecast data from spawn",
+                        0.22F,
+                        "server_start_regenerate_spawn"
+                );
                 ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
                 WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                        "Initializing weather systems",
+                        0.88F,
+                        "server_start_initialize_systems"
+                );
                 initializeDynamicSystems(level);
                 return true;
             }
@@ -98,13 +139,34 @@ public class ForecastOrchestrator {
 
 
         if (!ForecastDataStorage.playerData.isEmpty()) {
+            int totalCenters = ForecastDataStorage.playerData.size();
+            int centerIndex = 0;
             for (BlockPos pos : ForecastDataStorage.playerData.values()) {
+                centerIndex++;
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                        "Designing forecast region " + centerIndex + " / " + totalCenters,
+                        0.18F + (0.5F * centerIndex / Math.max(1.0F, (float) totalCenters)),
+                        "server_start_player_region_" + centerIndex
+                );
                 ForecastGenerator.generateForecastForRegion(pos, level);
             }
         } else {
+            IntegratedForecastLoadingBridge.update(
+                    ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                    "Designing forecast region 1 / 1",
+                    0.24F,
+                    "server_start_spawn_region"
+            );
             ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
         }
         WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Initializing weather systems",
+                0.88F,
+                "server_start_initialize_systems"
+        );
         initializeDynamicSystems(level);
         return true;
     }
@@ -126,6 +188,7 @@ public class ForecastOrchestrator {
     public static void onPlayerLogin(ServerPlayer player, ServerLevel level) {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
+        sendLoginStage(player, "Collecting nearby forecast regions", 0.16F, "player_login_collect_regions");
         getNearbyRegions(level, player, 1000);
         long start = System.nanoTime();
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
@@ -141,11 +204,13 @@ public class ForecastOrchestrator {
                 if(ProjectAtmosphere.DEBUG_MODE)
                     ProjectAtmosphere.LOGGER.info("[Atmosphere] Player " + player.getName().getString());
                 ForecastDataStorage.playerData.put(uuid, playerPos);
+                sendLoginStage(player, "Seeding local weather systems", 0.28F, "player_login_seed_weather");
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
             }
 
         }
         SimpleCloudsCompat.setIsInit(true);
+        sendLoginStage(player, "Forecast regions ready", 0.38F, "player_login_regions_ready");
 
         long end = System.nanoTime();
         long durationMs = (end - start) / 1_000_000;
@@ -674,6 +739,19 @@ public class ForecastOrchestrator {
 
         var h = hurricanes.get(0);
         return new HurricaneState(h.position.x, h.position.z, h.radius, h.radius * 0.5);
+    }
+
+    private static void sendLoginStage(ServerPlayer player, String subtext, float progress, String source) {
+        NetworkHandler.CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                ForecastLoadingStatusPacket.status(
+                        ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                        null,
+                        subtext,
+                        progress,
+                        source
+                )
+        );
     }
 }
 

@@ -18,6 +18,10 @@ public class BiomeClientTemperatureCache {
         DAILY_FORECASTS = next;
     }
 
+    public static void replaceDayForecasts(Map<ResourceLocation, float[]> newData) {
+        DAILY_FORECASTS = new ConcurrentHashMap<>(newData);
+    }
+
     /**
      * Retrieves the forecasted temperature for a biome at the given tick of the current day (0–23999).
      * Converts the tick value into an index for the forecast array.

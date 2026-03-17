@@ -272,3 +272,18 @@ This file records functionality additions/removals made during development sessi
   - Spawns the specified SimpleClouds cloud at the player’s position/biome.
   - Requires permission level 2.
   - Applies current wind sample; fails gracefully if SimpleClouds is not initialized.
+## Unreleased â€” Cloud probe targeting
+- Updated `CloudProbeItem` to prioritize clouds intersected by the forward probe ray instead of immediately reporting the cloud containing the player.
+- The probe now uses SimpleClouds' actual cloud layer height for intersection checks and only falls back to the containing cloud when no targeted cloud is found ahead.
+- Added an enchanted-glint stick presentation for the cloud probe item.
+
+## Unreleased - Forecast loading overlay
+- Added a dedicated client forecast loading state and staged status model for the Project Atmosphere sync lifecycle.
+- Render the PA loading panel from the vanilla `LoadingOverlay` path so the standard Minecraft loading UI remains visible underneath.
+- Hooked the existing login forecast sync into wait/receive/build/prepare/ready transitions and reset the client state automatically on disconnect.
+- Extended the PA renderer onto the actual world-join loading screens and upgraded the overlay to a centered, dominant progress panel with determinate or animated indeterminate bar states.
+- Reworked the loading overlay into a smaller top-centered status panel so it sits above the vanilla loading UI instead of covering it.
+- Promoted the current PA loading stage to the primary on-screen label and tied progress updates to the real forecast snapshot, cache-build, and finalization milestones used during client sync.
+- Forecast cache application now drains in client-side batches across ticks, allowing the overlay to report visible per-loop progress from the actual biome-profile apply path instead of jumping from wait to ready.
+- Added server-side login preparation stage updates around nearby-region collection and local weather seeding so the overlay advances before the forecast snapshot packet is sent.
+- Added an integrated-world loading bridge so local world startup can push forecast-design stages from the real server generation loops before the later client sync packet phase begins.

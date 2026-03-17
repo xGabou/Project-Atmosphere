@@ -8,6 +8,8 @@ import net.Gabou.projectatmosphere.async.BiomeSampler;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.ToughAsNailsCompat;
 import net.Gabou.projectatmosphere.event.BiomeChangeManager;
+import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
+import net.Gabou.projectatmosphere.client.loading.IntegratedForecastLoadingBridge;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
@@ -95,22 +97,8 @@ public class ForecastGenerator {
     }
 
     static void computeAverageForecastsByBiomeType() {
-        Map<ResourceLocation, float[]> map = new HashMap<>();
-        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
-            List<BiomeForecast> list = entry.getValue();
-            if (list.isEmpty()) continue;
-
-            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), k -> new BiomeForecast());
-            avg.setTemperature(averageWeek(list, BiomeForecast::getTemperature));
-            avg.setHumidity(averageWeek(list, BiomeForecast::getHumidity));
-            avg.setPressure(averageWeek(list, BiomeForecast::getPressure));
-            avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
-            avg.setBiomeKey(list.get(0).getBiomeKey());
-
-            float representative = deriveRepresentativeTemperature(avg);
-            map.put(entry.getKey(), buildFlatCurve(representative));
-        }
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new BiomeDayTemperaturePacket(map));
+        rebuildAverageForecasts();
+        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new BiomeDayTemperaturePacket(createDailyTemperatureSnapshot()));
     }
 
     private static void computeAverageTemperatureWeek() {
@@ -170,6 +158,17 @@ public class ForecastGenerator {
         return AVERAGE_FORECASTS.get(biomeType);
     }
 
+    public static void sendDailyForecastsToPlayer(ServerPlayer player, Map<ResourceLocation, float[]> snapshot) {
+        if (player == null) {
+            return;
+        }
+        NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new BiomeDayTemperaturePacket(snapshot));
+    }
+
+    public static Map<ResourceLocation, float[]> createDailyTemperatureSnapshotForSync() {
+        return createDailyTemperatureSnapshot();
+    }
+
     public static Set<BiomeInstanceKey> getBiomeSamples() {
         return biomeSamples;
     }
@@ -182,7 +181,19 @@ public class ForecastGenerator {
 
 
     static void generateForecastForSavedRegion(ServerLevel level) {
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                "Restoring saved forecast regions",
+                0.34F,
+                "generate_saved_region_restore"
+        );
         buildRegionForecasts();
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Applying sandstorm state",
+                0.82F,
+                "generate_saved_region_sand"
+        );
         SandStormManager.dailyAndSand(level);
     }
 
@@ -258,9 +269,21 @@ public class ForecastGenerator {
                 new HashMap<>(estimatedSamples / 4 + 16);
 
         final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+        int samplingColumns = samplesPerAxis;
+        int samplingIndex = 0;
 
         if (!belowSeaLevel) {
             for (int dx = -RADIUS; dx <= RADIUS; dx += SAMPLE_STEP) {
+                samplingIndex++;
+                if (samplingIndex == 1 || samplingIndex == samplingColumns || samplingIndex % 4 == 0) {
+                    float samplingProgress = 0.16F + (0.22F * samplingIndex / Math.max(1.0F, (float) samplingColumns));
+                    IntegratedForecastLoadingBridge.update(
+                            ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                            "Sampling biome layout " + samplingIndex + " / " + samplingColumns,
+                            samplingProgress,
+                            "generate_region_sampling"
+                    );
+                }
                 final int x = baseX + dx;
                 for (int dz = -RADIUS; dz <= RADIUS; dz += SAMPLE_STEP) {
                     final int z = baseZ + dz;
@@ -328,14 +351,27 @@ public class ForecastGenerator {
 
         // --- Forecast generation phase (temperature / TAN) ---
         final long forecastStart = samplingEnd;
+        int biomeSampleTotal = Math.max(1, biomeSamples.size());
 
         if (CompatHandler.isToughAsNailsLoaded()) {
             // Process each biome only once (as before) using a Set.
             Set<ResourceLocation> processed = new HashSet<>(biomeIndex.size());
+            int totalBiomes = Math.max(1, biomeIndex.size());
+            int processedCount = 0;
             for (BiomeInstanceKey key : biomeSamples) {
                 ResourceLocation biomeId = key.biomeType();
                 if (!processed.add(biomeId)) {
                     continue; // already handled this biome
+                }
+                processedCount++;
+                if (processedCount == 1 || processedCount == totalBiomes || processedCount % 4 == 0) {
+                    float forecastProgress = 0.42F + (0.18F * processedCount / Math.max(1.0F, (float) totalBiomes));
+                    IntegratedForecastLoadingBridge.update(
+                            ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                            "Generating temperature forecast " + processedCount + " / " + totalBiomes,
+                            forecastProgress,
+                            "generate_region_temperature_tan"
+                    );
                 }
 
                 long perBiomeStart = System.nanoTime();
@@ -361,7 +397,18 @@ public class ForecastGenerator {
             groupForecastsByBiome();
         } else {
             // Per-sample temperature generation (kept for semantic equivalence).
+            int processedCount = 0;
             for (BiomeInstanceKey key : biomeSamples) {
+                processedCount++;
+                if (processedCount == 1 || processedCount == biomeSampleTotal || processedCount % 32 == 0) {
+                    float forecastProgress = 0.42F + (0.18F * processedCount / (float) biomeSampleTotal);
+                    IntegratedForecastLoadingBridge.update(
+                            ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                            "Generating temperature forecast " + processedCount + " / " + biomeSampleTotal,
+                            forecastProgress,
+                            "generate_region_temperature"
+                    );
+                }
                 BiomeForecast forecast = new BiomeForecast();
                 forecast.setTemperature(generateTemperature(key, level));
                 forecast.setBiomeKey(key);
@@ -382,7 +429,19 @@ public class ForecastGenerator {
 
         // NOTE: if dailyAndSand touches world state directly, it may need
         // AsyncAtmosphereService.callOnMainThread as well.
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Building forecast regions",
+                0.84F,
+                "generate_region_build_regions"
+        );
         buildRegionForecasts();
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Applying sandstorm state",
+                0.9F,
+                "generate_region_sand"
+        );
         SandStormManager.dailyAndSand(level);
 
         final long end = System.nanoTime();
@@ -408,6 +467,12 @@ public class ForecastGenerator {
     }
 
     private static void computeDependentForecasts(ServerLevel level, long day) {
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Computing humidity forecast",
+                0.66F,
+                "generate_region_humidity"
+        );
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeInstanceKey key = entry.getKey();
             BiomeForecast forecast = entry.getValue();
@@ -415,6 +480,12 @@ public class ForecastGenerator {
         }
         computeAverageHumidityWeek();
 
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Computing pressure forecast",
+                0.72F,
+                "generate_region_pressure"
+        );
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeInstanceKey key = entry.getKey();
             BiomeForecast forecast = entry.getValue();
@@ -422,6 +493,12 @@ public class ForecastGenerator {
         }
         computeAveragePressureWeek();
 
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Computing wind forecast",
+                0.78F,
+                "generate_region_wind"
+        );
         WindGenerator.buildNeighborIndex(getBiomeSamples());
         for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : FORECAST_MAP.entrySet()) {
             BiomeInstanceKey key = entry.getKey();
@@ -491,6 +568,7 @@ public class ForecastGenerator {
     public static void rebuildLoadedForecastIndexes() {
         groupForecastsByBiome();
         groupBiomeByType();
+        AVERAGE_FORECASTS.clear();
     }
 
     static void clearForecasts() {
@@ -782,6 +860,35 @@ public class ForecastGenerator {
             count++;
         }
         return count == 0 ? 0f : sum / count;
+    }
+
+    private static void rebuildAverageForecasts() {
+        AVERAGE_FORECASTS.clear();
+        for (Map.Entry<ResourceLocation, List<BiomeForecast>> entry : grouped.entrySet()) {
+            List<BiomeForecast> list = entry.getValue();
+            if (list.isEmpty()) {
+                continue;
+            }
+
+            BiomeForecast avg = AVERAGE_FORECASTS.computeIfAbsent(entry.getKey(), key -> new BiomeForecast());
+            avg.setTemperature(averageWeek(list, BiomeForecast::getTemperature));
+            avg.setHumidity(averageWeek(list, BiomeForecast::getHumidity));
+            avg.setPressure(averageWeek(list, BiomeForecast::getPressure));
+            avg.setWind(averageWindWeek(list, BiomeForecast::getWind));
+            avg.setBiomeKey(list.get(0).getBiomeKey());
+        }
+    }
+
+    private static Map<ResourceLocation, float[]> createDailyTemperatureSnapshot() {
+        if (AVERAGE_FORECASTS.isEmpty() && !grouped.isEmpty()) {
+            rebuildAverageForecasts();
+        }
+
+        Map<ResourceLocation, float[]> map = new HashMap<>(AVERAGE_FORECASTS.size());
+        for (Map.Entry<ResourceLocation, BiomeForecast> entry : AVERAGE_FORECASTS.entrySet()) {
+            map.put(entry.getKey(), buildFlatCurve(deriveRepresentativeTemperature(entry.getValue())));
+        }
+        return map;
     }
 
 }
