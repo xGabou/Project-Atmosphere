@@ -120,13 +120,13 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     implementation "curse.maven:serene-seasons-291874:6182596"
     implementation "curse.maven:glitchcore-955399:5660740"
-    implementation "curse.maven:betterdays-895618:7015564"
+    implementation "curse.maven:betterdays-895618:7294209"
     implementation "curse.maven:simple-clouds-1121215:6928979"
     //implementation files("libs/Serene Seasons Plus-neoforge-1.21.1-1.21.1-1.0.9.5.jar")
-    implementation "curse.maven:serene-seasons-plus-1288843:7118798"
+    implementation "curse.maven:serene-seasons-plus-1288843:7512515"
     implementation "nonamecrackers2:simplecloudsapi-neoforge:${api_version}"
     compileOnly "curse.maven:tough-as-nails-246391:5833252"
-    compileOnly "curse.maven:cold-sweat-506194:6934631"
+    compileOnly "curse.maven:cold-sweat-506194:7492465"
     runtimeOnly "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:auroras-1105290:6040674"
     implementation "curse.maven:rainboows-1121832:6416604"
