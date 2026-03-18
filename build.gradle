@@ -193,7 +193,7 @@ modrinth {
     changelog = rootProject.file("PAchangelog.md").text
     gameVersions = ["1.21.1"]
     loaders = ["neoforge"]
-    versionType = "alpha"
+    versionType = "beta"
     dependencies {
         required.project "e0bNACJD"
         required.project "4Al4H3t9"
@@ -212,7 +212,7 @@ if (!curseforgeToken) {
         project {
             id = "1258344"
             changelog = rootProject.file("PAchangelog.md")
-            releaseType = "alpha" // options: alpha, beta, release
+            releaseType = "beta" // options: alpha, beta, release
             addGameVersion "1.21.1"
             addGameVersion "NeoForge"
             mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {

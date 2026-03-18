@@ -1,6 +1,7 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 ## Unreleased - Dynamic Forge forecast loading merge
+- Restored the missing client telemetry debug commands on NeoForge by porting `/pa debug export` and `/pa debug open` from the Dynamic-Forge 1.20.1 branch.
 - Ported the Dynamic-Forge forecast sync flow onto NeoForge 1.21.1 using NeoForge payload registration, including staged forecast-loading status packets, batched client cache hydration, and a local client readiness lock.
 - Added a forecast loading overlay on NeoForge loading screens plus client lifecycle hooks so multiplayer login waits for the forecast cache before enabling weather-driven client systems.
 - Matched the NeoForge loading overlay behavior back to the Dynamic-Forge source and restored the original compact panel sizing.
