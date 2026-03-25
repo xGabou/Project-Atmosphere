@@ -24,6 +24,11 @@ public class NetworkHandler {
                 .encoder(SpawnTornadoPacket::encode)
                 .consumerMainThread(SpawnTornadoPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(RemoveTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(RemoveTornadoPacket::decode)
+                .encoder(RemoveTornadoPacket::encode)
+                .consumerMainThread(RemoveTornadoPacket::handle)
+                .add();
         CHANNEL.messageBuilder(SyncWindPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SyncWindPacket::decode)
                 .encoder(SyncWindPacket::encode)

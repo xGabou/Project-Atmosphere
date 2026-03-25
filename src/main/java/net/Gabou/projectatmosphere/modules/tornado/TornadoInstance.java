@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
+import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
@@ -19,6 +21,9 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.UUID;
 
 public class TornadoInstance {
 
@@ -27,12 +32,17 @@ public class TornadoInstance {
     public static final double WIND_SPEED_SCALING_FACTOR= 0.05;
     public static final double WIND_EFFECT_VERTICAL_MAX_OFFSET = 50;
     public static final double WIND_EFFECT_VERTICAL_MIN_OFFSET= -5;
+    private final UUID id;
     public Vec3 position;
     public final long spawnTime;
     public final float radius;
     public final WindVector wind;
+    private float visualBottomY;
+    private float visualHeight;
+    private boolean descriptorMissing;
 
-    private final CloudRegion cloudRegion;
+    @Nullable
+    private CloudRegion cloudRegion;
 
     private float angularSpeed = 0.15f;
     private long lastDemolitionCheck = 0L;
@@ -48,8 +58,21 @@ public class TornadoInstance {
         return level;
     }
 
+    @Nullable
     public CloudRegion getCloudRegion() {
-        return cloudRegion;
+        return this.cloudRegion;
+    }
+
+    public UUID getId() {
+        return this.id;
+    }
+
+    public float getVisualBottomY() {
+        return this.visualBottomY;
+    }
+
+    public float getVisualHeight() {
+        return this.visualHeight;
     }
 
     public double getSuctionRadius() {
@@ -60,11 +83,18 @@ public class TornadoInstance {
         return level.getBaseDamage();
     }
 
-    public TornadoInstance(Vec3 position, float radius, WindVector wind,CloudRegion cloudRegion) {
-        this(position, radius, wind, 0.05f,cloudRegion);
+    public TornadoInstance(Vec3 position, float radius, WindVector wind, @Nullable CloudRegion cloudRegion) {
+        this(UUID.randomUUID(), position, radius, wind, 0.05f, (float)position.y, Math.max(96.0F, radius * 12.0F), cloudRegion);
     }
 
-    public TornadoInstance(Vec3 position, float radius, WindVector wind, float angularSpeed, CloudRegion cloudRegion) {
+    public TornadoInstance(UUID id, Vec3 position, float radius, WindVector wind,
+                           float visualBottomY, float visualHeight, @Nullable CloudRegion cloudRegion) {
+        this(id, position, radius, wind, 0.05f, visualBottomY, visualHeight, cloudRegion);
+    }
+
+    public TornadoInstance(UUID id, Vec3 position, float radius, WindVector wind, float angularSpeed,
+                           float visualBottomY, float visualHeight, @Nullable CloudRegion cloudRegion) {
+        this.id = id;
         this.position = position;
         this.radius = radius;
         this.wind = wind;
@@ -72,7 +102,8 @@ public class TornadoInstance {
         this.spawnTime = System.currentTimeMillis();
         this.level = TornadoLevel.fromWindSpeed(wind.baseSpeed());
         this.cloudRegion = cloudRegion;
-
+        this.visualBottomY = visualBottomY;
+        this.visualHeight = visualHeight;
     }
 
     public float getLifetimeSeconds() {
@@ -83,6 +114,41 @@ public class TornadoInstance {
         long elapsedMs = System.currentTimeMillis() - spawnTime;
         float elapsedTicks = elapsedMs / 100.0f;
         return Mth.clamp(elapsedTicks * angularSpeed,0.5f,5.0f);
+    }
+
+    public void setCloudRegion(@Nullable CloudRegion cloudRegion) {
+        this.cloudRegion = cloudRegion;
+    }
+
+    public boolean isDescriptorMissing() {
+        return this.descriptorMissing;
+    }
+
+    public boolean synchronizeWithDescriptor() {
+        TornadoDescriptor descriptor = this.findDescriptor();
+        if (descriptor == null) {
+            this.descriptorMissing = this.cloudRegion instanceof ITornadoRegion;
+            return false;
+        }
+
+        this.descriptorMissing = false;
+        this.visualBottomY = descriptor.getBottomY();
+        this.visualHeight = descriptor.getHeight();
+        this.position = new Vec3(
+                this.cloudRegion.getWorldX() + descriptor.getOffsetX(),
+                descriptor.getBottomY(),
+                this.cloudRegion.getWorldZ() + descriptor.getOffsetZ()
+        );
+        return true;
+    }
+
+    public void advanceByWind() {
+        float speed = this.wind.baseSpeed() * 0.2f;
+        this.position = this.position.add(
+                Math.cos(this.wind.angleRadians()) * speed,
+                0.0,
+                Math.sin(this.wind.angleRadians()) * speed
+        );
     }
 
     /**
@@ -281,5 +347,13 @@ public class TornadoInstance {
                 0.5f + level.getRandom().nextFloat() * 0.4f,
                 false
         );
+    }
+
+    @Nullable
+    private TornadoDescriptor findDescriptor() {
+        if (!(this.cloudRegion instanceof ITornadoRegion tornadoRegion)) {
+            return null;
+        }
+        return tornadoRegion.findTornado(this.id);
     }
 }

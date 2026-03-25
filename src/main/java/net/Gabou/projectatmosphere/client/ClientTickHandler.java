@@ -57,6 +57,10 @@ public class ClientTickHandler {
         if (event.phase != TickEvent.Phase.END) return;
         if (!ClientSyncLock.isReady()) return;
         if (Minecraft.getInstance().isPaused()) return;
+        if (Minecraft.getInstance().level == null) {
+            TornadoManager.clearClientTornadoes();
+            return;
+        }
 
         SkyEffectState.beginFrame();
         tickCounter++;
@@ -83,7 +87,7 @@ public class ClientTickHandler {
         }
 
         if (mc.level != null) {
-            Set<TornadoInstance> current = new HashSet<>(TornadoManager.getActiveTornadoes());
+            Set<TornadoInstance> current = new HashSet<>(TornadoManager.getClientTornadoes());
             for (TornadoInstance tornado : current) {
                 float baseVol = 0.35f + 0.45f * 0.75f;
                 TornadoAudioClient.ensure(tornado, baseVol, 140f);
@@ -98,8 +102,8 @@ public class ClientTickHandler {
         }
 
         if (mc.level != null && mc.level.getGameTime() % 2 == 0) {
-            for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
-                TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
+            for (TornadoInstance tornado : TornadoManager.getClientTornadoes()) {
+                TornadoClientEffects.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
             }
         }
         if (tickCounter % 40 == 0) {

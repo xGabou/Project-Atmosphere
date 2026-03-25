@@ -6,8 +6,35 @@
   <component name="ChangeListManager">
     <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/temperature/config/BiomeTempConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientRenderHook.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/MyShaders.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoRenderHandler.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoShaders.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/TornadoMesh.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/ProjectAtmosphereCommands.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/command/ProjectAtmosphereCommands.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/SimpleCloudsTornadoSupport.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/CloudMeshGeneratorAccessor.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/MultiRegionCloudMeshGeneratorMixin.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/RegionUpload.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/TornadoUpload.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box.vsh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.fsh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/box_tornado.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.fsh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado.vsh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/simpleclouds/shaders/compute/cloud_regions.comp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/simpleclouds/shaders/compute/cube_mesh.comp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -112,7 +139,7 @@
     </option>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="dynamic-forge-for-dt" />
+        <entry key="$PROJECT_DIR$" value="Dynamic-Forge-1.20.1" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -245,7 +272,7 @@
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;extract.method.default.visibility&quot;: &quot;private&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;Dynamic-Forge-1.20.1&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Dynamic-Forge-1.20.1-Tornado&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
@@ -677,14 +704,9 @@
       <workItem from="1773859314081" duration="68000" />
       <workItem from="1773859401815" duration="118000" />
       <workItem from="1773935226925" duration="2446000" />
-    </task>
-    <task id="LOCAL-00098" summary="feat: disable cloud movement towards player and update related configurations">
-      <option name="closed" value="true" />
-      <created>1756272515958</created>
-      <option name="number" value="00098" />
-      <option name="presentableId" value="LOCAL-00098" />
-      <option name="project" value="LOCAL" />
-      <updated>1756272515958</updated>
+      <workItem from="1774465883952" duration="1396000" />
+      <workItem from="1774467828114" duration="2939000" />
+      <workItem from="1774474013577" duration="4752000" />
     </task>
     <task id="LOCAL-00099" summary="feat: update AtmoConfigScreen layout and improve widget visibility handling">
       <option name="closed" value="true" />
@@ -1070,7 +1092,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773774473295</updated>
     </task>
-    <option name="localTasksCounter" value="147" />
+    <task id="LOCAL-00147" summary="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues">
+      <option name="closed" value="true" />
+      <created>1774465890917</created>
+      <option name="number" value="00147" />
+      <option name="presentableId" value="LOCAL-00147" />
+      <option name="project" value="LOCAL" />
+      <updated>1774465890918</updated>
+    </task>
+    <option name="localTasksCounter" value="148" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1196,11 +1226,6 @@
           <url>jar://$USER_HOME$/.gradle/caches/forge_gradle/deobf_dependencies/nonamecrackers2/simpleclouds/0.7.3+1.20.1-forge_mapped_official_1.20.1/simpleclouds-0.7.3+1.20.1-forge_mapped_official_1.20.1-sources.jar!/dev/nonamecrackers2/simpleclouds/common/data/SimpleCloudsCloudSpawningConfigProvider.java</url>
           <line>35</line>
           <option name="timeStamp" value="327" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java</url>
-          <line>141</line>
-          <option name="timeStamp" value="340" />
         </line-breakpoint>
         <breakpoint type="java-exception">
           <properties class="java.nio.file.NoSuchFileException" package="java.nio.file" />

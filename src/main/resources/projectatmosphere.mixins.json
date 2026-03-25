@@ -13,10 +13,10 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
-    "CloudMeshGeneratorAccessor",
     "MixinSandstormDebugBlocker",
-    "MultiRegionCloudMeshGeneratorMixin",
+    "client.DefaultPipelineTornadoMixin",
     "client.LoadingScreenMixin",
+    "client.ShaderSupportPipelineTornadoMixin",
     "OverwriteDesertSound",
     "SimpleCloudsRendererMixin",
     "client.LoadingOverlayMixin",

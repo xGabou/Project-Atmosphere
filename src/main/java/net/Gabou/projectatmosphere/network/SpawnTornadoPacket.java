@@ -1,41 +1,55 @@
 package net.Gabou.projectatmosphere.network;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkEvent;
 
+import java.util.UUID;
 import java.util.function.Supplier;
 
 public class SpawnTornadoPacket {
+    private final UUID id;
     private final Vec3 pos;
     private final float radius;
+    private final float bottomY;
+    private final float height;
     private final float speed;
     private final float angle;
     private final float gust;
 
-    public SpawnTornadoPacket(Vec3 pos, float radius, WindVector wind) {
+    public SpawnTornadoPacket(UUID id, Vec3 pos, float radius, WindVector wind, float bottomY, float height) {
+        this.id = id;
         this.pos = pos;
         this.radius = radius;
+        this.bottomY = bottomY;
+        this.height = height;
         this.speed = wind.baseSpeed();
         this.angle = wind.angleRadians();
         this.gust = wind.gustSpeed();
     }
 
     public SpawnTornadoPacket(FriendlyByteBuf buf) {
+        this.id = buf.readUUID();
         this.pos = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
         this.radius = buf.readFloat();
+        this.bottomY = buf.readFloat();
+        this.height = buf.readFloat();
         this.speed = buf.readFloat();
         this.angle = buf.readFloat();
         this.gust = buf.readFloat();
     }
 
     public void encode(FriendlyByteBuf buf) {
+        buf.writeUUID(this.id);
         buf.writeDouble(pos.x);
         buf.writeDouble(pos.y);
         buf.writeDouble(pos.z);
         buf.writeFloat(radius);
+        buf.writeFloat(bottomY);
+        buf.writeFloat(height);
         buf.writeFloat(speed);
         buf.writeFloat(angle);
         buf.writeFloat(gust);
@@ -47,7 +61,20 @@ public class SpawnTornadoPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            TornadoManager.spawnClient(pos, radius, new WindVector(speed, angle, gust));
+            if (ProjectAtmosphere.DEBUG_MODE) {
+                ProjectAtmosphere.LOGGER.info(
+                        "[TornadoDebug] Client received SpawnTornadoPacket id={} pos={} radius={} bottomY={} height={} speed={} angle={} gust={}",
+                        this.id,
+                        this.pos,
+                        this.radius,
+                        this.bottomY,
+                        this.height,
+                        this.speed,
+                        this.angle,
+                        this.gust
+                );
+            }
+            TornadoManager.spawnClient(id, pos, radius, new WindVector(speed, angle, gust), bottomY, height);
         });
         ctx.get().setPacketHandled(true);
     }

@@ -74,7 +74,22 @@ mixin {
 
 
 repositories {
-    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    maven {
+        name = 'MinecraftForge'
+        url = 'https://maven.minecraftforge.net/'
+        content {
+            includeGroupByRegex('net\\.minecraftforge.*')
+            includeGroup('cpw.mods')
+        }
+    }
+    maven {
+        name = 'Sponge'
+        url = 'https://repo.spongepowered.org/repository/maven-public/'
+        content {
+            includeGroupByRegex('org\\.spongepowered.*')
+        }
+    }
+    mavenCentral()
     maven { url "https://maven.blamejared.com/" }
     maven {
         url "https://www.cursemaven.com"

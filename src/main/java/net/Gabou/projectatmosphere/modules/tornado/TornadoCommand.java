@@ -4,10 +4,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
-import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
-import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -16,15 +13,12 @@ import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 public class TornadoCommand {
-    private static final ResourceLocation PROJECTATMOSPHERE$TORNADO_CONTROLLER =
-            new ResourceLocation(ProjectAtmosphere.MODID, "command_spawn");
     private static final String PROJECTATMOSPHERE$CUMULONIMBUS_ID = "simpleclouds:cumulonimbus";
     private static final int PROJECTATMOSPHERE$SEARCH_RADIUS = 10;
     private static final float PROJECTATMOSPHERE$DEFAULT_RADIUS = 10.0F;
@@ -56,12 +50,12 @@ public class TornadoCommand {
 
                     CloudRegion existing = projectatmosphere$findCumulonimbus(level, tornadoPos);
                     if (existing != null) {
-                        if (projectatmosphere$attachDescriptor(level, existing, tornadoPos)) {
+                        if (TornadoManager.spawnServer(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
                             ctx.getSource().sendSuccess(
                                     () -> Component.literal("ðŸŒªï¸ Tornado engaged using SimpleClouds cumulonimbus."), true);
                             return 1;
                         }
-                        projectatmosphere$awaitCloud(ctx.getSource(), level, tornadoPos, PROJECTATMOSPHERE$AWAIT_POLLS);
+                        projectatmosphere$awaitCloud(ctx.getSource(), level, tornadoPos, wind, PROJECTATMOSPHERE$AWAIT_POLLS);
                         return 1;
                     }
 
@@ -70,11 +64,11 @@ public class TornadoCommand {
                     if (spawnedRegion != null) {
                         CommandSourceStack source = ctx.getSource();
                         DelayedTaskScheduler.schedule(PROJECTATMOSPHERE$SPAWN_DELAY_TICKS, () -> {
-                            if (projectatmosphere$attachDescriptor(level, spawnedRegion, tornadoPos)) {
+                            if (TornadoManager.spawnServer(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
                                 source.sendSuccess(
                                         () -> Component.literal("ðŸŒªï¸ Tornado engaged once the seeded cumulonimbus matured."), true);
                             } else {
-                                projectatmosphere$awaitCloud(source, level, tornadoPos, PROJECTATMOSPHERE$AWAIT_POLLS);
+                                projectatmosphere$awaitCloud(source, level, tornadoPos, wind, PROJECTATMOSPHERE$AWAIT_POLLS);
                             }
                         });
                         ctx.getSource().sendSuccess(
@@ -82,7 +76,7 @@ public class TornadoCommand {
                         return 1;
                     }
 
-                    projectatmosphere$awaitCloud(ctx.getSource(), level, tornadoPos, PROJECTATMOSPHERE$AWAIT_POLLS);
+                    projectatmosphere$awaitCloud(ctx.getSource(), level, tornadoPos, wind, PROJECTATMOSPHERE$AWAIT_POLLS);
                     return 1;
                 });
 
@@ -94,7 +88,6 @@ public class TornadoCommand {
         root.then(Commands.literal("cleartornadoes")
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
-                    ServerLevel level = ctx.getSource().getLevel();
                     TornadoManager.clearTornadoes();
                     ctx.getSource().sendSuccess(
                             () -> Component.literal("ðŸŒªï¸ All tornadoes cleared."), true);
@@ -128,6 +121,7 @@ public class TornadoCommand {
     private static void projectatmosphere$awaitCloud(CommandSourceStack source,
                                                      ServerLevel level,
                                                      Vec3 tornadoPos,
+                                                     net.Gabou.projectatmosphere.modules.core.WindVector wind,
                                                      int remainingPolls) {
         if (remainingPolls <= 0) {
             source.sendFailure(Component.literal("âš ï¸ No SimpleClouds cumulonimbus became available for this tornado."));
@@ -135,13 +129,13 @@ public class TornadoCommand {
         }
         DelayedTaskScheduler.schedule(PROJECTATMOSPHERE$AWAIT_INTERVAL, () -> {
             CloudRegion region = projectatmosphere$findCumulonimbus(level, tornadoPos);
-            if (region != null && projectatmosphere$attachDescriptor(level, region, tornadoPos)) {
+            if (region != null && TornadoManager.spawnServer(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
                 source.sendSuccess(
                         () -> Component.literal("ðŸŒªï¸ Tornado engaged once a SimpleClouds cumulonimbus entered range."), true);
                 return;
             }
             if (remainingPolls - 1 > 0) {
-                projectatmosphere$awaitCloud(source, level, tornadoPos, remainingPolls - 1);
+                projectatmosphere$awaitCloud(source, level, tornadoPos, wind, remainingPolls - 1);
             } else {
                 source.sendFailure(Component.literal("âš ï¸ Timed out waiting for a suitable SimpleClouds cumulonimbus."));
             }
@@ -160,31 +154,5 @@ public class TornadoCommand {
             }
         }
         return null;
-    }
-
-    private static boolean projectatmosphere$attachDescriptor(ServerLevel level, CloudRegion region, Vec3 tornadoPos) {
-        if (!(region instanceof ITornadoRegion tornadoRegion)) {
-            return false;
-        }
-        float offsetX = (float) (tornadoPos.x - region.getWorldX());
-        float offsetZ = (float) (tornadoPos.z - region.getWorldZ());
-        float cappedRadius = (float) Math.max(2.0F,
-                Math.min(PROJECTATMOSPHERE$DEFAULT_RADIUS, region.getWorldRadius()));
-        float bottom = (float) Math.min(tornadoPos.y, level.getSeaLevel());
-        float height = Math.max(80.0F, cappedRadius * 12.0F);
-        tornadoRegion.getTornadoes().removeIf(descriptor ->
-                PROJECTATMOSPHERE$TORNADO_CONTROLLER.equals(descriptor.getControllerId()));
-        TornadoDescriptor descriptor = new TornadoDescriptor(
-                PROJECTATMOSPHERE$TORNADO_CONTROLLER,
-                offsetX,
-                offsetZ,
-                0.0F,
-                0.0F,
-                cappedRadius,
-                bottom,
-                height
-        );
-        tornadoRegion.addTornado(descriptor);
-        return true;
     }
 }
