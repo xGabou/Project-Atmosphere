@@ -8,6 +8,7 @@ This file records functionality additions/removals made during development sessi
 - Updated IntelliJ project settings to use the existing `temurin-17 (2)` SDK for Gradle import and changed the leftover module bytecode target from Java 21 back to Java 17.
 - Stopped the forecast loading overlay from injecting into `ProgressScreen` and `GenericDirtMessageScreen`, so it no longer renders during save-world and generic dirt/progress screens while still appearing on actual world-loading screens.
 - Moved the forecast loading overlay higher on the screen to avoid overlapping vanilla loading text and progress elements.
+- Replaced every `tfc:*` biome temperature block in `BiomeTempConfig` with the new seasonal min/max dataset and removed obsolete TFC keys that were not part of the provided list.
 ## Unreleased - Release notes refresh
 - Replaced `PAchangelog.md` with updated platform-ready release notes for Discord, CurseForge, and Modrinth covering the current `0.8.0.0` forecast/runtime refactor, telemetry, coupling, and compatibility work.
 ## Unreleased - Telemetry Instant serialization fix
