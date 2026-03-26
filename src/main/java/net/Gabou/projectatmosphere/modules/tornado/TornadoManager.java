@@ -52,6 +52,7 @@ public class TornadoManager {
                 wind.angleRadians(),
                 wind.gustSpeed(),
                 Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F),
+                0.0F,
                 net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase.FORMING
         ));
     }

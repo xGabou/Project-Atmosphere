@@ -19,12 +19,16 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.UUID;
 
 public class TornadoInstance {
@@ -33,11 +37,17 @@ public class TornadoInstance {
     public static final double WIND_SPEED_SCALING_FACTOR = 0.05D;
     public static final double WIND_EFFECT_VERTICAL_MAX_OFFSET = 50.0D;
     public static final double WIND_EFFECT_VERTICAL_MIN_OFFSET = -5.0D;
-    private static final int AMBIENT_WIND_INTERVAL_TICKS = 40;
+    private static final int FLOW_FIELD_INTERVAL_TICKS = 2;
     private static final int DEMOLITION_INTERVAL_TICKS = 20;
     private static final float MIN_EFFECTIVE_WIND = 73.0F;
     private static final float MAX_EFFECTIVE_WIND = 260.0F;
     private static final float RANKINE_FACTOR = 4.5F;
+    private static final float OUTER_FLOW_RADIUS_FACTOR = 1.30F;
+    private static final float MID_SHELL_CENTER = 0.44F;
+    private static final float MID_SHELL_WIDTH = 0.24F;
+    private static final float CORE_ZONE_END = 0.22F;
+    private static final float PLUME_FLOW_START = 0.70F;
+    private static final float EJECTION_START_HEIGHT = 0.84F;
 
     private final UUID id;
     public Vec3 position;
@@ -64,6 +74,8 @@ public class TornadoInstance {
     private float anchorX;
     private float anchorZ;
     private StormLifecyclePhase phase;
+    private float recentDebrisScore;
+    private final Map<Integer, CapturedEntityState> capturedEntities = new HashMap<>();
 
     @Nullable
     private CloudRegion cloudRegion;
@@ -130,6 +142,10 @@ public class TornadoInstance {
         return this.phase;
     }
 
+    public float getRecentDebrisScore() {
+        return this.recentDebrisScore;
+    }
+
     public TornadoLevel getLevel() {
         return TornadoLevel.fromWindSpeed(this.getEffectiveWindSpeed());
     }
@@ -176,12 +192,14 @@ public class TornadoInstance {
 
         WindVector sampledWind = ForecastOrchestrator.getWind(level, BlockPos.containing(this.position), gameTime);
         this.wind = sampledWind;
+        this.recentDebrisScore = Math.max(0.0F, this.recentDebrisScore - 0.015F);
+        this.pruneCapturedEntities(level);
         this.tickLifecycle();
         this.updateMovement(gameTime);
         this.pushStateToDescriptor();
 
         if (this.phase == StormLifecyclePhase.ACTIVE || this.phase == StormLifecyclePhase.DISSIPATING) {
-            if (gameTime - this.lastAmbientWindTick >= AMBIENT_WIND_INTERVAL_TICKS) {
+            if (gameTime - this.lastAmbientWindTick >= FLOW_FIELD_INTERVAL_TICKS) {
                 this.lastAmbientWindTick = gameTime;
                 this.applyAmbientWind(level);
             }
@@ -214,6 +232,7 @@ public class TornadoInstance {
                 this.wind.angleRadians(),
                 this.wind.gustSpeed(),
                 this.normalizedIntensity,
+                this.recentDebrisScore,
                 this.phase
         );
     }
@@ -225,6 +244,7 @@ public class TornadoInstance {
         this.visualHeight = snapshot.visualHeight();
         this.wind = new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust());
         this.normalizedIntensity = snapshot.normalizedIntensity();
+        this.recentDebrisScore = snapshot.recentDebrisScore();
         this.phase = snapshot.phase();
         this.cloudRegion = region;
         this.anchorX = (float) this.position.x;
@@ -372,6 +392,7 @@ public class TornadoInstance {
         it.unimi.dsi.fastutil.longs.LongArrayList toDestroy = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
         it.unimi.dsi.fastutil.longs.LongArrayList toDestroyGlass = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
         it.unimi.dsi.fastutil.longs.LongArrayList toDestroyWeak = new it.unimi.dsi.fastutil.longs.LongArrayList(1024);
+        it.unimi.dsi.fastutil.longs.LongArrayList toScourGrass = new it.unimi.dsi.fastutil.longs.LongArrayList(1024);
 
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             if (!level.isLoaded(pos)) {
@@ -406,6 +427,12 @@ public class TornadoInstance {
                         toDestroyGlass.add(pos.asLong());
                     }
                 } else if (state.getFluidState().isEmpty()) {
+                    if (state.is(Blocks.GRASS_BLOCK)) {
+                        float scourChance = Mth.clamp((windEffect - 48.0F) / 110.0F, 0.0F, 1.0F) * (0.08F + this.normalizedIntensity * 0.18F);
+                        if (random.nextFloat() < scourChance) {
+                            toScourGrass.add(pos.asLong());
+                        }
+                    }
                     float destroySpeed = state.getDestroySpeed(level, pos);
                     if (destroySpeed >= 0.0F && destroySpeed <= 1.0F) {
                         float chance = Mth.clamp((windEffect - 85.0F) / 90.0F, 0.0F, 1.0F) * (0.03F + this.normalizedIntensity * 0.08F);
@@ -427,13 +454,23 @@ public class TornadoInstance {
         if (!toDestroyWeak.isEmpty()) {
             AsyncAtmosphereService.runOnMainThread(() -> this.processWeakDestruction(level, toDestroyWeak, perTick));
         }
+        if (!toScourGrass.isEmpty()) {
+            AsyncAtmosphereService.runOnMainThread(() -> this.processGrassScouring(level, toScourGrass, perTick));
+        }
         if (!toDestroyGlass.isEmpty()) {
             GlassDamageManager.damageGlass(level, toDestroyGlass);
         }
+        float debrisGain = Math.min(1.0F,
+                toDestroy.size() * 0.012F
+                        + toDestroyWeak.size() * 0.020F
+                        + toScourGrass.size() * 0.010F
+                        + toDestroyGlass.size() * 0.028F);
+        this.recentDebrisScore = Mth.clamp(this.recentDebrisScore + debrisGain, 0.0F, 1.0F);
     }
 
     private int destroyCursor = 0;
     private int weakDestroyCursor = 0;
+    private int grassScourCursor = 0;
 
     private void processLeafLogDestruction(ServerLevel level,
                                            it.unimi.dsi.fastutil.longs.LongArrayList list,
@@ -496,6 +533,35 @@ public class TornadoInstance {
             level.getServer().execute(() -> this.processWeakDestruction(level, list, perTick));
         } else {
             this.weakDestroyCursor = 0;
+        }
+    }
+
+    private void processGrassScouring(ServerLevel level,
+                                      it.unimi.dsi.fastutil.longs.LongArrayList list,
+                                      int perTick) {
+        if (this.grassScourCursor >= list.size()) {
+            this.grassScourCursor = 0;
+            return;
+        }
+
+        int end = Math.min(this.grassScourCursor + perTick, list.size());
+        for (int i = this.grassScourCursor; i < end; i++) {
+            BlockPos pos = BlockPos.of(list.getLong(i));
+            if (!level.isLoaded(pos)) {
+                continue;
+            }
+
+            BlockState state = level.getBlockState(pos);
+            if (state.is(Blocks.GRASS_BLOCK)) {
+                level.setBlockAndUpdate(pos, Blocks.DIRT.defaultBlockState());
+            }
+        }
+
+        this.grassScourCursor = end;
+        if (this.grassScourCursor < list.size()) {
+            level.getServer().execute(() -> this.processGrassScouring(level, list, perTick));
+        } else {
+            this.grassScourCursor = 0;
         }
     }
 
@@ -569,6 +635,7 @@ public class TornadoInstance {
 
     private void pullEntity(Entity entity, float multiplier) {
         float windfieldWidth = this.getWindfieldWidth();
+        CapturedEntityState captured = this.capturedEntities.get(entity.getId());
         int worldHeight = entity.level().getHeight(
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
                 entity.blockPosition().getX(),
@@ -580,7 +647,8 @@ public class TornadoInstance {
 
         Vec3 targetPos = new Vec3(this.position.x, entity.position().y, this.position.z);
         double dist = entity.position().distanceTo(targetPos);
-        if (dist > windfieldWidth) {
+        double maxInfluenceDistance = windfieldWidth * (captured != null ? 1.28D : OUTER_FLOW_RADIUS_FACTOR);
+        if (dist > maxInfluenceDistance) {
             return;
         }
 
@@ -605,28 +673,102 @@ public class TornadoInstance {
         }
 
         double windEffect = this.getWindEffect(entity.position());
-        if (windEffect < 30.0D) {
+        if (windEffect < (captured != null ? 16.0D : 24.0D)) {
             return;
+        }
+
+        float radialNorm = Mth.clamp((float) (dist / Math.max(windfieldWidth, 0.001F)), 0.0F, 1.35F);
+        float heightNorm = Mth.clamp((float) ((entity.getY() - this.visualBottomY) / Math.max(this.visualHeight, 1.0F)), 0.0F, 1.15F);
+        float outerReach = 1.0F - smoothStep(0.68F, 1.10F, radialNorm);
+        float shellZone = 1.0F - Mth.clamp(Math.abs(radialNorm - MID_SHELL_CENTER) / MID_SHELL_WIDTH, 0.0F, 1.0F);
+        float coreZone = 1.0F - smoothStep(0.05F, CORE_ZONE_END, radialNorm);
+        float plumeZone = smoothStep(PLUME_FLOW_START, 0.98F, heightNorm);
+        boolean shouldCapture = dist <= windfieldWidth * 1.02F || (outerReach > 0.08F && windEffect >= 38.0D);
+        if (captured == null && shouldCapture) {
+            captured = this.createCaptureState(entity, windfieldWidth, dist);
+            this.capturedEntities.put(entity.getId(), captured);
         }
 
         double effectStrength = Mth.clamp(
                 (float) ((windEffect - 25.0D) / Math.max(this.getEffectiveWindSpeed() * 1.15F, 130.0F)),
                 0.0F,
                 1.0F
-        ) * multiplier * (0.85D + this.normalizedIntensity * 1.1D);
+        ) * multiplier * (1.05D + this.normalizedIntensity * 1.35D);
 
-        double pullFactor = 4.0D;
-        pullFactor -= Math.max(heightDifference, 0.0D) / 70.0D * 3.0D;
-        pullFactor /= Math.max(this.radius / 60.0F, 1.0F);
-        if (dist <= windfieldWidth / (RANKINE_FACTOR * 2.0F)) {
-            pullFactor = -1.2D;
+        Vec3 add;
+        boolean releaseCapture = false;
+        if (captured != null) {
+            captured.lastSeenAge = this.ageTicks;
+            captured.captureTicks++;
+            float captureProgress = smoothStep(4.0F, 22.0F, captured.captureTicks);
+            float transportProgress = smoothStep(18.0F, 70.0F, captured.captureTicks);
+            if (!captured.expelling && (heightNorm >= EJECTION_START_HEIGHT || captured.captureTicks > 120)) {
+                captured.expelling = true;
+            }
+            float desiredBand = Mth.clamp(
+                    Mth.lerp(transportProgress, 0.20F + shellZone * 0.04F, Mth.lerp(plumeZone, 0.42F, 0.58F + plumeZone * 0.12F)),
+                    0.16F,
+                    0.72F
+            );
+            captured.radialBand = Mth.lerp(0.22F, captured.radialBand, desiredBand);
+            captured.orbitAngle += (0.22F + this.normalizedIntensity * 0.20F + shellZone * 0.24F + transportProgress * 0.18F)
+                    * (1.0F - plumeZone * 0.22F)
+                    * captured.orbitBias;
+
+            double desiredRadius = windfieldWidth * captured.radialBand;
+            double desiredHeight = this.visualBottomY + this.visualHeight * Mth.clamp(
+                    heightNorm + 0.02F + captured.liftBias * 0.04F + plumeZone * 0.05F + captureProgress * 0.08F + transportProgress * 0.14F,
+                    0.04F,
+                    1.04F
+            );
+            Vec3 orbitTarget = new Vec3(
+                    Math.cos(captured.orbitAngle) * desiredRadius,
+                    desiredHeight,
+                    Math.sin(captured.orbitAngle) * desiredRadius
+            ).add(this.position.x, 0.0D, this.position.z);
+            Vec3 towardOrbit = orbitTarget.subtract(entity.position());
+            Vec3 orbitCorrection = towardOrbit.lengthSqr() > 1.0E-4 ? towardOrbit.normalize() : Vec3.ZERO;
+            double inwardStrength = captured.expelling
+                    ? -0.10D
+                    : Mth.lerp(captureProgress, 1.85D + outerReach * 0.80D + shellZone * 0.35D, 0.22D + shellZone * 0.22D - coreZone * 0.08D);
+            double liftStrength = captured.expelling
+                    ? effectStrength * (0.24D + plumeZone * 0.18D)
+                    : (0.03D + captured.liftBias * 0.10D + plumeZone * 0.10D + captureProgress * 0.18D + transportProgress * 0.34D) * effectStrength;
+            double tangentialStrength = captured.expelling
+                    ? effectStrength * (0.65D + plumeZone * 0.18D)
+                    : effectStrength * (0.70D + shellZone * 1.45D + captured.orbitBias * 0.42D + transportProgress * 1.05D);
+            double ejectFactor = captured.expelling
+                    ? 1.15D + plumeZone * 0.55D
+                    : 0.0D;
+            Vec3 outward = inward.scale(-1.0D);
+
+            add = orbitCorrection.scale(effectStrength * 1.15D)
+                    .add(rotational.scale(tangentialStrength))
+                    .add(inward.scale(effectStrength * inwardStrength))
+                    .add(outward.scale(effectStrength * ejectFactor))
+                    .add(0.0D, liftStrength, 0.0D)
+                    .scale(captured.expelling ? 0.105D : 0.112D);
+            releaseCapture = captured.expelling && (heightNorm > 0.98F || dist > windfieldWidth * 1.18F);
+        } else {
+            double suctionStrength = 1.60D + outerReach * 2.35D + shellZone * 0.40D - coreZone * 0.15D;
+            double tangentialStrength = 0.32D + shellZone * 0.72D + plumeZone * 0.10D;
+            double liftStrength = 0.02D + shellZone * 0.05D + plumeZone * 0.08D;
+
+            add = inward.scale(effectStrength * suctionStrength)
+                    .add(rotational.scale(effectStrength * tangentialStrength))
+                    .add(0.0D, effectStrength * liftStrength, 0.0D)
+                    .scale(0.096D + this.normalizedIntensity * 0.034D);
         }
-
-        Vec3 add = inward.scale(effectStrength * pullFactor)
-                .add(rotational.scale(effectStrength * 1.25D))
-                .add(0.0D, effectStrength * 0.95D, 0.0D)
-                .scale(0.075D);
-        entity.addDeltaMovement(add);
+        if (captured != null) {
+            Vec3 current = entity.getDeltaMovement();
+            Vec3 damped = new Vec3(current.x * 0.55D, Math.max(current.y * 0.70D, -0.12D), current.z * 0.55D);
+            entity.setDeltaMovement(damped.add(add));
+        } else {
+            entity.addDeltaMovement(add);
+        }
+        if (releaseCapture) {
+            this.capturedEntities.remove(entity.getId());
+        }
         if (entity instanceof Player) {
             entity.hurtMarked = true;
         }
@@ -635,7 +777,59 @@ public class TornadoInstance {
         }
     }
 
+    private CapturedEntityState createCaptureState(Entity entity, float windfieldWidth, double dist) {
+        double angle = Math.atan2(entity.getZ() - this.position.z, entity.getX() - this.position.x);
+        float band = Mth.clamp((float) (dist / Math.max(windfieldWidth, 0.001F)), 0.28F, 0.56F);
+        float orbitBias = 0.85F + (float) StormMotionModel.noise01(this.id, this.ageTicks + entity.getId(), 0.11F) * 0.65F;
+        float liftBias = 0.45F + (float) StormMotionModel.noise01(this.id, this.ageTicks + entity.getId() * 3L, 0.07F) * 0.55F;
+        return new CapturedEntityState(angle, band, orbitBias, liftBias, this.ageTicks, 0);
+    }
+
+    private void pruneCapturedEntities(ServerLevel level) {
+        Iterator<Map.Entry<Integer, CapturedEntityState>> iterator = this.capturedEntities.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Integer, CapturedEntityState> entry = iterator.next();
+            Entity entity = level.getEntity(entry.getKey());
+            if (entity == null || !entity.isAlive()) {
+                iterator.remove();
+                continue;
+            }
+            CapturedEntityState state = entry.getValue();
+            if ((this.ageTicks - state.lastSeenAge) > 18) {
+                iterator.remove();
+            }
+        }
+    }
+
     private float getEffectiveWindSpeed() {
         return Mth.lerp(this.normalizedIntensity, MIN_EFFECTIVE_WIND, MAX_EFFECTIVE_WIND);
+    }
+
+    private static final class CapturedEntityState {
+        private double orbitAngle;
+        private float radialBand;
+        private final float orbitBias;
+        private final float liftBias;
+        private int lastSeenAge;
+        private int captureTicks;
+        private boolean expelling;
+
+        private CapturedEntityState(double orbitAngle, float radialBand, float orbitBias, float liftBias, int lastSeenAge, int captureTicks) {
+            this.orbitAngle = orbitAngle;
+            this.radialBand = radialBand;
+            this.orbitBias = orbitBias;
+            this.liftBias = liftBias;
+            this.lastSeenAge = lastSeenAge;
+            this.captureTicks = captureTicks;
+            this.expelling = false;
+        }
+    }
+
+    private static float smoothStep(float edge0, float edge1, float value) {
+        if (edge0 == edge1) {
+            return value < edge0 ? 0.0F : 1.0F;
+        }
+        float t = Mth.clamp((value - edge0) / (edge1 - edge0), 0.0F, 1.0F);
+        return t * t * (3.0F - 2.0F * t);
     }
 }

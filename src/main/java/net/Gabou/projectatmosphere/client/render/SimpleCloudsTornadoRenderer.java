@@ -65,6 +65,9 @@ public final class SimpleCloudsTornadoRenderer {
     private static final float PLUME_BODY_REDUCTION = 0.55F;
     private static final float UPPER_BRIGHTEN_START = 0.70F;
     private static final float UPPER_BRIGHTEN_GAIN = 0.20F;
+    private static final float SPIRAL_MODULATION_STRENGTH = 0.18F;
+    private static final float SPIRAL_MODULATION_BANDS = 4.10F;
+    private static final float SPIRAL_MODULATION_SCROLL = 2.60F;
     private static final float MOUTH_FADE_END = 0.08F;
     private static final float TOP_FADE_START = 0.985F;
     private static final float BRIGHTNESS_BASE = 0.46F;
@@ -472,12 +475,16 @@ public final class SimpleCloudsTornadoRenderer {
                 localY * NOISE_VERTICAL_SECONDARY + 11.0F,
                 qz * NOISE_SCALE_SECONDARY - 9.0F - advectZ * 1.3F
         ) * NOISE_SECONDARY_WEIGHT;
+        float shellMask = 1.0F - Mth.clamp(Math.abs(radialDistance - funnelRadius) / Math.max(shellWidth, 0.001F), 0.0F, 1.0F);
+        float spiralPhase = (float) Math.atan2(qz, qx) * SPIRAL_MODULATION_BANDS - localY * 2.15F - animationTime * SPIRAL_MODULATION_SCROLL;
+        float spiralRidge = 1.0F - Mth.abs(Mth.sin(spiralPhase));
+        float spiralContrast = (spiralRidge - 0.45F) * SPIRAL_MODULATION_STRENGTH * shellMask * (1.0F - plumeBlend * 0.30F);
         float bodyBreakup = shellBreakup * BODY_BREAKUP_STRENGTH;
 
         float mouthFade = smoothstep(0.0F, MOUTH_FADE_END, y01);
         float topFade = 1.0F - smoothstep(TOP_FADE_START, 1.0F, y01);
         float plumeBodyStrength = Mth.lerp(plumeBlend, BODY_DENSITY_STRENGTH, BODY_DENSITY_STRENGTH * PLUME_BODY_REDUCTION);
-        float density = Math.max(shell + shellBreakup, Math.max(body * plumeBodyStrength + bodyBreakup, core));
+        float density = Math.max(shell + shellBreakup + spiralContrast, Math.max(body * plumeBodyStrength + bodyBreakup, core));
         return (density - DENSITY_BIAS) * mouthFade * topFade;
     }
 

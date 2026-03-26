@@ -4,20 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement tornado client effects, enhance tornado management, and update Gradle build configuration">
-      <change afterPath="$PROJECT_DIR$/pmweather_tornado_extraction_export.zip" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add storm lifecycle and regional weather phases, enhance hurricane management, and implement synchronization packets">
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoClientEffects.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoClientEffects.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/SimpleCloudsTornadoRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/SimpleCloudsTornadoRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneInstance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/render/HurricaneStateProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/render/HurricaneStateProvider.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSnapshot.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSnapshot.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticle.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticle.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticleData.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/particles/DebrisParticleData.java" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -691,15 +685,7 @@
       <workItem from="1774467828114" duration="2939000" />
       <workItem from="1774474013577" duration="9820000" />
       <workItem from="1774486500133" duration="5395000" />
-      <workItem from="1774540161727" duration="4337000" />
-    </task>
-    <task id="LOCAL-00100" summary="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects">
-      <option name="closed" value="true" />
-      <created>1756710295260</created>
-      <option name="number" value="00100" />
-      <option name="presentableId" value="LOCAL-00100" />
-      <option name="project" value="LOCAL" />
-      <updated>1756710295260</updated>
+      <workItem from="1774540161727" duration="11611000" />
     </task>
     <task id="LOCAL-00101" summary="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects">
       <option name="closed" value="true" />
@@ -1085,7 +1071,15 @@
       <option name="project" value="LOCAL" />
       <updated>1774478780563</updated>
     </task>
-    <option name="localTasksCounter" value="149" />
+    <task id="LOCAL-00149" summary="feat: add storm lifecycle and regional weather phases, enhance hurricane management, and implement synchronization packets">
+      <option name="closed" value="true" />
+      <created>1774549532033</created>
+      <option name="number" value="00149" />
+      <option name="presentableId" value="LOCAL-00149" />
+      <option name="project" value="LOCAL" />
+      <updated>1774549532034</updated>
+    </task>
+    <option name="localTasksCounter" value="150" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1134,7 +1128,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: add imperial units display option for temperature, wind speed, and pressure" />
     <MESSAGE value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
     <MESSAGE value="feat: update barometer and humidimeter models, add hygrometer, and increment version to 0.5.5.4" />
     <MESSAGE value="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands" />
@@ -1159,7 +1152,8 @@
     <MESSAGE value="feat: implement forecast loading system with overlay rendering and state management" />
     <MESSAGE value="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues" />
     <MESSAGE value="feat: implement tornado client effects, enhance tornado management, and update Gradle build configuration" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: implement tornado client effects, enhance tornado management, and update Gradle build configuration" />
+    <MESSAGE value="feat: add storm lifecycle and regional weather phases, enhance hurricane management, and implement synchronization packets" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add storm lifecycle and regional weather phases, enhance hurricane management, and implement synchronization packets" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

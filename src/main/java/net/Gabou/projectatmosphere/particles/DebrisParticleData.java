@@ -12,8 +12,9 @@ import net.minecraft.network.FriendlyByteBuf;
  * Particle data for {@link DebrisParticle}.
  * This implementation is client-only and does not support network or command serialization.
  */
-public record DebrisParticleData(TornadoInstance tornado, double radius, double height, float angularSpeed) implements ParticleOptions {
-    public static final Codec<DebrisParticleData> CODEC = Codec.unit(new DebrisParticleData(null, 0, 0, 0));
+public record DebrisParticleData(TornadoInstance tornado, double radius, double height, float angularSpeed,
+                                 float verticalDrift, float radialJitter, int band) implements ParticleOptions {
+    public static final Codec<DebrisParticleData> CODEC = Codec.unit(new DebrisParticleData(null, 0, 0, 0, 0, 0, 0));
 
     public static final Deserializer<DebrisParticleData> DESERIALIZER = new Deserializer<>() {
         @Override
