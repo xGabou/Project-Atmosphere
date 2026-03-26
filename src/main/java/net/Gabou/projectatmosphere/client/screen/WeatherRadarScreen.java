@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.client.screen;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
@@ -107,7 +106,7 @@ public class WeatherRadarScreen extends Screen {
             fillEllipse(guiGraphics, x, y, Math.max(2, r), Math.max(2, (int) (r * 0.7f)), color);
         }
 
-        for (HurricaneInstance h : HurricaneManager.getActiveHurricanes()) {
+        for (var h : HurricaneManager.getClientHurricanes()) {
             float dx = (float) ((h.position.x - player.getX()) / scale);
             float dz = (float) ((h.position.z - player.getZ()) / scale);
             int r = Math.max(3, Math.round(h.radius / scale));

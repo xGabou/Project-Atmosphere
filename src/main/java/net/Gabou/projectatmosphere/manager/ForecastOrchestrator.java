@@ -14,6 +14,8 @@ import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
+import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
+import net.Gabou.projectatmosphere.modules.weather.ServerWeatherStateResolver;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.region.RegionOrchestratorBootstrap;
@@ -640,6 +642,10 @@ public class ForecastOrchestrator {
             return 0f;
         }
         return region.sampleStorm(tick);
+    }
+
+    public static RegionalWeatherPhase getWeatherPhase(ServerLevel level, RegionInstanceKey key, long tick) {
+        return ServerWeatherStateResolver.resolve(level, key, tick);
     }
 
     public static void tick(ServerLevel level) {

@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.render;
 
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 
 public final class HurricaneStateProvider {
     private HurricaneStateProvider() {}
@@ -12,17 +12,17 @@ public final class HurricaneStateProvider {
      * dividing by the cloud scale.
      */
     public static HurricaneStateCloudSpace getActive(double camX, double camZ) {
-        var s = ForecastOrchestrator.getActiveHurricane();
-        if (s == null) {
+        var hurricane = HurricaneManager.getPrimaryClientHurricane();
+        if (hurricane == null) {
             return null;
         }
 
         double scale = SimpleCloudsCompat.getCloudScale();
         return new HurricaneStateCloudSpace(
-            (s.centerX() - camX) / scale,
-            (s.centerZ() - camZ) / scale,
-            s.eyeRadius() / scale,
-            s.eyewallFade() / scale
+            (hurricane.position.x - camX) / scale,
+            (hurricane.position.z - camZ) / scale,
+            hurricane.radius / scale,
+            hurricane.getEyewallRadius() / scale
         );
     }
 

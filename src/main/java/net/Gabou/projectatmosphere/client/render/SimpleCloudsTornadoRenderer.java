@@ -44,28 +44,41 @@ public final class SimpleCloudsTornadoRenderer {
     private static final ResourceLocation BAYER_MATRIX_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("simpleclouds", "textures/shader/bayer_matrix.png");
 
-    private static final float VOXEL_STEP = 0.35F;
-    private static final float FRINGE_WIDTH = 0.50F;
-    private static final float SHELL_HALF_WIDTH = 0.28F;
-    private static final float CORE_WIDTH = 0.045F;
-    private static final float CORE_FALLOFF = 0.22F;
-    private static final float DENSITY_BIAS = 0.19F;
+    private static final float VOXEL_STEP = 0.34F;
+    private static final float FRINGE_WIDTH = 0.56F;
+    private static final float SHELL_HALF_WIDTH = 0.32F;
+    private static final float CORE_WIDTH = 0.060F;
+    private static final float CORE_FALLOFF = 0.18F;
+    private static final float DENSITY_BIAS = 0.16F;
     private static final float NOISE_SCALE_PRIMARY = 1.10F;
     private static final float NOISE_SCALE_SECONDARY = 2.20F;
     private static final float NOISE_VERTICAL_PRIMARY = 0.30F;
     private static final float NOISE_VERTICAL_SECONDARY = 0.55F;
-    private static final float NOISE_PRIMARY_WEIGHT = 0.20F;
-    private static final float NOISE_SECONDARY_WEIGHT = 0.08F;
-    private static final float GROUND_RADIUS_FACTOR = 0.26F;
-    private static final float TOP_RADIUS_FACTOR = 1.05F;
-    private static final float TOP_FLARE_FACTOR = 1.36F;
+    private static final float NOISE_PRIMARY_WEIGHT = 0.24F;
+    private static final float NOISE_SECONDARY_WEIGHT = 0.10F;
+    private static final float GROUND_RADIUS_FACTOR = 0.24F;
+    private static final float TOP_RADIUS_FACTOR = 1.16F;
+    private static final float TOP_FLARE_FACTOR = 1.55F;
+    private static final float PLUME_START = 0.72F;
+    private static final float PLUME_RADIUS_GAIN = 1.40F;
+    private static final float PLUME_SOFTEN_GAIN = 0.42F;
+    private static final float PLUME_BODY_REDUCTION = 0.55F;
+    private static final float UPPER_BRIGHTEN_START = 0.70F;
+    private static final float UPPER_BRIGHTEN_GAIN = 0.20F;
     private static final float MOUTH_FADE_END = 0.08F;
-    private static final float TOP_FADE_START = 0.92F;
-    private static final float BRIGHTNESS_BASE = 0.58F;
-    private static final float BRIGHTNESS_GAIN = 0.28F;
+    private static final float TOP_FADE_START = 0.985F;
+    private static final float BRIGHTNESS_BASE = 0.46F;
+    private static final float BRIGHTNESS_GAIN = 0.18F;
+    private static final float BODY_FILL_START = 0.24F;
+    private static final float BODY_FILL_END = 0.68F;
+    private static final float BODY_DENSITY_STRENGTH = 0.68F;
+    private static final float BODY_BREAKUP_STRENGTH = 0.08F;
+    private static final float TORNADO_WHITEOUT_STRENGTH = 0.38F;
+    private static final float TORNADO_WHITEOUT_THRESHOLD = 0.10F;
     private static final float MIN_VISUAL_WORLD_RADIUS = 24.0F;
     private static final float MIN_GROUND_RADIUS_CLOUD = 0.72F;
     private static final float MIN_TOP_RADIUS_CLOUD = 2.60F;
+    private static final float CLOUD_BLEND_HEIGHT_ABOVE_BASE_WORLD = 200.0F;
 
     private static final int OPAQUE_STRIDE_BYTES = Integer.BYTES + 5 * Float.BYTES;
     private static final int TRANSPARENT_STRIDE_BYTES = 6 * Float.BYTES;
@@ -151,7 +164,6 @@ public final class SimpleCloudsTornadoRenderer {
 
         SingleSSBOShaderInstance shader = SimpleCloudsShaders.getCloudsShader();
         RenderSystem.setShader(() -> shader);
-        shader.apply();
 
         TextureManager textureManager = Minecraft.getInstance().getTextureManager();
         AbstractTexture ditherTexture = textureManager.getTexture(BAYER_MATRIX_TEXTURE);
@@ -160,13 +172,14 @@ public final class SimpleCloudsTornadoRenderer {
 
         SimpleCloudsRenderer.prepareShader(shader, stack.last().pose(), projMat,
                 renderer.getFogStart(), renderer.getFogEnd());
+        shader.apply();
 
         RenderSystem.setShaderColor(cloudR, cloudG, cloudB, 1.0F);
         if (shader.COLOR_MODULATOR != null) {
             shader.COLOR_MODULATOR.set(RenderSystem.getShaderColor());
+            shader.COLOR_MODULATOR.upload();
         }
 
-        shader.apply();
         GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, shader.getShaderStorageBinding(), this.opaqueSsbo.getId());
         this.sideMesh.drawInstanced(this.opaqueCount);
         GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, shader.getShaderStorageBinding(), 0);
@@ -199,7 +212,6 @@ public final class SimpleCloudsTornadoRenderer {
 
         SingleSSBOShaderInstance shader = SimpleCloudsShaders.getCloudsTransparencyShader();
         RenderSystem.setShader(() -> shader);
-        shader.apply();
 
         TextureManager textureManager = Minecraft.getInstance().getTextureManager();
         AbstractTexture ditherTexture = textureManager.getTexture(BAYER_MATRIX_TEXTURE);
@@ -208,13 +220,13 @@ public final class SimpleCloudsTornadoRenderer {
 
         SimpleCloudsRenderer.prepareShader(shader, stack.last().pose(), projMat,
                 renderer.getFogStart(), renderer.getFogEnd());
+        shader.apply();
 
         RenderSystem.setShaderColor(cloudR, cloudG, cloudB, 1.0F);
         if (shader.COLOR_MODULATOR != null) {
             shader.COLOR_MODULATOR.set(RenderSystem.getShaderColor());
+            shader.COLOR_MODULATOR.upload();
         }
-
-        shader.apply();
 
         GL30.glEnablei(GL11.GL_BLEND, 0);
         GL30.glEnablei(GL11.GL_BLEND, 1);
@@ -256,7 +268,7 @@ public final class SimpleCloudsTornadoRenderer {
                     cloudTornado,
                     animationTime
             );
-            float whiteout = Mth.clamp((density + FRINGE_WIDTH) / FRINGE_WIDTH, 0.0F, 1.0F);
+            float whiteout = Mth.clamp((density - TORNADO_WHITEOUT_THRESHOLD) / Math.max(FRINGE_WIDTH, 0.001F), 0.0F, 1.0F) * TORNADO_WHITEOUT_STRENGTH;
             strongest = Math.max(strongest, whiteout);
         }
         return strongest;
@@ -360,13 +372,15 @@ public final class SimpleCloudsTornadoRenderer {
 
             float y = key.y() * VOXEL_STEP;
             float y01 = Mth.clamp((y - cloudTornado.bottomY()) / Math.max(cloudTornado.height(), 0.001F), 0.0F, 1.0F);
-            float brightness = Mth.clamp(BRIGHTNESS_BASE + y01 * BRIGHTNESS_GAIN, 0.0F, 1.0F);
+            float upperBrighten = smoothstep(UPPER_BRIGHTEN_START, 1.0F, y01);
+            float brightness = Mth.clamp(BRIGHTNESS_BASE + y01 * BRIGHTNESS_GAIN + upperBrighten * UPPER_BRIGHTEN_GAIN, 0.0F, 1.0F);
             float radius = VOXEL_STEP * 0.5F;
 
             if (density > 0.0F) {
                 this.emitOpaqueFaces(densityByCell, key, brightness, radius);
             } else {
                 float alpha = Mth.clamp(1.0F + density / FRINGE_WIDTH, 0.0F, 1.0F);
+                alpha *= Mth.lerp(upperBrighten, 1.0F, 0.72F);
                 this.transparentInstances.add(new TransparentCubeInstance(
                         key.x() * VOXEL_STEP,
                         key.y() * VOXEL_STEP,
@@ -424,7 +438,12 @@ public final class SimpleCloudsTornadoRenderer {
 
     private float sampleDensityCloudSpace(float localX, float localY, float localZ,
                                           CloudSpaceTornado tornado, float animationTime) {
-        float y01 = Mth.clamp(localY / Math.max(tornado.height(), 0.001F), 0.0F, 1.0F);
+        float height = Math.max(tornado.height(), 0.001F);
+        if (localY <= -FRINGE_WIDTH || localY >= height + FRINGE_WIDTH) {
+            return -1.0F;
+        }
+
+        float y01 = Mth.clamp(localY / height, 0.0F, 1.0F);
         float twist = animationTime * 0.18F + tornado.twist() + y01 * 5.8F;
         float cos = Mth.cos(twist);
         float sin = Mth.sin(twist);
@@ -434,25 +453,32 @@ public final class SimpleCloudsTornadoRenderer {
         float funnelRadius = computeFunnelRadius(tornado, y01);
         float radialDistance = Mth.sqrt(qx * qx + qz * qz);
 
-        float shell = SHELL_HALF_WIDTH - Math.abs(radialDistance - funnelRadius);
+        float plumeBlend = smoothstep(PLUME_START, 1.0F, y01);
+        float shellWidth = SHELL_HALF_WIDTH + plumeBlend * PLUME_SOFTEN_GAIN;
+        float shell = shellWidth - Math.abs(radialDistance - funnelRadius);
+        float bodyRadius = Math.max(0.0F, funnelRadius - Mth.lerp(y01, BODY_FILL_START, BODY_FILL_END));
+        float body = bodyRadius - radialDistance;
         float core = CORE_WIDTH - radialDistance * CORE_FALLOFF;
 
         float advectX = animationTime * (0.08F + y01 * 0.18F);
         float advectZ = animationTime * (0.05F + y01 * 0.12F);
-        float breakup = fbm(
+        float shellBreakup = fbm(
                 (qx + advectX) * NOISE_SCALE_PRIMARY,
                 localY * NOISE_VERTICAL_PRIMARY + animationTime * 0.10F,
                 (qz - advectZ) * NOISE_SCALE_PRIMARY
         ) * NOISE_PRIMARY_WEIGHT;
-        breakup += fbm(
+        shellBreakup += fbm(
                 qx * NOISE_SCALE_SECONDARY + 17.0F + advectX * 1.7F,
                 localY * NOISE_VERTICAL_SECONDARY + 11.0F,
                 qz * NOISE_SCALE_SECONDARY - 9.0F - advectZ * 1.3F
         ) * NOISE_SECONDARY_WEIGHT;
+        float bodyBreakup = shellBreakup * BODY_BREAKUP_STRENGTH;
 
         float mouthFade = smoothstep(0.0F, MOUTH_FADE_END, y01);
         float topFade = 1.0F - smoothstep(TOP_FADE_START, 1.0F, y01);
-        return (Math.max(shell, core) + breakup - DENSITY_BIAS) * mouthFade * topFade;
+        float plumeBodyStrength = Mth.lerp(plumeBlend, BODY_DENSITY_STRENGTH, BODY_DENSITY_STRENGTH * PLUME_BODY_REDUCTION);
+        float density = Math.max(shell + shellBreakup, Math.max(body * plumeBodyStrength + bodyBreakup, core));
+        return (density - DENSITY_BIAS) * mouthFade * topFade;
     }
 
     private void uploadBuffers() {
@@ -566,10 +592,14 @@ public final class SimpleCloudsTornadoRenderer {
     }
 
     private static float computeFunnelRadius(CloudSpaceTornado tornado, float y01) {
-        float curve = (float)Math.pow(y01, 0.68F);
+        float curve = (float) Math.pow(y01, 0.62F);
         float radius = Mth.lerp(curve, tornado.baseRadius(), tornado.topRadius());
-        float cap = smoothstep(0.82F, 1.0F, y01);
-        return Mth.lerp(cap, radius, radius * TOP_FLARE_FACTOR);
+        float shoulder = (float) Math.pow(y01, 1.45F) * tornado.topRadius() * 0.28F;
+        float ropePinch = (1.0F - smoothstep(0.0F, 0.22F, y01)) * tornado.baseRadius() * 0.18F;
+        radius = radius + shoulder - ropePinch;
+        float plumeBlend = smoothstep(PLUME_START, 1.0F, y01);
+        float plumeRadius = radius * TOP_FLARE_FACTOR + tornado.topRadius() * PLUME_RADIUS_GAIN * plumeBlend;
+        return Mth.lerp(plumeBlend, radius, plumeRadius);
     }
 
     private record CellKey(int x, int y, int z) {
@@ -583,7 +613,9 @@ public final class SimpleCloudsTornadoRenderer {
             float centerX = (float) tornado.position.x / scale;
             float centerZ = (float) tornado.position.z / scale;
             float bottomY = (tornado.getVisualBottomY() - cloudHeight) / scale;
-            float height = tornado.getVisualHeight() / scale;
+            float baseHeight = tornado.getVisualHeight() / scale;
+            float minBlendTop = (CLOUD_BLEND_HEIGHT_ABOVE_BASE_WORLD / scale) - bottomY;
+            float height = Math.max(baseHeight, minBlendTop);
             float canopyRadius = Math.max(tornado.radius, MIN_VISUAL_WORLD_RADIUS) / scale;
             float groundRadius = Math.max(MIN_GROUND_RADIUS_CLOUD, canopyRadius * GROUND_RADIUS_FACTOR);
             float topRadius = Math.max(MIN_TOP_RADIUS_CLOUD, Math.max(groundRadius * 2.0F, canopyRadius * TOP_RADIUS_FACTOR));

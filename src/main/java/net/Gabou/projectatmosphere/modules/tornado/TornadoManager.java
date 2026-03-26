@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.RemoveTornadoPacket;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
+import net.Gabou.projectatmosphere.network.SyncTornadoesPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -35,28 +36,24 @@ public class TornadoManager {
     private static final float MIN_VISUAL_HEIGHT = 96.0F;
     private static final float HEIGHT_RADIUS_FACTOR = 6.0F;
     private static final float HEIGHT_CLOUD_PADDING = 40.0F;
+    private static final int SYNC_INTERVAL_TICKS = 5;
 
-    private static float shaderTime = 0.0f;
+    private static float shaderTime = 0.0F;
+
     @OnlyIn(Dist.CLIENT)
     public static void spawnClient(UUID id, Vec3 pos, float radius, WindVector wind, float bottomY, float height) {
-        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
-        Level level = Minecraft.getInstance().level;
-        if (level == null) return;
-        CLIENT_TORNADOES.removeIf(tornado -> tornado.getId().equals(id));
-        CloudRegion cloud = findIntersectingCloud(level, pos, radius);
-        CLIENT_TORNADOES.add(new TornadoInstance(id, new Vec3(pos.x, bottomY, pos.z), radius, wind, bottomY, height, cloud));
-        if (ProjectAtmosphere.DEBUG_MODE) {
-            ProjectAtmosphere.LOGGER.info(
-                    "[TornadoDebug] Client spawnClient kept tornado id={} activeCount={} cloudRegionPresent={} pos={} radius={} bottomY={} height={}",
-                    id,
-                    CLIENT_TORNADOES.size(),
-                    cloud != null,
-                    pos,
-                    radius,
-                    bottomY,
-                    height
-            );
-        }
+        applyClientSnapshot(new TornadoSnapshot(
+                id,
+                new Vec3(pos.x, bottomY, pos.z),
+                radius,
+                bottomY,
+                height,
+                wind.baseSpeed(),
+                wind.angleRadians(),
+                wind.gustSpeed(),
+                Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F),
+                net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase.FORMING
+        ));
     }
 
     public static boolean spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind) {
@@ -71,16 +68,16 @@ public class TornadoManager {
 
         UUID id = UUID.randomUUID();
         TornadoGeometry geometry = computeGeometry(level, pos, radius);
-        if (cloud instanceof ITornadoRegion tornadoRegion) {
-            tornadoRegion.addTornado(createRuntimeDescriptor(id, cloud, pos, radius, wind, geometry));
-        }
-
         Vec3 spawnPos = new Vec3(pos.x, geometry.bottomY(), pos.z);
-        SERVER_TORNADOES.add(new TornadoInstance(id, spawnPos, radius, wind, geometry.bottomY(), geometry.height(), cloud));
+        TornadoInstance tornado = new TornadoInstance(id, spawnPos, radius, wind, geometry.bottomY(), geometry.height(), cloud);
+        attachDescriptor(cloud, tornado);
+        SERVER_TORNADOES.add(tornado);
+
         NetworkHandler.CHANNEL.send(
                 PacketDistributor.ALL.noArg(),
                 new SpawnTornadoPacket(id, spawnPos, radius, wind, geometry.bottomY(), geometry.height())
         );
+        broadcastSnapshots();
         return true;
     }
 
@@ -96,6 +93,7 @@ public class TornadoManager {
         if (SERVER_TORNADOES.remove(tornado)) {
             removeAttachedDescriptor(tornado);
             broadcastRemoval(tornado.getId());
+            broadcastSnapshots();
         }
     }
 
@@ -105,17 +103,11 @@ public class TornadoManager {
             broadcastRemoval(tornado.getId());
         }
         SERVER_TORNADOES.clear();
+        broadcastSnapshots();
     }
 
     public static void removeClientTornado(UUID id) {
         CLIENT_TORNADOES.removeIf(tornado -> tornado.getId().equals(id));
-        if (ProjectAtmosphere.DEBUG_MODE) {
-            ProjectAtmosphere.LOGGER.info(
-                    "[TornadoDebug] Client removed tornado id={} remainingClientCount={}",
-                    id,
-                    CLIENT_TORNADOES.size()
-            );
-        }
     }
 
     public static void clearClientTornadoes() {
@@ -132,84 +124,108 @@ public class TornadoManager {
             return;
         }
 
-        boolean shouldDebugLog = ProjectAtmosphere.DEBUG_MODE && level.isClientSide && level.getGameTime() % 20L == 0L;
-        List<TornadoInstance> activeTornadoes = getTornadoes(level);
-        if (shouldDebugLog) {
-            ProjectAtmosphere.LOGGER.info("[TornadoDebug] Client TornadoManager.tick activeCount={}", activeTornadoes.size());
+        if (level.isClientSide) {
+            shaderTime += 0.05F;
+            for (TornadoInstance tornado : CLIENT_TORNADOES) {
+                tornado.tickClient();
+            }
+            return;
         }
 
-        Iterator<TornadoInstance> iterator = activeTornadoes.iterator();
+        ServerLevel serverLevel = (ServerLevel) level;
+        long gameTime = serverLevel.getGameTime();
+        Iterator<TornadoInstance> iterator = SERVER_TORNADOES.iterator();
         while (iterator.hasNext()) {
             TornadoInstance tornado = iterator.next();
-            if (tornado.getLifetimeSeconds() > 600) {
+            CloudRegion currentRegion = findIntersectingCloud(serverLevel, tornado.position, tornado.radius);
+            if (currentRegion != tornado.getCloudRegion()) {
                 removeAttachedDescriptor(tornado);
-                if (ProjectAtmosphere.DEBUG_MODE) {
-                    ProjectAtmosphere.LOGGER.info(
-                            "[TornadoDebug] Removing tornado id={} reason=lifetimeExceeded clientSide={}",
-                            tornado.getId(),
-                            level.isClientSide
-                    );
+                tornado.setCloudRegion(currentRegion);
+                if (currentRegion != null) {
+                    attachDescriptor(currentRegion, tornado);
                 }
+            } else if (currentRegion != null) {
+                ensureDescriptor(currentRegion, tornado);
+            }
+
+            if (tornado.getCloudRegion() == null && tornado.getLifetimeSeconds() > 5.0F) {
+                tornado.markDissipating();
+            }
+
+            tornado.tickServer(serverLevel, gameTime);
+            if (tornado.isDead()) {
+                removeAttachedDescriptor(tornado);
                 iterator.remove();
-                if (!level.isClientSide) {
-                    broadcastRemoval(tornado.getId());
-                }
-                continue;
+                broadcastRemoval(tornado.getId());
             }
-
-            if (tornado.getCloudRegion() == null) {
-                tornado.setCloudRegion(findIntersectingCloud(level, tornado.position, tornado.radius));
-            }
-
-            boolean synced = tornado.synchronizeWithDescriptor();
-            if (tornado.isDescriptorMissing()) {
-                if (!level.isClientSide) {
-                    if (ProjectAtmosphere.DEBUG_MODE) {
-                        ProjectAtmosphere.LOGGER.info(
-                                "[TornadoDebug] Removing tornado id={} reason=descriptorMissing serverSide",
-                                tornado.getId()
-                        );
-                    }
-                    iterator.remove();
-                    broadcastRemoval(tornado.getId());
-                    continue;
-                }
-                if (shouldDebugLog) {
-                    ProjectAtmosphere.LOGGER.info(
-                            "[TornadoDebug] Keeping client tornado id={} despite missing descriptor; cloudRegionPresent={} pos={} bottomY={} height={}",
-                            tornado.getId(),
-                            tornado.getCloudRegion() != null,
-                            tornado.position,
-                            tornado.getVisualBottomY(),
-                            tornado.getVisualHeight()
-                    );
-                }
-            }
-            if (!synced) {
-                tornado.advanceByWind();
-            }
-            if (shouldDebugLog) {
-                ProjectAtmosphere.LOGGER.info(
-                        "[TornadoDebug] Tick tornado id={} synced={} descriptorMissing={} cloudRegionPresent={} pos={} radius={} bottomY={} height={}",
-                        tornado.getId(),
-                        synced,
-                        tornado.isDescriptorMissing(),
-                        tornado.getCloudRegion() != null,
-                        tornado.position,
-                        tornado.radius,
-                        tornado.getVisualBottomY(),
-                        tornado.getVisualHeight()
-                );
-            }
-            tornado.tick(level);
         }
-        if (level.isClientSide) {
-            shaderTime += 0.05f;
+
+        if (gameTime % SYNC_INTERVAL_TICKS == 0L) {
+            broadcastSnapshots();
         }
     }
 
-    private static List<TornadoInstance> getTornadoes(Level level) {
-        return level.isClientSide ? getClientTornadoes() : SERVER_TORNADOES;
+    @OnlyIn(Dist.CLIENT)
+    public static void applyClientSnapshots(List<TornadoSnapshot> snapshots) {
+        List<TornadoInstance> next = new ArrayList<>(snapshots.size());
+        for (TornadoSnapshot snapshot : snapshots) {
+            TornadoInstance existing = findClient(snapshot.id());
+            CloudRegion cloud = findClientCloud(snapshot.position(), snapshot.radius());
+            if (existing == null) {
+                existing = new TornadoInstance(
+                        snapshot.id(),
+                        snapshot.position(),
+                        snapshot.radius(),
+                        new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust()),
+                        snapshot.visualBottomY(),
+                        snapshot.visualHeight(),
+                        cloud
+                );
+            }
+            existing.applySnapshot(snapshot, cloud);
+            next.add(existing);
+        }
+        CLIENT_TORNADOES.clear();
+        CLIENT_TORNADOES.addAll(next);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    private static void applyClientSnapshot(TornadoSnapshot snapshot) {
+        TornadoInstance existing = findClient(snapshot.id());
+        CloudRegion cloud = findClientCloud(snapshot.position(), snapshot.radius());
+        if (existing == null) {
+            existing = new TornadoInstance(
+                    snapshot.id(),
+                    snapshot.position(),
+                    snapshot.radius(),
+                    new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust()),
+                    snapshot.visualBottomY(),
+                    snapshot.visualHeight(),
+                    cloud
+            );
+            CLIENT_TORNADOES.add(existing);
+        }
+        existing.applySnapshot(snapshot, cloud);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    private static TornadoInstance findClient(UUID id) {
+        for (TornadoInstance tornado : CLIENT_TORNADOES) {
+            if (tornado.getId().equals(id)) {
+                return tornado;
+            }
+        }
+        return null;
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    @Nullable
+    private static CloudRegion findClientCloud(Vec3 pos, float radius) {
+        Level level = Minecraft.getInstance().level;
+        if (level == null) {
+            return null;
+        }
+        return findIntersectingCloud(level, pos, radius);
     }
 
     @Nullable
@@ -224,30 +240,38 @@ public class TornadoManager {
     }
 
     private static TornadoGeometry computeGeometry(Level level, Vec3 pos, float radius) {
-        float bottomY = (float)pos.y;
+        float bottomY = (float) pos.y;
         float cloudBase = CloudManager.get(level).getCloudHeight();
         float reachToCloudBase = Math.max(0.0F, cloudBase - bottomY);
         float height = Math.max(MIN_VISUAL_HEIGHT, reachToCloudBase + radius * HEIGHT_RADIUS_FACTOR + HEIGHT_CLOUD_PADDING);
         return new TornadoGeometry(bottomY, height);
     }
 
-    private static TornadoDescriptor createRuntimeDescriptor(UUID id, CloudRegion cloud, Vec3 pos, float radius,
-                                                             WindVector wind, TornadoGeometry geometry) {
-        float driftSpeed = wind.baseSpeed() * 0.2f;
-        float offsetX = (float)(pos.x - cloud.getWorldX());
-        float offsetZ = (float)(pos.z - cloud.getWorldZ());
-        float velocityX = (float)(Math.cos(wind.angleRadians()) * driftSpeed);
-        float velocityZ = (float)(Math.sin(wind.angleRadians()) * driftSpeed);
+    private static void attachDescriptor(CloudRegion cloud, TornadoInstance tornado) {
+        if (cloud instanceof ITornadoRegion tornadoRegion) {
+            tornadoRegion.replaceTornado(createRuntimeDescriptor(tornado, cloud));
+        }
+    }
+
+    private static void ensureDescriptor(CloudRegion cloud, TornadoInstance tornado) {
+        if (cloud instanceof ITornadoRegion tornadoRegion && tornadoRegion.findTornado(tornado.getId()) == null) {
+            tornadoRegion.addTornado(createRuntimeDescriptor(tornado, cloud));
+        }
+    }
+
+    private static TornadoDescriptor createRuntimeDescriptor(TornadoInstance tornado, CloudRegion cloud) {
+        float offsetX = (float) (tornado.position.x - cloud.getWorldX());
+        float offsetZ = (float) (tornado.position.z - cloud.getWorldZ());
         return new TornadoDescriptor(
-                id,
+                tornado.getId(),
                 RUNTIME_TORNADO_CONTROLLER,
                 offsetX,
                 offsetZ,
-                velocityX,
-                velocityZ,
-                radius,
-                geometry.bottomY(),
-                geometry.height()
+                tornado.wind.baseSpeed() * (float) Math.cos(tornado.wind.angleRadians()) * 0.05F,
+                tornado.wind.baseSpeed() * (float) Math.sin(tornado.wind.angleRadians()) * 0.05F,
+                tornado.radius,
+                tornado.getVisualBottomY(),
+                tornado.getVisualHeight()
         );
     }
 
@@ -259,6 +283,14 @@ public class TornadoManager {
 
     private static void broadcastRemoval(UUID id) {
         NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new RemoveTornadoPacket(id));
+    }
+
+    private static void broadcastSnapshots() {
+        List<TornadoSnapshot> snapshots = new ArrayList<>(SERVER_TORNADOES.size());
+        for (TornadoInstance tornado : SERVER_TORNADOES) {
+            snapshots.add(tornado.snapshot());
+        }
+        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new SyncTornadoesPacket(snapshots));
     }
 
     private record TornadoGeometry(float bottomY, float height) {

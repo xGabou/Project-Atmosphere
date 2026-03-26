@@ -10,6 +10,7 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
+import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -109,6 +110,10 @@ public final class TornadoProbabilityManager {
     }
 
     private static boolean isStormy(RegionInstanceKey key, ServerLevel level) {
+        RegionalWeatherPhase phase = ForecastOrchestrator.getWeatherPhase(level, key, level.getGameTime());
+        if (!phase.isStormCapable()) {
+            return false;
+        }
         ServerCloudManager manager = (ServerCloudManager) CloudManager.get(level);
         CloudGenerator generator = manager.getCloudGenerator();
         BlockPos pos = key.center();

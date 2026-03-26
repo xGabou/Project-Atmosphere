@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
@@ -59,6 +60,7 @@ public class ClientTickHandler {
         if (Minecraft.getInstance().isPaused()) return;
         if (Minecraft.getInstance().level == null) {
             TornadoManager.clearClientTornadoes();
+            HurricaneManager.clearClientHurricanes();
             return;
         }
 
