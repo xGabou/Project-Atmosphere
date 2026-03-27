@@ -63,11 +63,20 @@ public final class SimpleCloudsTornadoRenderer {
     private static final float PLUME_RADIUS_GAIN = 1.40F;
     private static final float PLUME_SOFTEN_GAIN = 0.42F;
     private static final float PLUME_BODY_REDUCTION = 0.55F;
+    private static final float PM_ATTACHMENT_STRENGTH = 0.70F;
+    private static final float PM_CENTER_SWAY_STRENGTH = 0.55F;
+    private static final float PM_CENTER_SWAY_SCROLL = 0.0065F;
+    private static final float PM_CENTER_SWAY_FREQ = 0.18F;
     private static final float UPPER_BRIGHTEN_START = 0.70F;
     private static final float UPPER_BRIGHTEN_GAIN = 0.20F;
     private static final float SPIRAL_MODULATION_STRENGTH = 0.18F;
     private static final float SPIRAL_MODULATION_BANDS = 4.10F;
     private static final float SPIRAL_MODULATION_SCROLL = 2.60F;
+    private static final float PM_HELIX_NOISE_STRENGTH = 0.16F;
+    private static final float PM_HELIX_NOISE_SCALE_A = 0.055F;
+    private static final float PM_HELIX_NOISE_SCALE_B = 0.032F;
+    private static final float PM_GROUND_DUST_STRENGTH = 0.12F;
+    private static final float PM_GROUND_DUST_HEIGHT = 0.12F;
     private static final float MOUTH_FADE_END = 0.08F;
     private static final float TOP_FADE_START = 0.985F;
     private static final float BRIGHTNESS_BASE = 0.46F;
@@ -447,12 +456,16 @@ public final class SimpleCloudsTornadoRenderer {
         }
 
         float y01 = Mth.clamp(localY / height, 0.0F, 1.0F);
+        float percCos = (-Mth.cos(y01 * Mth.PI) + 1.0F) * 0.5F;
+        Vec3 centerOffset = computePmCenterOffset(tornado, localY, y01, percCos, animationTime);
+        float shiftedX = localX - (float) centerOffset.x;
+        float shiftedZ = localZ - (float) centerOffset.z;
         float twist = animationTime * 0.18F + tornado.twist() + y01 * 5.8F;
         float cos = Mth.cos(twist);
         float sin = Mth.sin(twist);
 
-        float qx = localX * cos - localZ * sin;
-        float qz = localX * sin + localZ * cos;
+        float qx = shiftedX * cos - shiftedZ * sin;
+        float qz = shiftedX * sin + shiftedZ * cos;
         float funnelRadius = computeFunnelRadius(tornado, y01);
         float radialDistance = Mth.sqrt(qx * qx + qz * qz);
 
@@ -475,17 +488,74 @@ public final class SimpleCloudsTornadoRenderer {
                 localY * NOISE_VERTICAL_SECONDARY + 11.0F,
                 qz * NOISE_SCALE_SECONDARY - 9.0F - advectZ * 1.3F
         ) * NOISE_SECONDARY_WEIGHT;
+        float helixNoise = pmHelixNoise(qx, qz, localY, radialDistance, animationTime, tornado.twist(), plumeBlend);
         float shellMask = 1.0F - Mth.clamp(Math.abs(radialDistance - funnelRadius) / Math.max(shellWidth, 0.001F), 0.0F, 1.0F);
         float spiralPhase = (float) Math.atan2(qz, qx) * SPIRAL_MODULATION_BANDS - localY * 2.15F - animationTime * SPIRAL_MODULATION_SCROLL;
         float spiralRidge = 1.0F - Mth.abs(Mth.sin(spiralPhase));
         float spiralContrast = (spiralRidge - 0.45F) * SPIRAL_MODULATION_STRENGTH * shellMask * (1.0F - plumeBlend * 0.30F);
         float bodyBreakup = shellBreakup * BODY_BREAKUP_STRENGTH;
+        float groundDust = computeGroundDust(y01, radialDistance, funnelRadius, animationTime, qx, qz);
 
         float mouthFade = smoothstep(0.0F, MOUTH_FADE_END, y01);
         float topFade = 1.0F - smoothstep(TOP_FADE_START, 1.0F, y01);
         float plumeBodyStrength = Mth.lerp(plumeBlend, BODY_DENSITY_STRENGTH, BODY_DENSITY_STRENGTH * PLUME_BODY_REDUCTION);
-        float density = Math.max(shell + shellBreakup + spiralContrast, Math.max(body * plumeBodyStrength + bodyBreakup, core));
+        float density = Math.max(shell + shellBreakup + spiralContrast + helixNoise, Math.max(body * plumeBodyStrength + bodyBreakup, core));
+        density = Math.max(density, groundDust);
         return (density - DENSITY_BIAS) * mouthFade * topFade;
+    }
+
+    private static Vec3 computePmCenterOffset(CloudSpaceTornado tornado, float localY, float y01, float percCos, float animationTime) {
+        float ropeMod = Mth.lerp(Mth.clamp((tornado.topRadius() - tornado.baseRadius()) / 3.5F, 0.0F, 1.0F), 3.0F, 1.0F);
+        float attachNoiseX = noise(tornado.centerX() * 0.004F, tornado.centerZ() * 0.004F, animationTime * PM_CENTER_SWAY_SCROLL) * 0.55F;
+        float attachNoiseZ = noise(animationTime * PM_CENTER_SWAY_SCROLL, tornado.centerZ() * 0.004F, tornado.centerX() * 0.004F) * 0.55F;
+        float attachmentX = attachNoiseX * tornado.topRadius() * PM_ATTACHMENT_STRENGTH * ropeMod;
+        float attachmentZ = attachNoiseZ * tornado.topRadius() * PM_ATTACHMENT_STRENGTH * ropeMod;
+
+        float swayNoiseX = noise(
+                tornado.centerX() * 0.008F,
+                animationTime * PM_CENTER_SWAY_SCROLL + localY * PM_CENTER_SWAY_FREQ,
+                tornado.centerZ() * 0.008F
+        );
+        float swayNoiseZ = noise(
+                animationTime * PM_CENTER_SWAY_SCROLL + localY * PM_CENTER_SWAY_FREQ,
+                tornado.centerZ() * 0.008F,
+                tornado.centerX() * 0.008F
+        );
+        float swayScale = (float) Math.pow(y01, 0.75F) * tornado.baseRadius() * PM_CENTER_SWAY_STRENGTH * ropeMod;
+        float x = Mth.lerp(percCos, 0.0F, attachmentX) + swayNoiseX * swayScale;
+        float z = Mth.lerp(percCos, 0.0F, attachmentZ) + swayNoiseZ * swayScale;
+        return new Vec3(x, 0.0D, z);
+    }
+
+    private static float pmHelixNoise(float qx, float qz, float localY, float radialDistance, float animationTime, float twist, float plumeBlend) {
+        float rotA = -twist * 3.0F;
+        float rotB = -twist / 1.5F;
+        float angleA = rotA + radialDistance / 1.65F;
+        float angleB = rotB + radialDistance / 4.80F;
+        float cosA = Mth.cos(angleA);
+        float sinA = Mth.sin(angleA);
+        float cosB = Mth.cos(angleB);
+        float sinB = Mth.sin(angleB);
+
+        float ax = qx * cosA - qz * sinA;
+        float az = qx * sinA + qz * cosA;
+        float bx = qx * cosB - qz * sinB;
+        float bz = qx * sinB + qz * cosB;
+
+        float n1 = fbm(ax * PM_HELIX_NOISE_SCALE_A, (localY - animationTime * 0.5F) * PM_HELIX_NOISE_SCALE_A, az * PM_HELIX_NOISE_SCALE_A);
+        float n2 = fbm(bx * PM_HELIX_NOISE_SCALE_B, (localY - animationTime * 0.5F) * PM_HELIX_NOISE_SCALE_B, bz * PM_HELIX_NOISE_SCALE_B);
+        return Mth.lerp(plumeBlend, n1, Mth.lerp(0.55F, n1, n2)) * PM_HELIX_NOISE_STRENGTH;
+    }
+
+    private static float computeGroundDust(float y01, float radialDistance, float funnelRadius, float animationTime, float qx, float qz) {
+        if (y01 > PM_GROUND_DUST_HEIGHT) {
+            return -1.0F;
+        }
+        float dustBand = funnelRadius + 0.7F;
+        float dustWidth = 0.85F;
+        float dustMask = 1.0F - Mth.clamp(Math.abs(radialDistance - dustBand) / dustWidth, 0.0F, 1.0F);
+        float dustNoise = fbm(qx * 0.10F, y01 * 3.0F + animationTime * 0.15F, qz * 0.10F);
+        return (dustMask * (0.75F + dustNoise * 0.25F) * PM_GROUND_DUST_STRENGTH) - 0.08F;
     }
 
     private void uploadBuffers() {

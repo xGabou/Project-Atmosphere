@@ -20,11 +20,11 @@ public final class TornadoClientEffects {
         float debrisScore = tornado.getRecentDebrisScore();
 
         int lowCount = 7 + Math.round(intensity * 7.0F + debrisScore * 10.0F);
-        int midCount = 9 + Math.round(intensity * 7.0F + debrisScore * 6.0F);
+        int midCount = 12 + Math.round(intensity * 8.0F + debrisScore * 7.0F);
         int upperCount = 4 + Math.round(intensity * 4.0F + debrisScore * 2.0F);
 
         spawnBand(level, tornado, lowCount, maxRadius * 1.24D, visualHeight * 0.20D, 8.4F, 0.020F, 0.42F, LOW_BAND);
-        spawnBand(level, tornado, midCount, maxRadius * 0.80D, visualHeight * 0.70D, 13.2F, 0.040F, 0.26F, MID_BAND);
+        spawnBand(level, tornado, midCount, maxRadius * 0.76D, visualHeight * 0.74D, 16.0F, 0.046F, 0.30F, MID_BAND);
         spawnBand(level, tornado, upperCount, maxRadius * 1.24D, visualHeight * 1.06D, 5.4F, 0.026F, 0.46F, UPPER_BAND);
     }
 

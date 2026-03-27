@@ -64,11 +64,11 @@ public class DebrisParticle extends TextureSheetParticle {
         float lifeProgress = this.lifetime <= 0 ? 1.0F : (float) this.age / (float) this.lifetime;
         float bandSpinBoost = switch (this.band) {
             case 0 -> 1.25F;
-            case 1 -> 1.85F;
+            case 1 -> 2.20F;
             default -> 1.05F;
         };
         float angle = startAngle
-                + tornado.getTwist() * 72.0F * bandSpinBoost
+                + tornado.getTwist() * 96.0F * bandSpinBoost
                 + (tornado.getLifetimeSeconds() * 20 + this.age) * angularSpeed;
         double rad = Math.toRadians(angle);
         double rise = this.baseY + this.age * this.verticalDrift + switch (this.band) {
@@ -80,7 +80,7 @@ public class DebrisParticle extends TextureSheetParticle {
                 + Math.cos((this.age + this.startAngle) * 0.05F + this.band) * this.radialJitter * 0.45D;
         double spiralOffset = switch (this.band) {
             case 0 -> -lifeProgress * this.radius * 0.10D;
-            case 1 -> -lifeProgress * this.radius * 0.24D;
+            case 1 -> -lifeProgress * this.radius * 0.34D;
             default -> lifeProgress * this.radius * 0.10D;
         };
         double orbitRadius = Math.max(0.2D, this.radius + pulse + spiralOffset);

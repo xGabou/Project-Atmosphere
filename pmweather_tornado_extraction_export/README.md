@@ -52,6 +52,16 @@ Important: PMWeather does not render the tornado as a normal model or mesh.
 - `assets/pmweather/shaders/post/clouds.json`
 - `dev/protomanly/pmweather/render/RenderEvents.java`
   - Hooks the shader render pass into the level render.
+- `dev/protomanly/pmweather/event/ModBusClientEvents.java`
+  - Reload listener and client-side registration that the shader/debris path depends on.
+- `dev/protomanly/pmweather/mixin/PostChainMixin.java`
+  - Accessor mixin used by `ModShaders` to reach the post-pass list.
+- `dev/protomanly/pmweather/interfaces/PostChainData.java`
+- `dev/protomanly/pmweather/compat/DistantHorizons.java`
+- `dev/protomanly/pmweather/compat/DistantHorizonsHandler.java`
+  - Optional compatibility layer used by the shader when Distant Horizons is present.
+- `pmweather.mixins.json`
+  - Needed if you want the `PostChainMixin` path to work as PMWeather does it.
 
 ## Particle And Debris Layer
 

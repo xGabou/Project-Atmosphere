@@ -42,12 +42,13 @@ public class TornadoInstance {
     private static final float MIN_EFFECTIVE_WIND = 73.0F;
     private static final float MAX_EFFECTIVE_WIND = 260.0F;
     private static final float RANKINE_FACTOR = 4.5F;
-    private static final float OUTER_FLOW_RADIUS_FACTOR = 1.30F;
+    private static final float OUTER_FLOW_RADIUS_FACTOR = 1.24F;
     private static final float MID_SHELL_CENTER = 0.44F;
     private static final float MID_SHELL_WIDTH = 0.24F;
     private static final float CORE_ZONE_END = 0.22F;
     private static final float PLUME_FLOW_START = 0.70F;
     private static final float EJECTION_START_HEIGHT = 0.84F;
+    private static final float CAPTURE_ENTRY_RADIUS = 0.84F;
 
     private final UUID id;
     public Vec3 position;
@@ -683,7 +684,9 @@ public class TornadoInstance {
         float shellZone = 1.0F - Mth.clamp(Math.abs(radialNorm - MID_SHELL_CENTER) / MID_SHELL_WIDTH, 0.0F, 1.0F);
         float coreZone = 1.0F - smoothStep(0.05F, CORE_ZONE_END, radialNorm);
         float plumeZone = smoothStep(PLUME_FLOW_START, 0.98F, heightNorm);
-        boolean shouldCapture = dist <= windfieldWidth * 1.02F || (outerReach > 0.08F && windEffect >= 38.0D);
+        boolean shouldCapture = dist <= windfieldWidth * CAPTURE_ENTRY_RADIUS
+                || (shellZone > 0.42F && windEffect >= 58.0D)
+                || (coreZone > 0.45F && windEffect >= 48.0D);
         if (captured == null && shouldCapture) {
             captured = this.createCaptureState(entity, windfieldWidth, dist);
             this.capturedEntities.put(entity.getId(), captured);
@@ -693,15 +696,15 @@ public class TornadoInstance {
                 (float) ((windEffect - 25.0D) / Math.max(this.getEffectiveWindSpeed() * 1.15F, 130.0F)),
                 0.0F,
                 1.0F
-        ) * multiplier * (1.05D + this.normalizedIntensity * 1.35D);
+        ) * multiplier * (1.02D + this.normalizedIntensity * 1.32D);
 
         Vec3 add;
         boolean releaseCapture = false;
         if (captured != null) {
             captured.lastSeenAge = this.ageTicks;
             captured.captureTicks++;
-            float captureProgress = smoothStep(4.0F, 22.0F, captured.captureTicks);
-            float transportProgress = smoothStep(18.0F, 70.0F, captured.captureTicks);
+            float captureProgress = smoothStep(3.0F, 16.0F, captured.captureTicks);
+            float transportProgress = smoothStep(12.0F, 46.0F, captured.captureTicks);
             if (!captured.expelling && (heightNorm >= EJECTION_START_HEIGHT || captured.captureTicks > 120)) {
                 captured.expelling = true;
             }
@@ -729,16 +732,16 @@ public class TornadoInstance {
             Vec3 towardOrbit = orbitTarget.subtract(entity.position());
             Vec3 orbitCorrection = towardOrbit.lengthSqr() > 1.0E-4 ? towardOrbit.normalize() : Vec3.ZERO;
             double inwardStrength = captured.expelling
-                    ? -0.10D
-                    : Mth.lerp(captureProgress, 1.85D + outerReach * 0.80D + shellZone * 0.35D, 0.22D + shellZone * 0.22D - coreZone * 0.08D);
+                    ? -0.16D
+                    : Mth.lerp(captureProgress, 2.15D + outerReach * 0.95D + shellZone * 0.44D, 0.38D + shellZone * 0.32D - coreZone * 0.05D);
             double liftStrength = captured.expelling
-                    ? effectStrength * (0.24D + plumeZone * 0.18D)
-                    : (0.03D + captured.liftBias * 0.10D + plumeZone * 0.10D + captureProgress * 0.18D + transportProgress * 0.34D) * effectStrength;
+                    ? effectStrength * (0.34D + plumeZone * 0.22D)
+                    : (0.01D + captured.liftBias * 0.08D + plumeZone * 0.08D + captureProgress * 0.10D + transportProgress * 0.42D) * effectStrength;
             double tangentialStrength = captured.expelling
-                    ? effectStrength * (0.65D + plumeZone * 0.18D)
-                    : effectStrength * (0.70D + shellZone * 1.45D + captured.orbitBias * 0.42D + transportProgress * 1.05D);
+                    ? effectStrength * (0.72D + plumeZone * 0.22D)
+                    : effectStrength * (0.42D + shellZone * 1.65D + captured.orbitBias * 0.48D + transportProgress * 1.28D);
             double ejectFactor = captured.expelling
-                    ? 1.15D + plumeZone * 0.55D
+                    ? 1.35D + plumeZone * 0.78D
                     : 0.0D;
             Vec3 outward = inward.scale(-1.0D);
 
@@ -747,21 +750,23 @@ public class TornadoInstance {
                     .add(inward.scale(effectStrength * inwardStrength))
                     .add(outward.scale(effectStrength * ejectFactor))
                     .add(0.0D, liftStrength, 0.0D)
-                    .scale(captured.expelling ? 0.105D : 0.112D);
-            releaseCapture = captured.expelling && (heightNorm > 0.98F || dist > windfieldWidth * 1.18F);
+                    .scale(captured.expelling ? 0.115D : 0.125D);
+            releaseCapture = captured.expelling && (heightNorm > 1.04F || dist > windfieldWidth * 1.26F);
         } else {
-            double suctionStrength = 1.60D + outerReach * 2.35D + shellZone * 0.40D - coreZone * 0.15D;
-            double tangentialStrength = 0.32D + shellZone * 0.72D + plumeZone * 0.10D;
-            double liftStrength = 0.02D + shellZone * 0.05D + plumeZone * 0.08D;
+            double suctionStrength = 1.95D + outerReach * 2.85D + shellZone * 0.28D - coreZone * 0.10D;
+            double tangentialStrength = 0.08D + shellZone * 0.34D + plumeZone * 0.06D;
+            double liftStrength = 0.0D + shellZone * 0.02D + plumeZone * 0.04D;
 
             add = inward.scale(effectStrength * suctionStrength)
                     .add(rotational.scale(effectStrength * tangentialStrength))
                     .add(0.0D, effectStrength * liftStrength, 0.0D)
-                    .scale(0.096D + this.normalizedIntensity * 0.034D);
+                    .scale(0.082D + this.normalizedIntensity * 0.028D);
         }
         if (captured != null) {
             Vec3 current = entity.getDeltaMovement();
-            Vec3 damped = new Vec3(current.x * 0.55D, Math.max(current.y * 0.70D, -0.12D), current.z * 0.55D);
+            Vec3 damped = captured.expelling
+                    ? new Vec3(current.x * 0.72D, Math.max(current.y * 0.78D, -0.08D), current.z * 0.72D)
+                    : new Vec3(current.x * 0.38D, Math.max(current.y * 0.58D, -0.08D), current.z * 0.38D);
             entity.setDeltaMovement(damped.add(add));
         } else {
             entity.addDeltaMovement(add);
@@ -779,7 +784,7 @@ public class TornadoInstance {
 
     private CapturedEntityState createCaptureState(Entity entity, float windfieldWidth, double dist) {
         double angle = Math.atan2(entity.getZ() - this.position.z, entity.getX() - this.position.x);
-        float band = Mth.clamp((float) (dist / Math.max(windfieldWidth, 0.001F)), 0.28F, 0.56F);
+        float band = Mth.clamp((float) (dist / Math.max(windfieldWidth, 0.001F)), 0.22F, 0.48F);
         float orbitBias = 0.85F + (float) StormMotionModel.noise01(this.id, this.ageTicks + entity.getId(), 0.11F) * 0.65F;
         float liftBias = 0.45F + (float) StormMotionModel.noise01(this.id, this.ageTicks + entity.getId() * 3L, 0.07F) * 0.55F;
         return new CapturedEntityState(angle, band, orbitBias, liftBias, this.ageTicks, 0);
@@ -795,7 +800,7 @@ public class TornadoInstance {
                 continue;
             }
             CapturedEntityState state = entry.getValue();
-            if ((this.ageTicks - state.lastSeenAge) > 18) {
+            if ((this.ageTicks - state.lastSeenAge) > 22) {
                 iterator.remove();
             }
         }
