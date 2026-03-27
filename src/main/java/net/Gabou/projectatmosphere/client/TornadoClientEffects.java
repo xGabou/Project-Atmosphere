@@ -14,8 +14,8 @@ public final class TornadoClientEffects {
     }
 
     public static void spawnDebrisParticles(TornadoInstance tornado, ClientLevel level) {
-        double visualHeight = Math.min(tornado.getVisualHeight(), SimpleCloudsConfig.CLIENT.cloudHeight.get());
-        double maxRadius = Math.max(4.0, tornado.radius);
+        double visualHeight = Math.min(tornado.getRenderHeight(1.0F), SimpleCloudsConfig.CLIENT.cloudHeight.get());
+        double maxRadius = Math.max(4.0, tornado.getRenderRadius(1.0F));
         float intensity = tornado.getNormalizedIntensity();
         float debrisScore = tornado.getRecentDebrisScore();
 
@@ -39,9 +39,9 @@ public final class TornadoClientEffects {
 
             level.addParticle(
                     new DebrisParticleData(tornado, radius, height, localAngularSpeed, localVerticalDrift, localRadialJitter, band),
-                    tornado.position.x,
-                    tornado.position.y,
-                    tornado.position.z,
+                    tornado.getRenderPosition(1.0F).x,
+                    tornado.getRenderBottomY(1.0F),
+                    tornado.getRenderPosition(1.0F).z,
                     0.0,
                     localVerticalDrift,
                     0.0

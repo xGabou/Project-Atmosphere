@@ -23,9 +23,7 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneState;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
@@ -735,18 +733,6 @@ public class ForecastOrchestrator {
         CycloneManager.initialize(level);
         OceanBasinManager.initialize(level);
     }
-
-
-    public static HurricaneState getActiveHurricane() {
-        var hurricanes = HurricaneManager.getActiveHurricanes();
-        if (hurricanes.isEmpty()) {
-            return null;
-        }
-
-        var h = hurricanes.get(0);
-        return new HurricaneState(h.position.x, h.position.z, h.radius, h.radius * 0.5);
-    }
-
     private static void sendLoginStage(ServerPlayer player, String subtext, float progress, String source) {
         NetworkHandler.CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),

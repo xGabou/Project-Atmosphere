@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
@@ -7,6 +8,8 @@ import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
 import net.Gabou.projectatmosphere.modules.weather.StormMotionModel;
+import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
+import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
@@ -14,6 +17,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
@@ -22,6 +26,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -37,8 +42,8 @@ public class TornadoInstance {
     public static final double WIND_SPEED_SCALING_FACTOR = 0.05D;
     public static final double WIND_EFFECT_VERTICAL_MAX_OFFSET = 50.0D;
     public static final double WIND_EFFECT_VERTICAL_MIN_OFFSET = -5.0D;
-    private static final int FLOW_FIELD_INTERVAL_TICKS = 2;
-    private static final int DEMOLITION_INTERVAL_TICKS = 20;
+    private static final int FLOW_FIELD_INTERVAL_TICKS = 1;
+    private static final int DEMOLITION_INTERVAL_TICKS = 10;
     private static final float MIN_EFFECTIVE_WIND = 73.0F;
     private static final float MAX_EFFECTIVE_WIND = 260.0F;
     private static final float RANKINE_FACTOR = 4.5F;
@@ -48,7 +53,14 @@ public class TornadoInstance {
     private static final float CORE_ZONE_END = 0.22F;
     private static final float PLUME_FLOW_START = 0.70F;
     private static final float EJECTION_START_HEIGHT = 0.84F;
-    private static final float CAPTURE_ENTRY_RADIUS = 0.84F;
+    private static final float CAPTURE_ENTRY_RADIUS = 0.92F;
+    private static final float CAPTURED_ENTITY_ORBIT_SPEED_SCALE = 0.58F;
+    private static final float CAPTURED_ENTITY_TANGENTIAL_SCALE = 0.62F;
+    private static final float UNCAPTURED_ENTITY_TANGENTIAL_SCALE = 0.70F;
+    private static final double ENTITY_LIFT_VECTOR_SCALE = 4.0D;
+    private static final float WATER_PENALTY_THRESHOLD = 0.20F;
+    private static final float WATER_FORCED_DISSIPATION_THRESHOLD = 0.65F;
+    private static final int DEMOLITION_DEBUG_LOG_INTERVAL_TICKS = 100;
 
     private final UUID id;
     public Vec3 position;
@@ -61,6 +73,7 @@ public class TornadoInstance {
     private float angularSpeed;
     private float normalizedIntensity;
     private float targetIntensity;
+    private int stormLevel;
     private float headingRadians;
     private Vec3 motion = Vec3.ZERO;
     private boolean descriptorMissing;
@@ -76,22 +89,35 @@ public class TornadoInstance {
     private float anchorZ;
     private StormLifecyclePhase phase;
     private float recentDebrisScore;
+    private Vec3 clientPreviousRenderPosition;
+    private Vec3 clientRenderPosition;
+    private float clientPreviousRenderBottomY;
+    private float clientRenderBottomY;
+    private float clientPreviousRenderHeight;
+    private float clientRenderHeight;
+    private float clientPreviousRenderRadius;
+    private float clientRenderRadius;
     private final Map<Integer, CapturedEntityState> capturedEntities = new HashMap<>();
 
     @Nullable
     private CloudRegion cloudRegion;
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind, @Nullable CloudRegion cloudRegion) {
-        this(UUID.randomUUID(), position, radius, wind, 0.05F, (float) position.y, Math.max(96.0F, radius * 12.0F), cloudRegion);
+        this(UUID.randomUUID(), position, radius, wind, 0.05F, (float) position.y, Math.max(96.0F, radius * 12.0F), cloudRegion, StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F)));
     }
 
     public TornadoInstance(UUID id, Vec3 position, float radius, WindVector wind,
                            float visualBottomY, float visualHeight, @Nullable CloudRegion cloudRegion) {
-        this(id, position, radius, wind, 0.05F, visualBottomY, visualHeight, cloudRegion);
+        this(id, position, radius, wind, 0.05F, visualBottomY, visualHeight, cloudRegion, StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F)));
     }
 
     public TornadoInstance(UUID id, Vec3 position, float radius, WindVector wind, float angularSpeed,
                            float visualBottomY, float visualHeight, @Nullable CloudRegion cloudRegion) {
+        this(id, position, radius, wind, angularSpeed, visualBottomY, visualHeight, cloudRegion, StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F)));
+    }
+
+    public TornadoInstance(UUID id, Vec3 position, float radius, WindVector wind, float angularSpeed,
+                           float visualBottomY, float visualHeight, @Nullable CloudRegion cloudRegion, int stormLevel) {
         this.id = id;
         this.position = position;
         this.radius = radius;
@@ -102,16 +128,25 @@ public class TornadoInstance {
         this.visualHeight = visualHeight;
         this.targetVisualHeight = Math.max(visualHeight, 32.0F);
         this.cloudRegion = cloudRegion;
+        this.stormLevel = StormSeverityScale.clamp(stormLevel);
         this.anchorX = (float) position.x;
         this.anchorZ = (float) position.z;
         this.phase = StormLifecyclePhase.FORMING;
-        this.targetIntensity = defaultTargetIntensity(radius, wind);
+        this.targetIntensity = defaultTargetIntensity(radius, wind, this.stormLevel);
         this.normalizedIntensity = Math.max(0.18F, this.targetIntensity * 0.35F);
         this.headingRadians = wind.angleRadians();
-        this.formationTicks = 120 + Mth.floor(this.targetIntensity * 120.0F);
-        this.activeTicks = 1200 + Mth.floor(this.targetIntensity * 1800.0F);
-        this.dissipationTicks = 160 + Mth.floor(this.targetIntensity * 180.0F);
+        this.formationTicks = 120 + Mth.floor(this.targetIntensity * 120.0F) - this.stormLevel * 6;
+        this.activeTicks = 1000 + Mth.floor(this.targetIntensity * 1400.0F) + this.stormLevel * 120;
+        this.dissipationTicks = 140 + Mth.floor(this.targetIntensity * 160.0F) + this.stormLevel * 10;
         this.applyIntensityToVisuals();
+        this.clientPreviousRenderPosition = position;
+        this.clientRenderPosition = position;
+        this.clientPreviousRenderBottomY = this.visualBottomY;
+        this.clientRenderBottomY = this.visualBottomY;
+        this.clientPreviousRenderHeight = this.visualHeight;
+        this.clientRenderHeight = this.visualHeight;
+        this.clientPreviousRenderRadius = this.radius;
+        this.clientRenderRadius = this.radius;
     }
 
     public UUID getId() {
@@ -143,8 +178,28 @@ public class TornadoInstance {
         return this.phase;
     }
 
+    public int getStormLevel() {
+        return this.stormLevel;
+    }
+
     public float getRecentDebrisScore() {
         return this.recentDebrisScore;
+    }
+
+    public Vec3 getRenderPosition(float partialTick) {
+        return this.clientPreviousRenderPosition.lerp(this.clientRenderPosition, Mth.clamp(partialTick, 0.0F, 1.0F));
+    }
+
+    public float getRenderBottomY(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderBottomY, this.clientRenderBottomY);
+    }
+
+    public float getRenderHeight(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderHeight, this.clientRenderHeight);
+    }
+
+    public float getRenderRadius(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderRadius, this.clientRenderRadius);
     }
 
     public TornadoLevel getLevel() {
@@ -156,7 +211,9 @@ public class TornadoInstance {
     }
 
     public double getDamageMultiplier() {
-        return this.getLevel().getBaseDamage() * Math.max(0.3D, this.normalizedIntensity);
+        return this.getLevel().getBaseDamage()
+                * Math.max(0.3D, this.normalizedIntensity)
+                * (0.75D + StormSeverityScale.toNormalized(this.stormLevel) * 0.65D);
     }
 
     public float getLifetimeSeconds() {
@@ -193,10 +250,13 @@ public class TornadoInstance {
 
         WindVector sampledWind = ForecastOrchestrator.getWind(level, BlockPos.containing(this.position), gameTime);
         this.wind = sampledWind;
+        this.refreshStormLevel(level, gameTime);
+        float waterExposure = this.sampleWaterExposure(level);
+        this.applyWaterPenalty(waterExposure);
         this.recentDebrisScore = Math.max(0.0F, this.recentDebrisScore - 0.015F);
         this.pruneCapturedEntities(level);
         this.tickLifecycle();
-        this.updateMovement(gameTime);
+        this.updateMovement(level, gameTime);
         this.pushStateToDescriptor();
 
         if (this.phase == StormLifecyclePhase.ACTIVE || this.phase == StormLifecyclePhase.DISSIPATING) {
@@ -206,20 +266,24 @@ public class TornadoInstance {
             }
             if (gameTime - this.lastDemolitionTick >= DEMOLITION_INTERVAL_TICKS && this.normalizedIntensity >= 0.35F) {
                 this.lastDemolitionTick = gameTime;
-                AsyncAtmosphereService.runStorm(() -> {
-                    try {
-                        this.demolishBlocks(level);
-                        level.getServer().execute(() -> this.playDemolitionSound(level));
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
+                this.demolishBlocks(level);
+                this.playDemolitionSound(level);
             }
         }
     }
 
     public void tickClient() {
         this.ageTicks++;
+        this.clientPreviousRenderPosition = this.clientRenderPosition;
+        this.clientPreviousRenderBottomY = this.clientRenderBottomY;
+        this.clientPreviousRenderHeight = this.clientRenderHeight;
+        this.clientPreviousRenderRadius = this.clientRenderRadius;
+
+        float follow = 0.38F;
+        this.clientRenderPosition = this.clientRenderPosition.lerp(this.position, follow);
+        this.clientRenderBottomY = Mth.lerp(follow, this.clientRenderBottomY, this.visualBottomY);
+        this.clientRenderHeight = Mth.lerp(follow, this.clientRenderHeight, this.visualHeight);
+        this.clientRenderRadius = Mth.lerp(follow, this.clientRenderRadius, this.radius);
     }
 
     public TornadoSnapshot snapshot() {
@@ -233,23 +297,36 @@ public class TornadoInstance {
                 this.wind.angleRadians(),
                 this.wind.gustSpeed(),
                 this.normalizedIntensity,
+                this.stormLevel,
                 this.recentDebrisScore,
                 this.phase
         );
     }
 
     public void applySnapshot(TornadoSnapshot snapshot, @Nullable CloudRegion region) {
+        boolean snapToTarget = this.ageTicks <= 1 || this.clientRenderPosition.distanceToSqr(snapshot.position()) > 1024.0D;
         this.position = snapshot.position();
         this.radius = snapshot.radius();
         this.visualBottomY = snapshot.visualBottomY();
         this.visualHeight = snapshot.visualHeight();
         this.wind = new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust());
         this.normalizedIntensity = snapshot.normalizedIntensity();
+        this.stormLevel = StormSeverityScale.clamp(snapshot.stormLevel());
         this.recentDebrisScore = snapshot.recentDebrisScore();
         this.phase = snapshot.phase();
         this.cloudRegion = region;
         this.anchorX = (float) this.position.x;
         this.anchorZ = (float) this.position.z;
+        if (snapToTarget) {
+            this.clientPreviousRenderPosition = this.position;
+            this.clientRenderPosition = this.position;
+            this.clientPreviousRenderBottomY = this.visualBottomY;
+            this.clientRenderBottomY = this.visualBottomY;
+            this.clientPreviousRenderHeight = this.visualHeight;
+            this.clientRenderHeight = this.visualHeight;
+            this.clientPreviousRenderRadius = this.radius;
+            this.clientRenderRadius = this.radius;
+        }
     }
 
     public boolean synchronizeWithDescriptor() {
@@ -318,18 +395,21 @@ public class TornadoInstance {
 
     private void applyIntensityToVisuals() {
         float growth = Mth.clamp(this.normalizedIntensity, 0.0F, 1.0F);
-        this.radius = Mth.lerp(growth, this.maxRadius * 0.32F, this.maxRadius);
-        this.visualHeight = Mth.lerp(growth, this.targetVisualHeight * 0.35F, this.targetVisualHeight);
-        this.angularSpeed = 0.08F + growth * 0.16F;
+        float stormBias = 0.18F + StormSeverityScale.toNormalized(this.stormLevel) * 0.82F;
+        this.radius = Mth.lerp(growth, this.maxRadius * (0.26F + stormBias * 0.12F), this.maxRadius * (0.90F + stormBias * 0.22F));
+        this.visualHeight = Mth.lerp(growth, this.targetVisualHeight * (0.30F + stormBias * 0.08F), this.targetVisualHeight * (0.92F + stormBias * 0.15F));
+        this.angularSpeed = 0.08F + growth * 0.16F + StormSeverityScale.toNormalized(this.stormLevel) * 0.05F;
     }
 
-    private void updateMovement(long gameTime) {
+    private void updateMovement(ServerLevel level, long gameTime) {
         Vec3 updated = StormMotionModel.advanceTornado(
+                level,
                 this.id,
                 this.position,
                 this.motion,
                 this.wind,
                 Math.max(this.normalizedIntensity, 0.08F),
+                this.stormLevel,
                 gameTime,
                 this.anchorX,
                 this.anchorZ
@@ -362,41 +442,55 @@ public class TornadoInstance {
             return;
         }
 
+        Vec3 anchor = this.getInteractionAnchor(serverLevel);
         double influence = this.getWindfieldWidth() * 1.25D + AMBIENT_WIND_INFLUENCE_EXTENSION;
-        double minY = this.position.y + WIND_EFFECT_VERTICAL_MIN_OFFSET;
-        double maxY = this.position.y + 85.0D;
+        double minY = anchor.y + WIND_EFFECT_VERTICAL_MIN_OFFSET;
+        double maxY = anchor.y + Math.max(90.0D, this.visualHeight * 0.60D);
         AABB box = new AABB(
-                this.position.x - influence, minY,
-                this.position.z - influence, this.position.x + influence,
-                maxY, this.position.z + influence
+                anchor.x - influence, minY,
+                anchor.z - influence, anchor.x + influence,
+                maxY, anchor.z + influence
         );
 
         for (Entity entity : serverLevel.getEntities(null, box)) {
             if (entity instanceof Player player && (player.isCreative() || player.isSpectator())) {
                 continue;
             }
-            this.pullEntity(entity, entity instanceof Player ? 2.3F : 1.6F);
+            if (StormShieldManager.isProtected(serverLevel, entity.position())) {
+                continue;
+            }
+            this.pullEntity(entity, 2.45F);
         }
     }
 
     private void demolishBlocks(ServerLevel level) {
-        BlockPos center = BlockPos.containing(this.position);
-        int intRadius = Mth.ceil(this.radius);
-        double outerSq = (this.radius + 5.0F) * (this.radius + 5.0F);
-        double innerSq = this.radius * this.radius;
+        Vec3 anchor = this.getInteractionAnchor(level);
+        BlockPos center = BlockPos.containing(anchor);
+        float windfieldWidth = this.getWindfieldWidth();
+        float destructionRadius = Math.max(this.radius + 6.0F, windfieldWidth * 0.68F);
+        int intRadius = Mth.ceil(destructionRadius);
+        double outerSq = destructionRadius * destructionRadius;
+        double innerSq = Math.max(0.0F, destructionRadius - 5.0F) * Math.max(0.0F, destructionRadius - 5.0F);
         double band = Math.max(1.0, outerSq - innerSq);
         double invBand = 1.0 / band;
-        BlockPos min = center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, 0, -intRadius - DEBRIS_RANGE_EXTENSION);
-        BlockPos max = center.offset(intRadius + DEBRIS_RANGE_EXTENSION, 8 + intRadius, intRadius + DEBRIS_RANGE_EXTENSION);
+        int topScan = Math.max(24, intRadius + 22);
+        BlockPos min = center.offset(-intRadius - DEBRIS_RANGE_EXTENSION, -1, -intRadius - DEBRIS_RANGE_EXTENSION);
+        BlockPos max = center.offset(intRadius + DEBRIS_RANGE_EXTENSION, topScan, intRadius + DEBRIS_RANGE_EXTENSION);
 
         RandomSource random = RandomSource.create(this.id.getLeastSignificantBits() ^ this.ageTicks);
         it.unimi.dsi.fastutil.longs.LongArrayList toDestroy = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
         it.unimi.dsi.fastutil.longs.LongArrayList toDestroyGlass = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
-        it.unimi.dsi.fastutil.longs.LongArrayList toDestroyWeak = new it.unimi.dsi.fastutil.longs.LongArrayList(1024);
+        it.unimi.dsi.fastutil.longs.LongArrayList toDestroyWeak = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
         it.unimi.dsi.fastutil.longs.LongArrayList toScourGrass = new it.unimi.dsi.fastutil.longs.LongArrayList(1024);
+        float stormFactor = StormSeverityScale.toNormalized(this.stormLevel);
+        int scannedBlocks = 0;
+        int eligibleBlocks = 0;
 
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             if (!level.isLoaded(pos)) {
+                continue;
+            }
+            if (StormShieldManager.isProtected(level, pos)) {
                 continue;
             }
             try {
@@ -409,35 +503,43 @@ public class TornadoInstance {
                 if (state.isAir()) {
                     continue;
                 }
-                float windEffect = this.getWindEffect(pos.getCenter());
-                if (windEffect < 40.0F) {
+                scannedBlocks++;
+                double dx = pos.getX() + 0.5D - anchor.x;
+                double dz = pos.getZ() + 0.5D - anchor.z;
+                double horizontalDistSq = dx * dx + dz * dz;
+                if (horizontalDistSq > outerSq * 1.08D) {
                     continue;
                 }
-                double distSq = pos.distSqr(center);
+                float windEffect = this.getWindEffect(pos.getCenter());
+                if (windEffect < 26.0F) {
+                    continue;
+                }
+                eligibleBlocks++;
                 if (state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)) {
-                    toDestroy.add(pos.asLong());
+                    this.queueTreeCluster(level, pos, toDestroy);
                 } else if (AtmosphereUtils.isGlass(state)) {
-                    if (distSq > outerSq) {
+                    if (horizontalDistSq > outerSq) {
                         continue;
                     }
 
                     float pMax = 0.15F + this.normalizedIntensity * 0.35F;
-                    double t = Mth.clamp((outerSq - distSq) * invBand, 0.0, 1.0);
+                    double t = Mth.clamp((outerSq - horizontalDistSq) * invBand, 0.0, 1.0);
                     float p = (float) (t * pMax);
                     if (random.nextFloat() < p) {
                         toDestroyGlass.add(pos.asLong());
                     }
                 } else if (state.getFluidState().isEmpty()) {
                     if (state.is(Blocks.GRASS_BLOCK)) {
-                        float scourChance = Mth.clamp((windEffect - 48.0F) / 110.0F, 0.0F, 1.0F) * (0.08F + this.normalizedIntensity * 0.18F);
-                        if (random.nextFloat() < scourChance) {
+                        float scourChance = Mth.clamp((windEffect - 34.0F) / 90.0F, 0.0F, 1.0F) * (0.14F + this.normalizedIntensity * 0.22F + stormFactor * 0.16F);
+                        boolean forceScour = windEffect >= 88.0F || horizontalDistSq <= innerSq * 0.75D;
+                        if (forceScour || random.nextFloat() < scourChance) {
                             toScourGrass.add(pos.asLong());
                         }
                     }
-                    float destroySpeed = state.getDestroySpeed(level, pos);
-                    if (destroySpeed >= 0.0F && destroySpeed <= 1.0F) {
-                        float chance = Mth.clamp((windEffect - 85.0F) / 90.0F, 0.0F, 1.0F) * (0.03F + this.normalizedIntensity * 0.08F);
-                        if (random.nextFloat() < chance) {
+                    if (isVegetationBlock(state) || isSimpleStructureBlock(state) || isWeakBlock(state, level, pos, stormFactor)) {
+                        float chance = Mth.clamp((windEffect - 44.0F) / 86.0F, 0.0F, 1.0F) * (0.12F + this.normalizedIntensity * 0.16F + stormFactor * 0.14F);
+                        boolean forceBreak = windEffect >= 96.0F || horizontalDistSq <= innerSq * 0.70D;
+                        if (forceBreak || random.nextFloat() < chance) {
                             toDestroyWeak.add(pos.asLong());
                         }
                     }
@@ -446,17 +548,15 @@ public class TornadoInstance {
             }
         }
 
-        int perTick = 256;
-        this.destroyCursor = 0;
-        this.weakDestroyCursor = 0;
+        int perTick = 640;
         if (!toDestroy.isEmpty()) {
-            AsyncAtmosphereService.runOnMainThread(() -> this.processLeafLogDestruction(level, toDestroy, perTick));
+            AsyncAtmosphereService.runOnMainThread(() -> this.processLeafLogDestruction(level, toDestroy, perTick, 0));
         }
         if (!toDestroyWeak.isEmpty()) {
-            AsyncAtmosphereService.runOnMainThread(() -> this.processWeakDestruction(level, toDestroyWeak, perTick));
+            AsyncAtmosphereService.runOnMainThread(() -> this.processWeakDestruction(level, toDestroyWeak, perTick, 0, stormFactor));
         }
         if (!toScourGrass.isEmpty()) {
-            AsyncAtmosphereService.runOnMainThread(() -> this.processGrassScouring(level, toScourGrass, perTick));
+            AsyncAtmosphereService.runOnMainThread(() -> this.processGrassScouring(level, toScourGrass, perTick, 0));
         }
         if (!toDestroyGlass.isEmpty()) {
             GlassDamageManager.damageGlass(level, toDestroyGlass);
@@ -467,24 +567,41 @@ public class TornadoInstance {
                         + toScourGrass.size() * 0.010F
                         + toDestroyGlass.size() * 0.028F);
         this.recentDebrisScore = Mth.clamp(this.recentDebrisScore + debrisGain, 0.0F, 1.0F);
-    }
 
-    private int destroyCursor = 0;
-    private int weakDestroyCursor = 0;
-    private int grassScourCursor = 0;
+        if (ProjectAtmosphere.DEBUG_MODE && this.ageTicks % DEMOLITION_DEBUG_LOG_INTERVAL_TICKS == 0) {
+            ProjectAtmosphere.LOGGER.info(
+                    "[TornadoDebug] demolish id={} center=({}, {}, {}) radius={} windfield={} scanned={} eligible={} leafLog={} weak={} grass={} glass={}",
+                    this.id,
+                    Mth.floor(anchor.x),
+                    Mth.floor(anchor.y),
+                    Mth.floor(anchor.z),
+                    destructionRadius,
+                    windfieldWidth,
+                    scannedBlocks,
+                    eligibleBlocks,
+                    toDestroy.size(),
+                    toDestroyWeak.size(),
+                    toScourGrass.size(),
+                    toDestroyGlass.size()
+            );
+        }
+    }
 
     private void processLeafLogDestruction(ServerLevel level,
                                            it.unimi.dsi.fastutil.longs.LongArrayList list,
-                                           int perTick) {
-        if (this.destroyCursor >= list.size()) {
-            this.destroyCursor = 0;
+                                           int perTick,
+                                           int startIndex) {
+        if (startIndex >= list.size()) {
             return;
         }
 
-        int end = Math.min(this.destroyCursor + perTick, list.size());
-        for (int i = this.destroyCursor; i < end; i++) {
+        int end = Math.min(startIndex + perTick, list.size());
+        for (int i = startIndex; i < end; i++) {
             BlockPos pos = BlockPos.of(list.getLong(i));
             if (!level.isLoaded(pos)) {
+                continue;
+            }
+            if (StormShieldManager.isProtected(level, pos)) {
                 continue;
             }
 
@@ -495,26 +612,27 @@ public class TornadoInstance {
             level.destroyBlock(pos, false);
         }
 
-        this.destroyCursor = end;
-        if (this.destroyCursor < list.size()) {
-            level.getServer().execute(() -> this.processLeafLogDestruction(level, list, perTick));
-        } else {
-            this.destroyCursor = 0;
+        if (end < list.size()) {
+            level.getServer().execute(() -> this.processLeafLogDestruction(level, list, perTick, end));
         }
     }
 
     private void processWeakDestruction(ServerLevel level,
                                         it.unimi.dsi.fastutil.longs.LongArrayList list,
-                                        int perTick) {
-        if (this.weakDestroyCursor >= list.size()) {
-            this.weakDestroyCursor = 0;
+                                        int perTick,
+                                        int startIndex,
+                                        float stormFactor) {
+        if (startIndex >= list.size()) {
             return;
         }
 
-        int end = Math.min(this.weakDestroyCursor + perTick, list.size());
-        for (int i = this.weakDestroyCursor; i < end; i++) {
+        int end = Math.min(startIndex + perTick, list.size());
+        for (int i = startIndex; i < end; i++) {
             BlockPos pos = BlockPos.of(list.getLong(i));
             if (!level.isLoaded(pos)) {
+                continue;
+            }
+            if (StormShieldManager.isProtected(level, pos)) {
                 continue;
             }
 
@@ -522,33 +640,32 @@ public class TornadoInstance {
             if (state.isAir() || !state.getFluidState().isEmpty()) {
                 continue;
             }
-            float destroySpeed = state.getDestroySpeed(level, pos);
-            if (destroySpeed < 0.0F || destroySpeed > 1.0F) {
+            if (!(isVegetationBlock(state) || isSimpleStructureBlock(state) || isWeakBlock(state, level, pos, stormFactor))) {
                 continue;
             }
             level.destroyBlock(pos, false);
         }
 
-        this.weakDestroyCursor = end;
-        if (this.weakDestroyCursor < list.size()) {
-            level.getServer().execute(() -> this.processWeakDestruction(level, list, perTick));
-        } else {
-            this.weakDestroyCursor = 0;
+        if (end < list.size()) {
+            level.getServer().execute(() -> this.processWeakDestruction(level, list, perTick, end, stormFactor));
         }
     }
 
     private void processGrassScouring(ServerLevel level,
                                       it.unimi.dsi.fastutil.longs.LongArrayList list,
-                                      int perTick) {
-        if (this.grassScourCursor >= list.size()) {
-            this.grassScourCursor = 0;
+                                      int perTick,
+                                      int startIndex) {
+        if (startIndex >= list.size()) {
             return;
         }
 
-        int end = Math.min(this.grassScourCursor + perTick, list.size());
-        for (int i = this.grassScourCursor; i < end; i++) {
+        int end = Math.min(startIndex + perTick, list.size());
+        for (int i = startIndex; i < end; i++) {
             BlockPos pos = BlockPos.of(list.getLong(i));
             if (!level.isLoaded(pos)) {
+                continue;
+            }
+            if (StormShieldManager.isProtected(level, pos)) {
                 continue;
             }
 
@@ -558,16 +675,15 @@ public class TornadoInstance {
             }
         }
 
-        this.grassScourCursor = end;
-        if (this.grassScourCursor < list.size()) {
-            level.getServer().execute(() -> this.processGrassScouring(level, list, perTick));
-        } else {
-            this.grassScourCursor = 0;
+        if (end < list.size()) {
+            level.getServer().execute(() -> this.processGrassScouring(level, list, perTick, end));
         }
     }
 
     private void playDemolitionSound(Level level) {
-        BlockPos center = BlockPos.containing(this.position);
+        BlockPos center = level instanceof ServerLevel serverLevel
+                ? BlockPos.containing(this.getInteractionAnchor(serverLevel))
+                : BlockPos.containing(this.position);
         level.playLocalSound(
                 center.getX(), center.getY(), center.getZ(),
                 SoundEvents.GENERIC_EXPLODE,
@@ -578,6 +694,14 @@ public class TornadoInstance {
         );
     }
 
+    private void refreshStormLevel(ServerLevel level, long gameTime) {
+        int strongest = this.cloudRegion == null ? StormSeverityScale.MIN_LEVEL : StormSeverityScale.clamp(net.Gabou.projectatmosphere.modules.core.CloudLibrary.getSeverityFromRessourceLocation(this.cloudRegion.getCloudTypeId()));
+        var regionKey = net.Gabou.projectatmosphere.util.RegionInstanceKey.from(BlockPos.containing(this.position));
+        strongest = Math.max(strongest, StormSeverityScale.resolve(level, regionKey, gameTime));
+        this.stormLevel = strongest;
+        this.targetIntensity = defaultTargetIntensity(this.maxRadius, this.wind, this.stormLevel);
+    }
+
     @Nullable
     private TornadoDescriptor findDescriptor() {
         if (!(this.cloudRegion instanceof ITornadoRegion tornadoRegion)) {
@@ -586,14 +710,57 @@ public class TornadoInstance {
         return tornadoRegion.findTornado(this.id);
     }
 
-    private static float defaultTargetIntensity(float radius, WindVector wind) {
+    private static float defaultTargetIntensity(float radius, WindVector wind, int stormLevel) {
         float radiusFactor = Mth.clamp((radius - 5.0F) / 20.0F, 0.0F, 1.0F);
         float windFactor = Mth.clamp((wind.baseSpeed() - 12.0F) / 28.0F, 0.0F, 1.0F);
-        return Mth.clamp(0.35F + radiusFactor * 0.4F + windFactor * 0.25F, 0.25F, 1.0F);
+        float stormFactor = StormSeverityScale.toNormalized(stormLevel);
+        return Mth.clamp(0.18F + radiusFactor * 0.28F + windFactor * 0.18F + stormFactor * 0.42F, 0.18F, 1.0F);
+    }
+
+    private static boolean isVegetationBlock(BlockState state) {
+        return state.is(BlockTags.LEAVES)
+                || state.is(BlockTags.FLOWERS)
+                || state.is(BlockTags.CROPS)
+                || state.is(Blocks.VINE)
+                || state.is(Blocks.TALL_GRASS)
+                || state.is(Blocks.GRASS)
+                || state.is(Blocks.FERN)
+                || state.is(Blocks.LARGE_FERN)
+                || state.is(Blocks.DEAD_BUSH)
+                || state.is(Blocks.SUGAR_CANE)
+                || state.is(Blocks.BAMBOO)
+                || state.is(Blocks.SWEET_BERRY_BUSH)
+                || state.is(Blocks.KELP)
+                || state.is(Blocks.KELP_PLANT)
+                || state.is(Blocks.SEAGRASS)
+                || state.is(Blocks.TALL_SEAGRASS)
+                || state.canBeReplaced();
+    }
+
+    private static boolean isSimpleStructureBlock(BlockState state) {
+        return state.is(BlockTags.PLANKS)
+                || state.is(BlockTags.WOODEN_DOORS)
+                || state.is(BlockTags.WOODEN_TRAPDOORS)
+                || state.is(BlockTags.FENCES)
+                || state.is(BlockTags.FENCE_GATES)
+                || state.is(BlockTags.WOOL)
+                || state.is(BlockTags.WOODEN_STAIRS)
+                || state.is(BlockTags.WOODEN_SLABS)
+                || state.is(BlockTags.BEDS)
+                || state.is(BlockTags.CAMPFIRES);
+    }
+
+    private static boolean isWeakBlock(BlockState state, Level level, BlockPos pos, float stormFactor) {
+        float destroySpeed = state.getDestroySpeed(level, pos);
+        if (destroySpeed < 0.0F) {
+            return false;
+        }
+        float threshold = 1.0F + stormFactor * 1.4F;
+        return destroySpeed <= threshold;
     }
 
     private float getWindfieldWidth() {
-        return Math.max(this.radius * 1.8F, 28.0F);
+        return Math.max(this.radius * (1.65F + StormSeverityScale.toNormalized(this.stormLevel) * 0.45F), 28.0F);
     }
 
     private float getRankine(double dist, float windfieldWidth) {
@@ -635,26 +802,33 @@ public class TornadoInstance {
     }
 
     private void pullEntity(Entity entity, float multiplier) {
+        if (StormShieldManager.isProtected(entity.level(), entity.position())) {
+            this.capturedEntities.remove(entity.getId());
+            return;
+        }
+        Vec3 anchor = entity.level() instanceof ServerLevel serverLevel
+                ? this.getInteractionAnchor(serverLevel)
+                : new Vec3(this.position.x, this.visualBottomY, this.position.z);
         float windfieldWidth = this.getWindfieldWidth();
         CapturedEntityState captured = this.capturedEntities.get(entity.getId());
-        int worldHeight = entity.level().getHeight(
-                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
+        int terrainY = entity.level().getHeight(
+                Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 entity.blockPosition().getX(),
                 entity.blockPosition().getZ()
-        );
-        if (worldHeight > entity.blockPosition().getY()) {
+        ) - 1;
+        if (entity.getY() + 1.5D < terrainY) {
             return;
         }
 
-        Vec3 targetPos = new Vec3(this.position.x, entity.position().y, this.position.z);
+        Vec3 targetPos = new Vec3(anchor.x, entity.position().y, anchor.z);
         double dist = entity.position().distanceTo(targetPos);
         double maxInfluenceDistance = windfieldWidth * (captured != null ? 1.28D : OUTER_FLOW_RADIUS_FACTOR);
         if (dist > maxInfluenceDistance) {
             return;
         }
 
-        Vec3 relativePos = entity.position().subtract(this.position);
-        double heightDifference = entity.position().y - this.position.y;
+        Vec3 relativePos = entity.position().subtract(anchor);
+        double heightDifference = entity.position().y - anchor.y;
         if (Math.abs(heightDifference) > 150.0D) {
             return;
         }
@@ -679,14 +853,14 @@ public class TornadoInstance {
         }
 
         float radialNorm = Mth.clamp((float) (dist / Math.max(windfieldWidth, 0.001F)), 0.0F, 1.35F);
-        float heightNorm = Mth.clamp((float) ((entity.getY() - this.visualBottomY) / Math.max(this.visualHeight, 1.0F)), 0.0F, 1.15F);
+        float heightNorm = Mth.clamp((float) ((entity.getY() - anchor.y) / Math.max(this.visualHeight, 1.0F)), 0.0F, 1.15F);
         float outerReach = 1.0F - smoothStep(0.68F, 1.10F, radialNorm);
         float shellZone = 1.0F - Mth.clamp(Math.abs(radialNorm - MID_SHELL_CENTER) / MID_SHELL_WIDTH, 0.0F, 1.0F);
         float coreZone = 1.0F - smoothStep(0.05F, CORE_ZONE_END, radialNorm);
         float plumeZone = smoothStep(PLUME_FLOW_START, 0.98F, heightNorm);
         boolean shouldCapture = dist <= windfieldWidth * CAPTURE_ENTRY_RADIUS
-                || (shellZone > 0.42F && windEffect >= 58.0D)
-                || (coreZone > 0.45F && windEffect >= 48.0D);
+                || (shellZone > 0.35F && windEffect >= 48.0D)
+                || (coreZone > 0.35F && windEffect >= 42.0D);
         if (captured == null && shouldCapture) {
             captured = this.createCaptureState(entity, windfieldWidth, dist);
             this.capturedEntities.put(entity.getId(), captured);
@@ -714,32 +888,33 @@ public class TornadoInstance {
                     0.72F
             );
             captured.radialBand = Mth.lerp(0.22F, captured.radialBand, desiredBand);
-            captured.orbitAngle += (0.22F + this.normalizedIntensity * 0.20F + shellZone * 0.24F + transportProgress * 0.18F)
+            captured.orbitAngle += (0.11F + this.normalizedIntensity * 0.10F + shellZone * 0.12F + transportProgress * 0.09F)
                     * (1.0F - plumeZone * 0.22F)
-                    * captured.orbitBias;
+                    * captured.orbitBias
+                    * CAPTURED_ENTITY_ORBIT_SPEED_SCALE;
 
             double desiredRadius = windfieldWidth * captured.radialBand;
-            double desiredHeight = this.visualBottomY + this.visualHeight * Mth.clamp(
-                    heightNorm + 0.02F + captured.liftBias * 0.04F + plumeZone * 0.05F + captureProgress * 0.08F + transportProgress * 0.14F,
+            double desiredHeight = anchor.y + this.visualHeight * Mth.clamp(
+                    heightNorm + 0.04F + captured.liftBias * 0.08F + plumeZone * 0.08F + captureProgress * 0.16F + transportProgress * 0.28F,
                     0.04F,
-                    1.04F
+                    1.10F
             );
             Vec3 orbitTarget = new Vec3(
                     Math.cos(captured.orbitAngle) * desiredRadius,
                     desiredHeight,
                     Math.sin(captured.orbitAngle) * desiredRadius
-            ).add(this.position.x, 0.0D, this.position.z);
+            ).add(anchor.x, 0.0D, anchor.z);
             Vec3 towardOrbit = orbitTarget.subtract(entity.position());
             Vec3 orbitCorrection = towardOrbit.lengthSqr() > 1.0E-4 ? towardOrbit.normalize() : Vec3.ZERO;
             double inwardStrength = captured.expelling
                     ? -0.16D
-                    : Mth.lerp(captureProgress, 2.15D + outerReach * 0.95D + shellZone * 0.44D, 0.38D + shellZone * 0.32D - coreZone * 0.05D);
+                    : Mth.lerp(captureProgress, 2.45D + outerReach * 1.20D + shellZone * 0.38D, 0.54D + shellZone * 0.24D - coreZone * 0.04D);
             double liftStrength = captured.expelling
-                    ? effectStrength * (0.34D + plumeZone * 0.22D)
-                    : (0.01D + captured.liftBias * 0.08D + plumeZone * 0.08D + captureProgress * 0.10D + transportProgress * 0.42D) * effectStrength;
+                    ? effectStrength * (0.52D + plumeZone * 0.32D)
+                    : (0.08D + captured.liftBias * 0.18D + plumeZone * 0.16D + captureProgress * 0.24D + transportProgress * 0.88D) * effectStrength;
             double tangentialStrength = captured.expelling
-                    ? effectStrength * (0.72D + plumeZone * 0.22D)
-                    : effectStrength * (0.42D + shellZone * 1.65D + captured.orbitBias * 0.48D + transportProgress * 1.28D);
+                    ? effectStrength * (0.36D + plumeZone * 0.14D) * CAPTURED_ENTITY_TANGENTIAL_SCALE
+                    : effectStrength * (0.20D + shellZone * 0.82D + captured.orbitBias * 0.24D + transportProgress * 0.64D) * CAPTURED_ENTITY_TANGENTIAL_SCALE;
             double ejectFactor = captured.expelling
                     ? 1.35D + plumeZone * 0.78D
                     : 0.0D;
@@ -749,24 +924,24 @@ public class TornadoInstance {
                     .add(rotational.scale(tangentialStrength))
                     .add(inward.scale(effectStrength * inwardStrength))
                     .add(outward.scale(effectStrength * ejectFactor))
-                    .add(0.0D, liftStrength, 0.0D)
-                    .scale(captured.expelling ? 0.115D : 0.125D);
-            releaseCapture = captured.expelling && (heightNorm > 1.04F || dist > windfieldWidth * 1.26F);
+                    .add(0.0D, liftStrength * ENTITY_LIFT_VECTOR_SCALE, 0.0D)
+                    .scale(captured.expelling ? 0.125D : 0.155D);
+            releaseCapture = captured.expelling && (heightNorm > 1.08F || dist > windfieldWidth * 1.34F);
         } else {
             double suctionStrength = 1.95D + outerReach * 2.85D + shellZone * 0.28D - coreZone * 0.10D;
-            double tangentialStrength = 0.08D + shellZone * 0.34D + plumeZone * 0.06D;
-            double liftStrength = 0.0D + shellZone * 0.02D + plumeZone * 0.04D;
+            double tangentialStrength = (0.04D + shellZone * 0.17D + plumeZone * 0.03D) * UNCAPTURED_ENTITY_TANGENTIAL_SCALE;
+            double liftStrength = 0.02D + shellZone * 0.05D + plumeZone * 0.08D;
 
             add = inward.scale(effectStrength * suctionStrength)
                     .add(rotational.scale(effectStrength * tangentialStrength))
-                    .add(0.0D, effectStrength * liftStrength, 0.0D)
-                    .scale(0.082D + this.normalizedIntensity * 0.028D);
+                    .add(0.0D, effectStrength * liftStrength * ENTITY_LIFT_VECTOR_SCALE, 0.0D)
+                    .scale(0.094D + this.normalizedIntensity * 0.034D);
         }
         if (captured != null) {
             Vec3 current = entity.getDeltaMovement();
             Vec3 damped = captured.expelling
-                    ? new Vec3(current.x * 0.72D, Math.max(current.y * 0.78D, -0.08D), current.z * 0.72D)
-                    : new Vec3(current.x * 0.38D, Math.max(current.y * 0.58D, -0.08D), current.z * 0.38D);
+                    ? new Vec3(current.x * 0.80D, Math.max(current.y * 0.90D, -0.04D), current.z * 0.80D)
+                    : new Vec3(current.x * 0.42D, Math.max(current.y * 0.88D, -0.02D), current.z * 0.42D);
             entity.setDeltaMovement(damped.add(add));
         } else {
             entity.addDeltaMovement(add);
@@ -786,8 +961,25 @@ public class TornadoInstance {
         double angle = Math.atan2(entity.getZ() - this.position.z, entity.getX() - this.position.x);
         float band = Mth.clamp((float) (dist / Math.max(windfieldWidth, 0.001F)), 0.22F, 0.48F);
         float orbitBias = 0.85F + (float) StormMotionModel.noise01(this.id, this.ageTicks + entity.getId(), 0.11F) * 0.65F;
-        float liftBias = 0.45F + (float) StormMotionModel.noise01(this.id, this.ageTicks + entity.getId() * 3L, 0.07F) * 0.55F;
+        float liftBias = 0.72F + (float) StormMotionModel.noise01(this.id, this.ageTicks + entity.getId() * 3L, 0.07F) * 0.58F;
         return new CapturedEntityState(angle, band, orbitBias, liftBias, this.ageTicks, 0);
+    }
+
+    private void queueTreeCluster(ServerLevel level, BlockPos origin, it.unimi.dsi.fastutil.longs.LongArrayList list) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int dy = -2; dy <= 4; dy++) {
+                    BlockPos sample = origin.offset(dx, dy, dz);
+                    if (!level.isLoaded(sample) || StormShieldManager.isProtected(level, sample)) {
+                        continue;
+                    }
+                    BlockState state = level.getBlockState(sample);
+                    if (state.is(BlockTags.LOGS) || state.is(BlockTags.LEAVES)) {
+                        list.add(sample.asLong());
+                    }
+                }
+            }
+        }
     }
 
     private void pruneCapturedEntities(ServerLevel level) {
@@ -807,7 +999,76 @@ public class TornadoInstance {
     }
 
     private float getEffectiveWindSpeed() {
-        return Mth.lerp(this.normalizedIntensity, MIN_EFFECTIVE_WIND, MAX_EFFECTIVE_WIND);
+        float composite = Mth.clamp(this.normalizedIntensity * 0.72F + StormSeverityScale.toNormalized(this.stormLevel) * 0.28F, 0.0F, 1.0F);
+        return Mth.lerp(composite, MIN_EFFECTIVE_WIND, MAX_EFFECTIVE_WIND);
+    }
+
+    private void applyWaterPenalty(float waterExposure) {
+        if (waterExposure <= WATER_PENALTY_THRESHOLD) {
+            return;
+        }
+
+        float penalty = Mth.clamp((waterExposure - WATER_PENALTY_THRESHOLD) / (1.0F - WATER_PENALTY_THRESHOLD), 0.0F, 1.0F);
+        this.targetIntensity = Math.max(0.10F, this.targetIntensity * (1.0F - penalty * 0.72F));
+        if (this.phase == StormLifecyclePhase.ACTIVE) {
+            this.phaseTicks += 1 + Mth.floor(penalty * 3.0F);
+        } else if (this.phase == StormLifecyclePhase.FORMING) {
+            this.phaseTicks += Mth.floor(penalty * 2.0F);
+        }
+
+        if (waterExposure >= WATER_FORCED_DISSIPATION_THRESHOLD && this.phase == StormLifecyclePhase.ACTIVE && this.ageTicks > 80) {
+            this.markDissipating();
+        }
+    }
+
+    private Vec3 getInteractionAnchor(ServerLevel level) {
+        return new Vec3(this.position.x, this.sampleTerrainSurfaceY(level), this.position.z);
+    }
+
+    private float sampleTerrainSurfaceY(ServerLevel level) {
+        int centerX = Mth.floor(this.position.x);
+        int centerZ = Mth.floor(this.position.z);
+        int sampleOffset = Math.max(2, Mth.ceil(Math.min(this.getWindfieldWidth() * 0.18F, 10.0F)));
+
+        float highestSurface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ) - 1.0F;
+        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX + sampleOffset, centerZ) - 1.0F);
+        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX - sampleOffset, centerZ) - 1.0F);
+        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ + sampleOffset) - 1.0F);
+        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ - sampleOffset) - 1.0F);
+        return highestSurface;
+    }
+
+    private float sampleWaterExposure(ServerLevel level) {
+        double sampleRadius = Math.max(6.0D, this.getWindfieldWidth() * 0.45D);
+        double[][] offsets = {
+                {0.0D, 0.0D},
+                {sampleRadius, 0.0D},
+                {-sampleRadius, 0.0D},
+                {0.0D, sampleRadius},
+                {0.0D, -sampleRadius},
+                {sampleRadius * 0.7D, sampleRadius * 0.7D},
+                {sampleRadius * 0.7D, -sampleRadius * 0.7D},
+                {-sampleRadius * 0.7D, sampleRadius * 0.7D},
+                {-sampleRadius * 0.7D, -sampleRadius * 0.7D}
+        };
+
+        int waterSamples = 0;
+        for (double[] offset : offsets) {
+            int x = Mth.floor(this.position.x + offset[0]);
+            int z = Mth.floor(this.position.z + offset[1]);
+            int terrainY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            BlockPos surfacePos = new BlockPos(x, terrainY - 1, z);
+            BlockPos belowPos = surfacePos.below();
+            BlockState surface = level.getBlockState(surfacePos);
+            BlockState below = level.getBlockState(belowPos);
+            if (surface.is(Blocks.WATER)
+                    || below.is(Blocks.WATER)
+                    || surface.getFluidState().is(FluidTags.WATER)
+                    || below.getFluidState().is(FluidTags.WATER)) {
+                waterSamples++;
+            }
+        }
+        return waterSamples / (float) offsets.length;
     }
 
     private static final class CapturedEntityState {

@@ -1,5 +1,10 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Standalone hurricane cloud renderer tranche
+- Added a dedicated Simple Clouds-style hurricane renderer and shader path that renders bounded volumetric storm masses as their own cloud body instead of extending the old flat ring overlay path.
+- The new hurricane density field now supports a true empty eye, annular eyewall, upper canopy, outer shield, and early spiral-band structure while still reusing the Project Atmosphere / Simple Clouds texture samplers, fog, depth, and cloud-color language.
+- Hooked the hurricane renderer into both Simple Clouds default and shader-support pipelines, added hurricane shader registration/resources, and disabled the old `SimpleCloudsRendererMixin` ring path from the active mixin config.
+- Extended hurricane client snapshots/interpolation so prepared render data can be cached and reused per frame, and fixed tornado/hurricane motion/constructor mismatches so the current tree builds cleanly again.
 ## Unreleased - Gradle sync fix
 - Removed the duplicate mid-script `import groovy.json.JsonOutput` from `build.gradle`, which could stop the Gradle script from compiling during IDE sync.
 - Replaced legacy archive/version references with Gradle 8-safe values for the jar manifest plus the Modrinth and CurseForge artifact paths.
@@ -296,3 +301,9 @@ This file records functionality additions/removals made during development sessi
 - Forecast cache application now drains in client-side batches across ticks, allowing the overlay to report visible per-loop progress from the actual biome-profile apply path instead of jumping from wait to ready.
 - Added server-side login preparation stage updates around nearby-region collection and local weather seeding so the overlay advances before the forecast snapshot packet is sent.
 - Added an integrated-world loading bridge so local world startup can push forecast-design stages from the real server generation loops before the later client sync packet phase begins.
+## Unreleased - Hurricane renderer replacement
+- Removed the hurricane-specific `custom_cumulonimbus` spawn path so hurricane commands now create only the dedicated hurricane system instead of seeding a Simple Clouds cumulonimbus shell first.
+- Added an explicit `HurricaneRenderDescriptor` to server snapshots and client interpolation so eye size, eye-clear radius, eyewall thickness, canopy radius, shield radius, vertical layer factors, and outer band controls travel as storm data instead of being reconstructed only from radius and intensity during rendering.
+- Reworked `SimpleCloudsHurricaneRenderer` into a full dedicated hurricane pipeline with bounded opaque raymarching, weighted-transparency fringe rendering, and framebuffer eye-carve passes that clear unrelated ambient Simple Clouds content from both the opaque and transparent cloud targets before hurricane cloud content is added back.
+- Replaced the single hurricane shader registration with dedicated opaque, opaque-mask, transparency, and transparency-mask shader programs plus new fragment shaders for the standalone hurricane volume and eye-protection passes.
+- Deleted the abandoned flat-ring hurricane scaffold (`SimpleCloudsRendererMixin`, `HurricaneMeshRenderer`, `HurricaneStateProvider`, and `HurricaneState`) so there is no legacy ring renderer left in the active codebase.

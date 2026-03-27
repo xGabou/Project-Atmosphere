@@ -4,8 +4,10 @@ import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
 import net.Gabou.projectatmosphere.modules.weather.StormMotionModel;
+import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -15,6 +17,7 @@ import java.util.UUID;
 
 public class HurricaneInstance {
     private static final int AMBIENT_WIND_INTERVAL_TICKS = 20;
+    private static final float CLIENT_INTERPOLATION = 0.18F;
 
     private final UUID id;
     public Vec3 position;
@@ -33,6 +36,23 @@ public class HurricaneInstance {
     private int activeTicks;
     private int dissipationTicks;
     private long lastAmbientWindTick = Long.MIN_VALUE;
+    private Vec3 clientPreviousRenderPosition;
+    private Vec3 clientRenderPosition;
+    private Vec3 clientTargetPosition;
+    private float clientPreviousRenderRadius;
+    private float clientRenderRadius;
+    private float clientTargetRadius;
+    private float clientPreviousRenderEyeRadius;
+    private float clientRenderEyeRadius;
+    private float clientTargetEyeRadius;
+    private float clientPreviousRenderIntensity;
+    private float clientRenderIntensity;
+    private float clientTargetIntensity;
+    private HurricaneRenderDescriptor renderDescriptor;
+    private HurricaneRenderDescriptor clientPreviousRenderDescriptor;
+    private HurricaneRenderDescriptor clientRenderDescriptor;
+    private HurricaneRenderDescriptor clientTargetRenderDescriptor;
+    private final float visualSeed;
 
     public HurricaneInstance(Vec3 position, float radius, WindVector wind, HurricaneCategory category) {
         this(UUID.randomUUID(), position, radius, wind, category);
@@ -58,7 +78,24 @@ public class HurricaneInstance {
         this.formationTicks = 600;
         this.activeTicks = 9600 + Math.round(this.targetIntensity * 7200.0F);
         this.dissipationTicks = 1800;
+        this.visualSeed = (Math.abs(this.id.hashCode()) % 10000) / 10000.0F;
         this.applyIntensityToVisuals();
+        this.renderDescriptor = HurricaneRenderDescriptor.create(this.radius, this.normalizedIntensity, this.category);
+        this.clientPreviousRenderPosition = this.position;
+        this.clientRenderPosition = this.position;
+        this.clientTargetPosition = this.position;
+        this.clientPreviousRenderRadius = this.radius;
+        this.clientRenderRadius = this.radius;
+        this.clientTargetRadius = this.radius;
+        this.clientPreviousRenderEyeRadius = this.eyewallRadius;
+        this.clientRenderEyeRadius = this.eyewallRadius;
+        this.clientTargetEyeRadius = this.eyewallRadius;
+        this.clientPreviousRenderIntensity = this.normalizedIntensity;
+        this.clientRenderIntensity = this.normalizedIntensity;
+        this.clientTargetIntensity = this.normalizedIntensity;
+        this.clientPreviousRenderDescriptor = this.renderDescriptor;
+        this.clientRenderDescriptor = this.renderDescriptor;
+        this.clientTargetRenderDescriptor = this.renderDescriptor;
     }
 
     public UUID getId() {
@@ -81,6 +118,40 @@ public class HurricaneInstance {
         return this.eyewallRadius;
     }
 
+    public Vec3 getRenderPosition(float partialTick) {
+        return this.clientPreviousRenderPosition.lerp(this.clientRenderPosition, Mth.clamp(partialTick, 0.0F, 1.0F));
+    }
+
+    public float getRenderRadius(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderRadius, this.clientRenderRadius);
+    }
+
+    public float getRenderEyeRadius(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderEyeRadius, this.clientRenderEyeRadius);
+    }
+
+    public float getRenderIntensity(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderIntensity, this.clientRenderIntensity);
+    }
+
+    public float getVisualSpin(float partialTick) {
+        float intensity = this.getRenderIntensity(partialTick);
+        float gustFactor = Math.max(this.wind.baseSpeed(), this.wind.gustSpeed()) * 0.006F;
+        return (this.ageTicks + partialTick) * (0.0125F + intensity * 0.055F + gustFactor);
+    }
+
+    public float getVisualSeed() {
+        return this.visualSeed;
+    }
+
+    public HurricaneRenderDescriptor getRenderDescriptor(float partialTick) {
+        return HurricaneRenderDescriptor.lerp(
+                this.clientPreviousRenderDescriptor,
+                this.clientRenderDescriptor,
+                Mth.clamp(partialTick, 0.0F, 1.0F)
+        );
+    }
+
     public boolean isDead() {
         return this.phase.isTerminal();
     }
@@ -98,12 +169,26 @@ public class HurricaneInstance {
         this.phaseTicks++;
         this.wind = ForecastOrchestrator.getWind(level, BlockPos.containing(this.position), gameTime);
         this.tickLifecycle();
-        this.updateMovement(gameTime);
+        this.updateMovement(level, gameTime);
 
         if (gameTime - this.lastAmbientWindTick >= AMBIENT_WIND_INTERVAL_TICKS) {
             this.lastAmbientWindTick = gameTime;
             this.applyAmbientWind(level);
         }
+    }
+
+    public void tickClient() {
+        this.ageTicks++;
+        this.clientPreviousRenderPosition = this.clientRenderPosition;
+        this.clientPreviousRenderRadius = this.clientRenderRadius;
+        this.clientPreviousRenderEyeRadius = this.clientRenderEyeRadius;
+        this.clientPreviousRenderIntensity = this.clientRenderIntensity;
+        this.clientRenderPosition = this.clientRenderPosition.lerp(this.clientTargetPosition, CLIENT_INTERPOLATION);
+        this.clientRenderRadius = Mth.lerp(CLIENT_INTERPOLATION, this.clientRenderRadius, this.clientTargetRadius);
+        this.clientRenderEyeRadius = Mth.lerp(CLIENT_INTERPOLATION, this.clientRenderEyeRadius, this.clientTargetEyeRadius);
+        this.clientRenderIntensity = Mth.lerp(CLIENT_INTERPOLATION, this.clientRenderIntensity, this.clientTargetIntensity);
+        this.clientPreviousRenderDescriptor = this.clientRenderDescriptor;
+        this.clientRenderDescriptor = HurricaneRenderDescriptor.lerp(this.clientRenderDescriptor, this.clientTargetRenderDescriptor, CLIENT_INTERPOLATION);
     }
 
     public HurricaneSnapshot snapshot() {
@@ -116,6 +201,7 @@ public class HurricaneInstance {
                 this.wind.angleRadians(),
                 this.wind.gustSpeed(),
                 this.normalizedIntensity,
+                this.renderDescriptor,
                 this.category,
                 this.phase
         );
@@ -127,7 +213,13 @@ public class HurricaneInstance {
         this.eyewallRadius = snapshot.eyewallRadius();
         this.wind = new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust());
         this.normalizedIntensity = snapshot.normalizedIntensity();
+        this.renderDescriptor = snapshot.renderDescriptor();
         this.phase = snapshot.phase();
+        this.clientTargetPosition = snapshot.position();
+        this.clientTargetRadius = snapshot.radius();
+        this.clientTargetEyeRadius = snapshot.eyewallRadius();
+        this.clientTargetIntensity = snapshot.normalizedIntensity();
+        this.clientTargetRenderDescriptor = snapshot.renderDescriptor();
     }
 
     private void tickLifecycle() {
@@ -160,10 +252,12 @@ public class HurricaneInstance {
     private void applyIntensityToVisuals() {
         this.radius = this.maxRadius * (0.6F + this.normalizedIntensity * 0.7F);
         this.eyewallRadius = this.radius * (0.22F + this.normalizedIntensity * 0.20F);
+        this.renderDescriptor = HurricaneRenderDescriptor.create(this.radius, this.normalizedIntensity, this.category);
     }
 
-    private void updateMovement(long gameTime) {
+    private void updateMovement(ServerLevel level, long gameTime) {
         Vec3 updated = StormMotionModel.advanceHurricane(
+                level,
                 this.id,
                 this.position,
                 this.motion,
@@ -188,6 +282,9 @@ public class HurricaneInstance {
         double vz = Math.sin(this.wind.angleRadians()) * windSpeed;
 
         for (Entity entity : level.getEntities(null, box)) {
+            if (StormShieldManager.isProtected(level, entity.position())) {
+                continue;
+            }
             entity.push(vx, 0.01D * this.normalizedIntensity, vz);
         }
     }

@@ -13,12 +13,13 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
+    "client.DefaultPipelineHurricaneMixin",
     "MixinSandstormDebugBlocker",
     "client.DefaultPipelineTornadoMixin",
     "client.LoadingScreenMixin",
+    "client.ShaderSupportPipelineHurricaneMixin",
     "client.ShaderSupportPipelineTornadoMixin",
     "OverwriteDesertSound",
-    "SimpleCloudsRendererMixin",
     "client.LoadingOverlayMixin",
     "client.particle.ParticleMotionAccessor",
     "client.particle.WindBentParticleEngineMixin",

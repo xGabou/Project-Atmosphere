@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.hurricane;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.SyncHurricanesPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -19,6 +20,9 @@ public class HurricaneManager {
     private static final int SYNC_INTERVAL_TICKS = 10;
 
     public static void spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind, HurricaneCategory category) {
+        if (StormShieldManager.isProtected(level, pos)) {
+            return;
+        }
         SERVER_HURRICANES.add(new HurricaneInstance(pos, radius, wind, category));
         broadcastSnapshots();
     }
@@ -35,6 +39,12 @@ public class HurricaneManager {
         }
         if (gameTime % SYNC_INTERVAL_TICKS == 0L) {
             broadcastSnapshots();
+        }
+    }
+
+    public static void tickClient() {
+        for (HurricaneInstance hurricane : CLIENT_HURRICANES) {
+            hurricane.tickClient();
         }
     }
 

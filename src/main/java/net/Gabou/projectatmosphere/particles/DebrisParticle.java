@@ -25,7 +25,7 @@ public class DebrisParticle extends TextureSheetParticle {
 
     protected DebrisParticle(ClientLevel level, TornadoInstance tornado, double radius, double height, float angularSpeed,
                              float verticalDrift, float radialJitter, int band) {
-        super(level, tornado.position.x, tornado.position.y + height, tornado.position.z, 0, 0, 0);
+        super(level, tornado.getRenderPosition(1.0F).x, tornado.getRenderBottomY(1.0F) + height, tornado.getRenderPosition(1.0F).z, 0, 0, 0);
         this.tornadoRef = new WeakReference<>(tornado);
         this.radius = radius;
         this.baseY = height;
@@ -61,6 +61,8 @@ public class DebrisParticle extends TextureSheetParticle {
             remove();
             return;
         }
+        var renderPos = tornado.getRenderPosition(1.0F);
+        float renderBottomY = tornado.getRenderBottomY(1.0F);
         float lifeProgress = this.lifetime <= 0 ? 1.0F : (float) this.age / (float) this.lifetime;
         float bandSpinBoost = switch (this.band) {
             case 0 -> 1.25F;
@@ -90,9 +92,9 @@ public class DebrisParticle extends TextureSheetParticle {
             default -> 0.60F - lifeProgress * 0.22F;
         };
         setPos(
-                tornado.position.x + Math.cos(rad) * orbitRadius,
-                tornado.position.y + rise,
-                tornado.position.z + Math.sin(rad) * orbitRadius
+                renderPos.x + Math.cos(rad) * orbitRadius,
+                renderBottomY + rise,
+                renderPos.z + Math.sin(rad) * orbitRadius
         );
         this.yd += this.verticalDrift * 0.4;
         super.tick();

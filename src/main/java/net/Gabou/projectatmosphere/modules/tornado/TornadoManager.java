@@ -7,12 +7,17 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
+import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.RemoveTornadoPacket;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
 import net.Gabou.projectatmosphere.network.SyncTornadoesPacket;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -36,6 +41,7 @@ public class TornadoManager {
     private static final float MIN_VISUAL_HEIGHT = 96.0F;
     private static final float HEIGHT_RADIUS_FACTOR = 6.0F;
     private static final float HEIGHT_CLOUD_PADDING = 40.0F;
+    private static final float DEFAULT_ANGULAR_SPEED = 0.05F;
     private static final int SYNC_INTERVAL_TICKS = 5;
 
     private static float shaderTime = 0.0F;
@@ -52,12 +58,19 @@ public class TornadoManager {
                 wind.angleRadians(),
                 wind.gustSpeed(),
                 Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F),
+                StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F)),
                 0.0F,
                 net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase.FORMING
         ));
     }
 
     public static boolean spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind) {
+        CloudRegion cloud = findIntersectingCloud(level, pos, radius);
+        int stormLevel = deriveStormLevel(level, cloud, BlockPos.containing(pos));
+        return spawnServer(level, pos, radius, wind, stormLevel);
+    }
+
+    public static boolean spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind, int stormLevel) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
             return false;
         }
@@ -66,11 +79,14 @@ public class TornadoManager {
         if (cloud == null) {
             return false;
         }
+        if (StormShieldManager.isProtected(level, pos)) {
+            return false;
+        }
 
         UUID id = UUID.randomUUID();
         TornadoGeometry geometry = computeGeometry(level, pos, radius);
         Vec3 spawnPos = new Vec3(pos.x, geometry.bottomY(), pos.z);
-        TornadoInstance tornado = new TornadoInstance(id, spawnPos, radius, wind, geometry.bottomY(), geometry.height(), cloud);
+        TornadoInstance tornado = new TornadoInstance(id, spawnPos, radius, wind, DEFAULT_ANGULAR_SPEED, geometry.bottomY(), geometry.height(), cloud, stormLevel);
         attachDescriptor(cloud, tornado);
         SERVER_TORNADOES.add(tornado);
 
@@ -178,9 +194,11 @@ public class TornadoManager {
                         snapshot.position(),
                         snapshot.radius(),
                         new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust()),
+                        DEFAULT_ANGULAR_SPEED,
                         snapshot.visualBottomY(),
                         snapshot.visualHeight(),
-                        cloud
+                        cloud,
+                        snapshot.stormLevel()
                 );
             }
             existing.applySnapshot(snapshot, cloud);
@@ -200,9 +218,11 @@ public class TornadoManager {
                     snapshot.position(),
                     snapshot.radius(),
                     new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust()),
+                    DEFAULT_ANGULAR_SPEED,
                     snapshot.visualBottomY(),
                     snapshot.visualHeight(),
-                    cloud
+                    cloud,
+                    snapshot.stormLevel()
             );
             CLIENT_TORNADOES.add(existing);
         }
@@ -295,5 +315,17 @@ public class TornadoManager {
     }
 
     private record TornadoGeometry(float bottomY, float height) {
+    }
+
+    private static int deriveStormLevel(ServerLevel level, @Nullable CloudRegion cloud, net.minecraft.core.BlockPos pos) {
+        int cloudLevel = cloud == null ? StormSeverityScale.MIN_LEVEL : CloudLibrary.getSeverityFromRessourceLocation(cloud.getCloudTypeId());
+        RegionLevelProbe probe = RegionLevelProbe.at(level, pos);
+        return Math.max(cloudLevel, probe.level());
+    }
+
+    private record RegionLevelProbe(int level) {
+        private static RegionLevelProbe at(ServerLevel level, net.minecraft.core.BlockPos pos) {
+            return new RegionLevelProbe(StormSeverityScale.resolve(level, net.Gabou.projectatmosphere.util.RegionInstanceKey.from(pos), level.getGameTime()));
+        }
     }
 }

@@ -67,6 +67,7 @@ public class ClientTickHandler {
         SkyEffectState.beginFrame();
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
+        HurricaneManager.tickClient();
         Minecraft mc = Minecraft.getInstance();
         RainbowWeatherTracker.tick(mc);
 

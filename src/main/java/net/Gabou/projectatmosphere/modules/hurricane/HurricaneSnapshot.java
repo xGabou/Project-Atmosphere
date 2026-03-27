@@ -15,6 +15,7 @@ public record HurricaneSnapshot(
         float windAngle,
         float windGust,
         float normalizedIntensity,
+        HurricaneRenderDescriptor renderDescriptor,
         HurricaneCategory category,
         StormLifecyclePhase phase
 ) {
@@ -29,6 +30,7 @@ public record HurricaneSnapshot(
         buf.writeFloat(this.windAngle);
         buf.writeFloat(this.windGust);
         buf.writeFloat(this.normalizedIntensity);
+        this.renderDescriptor.write(buf);
         buf.writeEnum(this.category);
         buf.writeEnum(this.phase);
     }
@@ -42,8 +44,9 @@ public record HurricaneSnapshot(
         float windAngle = buf.readFloat();
         float windGust = buf.readFloat();
         float normalizedIntensity = buf.readFloat();
+        HurricaneRenderDescriptor renderDescriptor = HurricaneRenderDescriptor.read(buf);
         HurricaneCategory category = buf.readEnum(HurricaneCategory.class);
         StormLifecyclePhase phase = buf.readEnum(StormLifecyclePhase.class);
-        return new HurricaneSnapshot(id, position, radius, eyewallRadius, windSpeed, windAngle, windGust, normalizedIntensity, category, phase);
+        return new HurricaneSnapshot(id, position, radius, eyewallRadius, windSpeed, windAngle, windGust, normalizedIntensity, renderDescriptor, category, phase);
     }
 }

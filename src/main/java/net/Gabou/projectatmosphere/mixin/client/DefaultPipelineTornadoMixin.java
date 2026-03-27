@@ -18,11 +18,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = DefaultPipeline.class, remap = false)
 public abstract class DefaultPipelineTornadoMixin {
     @Inject(
-            method = "afterSky",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Ldev/nonamecrackers2/simpleclouds/client/renderer/SimpleCloudsRenderer;copyDepthFromCloudsToMain()V"
-            )
+            method = "afterLevel",
+            at = @At("HEAD")
     )
     private void projectatmosphere$renderTornadoOpaque(Minecraft mc, SimpleCloudsRenderer renderer,
                                                        PoseStack stack, Matrix4f projMat, float partialTick,
@@ -36,16 +33,21 @@ public abstract class DefaultPipelineTornadoMixin {
         float[] cloudColor = renderer.getCloudColor(partialTick);
         if (ProjectAtmosphere.DEBUG_MODE && level.getGameTime() % 40L == 0L && !TornadoManager.getClientTornadoes().isEmpty()) {
             ProjectAtmosphere.LOGGER.info(
-                    "[TornadoDebug] DefaultPipeline opaque hook reached gameTime={} activeTornadoes={}",
+                    "[TornadoDebug] DefaultPipeline late opaque hook reached gameTime={} activeTornadoes={}",
                     level.getGameTime(),
                     TornadoManager.getClientTornadoes().size()
             );
         }
         mc.getProfiler().push("projectatmosphere_tornado_opaque");
         SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
+        stack.pushPose();
+        renderer.translateClouds(stack, camX, camY, camZ);
+        mc.getMainRenderTarget().bindWrite(false);
         SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
-                renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2]
+                renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
+                mc.getMainRenderTarget().getDepthTextureId(), false
         );
+        stack.popPose();
         mc.getProfiler().pop();
     }
 

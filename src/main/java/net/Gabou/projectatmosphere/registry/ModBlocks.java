@@ -86,4 +86,12 @@ public class ModBlocks {
                     .noOcclusion()
             ));
 
+    public static final RegistryObject<Block> STORM_SHIELD = REGISTRY.register("storm_shield", () ->
+            new StormShieldBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(3.0f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
 }
