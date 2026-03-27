@@ -307,3 +307,11 @@ This file records functionality additions/removals made during development sessi
 - Reworked `SimpleCloudsHurricaneRenderer` into a full dedicated hurricane pipeline with bounded opaque raymarching, weighted-transparency fringe rendering, and framebuffer eye-carve passes that clear unrelated ambient Simple Clouds content from both the opaque and transparent cloud targets before hurricane cloud content is added back.
 - Replaced the single hurricane shader registration with dedicated opaque, opaque-mask, transparency, and transparency-mask shader programs plus new fragment shaders for the standalone hurricane volume and eye-protection passes.
 - Deleted the abandoned flat-ring hurricane scaffold (`SimpleCloudsRendererMixin`, `HurricaneMeshRenderer`, `HurricaneStateProvider`, and `HurricaneState`) so there is no legacy ring renderer left in the active codebase.
+
+## Unreleased - GPU-native hurricane mesh generation
+- Removed the fullscreen hurricane pipeline hooks and their shader registration so hurricanes are no longer rendered as a separate post/cloud-target pass.
+- Added `HurricaneMeshField` plus a new `MultiRegionCloudMeshGenerator` mixin that uploads prepared hurricane descriptors to the active Simple Clouds mesh compute shader each mesh-generation cycle.
+- Extended chunk scheduling so Simple Clouds now allocates mesh generation work for hurricane volumes even when no ambient cloud region overlaps the chunk.
+- Overrode the Simple Clouds `cube_mesh.comp` compute shader with a hurricane-aware density field that emits real mesh cubes for the eye wall, canopy, shield, and outer bands while using the same GPU block generation and face occlusion path as native Simple Clouds clouds.
+- Added an eye-carve override directly inside the cube generation density sampling so the hurricane eye removes ambient cloud blocks in the same generated volume instead of relying on a later framebuffer cleanup pass.
+- Added a `cloud_regions.comp` override that preserves an explicit "no ambient region" sentinel, preventing hurricane-only chunks from inheriting a bogus default cloud region during compute meshing.

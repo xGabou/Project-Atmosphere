@@ -13,8 +13,8 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
-    "client.DefaultPipelineHurricaneMixin",
     "MixinSandstormDebugBlocker",
+    "client.DefaultPipelineHurricaneMixin",
     "client.DefaultPipelineTornadoMixin",
     "client.LoadingScreenMixin",
     "client.ShaderSupportPipelineHurricaneMixin",
