@@ -42,6 +42,13 @@ public class TornadoInstance {
     public static final double WIND_SPEED_SCALING_FACTOR = 0.05D;
     public static final double WIND_EFFECT_VERTICAL_MAX_OFFSET = 50.0D;
     public static final double WIND_EFFECT_VERTICAL_MIN_OFFSET = -5.0D;
+    private static final int MINIMUM_PERSISTENCE_TICKS = 20 * 120;
+    private static final int MINIMUM_ACTIVE_TICKS = 20 * 120;
+    private static final int MAXIMUM_ACTIVE_TICKS = 20 * 600;
+    private static final int MINIMUM_FORMATION_TICKS = 20 * 6;
+    private static final int MAXIMUM_FORMATION_TICKS = 20 * 20;
+    private static final int MINIMUM_DISSIPATION_TICKS = 20 * 8;
+    private static final int MAXIMUM_DISSIPATION_TICKS = 20 * 40;
     private static final int FLOW_FIELD_INTERVAL_TICKS = 1;
     private static final int DEMOLITION_INTERVAL_TICKS = 10;
     private static final float MIN_EFFECTIVE_WIND = 73.0F;
@@ -59,8 +66,8 @@ public class TornadoInstance {
     private static final float UNCAPTURED_ENTITY_TANGENTIAL_SCALE = 0.70F;
     private static final double ENTITY_LIFT_VECTOR_SCALE = 4.0D;
     private static final float WATER_PENALTY_THRESHOLD = 0.20F;
-    private static final float WATER_FORCED_DISSIPATION_THRESHOLD = 0.65F;
     private static final int DEMOLITION_DEBUG_LOG_INTERVAL_TICKS = 100;
+    private static final int CLOUD_DETACH_GRACE_TICKS = 20 * 30;
 
     private final UUID id;
     public Vec3 position;
@@ -82,6 +89,7 @@ public class TornadoInstance {
     private int formationTicks;
     private int activeTicks;
     private int dissipationTicks;
+    private int detachedTicks;
     private long spawnGameTime;
     private long lastAmbientWindTick = Long.MIN_VALUE;
     private long lastDemolitionTick = Long.MIN_VALUE;
@@ -135,9 +143,14 @@ public class TornadoInstance {
         this.targetIntensity = defaultTargetIntensity(radius, wind, this.stormLevel);
         this.normalizedIntensity = Math.max(0.18F, this.targetIntensity * 0.35F);
         this.headingRadians = wind.angleRadians();
-        this.formationTicks = 120 + Mth.floor(this.targetIntensity * 120.0F) - this.stormLevel * 6;
-        this.activeTicks = 1000 + Mth.floor(this.targetIntensity * 1400.0F) + this.stormLevel * 120;
-        this.dissipationTicks = 140 + Mth.floor(this.targetIntensity * 160.0F) + this.stormLevel * 10;
+        float persistenceFactor = Mth.clamp(
+                this.targetIntensity * 0.65F + StormSeverityScale.toNormalized(this.stormLevel) * 0.35F,
+                0.0F,
+                1.0F
+        );
+        this.formationTicks = Mth.floor(Mth.lerp(persistenceFactor, MINIMUM_FORMATION_TICKS, MAXIMUM_FORMATION_TICKS));
+        this.activeTicks = Mth.floor(Mth.lerp(persistenceFactor, MINIMUM_ACTIVE_TICKS, MAXIMUM_ACTIVE_TICKS));
+        this.dissipationTicks = Mth.floor(Mth.lerp(persistenceFactor, MINIMUM_DISSIPATION_TICKS, MAXIMUM_DISSIPATION_TICKS));
         this.applyIntensityToVisuals();
         this.clientPreviousRenderPosition = position;
         this.clientRenderPosition = position;
@@ -160,6 +173,7 @@ public class TornadoInstance {
 
     public void setCloudRegion(@Nullable CloudRegion cloudRegion) {
         this.cloudRegion = cloudRegion;
+        this.detachedTicks = cloudRegion == null ? this.detachedTicks : 0;
     }
 
     public float getVisualBottomY() {
@@ -241,6 +255,24 @@ public class TornadoInstance {
         return this.phase.isTerminal();
     }
 
+    public void updateCloudAttachment(boolean attached) {
+        if (attached) {
+            this.detachedTicks = 0;
+            return;
+        }
+
+        this.detachedTicks++;
+        if (this.detachedTicks >= CLOUD_DETACH_GRACE_TICKS
+                && this.ageTicks >= MINIMUM_PERSISTENCE_TICKS
+                && this.phase != StormLifecyclePhase.DISSIPATING) {
+            this.markDissipating();
+        }
+    }
+
+    public int getDetachedTicks() {
+        return this.detachedTicks;
+    }
+
     public void tickServer(ServerLevel level, long gameTime) {
         this.ageTicks++;
         this.phaseTicks++;
@@ -264,7 +296,7 @@ public class TornadoInstance {
                 this.lastAmbientWindTick = gameTime;
                 this.applyAmbientWind(level);
             }
-            if (gameTime - this.lastDemolitionTick >= DEMOLITION_INTERVAL_TICKS && this.normalizedIntensity >= 0.35F) {
+            if (gameTime - this.lastDemolitionTick >= DEMOLITION_INTERVAL_TICKS && this.normalizedIntensity >= 0.22F) {
                 this.lastDemolitionTick = gameTime;
                 this.demolishBlocks(level);
                 this.playDemolitionSound(level);
@@ -467,7 +499,7 @@ public class TornadoInstance {
         Vec3 anchor = this.getInteractionAnchor(level);
         BlockPos center = BlockPos.containing(anchor);
         float windfieldWidth = this.getWindfieldWidth();
-        float destructionRadius = Math.max(this.radius + 6.0F, windfieldWidth * 0.68F);
+        float destructionRadius = Math.max(this.radius + 8.0F, windfieldWidth * 0.78F);
         int intRadius = Mth.ceil(destructionRadius);
         double outerSq = destructionRadius * destructionRadius;
         double innerSq = Math.max(0.0F, destructionRadius - 5.0F) * Math.max(0.0F, destructionRadius - 5.0F);
@@ -511,7 +543,7 @@ public class TornadoInstance {
                     continue;
                 }
                 float windEffect = this.getWindEffect(pos.getCenter());
-                if (windEffect < 26.0F) {
+                if (windEffect < 18.0F) {
                     continue;
                 }
                 eligibleBlocks++;
@@ -530,15 +562,19 @@ public class TornadoInstance {
                     }
                 } else if (state.getFluidState().isEmpty()) {
                     if (state.is(Blocks.GRASS_BLOCK)) {
-                        float scourChance = Mth.clamp((windEffect - 34.0F) / 90.0F, 0.0F, 1.0F) * (0.14F + this.normalizedIntensity * 0.22F + stormFactor * 0.16F);
-                        boolean forceScour = windEffect >= 88.0F || horizontalDistSq <= innerSq * 0.75D;
+                        float scourChance = Mth.clamp((windEffect - 24.0F) / 68.0F, 0.0F, 1.0F) * (0.24F + this.normalizedIntensity * 0.26F + stormFactor * 0.18F);
+                        boolean forceScour = windEffect >= 70.0F || horizontalDistSq <= innerSq * 0.88D;
                         if (forceScour || random.nextFloat() < scourChance) {
                             toScourGrass.add(pos.asLong());
                         }
                     }
-                    if (isVegetationBlock(state) || isSimpleStructureBlock(state) || isWeakBlock(state, level, pos, stormFactor)) {
-                        float chance = Mth.clamp((windEffect - 44.0F) / 86.0F, 0.0F, 1.0F) * (0.12F + this.normalizedIntensity * 0.16F + stormFactor * 0.14F);
-                        boolean forceBreak = windEffect >= 96.0F || horizontalDistSq <= innerSq * 0.70D;
+                    boolean looseTerrain = isLooseTerrainBlock(state);
+                    if (isVegetationBlock(state) || isSimpleStructureBlock(state) || looseTerrain || isWeakBlock(state, level, pos, stormFactor)) {
+                        float chance = Mth.clamp((windEffect - 22.0F) / 70.0F, 0.0F, 1.0F) * (0.24F + this.normalizedIntensity * 0.30F + stormFactor * 0.22F);
+                        if (looseTerrain) {
+                            chance *= 1.28F;
+                        }
+                        boolean forceBreak = windEffect >= 72.0F || horizontalDistSq <= innerSq * 0.86D;
                         if (forceBreak || random.nextFloat() < chance) {
                             toDestroyWeak.add(pos.asLong());
                         }
@@ -640,7 +676,7 @@ public class TornadoInstance {
             if (state.isAir() || !state.getFluidState().isEmpty()) {
                 continue;
             }
-            if (!(isVegetationBlock(state) || isSimpleStructureBlock(state) || isWeakBlock(state, level, pos, stormFactor))) {
+            if (!(isVegetationBlock(state) || isSimpleStructureBlock(state) || isLooseTerrainBlock(state) || isWeakBlock(state, level, pos, stormFactor))) {
                 continue;
             }
             level.destroyBlock(pos, false);
@@ -750,12 +786,33 @@ public class TornadoInstance {
                 || state.is(BlockTags.CAMPFIRES);
     }
 
+    private static boolean isLooseTerrainBlock(BlockState state) {
+        return state.is(Blocks.DIRT)
+                || state.is(Blocks.COARSE_DIRT)
+                || state.is(Blocks.ROOTED_DIRT)
+                || state.is(Blocks.GRASS_BLOCK)
+                || state.is(Blocks.PODZOL)
+                || state.is(Blocks.MYCELIUM)
+                || state.is(Blocks.DIRT_PATH)
+                || state.is(Blocks.FARMLAND)
+                || state.is(Blocks.MUD)
+                || state.is(Blocks.MUDDY_MANGROVE_ROOTS)
+                || state.is(Blocks.CLAY)
+                || state.is(Blocks.SAND)
+                || state.is(Blocks.RED_SAND)
+                || state.is(Blocks.GRAVEL)
+                || state.is(Blocks.SNOW)
+                || state.is(Blocks.SNOW_BLOCK)
+                || state.is(Blocks.POWDER_SNOW)
+                || state.is(Blocks.MOSS_BLOCK);
+    }
+
     private static boolean isWeakBlock(BlockState state, Level level, BlockPos pos, float stormFactor) {
         float destroySpeed = state.getDestroySpeed(level, pos);
         if (destroySpeed < 0.0F) {
             return false;
         }
-        float threshold = 1.0F + stormFactor * 1.4F;
+        float threshold = 1.6F + stormFactor * 2.2F;
         return destroySpeed <= threshold;
     }
 
@@ -1009,16 +1066,7 @@ public class TornadoInstance {
         }
 
         float penalty = Mth.clamp((waterExposure - WATER_PENALTY_THRESHOLD) / (1.0F - WATER_PENALTY_THRESHOLD), 0.0F, 1.0F);
-        this.targetIntensity = Math.max(0.10F, this.targetIntensity * (1.0F - penalty * 0.72F));
-        if (this.phase == StormLifecyclePhase.ACTIVE) {
-            this.phaseTicks += 1 + Mth.floor(penalty * 3.0F);
-        } else if (this.phase == StormLifecyclePhase.FORMING) {
-            this.phaseTicks += Mth.floor(penalty * 2.0F);
-        }
-
-        if (waterExposure >= WATER_FORCED_DISSIPATION_THRESHOLD && this.phase == StormLifecyclePhase.ACTIVE && this.ageTicks > 80) {
-            this.markDissipating();
-        }
+        this.targetIntensity = Math.max(0.18F, this.targetIntensity * (1.0F - penalty * 0.18F));
     }
 
     private Vec3 getInteractionAnchor(ServerLevel level) {

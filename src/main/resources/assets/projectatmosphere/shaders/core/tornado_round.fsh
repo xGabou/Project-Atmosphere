@@ -17,7 +17,13 @@ uniform vec4 FogColor;
 uniform float AnimationTime;
 uniform float MaxDistance;
 uniform vec2 OutSize;
+uniform vec3 VolumeMin;
+uniform vec3 VolumeMax;
+uniform float CloudScale;
 uniform int StormCount;
+uniform int DebugMode;
+uniform int DebugSelectedStorm;
+uniform int DebugFreeze;
 uniform float StormPositions[24];
 uniform float StormHeights[8];
 uniform float StormWidths[8];
@@ -28,17 +34,41 @@ uniform float StormShapes[8];
 uniform float StormProgress[8];
 
 in vec2 texCoord;
+in vec3 fragPos;
 out vec4 fragColor;
 
 const float PI = 3.1415926535897932384626433832795;
 const float TAU = 6.2831853071795864769252867665590;
 const int MAX_STORMS_COUNT = 8;
+const int DEBUG_OFF = 0;
+const int DEBUG_BOX = 1;
+const int DEBUG_HIT = 2;
+const int DEBUG_FILL = 3;
+const int DEBUG_FUNNEL = 4;
+const int DEBUG_HEIGHT = 5;
+const int DEBUG_RADIAL = 6;
+const int DEBUG_RADIUS = 7;
+const int DEBUG_DENSITY = 8;
+const int DEBUG_ALPHA = 9;
+const int DEBUG_WALLCLOUD = 10;
+const int DEBUG_CONNECTION = 11;
+const int DEBUG_FULL = 12;
 
 struct StormSample {
     float cloud;
     float dust;
     float upper;
     float material;
+};
+
+struct DebugMasks {
+    float heightMask;
+    float radialMask;
+    float radiusMask;
+    float density;
+    float alpha;
+    float wallcloud;
+    float connection;
 };
 
 float saturate(float value) {
@@ -110,6 +140,14 @@ mat2 spin(float angle) {
     return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 }
 
+float cloudToWorld(float value) {
+    return value * CloudScale;
+}
+
+vec3 cloudToWorld(vec3 value) {
+    return value * CloudScale;
+}
+
 vec3 reconstructPosition(vec2 uv, float depth) {
     vec4 ndc = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
     vec4 clip = InverseProjMat * ndc;
@@ -139,21 +177,34 @@ vec3 getStormPos(int index) {
     return vec3(StormPositions[index * 3], StormPositions[index * 3 + 1], StormPositions[index * 3 + 2]);
 }
 
-float sampleMaterialField(vec3 localTorPos, float percFnlHeight, float widPerc, float wid, float spinPhaseA, float spinPhaseB) {
-    vec2 swirlA = spin(spinPhaseA) * localTorPos.xz;
-    vec2 swirlB = spin(spinPhaseB) * localTorPos.xz;
+float sampleFunnelRadiusWorld(float widthWorld, float stormSizeWorld, float tornadoShape, float torPerc, float percFnlHeight) {
+    float torShape = mix(tornadoShape, 20.0, saturate(widthWorld / 62.5));
+    float widWorld = (widthWorld / 2.5)
+        + ((widthWorld / 2.5) * percFnlHeight * torPerc)
+        + ((stormSizeWorld / mix(torShape + 2.0, torShape, torPerc)) * pow(percFnlHeight, 4.0));
+    return mix(widWorld, 0.0, (1.0 - percFnlHeight) * (1.0 - torPerc));
+}
+
+float sampleMaterialField(vec3 localTorPosWorld, float percFnlHeight, float widPerc, float widWorld,
+                          float spinPhaseA, float spinPhaseB, float animTime, bool freezeDebug) {
+    if (freezeDebug) {
+        return 1.0;
+    }
+
+    vec2 swirlA = spin(spinPhaseA) * localTorPosWorld.xz;
+    vec2 swirlB = spin(spinPhaseB) * localTorPosWorld.xz;
 
     vec2 flowA = texture(
         FlowSampler,
-        fract(swirlA * 0.020 + vec2(AnimationTime * 0.012, -AnimationTime * 0.014))
+        fract(swirlA * 0.020 + vec2(animTime * 0.012, -animTime * 0.014))
     ).rg * 2.0 - 1.0;
     vec2 flowB = texture(
         FlowSampler,
-        fract(swirlB * 0.033 + vec2(-AnimationTime * 0.018, AnimationTime * 0.016))
+        fract(swirlB * 0.033 + vec2(-animTime * 0.018, animTime * 0.016))
     ).rg * 2.0 - 1.0;
 
-    vec2 uvA = fract(swirlA * 0.055 + flowA * 0.060 + vec2(percFnlHeight * 0.30, AnimationTime * 0.030));
-    vec2 uvB = fract(swirlB * 0.095 + flowB * 0.040 + vec2(-AnimationTime * 0.042, percFnlHeight * 0.88));
+    vec2 uvA = fract(swirlA * 0.055 + flowA * 0.060 + vec2(percFnlHeight * 0.30, animTime * 0.030));
+    vec2 uvB = fract(swirlB * 0.095 + flowB * 0.040 + vec2(-animTime * 0.042, percFnlHeight * 0.88));
     vec4 texA = texture(TornadoSampler, uvA);
     vec4 texB = texture(TornadoSampler, uvB);
     float lumA = max(texA.a, dot(texA.rgb, vec3(0.299, 0.587, 0.114)));
@@ -163,18 +214,18 @@ float sampleMaterialField(vec3 localTorPos, float percFnlHeight, float widPerc, 
     float noiseB = texture(NoiseSampler, fract(swirlB * 0.037 + vec2(0.48, 0.22))).r;
     float planarField = mix(lumA, lumB, 0.58);
 
-    float radial = length(localTorPos.xz);
-    float angular = atan(localTorPos.z, localTorPos.x) / TAU + 0.5;
+    float radial = length(localTorPosWorld.xz);
+    float angular = atan(localTorPosWorld.z, localTorPosWorld.x) / TAU + 0.5;
     vec2 cylFlow = texture(
         FlowSampler,
-        fract(vec2(angular * 1.35 + AnimationTime * 0.022, percFnlHeight * 1.20 - AnimationTime * 0.016) + vec2(0.19, 0.43))
+        fract(vec2(angular * 1.35 + animTime * 0.022, percFnlHeight * 1.20 - animTime * 0.016) + vec2(0.19, 0.43))
     ).rg * 2.0 - 1.0;
     vec2 cylUvA = fract(vec2(
-        angular * 2.60 + AnimationTime * 0.085 + cylFlow.x * 0.08,
+        angular * 2.60 + animTime * 0.085 + cylFlow.x * 0.08,
         percFnlHeight * 1.55 + radial * 0.050 + cylFlow.y * 0.06
     ));
     vec2 cylUvB = fract(vec2(
-        angular * 4.10 - AnimationTime * 0.132 - cylFlow.y * 0.05,
+        angular * 4.10 - animTime * 0.132 - cylFlow.y * 0.05,
         percFnlHeight * 2.05 - radial * 0.032 + cylFlow.x * 0.04
     ));
     vec4 cylTexA = texture(TornadoSampler, cylUvA);
@@ -185,32 +236,121 @@ float sampleMaterialField(vec3 localTorPos, float percFnlHeight, float widPerc, 
 
     float lowerBlend = 1.0 - smoothstep(0.18, 0.46, percFnlHeight);
     lowerBlend *= mix(0.55, 1.0, widPerc);
-    lowerBlend *= 1.0 - smoothstep(1.2, 3.0, wid);
+    lowerBlend *= 1.0 - smoothstep(1.2, 3.0, widWorld);
 
     float texField = mix(planarField, cylindricalField, lowerBlend);
     float turbulence = saturate(texField * 0.72 + noiseA * 0.18 + noiseB * 0.10);
     return mix(0.84, 1.18, turbulence) * mix(0.88, 1.14, widPerc);
 }
 
+DebugMasks sampleDebugMasks(int index, vec3 position) {
+    vec3 pos = getStormPos(index);
+    vec3 posWorld = cloudToWorld(pos);
+    vec3 positionWorld = cloudToWorld(position);
+    float widthWorld = max(cloudToWorld(StormWidths[index]), 0.001);
+    float stormSizeWorld = max(cloudToWorld(StormSizes[index]), widthWorld * 2.0);
+    float baseHeightWorld = cloudToWorld(pos.y + StormHeights[index]);
+    float intensity = saturate(StormIntensities[index]);
+    float torPerc = saturate(StormProgress[index]);
+    float tornadoShape = StormShapes[index];
+
+    float funnelTopWorld = max(baseHeightWorld - 13.125, posWorld.y + 3.75);
+    float heightMask = 0.0;
+    if (positionWorld.y >= posWorld.y && positionWorld.y <= funnelTopWorld) {
+        heightMask = saturate((positionWorld.y - posWorld.y) / max(funnelTopWorld - posWorld.y, 0.001));
+    }
+
+    float funnelRadiusWorld = sampleFunnelRadiusWorld(widthWorld, stormSizeWorld, tornadoShape, torPerc, heightMask);
+    float radialDistanceWorld = distance(positionWorld.xz, posWorld.xz);
+    float radialMask = 1.0 - saturate(radialDistanceWorld / max(funnelRadiusWorld, 0.001));
+    float verticalGate = step(posWorld.y, positionWorld.y) * (1.0 - step(funnelTopWorld, positionWorld.y));
+    float density = radialMask * verticalGate;
+    float alpha = saturate(density * 0.85);
+
+    float wallcloudRadiusWorld = stormSizeWorld * 0.35;
+    float wallcloudLowerWorld = 15.0 * pow(max(1.0 - saturate(radialDistanceWorld / max(wallcloudRadiusWorld, 0.001)), 0.0), 0.25) * saturate((intensity - 0.45) * 2.2);
+    float wallcloud = 0.0;
+    if (positionWorld.y <= baseHeightWorld && positionWorld.y >= baseHeightWorld - wallcloudLowerWorld) {
+        float wallPerc = 1.0 - saturate(radialDistanceWorld / max(wallcloudRadiusWorld, 0.001));
+        wallcloud = pow(max(wallPerc, 0.0), 0.55) * saturate((intensity - 0.40) * 2.6);
+    }
+
+    float connectionRadiusWorld = max(funnelRadiusWorld * mix(1.8, 2.5, intensity), stormSizeWorld * 0.28);
+    float connectionPerc = 1.0 - saturate(radialDistanceWorld / max(connectionRadiusWorld, 0.001));
+    float connection = pow(max(connectionPerc, 0.0), 0.55);
+    connection *= smoothstep(funnelTopWorld - 1.8, baseHeightWorld + 1.8, positionWorld.y);
+    connection *= saturate((intensity - 0.25) * 1.7);
+
+    DebugMasks masks;
+    masks.heightMask = heightMask * verticalGate;
+    masks.radialMask = radialMask;
+    masks.radiusMask = saturate(funnelRadiusWorld / max(stormSizeWorld, 0.001));
+    masks.density = density;
+    masks.alpha = alpha;
+    masks.wallcloud = wallcloud;
+    masks.connection = connection;
+    return masks;
+}
+
+float selectDebugMask(DebugMasks masks) {
+    if (DebugMode == DEBUG_FUNNEL) {
+        return max(masks.density, max(masks.wallcloud, masks.connection));
+    }
+    if (DebugMode == DEBUG_HEIGHT) {
+        return masks.heightMask;
+    }
+    if (DebugMode == DEBUG_RADIAL) {
+        return masks.radialMask;
+    }
+    if (DebugMode == DEBUG_RADIUS) {
+        return masks.radiusMask;
+    }
+    if (DebugMode == DEBUG_DENSITY) {
+        return masks.density;
+    }
+    if (DebugMode == DEBUG_ALPHA) {
+        return masks.alpha;
+    }
+    if (DebugMode == DEBUG_WALLCLOUD) {
+        return masks.wallcloud;
+    }
+    if (DebugMode == DEBUG_CONNECTION) {
+        return masks.connection;
+    }
+    return 0.0;
+}
+
+StormSample sampleFrozenStorm(int index, vec3 position) {
+    DebugMasks masks = sampleDebugMasks(index, position);
+    StormSample outSample;
+    outSample.cloud = max(masks.density, max(masks.wallcloud, masks.connection * 0.9));
+    outSample.dust = 0.0;
+    outSample.upper = max(masks.wallcloud, masks.connection);
+    outSample.material = saturate(masks.alpha + masks.connection * 0.25);
+    return outSample;
+}
+
 StormSample sampleStorm(int index, vec3 position) {
     vec3 pos = getStormPos(index);
-    float baseHeight = pos.y + StormHeights[index];
-    float width = max(StormWidths[index], 0.001);
-    float stormSize = max(StormSizes[index], width * 2.0);
+    vec3 posWorld = cloudToWorld(pos);
+    vec3 positionWorld = cloudToWorld(position);
+    float baseHeightWorld = cloudToWorld(pos.y + StormHeights[index]);
+    float widthWorld = max(cloudToWorld(StormWidths[index]), 0.001);
+    float stormSizeWorld = max(cloudToWorld(StormSizes[index]), widthWorld * 2.0);
     float stormSpin = StormSpins[index];
     float intensity = saturate(StormIntensities[index]);
     float torPerc = saturate(StormProgress[index]);
     float tornadoShape = StormShapes[index];
 
-    float dist = distance(position.xz, pos.xz);
-    float wallcloudRadius = stormSize * 0.35;
-    float wallcloudLower = 15.0 * pow(max(1.0 - saturate(dist / max(wallcloudRadius, 0.001)), 0.0), 0.25) * saturate((intensity - 0.45) * 2.2);
+    float distWorld = distance(positionWorld.xz, posWorld.xz);
+    float wallcloudRadiusWorld = stormSizeWorld * 0.35;
+    float wallcloudLowerWorld = 15.0 * pow(max(1.0 - saturate(distWorld / max(wallcloudRadiusWorld, 0.001)), 0.0), 0.25) * saturate((intensity - 0.45) * 2.2);
 
     float wallcloud = 0.0;
-    if (position.y <= baseHeight && position.y >= baseHeight - wallcloudLower) {
-        float wallPerc = 1.0 - saturate(dist / max(wallcloudRadius, 0.001));
+    if (positionWorld.y <= baseHeightWorld && positionWorld.y >= baseHeightWorld - wallcloudLowerWorld) {
+        float wallPerc = 1.0 - saturate(distWorld / max(wallcloudRadiusWorld, 0.001));
         wallcloud = pow(max(wallPerc, 0.0), 0.55) * saturate((intensity - 0.40) * 2.6);
-        wallcloud *= 0.7 + onoise(vec3(position.xz / 20.0, AnimationTime / 150.0)) * 0.3;
+        wallcloud *= 0.7 + onoise(vec3(positionWorld.xz / 20.0, AnimationTime / 150.0)) * 0.3;
     }
 
     StormSample outSample;
@@ -219,121 +359,129 @@ StormSample sampleStorm(int index, vec3 position) {
     outSample.upper = wallcloud;
     outSample.material = wallcloud * 0.45;
 
-    if (!(position.y < baseHeight - wallcloudLower && position.y > pos.y - 8.5 && dist < max(width * 5.0, stormSize / 2.6))) {
+    if (!(positionWorld.y < baseHeightWorld - wallcloudLowerWorld && positionWorld.y > posWorld.y - 8.5 && distWorld < max(widthWorld * 5.0, stormSizeWorld / 2.6))) {
         return outSample;
     }
 
-    float fnlTop = max(baseHeight - 13.125, pos.y + 3.75);
-    float percFnlHeight = saturate((position.y - pos.y) / max(fnlTop - pos.y, 0.001));
+    float fnlTopWorld = max(baseHeightWorld - 13.125, posWorld.y + 3.75);
+    float percFnlHeight = saturate((positionWorld.y - posWorld.y) / max(fnlTopWorld - posWorld.y, 0.001));
     float percCos = (-cos(percFnlHeight * PI) + 1.0) * 0.5;
-    float torShape = mix(tornadoShape, 20.0, pow(saturate(width / 62.5), 1.75));
-    float wid = (width / 2.5)
-        + ((width / 2.5) * percFnlHeight * torPerc)
-        + ((stormSize / mix(torShape + 2.0, torShape, torPerc)) * pow(percFnlHeight, 4.0));
-    wid = mix(wid, 0.0, (1.0 - percFnlHeight) * (1.0 - torPerc));
-    float tornadoHeight = mix(fnlTop, pos.y - 0.25, torPerc);
-    float th = 1.0 - saturate((position.y - tornadoHeight) / 3.75);
-    wid = mix(wid, 0.0, th * th * th);
-    float maxWid = (width / 4.0) + ((width / 4.0) * torPerc) + ((stormSize / 8.0) * torPerc);
+    float torShape = mix(tornadoShape, 20.0, pow(saturate(widthWorld / 62.5), 1.75));
+    float widWorld = (widthWorld / 2.5)
+        + ((widthWorld / 2.5) * percFnlHeight * torPerc)
+        + ((stormSizeWorld / mix(torShape + 2.0, torShape, torPerc)) * pow(percFnlHeight, 4.0));
+    widWorld = mix(widWorld, 0.0, (1.0 - percFnlHeight) * (1.0 - torPerc));
+    float tornadoHeightWorld = mix(fnlTopWorld, posWorld.y - 0.25, torPerc);
+    float th = 1.0 - saturate((positionWorld.y - tornadoHeightWorld) / 3.75);
+    widWorld = mix(widWorld, 0.0, th * th * th);
+    float maxWidWorld = (widthWorld / 4.0) + ((widthWorld / 4.0) * torPerc) + ((stormSizeWorld / 8.0) * torPerc);
 
-    float ropeMod = mix(3.0, 1.0, saturate(width / 3.75));
+    float ropeMod = mix(3.0, 1.0, saturate(widthWorld / 3.75));
     ropeMod = mix(ropeMod, 1.0, saturate((intensity - 0.55) * 2.4));
     ropeMod = mix(0.1, ropeMod, saturate(torPerc * 1.35));
 
     float swayTime = AnimationTime / 220.0;
     float nx = mix(
-        onoise(vec3(pos.xz / 62.5, swayTime)),
-        noise3(vec3(pos.xz / 35.0, swayTime * 0.6)),
+        onoise(vec3(posWorld.xz / 62.5, swayTime)),
+        noise3(vec3(posWorld.xz / 35.0, swayTime * 0.6)),
         0.35
     ) * 5.0 * ropeMod;
     float nz = mix(
-        onoise(vec3(swayTime, pos.zx / 62.5)),
-        noise3(vec3(swayTime * 0.6, pos.zx / 35.0)),
+        onoise(vec3(swayTime, posWorld.zx / 62.5)),
+        noise3(vec3(swayTime * 0.6, posWorld.zx / 35.0)),
         0.35
     ) * 5.0 * ropeMod;
-    vec3 attachmentPoint = vec3(nx, 0.0, nz);
+    vec3 attachmentPointWorld = vec3(nx, 0.0, nz);
 
     float xAdd = mix(
-        onoise(vec3(pos.xz / 31.25, swayTime + ((position.y * ropeMod) / 6.25))),
-        noise3(vec3(pos.xz / 18.0, (swayTime * 0.8) + ((position.y * ropeMod) / 9.5))),
+        onoise(vec3(posWorld.xz / 31.25, swayTime + ((positionWorld.y * ropeMod) / 6.25))),
+        noise3(vec3(posWorld.xz / 18.0, (swayTime * 0.8) + ((positionWorld.y * ropeMod) / 9.5))),
         0.30
     ) * 2.5 * ropeMod;
     float zAdd = mix(
-        onoise(vec3(swayTime + ((position.y * ropeMod) / 6.25), pos.zx / 31.25)),
-        noise3(vec3((swayTime * 0.8) + ((position.y * ropeMod) / 9.5), pos.zx / 18.0)),
+        onoise(vec3(swayTime + ((positionWorld.y * ropeMod) / 6.25), posWorld.zx / 31.25)),
+        noise3(vec3((swayTime * 0.8) + ((positionWorld.y * ropeMod) / 9.5), posWorld.zx / 18.0)),
         0.30
     ) * 2.5 * ropeMod;
     float a = pow(percFnlHeight, 0.75);
     xAdd *= a;
     zAdd *= a;
 
-    vec3 torPos = pos + mix(vec3(0.0), vec3(attachmentPoint.x, 0.0, attachmentPoint.z), percCos) + vec3(xAdd, 0.0, zAdd);
-    float torDist = distance(torPos.xz, position.xz);
-    vec3 localTorPos = position - torPos;
+    vec3 torPosWorld = posWorld + mix(vec3(0.0), vec3(attachmentPointWorld.x, 0.0, attachmentPointWorld.z), percCos) + vec3(xAdd, 0.0, zAdd);
+    float torDistWorld = distance(torPosWorld.xz, positionWorld.xz);
+    vec3 localTorPosWorld = positionWorld - torPosWorld;
 
-    float widPerc = 1.0 - saturate(torDist / max(wid, 0.001));
-    float widMaxPerc = saturate(wid / max(maxWid, 0.001));
+    float widPerc = 1.0 - saturate(torDistWorld / max(widWorld, 0.001));
+    float widMaxPerc = saturate(widWorld / max(maxWidWorld, 0.001));
     float rotation = -stormSpin * 3.0;
     float rotation2 = -stormSpin / 1.5;
 
-    mat2 torSpin = spin(rotation + (torDist / 6.25));
-    mat2 torSpin2 = spin(rotation2 + (torDist / 18.75));
-    mat2 torSpin3 = spin(rotation2 + (torDist / 7.5));
-    vec3 torSpinPos = vec3(torSpin * localTorPos.xz, position.y - (AnimationTime / 2.0));
-    vec3 torSpinPos2 = vec3(torSpin2 * localTorPos.xz, position.y - (AnimationTime / 2.0));
-    vec3 torSpinPos3 = vec3(torSpin3 * localTorPos.xz, position.y - (AnimationTime / 2.0));
+    mat2 torSpin = spin(rotation + (torDistWorld / 6.25));
+    mat2 torSpin2 = spin(rotation2 + (torDistWorld / 18.75));
+    mat2 torSpin3 = spin(rotation2 + (torDistWorld / 7.5));
+    vec3 torSpinPos = vec3(torSpin * localTorPosWorld.xz, positionWorld.y - (AnimationTime / 2.0));
+    vec3 torSpinPos2 = vec3(torSpin2 * localTorPosWorld.xz, positionWorld.y - (AnimationTime / 2.0));
+    vec3 torSpinPos3 = vec3(torSpin3 * localTorPosWorld.xz, positionWorld.y - (AnimationTime / 2.0));
 
     float nComp1 = fbm(torSpinPos / 2.5, 3, 2.0, 0.5, 1.0);
     float nComp2 = fbm(torSpinPos2 / 5.0, 3, 2.0, 0.5, 1.0);
     float torNoise1 = mix(nComp1, nComp2, sqrt(widMaxPerc));
     float torNoise2 = fbm((torSpinPos + vec3(9.2, -5.7, 3.1)) / 1.6, 2, 2.0, 0.55, 1.0);
 
-    wid *= mix(0.8 + (torNoise1 * 0.2), 0.9, saturate(width / 125.0) * 0.9);
-    wid *= 1.0 + torNoise2 * 0.035;
-    widPerc = 1.0 - saturate(torDist / max(wid, 0.001));
+    widWorld *= mix(0.8 + (torNoise1 * 0.2), 0.9, saturate(widthWorld / 125.0) * 0.9);
+    widWorld *= 1.0 + torNoise2 * 0.035;
+    widPerc = 1.0 - saturate(torDistWorld / max(widWorld, 0.001));
 
-    float materialField = sampleMaterialField(localTorPos, percFnlHeight, widPerc, wid, rotation + (torDist / 6.25), rotation2 + (torDist / 18.75));
+    float materialField = sampleMaterialField(localTorPosWorld, percFnlHeight, widPerc, widWorld, rotation + (torDistWorld / 6.25), rotation2 + (torDistWorld / 18.75), AnimationTime, false);
     float innerDensity = pow(max(widPerc, 0.0), mix(1.15, 1.55, 1.0 - intensity)) * 4.0;
     float shearBand = saturate(widPerc * (1.0 - widPerc) * 4.0);
+    float shellDensity = shearBand * (0.92 + materialField * 0.34) * mix(0.95, 1.35, intensity);
+    float coreFill = pow(max(widPerc, 0.0), mix(2.8, 1.45, intensity)) * (0.22 + materialField * 0.20);
+    coreFill *= smoothstep(posWorld.y - 0.8, fnlTopWorld, positionWorld.y);
+    float innerVeil = smoothstep(0.18, 0.74, widPerc) * (1.0 - smoothstep(0.78, 0.98, widPerc));
+    innerVeil *= 0.18 + intensity * 0.16;
     float turbulence = 0.82 + (torNoise1 * 0.14) + (torNoise2 * 0.08);
-    float tornado = innerDensity * saturate((position.y - tornadoHeight) / 2.5) * turbulence;
+    float tornado = innerDensity * saturate((positionWorld.y - tornadoHeightWorld) / 2.5) * turbulence;
     tornado += shearBand * 0.55 * (0.85 + materialField * 0.25);
+    tornado += shellDensity * 0.78;
+    tornado += coreFill * 0.65;
+    tornado += innerVeil * (0.80 + materialField * 0.20);
     tornado *= materialField;
     tornado *= mix(0.78, 1.06, intensity);
 
     float dcNoise1 = fbm(torSpinPos3 / 2.5, 3, 2.0, 0.5, 1.0);
-    float baseContactRadius = max(width * 0.24, 0.72) + intensity * 0.42;
-    float baseContactPerc = 1.0 - saturate(torDist / max(baseContactRadius, 0.001));
+    float baseContactRadiusWorld = max(widthWorld * 0.24, 0.72) + intensity * 0.42;
+    float baseContactPerc = 1.0 - saturate(torDistWorld / max(baseContactRadiusWorld, 0.001));
     float touchdown = pow(max(baseContactPerc, 0.0), 0.48);
-    touchdown *= saturate((position.y - (pos.y - 2.2)) / 2.6);
-    touchdown *= 1.0 - saturate((position.y - (pos.y + 1.8)) / 3.4);
+    touchdown *= saturate((positionWorld.y - (posWorld.y - 2.2)) / 2.6);
+    touchdown *= 1.0 - saturate((positionWorld.y - (posWorld.y + 1.8)) / 3.4);
     touchdown *= 0.72 + dcNoise1 * 0.12;
     tornado = max(tornado, touchdown * 1.05);
 
     float dcPerc = saturate((intensity - 0.35) * 1.9);
     float h = 5.0 + (dcNoise1 * 1.875);
-    float dcTop = pos.y + (max(dcPerc, 0.35) * h);
-    float percDCHeight = saturate((position.y - (pos.y - 1.25)) / max(dcTop - pos.y, 0.001));
+    float dcTopWorld = posWorld.y + (max(dcPerc, 0.35) * h);
+    float percDCHeight = saturate((positionWorld.y - (posWorld.y - 1.25)) / max(dcTopWorld - posWorld.y, 0.001));
 
-    float dustWid = ((width / 1.5) + ((width / 1.5) * percFnlHeight * torPerc) + 3.125) + (3.125 * pow(percDCHeight, 1.5) * pow(dcPerc, 0.75));
-    dustWid *= mix(0.6 + (dcNoise1 * 0.5), 0.85, saturate(width / 62.5) * 0.9);
-    float dustWidPerc = 1.0 - saturate(torDist / max(dustWid, 0.001));
+    float dustWidWorld = ((widthWorld / 1.5) + ((widthWorld / 1.5) * percFnlHeight * torPerc) + 3.125) + (3.125 * pow(percDCHeight, 1.5) * pow(dcPerc, 0.75));
+    dustWidWorld *= mix(0.6 + (dcNoise1 * 0.5), 0.85, saturate(widthWorld / 62.5) * 0.9);
+    float dustWidPerc = 1.0 - saturate(torDistWorld / max(dustWidWorld, 0.001));
     dustWidPerc = pow(max(dustWidPerc, 0.0), 0.25);
-    float edge = saturate(torDist / max(dustWid * 0.9, 0.001));
+    float edge = saturate(torDistWorld / max(dustWidWorld * 0.9, 0.001));
     dustWidPerc *= edge * edge * edge;
     float dust = pow(max(dustWidPerc, 0.0), 1.5) * 0.15;
-    dust *= saturate((dcTop - position.y) / 2.5);
-    dust *= saturate((position.y - (pos.y - 2.5)) / 2.5);
+    dust *= saturate((dcTopWorld - positionWorld.y) / 2.5);
+    dust *= saturate((positionWorld.y - (posWorld.y - 2.5)) / 2.5);
     dust *= 0.8 + (dcNoise1 * 0.2);
     dust *= dcPerc;
-    dust *= 1.0 - saturate((width - 6.25) / 25.0);
+    dust *= 1.0 - saturate((widthWorld - 6.25) / 25.0);
 
-    float connectionRadius = max(wid * mix(1.8, 2.5, intensity), stormSize * 0.28);
-    float connectionPerc = 1.0 - saturate(torDist / max(connectionRadius, 0.001));
+    float connectionRadiusWorld = max(widWorld * mix(1.8, 2.5, intensity), stormSizeWorld * 0.28);
+    float connectionPerc = 1.0 - saturate(torDistWorld / max(connectionRadiusWorld, 0.001));
     float connection = pow(max(connectionPerc, 0.0), 0.55);
-    connection *= smoothstep(fnlTop - 1.8, baseHeight + 1.8, position.y);
+    connection *= smoothstep(fnlTopWorld - 1.8, baseHeightWorld + 1.8, positionWorld.y);
     connection *= saturate((intensity - 0.25) * 1.7);
-    connection *= 0.82 + onoise(vec3((position.xz + pos.xz) / 20.0, AnimationTime / 140.0)) * 0.18;
+    connection *= 0.82 + onoise(vec3((positionWorld.xz + posWorld.xz) / 20.0, AnimationTime / 140.0)) * 0.18;
 
     outSample.cloud = max(outSample.cloud, max(tornado, dust));
     outSample.cloud = max(outSample.cloud, connection * 0.9);
@@ -345,77 +493,123 @@ StormSample sampleStorm(int index, vec3 position) {
 }
 
 void main() {
-    float sceneDepth = texture(DepthSampler, texCoord).r;
-    vec3 rayEnd = reconstructPosition(texCoord, sceneDepth < 1.0 ? sceneDepth : 1.0);
+    if (DebugMode == DEBUG_BOX) {
+        fragColor = vec4(0.95, 0.28, 0.08, 1.0);
+        return;
+    }
+
     vec3 ro = CameraPos;
-    vec3 rd = normalize(rayEnd - ro);
-    float maxRay = min(length(rayEnd - ro), MaxDistance);
-    if (maxRay <= 0.001) {
+    vec3 rd = normalize(fragPos - ro);
+    float tNear;
+    float tFar;
+    if (!intersectAabb(ro, rd, VolumeMin, VolumeMax, tNear, tFar)) {
+        if (DebugMode == DEBUG_HIT) {
+            fragColor = vec4(1.0, 0.0, 1.0, 1.0);
+            return;
+        }
+        discard;
+    }
+    tNear = max(tNear, 0.0);
+
+    if (DebugMode == DEBUG_HIT) {
+        fragColor = vec4(0.10, 0.95, 0.15, 1.0);
+        return;
+    }
+
+    if (DebugMode == DEBUG_FILL) {
+        float intervalFill = max(tFar - tNear, 0.0);
+        float alphaFill = saturate(1.0 - exp(-intervalFill * 0.55));
+        fragColor = vec4(vec3(0.86), max(alphaFill, 0.65));
+        return;
+    }
+
+    vec2 screenUv = gl_FragCoord.xy / OutSize;
+    float sceneDepth = texture(DepthSampler, screenUv).r;
+    bool useSceneDepthStop = DebugMode == DEBUG_OFF;
+    float maxRay = min(tFar, MaxDistance);
+    if (useSceneDepthStop && sceneDepth < 1.0) {
+        vec3 rayEnd = reconstructPosition(screenUv, sceneDepth);
+        maxRay = min(maxRay, length(rayEnd - ro));
+    }
+    if (maxRay <= tNear + 0.001) {
         discard;
     }
 
+    bool debugActive = DebugMode != DEBUG_OFF;
+    bool debugMaskMode = debugActive
+        && DebugMode != DEBUG_BOX
+        && DebugMode != DEBUG_HIT
+        && DebugMode != DEBUG_FILL
+        && DebugMode != DEBUG_FULL;
+
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
-    float nearestT = MaxDistance;
+    float nearestT = tNear;
     float firstHitDepth = 1.0;
+    float debugValue = 0.0;
     bool wroteDepth = false;
 
-    for (int i = 0; i < MAX_STORMS_COUNT; i++) {
-        if (i >= StormCount) {
+    float interval = maxRay - tNear;
+    int steps = int(clamp(interval / 0.42, 18.0, 52.0));
+    float stepSize = interval / float(max(steps, 1));
+    float jitter = hash1(screenUv.x * OutSize.x + screenUv.y * OutSize.y + 17.13);
+    float t = tNear + stepSize * (0.20 + jitter * 0.80);
+
+    for (int step = 0; step < 52; step++) {
+        if (step >= steps) {
+            break;
+        }
+        if (!debugMaskMode && transmittance < 0.025) {
             break;
         }
 
-        vec3 stormPos = getStormPos(i);
-        float width = max(StormWidths[i], 0.001);
-        float stormSize = max(StormSizes[i], width * 2.0);
-        float boundsRadius = max(width * 5.4, stormSize * 0.58);
-        vec3 bmin = vec3(stormPos.x - boundsRadius, stormPos.y - 8.0, stormPos.z - boundsRadius);
-        vec3 bmax = vec3(stormPos.x + boundsRadius, stormPos.y + StormHeights[i] + 12.0, stormPos.z + boundsRadius);
-
-        float tNear;
-        float tFar;
-        if (!intersectAabb(ro, rd, bmin, bmax, tNear, tFar)) {
-            continue;
-        }
-        tNear = max(tNear, 0.0);
-        tFar = min(tFar, maxRay);
-        if (tFar <= tNear) {
-            continue;
-        }
-
-        nearestT = min(nearestT, tNear);
-        float interval = tFar - tNear;
-        int steps = int(clamp(interval / 0.42, 18.0, 52.0));
-        float stepSize = interval / float(max(steps, 1));
-        float jitter = hash1(texCoord.x * OutSize.x + texCoord.y * OutSize.y + float(i) * 17.13);
-        float t = tNear + stepSize * (0.20 + jitter * 0.80);
-
-        for (int step = 0; step < 52; step++) {
-            if (step >= steps || transmittance < 0.025) {
-                break;
+        vec3 samplePos = ro + rd * t;
+        if (debugMaskMode) {
+            DebugMasks masks = sampleDebugMasks(0, samplePos);
+            float value = selectDebugMask(masks);
+            if (value > 0.0005) {
+                debugValue = max(debugValue, value);
+                if (!wroteDepth) {
+                    firstHitDepth = clamp(cloudSpaceToDepth(samplePos), 0.0, 1.0);
+                    wroteDepth = true;
+                }
             }
-
-            vec3 samplePos = ro + rd * t;
-            StormSample storm = sampleStorm(i, samplePos);
-            float sigma = max(storm.cloud, 0.0) * 0.115;
+        } else {
+            StormSample storm = debugActive && DebugFreeze != 0
+                ? sampleFrozenStorm(0, samplePos)
+                : sampleStorm(0, samplePos);
+            float sigma = max(storm.cloud, 0.0) * 0.195;
             if (sigma > 0.0005) {
                 if (!wroteDepth) {
                     firstHitDepth = clamp(cloudSpaceToDepth(samplePos), 0.0, 1.0);
                     wroteDepth = true;
                 }
-                float alpha = 1.0 - exp(-sigma * stepSize * 5.8);
-                float bodyDark = mix(0.16, 0.34, saturate(storm.material));
+                float nearField = 1.0 - saturate(t / 12.0);
+                float alpha = 1.0 - exp(-sigma * stepSize * 8.4);
+                alpha = saturate(alpha * (1.10 + nearField * 0.32));
+                float bodyDark = mix(0.08, 0.25, saturate(storm.material));
                 vec3 cloudBase = CloudColor.rgb * bodyDark;
-                vec3 upperCol = mix(cloudBase, CloudColor.rgb * 0.90, saturate(storm.upper));
+                vec3 upperCol = mix(cloudBase, CloudColor.rgb * 0.70, saturate(storm.upper) * 0.62);
                 vec3 dustCol = vec3(0.20, 0.125, 0.071);
                 float dustTint = saturate(pow(storm.dust, 0.55)) * (1.0 - saturate(storm.material * 0.45));
                 vec3 localColor = mix(upperCol, dustCol, dustTint);
                 accum += localColor * alpha * transmittance;
                 transmittance *= (1.0 - alpha);
             }
-
-            t += stepSize;
         }
+
+        t += stepSize;
+    }
+
+    if (debugMaskMode) {
+        if (debugValue < 0.01) {
+            discard;
+        }
+        if (wroteDepth) {
+            gl_FragDepth = firstHitDepth;
+        }
+        fragColor = vec4(vec3(debugValue), saturate(debugValue));
+        return;
     }
 
     float alpha = 1.0 - transmittance;

@@ -59,6 +59,16 @@ public class NetworkHandler {
                 .encoder(RainfallUpdatePacket::encode)
                 .consumerMainThread(RainfallUpdatePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncFogStatusPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncFogStatusPacket::decode)
+                .encoder(SyncFogStatusPacket::encode)
+                .consumerMainThread(SyncFogStatusPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(FogDebugOverridePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(FogDebugOverridePacket::decode)
+                .encoder(FogDebugOverridePacket::encode)
+                .consumerMainThread(FogDebugOverridePacket::handle)
+                .add();
         CHANNEL.messageBuilder(InstrumentReadoutPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(InstrumentReadoutPacket::decode)
                 .encoder(InstrumentReadoutPacket::encode)

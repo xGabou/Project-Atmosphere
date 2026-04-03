@@ -165,9 +165,7 @@ public class TornadoManager {
                 ensureDescriptor(currentRegion, tornado);
             }
 
-            if (tornado.getCloudRegion() == null && tornado.getLifetimeSeconds() > 5.0F) {
-                tornado.markDissipating();
-            }
+            tornado.updateCloudAttachment(tornado.getCloudRegion() != null);
 
             tornado.tickServer(serverLevel, gameTime);
             if (tornado.isDead()) {

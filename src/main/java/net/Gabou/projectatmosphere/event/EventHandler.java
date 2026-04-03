@@ -14,6 +14,7 @@ import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
+import net.Gabou.projectatmosphere.modules.fog.FogStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.wind.WindForces;
 import net.minecraft.core.BlockPos;
@@ -80,6 +81,7 @@ public class EventHandler {
         if (CompatHandler.isRainbowsLoaded()) {
             RainbowRainBridge.sync(serverLevel, generator);
         }
+        FogStatusSyncManager.syncPlayers(serverLevel);
         if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
             hasDisplayedMessage = true;
             serverLevel.players().forEach(player -> {player.sendSystemMessage(Component.literal(ForecastGenerator.message) );});

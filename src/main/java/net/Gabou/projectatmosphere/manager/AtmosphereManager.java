@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
+import net.Gabou.projectatmosphere.modules.fog.FogStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
@@ -125,6 +126,7 @@ public class AtmosphereManager {
                 ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(world);
                 RainbowRainBridge.sendSnapshot(player, world, cloudManager.getCloudGenerator());
             }
+            FogStatusSyncManager.syncPlayer(player);
             future.complete(null);
         });
     }

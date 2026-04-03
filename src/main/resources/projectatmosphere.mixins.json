@@ -16,6 +16,7 @@
     "MixinSandstormDebugBlocker",
     "client.DefaultPipelineHurricaneMixin",
     "client.DefaultPipelineTornadoMixin",
+    "client.MinecraftCrashHandlerMixin",
     "client.LoadingScreenMixin",
     "client.ShaderSupportPipelineHurricaneMixin",
     "client.ShaderSupportPipelineTornadoMixin",

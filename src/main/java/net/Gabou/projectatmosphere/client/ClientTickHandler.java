@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.async.PoolType;
+import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -57,8 +58,10 @@ public class ClientTickHandler {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         if (!ClientSyncLock.isReady()) return;
-        if (Minecraft.getInstance().isPaused()) return;
-        if (Minecraft.getInstance().level == null) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.isPaused()) return;
+        AtmosphereFogState.tick(mc);
+        if (mc.level == null) {
             TornadoManager.clearClientTornadoes();
             HurricaneManager.clearClientHurricanes();
             return;
@@ -68,7 +71,6 @@ public class ClientTickHandler {
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
         HurricaneManager.tickClient();
-        Minecraft mc = Minecraft.getInstance();
         RainbowWeatherTracker.tick(mc);
 
         if (mc.level != null && mc.player != null) {

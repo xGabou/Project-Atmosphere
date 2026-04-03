@@ -6,10 +6,14 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsTornadoRenderer;
+import net.Gabou.projectatmosphere.modules.fog.FogHeuristics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -35,22 +39,44 @@ public final class SimpleCloudsWhiteoutFogHandler {
         }
 
         SimpleCloudsRenderer renderer = SimpleCloudsRenderer.getOptionalInstance().orElse(null);
-        if (renderer == null) {
-            return;
-        }
-
         float partialTick = (float) event.getPartialTick();
         Vec3 cameraPos = event.getCamera().getPosition();
-        float cloudWhiteout = computeCloudWhiteout(level, renderer, cameraPos);
+        FogHeuristics.FogProfile dynamicFog = AtmosphereFogState.sample(level, cameraPos, partialTick);
+        float cloudWhiteout = renderer == null ? 0.0F : computeCloudWhiteout(level, renderer, cameraPos);
         float tornadoWhiteout = SimpleCloudsTornadoRenderer.INSTANCE.sampleWhiteoutAtCamera(level, cameraPos, partialTick);
         float whiteout = Math.max(cloudWhiteout, tornadoWhiteout);
+        float dynamicStrength = dynamicFog.strength();
 
-        if (whiteout <= 0.0F) {
+        if (whiteout <= 0.0F && dynamicStrength <= 0.0F) {
             return;
         }
 
-        event.setNearPlaneDistance(0.0F);
-        event.setFarPlaneDistance(Math.max(0.5F, Mth.lerp(whiteout, event.getFarPlaneDistance(), 6.0F)));
+        float baseNear = event.getNearPlaneDistance();
+        float baseFar = event.getFarPlaneDistance();
+        float nearPlane = baseNear;
+        float farPlane = baseFar;
+
+        if (dynamicStrength > 0.0F && Level.OVERWORLD.equals(level.dimension())) {
+            float fogInfluence = Mth.clamp(
+                    dynamicStrength * 0.55F
+                            + dynamicStrength * dynamicStrength * 0.85F
+                            + dynamicFog.wetBiomeFactor() * 0.20F
+                            + dynamicFog.rainFactor() * 0.12F,
+                    0.0F,
+                    1.0F
+            );
+            float configuredNear = AtmoCommonConfig.FOG_NEAR_DISTANCE.get().floatValue();
+            float configuredFar = AtmoCommonConfig.FOG_FAR_DISTANCE.get().floatValue();
+            nearPlane = Math.min(nearPlane, Mth.lerp(fogInfluence, baseNear, configuredNear));
+            farPlane = Math.min(farPlane, Math.max(2.0F, Mth.lerp(fogInfluence, baseFar, configuredFar)));
+        }
+        if (whiteout > 0.0F) {
+            nearPlane = 0.0F;
+            farPlane = Math.min(farPlane, Math.max(0.5F, Mth.lerp(whiteout, baseFar, 6.0F)));
+        }
+
+        event.setNearPlaneDistance(nearPlane);
+        event.setFarPlaneDistance(farPlane);
         event.setCanceled(true);
     }
 
@@ -62,24 +88,43 @@ public final class SimpleCloudsWhiteoutFogHandler {
         }
 
         SimpleCloudsRenderer renderer = SimpleCloudsRenderer.getOptionalInstance().orElse(null);
-        if (renderer == null) {
-            return;
-        }
-
         float partialTick = (float) event.getPartialTick();
         Vec3 cameraPos = event.getCamera().getPosition();
-        float cloudWhiteout = computeCloudWhiteout(level, renderer, cameraPos);
+        FogHeuristics.FogProfile dynamicFog = AtmosphereFogState.sample(level, cameraPos, partialTick);
+        float cloudWhiteout = renderer == null ? 0.0F : computeCloudWhiteout(level, renderer, cameraPos);
         float tornadoWhiteout = SimpleCloudsTornadoRenderer.INSTANCE.sampleWhiteoutAtCamera(level, cameraPos, partialTick);
         float whiteout = Math.max(cloudWhiteout, tornadoWhiteout);
+        float dynamicStrength = dynamicFog.strength();
 
-        if (whiteout <= 0.0F) {
+        if (whiteout <= 0.0F && dynamicStrength <= 0.0F) {
             return;
         }
 
-        float[] cloudColor = renderer.getCloudColor(partialTick);
-        event.setRed(Mth.lerp(whiteout, event.getRed(), cloudColor[0]));
-        event.setGreen(Mth.lerp(whiteout, event.getGreen(), cloudColor[1]));
-        event.setBlue(Mth.lerp(whiteout, event.getBlue(), cloudColor[2]));
+        if (dynamicStrength > 0.0F && Level.OVERWORLD.equals(level.dimension())) {
+            float fogInfluence = Mth.clamp(
+                    dynamicStrength * 0.55F
+                            + dynamicStrength * dynamicStrength * 0.85F
+                            + dynamicFog.wetBiomeFactor() * 0.20F
+                            + dynamicFog.rainFactor() * 0.12F,
+                    0.0F,
+                    1.0F
+            );
+            float colorBlend = AtmoCommonConfig.FOG_COLOR_BLEND.get().floatValue()
+                    * Mth.clamp(dynamicStrength * 0.45F + fogInfluence * 0.70F, 0.0F, 1.0F);
+            float dampRed = Mth.clamp(event.getRed() * (0.88F - dynamicFog.wetBiomeFactor() * 0.06F), 0.0F, 1.0F);
+            float dampGreen = Mth.clamp(event.getGreen() * (0.90F + dynamicFog.wetBiomeFactor() * 0.05F), 0.0F, 1.0F);
+            float dampBlue = Mth.clamp(event.getBlue() * (0.95F + dynamicFog.rainFactor() * 0.05F), 0.0F, 1.0F);
+            event.setRed(Mth.lerp(colorBlend, event.getRed(), dampRed));
+            event.setGreen(Mth.lerp(colorBlend, event.getGreen(), dampGreen));
+            event.setBlue(Mth.lerp(colorBlend, event.getBlue(), dampBlue));
+        }
+
+        if (whiteout > 0.0F && renderer != null) {
+            float[] cloudColor = renderer.getCloudColor(partialTick);
+            event.setRed(Mth.lerp(whiteout, event.getRed(), cloudColor[0]));
+            event.setGreen(Mth.lerp(whiteout, event.getGreen(), cloudColor[1]));
+            event.setBlue(Mth.lerp(whiteout, event.getBlue(), cloudColor[2]));
+        }
     }
 
     private static float computeCloudWhiteout(ClientLevel level, SimpleCloudsRenderer renderer, Vec3 cameraPos) {

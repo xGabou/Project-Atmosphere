@@ -43,6 +43,7 @@ public final class SimpleCloudsHurricaneRenderer {
     private final List<PreparedHurricane> preparedHurricanes = new ArrayList<>();
     private boolean initialized;
     private VertexBuffer fullscreenQuad;
+    private final VolumeBoxMesh volumeBox = new VolumeBoxMesh();
     private TextureTarget opaqueScratchTarget;
     private WeightedBlendingTarget transparencyScratchTarget;
 
@@ -83,7 +84,7 @@ public final class SimpleCloudsHurricaneRenderer {
                 renderer.getCloudTarget().getColorTextureId(), renderer.getCloudTarget().getDepthTextureId(), false);
         this.runOpaqueEyeMaskPass(renderer, stack, projMat, uniforms, renderer.getCloudTarget(),
                 this.opaqueScratchTarget.getColorTextureId(), this.opaqueScratchTarget.getDepthTextureId(), true);
-        this.runOpaqueVolumePass(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB, uniforms);
+        this.runOpaqueVolumePass(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB);
     }
 
     public void renderTransparency(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
@@ -105,7 +106,7 @@ public final class SimpleCloudsHurricaneRenderer {
                 this.transparencyScratchTarget.getRevealageTextureId(),
                 this.transparencyScratchTarget.getDepthTextureId(),
                 true);
-        this.runTransparencyVolumePass(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB, uniforms);
+        this.runTransparencyVolumePass(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB);
     }
 
     public void close() {
@@ -117,6 +118,7 @@ public final class SimpleCloudsHurricaneRenderer {
             this.fullscreenQuad.close();
             this.fullscreenQuad = null;
         }
+        this.volumeBox.close();
         if (this.opaqueScratchTarget != null) {
             this.opaqueScratchTarget.destroyBuffers();
             this.opaqueScratchTarget = null;
@@ -237,8 +239,7 @@ public final class SimpleCloudsHurricaneRenderer {
     }
 
     private void runOpaqueVolumePass(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
-                                     float partialTick, float cloudR, float cloudG, float cloudB,
-                                     StormUniforms uniforms) {
+                                     float partialTick, float cloudR, float cloudG, float cloudB) {
         ShaderInstance shader = HurricaneShaders.getOpaqueShader();
         if (shader == null) {
             return;
@@ -264,13 +265,29 @@ public final class SimpleCloudsHurricaneRenderer {
 
         this.applyCommonUniforms(shader, renderer, stack, projMat);
         shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
-        this.applyStormUniforms(shader, uniforms);
-        shader.apply();
+        List<PreparedHurricane> renderOrder = new ArrayList<>(this.preparedHurricanes);
+        Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
+        renderOrder.sort((left, right) -> Double.compare(
+                right.centerWorld().distanceToSqr(cameraPos),
+                left.centerWorld().distanceToSqr(cameraPos)
+        ));
 
-        this.fullscreenQuad.bind();
-        this.fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
-        VertexBuffer.unbind();
-        shader.clear();
+        for (PreparedHurricane hurricane : renderOrder) {
+            this.applySingleStormUniforms(shader, hurricane);
+            shader.safeGetUniform("VolumeMin").set(
+                    (float) hurricane.boundsMinCloud().x,
+                    (float) hurricane.boundsMinCloud().y,
+                    (float) hurricane.boundsMinCloud().z
+            );
+            shader.safeGetUniform("VolumeMax").set(
+                    (float) hurricane.boundsMaxCloud().x,
+                    (float) hurricane.boundsMaxCloud().y,
+                    (float) hurricane.boundsMaxCloud().z
+            );
+            shader.apply();
+            this.volumeBox.draw(shader, stack.last().pose(), projMat);
+            shader.clear();
+        }
 
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
@@ -279,8 +296,7 @@ public final class SimpleCloudsHurricaneRenderer {
     }
 
     private void runTransparencyVolumePass(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
-                                           float partialTick, float cloudR, float cloudG, float cloudB,
-                                           StormUniforms uniforms) {
+                                           float partialTick, float cloudR, float cloudG, float cloudB) {
         ShaderInstance shader = HurricaneShaders.getTransparencyShader();
         if (shader == null) {
             return;
@@ -303,8 +319,6 @@ public final class SimpleCloudsHurricaneRenderer {
 
         this.applyCommonUniforms(shader, renderer, stack, projMat);
         shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
-        this.applyStormUniforms(shader, uniforms);
-        shader.apply();
 
         GL30.glEnablei(GL11.GL_BLEND, 0);
         GL30.glEnablei(GL11.GL_BLEND, 1);
@@ -313,10 +327,29 @@ public final class SimpleCloudsHurricaneRenderer {
         GL40.glBlendFunci(0, GL11.GL_ONE, GL11.GL_ONE);
         GL40.glBlendFunci(1, GL11.GL_ZERO, GL11.GL_ONE_MINUS_SRC_COLOR);
 
-        this.fullscreenQuad.bind();
-        this.fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
-        VertexBuffer.unbind();
-        shader.clear();
+        List<PreparedHurricane> renderOrder = new ArrayList<>(this.preparedHurricanes);
+        Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
+        renderOrder.sort((left, right) -> Double.compare(
+                right.centerWorld().distanceToSqr(cameraPos),
+                left.centerWorld().distanceToSqr(cameraPos)
+        ));
+
+        for (PreparedHurricane hurricane : renderOrder) {
+            this.applySingleStormUniforms(shader, hurricane);
+            shader.safeGetUniform("VolumeMin").set(
+                    (float) hurricane.boundsMinCloud().x,
+                    (float) hurricane.boundsMinCloud().y,
+                    (float) hurricane.boundsMinCloud().z
+            );
+            shader.safeGetUniform("VolumeMax").set(
+                    (float) hurricane.boundsMaxCloud().x,
+                    (float) hurricane.boundsMaxCloud().y,
+                    (float) hurricane.boundsMaxCloud().z
+            );
+            shader.apply();
+            this.volumeBox.draw(shader, stack.last().pose(), projMat);
+            shader.clear();
+        }
 
         GL30.glDisablei(GL11.GL_BLEND, 0);
         GL30.glDisablei(GL11.GL_BLEND, 1);
@@ -377,6 +410,77 @@ public final class SimpleCloudsHurricaneRenderer {
         shader.safeGetUniform("StormSeeds").set(uniforms.stormSeeds());
     }
 
+    private void applySingleStormUniforms(ShaderInstance shader, PreparedHurricane hurricane) {
+        float[] stormPositions = new float[MAX_STORMS * 3];
+        float[] stormHeights = new float[MAX_STORMS];
+        float[] eyeRadii = new float[MAX_STORMS];
+        float[] eyeClearRadii = new float[MAX_STORMS];
+        float[] eyeSlopes = new float[MAX_STORMS];
+        float[] eyewallThicknesses = new float[MAX_STORMS];
+        float[] canopyRadii = new float[MAX_STORMS];
+        float[] shieldRadii = new float[MAX_STORMS];
+        float[] canopyBaseFactors = new float[MAX_STORMS];
+        float[] canopyTopFactors = new float[MAX_STORMS];
+        float[] shieldBaseFactors = new float[MAX_STORMS];
+        float[] shieldTopFactors = new float[MAX_STORMS];
+        float[] bandStartRadii = new float[MAX_STORMS];
+        float[] bandEndRadii = new float[MAX_STORMS];
+        float[] bandWidths = new float[MAX_STORMS];
+        float[] bandStrengths = new float[MAX_STORMS];
+        float[] bandCounts = new float[MAX_STORMS];
+        float[] fringeStrengths = new float[MAX_STORMS];
+        float[] stormSpins = new float[MAX_STORMS];
+        float[] stormIntensities = new float[MAX_STORMS];
+        float[] stormSeeds = new float[MAX_STORMS];
+
+        stormPositions[0] = hurricane.centerX();
+        stormPositions[1] = hurricane.baseY();
+        stormPositions[2] = hurricane.centerZ();
+        stormHeights[0] = hurricane.height();
+        eyeRadii[0] = hurricane.eyeRadius();
+        eyeClearRadii[0] = hurricane.eyeClearRadius();
+        eyeSlopes[0] = hurricane.eyeSlope();
+        eyewallThicknesses[0] = hurricane.eyewallThickness();
+        canopyRadii[0] = hurricane.canopyRadius();
+        shieldRadii[0] = hurricane.shieldRadius();
+        canopyBaseFactors[0] = hurricane.canopyBaseFactor();
+        canopyTopFactors[0] = hurricane.canopyTopFactor();
+        shieldBaseFactors[0] = hurricane.shieldBaseFactor();
+        shieldTopFactors[0] = hurricane.shieldTopFactor();
+        bandStartRadii[0] = hurricane.bandStartRadius();
+        bandEndRadii[0] = hurricane.bandEndRadius();
+        bandWidths[0] = hurricane.bandWidth();
+        bandStrengths[0] = hurricane.bandStrength();
+        bandCounts[0] = hurricane.bandCount();
+        fringeStrengths[0] = hurricane.fringeStrength();
+        stormSpins[0] = hurricane.spin();
+        stormIntensities[0] = hurricane.intensity();
+        stormSeeds[0] = hurricane.seed();
+
+        shader.safeGetUniform("StormCount").set(1);
+        shader.safeGetUniform("StormPositions").set(stormPositions);
+        shader.safeGetUniform("StormHeights").set(stormHeights);
+        shader.safeGetUniform("EyeRadii").set(eyeRadii);
+        shader.safeGetUniform("EyeClearRadii").set(eyeClearRadii);
+        shader.safeGetUniform("EyeSlopes").set(eyeSlopes);
+        shader.safeGetUniform("EyewallThicknesses").set(eyewallThicknesses);
+        shader.safeGetUniform("CanopyRadii").set(canopyRadii);
+        shader.safeGetUniform("ShieldRadii").set(shieldRadii);
+        shader.safeGetUniform("CanopyBaseFactors").set(canopyBaseFactors);
+        shader.safeGetUniform("CanopyTopFactors").set(canopyTopFactors);
+        shader.safeGetUniform("ShieldBaseFactors").set(shieldBaseFactors);
+        shader.safeGetUniform("ShieldTopFactors").set(shieldTopFactors);
+        shader.safeGetUniform("BandStartRadii").set(bandStartRadii);
+        shader.safeGetUniform("BandEndRadii").set(bandEndRadii);
+        shader.safeGetUniform("BandWidths").set(bandWidths);
+        shader.safeGetUniform("BandStrengths").set(bandStrengths);
+        shader.safeGetUniform("BandCounts").set(bandCounts);
+        shader.safeGetUniform("FringeStrengths").set(fringeStrengths);
+        shader.safeGetUniform("StormSpins").set(stormSpins);
+        shader.safeGetUniform("StormIntensities").set(stormIntensities);
+        shader.safeGetUniform("StormSeeds").set(stormSeeds);
+    }
+
     private record PreparedHurricane(UUID id, float centerX, float centerZ, float baseY, float height,
                                      float eyeRadius, float eyeClearRadius, float eyeSlope,
                                      float eyewallThickness, float canopyRadius, float shieldRadius,
@@ -384,7 +488,8 @@ public final class SimpleCloudsHurricaneRenderer {
                                      float shieldBaseFactor, float shieldTopFactor,
                                      float bandStartRadius, float bandEndRadius, float bandWidth,
                                      float bandStrength, float bandCount, float fringeStrength,
-                                     float spin, float intensity, float seed) {
+                                     float spin, float intensity, float seed,
+                                     Vec3 renderPosWorld, float cloudScale) {
         static PreparedHurricane from(HurricaneInstance hurricane, float partialTick) {
             float scale = SimpleCloudsConstants.CLOUD_SCALE;
             Vec3 renderPos = hurricane.getRenderPosition(partialTick);
@@ -414,8 +519,38 @@ public final class SimpleCloudsHurricaneRenderer {
                     descriptor.fringeStrength(),
                     hurricane.getVisualSpin(partialTick),
                     Mth.clamp(hurricane.getRenderIntensity(partialTick), 0.0F, 1.0F),
-                    hurricane.getVisualSeed()
+                    hurricane.getVisualSeed(),
+                    renderPos,
+                    scale
             );
+        }
+
+        Vec3 centerWorld() {
+            return new Vec3(this.renderPosWorld.x, this.baseWorld() + this.heightWorld() * 0.5F, this.renderPosWorld.z);
+        }
+
+        float boundsRadiusCloud() {
+            return Math.max(this.shieldRadius * 1.18F, this.canopyRadius * 1.28F);
+        }
+
+        float boundsRadiusWorld() {
+            return this.boundsRadiusCloud() * this.cloudScale;
+        }
+
+        float baseWorld() {
+            return (float) this.renderPosWorld.y + this.baseY * this.cloudScale;
+        }
+
+        float heightWorld() {
+            return this.height * this.cloudScale;
+        }
+
+        Vec3 boundsMinCloud() {
+            return new Vec3(this.centerX - this.boundsRadiusCloud(), this.baseY - 2.0F, this.centerZ - this.boundsRadiusCloud());
+        }
+
+        Vec3 boundsMaxCloud() {
+            return new Vec3(this.centerX + this.boundsRadiusCloud(), this.baseY + this.height + 4.0F, this.centerZ + this.boundsRadiusCloud());
         }
     }
 

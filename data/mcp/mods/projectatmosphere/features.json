@@ -1,0 +1,91 @@
+{
+  "features": [
+    {
+      "id": "region-forecasting",
+      "name": "Regional Forecasting",
+      "shortDescription": "Generates regional forecast data for temperature, humidity, pressure, and wind.",
+      "examples": [
+        "/pa temperature forecast",
+        "/pa humidity get"
+      ]
+    },
+    {
+      "id": "seasonal-temperature",
+      "name": "Season-Aware Temperatures",
+      "shortDescription": "Uses biome-specific seasonal temperature ranges and daily curves.",
+      "examples": [
+        "Biome temperature ranges can be overridden in config/projectatmosphere/biome_temps.json"
+      ]
+    },
+    {
+      "id": "simple-clouds-integration",
+      "name": "Simple Clouds Integration",
+      "shortDescription": "Uses Simple Clouds for cloud spawning and weather-linked cloud visuals.",
+      "notes": "Simple Clouds is a mandatory dependency."
+    },
+    {
+      "id": "humidity-pressure-wind",
+      "name": "Humidity, Pressure, and Wind",
+      "shortDescription": "Tracks atmospheric state values that can be sampled through commands or API.",
+      "examples": [
+        "/pa pressure get",
+        "/pa windSpeed get"
+      ]
+    },
+    {
+      "id": "world-effects",
+      "name": "Weather World Effects",
+      "shortDescription": "Applies weather-driven world effects such as fire suppression and cauldron filling.",
+      "notes": "Controlled by the worldEffects config section."
+    },
+    {
+      "id": "telemetry-debugging",
+      "name": "Telemetry and Debugging",
+      "shortDescription": "Includes server and client debug tools for inspecting forecasts and exporting telemetry.",
+      "examples": [
+        "/pa weatherdebug forecast",
+        "/pa debug export"
+      ]
+    },
+    {
+      "id": "tornadoes",
+      "name": "Tornado Systems",
+      "shortDescription": "Current source includes tornado spawning, risk sampling, and render/debug hooks.",
+      "examples": [
+        "/pa spawnTornado",
+        "/pa weatherdebug tornado risk"
+      ],
+      "notes": "Present in the current source tree. Official release documentation for 0.8.0.0 does not fully document support scope."
+    },
+    {
+      "id": "hurricanes",
+      "name": "Hurricane Systems",
+      "shortDescription": "Current source includes hurricane spawn and clear commands plus runtime handling.",
+      "examples": [
+        "/pa spawnHurricane 1",
+        "/pa clearhurricanes"
+      ],
+      "notes": "Present in the current source tree. Official release documentation for 0.8.0.0 does not fully document support scope."
+    },
+    {
+      "id": "dynamic-fog",
+      "name": "Dynamic Fog",
+      "shortDescription": "Current source includes humidity-driven fog with wet-biome and rain weighting.",
+      "examples": [
+        "/pa fog spawn 0.85 30",
+        "/pa weatherdebug fog"
+      ],
+      "notes": "Present in the current source tree. Official release documentation for 0.8.0.0 does not fully document support scope."
+    },
+    {
+      "id": "seasonal-trees",
+      "name": "Seasonal Trees",
+      "shortDescription": "Includes optional seasonal leaf transition and seed transport systems.",
+      "notes": "Dynamic Trees integration exists, but the latest official note says to keep the Dynamic Trees module disabled."
+    }
+  ],
+  "notes": [
+    "Feature list combines official documentation and currently implemented source features.",
+    "Entries that mention current-source behavior should not be treated as officially documented release guarantees without maintainer confirmation."
+  ]
+}

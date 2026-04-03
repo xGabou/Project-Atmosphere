@@ -1,0 +1,88 @@
+{
+  "supportedMinecraftVersions": [
+    "1.20.1"
+  ],
+  "supportedLoaders": [
+    "forge"
+  ],
+  "requiredDependencies": [
+    {
+      "id": "forge",
+      "name": "Minecraft Forge",
+      "notes": "Declared mandatory in mods.toml."
+    },
+    {
+      "id": "minecraft",
+      "name": "Minecraft",
+      "notes": "Declared mandatory in mods.toml with version range [1.20.1,1.21)."
+    },
+    {
+      "id": "simpleclouds",
+      "name": "Simple Clouds",
+      "notes": "Declared mandatory in mods.toml."
+    },
+    {
+      "id": "gaboulibs",
+      "name": "Gabou's Libs",
+      "notes": "Declared mandatory in mods.toml."
+    }
+  ],
+  "optionalDependencies": [
+    {
+      "id": "sereneseasons",
+      "name": "Serene Seasons",
+      "notes": "Optional in mods.toml and explicitly documented in README."
+    },
+    {
+      "id": "sereneseasonsplus",
+      "name": "Serene Seasons Extended / Serene Seasons Plus",
+      "notes": "Optional in mods.toml; README calls out Serene Seasons Extended by name."
+    },
+    {
+      "id": "dynamictrees",
+      "name": "Dynamic Trees",
+      "notes": "Optional in mods.toml; latest official note says the module is still work in progress and should be disabled."
+    },
+    {
+      "id": "sandstorm",
+      "name": "Sandstorm",
+      "notes": "Optional in mods.toml. No official support statement beyond optional dependency declaration was found."
+    },
+    {
+      "id": "prettyrain",
+      "name": "Pretty Rain",
+      "notes": "Mentioned as compatible in README."
+    }
+  ],
+  "confirmedCompatible": [
+    {
+      "name": "Serene Seasons",
+      "scope": "seasonal logic"
+    },
+    {
+      "name": "Serene Seasons Extended / Serene Seasons Plus",
+      "scope": "seasonal compatibility"
+    },
+    {
+      "name": "Simple Clouds",
+      "scope": "cloud rendering and cloud-driven weather"
+    },
+    {
+      "name": "Pretty Rain",
+      "scope": "visual rain enhancements"
+    }
+  ],
+  "confirmedIncompatible": [
+    {
+      "name": "Project Atmosphere for TFC",
+      "affectedVersions": [
+        "0.8.0.0"
+      ],
+      "notes": "PAchangelog.md says 0.8.0.0 is temporarily incompatible with PA x TFC."
+    }
+  ],
+  "notes": [
+    "This file stays strict: it only includes compatibility directly documented in repository metadata or official release notes.",
+    "Current code appears to require a season provider at runtime, but the officially supported provider list still needs maintainer confirmation."
+  ]
+}
