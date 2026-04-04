@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
@@ -15,8 +16,11 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.Comparator;
 
 public class TornadoCommand {
     private static final String PROJECTATMOSPHERE$CUMULONIMBUS_ID = "simpleclouds:cumulonimbus";
@@ -25,6 +29,7 @@ public class TornadoCommand {
     private static final int PROJECTATMOSPHERE$SPAWN_DELAY_TICKS = 500;
     private static final int PROJECTATMOSPHERE$AWAIT_INTERVAL = 100;
     private static final int PROJECTATMOSPHERE$AWAIT_POLLS = 40;
+    private static final double PROJECTATMOSPHERE$DEFAULT_REMOVE_RADIUS = 256.0D;
 
     public static void appendTo(LiteralArgumentBuilder<CommandSourceStack> root) {
         LiteralArgumentBuilder<CommandSourceStack> noCloudsBaseCommand = Commands.literal("spawnTornadoNoClouds")
@@ -132,34 +137,60 @@ public class TornadoCommand {
 
         root.then(Commands.literal("cleartornadoes")
                 .requires(source -> source.hasPermission(2))
-                .executes(ctx -> {
-                    TornadoManager.clearTornadoes();
-                    ctx.getSource().sendSuccess(() -> Component.literal("All tornadoes cleared."), true);
-                    return 1;
-                }));
+                .executes(ctx -> projectatmosphere$clearAllTornadoes(ctx.getSource())));
 
-        root.then(Commands.literal("removetornado")
+        LiteralArgumentBuilder<CommandSourceStack> removeTornado = Commands.literal("removetornado")
                 .requires(source -> source.hasPermission(2))
-                .executes(ctx -> {
-                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                    ServerLevel level = player.serverLevel();
-                    if (!level.dimension().equals(Level.OVERWORLD)) {
-                        return 0;
-                    }
+                .executes(ctx -> projectatmosphere$removeNearestTornado(ctx.getSource(), PROJECTATMOSPHERE$DEFAULT_REMOVE_RADIUS))
+                .then(Commands.argument("radius", IntegerArgumentType.integer(1))
+                        .executes(ctx -> projectatmosphere$removeNearestTornado(
+                                ctx.getSource(),
+                                IntegerArgumentType.getInteger(ctx, "radius")
+                        )))
+                .then(Commands.literal("all")
+                        .executes(ctx -> projectatmosphere$clearAllTornadoes(ctx.getSource())));
+        root.then(removeTornado);
+        root.then(Commands.literal("remove")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("tornado")
+                        .executes(ctx -> projectatmosphere$removeNearestTornado(ctx.getSource(), PROJECTATMOSPHERE$DEFAULT_REMOVE_RADIUS))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(1))
+                                .executes(ctx -> projectatmosphere$removeNearestTornado(
+                                        ctx.getSource(),
+                                        IntegerArgumentType.getInteger(ctx, "radius")
+                                )))
+                        .then(Commands.literal("all")
+                                .executes(ctx -> projectatmosphere$clearAllTornadoes(ctx.getSource())))));
+    }
 
-                    Vec3 playerPos = player.position();
-                    TornadoInstance tornado = TornadoManager.getActiveTornadoes().stream()
-                            .filter(t -> t.position.distanceToSqr(playerPos) < 100)
-                            .findFirst()
-                            .orElse(null);
-                    if (tornado != null) {
-                        TornadoManager.removeTornado(tornado);
-                        ctx.getSource().sendSuccess(() -> Component.literal("Tornado removed."), true);
-                    } else {
-                        ctx.getSource().sendFailure(Component.literal("No tornado found near you."));
-                    }
-                    return 1;
-                }));
+    private static int projectatmosphere$removeNearestTornado(CommandSourceStack source, double maxDistance) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        ServerLevel level = player.serverLevel();
+        if (!level.dimension().equals(Level.OVERWORLD)) {
+            return 0;
+        }
+
+        Vec3 playerPos = player.position();
+        double maxDistanceSq = maxDistance * maxDistance;
+        TornadoInstance tornado = TornadoManager.getActiveTornadoes().stream()
+                .filter(t -> t.position.distanceToSqr(playerPos) <= maxDistanceSq)
+                .min(Comparator.comparingDouble(t -> t.position.distanceToSqr(playerPos)))
+                .orElse(null);
+        if (tornado == null) {
+            source.sendFailure(Component.literal("No tornado found within " + Mth.floor(maxDistance) + " blocks."));
+            return 0;
+        }
+
+        int distance = Mth.floor(Math.sqrt(tornado.position.distanceToSqr(playerPos)));
+        TornadoManager.removeTornado(tornado);
+        source.sendSuccess(() -> Component.literal("Removed tornado " + distance + " blocks away."), true);
+        return 1;
+    }
+
+    private static int projectatmosphere$clearAllTornadoes(CommandSourceStack source) {
+        TornadoManager.clearTornadoes();
+        source.sendSuccess(() -> Component.literal("All tornadoes cleared."), true);
+        return 1;
     }
 
     private static void projectatmosphere$awaitCloud(CommandSourceStack source,

@@ -85,9 +85,11 @@ public class SimpleCloudsEventListener {
         float tornadoBoost = 0f;
         for (var t : TornadoManager.getActiveTornadoes()) {
             var cr = t.getCloudRegion();
-            // Compare by proximity of cloud region centers
-            double dx = cr.getWorldX() - region.getWorldX();
-            double dz = cr.getWorldZ() - region.getWorldZ();
+            double centerX = cr != null ? cr.getWorldX() : t.position.x;
+            double centerZ = cr != null ? cr.getWorldZ() : t.position.z;
+            // Standalone tornadoes do not have a Simple Clouds region; compare against the tornado position instead.
+            double dx = centerX - region.getWorldX();
+            double dz = centerZ - region.getWorldZ();
             double dist = Math.sqrt(dx * dx + dz * dz);
             if (dist <= (double) (t.radius + 150f)) { // generous overlap threshold
                 // Amplify based on tornado level

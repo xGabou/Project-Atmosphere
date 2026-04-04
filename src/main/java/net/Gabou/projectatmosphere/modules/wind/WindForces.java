@@ -29,11 +29,6 @@ public final class WindForces {
             return;
         }
         applyPlayerGusts(level, player);
-
-        TornadoWindModel.TornadoForces tornado = WindEngine.getCurrentTornadoForce(player.position());
-        if (tornado != null) {
-            applyTornadoForce(player, tornado, deltaTime);
-        }
     }
 
     public static void applyToEntity(ServerLevel level, LivingEntity entity, float deltaTime) {
@@ -42,14 +37,6 @@ public final class WindForces {
         }
         applyWindSteering(level, entity, WindConfig.pushThresholdMps(), ENTITY_WEIGHT_DIFF, WindConfig.entityPushScale(),
                 ENTITY_MAX_DRIFT_BPT, deltaTime, true);
-    }
-
-    private static void applyTornadoForce(LivingEntity entity, TornadoWindModel.TornadoForces forces, float deltaTime) {
-        double scale = deltaTime / 20f;
-        Vec3 combined = forces.pullVector().add(forces.rotationVector()).scale(scale);
-        Vec3 lift = forces.liftVector().scale(scale);
-        entity.push(combined.x, lift.y, combined.z);
-        entity.hurtMarked = true;
     }
 
     private static void applyWindSteering(ServerLevel level, LivingEntity entity, float thresholdMps, float weightDiff,

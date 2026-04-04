@@ -4,15 +4,13 @@ package net.Gabou.projectatmosphere.manager;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.command.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphereStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.modules.fog.FogStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
@@ -122,11 +120,7 @@ public class AtmosphereManager {
                     PacketDistributor.PLAYER.with(() -> player),
                     ForecastLoadingStatusPacket.ready("player_login_ready")
             );
-            if (CompatHandler.isRainbowsLoaded()) {
-                ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(world);
-                RainbowRainBridge.sendSnapshot(player, world, cloudManager.getCloudGenerator());
-            }
-            FogStatusSyncManager.syncPlayer(player);
+            AtmosphereStatusSyncManager.syncPlayer(player);
             future.complete(null);
         });
     }
@@ -151,9 +145,6 @@ public class AtmosphereManager {
 
     public static void onRegenerate(ServerLevel world) {
         ProjectAtmosphere.LOGGER.info("Regenerating weather data for all players");
-        if (CompatHandler.isRainbowsLoaded()) {
-            RainbowRainBridge.clear(world.dimension());
-        }
         AsyncAtmosphereService.runWeather(() -> {
             EventHandler.onRegenerate();
             CloudManager.get(world).getCloudGenerator().removeAllClouds();

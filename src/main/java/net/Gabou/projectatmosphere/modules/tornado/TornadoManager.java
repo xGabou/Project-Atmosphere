@@ -112,6 +112,9 @@ public class TornadoManager {
                 stormLevel,
                 requiresCloudAttachment
         );
+        if (!requiresCloudAttachment) {
+            tornado.activateImmediately();
+        }
         if (cloud != null) {
             attachDescriptor(cloud, tornado);
         }

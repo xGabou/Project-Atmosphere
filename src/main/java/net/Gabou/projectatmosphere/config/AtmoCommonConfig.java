@@ -395,7 +395,7 @@ public class AtmoCommonConfig {
                 .comment("Enable humidity-driven dynamic fog rendering on the client")
                 .define("enabled", true);
         FOG_SYNC_INTERVAL_TICKS = builder
-                .comment("Ticks between lightweight server->client humidity sync updates for fog sampling")
+                .comment("Ticks between lightweight server->client atmosphere sync updates used by fog and sky-effect compatibility sampling")
                 .defineInRange("syncIntervalTicks", 20, 1, 200);
         FOG_HUMIDITY_START_PERCENT = builder
                 .comment("Humidity percentage where dynamic fog starts to form")

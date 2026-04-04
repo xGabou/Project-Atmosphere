@@ -16,5 +16,7 @@
   "block.projectatmosphere.anemometer": "AnÃ©momÃ¨tre",
   "block.projectatmosphere.thermometer_block": "ThermomÃ¨tre",
   "block.projectatmosphere.barometer_block": "BaromÃ¨tre",
-  "block.projectatmosphere.humidimeter_block": "HygromÃ¨tre"
+  "block.projectatmosphere.humidimeter_block": "HygromÃ¨tre",
+  "block.projectatmosphere.storm_siren": "Sirene de tempete",
+  "block.projectatmosphere.storm_shield": "Bouclier anti-tempete"
 }

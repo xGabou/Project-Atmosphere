@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.async.PoolType;
+import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
@@ -14,7 +15,7 @@ import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
+import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkyEffectController;
 import net.Gabou.projectatmosphere.client.render.SkyEffectState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -60,6 +61,7 @@ public class ClientTickHandler {
         if (!ClientSyncLock.isReady()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.isPaused()) return;
+        AtmosphereClientState.tick(mc);
         AtmosphereFogState.tick(mc);
         if (mc.level == null) {
             TornadoManager.clearClientTornadoes();
@@ -71,7 +73,7 @@ public class ClientTickHandler {
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
         HurricaneManager.tickClient();
-        RainbowWeatherTracker.tick(mc);
+        AtmosphereSkyEffectController.tick(mc);
 
         if (mc.level != null && mc.player != null) {
             CloudManager<?> manager = CloudManager.get(mc.level);

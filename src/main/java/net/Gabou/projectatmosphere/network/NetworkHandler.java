@@ -8,7 +8,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class NetworkHandler {
-    private static final String PROTOCOL_VERSION = "1";
+    private static final String PROTOCOL_VERSION = "2";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -54,15 +54,10 @@ public class NetworkHandler {
                 .encoder(ForecastLoadingStatusPacket::encode)
                 .consumerMainThread(ForecastLoadingStatusPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(RainfallUpdatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(RainfallUpdatePacket::decode)
-                .encoder(RainfallUpdatePacket::encode)
-                .consumerMainThread(RainfallUpdatePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(SyncFogStatusPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(SyncFogStatusPacket::decode)
-                .encoder(SyncFogStatusPacket::encode)
-                .consumerMainThread(SyncFogStatusPacket::handle)
+        CHANNEL.messageBuilder(SyncAtmosphereStatusPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncAtmosphereStatusPacket::decode)
+                .encoder(SyncAtmosphereStatusPacket::encode)
+                .consumerMainThread(SyncAtmosphereStatusPacket::handle)
                 .add();
         CHANNEL.messageBuilder(FogDebugOverridePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(FogDebugOverridePacket::decode)
