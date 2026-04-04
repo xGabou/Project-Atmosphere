@@ -106,11 +106,6 @@ public class ClientTickHandler {
             prevTornadoes.addAll(current);
         }
 
-        if (mc.level != null && mc.level.getGameTime() % 2 == 0) {
-            for (TornadoInstance tornado : TornadoManager.getClientTornadoes()) {
-                TornadoClientEffects.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
-            }
-        }
         if (tickCounter % 40 == 0) {
             if (mc.level != null && mc.player != null) {
                 // snapshot

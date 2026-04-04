@@ -68,6 +68,12 @@ public class TornadoInstance {
     private static final float WATER_PENALTY_THRESHOLD = 0.20F;
     private static final int DEMOLITION_DEBUG_LOG_INTERVAL_TICKS = 100;
     private static final int CLOUD_DETACH_GRACE_TICKS = 20 * 30;
+    private static final float CLIENT_POSITION_INTERPOLATION = 0.18F;
+    private static final float CLIENT_SHAPE_INTERPOLATION = 0.22F;
+    private static final double CLIENT_SNAPSHOT_INTERVAL_TICKS = 5.0D;
+    private static final double CLIENT_VELOCITY_TRACKING = 0.45D;
+    private static final double CLIENT_VELOCITY_DAMPING = 0.84D;
+    private static final double CLIENT_EXTRAPOLATION_TICKS = 1.35D;
 
     private final UUID id;
     public Vec3 position;
@@ -95,16 +101,22 @@ public class TornadoInstance {
     private long lastDemolitionTick = Long.MIN_VALUE;
     private float anchorX;
     private float anchorZ;
+    private final boolean requiresCloudAttachment;
     private StormLifecyclePhase phase;
     private float recentDebrisScore;
     private Vec3 clientPreviousRenderPosition;
     private Vec3 clientRenderPosition;
+    private Vec3 clientTargetPosition;
+    private Vec3 clientTargetVelocity;
     private float clientPreviousRenderBottomY;
     private float clientRenderBottomY;
+    private float clientTargetBottomY;
     private float clientPreviousRenderHeight;
     private float clientRenderHeight;
+    private float clientTargetHeight;
     private float clientPreviousRenderRadius;
     private float clientRenderRadius;
+    private float clientTargetRadius;
     private final Map<Integer, CapturedEntityState> capturedEntities = new HashMap<>();
 
     @Nullable
@@ -126,6 +138,12 @@ public class TornadoInstance {
 
     public TornadoInstance(UUID id, Vec3 position, float radius, WindVector wind, float angularSpeed,
                            float visualBottomY, float visualHeight, @Nullable CloudRegion cloudRegion, int stormLevel) {
+        this(id, position, radius, wind, angularSpeed, visualBottomY, visualHeight, cloudRegion, stormLevel, true);
+    }
+
+    public TornadoInstance(UUID id, Vec3 position, float radius, WindVector wind, float angularSpeed,
+                           float visualBottomY, float visualHeight, @Nullable CloudRegion cloudRegion, int stormLevel,
+                           boolean requiresCloudAttachment) {
         this.id = id;
         this.position = position;
         this.radius = radius;
@@ -137,6 +155,7 @@ public class TornadoInstance {
         this.targetVisualHeight = Math.max(visualHeight, 32.0F);
         this.cloudRegion = cloudRegion;
         this.stormLevel = StormSeverityScale.clamp(stormLevel);
+        this.requiresCloudAttachment = requiresCloudAttachment;
         this.anchorX = (float) position.x;
         this.anchorZ = (float) position.z;
         this.phase = StormLifecyclePhase.FORMING;
@@ -154,12 +173,17 @@ public class TornadoInstance {
         this.applyIntensityToVisuals();
         this.clientPreviousRenderPosition = position;
         this.clientRenderPosition = position;
+        this.clientTargetPosition = position;
+        this.clientTargetVelocity = Vec3.ZERO;
         this.clientPreviousRenderBottomY = this.visualBottomY;
         this.clientRenderBottomY = this.visualBottomY;
+        this.clientTargetBottomY = this.visualBottomY;
         this.clientPreviousRenderHeight = this.visualHeight;
         this.clientRenderHeight = this.visualHeight;
+        this.clientTargetHeight = this.visualHeight;
         this.clientPreviousRenderRadius = this.radius;
         this.clientRenderRadius = this.radius;
+        this.clientTargetRadius = this.radius;
     }
 
     public UUID getId() {
@@ -235,8 +259,12 @@ public class TornadoInstance {
     }
 
     public float getTwist() {
-        float elapsedTicks = this.ageTicks;
-        return Mth.clamp(elapsedTicks * this.angularSpeed * 0.05F, 0.5F, 5.0F);
+        return this.getVisualSpin(0.0F);
+    }
+
+    public float getVisualSpin(float partialTick) {
+        float elapsedTicks = this.ageTicks + Mth.clamp(partialTick, 0.0F, 1.0F);
+        return elapsedTicks * (0.004F + this.angularSpeed * 0.16F);
     }
 
     public boolean isDescriptorMissing() {
@@ -256,6 +284,10 @@ public class TornadoInstance {
     }
 
     public void updateCloudAttachment(boolean attached) {
+        if (!this.requiresCloudAttachment) {
+            this.detachedTicks = 0;
+            return;
+        }
         if (attached) {
             this.detachedTicks = 0;
             return;
@@ -311,11 +343,12 @@ public class TornadoInstance {
         this.clientPreviousRenderHeight = this.clientRenderHeight;
         this.clientPreviousRenderRadius = this.clientRenderRadius;
 
-        float follow = 0.38F;
-        this.clientRenderPosition = this.clientRenderPosition.lerp(this.position, follow);
-        this.clientRenderBottomY = Mth.lerp(follow, this.clientRenderBottomY, this.visualBottomY);
-        this.clientRenderHeight = Mth.lerp(follow, this.clientRenderHeight, this.visualHeight);
-        this.clientRenderRadius = Mth.lerp(follow, this.clientRenderRadius, this.radius);
+        Vec3 predictedTarget = this.clientTargetPosition.add(this.clientTargetVelocity.scale(CLIENT_EXTRAPOLATION_TICKS));
+        this.clientRenderPosition = this.clientRenderPosition.lerp(predictedTarget, CLIENT_POSITION_INTERPOLATION);
+        this.clientRenderBottomY = Mth.lerp(CLIENT_SHAPE_INTERPOLATION, this.clientRenderBottomY, this.clientTargetBottomY);
+        this.clientRenderHeight = Mth.lerp(CLIENT_SHAPE_INTERPOLATION, this.clientRenderHeight, this.clientTargetHeight);
+        this.clientRenderRadius = Mth.lerp(CLIENT_SHAPE_INTERPOLATION, this.clientRenderRadius, this.clientTargetRadius);
+        this.clientTargetVelocity = this.clientTargetVelocity.scale(CLIENT_VELOCITY_DAMPING);
     }
 
     public TornadoSnapshot snapshot() {
@@ -337,6 +370,7 @@ public class TornadoInstance {
 
     public void applySnapshot(TornadoSnapshot snapshot, @Nullable CloudRegion region) {
         boolean snapToTarget = this.ageTicks <= 1 || this.clientRenderPosition.distanceToSqr(snapshot.position()) > 1024.0D;
+        Vec3 previousTargetPosition = this.clientTargetPosition;
         this.position = snapshot.position();
         this.radius = snapshot.radius();
         this.visualBottomY = snapshot.visualBottomY();
@@ -352,13 +386,26 @@ public class TornadoInstance {
         if (snapToTarget) {
             this.clientPreviousRenderPosition = this.position;
             this.clientRenderPosition = this.position;
+            this.clientTargetPosition = this.position;
+            this.clientTargetVelocity = Vec3.ZERO;
             this.clientPreviousRenderBottomY = this.visualBottomY;
             this.clientRenderBottomY = this.visualBottomY;
+            this.clientTargetBottomY = this.visualBottomY;
             this.clientPreviousRenderHeight = this.visualHeight;
             this.clientRenderHeight = this.visualHeight;
+            this.clientTargetHeight = this.visualHeight;
             this.clientPreviousRenderRadius = this.radius;
             this.clientRenderRadius = this.radius;
+            this.clientTargetRadius = this.radius;
+            return;
         }
+
+        Vec3 snapshotVelocity = this.position.subtract(previousTargetPosition).scale(1.0D / CLIENT_SNAPSHOT_INTERVAL_TICKS);
+        this.clientTargetPosition = this.position;
+        this.clientTargetVelocity = this.clientTargetVelocity.lerp(snapshotVelocity, CLIENT_VELOCITY_TRACKING);
+        this.clientTargetBottomY = this.visualBottomY;
+        this.clientTargetHeight = this.visualHeight;
+        this.clientTargetRadius = this.radius;
     }
 
     public boolean synchronizeWithDescriptor() {

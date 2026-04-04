@@ -71,12 +71,26 @@ public class TornadoManager {
     }
 
     public static boolean spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind, int stormLevel) {
-        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
-            return false;
-        }
-
         CloudRegion cloud = findIntersectingCloud(level, pos, radius);
         if (cloud == null) {
+            return false;
+        }
+        return spawnServerInternal(level, pos, radius, wind, stormLevel, cloud, true);
+    }
+
+    public static boolean spawnServerWithoutCloud(ServerLevel level, Vec3 pos, float radius, WindVector wind) {
+        int stormLevel = deriveStormLevel(level, null, BlockPos.containing(pos));
+        return spawnServerWithoutCloud(level, pos, radius, wind, stormLevel);
+    }
+
+    public static boolean spawnServerWithoutCloud(ServerLevel level, Vec3 pos, float radius, WindVector wind, int stormLevel) {
+        return spawnServerInternal(level, pos, radius, wind, stormLevel, null, false);
+    }
+
+    private static boolean spawnServerInternal(ServerLevel level, Vec3 pos, float radius, WindVector wind,
+                                               int stormLevel, @Nullable CloudRegion cloud,
+                                               boolean requiresCloudAttachment) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
             return false;
         }
         if (StormShieldManager.isProtected(level, pos)) {
@@ -86,8 +100,21 @@ public class TornadoManager {
         UUID id = UUID.randomUUID();
         TornadoGeometry geometry = computeGeometry(level, pos, radius);
         Vec3 spawnPos = new Vec3(pos.x, geometry.bottomY(), pos.z);
-        TornadoInstance tornado = new TornadoInstance(id, spawnPos, radius, wind, DEFAULT_ANGULAR_SPEED, geometry.bottomY(), geometry.height(), cloud, stormLevel);
-        attachDescriptor(cloud, tornado);
+        TornadoInstance tornado = new TornadoInstance(
+                id,
+                spawnPos,
+                radius,
+                wind,
+                DEFAULT_ANGULAR_SPEED,
+                geometry.bottomY(),
+                geometry.height(),
+                cloud,
+                stormLevel,
+                requiresCloudAttachment
+        );
+        if (cloud != null) {
+            attachDescriptor(cloud, tornado);
+        }
         SERVER_TORNADOES.add(tornado);
 
         NetworkHandler.CHANNEL.send(

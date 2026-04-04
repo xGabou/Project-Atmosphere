@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -172,6 +173,7 @@ public final class SimpleCloudsTornadoRenderer {
                 ? TornadoRenderDebugState.getMode()
                 : TornadoRenderDebugState.Mode.OFF;
         shader.safeGetUniform("CloudScale").set(scale);
+        shader.safeGetUniform("RenderQuality").set((float) AtmoCommonConfig.TORNADO_RENDER_QUALITY.get().doubleValue());
 
         shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
         shader.safeGetUniform("AnimationTime").set(TornadoManager.getShaderTime() + partialTick * 0.05F);
@@ -640,7 +642,7 @@ public final class SimpleCloudsTornadoRenderer {
                     height,
                     width,
                     stormSize,
-                    tornado.getTwist(),
+                    tornado.getVisualSpin(partialTick),
                     intensity,
                     shape,
                     touchdownProgress,

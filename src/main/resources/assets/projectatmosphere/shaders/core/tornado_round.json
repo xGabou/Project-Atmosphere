@@ -32,6 +32,7 @@
     { "name": "MaxDistance", "type": "float", "count": 1, "values": [ 420.0 ] },
     { "name": "OutSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
     { "name": "CloudScale", "type": "float", "count": 1, "values": [ 8.0 ] },
+    { "name": "RenderQuality", "type": "float", "count": 1, "values": [ 0.72 ] },
     { "name": "StormCount", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "DebugMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "DebugSelectedStorm", "type": "int", "count": 1, "values": [ -1 ] },

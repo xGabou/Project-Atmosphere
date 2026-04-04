@@ -20,6 +20,7 @@ uniform vec2 OutSize;
 uniform vec3 VolumeMin;
 uniform vec3 VolumeMax;
 uniform float CloudScale;
+uniform float RenderQuality;
 uniform int StormCount;
 uniform int DebugMode;
 uniform int DebugSelectedStorm;
@@ -53,6 +54,8 @@ const int DEBUG_ALPHA = 9;
 const int DEBUG_WALLCLOUD = 10;
 const int DEBUG_CONNECTION = 11;
 const int DEBUG_FULL = 12;
+const float TORNADO_ROTATION_SPEED_MULTIPLIER = 3.0;
+const float TORNADO_TOP_DARKEN_FACTOR = 0.45;
 
 struct StormSample {
     float cloud;
@@ -177,6 +180,16 @@ vec3 getStormPos(int index) {
     return vec3(StormPositions[index * 3], StormPositions[index * 3 + 1], StormPositions[index * 3 + 2]);
 }
 
+float computeStormDetailQuality(int index) {
+    vec3 cameraPosWorld = cloudToWorld(CameraPos);
+    vec3 stormPosWorld = cloudToWorld(getStormPos(index));
+    float horizontalDistanceWorld = distance(cameraPosWorld.xz, stormPosWorld.xz);
+    float distanceQuality = 1.0 - smoothstep(96.0, 320.0, horizontalDistanceWorld);
+    float screenProxyQuality = saturate(cloudToWorld(StormWidths[index]) / 42.0);
+    float retainedQuality = max(distanceQuality, screenProxyQuality * 0.45);
+    return clamp(RenderQuality * mix(0.42, 1.0, retainedQuality), 0.25, 1.0);
+}
+
 float sampleFunnelRadiusWorld(float widthWorld, float stormSizeWorld, float tornadoShape, float torPerc, float percFnlHeight) {
     float torShape = mix(tornadoShape, 20.0, saturate(widthWorld / 62.5));
     float widWorld = (widthWorld / 2.5)
@@ -186,9 +199,30 @@ float sampleFunnelRadiusWorld(float widthWorld, float stormSizeWorld, float torn
 }
 
 float sampleMaterialField(vec3 localTorPosWorld, float percFnlHeight, float widPerc, float widWorld,
-                          float spinPhaseA, float spinPhaseB, float animTime, bool freezeDebug) {
+                          float spinPhaseA, float spinPhaseB, float animTime, float detailQuality, bool freezeDebug) {
     if (freezeDebug) {
         return 1.0;
+    }
+
+    if (detailQuality < 0.45) {
+        float coarse = noise3(vec3(localTorPosWorld.xz * 0.055, percFnlHeight * 2.2 + animTime * 0.018)) * 0.5 + 0.5;
+        float band = noise3(vec3(localTorPosWorld.xz * 0.028 + vec2(animTime * 0.038, -animTime * 0.032), percFnlHeight * 1.35)) * 0.5 + 0.5;
+        float turbulence = saturate(coarse * 0.68 + band * 0.32);
+        return mix(0.90, 1.12, turbulence) * mix(0.90, 1.08, widPerc);
+    }
+
+    if (detailQuality < 0.72) {
+        vec2 swirl = spin(spinPhaseA) * localTorPosWorld.xz;
+        vec2 flow = texture(
+            FlowSampler,
+            fract(swirl * 0.024 + vec2(animTime * 0.014, -animTime * 0.012))
+        ).rg * 2.0 - 1.0;
+        vec2 uv = fract(swirl * 0.064 + flow * 0.052 + vec2(percFnlHeight * 0.24, animTime * 0.034));
+        vec4 tex = texture(TornadoSampler, uv);
+        float lum = max(tex.a, dot(tex.rgb, vec3(0.299, 0.587, 0.114)));
+        float noise = texture(NoiseSampler, fract(swirl * 0.030 + vec2(0.17, 0.63))).r;
+        float turbulence = saturate(lum * 0.74 + noise * 0.26);
+        return mix(0.86, 1.14, turbulence) * mix(0.90, 1.12, widPerc);
     }
 
     vec2 swirlA = spin(spinPhaseA) * localTorPosWorld.xz;
@@ -341,6 +375,9 @@ StormSample sampleStorm(int index, vec3 position) {
     float intensity = saturate(StormIntensities[index]);
     float torPerc = saturate(StormProgress[index]);
     float tornadoShape = StormShapes[index];
+    float detailQuality = computeStormDetailQuality(index);
+    bool reducedDetail = detailQuality < 0.72;
+    bool lowDetail = detailQuality < 0.45;
 
     float distWorld = distance(positionWorld.xz, posWorld.xz);
     float wallcloudRadiusWorld = stormSizeWorld * 0.35;
@@ -411,10 +448,18 @@ StormSample sampleStorm(int index, vec3 position) {
     float torDistWorld = distance(torPosWorld.xz, positionWorld.xz);
     vec3 localTorPosWorld = positionWorld - torPosWorld;
 
+    float influenceRadiusWorld = max(
+        max(widWorld * mix(1.8, 2.5, intensity), stormSizeWorld * 0.28),
+        max((widthWorld / 1.5) + 6.25, widthWorld * 1.8)
+    );
+    if (torDistWorld > influenceRadiusWorld) {
+        return outSample;
+    }
+
     float widPerc = 1.0 - saturate(torDistWorld / max(widWorld, 0.001));
     float widMaxPerc = saturate(widWorld / max(maxWidWorld, 0.001));
-    float rotation = -stormSpin * 3.0;
-    float rotation2 = -stormSpin / 1.5;
+    float rotation = -stormSpin * 3.0 * TORNADO_ROTATION_SPEED_MULTIPLIER;
+    float rotation2 = (-stormSpin / 1.5) * TORNADO_ROTATION_SPEED_MULTIPLIER;
 
     mat2 torSpin = spin(rotation + (torDistWorld / 6.25));
     mat2 torSpin2 = spin(rotation2 + (torDistWorld / 18.75));
@@ -423,16 +468,31 @@ StormSample sampleStorm(int index, vec3 position) {
     vec3 torSpinPos2 = vec3(torSpin2 * localTorPosWorld.xz, positionWorld.y - (AnimationTime / 2.0));
     vec3 torSpinPos3 = vec3(torSpin3 * localTorPosWorld.xz, positionWorld.y - (AnimationTime / 2.0));
 
-    float nComp1 = fbm(torSpinPos / 2.5, 3, 2.0, 0.5, 1.0);
-    float nComp2 = fbm(torSpinPos2 / 5.0, 3, 2.0, 0.5, 1.0);
+    int primaryOctaves = lowDetail ? 1 : (reducedDetail ? 2 : 3);
+    int secondaryOctaves = lowDetail ? 1 : 2;
+    int contactOctaves = lowDetail ? 1 : (reducedDetail ? 2 : 3);
+    float nComp1 = fbm(torSpinPos / 2.5, primaryOctaves, 2.0, 0.5, 1.0);
+    float nComp2 = fbm(torSpinPos2 / 5.0, primaryOctaves, 2.0, 0.5, 1.0);
     float torNoise1 = mix(nComp1, nComp2, sqrt(widMaxPerc));
-    float torNoise2 = fbm((torSpinPos + vec3(9.2, -5.7, 3.1)) / 1.6, 2, 2.0, 0.55, 1.0);
+    float torNoise2 = lowDetail
+        ? noise3((torSpinPos + vec3(9.2, -5.7, 3.1)) / 1.6)
+        : fbm((torSpinPos + vec3(9.2, -5.7, 3.1)) / 1.6, secondaryOctaves, 2.0, 0.55, 1.0);
 
     widWorld *= mix(0.8 + (torNoise1 * 0.2), 0.9, saturate(widthWorld / 125.0) * 0.9);
     widWorld *= 1.0 + torNoise2 * 0.035;
     widPerc = 1.0 - saturate(torDistWorld / max(widWorld, 0.001));
 
-    float materialField = sampleMaterialField(localTorPosWorld, percFnlHeight, widPerc, widWorld, rotation + (torDistWorld / 6.25), rotation2 + (torDistWorld / 18.75), AnimationTime, false);
+    float materialField = sampleMaterialField(
+        localTorPosWorld,
+        percFnlHeight,
+        widPerc,
+        widWorld,
+        rotation + (torDistWorld / 6.25),
+        rotation2 + (torDistWorld / 18.75),
+        AnimationTime,
+        detailQuality,
+        false
+    );
     float innerDensity = pow(max(widPerc, 0.0), mix(1.15, 1.55, 1.0 - intensity)) * 4.0;
     float shearBand = saturate(widPerc * (1.0 - widPerc) * 4.0);
     float shellDensity = shearBand * (0.92 + materialField * 0.34) * mix(0.95, 1.35, intensity);
@@ -449,7 +509,9 @@ StormSample sampleStorm(int index, vec3 position) {
     tornado *= materialField;
     tornado *= mix(0.78, 1.06, intensity);
 
-    float dcNoise1 = fbm(torSpinPos3 / 2.5, 3, 2.0, 0.5, 1.0);
+    float dcNoise1 = lowDetail
+        ? noise3(torSpinPos3 / 2.5)
+        : fbm(torSpinPos3 / 2.5, contactOctaves, 2.0, 0.5, 1.0);
     float baseContactRadiusWorld = max(widthWorld * 0.24, 0.72) + intensity * 0.42;
     float baseContactPerc = 1.0 - saturate(torDistWorld / max(baseContactRadiusWorld, 0.001));
     float touchdown = pow(max(baseContactPerc, 0.0), 0.48);
@@ -469,19 +531,24 @@ StormSample sampleStorm(int index, vec3 position) {
     dustWidPerc = pow(max(dustWidPerc, 0.0), 0.25);
     float edge = saturate(torDistWorld / max(dustWidWorld * 0.9, 0.001));
     dustWidPerc *= edge * edge * edge;
-    float dust = pow(max(dustWidPerc, 0.0), 1.5) * 0.15;
-    dust *= saturate((dcTopWorld - positionWorld.y) / 2.5);
-    dust *= saturate((positionWorld.y - (posWorld.y - 2.5)) / 2.5);
-    dust *= 0.8 + (dcNoise1 * 0.2);
-    dust *= dcPerc;
-    dust *= 1.0 - saturate((widthWorld - 6.25) / 25.0);
+    float dust = 0.0;
+    if (!lowDetail) {
+        dust = pow(max(dustWidPerc, 0.0), 1.5) * 0.15;
+        dust *= saturate((dcTopWorld - positionWorld.y) / 2.5);
+        dust *= saturate((positionWorld.y - (posWorld.y - 2.5)) / 2.5);
+        dust *= 0.8 + (dcNoise1 * 0.2);
+        dust *= dcPerc;
+        dust *= 1.0 - saturate((widthWorld - 6.25) / 25.0);
+    }
 
     float connectionRadiusWorld = max(widWorld * mix(1.8, 2.5, intensity), stormSizeWorld * 0.28);
     float connectionPerc = 1.0 - saturate(torDistWorld / max(connectionRadiusWorld, 0.001));
     float connection = pow(max(connectionPerc, 0.0), 0.55);
     connection *= smoothstep(fnlTopWorld - 1.8, baseHeightWorld + 1.8, positionWorld.y);
     connection *= saturate((intensity - 0.25) * 1.7);
-    connection *= 0.82 + onoise(vec3((positionWorld.xz + posWorld.xz) / 20.0, AnimationTime / 140.0)) * 0.18;
+    if (!reducedDetail) {
+        connection *= 0.82 + onoise(vec3((positionWorld.xz + posWorld.xz) / 20.0, AnimationTime / 140.0)) * 0.18;
+    }
 
     outSample.cloud = max(outSample.cloud, max(tornado, dust));
     outSample.cloud = max(outSample.cloud, connection * 0.9);
@@ -541,6 +608,7 @@ void main() {
         && DebugMode != DEBUG_HIT
         && DebugMode != DEBUG_FILL
         && DebugMode != DEBUG_FULL;
+    float detailQuality = debugActive ? 1.0 : computeStormDetailQuality(0);
 
     vec3 accum = vec3(0.0);
     float transmittance = 1.0;
@@ -550,16 +618,19 @@ void main() {
     bool wroteDepth = false;
 
     float interval = maxRay - tNear;
-    int steps = int(clamp(interval / 0.42, 18.0, 52.0));
+    float stepSpacing = mix(1.40, 0.60, detailQuality);
+    float minSteps = mix(8.0, 14.0, detailQuality);
+    float maxSteps = mix(22.0, 40.0, detailQuality);
+    int steps = int(clamp(interval / stepSpacing, minSteps, maxSteps));
     float stepSize = interval / float(max(steps, 1));
     float jitter = hash1(screenUv.x * OutSize.x + screenUv.y * OutSize.y + 17.13);
     float t = tNear + stepSize * (0.20 + jitter * 0.80);
 
-    for (int step = 0; step < 52; step++) {
+    for (int step = 0; step < 40; step++) {
         if (step >= steps) {
             break;
         }
-        if (!debugMaskMode && transmittance < 0.025) {
+        if (!debugMaskMode && transmittance < mix(0.08, 0.03, detailQuality)) {
             break;
         }
 
@@ -589,7 +660,9 @@ void main() {
                 alpha = saturate(alpha * (1.10 + nearField * 0.32));
                 float bodyDark = mix(0.08, 0.25, saturate(storm.material));
                 vec3 cloudBase = CloudColor.rgb * bodyDark;
-                vec3 upperCol = mix(cloudBase, CloudColor.rgb * 0.70, saturate(storm.upper) * 0.62);
+                float upperStrength = saturate(storm.upper);
+                vec3 upperCol = mix(cloudBase, CloudColor.rgb * 0.64, upperStrength * 0.62);
+                upperCol *= mix(1.0, 1.0 - TORNADO_TOP_DARKEN_FACTOR, upperStrength);
                 vec3 dustCol = vec3(0.20, 0.125, 0.071);
                 float dustTint = saturate(pow(storm.dust, 0.55)) * (1.0 - saturate(storm.material * 0.45));
                 vec3 localColor = mix(upperCol, dustCol, dustTint);
