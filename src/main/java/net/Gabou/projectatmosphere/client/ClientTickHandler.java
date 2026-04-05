@@ -77,7 +77,7 @@ public class ClientTickHandler {
 
         if (mc.level != null && mc.player != null) {
             CloudManager<?> manager = CloudManager.get(mc.level);
-            List<CloudRegion> regions = manager.getCloudGenerator().getClouds();
+            List<CloudRegion> regions = manager.getClouds();
             double playerX = mc.player.getX();
             double playerZ = mc.player.getZ();
             Set<Integer> nextCulled = new HashSet<>();

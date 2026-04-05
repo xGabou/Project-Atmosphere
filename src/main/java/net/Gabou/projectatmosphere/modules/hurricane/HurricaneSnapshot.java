@@ -11,6 +11,7 @@ public record HurricaneSnapshot(
         Vec3 position,
         float radius,
         float eyewallRadius,
+        int ageTicks,
         float windSpeed,
         float windAngle,
         float windGust,
@@ -26,6 +27,7 @@ public record HurricaneSnapshot(
         buf.writeDouble(this.position.z);
         buf.writeFloat(this.radius);
         buf.writeFloat(this.eyewallRadius);
+        buf.writeVarInt(this.ageTicks);
         buf.writeFloat(this.windSpeed);
         buf.writeFloat(this.windAngle);
         buf.writeFloat(this.windGust);
@@ -40,6 +42,7 @@ public record HurricaneSnapshot(
         Vec3 position = new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble());
         float radius = buf.readFloat();
         float eyewallRadius = buf.readFloat();
+        int ageTicks = buf.readVarInt();
         float windSpeed = buf.readFloat();
         float windAngle = buf.readFloat();
         float windGust = buf.readFloat();
@@ -47,6 +50,6 @@ public record HurricaneSnapshot(
         HurricaneRenderDescriptor renderDescriptor = HurricaneRenderDescriptor.read(buf);
         HurricaneCategory category = buf.readEnum(HurricaneCategory.class);
         StormLifecyclePhase phase = buf.readEnum(StormLifecyclePhase.class);
-        return new HurricaneSnapshot(id, position, radius, eyewallRadius, windSpeed, windAngle, windGust, normalizedIntensity, renderDescriptor, category, phase);
+        return new HurricaneSnapshot(id, position, radius, eyewallRadius, ageTicks, windSpeed, windAngle, windGust, normalizedIntensity, renderDescriptor, category, phase);
     }
 }

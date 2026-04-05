@@ -26,35 +26,38 @@ public record HurricaneRenderDescriptor(
     public static HurricaneRenderDescriptor create(float stormRadiusWorld, float intensity, HurricaneCategory category) {
         float normalizedIntensity = Mth.clamp(intensity, 0.0F, 1.0F);
         float categoryBias = category.ordinal() / (float) (HurricaneCategory.values().length - 1);
-        float eyeRadius = stormRadiusWorld * (0.17F + normalizedIntensity * 0.11F + categoryBias * 0.04F);
-        float eyeClearRadius = eyeRadius * (1.08F + normalizedIntensity * 0.10F);
-        float eyewallThickness = Math.max(
-                stormRadiusWorld * (0.36F + normalizedIntensity * 0.16F + categoryBias * 0.08F),
-                eyeRadius * 0.80F
+        float torusMajorRadius = Mth.clamp(
+                stormRadiusWorld * (2.2F + normalizedIntensity * 0.80F + categoryBias * 0.45F),
+                110.0F,
+                360.0F
         );
-        float canopyRadius = Mth.clamp(
-                stormRadiusWorld * (3.0F + normalizedIntensity * 1.2F + categoryBias * 0.8F),
-                220.0F,
-                820.0F
+        float torusMinorRadius = Mth.clamp(
+                stormRadiusWorld * (0.72F + normalizedIntensity * 0.18F + categoryBias * 0.14F),
+                32.0F,
+                110.0F
         );
-        float shieldRadius = canopyRadius * (1.10F + categoryBias * 0.12F);
-        float bandStart = canopyRadius * (0.88F + normalizedIntensity * 0.10F);
-        float bandEnd = shieldRadius * (1.02F + normalizedIntensity * 0.10F);
-        float bandWidth = Mth.clamp(stormRadiusWorld * (0.42F + normalizedIntensity * 0.16F), 52.0F, 170.0F);
-        float bandStrength = Mth.clamp(0.18F + normalizedIntensity * 0.30F + categoryBias * 0.12F, 0.0F, 1.0F);
+        float eyeRadius = Math.max(torusMajorRadius - torusMinorRadius * 1.16F, stormRadiusWorld * 0.55F);
+        float eyeClearRadius = eyeRadius + torusMinorRadius * (0.32F + normalizedIntensity * 0.18F);
+        float canopyRadius = torusMajorRadius;
+        float shieldRadius = torusMajorRadius + torusMinorRadius * (2.10F + categoryBias * 0.60F);
+        float bandStart = shieldRadius * (0.96F + normalizedIntensity * 0.04F);
+        float bandEnd = shieldRadius * (1.78F + normalizedIntensity * 0.18F + categoryBias * 0.10F);
+        float bandWidth = Mth.clamp(torusMinorRadius * (1.15F + normalizedIntensity * 0.30F), 48.0F, 180.0F);
+        float bandStrength = Mth.clamp(0.22F + normalizedIntensity * 0.34F + categoryBias * 0.12F, 0.0F, 1.0F);
         float bandCount = 2.0F + category.ordinal();
-        float fringeStrength = Mth.clamp(0.28F + normalizedIntensity * 0.36F + categoryBias * 0.10F, 0.0F, 1.0F);
-        float baseOffset = 44.0F + normalizedIntensity * 90.0F + categoryBias * 26.0F;
+        float fringeStrength = Mth.clamp(0.30F + normalizedIntensity * 0.34F + categoryBias * 0.12F, 0.0F, 1.0F);
+        float baseOffset = 56.0F + normalizedIntensity * 92.0F + categoryBias * 20.0F;
         float volumeHeight = Mth.clamp(
-                210.0F + canopyRadius * 0.17F + normalizedIntensity * 95.0F + categoryBias * 50.0F,
-                180.0F,
-                460.0F
+                220.0F + torusMinorRadius * 2.8F + normalizedIntensity * 80.0F + categoryBias * 36.0F,
+                220.0F,
+                430.0F
         );
-        float canopyBase = 0.20F - categoryBias * 0.04F;
-        float canopyTop = 0.95F + normalizedIntensity * 0.05F;
-        float shieldBase = 0.14F;
-        float shieldTop = 0.86F + normalizedIntensity * 0.05F;
-        float eyeSlope = 0.82F + normalizedIntensity * 0.26F + categoryBias * 0.08F;
+        float canopyBase = 0.38F - categoryBias * 0.03F;
+        float canopyTop = 0.82F + normalizedIntensity * 0.05F;
+        float shieldBase = 0.28F;
+        float shieldTop = 0.96F;
+        float eyeSlope = 0.94F + normalizedIntensity * 0.16F + categoryBias * 0.05F;
+        float eyewallThickness = torusMinorRadius;
 
         return new HurricaneRenderDescriptor(
                 baseOffset,

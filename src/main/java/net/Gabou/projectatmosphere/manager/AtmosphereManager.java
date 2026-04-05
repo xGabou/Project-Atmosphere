@@ -84,8 +84,6 @@ public class AtmosphereManager {
     }
 
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        if(ProjectAtmosphere.DEBUG_MODE)
-            ProjectAtmosphere.LOGGER.info("Updating forecast Around");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.updateForecast(world, center);
         });
@@ -136,8 +134,6 @@ public class AtmosphereManager {
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        if(ProjectAtmosphere.DEBUG_MODE)
-            ProjectAtmosphere.LOGGER.info("Swapping profiles and updating weather");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.onSwapDay(world);
         });

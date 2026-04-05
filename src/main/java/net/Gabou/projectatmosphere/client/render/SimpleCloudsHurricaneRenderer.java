@@ -12,14 +12,13 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.nonamecrackers2.simpleclouds.client.framebuffer.WeightedBlendingTarget;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCloudVolume;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderDescriptor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.texture.AbstractTexture;
-import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
@@ -29,7 +28,6 @@ import org.lwjgl.opengl.GL40;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public final class SimpleCloudsHurricaneRenderer {
     public static final SimpleCloudsHurricaneRenderer INSTANCE = new SimpleCloudsHurricaneRenderer();
@@ -40,7 +38,7 @@ public final class SimpleCloudsHurricaneRenderer {
     private ClientLevel preparedLevel;
     private long preparedGameTime = Long.MIN_VALUE;
     private float preparedPartialTick = Float.NaN;
-    private final List<PreparedHurricane> preparedHurricanes = new ArrayList<>();
+    private final List<HurricaneCloudVolume> preparedHurricanes = new ArrayList<>();
     private boolean initialized;
     private VertexBuffer fullscreenQuad;
     private final VolumeBoxMesh volumeBox = new VolumeBoxMesh();
@@ -67,7 +65,7 @@ public final class SimpleCloudsHurricaneRenderer {
             if (this.preparedHurricanes.size() >= MAX_STORMS) {
                 break;
             }
-            this.preparedHurricanes.add(PreparedHurricane.from(hurricane, partialTick));
+            this.preparedHurricanes.add(HurricaneCloudVolume.from(hurricane, partialTick));
         }
     }
 
@@ -265,14 +263,14 @@ public final class SimpleCloudsHurricaneRenderer {
 
         this.applyCommonUniforms(shader, renderer, stack, projMat);
         shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
-        List<PreparedHurricane> renderOrder = new ArrayList<>(this.preparedHurricanes);
+        List<HurricaneCloudVolume> renderOrder = new ArrayList<>(this.preparedHurricanes);
         Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
         renderOrder.sort((left, right) -> Double.compare(
                 right.centerWorld().distanceToSqr(cameraPos),
                 left.centerWorld().distanceToSqr(cameraPos)
         ));
 
-        for (PreparedHurricane hurricane : renderOrder) {
+        for (HurricaneCloudVolume hurricane : renderOrder) {
             this.applySingleStormUniforms(shader, hurricane);
             shader.safeGetUniform("VolumeMin").set(
                     (float) hurricane.boundsMinCloud().x,
@@ -327,14 +325,14 @@ public final class SimpleCloudsHurricaneRenderer {
         GL40.glBlendFunci(0, GL11.GL_ONE, GL11.GL_ONE);
         GL40.glBlendFunci(1, GL11.GL_ZERO, GL11.GL_ONE_MINUS_SRC_COLOR);
 
-        List<PreparedHurricane> renderOrder = new ArrayList<>(this.preparedHurricanes);
+        List<HurricaneCloudVolume> renderOrder = new ArrayList<>(this.preparedHurricanes);
         Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
         renderOrder.sort((left, right) -> Double.compare(
                 right.centerWorld().distanceToSqr(cameraPos),
                 left.centerWorld().distanceToSqr(cameraPos)
         ));
 
-        for (PreparedHurricane hurricane : renderOrder) {
+        for (HurricaneCloudVolume hurricane : renderOrder) {
             this.applySingleStormUniforms(shader, hurricane);
             shader.safeGetUniform("VolumeMin").set(
                     (float) hurricane.boundsMinCloud().x,
@@ -410,7 +408,7 @@ public final class SimpleCloudsHurricaneRenderer {
         shader.safeGetUniform("StormSeeds").set(uniforms.stormSeeds());
     }
 
-    private void applySingleStormUniforms(ShaderInstance shader, PreparedHurricane hurricane) {
+    private void applySingleStormUniforms(ShaderInstance shader, HurricaneCloudVolume hurricane) {
         float[] stormPositions = new float[MAX_STORMS * 3];
         float[] stormHeights = new float[MAX_STORMS];
         float[] eyeRadii = new float[MAX_STORMS];
@@ -481,79 +479,6 @@ public final class SimpleCloudsHurricaneRenderer {
         shader.safeGetUniform("StormSeeds").set(stormSeeds);
     }
 
-    private record PreparedHurricane(UUID id, float centerX, float centerZ, float baseY, float height,
-                                     float eyeRadius, float eyeClearRadius, float eyeSlope,
-                                     float eyewallThickness, float canopyRadius, float shieldRadius,
-                                     float canopyBaseFactor, float canopyTopFactor,
-                                     float shieldBaseFactor, float shieldTopFactor,
-                                     float bandStartRadius, float bandEndRadius, float bandWidth,
-                                     float bandStrength, float bandCount, float fringeStrength,
-                                     float spin, float intensity, float seed,
-                                     Vec3 renderPosWorld, float cloudScale) {
-        static PreparedHurricane from(HurricaneInstance hurricane, float partialTick) {
-            float scale = SimpleCloudsConstants.CLOUD_SCALE;
-            Vec3 renderPos = hurricane.getRenderPosition(partialTick);
-            HurricaneRenderDescriptor descriptor = hurricane.getRenderDescriptor(partialTick);
-
-            return new PreparedHurricane(
-                    hurricane.getId(),
-                    (float) renderPos.x / scale,
-                    (float) renderPos.z / scale,
-                    -descriptor.baseOffsetWorld() / scale,
-                    descriptor.volumeHeightWorld() / scale,
-                    descriptor.eyeRadiusWorld() / scale,
-                    descriptor.eyeClearRadiusWorld() / scale,
-                    descriptor.eyeSlope(),
-                    descriptor.eyewallThicknessWorld() / scale,
-                    descriptor.canopyRadiusWorld() / scale,
-                    descriptor.shieldRadiusWorld() / scale,
-                    descriptor.canopyBaseFactor(),
-                    descriptor.canopyTopFactor(),
-                    descriptor.shieldBaseFactor(),
-                    descriptor.shieldTopFactor(),
-                    descriptor.bandStartRadiusWorld() / scale,
-                    descriptor.bandEndRadiusWorld() / scale,
-                    descriptor.bandWidthWorld() / scale,
-                    descriptor.bandStrength(),
-                    descriptor.bandCount(),
-                    descriptor.fringeStrength(),
-                    hurricane.getVisualSpin(partialTick),
-                    Mth.clamp(hurricane.getRenderIntensity(partialTick), 0.0F, 1.0F),
-                    hurricane.getVisualSeed(),
-                    renderPos,
-                    scale
-            );
-        }
-
-        Vec3 centerWorld() {
-            return new Vec3(this.renderPosWorld.x, this.baseWorld() + this.heightWorld() * 0.5F, this.renderPosWorld.z);
-        }
-
-        float boundsRadiusCloud() {
-            return Math.max(this.shieldRadius * 1.18F, this.canopyRadius * 1.28F);
-        }
-
-        float boundsRadiusWorld() {
-            return this.boundsRadiusCloud() * this.cloudScale;
-        }
-
-        float baseWorld() {
-            return (float) this.renderPosWorld.y + this.baseY * this.cloudScale;
-        }
-
-        float heightWorld() {
-            return this.height * this.cloudScale;
-        }
-
-        Vec3 boundsMinCloud() {
-            return new Vec3(this.centerX - this.boundsRadiusCloud(), this.baseY - 2.0F, this.centerZ - this.boundsRadiusCloud());
-        }
-
-        Vec3 boundsMaxCloud() {
-            return new Vec3(this.centerX + this.boundsRadiusCloud(), this.baseY + this.height + 4.0F, this.centerZ + this.boundsRadiusCloud());
-        }
-    }
-
     private record StormUniforms(
             int stormCount,
             float[] stormPositions,
@@ -578,7 +503,7 @@ public final class SimpleCloudsHurricaneRenderer {
             float[] stormIntensities,
             float[] stormSeeds
     ) {
-        static StormUniforms from(List<PreparedHurricane> hurricanes) {
+        static StormUniforms from(List<HurricaneCloudVolume> hurricanes) {
             float[] stormPositions = new float[MAX_STORMS * 3];
             float[] stormHeights = new float[MAX_STORMS];
             float[] eyeRadii = new float[MAX_STORMS];
@@ -602,7 +527,7 @@ public final class SimpleCloudsHurricaneRenderer {
             float[] stormSeeds = new float[MAX_STORMS];
 
             for (int i = 0; i < hurricanes.size(); i++) {
-                PreparedHurricane hurricane = hurricanes.get(i);
+                HurricaneCloudVolume hurricane = hurricanes.get(i);
                 stormPositions[i * 3] = hurricane.centerX();
                 stormPositions[i * 3 + 1] = hurricane.baseY();
                 stormPositions[i * 3 + 2] = hurricane.centerZ();

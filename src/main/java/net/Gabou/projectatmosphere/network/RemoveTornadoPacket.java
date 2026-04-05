@@ -1,6 +1,4 @@
 package net.Gabou.projectatmosphere.network;
-
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -29,9 +27,6 @@ public class RemoveTornadoPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            if (ProjectAtmosphere.DEBUG_MODE) {
-                ProjectAtmosphere.LOGGER.info("[TornadoDebug] Client received RemoveTornadoPacket id={}", this.id);
-            }
             TornadoManager.removeClientTornado(this.id);
         });
         ctx.get().setPacketHandled(true);

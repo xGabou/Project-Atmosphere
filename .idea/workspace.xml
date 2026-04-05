@@ -4,33 +4,28 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add fog synchronization, implement fog biome classification, and enhance tornado rendering">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add storm shield block, implement atmosphere status synchronization, and enhance client-side weather effects">
       <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientPacketHandlers.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientPacketHandlers.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientSyncLock.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientSyncLock.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/CompatHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/rainbows/RainbowRainBridge.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/rainbows/RainbowWeatherTracker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/compat/rainbows/RainbowWeatherTracker.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/EventHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/event/SimpleCloudsEventListener.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/SimpleCloudsHurricaneRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/SimpleCloudsHurricaneRenderer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/SimpleCloudsTornadoRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/SimpleCloudsTornadoRenderer.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/AtmosphereManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/auroras/AuroraRendererMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/auroras/AuroraRendererMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/compat/rainbows/RainbowsRendererParticleMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/fog/FogStatusSyncManager.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/DefaultPipelineTornadoMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/DefaultPipelineTornadoMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/ShaderSupportPipelineTornadoMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/ShaderSupportPipelineTornadoMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneInstance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneRenderDescriptor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneRenderDescriptor.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneSnapshot.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneSnapshot.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindForces.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/wind/WindForces.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/RainfallUpdatePacket.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SyncFogStatusPacket.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ClientOnlyRegistrar.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/registry/ClientOnlyRegistrar.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/en_us.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/en_us.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/fr_fr.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/lang/fr_fr.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/StormMotionModel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/StormMotionModel.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/RemoveTornadoPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/RemoveTornadoPacket.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/hurricane_clouds.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/hurricane_clouds.fsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/hurricane_clouds_transparency.fsh" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/hurricane_clouds_transparency.fsh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -671,15 +666,7 @@
       <workItem from="1775052608831" duration="1944000" />
       <workItem from="1775132709891" duration="6164000" />
       <workItem from="1775247796061" duration="10617000" />
-      <workItem from="1775316107312" duration="7062000" />
-    </task>
-    <task id="LOCAL-00105" summary="feat: introduce async biome sampling and enhance threading support">
-      <option name="closed" value="true" />
-      <created>1757714997682</created>
-      <option name="number" value="00105" />
-      <option name="presentableId" value="LOCAL-00105" />
-      <option name="project" value="LOCAL" />
-      <updated>1757714997682</updated>
+      <workItem from="1775316107312" duration="13452000" />
     </task>
     <task id="LOCAL-00106" summary="feat: update particle textures and enhance tornado rendering logic">
       <option name="closed" value="true" />
@@ -1065,7 +1052,15 @@
       <option name="project" value="LOCAL" />
       <updated>1775255273805</updated>
     </task>
-    <option name="localTasksCounter" value="154" />
+    <task id="LOCAL-00154" summary="feat: add storm shield block, implement atmosphere status synchronization, and enhance client-side weather effects">
+      <option name="closed" value="true" />
+      <created>1775339770678</created>
+      <option name="number" value="00154" />
+      <option name="presentableId" value="LOCAL-00154" />
+      <option name="project" value="LOCAL" />
+      <updated>1775339770679</updated>
+    </task>
+    <option name="localTasksCounter" value="155" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1114,7 +1109,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: integrate auroras and rainbows compatibility, enhance storm severity calculations, and update version to 0.5.5.7" />
     <MESSAGE value="feat: update mod version to 0.6.0.0-pre2, enhance sunlight-driven temperature calculations, and add baseline temperature bounds" />
     <MESSAGE value="feat: update build configuration to change dependency scope and enhance project structure" />
     <MESSAGE value="feat: enhance tornado integration with SimpleClouds, improve shader support, and update spawn logic" />
@@ -1139,7 +1133,8 @@
     <MESSAGE value="feat: add Distant Horizons compatibility, enhance shader management, and improve tornado effects" />
     <MESSAGE value="feat: implement hurricane cloud renderer, add storm shield block, and enhance tornado effects" />
     <MESSAGE value="feat: add fog synchronization, implement fog biome classification, and enhance tornado rendering" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: add fog synchronization, implement fog biome classification, and enhance tornado rendering" />
+    <MESSAGE value="feat: add storm shield block, implement atmosphere status synchronization, and enhance client-side weather effects" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add storm shield block, implement atmosphere status synchronization, and enhance client-side weather effects" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1228,6 +1223,7 @@
         <watch expression="ForecastGenerator.getForecastMap().keySet().stream().min(Comparator.comparingDouble(k -&gt; k.samplePos().distSqr(new BlockPos(x, y, z)))).orElse(null)" language="JAVA" custom="java.util.Comparator" />
         <watch expression="serverLevel.getBiome(new BlockPos(x,y,-z))" language="JAVA" />
         <watch expression="((java.util.concurrent.ConcurrentHashMap)ForecastGenerator.getForecastMap()).entrySet().toArray()[0]" custom="java.util.concurrent.ConcurrentHashMap" />
+        <watch expression="cloudManager.getClouds().get(0)" />
       </configuration>
     </watches-manager>
   </component>

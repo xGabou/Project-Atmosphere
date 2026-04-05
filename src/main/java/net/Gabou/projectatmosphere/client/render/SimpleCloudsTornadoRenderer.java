@@ -68,7 +68,6 @@ public final class SimpleCloudsTornadoRenderer {
             return;
         }
 
-        boolean shouldDebugLog = shouldDebugLog(level);
         this.preparedLevel = level;
         this.preparedGameTime = level.getGameTime();
         this.preparedPartialTick = partialTick;
@@ -92,7 +91,7 @@ public final class SimpleCloudsTornadoRenderer {
             this.resolvedDebugStormIndex = -1;
         }
 
-        if (shouldDebugLog) {
+        if (shouldDebugLog(level)) {
             debug(
                     "prepareFrame complete gameTime={} tornadoes={} debugState={} resolvedDebugStorm={}",
                     level.getGameTime(),
@@ -575,7 +574,7 @@ public final class SimpleCloudsTornadoRenderer {
     }
 
     private static boolean shouldDebugLog(ClientLevel level) {
-        return ProjectAtmosphere.DEBUG_MODE && level != null && level.getGameTime() % 20L == 0L;
+        return TornadoRenderDebugState.isActive() && level != null && level.getGameTime() % 20L == 0L;
     }
 
     private static float sampleTerrainSurfaceY(ClientLevel level, Vec3 renderPos, float radius) {
@@ -592,7 +591,7 @@ public final class SimpleCloudsTornadoRenderer {
     }
 
     private static void debug(String message, Object... args) {
-        if (ProjectAtmosphere.DEBUG_MODE) {
+        if (TornadoRenderDebugState.isActive()) {
             ProjectAtmosphere.LOGGER.info("[TornadoDebug] " + message, args);
         }
     }

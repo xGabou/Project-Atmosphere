@@ -144,6 +144,11 @@ float eyeRadiusAtHeight(int index, float localY, float baseRadius) {
     return mix(baseRadius, baseRadius * slope, saturate(localY));
 }
 
+float sdTorus(vec3 p, float majorRadius, float minorRadius, float verticalScale) {
+    vec2 q = vec2(length(p.xz) - majorRadius, p.y / max(verticalScale, 0.01));
+    return length(q) - minorRadius;
+}
+
 HurricaneSample sampleStorm(int index, vec3 position) {
     vec3 pos = getStormPos(index);
     float height = max(StormHeights[index], 0.001);
@@ -160,16 +165,12 @@ HurricaneSample sampleStorm(int index, vec3 position) {
     float seed = StormSeeds[index];
 
     float eyeRadius = max(EyeRadii[index], 0.001);
-    float effectiveEye = eyeRadiusAtHeight(index, localY, eyeRadius);
-    if (r < effectiveEye * 0.98) {
-        return HurricaneSample(0.0, 0.0);
-    }
-
     float eyeClear = eyeRadiusAtHeight(index, localY, max(EyeClearRadii[index], eyeRadius * 1.04));
-    float wallOuter = effectiveEye + max(EyewallThicknesses[index], 0.001) * mix(0.82, 1.22, saturate(localY));
-    float wallSoft = max(EyewallThicknesses[index] * 0.16, 0.22);
-    float wallBand = band(r, effectiveEye, wallOuter, wallSoft);
-    float wallHeight = verticalWindow(localY, 0.02, 0.94, 0.08);
+    float torusMajor = max(CanopyRadii[index], eyeClear + EyewallThicknesses[index] * 0.65);
+    float torusMinor = max(EyewallThicknesses[index], 0.001);
+    float torusCenterY = mix(CanopyBaseFactors[index], CanopyTopFactors[index], 0.56);
+    vec3 torusLocal = vec3(rel.x, (localY - torusCenterY) * height, rel.y);
+    float torusSdf = sdTorus(torusLocal, torusMajor, torusMinor, mix(0.78, 1.08, intensity));
 
     vec2 flowUv = fract(rel * 0.010 + vec2(spin * 0.010, -AnimationTime * 0.012) + vec2(seed, localY * 0.23));
     vec2 flow = texture(FlowSampler, flowUv).rg * 2.0 - 1.0;
@@ -178,41 +179,32 @@ HurricaneSample sampleStorm(int index, vec3 position) {
     float volumeNoise = fbm(vec3(rel * 0.055 + flow * 1.8, localY * 3.3 + seed * 7.0), 3, 2.0, 0.5, 1.0);
     float noiseField = saturate(baseTex * 0.46 + detailTex * 0.26 + volumeNoise * 0.28 + 0.46);
 
-    float canopyHeight = verticalWindow(localY, CanopyBaseFactors[index], CanopyTopFactors[index], 0.09);
-    float canopyRadius = max(CanopyRadii[index], wallOuter + 0.001);
-    float canopyRadiusAtY = mix(wallOuter * 1.28, canopyRadius, smoothstep(CanopyBaseFactors[index], CanopyTopFactors[index], localY));
-    float canopyDisk = 1.0 - smoothstep(canopyRadiusAtY * 0.88, canopyRadiusAtY * 1.05, r);
-    float canopyHole = smoothstep(eyeClear * 0.96, eyeClear * 1.28, r);
+    float torusBody = 1.0 - smoothstep(0.0, torusMinor * 0.72 + 0.35, torusSdf);
+    torusBody *= verticalWindow(localY, max(CanopyBaseFactors[index] - 0.12, 0.0), min(CanopyTopFactors[index] + 0.12, 1.02), 0.12);
+    torusBody *= smoothstep(eyeRadius * 0.98, eyeClear * 1.04, r);
+    torusBody *= mix(0.74, 1.32, noiseField);
 
-    float shieldHeight = verticalWindow(localY, ShieldBaseFactors[index], ShieldTopFactors[index], 0.08);
-    float shieldRadius = max(ShieldRadii[index], canopyRadius * 1.02);
-    float shield = (1.0 - smoothstep(canopyRadius * 0.94, shieldRadius, r)) * shieldHeight;
-    shield *= smoothstep(eyeClear * 1.08, eyeClear * 1.52, r);
+    float torusRim = 1.0 - smoothstep(torusMinor * 0.08, torusMinor * 0.75, abs(torusSdf));
+    float shieldHeight = verticalWindow(localY, ShieldBaseFactors[index], ShieldTopFactors[index], 0.10);
+    float shieldRadius = max(ShieldRadii[index], torusMajor + torusMinor * 1.8);
+    float veil = (1.0 - smoothstep(torusMajor * 0.92, shieldRadius, r)) * shieldHeight;
+    veil *= smoothstep(eyeClear * 1.08, eyeClear * 1.48, r);
+    veil *= mix(0.12, 0.30, noiseField) * FringeStrengths[index];
 
     float bandWindow = band(r, BandStartRadii[index], BandEndRadii[index], max(BandWidths[index] * 0.22, 0.4));
-    float bandAngle = theta * max(BandCounts[index], 1.0) - r * 0.050 - AnimationTime * (0.24 + intensity * 0.22) - spin * 0.065 + seed * TAU;
+    float bandAngle = theta * max(BandCounts[index], 1.0) - r * 0.038 - AnimationTime * (0.22 + intensity * 0.24) - spin * 0.068 + seed * TAU;
     float spiral = smoothstep(0.38, 0.90, sin(bandAngle) * 0.5 + 0.5);
     spiral *= bandWindow * BandStrengths[index];
     spiral *= verticalWindow(localY, ShieldBaseFactors[index], min(ShieldTopFactors[index] + 0.08, 1.02), 0.10);
-    spiral *= mix(0.35, 1.0, noiseField);
+    spiral *= mix(0.30, 1.0, noiseField);
 
-    float wallDensity = wallBand * wallHeight * mix(1.28, 2.15, intensity);
-    wallDensity *= mix(0.68, 1.32, noiseField);
+    float density = max(torusBody * mix(1.18, 1.92, intensity), spiral);
+    density = max(density, veil);
 
-    float canopyDensity = canopyDisk * canopyHole * canopyHeight * mix(0.22, 0.88, noiseField);
-    canopyDensity *= mix(0.76, 1.18, intensity);
-
-    float shieldDensity = shield * mix(0.14, 0.34, noiseField);
-    shieldDensity *= mix(0.72, 1.05, intensity);
-
-    float density = max(wallDensity, canopyDensity);
-    density = max(density, shieldDensity);
-    density = max(density, spiral);
-
-    float brightness = 0.22;
-    brightness += wallBand * 0.22;
-    brightness += smoothstep(CanopyBaseFactors[index], CanopyTopFactors[index], localY) * 0.44;
-    brightness += canopyDisk * 0.08;
+    float brightness = 0.24;
+    brightness += torusRim * 0.34;
+    brightness += smoothstep(CanopyBaseFactors[index], CanopyTopFactors[index], localY) * 0.30;
+    brightness += spiral * 0.08;
     brightness = saturate(brightness);
 
     return HurricaneSample(density, brightness);

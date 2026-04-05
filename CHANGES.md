@@ -1,5 +1,31 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Hurricane custom volumetric cloud rewrite
+- Abandoned the hurricane fake `CloudRegion` ring path and restored a dedicated one-object hurricane render path, so hurricanes no longer depend on injecting several regular Simple Clouds formations into the world cloud list.
+- Added an explicit `HurricaneCloudVolume` representation for the custom hurricane cloud body and re-enabled the dedicated pipeline mixins that render hurricanes as bounded world-space volumetric formations.
+- Reworked hurricane shape generation so the cloud body now comes from a torus-based volumetric density field in the hurricane shaders, with spiral band and veil layers built around that single density volume instead of approximating the shape through grouped cloud instances.
+- Removed the synthetic hurricane cloud-region helpers and cloud-list injection mixin that were previously faking the donut structure through multiple managed cloud objects.
+
+## Unreleased - Hurricane visibility logging and tornado log cleanup
+- Removed the automatic tornado runtime, demolition, and scheduled tornado-check log spam so tornado debugging stays on-demand instead of constantly filling `latest.log`.
+- Added targeted hurricane debug logging for client snapshot receipt, client synthetic-cloud cache state, and final Simple Clouds cloud-list injection, making it easier to see whether hurricanes are syncing, generating synthetic cloud regions, and actually entering the cloud pipeline.
+- Removed the recurring forecast/region debug spam from forecast updates, client forecast readiness, and cloud-region sampling/cover updates so region forecasting no longer floods `latest.log` every few ticks.
+- Synced managed synthetic hurricane regions back into the base `CloudRegion` position/radius/transform state that Simple Clouds uses during cloud lookup and mesh-generation heuristics, fixing hurricanes that were injected into the cloud list but still resolved as visually empty.
+- Removed the remaining automatic tornado render-hook and tornado packet debug logs so `latest.log` stays focused on hurricane visibility diagnostics instead of unrelated tornado spam.
+- Changed hurricanes to resolve their inner/outer cloud types from the active Simple Clouds cloud source instead of relying on hardcoded cloud IDs, and extended hurricane debug logs to report the active cloud mode, indexed cloud-type count, and the resolved synthetic cloud types.
+- Reworked the hurricane storm-cloud field to use fewer, much larger Simple Clouds formations that better match the engine's coarse chunk-generation heuristics, and prioritized the nearest client hurricane when capping synthetic cloud formations to the Simple Clouds region limit.
+
+## Unreleased - Hurricane cloud-pipeline refactor
+- Replaced the hurricane's standalone PA volume renderer path with a Simple Clouds cloud-data integration, so hurricanes are now injected into `CloudManager.getClouds()` as synthetic storm cloud regions and render through the normal Simple Clouds mesh generator, chunk, shader, fog, depth, and lighting pipeline.
+- Added a shared parametric storm-cloud field system with reusable parameters for radius, eye radius, band count, band width, rotation speed, density falloff, vertical thickness, noise scale, and spiral tightness, then used it to generate hurricane eyewall and spiral-band cloud cells instead of hardcoded hurricane mesh volumes.
+- Added managed synthetic cloud-region wrappers plus hurricane-side cloud caches on both logical sides, allowing client hurricanes to rebuild matching storm cloud cells from PA snapshots while server queries and client rendering see the same hurricane-shaped cloud field through the normal Simple Clouds cloud getter path.
+- Disabled the old hurricane pipeline mixins so the custom hurricane render pass no longer runs, and updated client cloud culling to operate on the combined cloud list that now includes injected hurricane storm cells.
+
+## Unreleased - Tornado movement refactor
+- Replaced the tornado's old per-tick heading recomputation with a persistent route-planning system that stores a waypoint, target heading, target speed, and route duration, so the server now chooses a path ahead of time and commits to it for several seconds instead of zigzagging every tick.
+- Refactored `StormMotionModel` so tornado movement planning now happens as a low-frequency route selection pass, while `TornadoInstance` performs only smooth per-tick heading blending, speed blending, and one final authoritative motion application.
+- Added leash-aware waypoint planning plus light shield-avoidance shortening, so tornadoes keep a coherent travel path, curve naturally into new routes, and stop stalling or visually shaking from unstable steering corrections.
+
 ## Unreleased - Command and utility fixes
 - Refined tornado removal commands so `/pa removetornado` now removes the nearest tornado within a sane default range, supports an optional radius argument, and has a new spaced alias at `/pa remove tornado`; both also support `all` to clear every tornado quickly.
 - Added a proper craftable recipe for the storm shield weather deflector, plus the missing blockstate, block model, item model, and lang entries so it can be crafted and shown in inventory without missing-model warnings.

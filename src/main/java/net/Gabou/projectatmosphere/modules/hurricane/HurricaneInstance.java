@@ -9,7 +9,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -80,7 +79,6 @@ public class HurricaneInstance {
         this.dissipationTicks = 1800;
         this.visualSeed = (Math.abs(this.id.hashCode()) % 10000) / 10000.0F;
         this.applyIntensityToVisuals();
-        this.renderDescriptor = HurricaneRenderDescriptor.create(this.radius, this.normalizedIntensity, this.category);
         this.clientPreviousRenderPosition = this.position;
         this.clientRenderPosition = this.position;
         this.clientTargetPosition = this.position;
@@ -135,9 +133,7 @@ public class HurricaneInstance {
     }
 
     public float getVisualSpin(float partialTick) {
-        float intensity = this.getRenderIntensity(partialTick);
-        float gustFactor = Math.max(this.wind.baseSpeed(), this.wind.gustSpeed()) * 0.006F;
-        return (this.ageTicks + partialTick) * (0.0125F + intensity * 0.055F + gustFactor);
+        return this.computeRotationPhase(this.getRenderIntensity(partialTick), partialTick);
     }
 
     public float getVisualSeed() {
@@ -150,6 +146,10 @@ public class HurricaneInstance {
                 this.clientRenderDescriptor,
                 Mth.clamp(partialTick, 0.0F, 1.0F)
         );
+    }
+
+    public double getVisualCloudRadius() {
+        return Math.max(this.renderDescriptor.canopyRadiusWorld(), this.renderDescriptor.shieldRadiusWorld());
     }
 
     public boolean isDead() {
@@ -197,6 +197,7 @@ public class HurricaneInstance {
                 this.position,
                 this.radius,
                 this.eyewallRadius,
+                this.ageTicks,
                 this.wind.baseSpeed(),
                 this.wind.angleRadians(),
                 this.wind.gustSpeed(),
@@ -211,6 +212,7 @@ public class HurricaneInstance {
         this.position = snapshot.position();
         this.radius = snapshot.radius();
         this.eyewallRadius = snapshot.eyewallRadius();
+        this.ageTicks = snapshot.ageTicks();
         this.wind = new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust());
         this.normalizedIntensity = snapshot.normalizedIntensity();
         this.renderDescriptor = snapshot.renderDescriptor();
@@ -251,8 +253,8 @@ public class HurricaneInstance {
 
     private void applyIntensityToVisuals() {
         this.radius = this.maxRadius * (0.6F + this.normalizedIntensity * 0.7F);
-        this.eyewallRadius = this.radius * (0.22F + this.normalizedIntensity * 0.20F);
         this.renderDescriptor = HurricaneRenderDescriptor.create(this.radius, this.normalizedIntensity, this.category);
+        this.eyewallRadius = this.renderDescriptor.eyeRadiusWorld();
     }
 
     private void updateMovement(ServerLevel level, long gameTime) {
@@ -287,5 +289,10 @@ public class HurricaneInstance {
             }
             entity.push(vx, 0.01D * this.normalizedIntensity, vz);
         }
+    }
+
+    private float computeRotationPhase(float intensity, float partialTick) {
+        float gustFactor = Math.max(this.wind.baseSpeed(), this.wind.gustSpeed()) * 0.006F;
+        return (this.ageTicks + partialTick) * (0.0125F + intensity * 0.055F + gustFactor);
     }
 }

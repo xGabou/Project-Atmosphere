@@ -1,6 +1,4 @@
 package net.Gabou.projectatmosphere.network;
-
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.network.FriendlyByteBuf;
@@ -61,19 +59,6 @@ public class SpawnTornadoPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            if (ProjectAtmosphere.DEBUG_MODE) {
-                ProjectAtmosphere.LOGGER.info(
-                        "[TornadoDebug] Client received SpawnTornadoPacket id={} pos={} radius={} bottomY={} height={} speed={} angle={} gust={}",
-                        this.id,
-                        this.pos,
-                        this.radius,
-                        this.bottomY,
-                        this.height,
-                        this.speed,
-                        this.angle,
-                        this.gust
-                );
-            }
             TornadoManager.spawnClient(id, pos, radius, new WindVector(speed, angle, gust), bottomY, height);
         });
         ctx.get().setPacketHandled(true);

@@ -1,6 +1,4 @@
 package net.Gabou.projectatmosphere.modules.tornado;
-
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
@@ -77,7 +75,6 @@ public class TornadoInstance {
     private static final float CAPTURED_TANGENTIAL_FORCE = 0.23F;
     private static final float CAPTURED_LIFT_FORCE = 0.34F;
     private static final float WATER_PENALTY_THRESHOLD = 0.20F;
-    private static final int DEMOLITION_DEBUG_LOG_INTERVAL_TICKS = 100;
     private static final int CLOUD_DETACH_GRACE_TICKS = 20 * 30;
     private static final float CLIENT_POSITION_INTERPOLATION = 0.18F;
     private static final float CLIENT_SHAPE_INTERPOLATION = 0.22F;
@@ -92,7 +89,13 @@ public class TornadoInstance {
     private static final float MAX_DEBRIS_ENTITY_SPAWN_CHANCE = 0.46F;
     private static final int BASE_MAX_DEBRIS_ENTITY_SPAWNS = 8;
     private static final int ENTITY_DAMAGE_INTERVAL_TICKS = 8;
-    private static final int RUNTIME_DEBUG_LOG_INTERVAL_TICKS = 20;
+    private static final float MOVEMENT_ROUTE_LEASH_RADIUS = 150.0F;
+    private static final double MOVEMENT_ROUTE_REACHED_DISTANCE_SQR = 36.0D;
+    private static final float MOVEMENT_HEADING_BLEND = 0.010F;
+    private static final float MOVEMENT_SPEED_BLEND = 0.10F;
+    private static final double MOVEMENT_VECTOR_BLEND = 0.16D;
+    private static final double MOVEMENT_AMBIENT_SCALE = 0.0035D;
+    private static final int MOVEMENT_REPLAN_ON_AVOIDANCE_TICKS = 24;
 
     private final UUID id;
     public Vec3 position;
@@ -107,7 +110,13 @@ public class TornadoInstance {
     private float targetIntensity;
     private int stormLevel;
     private float headingRadians;
+    private float targetHeadingRadians;
     private Vec3 motion = Vec3.ZERO;
+    private float plannedMoveSpeed;
+    private float targetMoveSpeed;
+    private int routeTicksRemaining;
+    @Nullable
+    private Vec3 routeWaypoint;
     private boolean descriptorMissing;
     private int ageTicks;
     private int phaseTicks;
@@ -195,6 +204,11 @@ public class TornadoInstance {
         this.targetIntensity = defaultTargetIntensity(radius, wind, this.stormLevel);
         this.normalizedIntensity = Math.max(0.18F, this.targetIntensity * 0.35F);
         this.headingRadians = wind.angleRadians();
+        this.targetHeadingRadians = this.headingRadians;
+        this.plannedMoveSpeed = 0.04F + this.targetIntensity * 0.05F;
+        this.targetMoveSpeed = this.plannedMoveSpeed;
+        this.routeTicksRemaining = 0;
+        this.routeWaypoint = null;
         float persistenceFactor = Mth.clamp(
                 this.targetIntensity * 0.65F + StormSeverityScale.toNormalized(this.stormLevel) * 0.35F,
                 0.0F,
@@ -400,7 +414,6 @@ public class TornadoInstance {
                 }
             }
         }
-        this.maybeLogRuntimeDebug(level);
     }
 
     public void tickClient() {
@@ -495,18 +508,8 @@ public class TornadoInstance {
     }
 
     public void advanceByWind() {
-        Vec3 updated = StormMotionModel.advanceTornado(
-                this.id,
-                this.position,
-                this.motion,
-                this.wind,
-                Math.max(this.normalizedIntensity, 0.25F),
-                this.ageTicks,
-                this.anchorX,
-                this.anchorZ
-        );
-        this.motion = updated.subtract(this.position);
-        this.position = new Vec3(updated.x, this.visualBottomY, updated.z);
+        this.ensureFallbackMovementPlan();
+        this.advanceAlongMovementPlan(null);
     }
 
     private void tickLifecycle() {
@@ -548,21 +551,156 @@ public class TornadoInstance {
     }
 
     private void updateMovement(ServerLevel level, long gameTime) {
-        Vec3 updated = StormMotionModel.advanceTornado(
+        // Route selection runs on a slower cadence. Per-tick movement only blends toward the
+        // current plan so the tornado keeps committing to a path instead of re-steering every tick.
+        this.ensureMovementPlan(level, gameTime);
+        this.advanceAlongMovementPlan(level);
+    }
+
+    private void ensureMovementPlan(ServerLevel level, long gameTime) {
+        if (!this.shouldReplanMovement(level)) {
+            return;
+        }
+        this.applyMovementPlan(StormMotionModel.planTornadoRoute(
                 level,
                 this.id,
                 this.position,
-                this.motion,
                 this.wind,
                 Math.max(this.normalizedIntensity, 0.08F),
                 this.stormLevel,
+                this.headingRadians,
                 gameTime,
                 this.anchorX,
                 this.anchorZ
+        ));
+    }
+
+    private void ensureFallbackMovementPlan() {
+        if (!this.shouldReplanMovement(null)) {
+            return;
+        }
+        this.applyMovementPlan(StormMotionModel.planFallbackTornadoRoute(
+                this.id,
+                this.position,
+                this.wind,
+                Math.max(this.normalizedIntensity, 0.08F),
+                this.stormLevel,
+                this.headingRadians,
+                this.ageTicks,
+                this.anchorX,
+                this.anchorZ
+        ));
+    }
+
+    private boolean shouldReplanMovement(@Nullable ServerLevel level) {
+        if (this.routeWaypoint == null || this.routeTicksRemaining <= 0) {
+            return true;
+        }
+        if (this.hasReachedRouteWaypoint()) {
+            return true;
+        }
+        if (level != null && StormShieldManager.isProtected(level, this.routeWaypoint)) {
+            return true;
+        }
+        double dx = this.routeWaypoint.x - this.anchorX;
+        double dz = this.routeWaypoint.z - this.anchorZ;
+        return dx * dx + dz * dz > MOVEMENT_ROUTE_LEASH_RADIUS * MOVEMENT_ROUTE_LEASH_RADIUS;
+    }
+
+    private boolean hasReachedRouteWaypoint() {
+        if (this.routeWaypoint == null) {
+            return true;
+        }
+        double dx = this.routeWaypoint.x - this.position.x;
+        double dz = this.routeWaypoint.z - this.position.z;
+        double dynamicThreshold = Math.max(MOVEMENT_ROUTE_REACHED_DISTANCE_SQR, this.motion.lengthSqr() * 48.0D);
+        return dx * dx + dz * dz <= dynamicThreshold;
+    }
+
+    private void applyMovementPlan(StormMotionModel.TornadoRoutePlan plan) {
+        this.routeWaypoint = new Vec3(plan.waypoint().x, this.visualBottomY, plan.waypoint().z);
+        this.targetHeadingRadians = plan.headingRadians();
+        this.targetMoveSpeed = plan.speed();
+        this.routeTicksRemaining = Math.max(1, plan.durationTicks());
+        if (this.motion.lengthSqr() <= 1.0E-5D) {
+            this.headingRadians = this.targetHeadingRadians;
+            this.plannedMoveSpeed = this.targetMoveSpeed;
+        }
+    }
+
+    private void advanceAlongMovementPlan(@Nullable ServerLevel level) {
+        Vec3 waypoint = this.routeWaypoint != null
+                ? this.routeWaypoint
+                : this.position.add(horizontalVector(this.targetHeadingRadians).scale(12.0D));
+        Vec3 toWaypoint = new Vec3(waypoint.x - this.position.x, 0.0D, waypoint.z - this.position.z);
+        float desiredHeading = toWaypoint.lengthSqr() > 1.0E-4D
+                ? (float) Math.atan2(toWaypoint.z, toWaypoint.x)
+                : this.targetHeadingRadians;
+        float stormFactor = StormSeverityScale.toNormalized(this.stormLevel);
+        float maxTurn = MOVEMENT_HEADING_BLEND
+                + this.normalizedIntensity * 0.012F
+                + stormFactor * 0.008F;
+        this.headingRadians = rotateTowards(this.headingRadians, desiredHeading, maxTurn);
+        this.plannedMoveSpeed = Mth.lerp(MOVEMENT_SPEED_BLEND, this.plannedMoveSpeed, this.targetMoveSpeed);
+
+        Vec3 plannedVector = horizontalVector(this.headingRadians).scale(this.plannedMoveSpeed);
+        Vec3 ambientVector = horizontalVector(this.wind.angleRadians()).scale(
+                Math.max(0.6F, this.wind.baseSpeed()) * (MOVEMENT_AMBIENT_SCALE + this.normalizedIntensity * 0.0012D)
         );
-        this.motion = updated.subtract(this.position);
-        this.headingRadians = (float) Math.atan2(this.motion.z, this.motion.x);
-        this.position = new Vec3(updated.x, this.visualBottomY, updated.z);
+        Vec3 leashCorrection = this.sampleMovementLeashCorrection();
+        Vec3 shieldCorrection = Vec3.ZERO;
+        if (level != null) {
+            Vec3 avoidance = StormShieldManager.sampleAvoidance(level, this.position, 24.0D + this.stormLevel * 8.0D);
+            if (avoidance.lengthSqr() > 1.0E-6D) {
+                shieldCorrection = avoidance.scale(0.05D + stormFactor * 0.08D);
+                if (this.routeTicksRemaining > MOVEMENT_REPLAN_ON_AVOIDANCE_TICKS) {
+                    this.routeTicksRemaining = MOVEMENT_REPLAN_ON_AVOIDANCE_TICKS;
+                }
+            }
+        }
+
+        Vec3 targetMotion = plannedVector.add(ambientVector).add(leashCorrection).add(shieldCorrection);
+        this.motion = this.motion.lerp(targetMotion, MOVEMENT_VECTOR_BLEND + this.normalizedIntensity * 0.05D);
+        if (this.motion.lengthSqr() <= 1.0E-6D && targetMotion.lengthSqr() > 0.0D) {
+            this.motion = targetMotion;
+        }
+
+        double maxSpeed = Math.max(0.05D, this.targetMoveSpeed * 1.75D + 0.04D);
+        if (this.motion.lengthSqr() > maxSpeed * maxSpeed) {
+            this.motion = this.motion.normalize().scale(maxSpeed);
+        }
+
+        this.position = new Vec3(this.position.x + this.motion.x, this.visualBottomY, this.position.z + this.motion.z);
+        if (this.routeTicksRemaining > 0) {
+            this.routeTicksRemaining--;
+        }
+    }
+
+    private Vec3 sampleMovementLeashCorrection() {
+        double dx = this.anchorX - this.position.x;
+        double dz = this.anchorZ - this.position.z;
+        double distSqr = dx * dx + dz * dz;
+        if (distSqr <= MOVEMENT_ROUTE_LEASH_RADIUS * MOVEMENT_ROUTE_LEASH_RADIUS) {
+            return Vec3.ZERO;
+        }
+        double dist = Math.sqrt(distSqr);
+        double strength = Mth.clamp(
+                (dist - MOVEMENT_ROUTE_LEASH_RADIUS) / (MOVEMENT_ROUTE_LEASH_RADIUS * 0.80D),
+                0.0D,
+                1.0D
+        );
+        return new Vec3(dx / Math.max(dist, 0.001D), 0.0D, dz / Math.max(dist, 0.001D))
+                .scale(0.03D + strength * 0.11D);
+    }
+
+    private static Vec3 horizontalVector(float heading) {
+        return new Vec3(Math.cos(heading), 0.0D, Math.sin(heading));
+    }
+
+    private static float rotateTowards(float current, float target, float maxTurn) {
+        float delta = Mth.wrapDegrees((float) Math.toDegrees(target - current));
+        float clamped = Mth.clamp(delta, (float) Math.toDegrees(-maxTurn), (float) Math.toDegrees(maxTurn));
+        return current + (float) Math.toRadians(clamped);
     }
 
     private void pushStateToDescriptor() {
@@ -813,24 +951,6 @@ public class TornadoInstance {
                         + grassScoured * 0.008F
                         + glassDestroyed * 0.024F);
         this.recentDebrisScore = Mth.clamp(this.recentDebrisScore + debrisGain, 0.0F, 1.0F);
-
-        if (ProjectAtmosphere.DEBUG_MODE && this.ageTicks % DEMOLITION_DEBUG_LOG_INTERVAL_TICKS == 0) {
-            ProjectAtmosphere.LOGGER.info(
-                    "[TornadoDebug] demolish id={} center=({}, {}, {}) radius={} windfield={} scanned={} eligible={} leafLog={} weak={} grass={} glass={}",
-                    this.id,
-                    Mth.floor(anchor.x),
-                    Mth.floor(anchor.y),
-                    Mth.floor(anchor.z),
-                    destructionRadius,
-                    windfieldWidth,
-                    scannedColumns,
-                    eligibleColumns,
-                    leafLogDestroyed,
-                    weakDestroyed,
-                    grassScoured,
-                    glassDestroyed
-            );
-        }
 
         return leafLogDestroyed > 0 || weakDestroyed > 0 || grassScoured > 0 || glassDestroyed > 0;
     }
@@ -1323,36 +1443,6 @@ public class TornadoInstance {
         this.debugUpwardForceSum += upwardForce;
         this.debugPullForceMax = Math.max(this.debugPullForceMax, pullForce);
         this.debugUpwardForceMax = Math.max(this.debugUpwardForceMax, upwardForce);
-    }
-
-    private void maybeLogRuntimeDebug(ServerLevel level) {
-        if (!AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get()) {
-            return;
-        }
-        if (level.getGameTime() % RUNTIME_DEBUG_LOG_INTERVAL_TICKS != 0L) {
-            return;
-        }
-
-        RuntimeDebugSnapshot snapshot = this.getRuntimeDebugSnapshot();
-        ProjectAtmosphere.LOGGER.info(
-                "[TornadoRuntime] id={} phase={} intensity={} eligibleEntities={} capturedEntities={} pull(avg={},max={}) lift(avg={},max={}) sweepRadius={} candidateBlocks={} destroyedBlocks={} leafLog={} weak={} grass={} glass={}",
-                snapshot.id(),
-                snapshot.phase(),
-                String.format(java.util.Locale.ROOT, "%.3f", snapshot.normalizedIntensity()),
-                snapshot.eligibleEntityCount(),
-                snapshot.capturedEntityCount(),
-                String.format(java.util.Locale.ROOT, "%.3f", snapshot.averagePullForce()),
-                String.format(java.util.Locale.ROOT, "%.3f", snapshot.maxPullForce()),
-                String.format(java.util.Locale.ROOT, "%.3f", snapshot.averageUpwardForce()),
-                String.format(java.util.Locale.ROOT, "%.3f", snapshot.maxUpwardForce()),
-                String.format(java.util.Locale.ROOT, "%.3f", snapshot.destructionSweepRadius()),
-                snapshot.destructionCandidateBlockCount(),
-                snapshot.destroyedBlockCount(),
-                snapshot.destroyedLeafLogCount(),
-                snapshot.destroyedWeakCount(),
-                snapshot.destroyedGrassCount(),
-                snapshot.destroyedGlassCount()
-        );
     }
 
     private void pruneCapturedEntities(ServerLevel level) {

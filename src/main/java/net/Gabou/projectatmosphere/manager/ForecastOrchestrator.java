@@ -190,7 +190,6 @@ public class ForecastOrchestrator {
         BlockPos playerPos = player.blockPosition();
         sendLoginStage(player, "Collecting nearby forecast regions", 0.16F, "player_login_collect_regions");
         getNearbyRegions(level, player, 1000);
-        long start = System.nanoTime();
         if (!ForecastDataStorage.playerData.containsKey(uuid)) {
             boolean shouldGenerate = true;
             for (BlockPos center : ForecastDataStorage.playerData.values()) {
@@ -201,8 +200,6 @@ public class ForecastOrchestrator {
             }
 
             if (shouldGenerate) {
-                if(ProjectAtmosphere.DEBUG_MODE)
-                    ProjectAtmosphere.LOGGER.info("[Atmosphere] Player " + player.getName().getString());
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 sendLoginStage(player, "Seeding local weather systems", 0.28F, "player_login_seed_weather");
                 SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
@@ -211,11 +208,6 @@ public class ForecastOrchestrator {
         }
         SimpleCloudsCompat.setIsInit(true);
         sendLoginStage(player, "Forecast regions ready", 0.38F, "player_login_regions_ready");
-
-        long end = System.nanoTime();
-        long durationMs = (end - start) / 1_000_000;
-        if(ProjectAtmosphere.DEBUG_MODE)
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
 
     }
 
@@ -667,8 +659,6 @@ public class ForecastOrchestrator {
             if (REGENERATING) {
                 runAfterRegen(() -> AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level)));
             } else {
-                if(ProjectAtmosphere.DEBUG_MODE)
-                    ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
                 AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level));
             }
         }

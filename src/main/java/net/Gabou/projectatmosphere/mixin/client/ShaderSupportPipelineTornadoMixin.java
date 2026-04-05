@@ -3,9 +3,7 @@ package net.Gabou.projectatmosphere.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.client.renderer.pipeline.ShaderSupportPipeline;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsTornadoRenderer;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -32,15 +30,7 @@ public abstract class ShaderSupportPipelineTornadoMixin {
         if (level == null) {
             return;
         }
-
         float[] cloudColor = renderer.getCloudColor(partialTick);
-        if (ProjectAtmosphere.DEBUG_MODE && level.getGameTime() % 40L == 0L && !TornadoManager.getClientTornadoes().isEmpty()) {
-            ProjectAtmosphere.LOGGER.info(
-                    "[TornadoDebug] ShaderSupportPipeline opaque hook reached gameTime={} activeTornadoes={}",
-                    level.getGameTime(),
-                    TornadoManager.getClientTornadoes().size()
-            );
-        }
         mc.getProfiler().push("projectatmosphere_tornado_opaque");
         SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
         renderer.getCloudTarget().bindWrite(false);
@@ -67,15 +57,7 @@ public abstract class ShaderSupportPipelineTornadoMixin {
         if (level == null) {
             return;
         }
-
         float[] cloudColor = renderer.getCloudColor(partialTick);
-        if (ProjectAtmosphere.DEBUG_MODE && level.getGameTime() % 40L == 0L && !TornadoManager.getClientTornadoes().isEmpty()) {
-            ProjectAtmosphere.LOGGER.info(
-                    "[TornadoDebug] ShaderSupportPipeline transparency hook reached gameTime={} activeTornadoes={}",
-                    level.getGameTime(),
-                    TornadoManager.getClientTornadoes().size()
-            );
-        }
         mc.getProfiler().push("projectatmosphere_tornado_transparency");
         SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
         renderer.copyDepthFromCloudsToTransparency();
