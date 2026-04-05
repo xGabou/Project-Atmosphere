@@ -1,0 +1,72 @@
+{
+  "issues": [
+    {
+      "id": "paxtfc-temporary-incompatibility-0800",
+      "title": "PA x TFC is temporarily incompatible with 0.8.0.0",
+      "affectedVersions": [
+        "0.8.0.0"
+      ],
+      "symptoms": [
+        "PA x TFC integration does not work correctly with the latest documented release.",
+        "Users may need to remove the bridge mod to stabilize startup or gameplay."
+      ],
+      "workarounds": [
+        "Do not use PA x TFC with 0.8.0.0 until the compatibility update is released."
+      ],
+      "status": "open",
+      "fixedIn": null,
+      "sourceType": "official"
+    },
+    {
+      "id": "dynamic-trees-module-should-stay-disabled",
+      "title": "Dynamic Trees integration is still work in progress",
+      "affectedVersions": [
+        "0.8.0.0"
+      ],
+      "symptoms": [
+        "Seasonal tree integration with Dynamic Trees is not considered ready."
+      ],
+      "workarounds": [
+        "Leave the Dynamic Trees integration disabled."
+      ],
+      "status": "open",
+      "fixedIn": null,
+      "sourceType": "official"
+    },
+    {
+      "id": "missing-season-provider-startup-failure",
+      "title": "Startup fails when no season provider is installed",
+      "affectedVersions": [
+        "0.8.0.0",
+        "UNKNOWN"
+      ],
+      "symptoms": [
+        "The game or server throws an IllegalStateException at startup asking for Serene Seasons, ProjectAtmosphereForTFC, or Ecliptic Seasons."
+      ],
+      "workarounds": [
+        "Install a season provider before loading the mod.",
+        "If you need an officially documented option, prefer Serene Seasons."
+      ],
+      "status": "open",
+      "fixedIn": null,
+      "sourceType": "reviewed-issues"
+    },
+    {
+      "id": "weatherdebug-snowstorm-command-broken",
+      "title": "The weatherdebug snowstorm command is mis-registered",
+      "affectedVersions": [
+        "0.8.0.0",
+        "UNKNOWN"
+      ],
+      "symptoms": [
+        "Running /pa weatherdebug snowstorm fails because the handler expects an intensity argument that the command tree does not expose."
+      ],
+      "workarounds": [
+        "Do not rely on this command until the argument registration is fixed."
+      ],
+      "status": "open",
+      "fixedIn": null,
+      "sourceType": "reviewed-issues"
+    }
+  ]
+}

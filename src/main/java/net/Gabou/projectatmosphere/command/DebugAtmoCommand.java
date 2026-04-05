@@ -8,11 +8,15 @@ import com.mojang.brigadier.context.CommandContext;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.api.AtmoApi;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.client.fog.FogBiomeClassifier;
+import net.Gabou.projectatmosphere.modules.fog.FogHeuristics;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
@@ -90,6 +94,12 @@ public class DebugAtmoCommand {
                             BlockPos pos = BlockPos.containing(ctx.getSource().getPosition());
                             return sendForecast(ctx, pos, biome);
                         })
+                )
+        );
+        root.then(Commands.literal("fog")
+                .executes(DebugAtmoCommand::sendFogDebug)
+                .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                        .executes(DebugAtmoCommand::sendFogDebug)
                 )
         );
 
@@ -202,6 +212,50 @@ public class DebugAtmoCommand {
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
         WindVector wind = ForecastOrchestrator.getWind(level, pos, level.getGameTime());
         return SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
+    }
+
+    private static int sendFogDebug(CommandContext<CommandSourceStack> ctx) {
+        ServerLevel level = ctx.getSource().getLevel();
+        if (!TemperatureCommandHelper.isInOverworld(level)) {
+            ctx.getSource().sendFailure(Component.literal("Fog debug is only available in the Overworld."));
+            return 0;
+        }
+
+        BlockPos pos;
+        try {
+            pos = BlockPosArgument.getBlockPos(ctx, "pos");
+        } catch (IllegalArgumentException e) {
+            pos = BlockPos.containing(ctx.getSource().getPosition());
+        }
+        final BlockPos samplePos = pos;
+
+        long tick = level.getGameTime();
+        float humidity = ForecastOrchestrator.getCurrentHumidity(level, samplePos, tick);
+        float rainIntensity = AtmoApi.getInstance().getWeatherSnapshot(level, samplePos, tick).rainIntensity();
+        float wetBiomeFactor = FogBiomeClassifier.computeWetBiomeFactor(level, samplePos);
+        FogHeuristics.FogProfile fog = FogHeuristics.sample(humidity, wetBiomeFactor, rainIntensity);
+        ResourceLocation biome = level.registryAccess()
+                .registryOrThrow(Registries.BIOME)
+                .getKey(level.getBiome(samplePos).value());
+
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "Fog Debug: " + samplePos.getX() + ", " + samplePos.getY() + ", " + samplePos.getZ() +
+                        "\n  Enabled:          " + AtmoCommonConfig.FOG_ENABLED.get() +
+                        "\n  Biome:            " + biome +
+                        "\n  Humidity:         " + UnitFormatter.formatHumidity(humidity) +
+                        "\n  Rain intensity:   " + String.format("%.2f", rainIntensity) +
+                        "\n  Wet biome factor: " + String.format("%.2f", wetBiomeFactor) +
+                        "\n  Humidity factor:  " + String.format("%.2f", fog.humidityFactor()) +
+                        "\n  Fog strength:     " + String.format("%.2f", fog.strength()) +
+                        "\n  Thresholds:       start=" + String.format("%.0f", AtmoCommonConfig.FOG_HUMIDITY_START_PERCENT.get())
+                        + "% full=" + String.format("%.0f", AtmoCommonConfig.FOG_HUMIDITY_FULL_PERCENT.get()) + "%" +
+                        "\n  Tunables:         wetBiome=" + String.format("%.2f", AtmoCommonConfig.FOG_WET_BIOME_BASE_STRENGTH.get())
+                        + " rainBoost=" + String.format("%.2f", AtmoCommonConfig.FOG_RAIN_BOOST.get())
+                        + " near=" + String.format("%.1f", AtmoCommonConfig.FOG_NEAR_DISTANCE.get())
+                        + " far=" + String.format("%.1f", AtmoCommonConfig.FOG_FAR_DISTANCE.get())
+                        + " colorBlend=" + String.format("%.2f", AtmoCommonConfig.FOG_COLOR_BLEND.get())
+        ), false);
+        return 1;
     }
 
     private static int spawnRain(CommandContext<CommandSourceStack> ctx) {

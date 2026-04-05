@@ -13,12 +13,14 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
-    "CloudMeshGeneratorAccessor",
     "MixinSandstormDebugBlocker",
-    "MultiRegionCloudMeshGeneratorMixin",
+    "client.DefaultPipelineHurricaneMixin",
+    "client.DefaultPipelineTornadoMixin",
+    "client.MinecraftCrashHandlerMixin",
     "client.LoadingScreenMixin",
+    "client.ShaderSupportPipelineTornadoMixin",
+    "client.ShaderSupportPipelineHurricaneMixin",
     "OverwriteDesertSound",
-    "SimpleCloudsRendererMixin",
     "client.LoadingOverlayMixin",
     "client.particle.ParticleMotionAccessor",
     "client.particle.WindBentParticleEngineMixin",

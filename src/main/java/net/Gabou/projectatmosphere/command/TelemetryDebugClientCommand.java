@@ -22,6 +22,7 @@ public class TelemetryDebugClientCommand {
         dispatcher.register(
                 LiteralArgumentBuilder.<CommandSourceStack>literal("pa")
                         .then(Commands.literal("debug")
+                                .then(TornadoRenderDebugClientCommand.build())
                                 .then(Commands.literal("export")
                                         .executes(ctx -> {
                                             if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {

@@ -1,5 +1,96 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Hurricane custom volumetric cloud rewrite
+- Abandoned the hurricane fake `CloudRegion` ring path and restored a dedicated one-object hurricane render path, so hurricanes no longer depend on injecting several regular Simple Clouds formations into the world cloud list.
+- Added an explicit `HurricaneCloudVolume` representation for the custom hurricane cloud body and re-enabled the dedicated pipeline mixins that render hurricanes as bounded world-space volumetric formations.
+- Reworked hurricane shape generation so the cloud body now comes from a torus-based volumetric density field in the hurricane shaders, with spiral band and veil layers built around that single density volume instead of approximating the shape through grouped cloud instances.
+- Removed the synthetic hurricane cloud-region helpers and cloud-list injection mixin that were previously faking the donut structure through multiple managed cloud objects.
+
+## Unreleased - Hurricane visibility logging and tornado log cleanup
+- Removed the automatic tornado runtime, demolition, and scheduled tornado-check log spam so tornado debugging stays on-demand instead of constantly filling `latest.log`.
+- Added targeted hurricane debug logging for client snapshot receipt, client synthetic-cloud cache state, and final Simple Clouds cloud-list injection, making it easier to see whether hurricanes are syncing, generating synthetic cloud regions, and actually entering the cloud pipeline.
+- Removed the recurring forecast/region debug spam from forecast updates, client forecast readiness, and cloud-region sampling/cover updates so region forecasting no longer floods `latest.log` every few ticks.
+- Synced managed synthetic hurricane regions back into the base `CloudRegion` position/radius/transform state that Simple Clouds uses during cloud lookup and mesh-generation heuristics, fixing hurricanes that were injected into the cloud list but still resolved as visually empty.
+- Removed the remaining automatic tornado render-hook and tornado packet debug logs so `latest.log` stays focused on hurricane visibility diagnostics instead of unrelated tornado spam.
+- Changed hurricanes to resolve their inner/outer cloud types from the active Simple Clouds cloud source instead of relying on hardcoded cloud IDs, and extended hurricane debug logs to report the active cloud mode, indexed cloud-type count, and the resolved synthetic cloud types.
+- Reworked the hurricane storm-cloud field to use fewer, much larger Simple Clouds formations that better match the engine's coarse chunk-generation heuristics, and prioritized the nearest client hurricane when capping synthetic cloud formations to the Simple Clouds region limit.
+
+## Unreleased - Hurricane cloud-pipeline refactor
+- Replaced the hurricane's standalone PA volume renderer path with a Simple Clouds cloud-data integration, so hurricanes are now injected into `CloudManager.getClouds()` as synthetic storm cloud regions and render through the normal Simple Clouds mesh generator, chunk, shader, fog, depth, and lighting pipeline.
+- Added a shared parametric storm-cloud field system with reusable parameters for radius, eye radius, band count, band width, rotation speed, density falloff, vertical thickness, noise scale, and spiral tightness, then used it to generate hurricane eyewall and spiral-band cloud cells instead of hardcoded hurricane mesh volumes.
+- Added managed synthetic cloud-region wrappers plus hurricane-side cloud caches on both logical sides, allowing client hurricanes to rebuild matching storm cloud cells from PA snapshots while server queries and client rendering see the same hurricane-shaped cloud field through the normal Simple Clouds cloud getter path.
+- Disabled the old hurricane pipeline mixins so the custom hurricane render pass no longer runs, and updated client cloud culling to operate on the combined cloud list that now includes injected hurricane storm cells.
+
+## Unreleased - Tornado movement refactor
+- Replaced the tornado's old per-tick heading recomputation with a persistent route-planning system that stores a waypoint, target heading, target speed, and route duration, so the server now chooses a path ahead of time and commits to it for several seconds instead of zigzagging every tick.
+- Refactored `StormMotionModel` so tornado movement planning now happens as a low-frequency route selection pass, while `TornadoInstance` performs only smooth per-tick heading blending, speed blending, and one final authoritative motion application.
+- Added leash-aware waypoint planning plus light shield-avoidance shortening, so tornadoes keep a coherent travel path, curve naturally into new routes, and stop stalling or visually shaking from unstable steering corrections.
+
+## Unreleased - Command and utility fixes
+- Refined tornado removal commands so `/pa removetornado` now removes the nearest tornado within a sane default range, supports an optional radius argument, and has a new spaced alias at `/pa remove tornado`; both also support `all` to clear every tornado quickly.
+- Added a proper craftable recipe for the storm shield weather deflector, plus the missing blockstate, block model, item model, and lang entries so it can be crafted and shown in inventory without missing-model warnings.
+- Kept the storm siren craftable and added the missing display-name lang entry so it shows up correctly in-game.
+
+## Unreleased - Current systems recap
+- Reworked Rainbows and Auroras compatibility so both effects now use Project Atmosphere as the main sky-state authority with shared humidity, cloud-cover, recent-rain, clarity, smoothing, and hysteresis logic.
+- Added a humidity-driven fog system with synced atmospheric state, wet-biome heuristics, in-game tuning, and debug commands so fog reacts to PA moisture and rain instead of isolated vanilla checks.
+- Rebuilt tornado rendering and gameplay around grounded world-space volumes, longer-lived storm lifecycles, stronger entity interaction, configurable debug tooling, and server-side destruction/debris behavior.
+- Added the dedicated hurricane volumetric renderer/mesh work so large storms now render as bounded atmospheric structures instead of flat overlay rings.
+## Unreleased - Aurora and Rainbows compatibility refactor
+- Replaced the old Rainbows compatibility path that only watched rain-stop timing with a Project Atmosphere-driven client sky controller that evaluates humidity, recent rainfall, cloud breakup, sun visibility, sun angle, and hysteresis before exposing a smoothed rainbow state to the Rainbows renderer.
+- Replaced the old Auroras compatibility path that only scaled vanilla brightness with the same shared Project Atmosphere sky controller, now driving aurora visibility from PA cloud cover, atmospheric clarity, humidity haze, night timing, biome temperature, and seasonal context instead of isolated vanilla checks.
+- Added shared atmosphere status syncing plus a client atmospheric state cache/smoother so Rainbows, Auroras, and fog all consume the same humidity, rain, and cloud-cover authority from Project Atmosphere rather than maintaining duplicated packet trackers.
+- Removed obsolete compatibility duplication by deleting the legacy rain-only rainbow bridge and folding the old rain/fog packets into one atmosphere status packet with thin mod-specific hooks.
+## Unreleased - Tornado interaction rebuild
+- Replaced the old tornado gameplay force model with a new server-side capture system built around three explicit components: inward suction toward the funnel, tangential orbit around the core, and strong upward lift once a target is captured, so players and entities spiral upward instead of just being shoved sideways.
+- Reworked captured-entity handling so nearby mobs and other entities use the same funnel capture/orbit/lift path as players, including deterministic rotation direction, motion damping tuned for spiral ascent, and direct motion packet syncing for server players.
+- Replaced the previous tornado destruction sweep with a new active funnel-zone block destruction pass that scans the actual destructive cylinder, tears through tree clusters with connected log/leaf breaking, and more aggressively breaks vegetation, weak terrain, fragile structures, grass, and glass on the server.
+- Rebalanced tornado terrain scouring so the sweep now stays at the surface layer instead of digging down into multiple dirt layers, prefers turning grass and soil variants into plain dirt, and only rarely excavates topsoil outright during extreme core-strength hits.
+- Added capped tornado falling-block debris spawns for destroyed wood, leaves, surface soil, and loose terrain blocks, so more of the tornado's block damage becomes visible moving debris caught in the funnel instead of disappearing instantly.
+- Fixed standalone `spawnTornadoNoClouds` crashes in the Simple Clouds integration by treating cloudless tornadoes as position-based when boosting nearby cloud regions instead of blindly dereferencing a missing `CloudRegion`.
+- Removed the old `WindForces` tornado push path for players so the legacy slowdown/side-push model no longer fights the new server-side tornado capture system.
+- Standalone no-cloud tornado spawns now begin immediately in the active phase, and tornado interaction/destruction logic now starts during any non-terminal phase once intensity is high enough instead of waiting for the old active-only gate.
+## Unreleased - Local Simple Clouds dependency
+- Replaced the remote `nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge` dependency with the local `libs/simpleclouds-0.7.4+1.20.1-forge-all.jar` artifact in `build.gradle`.
+## Unreleased - Project Atmosphere crash screen
+- Added a client-side Project Atmosphere crash interception flow that detects whether a thrown exception or crash report stack involves `net.Gabou.projectatmosphere`, saves a crash report into `crash-reports`, unloads the active client session when possible, and opens a dedicated support screen instead of falling straight into the normal fatal client crash path.
+- Added a dedicated crash screen with a clear Discord support message plus buttons to close the game, copy a support summary to the clipboard, and open the Project Atmosphere Discord invite in the browser.
+- Hooked the handler into the Forge 1.20.1 client loop via a new Minecraft mixin that wraps `runTick(...)` and intercepts delayed crash reports.
+## Unreleased - MCP support bundle
+- Added a read-only support bundle under `docs/mods/projectatmosphere/` and `data/mcp/mods/projectatmosphere/`, covering overview/install/troubleshooting/FAQ docs plus structured manifest, features, commands, config schema, compatibility, known issues, versions, and support-focused changelog data derived from repository sources.
+- Separated strictly official compatibility notes from code-reviewed runtime behavior so support tooling can answer conservatively when release documentation and current source behavior differ.
+## Unreleased - Standalone hurricane cloud renderer tranche
+- Added a client tornado render-quality control and moved the tornado shader onto an adaptive LOD path that lowers raymarch step count, trims expensive material/noise work, and skips unnecessary inner-funnel sampling when the storm is far away or the user lowers tornado quality for better FPS.
+- Darkened the tornado's upper wall-cloud/connection shading again so the top mass reads denser and less washed out against the surrounding storm canopy.
+- Reworked tornado interaction gameplay so active funnels now demolish trees, leaves, vegetation, weak structures, grass, and loose terrain much more aggressively, and strengthened entity suction/capture so nearby mobs and players are pulled harder into the circulation and can take storm damage while trapped in the core.
+- Replaced the tornado's deferred block-destruction queueing with a direct server-thread column/cluster sweep around the funnel, and flagged all affected entities for motion sync so non-player mobs and entities now receive the same tornado pull/lift updates instead of only the player visibly reacting.
+- Added live tornado runtime instrumentation plus `weatherdebug tornado runtime` and `weatherdebug tornado logging <true|false>`, exposing real in-game pull force, upward force, eligible/captured entity counts, destruction sweep radius, candidate block counts, and destroyed block counts so tornado physics and block breaking can be debugged from actual runtime data instead of inferred behavior.
+- Replaced the fullscreen tornado volume pass with a world-space proxy-box volume draw, so each tornado is now rasterized at a fixed in-world position and the shader uses scene depth only as a march limit instead of as the thing defining the effect.
+- Mirrored the same proxy-box world-space volume approach into the hurricane cloud and fringe passes, keeping the existing storm shapes while removing the old fullscreen “mirage/post-process” anchoring behavior from the actual volume render path.
+- Added a gated `/pa debug tornado render ...` investigation path with per-storm selection, frozen deterministic funnel sampling, grayscale mask modes (`aabb`, `funnel`, `height`, `radial`, `radius`, `density`, `alpha`, `wallcloud`, `connection`, `full`), and structured CPU-side diagnostics that log the tornado origin, sample position, local-space values, bounds/scaling, and active render state for root-cause analysis.
+- Extended the tornado proxy debug path with ordered proof modes for the world-space renderer: `box` draws the proxy volume as a solid opaque color, `hit` shows ray-box intersection success, `fill` renders a constant-density box, and only the later modes reintroduce tornado shaping before normal depth stopping is enabled again.
+- Fixed the shared world-space proxy-box draw submission so tornado and hurricane volume boxes now render with the real cloud-pass model-view and projection matrices instead of identity matrices, which could make even forced-opaque `box` mode disappear entirely.
+- Darkened the tornado’s upper connection/top shading by about 30% and doubled the existing twist rotation speed in the shader, keeping the current silhouette and animation style while making the top feel denser and the spin read more strongly.
+- Removed the client tornado debris particle spawn loop entirely and increased the tornado shader’s existing twist multiplier again, so the funnel keeps the grounded volumetric look without the expensive swirling debris particles and reads with a faster spin.
+- Reworked tornado visual motion so the renderer now uses a continuously advancing spin value instead of the old capped twist, and changed client tornado interpolation to smooth toward snapshot targets with light extrapolation instead of directly stepping toward each sync update.
+- Fixed `spawnTornadoNoClouds` so it now spawns a real standalone tornado immediately instead of still routing through the cloud-gated cumulonimbus path, and added a no-cloud server spawn mode that does not auto-dissipate just because no Simple Clouds region is attached.
+- Corrected the tornado shader’s shaping math to evaluate funnel, wall-cloud, and connection terms in consistent world-unit space instead of mixing cloud-space coordinates with world-sized constants, which was producing oversized dome/ring artifacts near the cloud base.
+- Re-integrated tornado opaque rendering with the real cloud-target depth buffer while keeping the horizon-safe raymarch distance path, and thickened the tornado shader density/tint so funnels now read as embedded storm mass instead of a translucent hologram laid over the world.
+- Reworked the tornado raymarch from a blind full-range overlay into a scene-depth-clipped world-space volume, and changed the prepared top/bottom bounds to follow actual ground contact plus cloud-base attachment instead of an oversized fallback height band.
+- Retuned tornado demolition so active funnels start destroying trees, leaves, wooden lightweight structures, and loose natural terrain much earlier in the wind curve, with stronger inner-core forcing and wider believable damage reach tied to storm intensity.
+- Strengthened the dynamic fog application curve so humidity and wet-biome fog compresses view distance and tint more visibly instead of remaining too subtle to notice in normal gameplay.
+- Added `/pa fog spawn [strength] [seconds]` and `/pa fog clear`, implemented as a client-side debug fog override packet/state path that lets you force visible fog for render testing without faking server weather.
+- Fixed the tornado fullscreen render integration so both Simple Clouds pipelines now render the opaque pass on the cloud target in the correct translated cloud-space stage; this removes the bad extra shader-support translation and stops camera-position-dependent tornado popping/disappearance.
+- Increased tornado persistence by extending the lifecycle timings and adding a cloud-detach grace window, so tornadoes no longer collapse almost immediately after a brief cloud-region handoff or wobble.
+- Updated the tornado shader/render path so the funnel no longer hard-clips against the copied scene-depth horizon, which previously made tornadoes shear off around camera eye level over water or other long flat surfaces.
+- Reworked tornado lifetime scaling to guarantee a roughly 2-10 minute active window based on storm strength, and changed water exposure so it only softens intensity instead of fast-forwarding or force-ending the tornado after a few seconds.
+- Added a modular humidity-driven fog system with a lightweight server-to-client fog status sync, a client fog state cache/smoother, wet-biome classification heuristics, and integration into the existing fog event handler so fog now responds to humidity, rain, and moisture-heavy biomes without per-frame heavy sampling.
+- Added a new `fog` common-config section plus in-game config screen controls for the main fog tuning values, including humidity thresholds, wet-biome strength, rain boost, fog distance, tint strength, and advanced biome id/keyword overrides in the config file.
+- Added `weatherdebug fog` to expose the live humidity, wet-biome weighting, rain contribution, and resulting fog strength using the same shared heuristic that drives the client fog renderer.
+- Added a dedicated Simple Clouds-style hurricane renderer and shader path that renders bounded volumetric storm masses as their own cloud body instead of extending the old flat ring overlay path.
+- The new hurricane density field now supports a true empty eye, annular eyewall, upper canopy, outer shield, and early spiral-band structure while still reusing the Project Atmosphere / Simple Clouds texture samplers, fog, depth, and cloud-color language.
+- Hooked the hurricane renderer into both Simple Clouds default and shader-support pipelines, added hurricane shader registration/resources, and disabled the old `SimpleCloudsRendererMixin` ring path from the active mixin config.
+- Extended hurricane client snapshots/interpolation so prepared render data can be cached and reused per frame, and fixed tornado/hurricane motion/constructor mismatches so the current tree builds cleanly again.
 ## Unreleased - Gradle sync fix
 - Removed the duplicate mid-script `import groovy.json.JsonOutput` from `build.gradle`, which could stop the Gradle script from compiling during IDE sync.
 - Replaced legacy archive/version references with Gradle 8-safe values for the jar manifest plus the Modrinth and CurseForge artifact paths.
@@ -296,3 +387,20 @@ This file records functionality additions/removals made during development sessi
 - Forecast cache application now drains in client-side batches across ticks, allowing the overlay to report visible per-loop progress from the actual biome-profile apply path instead of jumping from wait to ready.
 - Added server-side login preparation stage updates around nearby-region collection and local weather seeding so the overlay advances before the forecast snapshot packet is sent.
 - Added an integrated-world loading bridge so local world startup can push forecast-design stages from the real server generation loops before the later client sync packet phase begins.
+## Unreleased - Hurricane renderer replacement
+- Removed the hurricane-specific `custom_cumulonimbus` spawn path so hurricane commands now create only the dedicated hurricane system instead of seeding a Simple Clouds cumulonimbus shell first.
+- Added an explicit `HurricaneRenderDescriptor` to server snapshots and client interpolation so eye size, eye-clear radius, eyewall thickness, canopy radius, shield radius, vertical layer factors, and outer band controls travel as storm data instead of being reconstructed only from radius and intensity during rendering.
+- Reworked `SimpleCloudsHurricaneRenderer` into a full dedicated hurricane pipeline with bounded opaque raymarching, weighted-transparency fringe rendering, and framebuffer eye-carve passes that clear unrelated ambient Simple Clouds content from both the opaque and transparent cloud targets before hurricane cloud content is added back.
+- Replaced the single hurricane shader registration with dedicated opaque, opaque-mask, transparency, and transparency-mask shader programs plus new fragment shaders for the standalone hurricane volume and eye-protection passes.
+- Deleted the abandoned flat-ring hurricane scaffold (`SimpleCloudsRendererMixin`, `HurricaneMeshRenderer`, `HurricaneStateProvider`, and `HurricaneState`) so there is no legacy ring renderer left in the active codebase.
+
+## Unreleased - GPU-native hurricane mesh generation
+- Removed the fullscreen hurricane pipeline hooks and their shader registration so hurricanes are no longer rendered as a separate post/cloud-target pass.
+- Added `HurricaneMeshField` plus a new `MultiRegionCloudMeshGenerator` mixin that uploads prepared hurricane descriptors to the active Simple Clouds mesh compute shader each mesh-generation cycle.
+- Extended chunk scheduling so Simple Clouds now allocates mesh generation work for hurricane volumes even when no ambient cloud region overlaps the chunk.
+- Overrode the Simple Clouds `cube_mesh.comp` compute shader with a hurricane-aware density field that emits real mesh cubes for the eye wall, canopy, shield, and outer bands while using the same GPU block generation and face occlusion path as native Simple Clouds clouds.
+- Added an eye-carve override directly inside the cube generation density sampling so the hurricane eye removes ambient cloud blocks in the same generated volume instead of relying on a later framebuffer cleanup pass.
+- Added a `cloud_regions.comp` override that preserves an explicit "no ambient region" sentinel, preventing hurricane-only chunks from inheriting a bogus default cloud region during compute meshing.
+
+
+

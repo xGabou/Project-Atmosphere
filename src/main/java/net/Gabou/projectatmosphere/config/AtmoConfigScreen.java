@@ -25,6 +25,7 @@ public class AtmoConfigScreen extends Screen {
     private boolean displayUnitsImperial;
     private boolean enableTornadoes;
     private boolean enableStormDebris;
+    private boolean fogEnabled;
     private int maxStormDebrisPerChunk;
     private boolean autoRepairGlass;
     private boolean damageGlassOnTornado;
@@ -46,6 +47,7 @@ public class AtmoConfigScreen extends Screen {
     private int tornadoCellCooldownMinutes;
     private boolean tornadoAllowLegacyFallback;
     private boolean tornadoDebugLogging;
+    private double tornadoRenderQuality;
     private double windBaseRetargetSec;
     private double windDirRetargetSec;
     private double windGustMeanSec;
@@ -54,6 +56,12 @@ public class AtmoConfigScreen extends Screen {
     private double windPushThresholdMps;
     private double windPlayerPushScale;
     private double windEntityPushScale;
+    private double fogHumidityStartPercent;
+    private double fogHumidityFullPercent;
+    private double fogWetBiomeBaseStrength;
+    private double fogRainBoost;
+    private double fogFarDistance;
+    private double fogColorBlend;
     private double stormBoostMultiplier;
     private boolean debugMode;
 
@@ -76,6 +84,13 @@ public class AtmoConfigScreen extends Screen {
     private EditBox tornadoIntensityMinBox;
     private EditBox tornadoIntensityMaxBox;
     private EditBox tornadoCellCooldownBox;
+    private EditBox tornadoRenderQualityBox;
+    private EditBox fogHumidityStartBox;
+    private EditBox fogHumidityFullBox;
+    private EditBox fogWetBiomeStrengthBox;
+    private EditBox fogRainBoostBox;
+    private EditBox fogFarDistanceBox;
+    private EditBox fogColorBlendBox;
     private EditBox windBaseRetargetBox;
     private EditBox windDirRetargetBox;
     private EditBox windGustMeanBox;
@@ -135,6 +150,7 @@ public class AtmoConfigScreen extends Screen {
         this.displayUnitsImperial = AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.get();
         this.enableTornadoes = AtmoCommonConfig.ENABLE_TORNADOES.get();
         this.enableStormDebris = AtmoCommonConfig.ENABLE_STORM_DEBRIS.get();
+        this.fogEnabled = AtmoCommonConfig.FOG_ENABLED.get();
         this.maxStormDebrisPerChunk = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
         this.autoRepairGlass = AtmoCommonConfig.AUTO_REPAIR_GLASS.get();
         this.damageGlassOnTornado = AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get();
@@ -157,6 +173,7 @@ public class AtmoConfigScreen extends Screen {
         this.tornadoCellCooldownMinutes = AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get();
         this.tornadoAllowLegacyFallback = AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.get();
         this.tornadoDebugLogging = AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get();
+        this.tornadoRenderQuality = AtmoCommonConfig.TORNADO_RENDER_QUALITY.get();
         this.windBaseRetargetSec = AtmoCommonConfig.WIND_BASE_RETARGET_SEC.get();
         this.windDirRetargetSec = AtmoCommonConfig.WIND_DIR_RETARGET_SEC.get();
         this.windGustMeanSec = AtmoCommonConfig.WIND_GUST_MEAN_SEC.get();
@@ -165,6 +182,12 @@ public class AtmoConfigScreen extends Screen {
         this.windPushThresholdMps = AtmoCommonConfig.WIND_PUSH_THRESHOLD_MPS.get();
         this.windPlayerPushScale = AtmoCommonConfig.WIND_PLAYER_PUSH_SCALE.get();
         this.windEntityPushScale = AtmoCommonConfig.WIND_ENTITY_PUSH_SCALE.get();
+        this.fogHumidityStartPercent = AtmoCommonConfig.FOG_HUMIDITY_START_PERCENT.get();
+        this.fogHumidityFullPercent = AtmoCommonConfig.FOG_HUMIDITY_FULL_PERCENT.get();
+        this.fogWetBiomeBaseStrength = AtmoCommonConfig.FOG_WET_BIOME_BASE_STRENGTH.get();
+        this.fogRainBoost = AtmoCommonConfig.FOG_RAIN_BOOST.get();
+        this.fogFarDistance = AtmoCommonConfig.FOG_FAR_DISTANCE.get();
+        this.fogColorBlend = AtmoCommonConfig.FOG_COLOR_BLEND.get();
 
         int center = this.width / 2;
         int y = 40;
@@ -176,6 +199,8 @@ public class AtmoConfigScreen extends Screen {
             b.setMessage(toggleLabel("Force Shared Executor", forceSharedExecutor));
         }).bounds(center - 100, y, 200, 20).build(), y);
         y += 32;
+        tornadoRenderQualityBox = addNumberField(center, y, "Tornado Render Quality", Double.toString(tornadoRenderQuality));
+        y += 34;
 
         addTitle("Display", y);
         y += 18;
@@ -184,6 +209,26 @@ public class AtmoConfigScreen extends Screen {
             b.setMessage(toggleLabel("Imperial Units", displayUnitsImperial));
         }).bounds(center - 100, y, 200, 20).build(), y);
         y += 32;
+
+        addTitle("Fog", y);
+        y += 18;
+        addConfigWidget(Button.builder(toggleLabel("Dynamic Fog", fogEnabled), b -> {
+            fogEnabled = !fogEnabled;
+            b.setMessage(toggleLabel("Dynamic Fog", fogEnabled));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+        fogHumidityStartBox = addNumberField(center, y, "Humidity Start Percent", Double.toString(fogHumidityStartPercent));
+        y += 34;
+        fogHumidityFullBox = addNumberField(center, y, "Humidity Full Percent", Double.toString(fogHumidityFullPercent));
+        y += 34;
+        fogWetBiomeStrengthBox = addNumberField(center, y, "Wet Biome Strength", Double.toString(fogWetBiomeBaseStrength));
+        y += 34;
+        fogRainBoostBox = addNumberField(center, y, "Rain Boost", Double.toString(fogRainBoost));
+        y += 34;
+        fogFarDistanceBox = addNumberField(center, y, "Fog Far Distance", Double.toString(fogFarDistance));
+        y += 34;
+        fogColorBlendBox = addNumberField(center, y, "Fog Color Blend", Double.toString(fogColorBlend));
+        y += 34;
 
         addTitle("Storms", y);
         y += 18;
@@ -415,7 +460,14 @@ public class AtmoConfigScreen extends Screen {
         tornadoIntensityMin = parseDouble(tornadoIntensityMinBox, tornadoIntensityMin);
         tornadoIntensityMax = parseDouble(tornadoIntensityMaxBox, tornadoIntensityMax);
         tornadoCellCooldownMinutes = parseInt(tornadoCellCooldownBox, tornadoCellCooldownMinutes);
+        tornadoRenderQuality = Mth.clamp(parseDouble(tornadoRenderQualityBox, tornadoRenderQuality), 0.25d, 1.0d);
         // Buttons already toggled booleans; nothing to parse.
+        fogHumidityStartPercent = parseDouble(fogHumidityStartBox, fogHumidityStartPercent);
+        fogHumidityFullPercent = parseDouble(fogHumidityFullBox, fogHumidityFullPercent);
+        fogWetBiomeBaseStrength = parseDouble(fogWetBiomeStrengthBox, fogWetBiomeBaseStrength);
+        fogRainBoost = parseDouble(fogRainBoostBox, fogRainBoost);
+        fogFarDistance = parseDouble(fogFarDistanceBox, fogFarDistance);
+        fogColorBlend = parseDouble(fogColorBlendBox, fogColorBlend);
         windBaseRetargetSec = parseDouble(windBaseRetargetBox, windBaseRetargetSec);
         windDirRetargetSec = parseDouble(windDirRetargetBox, windDirRetargetSec);
         windGustMeanSec = parseDouble(windGustMeanBox, windGustMeanSec);
@@ -429,6 +481,7 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.set(displayUnitsImperial);
         AtmoCommonConfig.ENABLE_TORNADOES.set(enableTornadoes);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
+        AtmoCommonConfig.FOG_ENABLED.set(fogEnabled);
         AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.set(maxStormDebrisPerChunk);
         AtmoCommonConfig.CLOUD_RENDER_DISTANCE.set(cloudRenderDistance);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
@@ -451,6 +504,13 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.set(tornadoCellCooldownMinutes);
         AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.set(tornadoAllowLegacyFallback);
         AtmoCommonConfig.TORNADO_DEBUG_LOGGING.set(tornadoDebugLogging);
+        AtmoCommonConfig.TORNADO_RENDER_QUALITY.set(tornadoRenderQuality);
+        AtmoCommonConfig.FOG_HUMIDITY_START_PERCENT.set(fogHumidityStartPercent);
+        AtmoCommonConfig.FOG_HUMIDITY_FULL_PERCENT.set(fogHumidityFullPercent);
+        AtmoCommonConfig.FOG_WET_BIOME_BASE_STRENGTH.set(fogWetBiomeBaseStrength);
+        AtmoCommonConfig.FOG_RAIN_BOOST.set(fogRainBoost);
+        AtmoCommonConfig.FOG_FAR_DISTANCE.set(fogFarDistance);
+        AtmoCommonConfig.FOG_COLOR_BLEND.set(fogColorBlend);
         AtmoCommonConfig.WIND_BASE_RETARGET_SEC.set(windBaseRetargetSec);
         AtmoCommonConfig.WIND_DIR_RETARGET_SEC.set(windDirRetargetSec);
         AtmoCommonConfig.WIND_GUST_MEAN_SEC.set(windGustMeanSec);

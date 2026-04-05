@@ -8,7 +8,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class NetworkHandler {
-    private static final String PROTOCOL_VERSION = "1";
+    private static final String PROTOCOL_VERSION = "2";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -23,6 +23,21 @@ public class NetworkHandler {
                 .decoder(SpawnTornadoPacket::decode)
                 .encoder(SpawnTornadoPacket::encode)
                 .consumerMainThread(SpawnTornadoPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(RemoveTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(RemoveTornadoPacket::decode)
+                .encoder(RemoveTornadoPacket::encode)
+                .consumerMainThread(RemoveTornadoPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncTornadoesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncTornadoesPacket::decode)
+                .encoder(SyncTornadoesPacket::encode)
+                .consumerMainThread(SyncTornadoesPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncHurricanesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncHurricanesPacket::decode)
+                .encoder(SyncHurricanesPacket::encode)
+                .consumerMainThread(SyncHurricanesPacket::handle)
                 .add();
         CHANNEL.messageBuilder(SyncWindPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SyncWindPacket::decode)
@@ -39,10 +54,15 @@ public class NetworkHandler {
                 .encoder(ForecastLoadingStatusPacket::encode)
                 .consumerMainThread(ForecastLoadingStatusPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(RainfallUpdatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(RainfallUpdatePacket::decode)
-                .encoder(RainfallUpdatePacket::encode)
-                .consumerMainThread(RainfallUpdatePacket::handle)
+        CHANNEL.messageBuilder(SyncAtmosphereStatusPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncAtmosphereStatusPacket::decode)
+                .encoder(SyncAtmosphereStatusPacket::encode)
+                .consumerMainThread(SyncAtmosphereStatusPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(FogDebugOverridePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(FogDebugOverridePacket::decode)
+                .encoder(FogDebugOverridePacket::encode)
+                .consumerMainThread(FogDebugOverridePacket::handle)
                 .add();
         CHANNEL.messageBuilder(InstrumentReadoutPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(InstrumentReadoutPacket::decode)

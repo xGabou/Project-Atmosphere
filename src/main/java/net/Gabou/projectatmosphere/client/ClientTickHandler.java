@@ -1,9 +1,12 @@
 package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.async.PoolType;
+import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
+import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
@@ -12,7 +15,7 @@ import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
+import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkyEffectController;
 import net.Gabou.projectatmosphere.client.render.SkyEffectState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -56,17 +59,25 @@ public class ClientTickHandler {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         if (!ClientSyncLock.isReady()) return;
-        if (Minecraft.getInstance().isPaused()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.isPaused()) return;
+        AtmosphereClientState.tick(mc);
+        AtmosphereFogState.tick(mc);
+        if (mc.level == null) {
+            TornadoManager.clearClientTornadoes();
+            HurricaneManager.clearClientHurricanes();
+            return;
+        }
 
         SkyEffectState.beginFrame();
         tickCounter++;
         TornadoManager.tick(Minecraft.getInstance().level);
-        Minecraft mc = Minecraft.getInstance();
-        RainbowWeatherTracker.tick(mc);
+        HurricaneManager.tickClient();
+        AtmosphereSkyEffectController.tick(mc);
 
         if (mc.level != null && mc.player != null) {
             CloudManager<?> manager = CloudManager.get(mc.level);
-            List<CloudRegion> regions = manager.getCloudGenerator().getClouds();
+            List<CloudRegion> regions = manager.getClouds();
             double playerX = mc.player.getX();
             double playerZ = mc.player.getZ();
             Set<Integer> nextCulled = new HashSet<>();
@@ -83,7 +94,7 @@ public class ClientTickHandler {
         }
 
         if (mc.level != null) {
-            Set<TornadoInstance> current = new HashSet<>(TornadoManager.getActiveTornadoes());
+            Set<TornadoInstance> current = new HashSet<>(TornadoManager.getClientTornadoes());
             for (TornadoInstance tornado : current) {
                 float baseVol = 0.35f + 0.45f * 0.75f;
                 TornadoAudioClient.ensure(tornado, baseVol, 140f);
@@ -97,11 +108,6 @@ public class ClientTickHandler {
             prevTornadoes.addAll(current);
         }
 
-        if (mc.level != null && mc.level.getGameTime() % 2 == 0) {
-            for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
-                TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
-            }
-        }
         if (tickCounter % 40 == 0) {
             if (mc.level != null && mc.player != null) {
                 // snapshot
