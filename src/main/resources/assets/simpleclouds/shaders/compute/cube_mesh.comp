@@ -15,6 +15,8 @@ layout(local_size_x = ${LOCAL_SIZE_X}, local_size_y = ${LOCAL_SIZE_Y}, local_siz
 
 #moj_import <simpleclouds:psrdnoise.glsl>
 
+bool projectatmosphere_insideTornado(vec3 pos, float typeIndex);
+
 struct LayerGroup {
 	int StartIndex;
 	int EndIndex;
@@ -257,7 +259,7 @@ bool isPosValid(float x, float y, float z, int nx, int nz)
     uint regionId = uint(info.r);
     LayerGroup group = layerGroupings.data[regionId];
     float fade = -5.0 * pow(1.0 - info.g, 10.0);
-    if (TotalCloudTornadoes > 0 && projectatmosphere$insideTornado(vec3(x, y, z), info.r))
+    if (TotalCloudTornadoes > 0 && projectatmosphere_insideTornado(vec3(x, y, z), info.r))
             return false;
 #if FADE_NEAR_ORIGIN == 1
     float len = distance(vec2(x, z), Origin.xz);
@@ -425,7 +427,7 @@ void main()
 #endif
 }
 
-bool projectatmosphere$insideTornado(vec3 pos, float typeIndex)
+bool projectatmosphere_insideTornado(vec3 pos, float typeIndex)
 {
         for (int i = 0; i < TotalCloudTornadoes; i++)
         {
@@ -439,3 +441,7 @@ bool projectatmosphere$insideTornado(vec3 pos, float typeIndex)
         }
         return false;
 }
+
+
+
+

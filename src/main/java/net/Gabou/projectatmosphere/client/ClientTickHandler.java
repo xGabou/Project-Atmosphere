@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.async.PoolType;
+import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -55,6 +56,7 @@ public class ClientTickHandler {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
+        ClientHurricaneStateCache.tick(Minecraft.getInstance().level);
         if (!ClientSyncLock.isReady()) return;
         if (Minecraft.getInstance().isPaused()) return;
 
@@ -192,3 +194,4 @@ public class ClientTickHandler {
     }
 
 }
+

@@ -2,12 +2,9 @@ package net.Gabou.projectatmosphere.modules.hurricane;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -41,12 +38,10 @@ public class HurricaneCommand {
                             }
                             int catInt = IntegerArgumentType.getInteger(ctx, "category");
                             HurricaneCategory cat = HurricaneCategory.fromId(catInt);
-                            BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
                             var wind = ForecastOrchestrator.getWind(level, pos, level.getGameTime());
-                            SimpleCloudsCompat.spawnCloudInBiome("custom_cumulonimbus", key, level, null, wind);
                             Vec3 spawnPos = new Vec3(player.getX(), level.getSeaLevel(), player.getZ());
-                            HurricaneManager.spawnServer(level, spawnPos, 40f, wind, cat);
-                            ctx.getSource().sendSuccess(() -> Component.literal("ðŸŒ€ Hurricane category " + catInt + " spawned."), true);
+                            HurricaneManager.spawnServer(level, spawnPos, 40.0F, wind, cat);
+                            ctx.getSource().sendSuccess(() -> Component.literal("Hurricane category " + catInt + " spawned."), true);
                             return 1;
                         }));
 
@@ -55,7 +50,7 @@ public class HurricaneCommand {
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
                     HurricaneManager.clearHurricanes();
-                    ctx.getSource().sendSuccess(() -> Component.literal("ðŸŒ€ All hurricanes cleared."), true);
+                    ctx.getSource().sendSuccess(() -> Component.literal("All hurricanes cleared."), true);
                     return 1;
                 }));
         root.then(Commands.literal("removehurricane")
@@ -68,7 +63,7 @@ public class HurricaneCommand {
                             .findFirst().orElse(null);
                     if (hurricane != null) {
                         HurricaneManager.removeHurricane(hurricane);
-                        ctx.getSource().sendSuccess(() -> Component.literal("ðŸŒ€ Hurricane removed."), true);
+                        ctx.getSource().sendSuccess(() -> Component.literal("Hurricane removed."), true);
                     } else {
                         ctx.getSource().sendFailure(Component.literal("No hurricane found near you."));
                     }

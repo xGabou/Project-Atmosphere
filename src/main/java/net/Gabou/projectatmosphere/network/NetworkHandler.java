@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.network.SyncWindPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
@@ -49,9 +48,10 @@ public class NetworkHandler {
                 .encoder(InstrumentReadoutPacket::encode)
                 .consumerMainThread(InstrumentReadoutPacket::handle)
                 .add();
-
-
+        CHANNEL.messageBuilder(SyncHurricaneStatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncHurricaneStatePacket::decode)
+                .encoder(SyncHurricaneStatePacket::encode)
+                .consumerMainThread(SyncHurricaneStatePacket::handle)
+                .add();
     }
 }
-
-

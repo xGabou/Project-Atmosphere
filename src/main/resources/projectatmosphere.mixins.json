@@ -14,11 +14,11 @@
   ],
   "client": [
     "CloudMeshGeneratorAccessor",
+    "CloudMeshGeneratorShaderMixin",
     "MixinSandstormDebugBlocker",
     "MultiRegionCloudMeshGeneratorMixin",
     "client.LoadingScreenMixin",
     "OverwriteDesertSound",
-    "SimpleCloudsRendererMixin",
     "client.LoadingOverlayMixin",
     "client.particle.ParticleMotionAccessor",
     "client.particle.WindBentParticleEngineMixin",
@@ -29,3 +29,5 @@
     "defaultRequire": 1
   }
 }
+
+

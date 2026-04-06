@@ -125,6 +125,7 @@ public class AtmosphereManager {
                 ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(world);
                 RainbowRainBridge.sendSnapshot(player, world, cloudManager.getCloudGenerator());
             }
+            HurricaneManager.syncToPlayer(player);
             future.complete(null);
         });
     }
@@ -283,3 +284,4 @@ public class AtmosphereManager {
 
     }
 }
+
