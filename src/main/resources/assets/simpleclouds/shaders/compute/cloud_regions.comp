@@ -38,6 +38,7 @@ struct CloudHurricane {
     vec4 shape0;
     vec4 shape1;
     vec4 shape2;
+    vec4 shape3;
 };
 
 layout(std430) readonly buffer CloudHurricanes {
@@ -113,38 +114,70 @@ vec2 projectatmosphere_sampleHurricane(CloudHurricane hurricane, vec2 coord)
 {
     float typeIndex = hurricane.shape0.x;
     vec2 center = hurricane.shape0.yz;
-    float outerRadius = hurricane.shape0.w;
+    float coreRadius = hurricane.shape1.x;
+    float stormExtentRadius = hurricane.shape1.y;
+    float eyeRadius = hurricane.shape1.z;
+    float edgeFade = max(hurricane.shape1.w, 1.0);
 
-    float eyeRadius = hurricane.shape1.x;
-    float edgeFade = max(hurricane.shape1.y, 1.0);
-    float bandCount = max(hurricane.shape1.z, 1.0);
-    float bandWidth = max(hurricane.shape1.w, 1.0);
+    float bandCount = max(hurricane.shape2.x, 1.0);
+    float bandWidth = max(hurricane.shape2.y, 1.0);
+    float spiralTightness = hurricane.shape2.z;
+    float rotationPhase = hurricane.shape2.w;
 
-    float spiralTightness = hurricane.shape2.x;
-    float rotationPhase = hurricane.shape2.y;
+    float transitionStart = hurricane.shape3.y;
+    float transitionEnd = max(hurricane.shape3.z, transitionStart + 1.0);
 
     vec2 local = coord - center;
     float radius = length(local);
-    if (radius > outerRadius + edgeFade)
+    if (radius > stormExtentRadius + edgeFade * 1.20)
         return vec2(-1.0);
 
     float angle = atan(local.y, local.x);
-    float outerMask = 1.0 - smoothstep(outerRadius, outerRadius + edgeFade, radius);
-    float eyeGuard = smoothstep(eyeRadius - edgeFade * 0.35, eyeRadius + edgeFade * 0.35, radius);
+    float normalizedRadius = stormExtentRadius > 0.0 ? saturate(radius / stormExtentRadius) : 0.0;
+    float spinPhase = angle + max(radius - eyeRadius, 0.0) * spiralTightness - rotationPhase;
 
-    float eyewallCenter = eyeRadius + bandWidth * 0.45;
-    float eyewallThickness = bandWidth * 0.95 + edgeFade * 0.20;
-    float eyewall = 1.0 - smoothstep(eyewallThickness * 0.35, eyewallThickness, abs(radius - eyewallCenter));
+    float outerMask = 1.0 - smoothstep(stormExtentRadius - edgeFade * 0.34, stormExtentRadius + edgeFade * 0.92, radius);
+    float eyeHole = smoothstep(eyeRadius + edgeFade * 0.06, eyeRadius + edgeFade * 0.82, radius);
 
-    float armRadius = max(radius - eyeRadius, 0.0);
-    float spiralAngle = angle + armRadius * spiralTightness - rotationPhase;
-    float armWave = 0.5 + 0.5 * cos(spiralAngle * bandCount);
-    armWave = pow(armWave, 3.0);
-    float armGate = smoothstep(eyeRadius + bandWidth * 0.20, outerRadius, radius);
-    float armMask = armWave * armGate;
+    float eyewallCenter = eyeRadius + bandWidth * 0.36;
+    float eyewallThickness = bandWidth * 0.88 + edgeFade * 0.14;
+    float eyewall = 1.0 - smoothstep(eyewallThickness * 0.26, eyewallThickness, abs(radius - eyewallCenter));
+    eyewall *= eyeHole;
 
-    float coverage = max(eyewall, armMask * 0.92) * outerMask * eyeGuard;
-    coverage = saturate(coverage);
+    float armNoiseA = 0.5 + 0.5 * cos(spinPhase * bandCount + normalizedRadius * 7.0);
+    float armNoiseB = 0.5 + 0.5 * cos(spinPhase * (bandCount * 0.72 + 1.10) - normalizedRadius * 9.5);
+    float armNoise = mix(armNoiseA, armNoiseB, 0.42);
+    armNoise = smoothstep(0.62, 0.94, armNoise);
+
+    float spiralEnvelope = smoothstep(eyeRadius + bandWidth * 0.12, eyeRadius + bandWidth * 1.22, radius);
+    spiralEnvelope *= 1.0 - smoothstep(coreRadius * 0.72, coreRadius * 1.08, radius);
+
+    float innerCore = max(eyewall, armNoise * spiralEnvelope);
+
+    float cbBlendStart = min(transitionStart, coreRadius * 0.84);
+    float cbEnvelope = smoothstep(cbBlendStart, transitionEnd, radius);
+    cbEnvelope *= 1.0 - smoothstep(stormExtentRadius * 1.02, stormExtentRadius + edgeFade * 0.78, radius);
+
+    float cbNoiseA = 0.5 + 0.5 * cos(angle * 1.9 - rotationPhase * 0.06 + normalizedRadius * 6.8);
+    float cbNoiseB = 0.5 + 0.5 * cos(angle * 4.4 + rotationPhase * 0.03 - normalizedRadius * 12.6);
+    float cbNoiseC = 0.5 + 0.5 * cos(angle * 2.7 - normalizedRadius * 4.4);
+    float cbNoise = mix(mix(cbNoiseA, cbNoiseB, 0.45), cbNoiseC, 0.30);
+    cbNoise = smoothstep(0.20, 0.90, cbNoise);
+
+    float cbMass = cbEnvelope * (0.46 + cbNoise * 0.54);
+
+    float continuityBand = smoothstep(coreRadius * 0.72, coreRadius * 0.96, radius);
+    continuityBand *= 1.0 - smoothstep(transitionEnd * 0.94, stormExtentRadius * 0.96, radius);
+    continuityBand *= 0.36 + mix(armNoise, cbNoise, 0.55) * 0.44;
+
+    float anvilEdge = smoothstep(stormExtentRadius * 0.72, stormExtentRadius * 0.96, radius);
+    anvilEdge *= 1.0 - smoothstep(stormExtentRadius * 1.06, stormExtentRadius + edgeFade * 0.94, radius);
+    anvilEdge *= smoothstep(0.34, 0.88, cbNoiseB);
+
+    float outerStorm = max(cbMass, continuityBand + anvilEdge * 0.24);
+    float coverage = max(innerCore, outerStorm);
+    coverage *= outerMask * eyeHole;
+    coverage = smoothstep(0.07, 0.91, saturate(coverage));
     if (coverage <= 0.001)
         return vec2(-1.0);
 
@@ -203,5 +236,3 @@ void main()
 
     imageStore(regionTexture, ivec3(texelCoord, lod), vec4(result, 0.0, 0.0));
 }
-
-

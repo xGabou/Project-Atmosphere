@@ -14,7 +14,8 @@ import java.util.UUID;
  * Represents a server-side hurricane event.
  */
 public class HurricaneInstance {
-    public static final ResourceLocation HURRICANE_CLOUD_TYPE_ID = ResourceLocation.fromNamespaceAndPath("simpleclouds", "hurricane");
+    public static final ResourceLocation HURRICANE_CLOUD_TYPE_ID = ResourceLocation.fromNamespaceAndPath("projectatmosphere", "hurricane");
+    private static final float DEFAULT_ANCHOR_Y = 256.0F;
 
     public final UUID id;
     public Vec3 position;
@@ -35,25 +36,34 @@ public class HurricaneInstance {
     }
 
     public float getLifetimeSeconds() {
-        return (float)this.ageTicks / 20.0F;
+        return (float) this.ageTicks / 20.0F;
     }
 
     public int getAgeTicks() {
         return this.ageTicks;
     }
 
-    public float getVisualOuterRadius() {
-        return Math.max(this.radius * 5.5F, 180.0F + this.category.ordinal() * 24.0F);
+    public float getAnchorY() {
+        return DEFAULT_ANCHOR_Y;
+    }
+
+    public float getCoreRadius() {
+        return Math.max(this.radius * 7.8F, 340.0F + this.category.ordinal() * 46.0F);
+    }
+
+    public float getStormExtentRadius() {
+        float coreRadius = this.getCoreRadius();
+        return Math.max(coreRadius * 3.5F, 1000.0F + this.category.ordinal() * 250.0F);
     }
 
     public float getVisualEyeRadius() {
-        float outer = this.getVisualOuterRadius();
-        float ratio = 0.26F + this.category.ordinal() * 0.02F;
-        return outer * ratio;
+        float coreRadius = this.getCoreRadius();
+        float ratio = 0.17F + this.category.ordinal() * 0.011F;
+        return coreRadius * ratio;
     }
 
     public float getVisualEdgeFade() {
-        return Math.max(this.getVisualOuterRadius() * 0.18F, 16.0F);
+        return Math.max(this.getStormExtentRadius() * 0.05F, 48.0F);
     }
 
     public int getBandCount() {
@@ -61,15 +71,24 @@ public class HurricaneInstance {
     }
 
     public float getBandWidth() {
-        return Math.max(this.getVisualOuterRadius() * 0.24F, 28.0F);
+        return Math.max(this.getCoreRadius() * 0.145F, 52.0F);
     }
 
     public float getSpiralTightness() {
-        return 0.18F + this.category.ordinal() * 0.02F;
+        return 0.052F + this.category.ordinal() * 0.0060F;
     }
 
     public float getRotationSpeed() {
-        return 0.015F + this.category.ordinal() * 0.0035F;
+        int periodTicks = Math.max(12000, 14400 - this.category.ordinal() * 600);
+        return (float)(Math.PI * 2.0 / (double)periodTicks);
+    }
+
+    public float getTransitionStart() {
+        return this.getCoreRadius() * 1.05F;
+    }
+
+    public float getTransitionEnd() {
+        return this.getStormExtentRadius() * 0.72F;
     }
 
     public float getRotationPhase() {
@@ -81,7 +100,9 @@ public class HurricaneInstance {
                 this.id,
                 this.position.x,
                 this.position.z,
-                this.getVisualOuterRadius(),
+                this.getAnchorY(),
+                this.getCoreRadius(),
+                this.getStormExtentRadius(),
                 this.getVisualEyeRadius(),
                 this.getVisualEdgeFade(),
                 this.getBandCount(),
@@ -89,6 +110,8 @@ public class HurricaneInstance {
                 this.getSpiralTightness(),
                 this.getRotationPhase(),
                 this.getRotationSpeed(),
+                this.getTransitionStart(),
+                this.getTransitionEnd(),
                 HURRICANE_CLOUD_TYPE_ID,
                 this.ageTicks
         );
@@ -102,7 +125,7 @@ public class HurricaneInstance {
         long now = System.currentTimeMillis();
         if (now - this.lastAmbientWindCheck >= this.ambientWindIntervalMs) {
             this.lastAmbientWindCheck = now;
-            this.applyAmbientWind((ServerLevel)level);
+            this.applyAmbientWind((ServerLevel) level);
         }
     }
 

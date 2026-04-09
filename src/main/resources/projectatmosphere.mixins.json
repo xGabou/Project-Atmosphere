@@ -6,10 +6,12 @@
   "refmap": "projectatmosphere.refmap.json",
   "mixins": [
     "BiomeFreezingMixin",
+    "CloudGeneratorHurricaneReservationMixin",
     "CloudRegionMixin",
     "CloudRegionTickEventMixin",
     "InfoMixin",
     "SeasonHooksMixin",
+    "SimpleCloudsCloudManagerMixin",
     "ServerLevelSnowStormMixin"
   ],
   "client": [

@@ -4,7 +4,9 @@ public record HurricaneUpload(
         float typeIndex,
         float centerX,
         float centerZ,
-        float outerRadius,
+        float anchorY,
+        float coreRadius,
+        float stormExtentRadius,
         float eyeRadius,
         float edgeFade,
         float bandCount,
@@ -12,6 +14,7 @@ public record HurricaneUpload(
         float spiralTightness,
         float rotationPhase,
         float rotationSpeed,
-        float ageTicks
+        float transitionStart,
+        float transitionEnd
 ) {
 }

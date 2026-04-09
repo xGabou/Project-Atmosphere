@@ -64,6 +64,7 @@ public enum WeatherType {
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "altocumulus"), RAIN);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "stratocumulus_opacus"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "altostratus_dry"), NONE);
+        CLOUD_MAP.put(new ResourceLocation("projectatmosphere", "hurricane"), THUNDERSTORM);
     }
 
     public static WeatherType getWeatherType(ResourceLocation id) {

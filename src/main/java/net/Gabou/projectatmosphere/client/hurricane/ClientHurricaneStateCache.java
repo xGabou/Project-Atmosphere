@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.client.hurricane;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -48,45 +49,78 @@ public final class ClientHurricaneStateCache {
         ENTRIES.clear();
     }
 
-    public static List<RenderableHurricane> getRenderableHurricanes(float partialTick) {
+    public static List<HurricaneRenderSnapshot> getSemanticSnapshots() {
+        return getSemanticSnapshots(0.0F);
+    }
+
+    public static List<HurricaneRenderSnapshot> getSemanticSnapshots(float partialTick) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || ENTRIES.isEmpty()) {
             return List.of();
         }
 
         long clientTick = mc.level.getGameTime();
-        List<RenderableHurricane> renderables = new ArrayList<>(ENTRIES.size());
+        List<HurricaneRenderSnapshot> snapshots = new ArrayList<>(ENTRIES.size());
         for (Entry entry : ENTRIES.values()) {
             float blend = Mth.clamp(((float)(clientTick - entry.clientUpdateTick) + partialTick) / (float)DEFAULT_BLEND_TICKS, 0.0F, 1.0F);
             HurricaneRenderSnapshot start = entry.previous;
             HurricaneRenderSnapshot end = entry.current;
 
-            double centerX = Mth.lerp(blend, start.centerX(), end.centerX());
-            double centerZ = Mth.lerp(blend, start.centerZ(), end.centerZ());
-            float outerRadius = Mth.lerp(blend, start.outerRadius(), end.outerRadius());
-            float eyeRadius = Mth.lerp(blend, start.eyeRadius(), end.eyeRadius());
-            float edgeFade = Mth.lerp(blend, start.edgeFade(), end.edgeFade());
-            float bandWidth = Mth.lerp(blend, start.bandWidth(), end.bandWidth());
-            float spiralTightness = Mth.lerp(blend, start.spiralTightness(), end.spiralTightness());
-            float rotationSpeed = Mth.lerp(blend, start.rotationSpeed(), end.rotationSpeed());
-            float basePhase = Mth.lerp(blend, start.rotationPhase(), end.rotationPhase());
-            float phase = basePhase + rotationSpeed * partialTick;
-            int ageTicks = Mth.floor(Mth.lerp(blend, start.ageTicks(), end.ageTicks()) + partialTick);
+            snapshots.add(new HurricaneRenderSnapshot(
+                    end.id(),
+                    Mth.lerp(blend, start.centerX(), end.centerX()),
+                    Mth.lerp(blend, start.centerZ(), end.centerZ()),
+                    Mth.lerp(blend, start.anchorY(), end.anchorY()),
+                    Mth.lerp(blend, start.coreRadius(), end.coreRadius()),
+                    Mth.lerp(blend, start.stormExtentRadius(), end.stormExtentRadius()),
+                    Mth.lerp(blend, start.eyeRadius(), end.eyeRadius()),
+                    Mth.lerp(blend, start.edgeFade(), end.edgeFade()),
+                    end.bandCount(),
+                    Mth.lerp(blend, start.bandWidth(), end.bandWidth()),
+                    Mth.lerp(blend, start.spiralTightness(), end.spiralTightness()),
+                    Mth.lerp(blend, start.rotationPhase(), end.rotationPhase()) + Mth.lerp(blend, start.rotationSpeed(), end.rotationSpeed()) * partialTick,
+                    Mth.lerp(blend, start.rotationSpeed(), end.rotationSpeed()),
+                    Mth.lerp(blend, start.transitionStart(), end.transitionStart()),
+                    Mth.lerp(blend, start.transitionEnd(), end.transitionEnd()),
+                    end.cloudTypeId(),
+                    Mth.floor(Mth.lerp(blend, start.ageTicks(), end.ageTicks()) + partialTick)
+            ));
+        }
+        return snapshots;
+    }
+
+    public static List<RenderableHurricane> getRenderableHurricanes(float partialTick) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || ENTRIES.isEmpty()) {
+            return List.of();
+        }
+
+        CloudManager<?> cloudManager = CloudManager.get(mc.level);
+        int cloudHeight = cloudManager == null ? 0 : cloudManager.getCloudHeight();
+        List<HurricaneRenderSnapshot> snapshots = getSemanticSnapshots(partialTick);
+        List<RenderableHurricane> renderables = new ArrayList<>(snapshots.size());
+        for (HurricaneRenderSnapshot snapshot : snapshots) {
+            // Simple Clouds keeps vertical sampling in cloud-height-relative blocks, not cloud-scale units.
+            float localAnchorY = snapshot.anchorY() - (float)cloudHeight;
 
             renderables.add(new RenderableHurricane(
-                    end.id(),
-                    centerX / (double)SimpleCloudsConstants.CLOUD_SCALE,
-                    centerZ / (double)SimpleCloudsConstants.CLOUD_SCALE,
-                    outerRadius / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    eyeRadius / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    edgeFade / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    end.bandCount(),
-                    bandWidth / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    spiralTightness,
-                    phase,
-                    rotationSpeed,
-                    end.cloudTypeId(),
-                    ageTicks
+                    snapshot.id(),
+                    snapshot.centerX() / (double)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.centerZ() / (double)SimpleCloudsConstants.CLOUD_SCALE,
+                    localAnchorY,
+                    snapshot.coreRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.stormExtentRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.eyeRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.edgeFade() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.bandCount(),
+                    snapshot.bandWidth() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.spiralTightness(),
+                    snapshot.rotationPhase(),
+                    snapshot.rotationSpeed(),
+                    snapshot.transitionStart() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.transitionEnd() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.cloudTypeId(),
+                    snapshot.ageTicks()
             ));
         }
         return renderables;
@@ -99,7 +133,9 @@ public final class ClientHurricaneStateCache {
             UUID id,
             double centerX,
             double centerZ,
-            float outerRadius,
+            float anchorY,
+            float coreRadius,
+            float stormExtentRadius,
             float eyeRadius,
             float edgeFade,
             int bandCount,
@@ -107,6 +143,8 @@ public final class ClientHurricaneStateCache {
             float spiralTightness,
             float rotationPhase,
             float rotationSpeed,
+            float transitionStart,
+            float transitionEnd,
             ResourceLocation cloudTypeId,
             int ageTicks
     ) {

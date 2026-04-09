@@ -35,21 +35,24 @@ public class CloudLibrary {
             "severe_cumulonimbus",
             "dense_tsegrus",
             "dark_wall",
-            "custom_cumulonimbus"
+            "custom_cumulonimbus",
+            "hurricane"
     );
 
     private static final String[] THUNDER_LOW_CLOUDS = {
             "cumulonimbus",
             "tsegrus",
             "custom_cumulonimbus",
-            "nimbostratus"
+            "nimbostratus",
+            "hurricane"
     };
 
     private static final String[] THUNDER_HIGH_CLOUDS = {
             "severe_cumulonimbus",
             "dense_tsegrus",
             "dark_wall",
-            "severe_nimbostratus"
+            "severe_nimbostratus",
+            "hurricane"
     };
 
     private static final String[] SEVERITY_7_CLOUDS = {
@@ -159,7 +162,7 @@ public class CloudLibrary {
 
     public static int getSeverityFromCloudId(String id) {
         return switch (id) {
-            case "severe_cumulonimbus", "dense_tsegrus", "dark_wall", "custom_cumulonimbus", "severe_nimbostratus" -> 7;
+            case "severe_cumulonimbus", "dense_tsegrus", "dark_wall", "custom_cumulonimbus", "severe_nimbostratus", "hurricane" -> 7;
             case "nimbostratus",
                  "cumulonimbus",
                  "tsegrus",

@@ -30,7 +30,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import net.Gabou.projectatmosphere.util.*;
+import net.Gabou.projectatmosphere.util.HurricaneUpload;
+import net.Gabou.projectatmosphere.util.RegionUpload;
+import net.Gabou.projectatmosphere.util.TornadoUpload;
 
 
 import java.io.IOException;
@@ -62,7 +64,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     @Unique
     private static final int PROJECTATMOSPHERE$TORNADO_STRIDE = 32;
     @Unique
-    private static final int PROJECTATMOSPHERE$HURRICANE_STRIDE = 48;
+    private static final int PROJECTATMOSPHERE$HURRICANE_STRIDE = 64;
 
     @Unique private ShaderStorageBufferObject projectatmosphere$tornadoBuffer;
     @Unique private ShaderStorageBufferObject projectatmosphere$hurricaneBuffer;
@@ -132,9 +134,12 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             initializedHeights = true;
         }
 
-        if (this.projectatmosphere$anyHurricaneIntersects(hurricanes, minX, minZ, maxX, maxZ)) {
-            int startHeight = hurricaneType.noiseConfig().getStartHeight();
-            int endHeight = hurricaneType.noiseConfig().getEndHeight();
+        for (ClientHurricaneStateCache.RenderableHurricane hurricane : hurricanes) {
+            if (!this.projectatmosphere$hurricaneIntersects(hurricane, minX, minZ, maxX, maxZ)) {
+                continue;
+            }
+            int startHeight = Mth.floor(hurricane.anchorY() + hurricaneType.noiseConfig().getStartHeight());
+            int endHeight = Mth.ceil(hurricane.anchorY() + hurricaneType.noiseConfig().getEndHeight());
             if (!initializedHeights || smallestStartHeight > startHeight) {
                 smallestStartHeight = startHeight;
             }
@@ -219,7 +224,9 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
                     buffer.putFloat(upload.typeIndex());
                     buffer.putFloat(upload.centerX());
                     buffer.putFloat(upload.centerZ());
-                    buffer.putFloat(upload.outerRadius());
+                    buffer.putFloat(upload.anchorY());
+                    buffer.putFloat(upload.coreRadius());
+                    buffer.putFloat(upload.stormExtentRadius());
                     buffer.putFloat(upload.eyeRadius());
                     buffer.putFloat(upload.edgeFade());
                     buffer.putFloat(upload.bandCount());
@@ -227,7 +234,9 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
                     buffer.putFloat(upload.spiralTightness());
                     buffer.putFloat(upload.rotationPhase());
                     buffer.putFloat(upload.rotationSpeed());
-                    buffer.putFloat(upload.ageTicks());
+                    buffer.putFloat(upload.transitionStart());
+                    buffer.putFloat(upload.transitionEnd());
+                    buffer.putFloat(0.0F);
                 }
                 buffer.flip();
             }, count * PROJECTATMOSPHERE$HURRICANE_STRIDE, false);
@@ -317,7 +326,9 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
                     hurricaneTypeIndex,
                     (float)hurricane.centerX(),
                     (float)hurricane.centerZ(),
-                    hurricane.outerRadius(),
+                    hurricane.anchorY(),
+                    hurricane.coreRadius(),
+                    hurricane.stormExtentRadius(),
                     hurricane.eyeRadius(),
                     Math.max(1.0F, hurricane.edgeFade()),
                     Math.max(1, hurricane.bandCount()),
@@ -325,7 +336,8 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
                     hurricane.spiralTightness(),
                     hurricane.rotationPhase(),
                     hurricane.rotationSpeed(),
-                    hurricane.ageTicks()
+                    hurricane.transitionStart(),
+                    hurricane.transitionEnd()
             ));
             if (uploads.size() >= PROJECTATMOSPHERE$MAX_HURRICANES) {
                 break;
@@ -392,18 +404,13 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     }
 
     @Unique
-    private boolean projectatmosphere$anyHurricaneIntersects(List<ClientHurricaneStateCache.RenderableHurricane> hurricanes, float minX, float minZ, float maxX, float maxZ) {
-        for (ClientHurricaneStateCache.RenderableHurricane hurricane : hurricanes) {
-            float closestX = Mth.clamp((float)hurricane.centerX(), minX, maxX);
-            float closestZ = Mth.clamp((float)hurricane.centerZ(), minZ, maxZ);
-            float dx = closestX - (float)hurricane.centerX();
-            float dz = closestZ - (float)hurricane.centerZ();
-            float radius = hurricane.outerRadius() + hurricane.edgeFade();
-            if (dx * dx + dz * dz <= radius * radius) {
-                return true;
-            }
-        }
-        return false;
+    private boolean projectatmosphere$hurricaneIntersects(ClientHurricaneStateCache.RenderableHurricane hurricane, float minX, float minZ, float maxX, float maxZ) {
+        float closestX = Mth.clamp((float)hurricane.centerX(), minX, maxX);
+        float closestZ = Mth.clamp((float)hurricane.centerZ(), minZ, maxZ);
+        float dx = closestX - (float)hurricane.centerX();
+        float dz = closestZ - (float)hurricane.centerZ();
+        float radius = hurricane.stormExtentRadius() + hurricane.edgeFade();
+        return dx * dx + dz * dz <= radius * radius;
     }
 
     @Unique
@@ -461,6 +468,10 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (this.regionTextureGenerator != null && this.regionTextureGenerator.isValid()) {
             this.regionTextureGenerator.forUniform("TotalCloudHurricanes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
         }
+        ComputeShader shader = this.projectatmosphere$getShader();
+        if (shader != null && shader.isValid()) {
+            shader.forUniform("TotalCloudHurricanes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
+        }
     }
 
     @Unique
@@ -499,4 +510,3 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         }
     }
 }
-
