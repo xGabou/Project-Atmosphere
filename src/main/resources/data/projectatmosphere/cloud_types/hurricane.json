@@ -1,44 +1,44 @@
 {
     "noise_settings": [
         {
-            "scale_z": 980.0,
-            "fade_distance": 132.0,
-            "height_offset": 12.0,
+            "scale_z": 2200.0,
+            "fade_distance": 184.0,
+            "height_offset": -48.0,
             "value_scale": 1.0,
-            "height": 300.0,
-            "value_offset": 0.14,
-            "scale_x": 1120.0,
-            "scale_y": 980.0
+            "height": 380.0,
+            "value_offset": 0.10,
+            "scale_x": 2480.0,
+            "scale_y": 1400.0
         },
         {
-            "scale_z": 64.0,
-            "fade_distance": 52.0,
-            "height_offset": 34.0,
-            "value_scale": 1.16,
-            "height": 176.0,
-            "value_offset": 1.18,
-            "scale_x": 64.0,
-            "scale_y": 72.0
+            "scale_z": 96.0,
+            "fade_distance": 72.0,
+            "height_offset": -8.0,
+            "value_scale": 1.12,
+            "height": 208.0,
+            "value_offset": 1.12,
+            "scale_x": 96.0,
+            "scale_y": 84.0
         },
         {
-            "scale_z": 236.0,
-            "fade_distance": 102.0,
-            "height_offset": 22.0,
+            "scale_z": 420.0,
+            "fade_distance": 138.0,
+            "height_offset": 8.0,
             "value_scale": 0.80,
-            "height": 244.0,
-            "value_offset": 0.48,
-            "scale_x": 248.0,
-            "scale_y": 186.0
+            "height": 308.0,
+            "value_offset": 0.44,
+            "scale_x": 460.0,
+            "scale_y": 260.0
         },
         {
-            "scale_z": 360.0,
-            "fade_distance": 128.0,
-            "height_offset": 72.0,
+            "scale_z": 640.0,
+            "fade_distance": 172.0,
+            "height_offset": 52.0,
             "value_scale": 0.62,
-            "height": 252.0,
-            "value_offset": 0.34,
-            "scale_x": 360.0,
-            "scale_y": 248.0
+            "height": 320.0,
+            "value_offset": 0.30,
+            "scale_x": 680.0,
+            "scale_y": 340.0
         }
     ],
     "weather_type": "thunderstorm",

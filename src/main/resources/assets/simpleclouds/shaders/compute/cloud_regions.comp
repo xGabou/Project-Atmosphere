@@ -149,12 +149,17 @@ vec2 projectatmosphere_sampleHurricane(CloudHurricane hurricane, vec2 coord)
     float armNoise = mix(armNoiseA, armNoiseB, 0.42);
     armNoise = smoothstep(0.62, 0.94, armNoise);
 
-    float spiralEnvelope = smoothstep(eyeRadius + bandWidth * 0.12, eyeRadius + bandWidth * 1.22, radius);
-    spiralEnvelope *= 1.0 - smoothstep(coreRadius * 0.72, coreRadius * 1.08, radius);
+    float spiralEnvelope = smoothstep(eyeRadius + bandWidth * 0.12, eyeRadius + bandWidth * 1.28, radius);
+    spiralEnvelope *= 1.0 - smoothstep(coreRadius * 0.78, coreRadius * 1.18, radius);
 
     float innerCore = max(eyewall, armNoise * spiralEnvelope);
 
-    float cbBlendStart = min(transitionStart, coreRadius * 0.84);
+    // Start the cumulonimbus recovery close to the eyewall so the core does not hand off into a hollow ring.
+    float bridgeStart = eyeRadius + bandWidth * 0.52;
+    float bridgeBuildEnd = max(bridgeStart + bandWidth * 1.85, coreRadius * 0.36);
+    float bridgeFadeEnd = max(coreRadius * 1.08, bridgeBuildEnd + bandWidth * 2.40);
+
+    float cbBlendStart = min(transitionStart, bridgeStart);
     float cbEnvelope = smoothstep(cbBlendStart, transitionEnd, radius);
     cbEnvelope *= 1.0 - smoothstep(stormExtentRadius * 1.02, stormExtentRadius + edgeFade * 0.78, radius);
 
@@ -164,20 +169,41 @@ vec2 projectatmosphere_sampleHurricane(CloudHurricane hurricane, vec2 coord)
     float cbNoise = mix(mix(cbNoiseA, cbNoiseB, 0.45), cbNoiseC, 0.30);
     cbNoise = smoothstep(0.20, 0.90, cbNoise);
 
-    float cbMass = cbEnvelope * (0.46 + cbNoise * 0.54);
+    float innerCbA = 0.5 + 0.5 * cos(spinPhase * (bandCount * 0.92 + 0.85) - normalizedRadius * 6.4);
+    float innerCbB = 0.5 + 0.5 * cos(angle * 2.2 - rotationPhase * 0.10 + normalizedRadius * 4.8);
+    float innerCbMask = smoothstep(0.20, 0.82, mix(innerCbA, innerCbB, 0.42));
 
-    float continuityBand = smoothstep(coreRadius * 0.72, coreRadius * 0.96, radius);
-    continuityBand *= 1.0 - smoothstep(transitionEnd * 0.94, stormExtentRadius * 0.96, radius);
-    continuityBand *= 0.36 + mix(armNoise, cbNoise, 0.55) * 0.44;
+    float innerBridgeEnvelope = smoothstep(bridgeStart, bridgeBuildEnd, radius);
+    innerBridgeEnvelope *= 1.0 - smoothstep(coreRadius * 0.94, bridgeFadeEnd, radius);
 
-    float anvilEdge = smoothstep(stormExtentRadius * 0.72, stormExtentRadius * 0.96, radius);
-    anvilEdge *= 1.0 - smoothstep(stormExtentRadius * 1.06, stormExtentRadius + edgeFade * 0.94, radius);
-    anvilEdge *= smoothstep(0.34, 0.88, cbNoiseB);
+    float outerBandEnvelope = smoothstep(coreRadius * 0.42, stormExtentRadius * 0.90, radius);
+    outerBandEnvelope *= 1.0 - smoothstep(stormExtentRadius * 0.96, stormExtentRadius + edgeFade * 0.72, radius);
 
-    float outerStorm = max(cbMass, continuityBand + anvilEdge * 0.24);
+    float outerBandA = 0.5 + 0.5 * cos(spinPhase * (bandCount * 0.42 + 1.05) - normalizedRadius * 15.0);
+    float outerBandB = 0.5 + 0.5 * cos((angle - rotationPhase * 0.16) * (bandCount * 0.30 + 1.85) + normalizedRadius * 21.0);
+    outerBandA = smoothstep(0.58, 0.94, outerBandA);
+    outerBandB = smoothstep(0.56, 0.92, outerBandB);
+    float outerBandMask = smoothstep(0.34, 0.88, mix(outerBandA, outerBandB, 0.38));
+
+    float cbMass = cbEnvelope * (0.22 + cbNoise * 0.26 + outerBandMask * 0.52);
+
+    float innerBridge = innerBridgeEnvelope * (0.54 + innerCbMask * 0.26 + armNoise * 0.20);
+
+    float continuityBand = smoothstep(bridgeStart, coreRadius * 0.96, radius);
+    continuityBand *= 1.0 - smoothstep(coreRadius * 1.08, transitionEnd * 0.92, radius);
+    continuityBand *= 0.48 + mix(armNoise, outerBandMask, 0.50) * 0.44;
+
+    float spiralShoulders = outerBandEnvelope * (0.28 + outerBandMask * 0.72);
+    spiralShoulders *= 0.52 + cbNoise * 0.30;
+
+    float anvilEdge = smoothstep(stormExtentRadius * 0.70, stormExtentRadius * 0.95, radius);
+    anvilEdge *= 1.0 - smoothstep(stormExtentRadius * 1.04, stormExtentRadius + edgeFade * 0.94, radius);
+    anvilEdge *= smoothstep(0.34, 0.88, cbNoiseB) * (0.42 + outerBandMask * 0.58);
+
+    float outerStorm = max(max(cbMass, spiralShoulders), max(innerBridge, continuityBand + anvilEdge * 0.20));
     float coverage = max(innerCore, outerStorm);
     coverage *= outerMask * eyeHole;
-    coverage = smoothstep(0.07, 0.91, saturate(coverage));
+    coverage = smoothstep(0.04, 0.88, saturate(coverage));
     if (coverage <= 0.001)
         return vec2(-1.0);
 

@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.client.TornadoRenderHandler;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -56,19 +57,22 @@ public class ClientTickHandler {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        ClientHurricaneStateCache.tick(Minecraft.getInstance().level);
+        Minecraft mc = Minecraft.getInstance();
+        ClientHurricaneStateCache.tick(mc.level);
         if (!ClientSyncLock.isReady()) return;
-        if (Minecraft.getInstance().isPaused()) return;
+        if (mc.isPaused()) return;
+        if (mc.level == null) {
+            return;
+        }
 
         SkyEffectState.beginFrame();
         tickCounter++;
-        TornadoManager.tick(Minecraft.getInstance().level);
-        Minecraft mc = Minecraft.getInstance();
+        TornadoManager.tick(mc.level);
         RainbowWeatherTracker.tick(mc);
 
-        if (mc.level != null && mc.player != null) {
+        if (mc.player != null) {
             CloudManager<?> manager = CloudManager.get(mc.level);
-            List<CloudRegion> regions = manager.getCloudGenerator().getClouds();
+            List<CloudRegion> regions = manager.getClouds();
             double playerX = mc.player.getX();
             double playerZ = mc.player.getZ();
             Set<Integer> nextCulled = new HashSet<>();
@@ -84,28 +88,26 @@ public class ClientTickHandler {
             culledRegionIds.addAll(nextCulled);
         }
 
-        if (mc.level != null) {
-            Set<TornadoInstance> current = new HashSet<>(TornadoManager.getActiveTornadoes());
-            for (TornadoInstance tornado : current) {
-                float baseVol = 0.35f + 0.45f * 0.75f;
-                TornadoAudioClient.ensure(tornado, baseVol, 140f);
-            }
-            for (TornadoInstance t : prevTornadoes) {
-                if (!current.contains(t)) {
-                    TornadoAudioClient.stop(t);
-                }
-            }
-            prevTornadoes.clear();
-            prevTornadoes.addAll(current);
+        Set<TornadoInstance> current = new HashSet<>(TornadoManager.getActiveTornadoes());
+        for (TornadoInstance tornado : current) {
+            float baseVol = 0.35f + 0.45f * 0.75f;
+            TornadoAudioClient.ensure(tornado, baseVol, 140f);
         }
+        for (TornadoInstance tornado : prevTornadoes) {
+            if (!current.contains(tornado)) {
+                TornadoAudioClient.stop(tornado);
+            }
+        }
+        prevTornadoes.clear();
+        prevTornadoes.addAll(current);
 
-        if (mc.level != null && mc.level.getGameTime() % 2 == 0) {
+        if (mc.level.getGameTime() % 2 == 0) {
             for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
                 TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
             }
         }
         if (tickCounter % 40 == 0) {
-            if (mc.level != null && mc.player != null) {
+            if (mc.player != null) {
                 // snapshot
                 BlockPos pos = mc.player.blockPosition();
                 long gameTime = mc.level.getGameTime();
@@ -194,4 +196,6 @@ public class ClientTickHandler {
     }
 
 }
+
+
 

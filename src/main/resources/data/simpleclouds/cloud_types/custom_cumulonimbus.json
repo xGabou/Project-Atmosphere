@@ -1,44 +1,44 @@
 {
     "noise_settings": [
         {
-            "scale_z": 900.0,
-            "fade_distance": 128.0,
+            "scale_z": 980.0,
+            "fade_distance": 144.0,
             "height_offset": 0.0,
-            "value_scale": 1.0,
-            "height": 280.0,
-            "value_offset": 0.15,
-            "scale_x": 1100.0,
-            "scale_y": 1100.0
-        },
-        {
-            "scale_z": 55.0,
-            "fade_distance": 48.0,
-            "height_offset": 20.0,
-            "value_scale": 1.2,
-            "height": 140.0,
-            "value_offset": 1.35,
-            "scale_x": 55.0,
-            "scale_y": 55.0
-        },
-        {
-            "scale_z": 220.0,
-            "fade_distance": 96.0,
-            "height_offset": 10.0,
-            "value_scale": 0.85,
+            "value_scale": 0.72,
             "height": 220.0,
-            "value_offset": 0.5,
-            "scale_x": 220.0,
-            "scale_y": 220.0
+            "value_offset": -0.08,
+            "scale_x": 1200.0,
+            "scale_y": 420.0
         },
         {
-            "scale_z": 320.0,
-            "fade_distance": 128.0,
-            "height_offset": 6.0,
-            "value_scale": 0.7,
-            "height": 220.0,
-            "value_offset": 0.45,
-            "scale_x": 320.0,
-            "scale_y": 320.0
+            "scale_z": 72.0,
+            "fade_distance": 42.0,
+            "height_offset": 48.0,
+            "value_scale": 0.88,
+            "height": 180.0,
+            "value_offset": 0.72,
+            "scale_x": 72.0,
+            "scale_y": 170.0
+        },
+        {
+            "scale_z": 260.0,
+            "fade_distance": 88.0,
+            "height_offset": 36.0,
+            "value_scale": 0.62,
+            "height": 176.0,
+            "value_offset": 0.14,
+            "scale_x": 260.0,
+            "scale_y": 120.0
+        },
+        {
+            "scale_z": 360.0,
+            "fade_distance": 120.0,
+            "height_offset": 144.0,
+            "value_scale": 0.52,
+            "height": 132.0,
+            "value_offset": -0.10,
+            "scale_x": 420.0,
+            "scale_y": 240.0
         }
     ],
     "weather_type": "thunderstorm",

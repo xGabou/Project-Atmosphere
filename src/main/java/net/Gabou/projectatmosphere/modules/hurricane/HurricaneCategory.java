@@ -29,4 +29,10 @@ public enum HurricaneCategory {
             default -> ONE;
         };
     }
+
+    public static HurricaneCategory fromStrength(float normalizedStrength) {
+        float clamped = Math.max(0.0F, Math.min(1.0F, normalizedStrength));
+        int id = 1 + Math.min(4, (int) Math.floor(clamped * 5.0F));
+        return fromId(id);
+    }
 }

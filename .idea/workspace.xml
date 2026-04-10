@@ -4,26 +4,60 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: implement hurricane system with state synchronization and rendering support">
+    <list default="true" id="d0bf4991-4e4d-4b73-b0f4-b6e66356bf84" name="Changes" comment="feat: add hurricane system with enhanced cloud management and rendering capabilities">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/TornadoClientEffects.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/SimpleCloudsTornadoRenderer.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/TornadoRenderDebugState.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/TornadoShaders.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/render/VolumeBoxMesh.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/DefaultPipelineTornadoMixin.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/client/ShaderSupportPipelineTornadoMixin.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSnapshot.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/RegionalWeatherPhase.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/ServerWeatherStateResolver.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/StormLifecyclePhase.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/StormMotionModel.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/StormSeverityScale.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/weather/StormShieldManager.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/RemoveTornadoPacket.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SyncTornadoesPacket.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado_round.fsh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado_round.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado_round.vsh" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/core/tornado_volume_box.vsh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CHANGES.md" beforeDir="false" afterPath="$PROJECT_DIR$/CHANGES.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/hurricane/ClientHurricaneStateCache.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/hurricane/ClientHurricaneStateCache.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/MultiRegionCloudMeshGeneratorMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/MultiRegionCloudMeshGeneratorMixin.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/RegionUpload.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/TornadoUpload.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/core/CloudLibrary.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/ClientTickHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/client/screen/WeatherRadarScreen.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/config/AtmoConfigScreen.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SimpleCloudsCloudManagerMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/mixin/SimpleCloudsCloudManagerMixin.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CloudManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CycloneManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/atmosphere/CycloneManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneCategory.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneCategory.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneInstance.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneRenderSnapshot.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneRenderSnapshot.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/HurricaneUpload.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/HurricaneUpload.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/RegionUpload.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/RegionUpload.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/TornadoUpload.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/TornadoUpload.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherType.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/util/WeatherType.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneSemantics.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/hurricane/HurricaneSemantics.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoCommand.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoDebug.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoProbabilityManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSpawner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoSpawner.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/NetworkHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/network/SpawnTornadoPacket.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/compute/cloud_regions.comp" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/compute/cloud_regions.comp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/compute/cube_mesh.comp" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/projectatmosphere/shaders/compute/cube_mesh.comp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/assets/simpleclouds/shaders/compute/cloud_regions.comp" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/simpleclouds/shaders/compute/cloud_regions.comp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/assets/simpleclouds/shaders/compute/cube_mesh.comp" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/assets/simpleclouds/shaders/compute/cube_mesh.comp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/hurricane.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/cloud_types/hurricane.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/projectatmosphere/cloud_types/hurricane.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altocumulus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altocumulus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/altostratus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_congestus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_congestus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_humilis.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_humilis.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_mediocris.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/cumulus_mediocris.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/custom_cumulonimbus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/custom_cumulonimbus.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stratocumulus_opacus.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/data/simpleclouds/cloud_types/stratocumulus_opacus.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/projectatmosphere.mixins.json" afterDir="false" />
     </list>
     <list id="5c63d173-11c9-4abf-9bdb-b23f613602e8" name="Changes by Antoi" comment="" />
@@ -700,15 +734,8 @@
       <workItem from="1775567539192" duration="2589000" />
       <workItem from="1775577610562" duration="5193000" />
       <workItem from="1775695460832" duration="629000" />
-      <workItem from="1775699708987" duration="3379000" />
-    </task>
-    <task id="LOCAL-00099" summary="feat: update AtmoConfigScreen layout and improve widget visibility handling">
-      <option name="closed" value="true" />
-      <created>1756676450465</created>
-      <option name="number" value="00099" />
-      <option name="presentableId" value="LOCAL-00099" />
-      <option name="project" value="LOCAL" />
-      <updated>1756676450465</updated>
+      <workItem from="1775699708987" duration="4645000" />
+      <workItem from="1775747236795" duration="8721000" />
     </task>
     <task id="LOCAL-00100" summary="feat: enhance WeatherRadarScreen with improved cloud rendering and jitter effects">
       <option name="closed" value="true" />
@@ -1094,7 +1121,15 @@
       <option name="project" value="LOCAL" />
       <updated>1775497988415</updated>
     </task>
-    <option name="localTasksCounter" value="148" />
+    <task id="LOCAL-00148" summary="feat: add hurricane system with enhanced cloud management and rendering capabilities">
+      <option name="closed" value="true" />
+      <created>1775704408380</created>
+      <option name="number" value="00148" />
+      <option name="presentableId" value="LOCAL-00148" />
+      <option name="project" value="LOCAL" />
+      <updated>1775704408381</updated>
+    </task>
+    <option name="localTasksCounter" value="149" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1143,7 +1178,6 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
-    <MESSAGE value="feat: add imperial units display option for temperature, wind speed, and pressure" />
     <MESSAGE value="feat: enhance regeneration process by pausing dependent ticks and deferring tornado checks" />
     <MESSAGE value="feat: update barometer and humidimeter models, add hygrometer, and increment version to 0.5.5.4" />
     <MESSAGE value="feat: improve biome temperature handling and enforce overworld restrictions for temperature commands" />
@@ -1168,7 +1202,8 @@
     <MESSAGE value="feat: implement forecast loading system with overlay rendering and state management" />
     <MESSAGE value="feat: enhance Gradle build configuration for GitHub packages, improve loading overlay, and fix IDE sync issues" />
     <MESSAGE value="feat: implement hurricane system with state synchronization and rendering support" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: implement hurricane system with state synchronization and rendering support" />
+    <MESSAGE value="feat: add hurricane system with enhanced cloud management and rendering capabilities" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: add hurricane system with enhanced cloud management and rendering capabilities" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -1223,7 +1258,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/net/Gabou/projectatmosphere/modules/tornado/TornadoInstance.java</url>
-          <line>141</line>
+          <line>514</line>
           <option name="timeStamp" value="340" />
         </line-breakpoint>
         <breakpoint type="java-exception">

@@ -6,24 +6,24 @@
   "storm_fade_distance": 12.0,
   "noise_settings": [
     {
-      "height": 48.0,
-      "value_offset": 0.9,
-      "scale_x": 80.0,
-      "scale_y": 80.0,
-      "scale_z": 80.0,
-      "fade_distance": 8.0,
+      "height": 42.0,
+      "value_offset": 0.08,
+      "scale_x": 112.0,
+      "scale_y": 44.0,
+      "scale_z": 112.0,
+      "fade_distance": 12.0,
       "height_offset": 0.0,
-      "value_scale": 0.9
+      "value_scale": 0.72
     },
     {
-      "height": 96.0,
-      "value_offset": 0.25,
-      "scale_x": 160.0,
-      "scale_y": 160.0,
-      "scale_z": 160.0,
-      "fade_distance": 18.0,
-      "height_offset": 8.0,
-      "value_scale": 0.5
+      "height": 82.0,
+      "value_offset": -0.06,
+      "scale_x": 180.0,
+      "scale_y": 74.0,
+      "scale_z": 180.0,
+      "fade_distance": 24.0,
+      "height_offset": 12.0,
+      "value_scale": 0.34
     }
   ]
 }

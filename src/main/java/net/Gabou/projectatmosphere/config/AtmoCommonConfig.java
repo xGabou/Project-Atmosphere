@@ -43,6 +43,7 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
     public static final ForgeConfigSpec.BooleanValue TORNADO_ALLOW_LEGACY_FALLBACK;
     public static final ForgeConfigSpec.BooleanValue TORNADO_DEBUG_LOGGING;
+    public static final ForgeConfigSpec.DoubleValue TORNADO_RENDER_QUALITY;
 
     public static final ForgeConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
 
@@ -198,6 +199,9 @@ public class AtmoCommonConfig {
         TORNADO_DEBUG_LOGGING = builder
                 .comment("Enable verbose tornado logging (SSBO detection, fallback decisions, command outcomes).")
                 .define("debugTornadoLogging", false);
+        TORNADO_RENDER_QUALITY = builder
+                .comment("Client tornado volume quality multiplier. Lower values reduce tornado shader step count and detail for better FPS.")
+                .defineInRange("renderQuality", 0.72d, 0.25d, 1.0d);
         builder.pop();
         builder.pop();
 

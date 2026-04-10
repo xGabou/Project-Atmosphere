@@ -156,12 +156,17 @@ public final class HurricaneSemantics {
         float armNoiseB = cos01(spinPhase * (hurricane.bandCount * 0.72F + 1.10F) - normalizedRadius * 9.5F);
         float armNoise = smoothstep(0.60F, 0.93F, Mth.lerp(0.42F, armNoiseA, armNoiseB));
 
-        float spiralEnvelope = smoothstep(hurricane.eyeRadius + hurricane.bandWidth * 0.12F, hurricane.eyeRadius + hurricane.bandWidth * 1.22F, radius);
-        spiralEnvelope *= 1.0F - smoothstep(hurricane.coreRadius * 0.72F, hurricane.coreRadius * 1.08F, radius);
+        float spiralEnvelope = smoothstep(hurricane.eyeRadius + hurricane.bandWidth * 0.12F, hurricane.eyeRadius + hurricane.bandWidth * 1.28F, radius);
+        spiralEnvelope *= 1.0F - smoothstep(hurricane.coreRadius * 0.78F, hurricane.coreRadius * 1.18F, radius);
 
         float coreCoverage = Math.max(eyewall, armNoise * spiralEnvelope);
 
-        float cbStart = Math.min(hurricane.transitionStart, hurricane.coreRadius * 0.84F);
+        // Start the cumulonimbus recovery close to the eyewall so the core never hands off into a dead gap.
+        float bridgeStart = hurricane.eyeRadius + hurricane.bandWidth * 0.52F;
+        float bridgeBuildEnd = Math.max(bridgeStart + hurricane.bandWidth * 1.85F, hurricane.coreRadius * 0.36F);
+        float bridgeFadeEnd = Math.max(hurricane.coreRadius * 1.08F, bridgeBuildEnd + hurricane.bandWidth * 2.40F);
+
+        float cbStart = Math.min(hurricane.transitionStart, bridgeStart);
         float cbEnvelope = smoothstep(cbStart, hurricane.transitionEnd, radius);
         cbEnvelope *= 1.0F - smoothstep(hurricane.stormExtentRadius * 1.02F, hurricane.stormExtentRadius + hurricane.edgeFade * 0.78F, radius);
 
@@ -170,20 +175,47 @@ public final class HurricaneSemantics {
         float cbNoiseC = cos01(angle * 2.7F - normalizedRadius * 4.4F);
         float cbNoise = smoothstep(0.18F, 0.90F, Mth.lerp(0.30F, Mth.lerp(0.45F, cbNoiseA, cbNoiseB), cbNoiseC));
 
-        float cbMass = cbEnvelope * (0.52F + cbNoise * 0.48F);
+        float innerCbA = cos01(spinPhase * (hurricane.bandCount * 0.92F + 0.85F) - normalizedRadius * 6.4F);
+        float innerCbB = cos01(angle * 2.2F - hurricane.rotationPhase * 0.10F + normalizedRadius * 4.8F);
+        float innerCbMask = smoothstep(0.20F, 0.82F, Mth.lerp(0.42F, innerCbA, innerCbB));
 
-        float continuityBand = smoothstep(hurricane.coreRadius * 0.72F, hurricane.coreRadius * 0.96F, radius);
-        continuityBand *= 1.0F - smoothstep(hurricane.transitionEnd * 0.94F, hurricane.stormExtentRadius * 0.96F, radius);
-        continuityBand *= 0.36F + Mth.lerp(0.55F, armNoise, cbNoise) * 0.44F;
+        float innerBridgeEnvelope = smoothstep(bridgeStart, bridgeBuildEnd, radius);
+        innerBridgeEnvelope *= 1.0F - smoothstep(hurricane.coreRadius * 0.94F, bridgeFadeEnd, radius);
 
-        float anvilEdge = smoothstep(hurricane.stormExtentRadius * 0.72F, hurricane.stormExtentRadius * 0.96F, radius);
-        anvilEdge *= 1.0F - smoothstep(hurricane.stormExtentRadius * 1.06F, hurricane.stormExtentRadius + hurricane.edgeFade * 0.94F, radius);
-        anvilEdge *= smoothstep(0.34F, 0.88F, cbNoiseB);
+        float outerBandEnvelope = smoothstep(hurricane.coreRadius * 0.42F, hurricane.stormExtentRadius * 0.90F, radius);
+        outerBandEnvelope *= 1.0F - smoothstep(hurricane.stormExtentRadius * 0.96F, hurricane.stormExtentRadius + hurricane.edgeFade * 0.72F, radius);
 
-        float outerCoverage = Math.max(cbMass, continuityBand + anvilEdge * 0.24F);
+        float outerBandA = smoothstep(
+                0.58F,
+                0.94F,
+                cos01(spinPhase * (hurricane.bandCount * 0.42F + 1.05F) - normalizedRadius * 15.0F)
+        );
+        float outerBandB = smoothstep(
+                0.56F,
+                0.92F,
+                cos01((angle - hurricane.rotationPhase * 0.16F) * (hurricane.bandCount * 0.30F + 1.85F) + normalizedRadius * 21.0F)
+        );
+        float outerBandMask = smoothstep(0.34F, 0.88F, Mth.lerp(0.38F, outerBandA, outerBandB));
+
+        float cbMass = cbEnvelope * (0.22F + cbNoise * 0.26F + outerBandMask * 0.52F);
+
+        float innerBridge = innerBridgeEnvelope * (0.54F + innerCbMask * 0.26F + armNoise * 0.20F);
+
+        float continuityBand = smoothstep(bridgeStart, hurricane.coreRadius * 0.96F, radius);
+        continuityBand *= 1.0F - smoothstep(hurricane.coreRadius * 1.08F, hurricane.transitionEnd * 0.92F, radius);
+        continuityBand *= 0.48F + Mth.lerp(0.50F, armNoise, outerBandMask) * 0.44F;
+
+        float spiralShoulders = outerBandEnvelope * (0.28F + outerBandMask * 0.72F);
+        spiralShoulders *= 0.52F + cbNoise * 0.30F;
+
+        float anvilEdge = smoothstep(hurricane.stormExtentRadius * 0.70F, hurricane.stormExtentRadius * 0.95F, radius);
+        anvilEdge *= 1.0F - smoothstep(hurricane.stormExtentRadius * 1.04F, hurricane.stormExtentRadius + hurricane.edgeFade * 0.94F, radius);
+        anvilEdge *= smoothstep(0.34F, 0.88F, cbNoiseB) * (0.42F + outerBandMask * 0.58F);
+
+        float outerCoverage = Math.max(Math.max(cbMass, spiralShoulders), Math.max(innerBridge, continuityBand + anvilEdge * 0.20F));
         float coverage = Math.max(coreCoverage, outerCoverage);
         coverage *= outerMask * eyeHole;
-        coverage = smoothstep(0.06F, 0.90F, saturate(coverage));
+        coverage = smoothstep(0.04F, 0.88F, saturate(coverage));
 
         if (inEye) {
             return new HurricaneSemanticSample(hurricane.cloudTypeId, hurricane.anchorY, 0.0F, 0.0F, true, 0.0F, 0.0F);

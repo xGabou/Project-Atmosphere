@@ -1,6 +1,17 @@
-﻿# Project Atmosphere â€” Developer Change Log
+# Project Atmosphere Ã¢â‚¬â€ Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from gradle.properties at the time of change.
 ## Unreleased - Native hurricane eye in Simple Clouds
+- Lowered the hurricane anchor by roughly 200 blocks and expanded the outer cumulonimbus storm extent by about 5x, with a broader edge fade and larger hurricane cloud-noise scales so the storm reads as a much larger regional system instead of a compact ring high in the sky.
+- Changed the tornado admin/debug spawn commands to force-spawn a visible tornado immediately instead of timing out on cloud seeding, while still attaching to a nearby severe cloud when one is available and broadening cloud lookup to a larger severe-cloud fallback radius.
+- Moved the hurricane core-to-cumulonimbus recovery inward so the outer storm body now begins from the eyewall region instead of from far out on the core radius, and added a dedicated inner bridge envelope/noise pass to close the remaining dead ring between the eye wall and the outer storm mass.
+- Optimized `StormShieldManager` to stop hammering chunk-load tick time: shield tracking now uses a chunk-aware primitive index, only scans chunk sections whose palettes can actually contain the storm shield block, updates from block place/break events, and queries nearby chunk buckets instead of mutating/iterating a global concurrent boxed set.
+- Diagnosed the tornado regression against Dynamic-Forge-1.20.1-Tornado: the dynamic branch diverged from merge base 7c30affb6c9a1f46c5526df5bbb7455e4b14a6c0 and never merged the newer tornado stack, so it had drifted back to the old local tornado implementation.
+- Restored the source-of-truth tornado pipeline from Dynamic-Forge-1.20.1-Tornado, including the tornado manager/instance/snapshot/spawner flow, regional storm phase integration, standalone spawn/remove/sync packets, the Simple Clouds tornado renderer/shaders, tornado client effects, and the config/UI hooks needed for render quality and client cleanup on the dynamic branch.
+- Reworked hurricanes to intensify out of the existing cyclone system instead of acting like isolated local storms: CycloneManager now exposes active cyclone snapshots, HurricaneManager tracks cyclone formation eligibility over warm ocean plus convective cloud coverage, and cyclone-linked hurricanes inherit the cyclone's regional disruption while adding stronger wind fields, tree/block destruction, entity pushing, eyewall lightning, and native hurricane rendering/sync.
+- Stabilized hurricane semantic ownership in the eye by keeping the eye visually empty/dry while still reporting `projectatmosphere:hurricane` to Simple Clouds query paths, which should stop the F3 overlay from flipping to `simpleclouds:empty` when crossing the eye.
+- Reworked the hurricane core-to-outer transition again so the inner spiral persists farther out, the outer cumulonimbus mass begins earlier, and new broad outer spiral rainbands give the storm a more cyclone-like top-down silhouette instead of a smooth circular disk.
+- Rebalanced `altocumulus`, `altostratus`, `cumulus_humilis`, `cumulus_mediocris`, `cumulus_congestus`, `custom_cumulonimbus`, and `stratocumulus_opacus` to reduce geometric fill and total cube output while improving vertical anisotropy, contour, and layered/puffy sculpting.
+- Fixed the command-spawn tornado path so `/pa spawnTornado` now creates a managed tornado instance in addition to attaching the cloud descriptor, and relaxed supporting-cloud lookup to use a nearby fallback cloud when strict intersection misses on the client.
 - Added a shared CPU hurricane semantic sampler and wired it into Simple Clouds cloud-type, precipitation, and rain-level queries, so hurricanes now report `projectatmosphere:hurricane`, force visible rain outside the eye, and keep the eye dry without relying on fake cloud regions.
 - Added query-only hurricane reservation regions plus spawn/reconciliation hooks in the Simple Clouds generator, preventing normal cloud formations from spawning into or drifting through the hurricane footprint while keeping the hurricane render path native.
 - Tightened the hurricane core-to-cumulonimbus blend so the outer storm body starts overlapping before the inner spiral fully fades, removing the remaining visible handoff between the core structure and the outer mass.
@@ -175,9 +186,9 @@ This file records functionality additions/removals made during development sessi
 - Spikes are region-only (no biome-generation spikes); BiomeChangeManager now tracks regions (and last biome for compatibility) and regenerates when entering a new region or moving ~80% of region size.
 - Cloud sampling uses region centers; far clouds culled; SimpleClouds spawn compatibility rejects spawns beyond 10k from players and biases closer spawns.
 - Added a client-only telemetry collector with bounded buffers plus `/pa debug export` to serialize session JSONL files and zip them asynchronously with clickable chat links; exports respect a retention window and configurable enable flag.
-## Unreleased â€” Async active-region scheduler
+## Unreleased Ã¢â‚¬â€ Async active-region scheduler
 - Added `AtmosphericUpdateScheduler` to refresh only player-proximate states every 20 ticks and batch passive regions through a round-robin queue every 100 ticks using `AsyncAtmosphereService`.
-- Sunlight/rain/relaxation now apply as clamped deltas on the main thread after async computation, with stronger sunlight blending and per-variable safety clamps (temperature floored at -273.15C, pressure limited to 870â€“1080 hPa).
+- Sunlight/rain/relaxation now apply as clamped deltas on the main thread after async computation, with stronger sunlight blending and per-variable safety clamps (temperature floored at -273.15C, pressure limited to 870Ã¢â‚¬â€œ1080 hPa).
 - Cyclone updates now compute off-thread and apply capped deltas on the main thread, preventing runaway pressure/temperature spikes and keeping rain/cloud boosts within bounds.
 - State mutators adjust relative to the current value instead of resetting to the biome base, so weather effects accumulate naturally while remaining clamped to realistic ceilings.
 ## 0.6.0.0-pre3.2 - Wind neighbor safety (2025-11-27)
@@ -185,7 +196,7 @@ This file records functionality additions/removals made during development sessi
 - Rebuilt neighbor lists off-thread into immutable snapshots before swapping them into the registry, preventing ConcurrentModificationException while wind mixing iterates during active rebuilds.
 
 
-## Unreleased â€“ Biome naming and TFC coverage
+## Unreleased Ã¢â‚¬â€œ Biome naming and TFC coverage
 - `BiomeTempConfig` now warns when biome keys are provided without a namespace (e.g., `minecraft:desert`, `biomesoplenty:bayou`) so config stays tied to the right mod IDs.
 - Added TerraFirmaCraft main and technical biome temperature curves (oceans, plains, mountains, rivers, beaches, edges, and estuaries) to keep climate sampling consistent in modded worlds.
 
@@ -195,7 +206,7 @@ This file records functionality additions/removals made during development sessi
 - Auroras render only on cold nights; rainbows trigger only when rain stops, and both now expose active flags/positions to the client for shader packs.
 - In-game config buttons cover tornado debug logging and legacy fallback toggles.
 
-## 0.6.0.0-pre2 â€“ Tornado-aware SimpleClouds sync (2025-11-16)
+## 0.6.0.0-pre2 Ã¢â‚¬â€œ Tornado-aware SimpleClouds sync (2025-11-16)
 - Reworked the `MultiRegionCloudMeshGenerator` tornado mixin to mirror the upstream region packing logic instead of calling
   compiler-generated lambda targets, restoring compatibility with SimpleClouds 0.7.3, using a dedicated `CloudMeshGenerator`
   accessor and standalone helper carriers to keep the mixin compliant with Sponge guidelines.
@@ -216,93 +227,93 @@ This file records functionality additions/removals made during development sessi
 - Fixed the `cube_mesh.comp` neighbor check so tornado interiors are treated as empty space, letting adjacent cubes emit faces
   and carve a visible funnel cavity.
 
-## 0.6.0.0-pre2 â€“ Ocean basin integration (2025-11-15)
+## 0.6.0.0-pre2 Ã¢â‚¬â€œ Ocean basin integration (2025-11-15)
 - Added a modular ocean basin subsystem that detects contiguous oceanic forecast samples asynchronously and keeps long-lived energy reservoirs in sync with the dynamic core.
 - Introduced polymorphic influence pipelines so basins adjust their own thermal/pressure memory before feeding humidity, pressure, temperature, and wind tendencies into nearby forecast cells.
 - Hooked the new manager into the existing tick loop alongside cyclones and registered optional Continents/Tectonic geometry support, including Gradle dependencies for both mods.
 
-## 0.6.0.0-pre1 â€“ Cloud region unification (2025-11-14)
+## 0.6.0.0-pre1 Ã¢â‚¬â€œ Cloud region unification (2025-11-14)
 - Rebuilt the atmospheric cloud manager so each SimpleClouds `CloudRegion` now carries its own thickness, rain intensity, and lifecycle instead of duplicating data per biome sample.
 - Region scans now run on `AsyncAtmosphereService`, averaging humidity/temperature for only the biomes under each cloud footprint and projecting the combined cover back to those biomes.
 - Cloud growth and shrink follow humidity and temperature trends while spawn attempts reuse the old `trySpawnClouds` heuristics to find humid hotspots asynchronously before creating regions on the main thread.
 - Sunlight now lerps toward forecast-derived daily min/max temperatures, preventing runaway heat spikes (e.g., 25C -> 139C swings in sparse jungles) while still letting rain, humidity, and wind modules nudge the live value.
 
-## 0.5.5.7 â€“ Cloud rave pacing (2025-11-14)
+## 0.5.5.7 Ã¢â‚¬â€œ Cloud rave pacing (2025-11-14)
 - Clouds no longer react every tick; they now require minutes/days of stability above a biome before the humidity-driven radius/lifetime adjustments kick in, producing a smoother, rave-like rhythm.
 - Humidity biases those dwell timers so humid climates saturate quicker while arid, hot areas still need to linger for several minutes before they can shrink or disperse.
 
-## 0.5.5.7 â€“ Cloud persistence tuning (2025-11-13)
+## 0.5.5.7 Ã¢â‚¬â€œ Cloud persistence tuning (2025-11-13)
 - Clouds now ease toward a humidity-driven target thickness instead of jumping immediately, so growth and dissipation happen over minutes rather than seconds.
 - Dissipation speed scales with biome dryness, letting humid areas keep their systems intact while extreme deserts still erode storms after several minutes of exposure.
 - Rain intensity ramps in slowly alongside thickness, preventing sudden downpours when a cloud first spawns.
 
-## 0.5.5.7 â€“ Cloud spawn throttling (2025-11-12)
+## 0.5.5.7 Ã¢â‚¬â€œ Cloud spawn throttling (2025-11-12)
 - Added a respawn cooldown to the atmospheric cloud manager so SimpleClouds visuals are not re-created every tick when humidity rapidly crosses the storm threshold.
 - Cloud data now persists through dissipation cycles and only attempts a new spawn once the cooldown elapses, preventing runaway "cloud rave" behaviour.
 
-## 0.5.5.7 â€“ Storm factor integration (2025-11-11)
+## 0.5.5.7 Ã¢â‚¬â€œ Storm factor integration (2025-11-11)
 - Removed the legacy storm chance forecast data in favour of live storm factors so gusts, cloud spawners, and SimpleClouds hooks follow the new cyclone/sunlight-driven core.
 - Wind gust multipliers now scale smoothly with the measured storm factor instead of toggling at a fixed threshold.
 
-## 0.5.5.7 â€“ Biome-driven cloud evolution (2025-11-10)
+## 0.5.5.7 Ã¢â‚¬â€œ Biome-driven cloud evolution (2025-11-10)
 - SimpleClouds regions now sample the biome beneath them to grow in cool, humid climates and dissipate over hot or arid zones.
 - Cloud radius changes gradually each tick with matching lifetime adjustments so long-lived storm systems persist over wet areas and burn out faster in deserts.
 - Cloud radius multipliers persist through sync/serialization and stay clamped, preventing abrupt pop-in while still allowing clouds to shrink back when conditions stabilise.
 
-## 0.5.5.7 â€“ Biome-aware sunlight tuning (2025-11-09)
-- Sunlight intensity now scales with each biomeâ€™s seasonal temperature ranges, letting hotter climates receive stronger midday heating.
+## 0.5.5.7 Ã¢â‚¬â€œ Biome-aware sunlight tuning (2025-11-09)
+- Sunlight intensity now scales with each biomeÃ¢â‚¬â„¢s seasonal temperature ranges, letting hotter climates receive stronger midday heating.
 - Region states keep hourly daily curves sourced from the live controllers so commands and clients can still display day profiles.
 - Build automation skips CurseForge uploads and Discord notifications automatically when their environment tokens are absent.
 
-## 0.5.5.7 â€“ Dynamic atmosphere simulation (2025-11-08)
+## 0.5.5.7 Ã¢â‚¬â€œ Dynamic atmosphere simulation (2025-11-08)
 - Replaced daily forecast regeneration with a live atmospheric state registry that evolves continuously.
 - Added sunlight, cyclone, cloud, rain, and wind controllers so temperature, humidity, and pressure react to in-game forces.
 - Updated commands and client helpers to report the new dynamic values and removed the legacy daily forecast generator.
 
-## 0.5.5.7 â€“ Aurora & rainbow integration (2025-11-07)
+## 0.5.5.7 Ã¢â‚¬â€œ Aurora & rainbow integration (2025-11-07)
 - Added optional compatibility hooks for the Auroras and Rainbows mods.
   - Aurora brightness now scales with Serene Seasons data and is boosted in freezing biomes.
   - Rainbows rely on the Project Atmosphere / Serene Seasons Plus rain helper so they only trigger after custom storms clear.
 - Introduced guarded client mixins plus a rain-state tracker so these integrations activate only when the companion mods are installed.
 - Refined aurora and rainbow compatibility syncing.
-  - Aurora brightness now queries Project Atmosphereâ€™s live temperature data (or active temperature mods) instead of static biome values.
+  - Aurora brightness now queries Project AtmosphereÃ¢â‚¬â„¢s live temperature data (or active temperature mods) instead of static biome values.
   - Rainbows receive server-synchronised rainfall intensity from SimpleClouds spawns/despawns, allowing accurate rain stop triggers across dimensions and for joining players.
 
-## 0.5.5.4 â€“ Non-vanilla biome resolution (2025-10-24)
+## 0.5.5.4 Ã¢â‚¬â€œ Non-vanilla biome resolution (2025-10-24)
 - BiomeTempConfig now resolves un-namespaced biome keys by scanning the biome registry.
   - Non-vanilla biomes defined without a namespace (e.g., `bog`) resolve to their mod ids when uniquely found (e.g., `biomesoplenty:bog`).
   - If multiple mods provide the same path, mappings apply to all matches and an info log is emitted.
   - If no match is found, falls back to `minecraft:<path>` and logs a warning.
   - Applies to `putAllSeasons`, `putConstSeasons`, and `mirrorBiome`.
 
-## Unreleased â€” Forecast regions grid
+## Unreleased Ã¢â‚¬â€ Forecast regions grid
 - Introduced `RegionInstanceKey` grid mapping and `ForecastRegion` aggregates to replace biome-scoped forecasts.
 - Atmospheric state registry and region state now operate per forecast region while keeping legacy biome lookups mapped to their owning regions.
 - Forecast generation now groups biome samples into region forecasts before seeding atmospheric states; SimpleClouds and cyclone/cloud sampling apply updates against region states.
 - Public API now exposes region-centric forecasts via `AtmoApi#getWeatherForecast`, aligning cloud speed sync with region identifiers.
 
-## 0.5.5.2 â€” Imperial Units Mode (2025-10-19)
+## 0.5.5.2 Ã¢â‚¬â€ Imperial Units Mode (2025-10-19)
 - Added config option `display.imperialUnits` to toggle display units.
 - Overlay and commands now respect units:
-  - Temperature shows as Â°F when enabled (Â°C otherwise).
+  - Temperature shows as Ã‚Â°F when enabled (Ã‚Â°C otherwise).
   - Wind speed shows as mph when enabled (m/s otherwise).
   - Pressure shows as inHg when enabled (hPa otherwise).
-- In-game config screen adds an â€œImperial Unitsâ€ toggle under Display.
+- In-game config screen adds an Ã¢â‚¬Å“Imperial UnitsÃ¢â‚¬Â toggle under Display.
 - Regeneration safety: clearing/regenerating forecasts now pauses dependent ticks (wind physics, tornado/hurricane/snowstorm managers), and defers scheduled tornado checks until regeneration completes.
 
-## Unreleased â€” Unified wind stack
+## Unreleased Ã¢â‚¬â€ Unified wind stack
 - Rebuilt wind handling into a high/low layer model with gust-aware forecasts and runtime smoothing that mirrors the other environment modules.
 - Added tornado-aware low wind forces plus helpers to apply combined wind, gust, and suction/rotation/lift to players.
 - Wired SimpleClouds and forecast orchestration to consume the new wind API while preserving existing forecast generation inputs.
 - Ground-level wind particles near players now receive directional pushes when the airflow is unobstructed, keeping leaves and streaks aligned with live wind samples.
 - Server-side telemetry now records player weather samples, dominant chunk occupancy, forecast snapshots, cloud lifecycle events, precipitation gate decisions, and temperature anomalies for `/pa debug export`.
 
-## 0.5.4.4 â€” Added weatherdebug cloud command (2025-10-17)
+## 0.5.4.4 Ã¢â‚¬â€ Added weatherdebug cloud command (2025-10-17)
 - Added command: `/weatherdebug cloud <id>`
-  - Spawns the specified SimpleClouds cloud at the playerâ€™s position/biome.
+  - Spawns the specified SimpleClouds cloud at the playerÃ¢â‚¬â„¢s position/biome.
   - Requires permission level 2.
   - Applies current wind sample; fails gracefully if SimpleClouds is not initialized.
-## Unreleased Ã¢â‚¬â€ Cloud probe targeting
+## Unreleased ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Cloud probe targeting
 - Updated `CloudProbeItem` to prioritize clouds intersected by the forward probe ray instead of immediately reporting the cloud containing the player.
 - The probe now uses SimpleClouds' actual cloud layer height for intersection checks and only falls back to the containing cloud when no targeted cloud is found ahead.
 - Added an enchanted-glint stick presentation for the cloud probe item.
@@ -317,8 +328,4 @@ This file records functionality additions/removals made during development sessi
 - Forecast cache application now drains in client-side batches across ticks, allowing the overlay to report visible per-loop progress from the actual biome-profile apply path instead of jumping from wait to ready.
 - Added server-side login preparation stage updates around nearby-region collection and local weather seeding so the overlay advances before the forecast snapshot packet is sent.
 - Added an integrated-world loading bridge so local world startup can push forecast-design stages from the real server generation loops before the later client sync packet phase begins.
-
-
-
-
 

@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client.hurricane;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -89,6 +90,19 @@ public final class ClientHurricaneStateCache {
         return snapshots;
     }
 
+    private static List<HurricaneRenderSnapshot> projectatmosphere$getIntegratedServerSnapshots(Minecraft mc) {
+        if (!mc.hasSingleplayerServer()) {
+            return List.of();
+        }
+        var server = mc.getSingleplayerServer();
+        if (server == null) {
+            return List.of();
+        }
+        return HurricaneManager.getActiveHurricanes().stream()
+                .map(hurricane -> hurricane.createRenderSnapshot())
+                .toList();
+    }
+
     public static List<RenderableHurricane> getRenderableHurricanes(float partialTick) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || ENTRIES.isEmpty()) {
@@ -150,3 +164,7 @@ public final class ClientHurricaneStateCache {
     ) {
     }
 }
+
+
+
+

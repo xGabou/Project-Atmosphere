@@ -226,9 +226,9 @@ public final class CloudManager {
             double dz = anchor.getZ() - centerZ;
             double dist = Math.sqrt(dx * dx + dz * dz);
             if(Objects.equals(state.getRegionId(), new RegionInstanceKey(-2, -2)))
-            if (AtmoCommonConfig.DEBUG_MODE.get()) {
-                ProjectAtmosphere.LOGGER.info("CloudManager: Sampling region {}, distance to center: {}", state.getRegionId(), dist);
-            }
+//            if (AtmoCommonConfig.DEBUG_MODE.get()) {
+//                ProjectAtmosphere.LOGGER.info("CloudManager: Sampling region {}, distance to center: {}", state.getRegionId(), dist);
+//            }
             if (dist > radius+regionRadius) {
                 continue;
             }

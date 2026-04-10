@@ -13,11 +13,17 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec2;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class CycloneManager {
     private static final List<Cyclone> ACTIVE_CYCLONES = new CopyOnWriteArrayList<>();
+    private static final Map<UUID, CycloneSnapshot> ACTIVE_SNAPSHOTS = new ConcurrentHashMap<>();
     private static final long COOLDOWN_TICKS = 24000L * 2;
     private static long lastSpawnTick = -COOLDOWN_TICKS;
     private static long lastMidnightTick = -1L;
@@ -27,9 +33,17 @@ public final class CycloneManager {
 
     public static void initialize(ServerLevel level) {
         ACTIVE_CYCLONES.clear();
+        ACTIVE_SNAPSHOTS.clear();
         lastSpawnTick = level.getDayTime();
         lastMidnightTick = -1L;
         spawnInitialCyclones(level);
+    }
+
+    public static List<CycloneSnapshot> getActiveCycloneSnapshots() {
+        if (ACTIVE_SNAPSHOTS.isEmpty()) {
+            return List.of();
+        }
+        return List.copyOf(ACTIVE_SNAPSHOTS.values());
     }
 
     public static void update(ServerLevel level) {
@@ -55,6 +69,9 @@ public final class CycloneManager {
                         applyCyclone(result);
                         if (result.remove()) {
                             ACTIVE_CYCLONES.remove(cyclone);
+                            ACTIVE_SNAPSHOTS.remove(cyclone.id);
+                        } else {
+                            ACTIVE_SNAPSHOTS.put(cyclone.id, cyclone.snapshot());
                         }
                     }
             );
@@ -114,13 +131,15 @@ public final class CycloneManager {
         float pressureDrop = 5f + random.nextFloat() * 10f;
         long lifetime = 24000L + random.nextInt(24000);
 
-        ACTIVE_CYCLONES.add(new Cyclone(
+        Cyclone cyclone = new Cyclone(
                 new Vec2(state.getPosition().getX(), state.getPosition().getZ()),
                 radius,
                 intensity,
                 pressureDrop,
                 lifetime
-        ));
+        );
+        ACTIVE_CYCLONES.add(cyclone);
+        ACTIVE_SNAPSHOTS.put(cyclone.id, cyclone.snapshot());
 
         lastSpawnTick = level.getDayTime();
     }
@@ -153,6 +172,7 @@ public final class CycloneManager {
 
 
     private static final class Cyclone {
+        private final UUID id = UUID.randomUUID();
         private Vec2 center;
         private float radius;
         private float intensity;
@@ -232,6 +252,18 @@ public final class CycloneManager {
                 }
             }
             return nearest;
+        }
+
+        private CycloneSnapshot snapshot() {
+            return new CycloneSnapshot(
+                    this.id,
+                    this.center.x,
+                    this.center.y,
+                    this.radius,
+                    this.intensity,
+                    this.corePressureDrop,
+                    this.lifetimeTicks
+            );
         }
     }
 

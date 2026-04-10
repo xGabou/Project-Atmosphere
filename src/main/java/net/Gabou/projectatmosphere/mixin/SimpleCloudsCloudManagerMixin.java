@@ -26,12 +26,16 @@ public abstract class SimpleCloudsCloudManagerMixin<T extends Level> {
     @Inject(method = "getCloudTypeAtPosition", at = @At("RETURN"), cancellable = true)
     private void projectatmosphere$surfaceHurricaneType(float x, float z, CallbackInfoReturnable<Pair<CloudType, Float>> cir) {
         HurricaneSemanticSample sample = HurricaneSemantics.sampleBest(this.level, x * (double)SimpleCloudsConstants.CLOUD_SCALE, z * (double)SimpleCloudsConstants.CLOUD_SCALE);
-        if (!sample.isPresent()) {
+        CloudType hurricaneType = this.getCloudTypeForId(sample.cloudTypeId());
+        if (hurricaneType == null) {
             return;
         }
 
-        CloudType hurricaneType = this.getCloudTypeForId(sample.cloudTypeId());
-        if (hurricaneType == null) {
+        if (sample.inEye()) {
+            cir.setReturnValue(Pair.of(hurricaneType, 1.0F));
+            return;
+        }
+        if (!sample.isPresent()) {
             return;
         }
 
