@@ -1,6 +1,13 @@
 # Project Atmosphere Ã¢â‚¬â€ Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from gradle.properties at the time of change.
-## Unreleased - Native hurricane eye in Simple Clouds
+## Unreleased - Restore shared Simple Clouds rendering
+- Restored the redirected Simple Clouds compute shaders to upstream semantics so Project Atmosphere no longer injects storm-specific logic into the shared base cloud mesh and region generation passes.
+- Fixed the global cloud invisibility regression by keeping the active Simple Clouds client render path aligned with upstream shader contracts instead of a forked shader copy that had drifted from the base renderer.
+- Re-anchored hurricanes against the live Simple Clouds layer instead of a hardcoded Y=64 fallback, so they now sit roughly 200 blocks below the configured cloud height without dropping the volumetric mesh completely out of range.
+- Switched the client hurricane cache to request a full Simple Clouds renderer reload when integrated-server hurricane snapshots appear, change, or clear, so local singleplayer hurricanes can force a fresh mesh pass instead of staying hidden with only rain semantics active.
+- Simplified the tornado admin/debug command flow so `/pa spawnTornado` and `/pa spawnTornadoNoClouds` no longer sit in cloud-seeding wait loops; if cloud attachment fails, they now fall back immediately to a force-spawned standalone tornado.
+- Restored the tornado branch integration points that the hurricane branch had lost: tornado client snapshot packets are registered again, the Simple Clouds tornado renderer mixins/shaders are back, and client tornado overlays/effects now read from the client tornado list instead of the server-only list.
+- Fixed the local singleplayer hurricane render path by making `ClientHurricaneStateCache` fall back to live integrated-server hurricane snapshots whenever the synced snapshot cache is empty, which lets debug-spawned hurricanes render again in local worlds.
 - Lowered the hurricane anchor by roughly 200 blocks and expanded the outer cumulonimbus storm extent by about 5x, with a broader edge fade and larger hurricane cloud-noise scales so the storm reads as a much larger regional system instead of a compact ring high in the sky.
 - Changed the tornado admin/debug spawn commands to force-spawn a visible tornado immediately instead of timing out on cloud seeding, while still attaching to a nearby severe cloud when one is available and broadening cloud lookup to a larger severe-cloud fallback radius.
 - Moved the hurricane core-to-cumulonimbus recovery inward so the outer storm body now begins from the eyewall region instead of from far out on the core radius, and added a dedicated inner bridge envelope/noise pass to close the remaining dead ring between the eye wall and the outer storm mass.
@@ -328,4 +335,5 @@ This file records functionality additions/removals made during development sessi
 - Forecast cache application now drains in client-side batches across ticks, allowing the overlay to report visible per-loop progress from the actual biome-profile apply path instead of jumping from wait to ready.
 - Added server-side login preparation stage updates around nearby-region collection and local weather seeding so the overlay advances before the forecast snapshot packet is sent.
 - Added an integrated-world loading bridge so local world startup can push forecast-design stages from the real server generation loops before the later client sync packet phase begins.
+
 

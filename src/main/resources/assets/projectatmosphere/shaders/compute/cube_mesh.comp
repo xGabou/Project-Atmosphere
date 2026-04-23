@@ -15,10 +15,6 @@ layout(local_size_x = ${LOCAL_SIZE_X}, local_size_y = ${LOCAL_SIZE_Y}, local_siz
 
 #moj_import <simpleclouds:psrdnoise.glsl>
 
-bool projectatmosphere_insideTornado(vec3 pos, float typeIndex);
-int projectatmosphere_findHurricane(vec2 pos, float typeIndex);
-float projectatmosphere_getStormHeightSample(float y, int hurricaneIndex);
-
 struct LayerGroup {
 	int StartIndex;
 	int EndIndex;
@@ -140,35 +136,9 @@ layout(std430) readonly buffer NoiseLayers {
 layers;
 
 layout(std430) readonly buffer LayerGroupings {
-        LayerGroup data[];
+	LayerGroup data[];
 }
 layerGroupings;
-
-struct CloudTornado {
-        float typeIndex;
-        vec2 center;
-        float radius;
-        float bottom;
-        float height;
-        vec2 padding;
-};
-
-layout(std430) readonly buffer CloudTornadoes {
-        CloudTornado data[];
-}
-cloudTornadoes;
-
-struct CloudHurricane {
-        vec4 shape0;
-        vec4 shape1;
-        vec4 shape2;
-        vec4 shape3;
-};
-
-layout(std430) readonly buffer CloudHurricanes {
-        CloudHurricane data[];
-}
-cloudHurricanes;
 
 #if TYPE == 0
 uniform sampler2DArray RegionsSampler;
@@ -185,8 +155,6 @@ uniform vec3 Origin;
 uniform bool TestFacesFacingAway;
 uniform int DoNotOccludeSide = -1;
 uniform int ChunkIndex;
-uniform int TotalCloudTornadoes;
-uniform int TotalCloudHurricanes;
 
 #if FIXED_SECTION_SIZE == 1
 //Offset in number of mesh elements
@@ -266,35 +234,24 @@ bool isPosValid(float x, float y, float z, LayerGroup group, float fade)
 	return getNoiseForLayerGroup(group, x, y, z, gradient) + fade > 0.0;
 }
 
-bool isPosValid(float x, float y, float z, LayerGroup group, float fade, int hurricaneIndex)
-{
-	vec3 gradient = vec3(0.0);
-	float sampleY = projectatmosphere_getStormHeightSample(y, hurricaneIndex);
-	return getNoiseForLayerGroup(group, x, sampleY, z, gradient) + fade > 0.0;
-}
-
 bool isPosValid(float x, float y, float z, int nx, int nz)
 {
 #if TYPE == 0
-        vec2 texelCoord = gl_GlobalInvocationID.xz + RegionSampleOffset + vec2(nx, nz);
+	vec2 texelCoord = gl_GlobalInvocationID.xz + RegionSampleOffset + vec2(nx, nz);
     vec4 info = texture(RegionsSampler, vec3(texelCoord / RegionsTexSize, float(LodLevel)));
     uint regionId = uint(info.r);
     LayerGroup group = layerGroupings.data[regionId];
     float fade = -5.0 * pow(1.0 - info.g, 10.0);
-    if (TotalCloudTornadoes > 0 && projectatmosphere_insideTornado(vec3(x, y, z), info.r))
-            return false;
-    int hurricaneIndex = TotalCloudHurricanes > 0 ? projectatmosphere_findHurricane(vec2(x, z), info.r) : -1;
 #if FADE_NEAR_ORIGIN == 1
     float len = distance(vec2(x, z), Origin.xz);
-        fade = min(fade, -5.0 * (1.0 - min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0)));
+	fade = min(fade, -5.0 * (1.0 - min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0)));
 #endif
 #elif TYPE == 1
 	LayerGroup group = layerGroupings.data[0];
 	float len = distance(vec2(x, z), Origin.xz);
 	float fade = -5.0 * min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0);
-	int hurricaneIndex = -1;
 #endif
-    return isPosValid(x, y, z, group, fade, hurricaneIndex);
+    return isPosValid(x, y, z, group, fade);
 }
 
 bool shouldNotOcclude(int index)
@@ -348,16 +305,16 @@ void createFace(vec3 center, float cubeRadius, int index, float brightness)
 #endif
 }
 
-void createCube(float x, float y, float z, float cubeRadius, float brightness, float fade, LayerGroup group, int hurricaneIndex)
+void createCube(float x, float y, float z, float cubeRadius, float brightness, float fade, LayerGroup group)
 {
 	vec3 pos = vec3(x, y, z);
 	vec3 norm = normalize(pos - Origin);
 	vec3 center = pos + cubeRadius;
 	//-Y
-	if ((TestFacesFacingAway || dot(norm, vec3(0.0, -1.0, 0.0)) <= 0.0) && (!isPosValid(x, y - Scale, z, group, fade, hurricaneIndex) || shouldNotOcclude(2)))
+	if ((TestFacesFacingAway || dot(norm, vec3(0.0, -1.0, 0.0)) <= 0.0) && (!isPosValid(x, y - Scale, z, group, fade) || shouldNotOcclude(2)))
 		createFace(center, cubeRadius, 2, brightness);
 	//+Y
-	if ((TestFacesFacingAway || dot(norm, vec3(0.0, 1.0, 0.0)) <= 0.0) && (!isPosValid(x, y + Scale, z, group, fade, hurricaneIndex) || shouldNotOcclude(3)))
+	if ((TestFacesFacingAway || dot(norm, vec3(0.0, 1.0, 0.0)) <= 0.0) && (!isPosValid(x, y + Scale, z, group, fade) || shouldNotOcclude(3)))
 		createFace(center, cubeRadius, 3, brightness);
 	//-X
 	if ((TestFacesFacingAway || dot(norm, vec3(-1.0, 0.0, 0.0)) <= 0.0) && (!isPosValid(x - Scale, y, z, -1, 0) || shouldNotOcclude(0)))
@@ -411,12 +368,11 @@ void main()
     float z = id.z * Scale + RenderOffset.z;
     
 #if TYPE == 0
-	vec2 texelCoord = gl_GlobalInvocationID.xz + RegionSampleOffset;
+    vec2 texelCoord = gl_GlobalInvocationID.xz + RegionSampleOffset;
     vec4 info = texture(RegionsSampler, vec3(texelCoord / RegionsTexSize, float(LodLevel)));
     uint regionId = uint(info.r);
     LayerGroup group = layerGroupings.data[regionId];
     float fade = -5.0 * pow(1.0 - info.g, 10.0);
-    int hurricaneIndex = TotalCloudHurricanes > 0 ? projectatmosphere_findHurricane(vec2(x, z), info.r) : -1;
 #if FADE_NEAR_ORIGIN == 1
     float len = distance(vec2(x, z), Origin.xz);
 	fade = min(fade, -5.0 * (1.0 - min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0)));
@@ -425,13 +381,11 @@ void main()
 	LayerGroup group = layerGroupings.data[0];
 	float len = distance(vec2(x, z), Origin.xz);
 	float fade = -5.0 * min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0);
-	int hurricaneIndex = -1;
 #endif
 	vec3 gradient = vec3(0.0);
-	float sampleY = projectatmosphere_getStormHeightSample(y, hurricaneIndex);
-	float noise = getNoiseForLayerGroup(group, x, sampleY, z, gradient) + fade;
+	float noise = getNoiseForLayerGroup(group, x, y, z, gradient) + fade;
 	float storminess = clamp(group.Storminess + fade * 0.1, 0.0, 1.0);
-	float brightness = clamp(1.0 - storminess * (1.0 - clamp((sampleY - group.StormStart) / group.StormFadeDistance, 0.0, 1.0)), 0.0, 1.0);
+	float brightness = clamp(1.0 - storminess * (1.0 - clamp((y - group.StormStart) / group.StormFadeDistance, 0.0, 1.0)), 0.0, 1.0);
 #if STYLE == 1
 	gradient = normalize(gradient);
 	float strength = dot(gradient, SHADE_DIRECTION) * 0.5 + 0.5;
@@ -439,7 +393,7 @@ void main()
 #endif
     if (noise > 0.0)
     {
-    	createCube(x, y, z, Scale / 2.0, brightness, fade, group, hurricaneIndex);
+    	createCube(x, y, z, Scale / 2.0, brightness, fade, group);
     }
 #if TRANSPARENCY == 1
     else if (group.TransparencyFade > 0.01 && noise > -group.TransparencyFade && noise < 0.0)
@@ -453,52 +407,3 @@ void main()
     }
 #endif
 }
-
-bool projectatmosphere_insideTornado(vec3 pos, float typeIndex)
-{
-        for (int i = 0; i < TotalCloudTornadoes; i++)
-        {
-                CloudTornado tornado = cloudTornadoes.data[i];
-                if (abs(tornado.typeIndex - typeIndex) > 0.5)
-                        continue;
-                if (pos.y < tornado.bottom || pos.y > tornado.bottom + tornado.height)
-                        continue;
-                if (distance(pos.xz, tornado.center) <= tornado.radius)
-                        return true;
-        }
-        return false;
-}
-
-int projectatmosphere_findHurricane(vec2 pos, float typeIndex)
-{
-        int bestIndex = -1;
-        float bestDistSq = 3.402823466e+38;
-        for (int i = 0; i < TotalCloudHurricanes; i++)
-        {
-                CloudHurricane hurricane = cloudHurricanes.data[i];
-                if (abs(hurricane.shape0.x - typeIndex) > 0.5)
-                        continue;
-                vec2 delta = pos - hurricane.shape0.yz;
-                float radius = hurricane.shape1.y + hurricane.shape1.w;
-                float distSq = dot(delta, delta);
-                if (distSq > radius * radius)
-                        continue;
-                if (distSq < bestDistSq)
-                {
-                        bestDistSq = distSq;
-                        bestIndex = i;
-                }
-        }
-        return bestIndex;
-}
-
-float projectatmosphere_getStormHeightSample(float y, int hurricaneIndex)
-{
-        if (hurricaneIndex < 0)
-                return y;
-        return y - cloudHurricanes.data[hurricaneIndex].shape0.w;
-}
-
-
-
-

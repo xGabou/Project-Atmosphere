@@ -1,0 +1,43 @@
+package net.Gabou.projectatmosphere.network;
+
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoSnapshot;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.network.NetworkEvent;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
+
+public class SyncTornadoesPacket {
+    private final List<TornadoSnapshot> snapshots;
+
+    public SyncTornadoesPacket(List<TornadoSnapshot> snapshots) {
+        this.snapshots = List.copyOf(snapshots);
+    }
+
+    public SyncTornadoesPacket(FriendlyByteBuf buf) {
+        int count = buf.readVarInt();
+        List<TornadoSnapshot> read = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            read.add(TornadoSnapshot.read(buf));
+        }
+        this.snapshots = read;
+    }
+
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeVarInt(this.snapshots.size());
+        for (TornadoSnapshot snapshot : this.snapshots) {
+            snapshot.write(buf);
+        }
+    }
+
+    public static SyncTornadoesPacket decode(FriendlyByteBuf buf) {
+        return new SyncTornadoesPacket(buf);
+    }
+
+    public void handle(Supplier<NetworkEvent.Context> ctx) {
+        ctx.get().enqueueWork(() -> TornadoManager.applyClientSnapshots(this.snapshots));
+        ctx.get().setPacketHandled(true);
+    }
+}

@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.hurricane;
 
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
@@ -29,7 +30,9 @@ public class HurricaneInstance {
     public static final ResourceLocation HURRICANE_CLOUD_TYPE_ID =
             ResourceLocation.fromNamespaceAndPath("projectatmosphere", "hurricane");
 
-    private static final float DEFAULT_ANCHOR_Y = 64.0F;
+    private static final float DEFAULT_ANCHOR_Y = 384.0F;
+    private static final float MIN_WORLD_ANCHOR_Y = 256.0F;
+    private static final float CLOUD_LAYER_DESCENT = 200.0F;
     private static final int WIND_FIELD_INTERVAL_TICKS = 2;
     private static final int DESTRUCTION_INTERVAL_TICKS = 8;
 
@@ -46,6 +49,7 @@ public class HurricaneInstance {
     private float cycloneRadius;
     private float cycloneIntensity;
     private float destructiveStrength;
+    private float anchorY = DEFAULT_ANCHOR_Y;
     private int ageTicks;
     private long lastWindFieldTick = Long.MIN_VALUE;
     private long lastDestructionTick = Long.MIN_VALUE;
@@ -77,6 +81,17 @@ public class HurricaneInstance {
         return hurricane;
     }
 
+    public void refreshAnchorY(Level level) {
+        CloudManager<?> manager = CloudManager.get(level);
+        if (manager == null) {
+            this.anchorY = Math.max(this.anchorY, MIN_WORLD_ANCHOR_Y);
+            return;
+        }
+
+        float cloudHeight = manager.getCloudHeight();
+        this.anchorY = Math.max(MIN_WORLD_ANCHOR_Y, cloudHeight - CLOUD_LAYER_DESCENT);
+    }
+
     public void updateFromCyclone(ServerLevel level, CycloneSnapshot snapshot, WindVector ambientWind,
                                   HurricaneCategory nextCategory, float intensificationStrength) {
         this.position = new Vec3(snapshot.centerX(), level.getSeaLevel(), snapshot.centerZ());
@@ -93,6 +108,7 @@ public class HurricaneInstance {
         float boostedBase = Math.max(ambientWind.baseSpeed(), 11.0F + this.destructiveStrength * 22.0F);
         float boostedGust = Math.max(ambientWind.gustSpeed(), boostedBase + 6.0F + this.category.ordinal() * 3.0F);
         this.wind = new WindVector(boostedBase, ambientWind.angleRadians(), boostedGust);
+        this.refreshAnchorY(level);
     }
 
     public float getLifetimeSeconds() {
@@ -117,7 +133,7 @@ public class HurricaneInstance {
     }
 
     public float getAnchorY() {
-        return DEFAULT_ANCHOR_Y;
+        return this.anchorY;
     }
 
     public float getCoreRadius() {
@@ -199,6 +215,7 @@ public class HurricaneInstance {
         }
 
         this.ageTicks++;
+        this.refreshAnchorY(level);
         ServerLevel serverLevel = (ServerLevel) level;
         long gameTime = serverLevel.getGameTime();
 

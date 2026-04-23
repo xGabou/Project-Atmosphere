@@ -54,6 +54,7 @@ public class HurricaneManager {
 
     public static void spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind, HurricaneCategory category) {
         HurricaneInstance hurricane = HurricaneInstance.createDebug(pos, radius, wind, category);
+        hurricane.refreshAnchorY(level);
         DEBUG_HURRICANES.add(hurricane);
         RESERVATION_REGIONS.put(hurricane.id, HurricaneSemantics.createReservationRegion(hurricane));
         dirty = true;

@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.client.hurricane;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
 import net.minecraft.client.Minecraft;
@@ -56,8 +55,11 @@ public final class ClientHurricaneStateCache {
 
     public static List<HurricaneRenderSnapshot> getSemanticSnapshots(float partialTick) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || ENTRIES.isEmpty()) {
+        if (mc.level == null) {
             return List.of();
+        }
+        if (ENTRIES.isEmpty()) {
+            return projectatmosphere$getIntegratedServerSnapshots(mc);
         }
 
         long clientTick = mc.level.getGameTime();
@@ -105,23 +107,18 @@ public final class ClientHurricaneStateCache {
 
     public static List<RenderableHurricane> getRenderableHurricanes(float partialTick) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || ENTRIES.isEmpty()) {
+        if (mc.level == null) {
             return List.of();
         }
 
-        CloudManager<?> cloudManager = CloudManager.get(mc.level);
-        int cloudHeight = cloudManager == null ? 0 : cloudManager.getCloudHeight();
         List<HurricaneRenderSnapshot> snapshots = getSemanticSnapshots(partialTick);
         List<RenderableHurricane> renderables = new ArrayList<>(snapshots.size());
         for (HurricaneRenderSnapshot snapshot : snapshots) {
-            // Simple Clouds keeps vertical sampling in cloud-height-relative blocks, not cloud-scale units.
-            float localAnchorY = snapshot.anchorY() - (float)cloudHeight;
-
             renderables.add(new RenderableHurricane(
                     snapshot.id(),
                     snapshot.centerX() / (double)SimpleCloudsConstants.CLOUD_SCALE,
                     snapshot.centerZ() / (double)SimpleCloudsConstants.CLOUD_SCALE,
-                    localAnchorY,
+                    snapshot.anchorY(),
                     snapshot.coreRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
                     snapshot.stormExtentRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
                     snapshot.eyeRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
@@ -164,7 +161,3 @@ public final class ClientHurricaneStateCache {
     ) {
     }
 }
-
-
-
-

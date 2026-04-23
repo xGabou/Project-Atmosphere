@@ -33,6 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.Gabou.projectatmosphere.util.HurricaneUpload;
 import net.Gabou.projectatmosphere.util.RegionUpload;
 import net.Gabou.projectatmosphere.util.TornadoUpload;
+import org.apache.commons.lang3.ArrayUtils;
 
 
 import java.io.IOException;
@@ -251,6 +252,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             this.projectatmosphere$tornadoBuffer = null;
         }
         if (this.regionTextureGenerator == null || this.projectatmosphere$tornadoBuffer != null) {
+            this.projectatmosphere$bindStormBufferToMeshShader(this.projectatmosphere$tornadoBuffer, PROJECTATMOSPHERE$TORNADO_BUFFER_NAME);
             return;
         }
         if (!this.projectatmosphere$supportsTornadoBuffer()) {
@@ -260,14 +262,15 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (this.projectatmosphere$tornadoBuffer != null) {
             this.projectatmosphere$tornadoBuffer.allocateBuffer(PROJECTATMOSPHERE$MAX_TORNADOES * PROJECTATMOSPHERE$TORNADO_STRIDE);
         }
+        this.projectatmosphere$bindStormBufferToMeshShader(this.projectatmosphere$tornadoBuffer, PROJECTATMOSPHERE$TORNADO_BUFFER_NAME);
     }
-
     @Unique
     private void projectatmosphere$ensureHurricaneBuffer() {
         if (this.projectatmosphere$hurricaneBuffer != null && this.projectatmosphere$hurricaneBuffer.getId() == -1) {
             this.projectatmosphere$hurricaneBuffer = null;
         }
         if (this.regionTextureGenerator == null || this.projectatmosphere$hurricaneBuffer != null) {
+            this.projectatmosphere$bindStormBufferToMeshShader(this.projectatmosphere$hurricaneBuffer, PROJECTATMOSPHERE$HURRICANE_BUFFER_NAME);
             return;
         }
         if (!this.projectatmosphere$supportsHurricaneBuffer()) {
@@ -277,7 +280,9 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (this.projectatmosphere$hurricaneBuffer != null) {
             this.projectatmosphere$hurricaneBuffer.allocateBuffer(PROJECTATMOSPHERE$MAX_HURRICANES * PROJECTATMOSPHERE$HURRICANE_STRIDE);
         }
+        this.projectatmosphere$bindStormBufferToMeshShader(this.projectatmosphere$hurricaneBuffer, PROJECTATMOSPHERE$HURRICANE_BUFFER_NAME);
     }
+
 
     @Unique
     private List<TornadoUpload> projectatmosphere$collectTornadoUploads(float partialTick) {
@@ -352,15 +357,26 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (this.cloudGetter == null) {
             return regions;
         }
+        int rejectedRegions = 0;
         for (CloudRegion region : this.cloudGetter.getClouds()) {
             float[] upload = this.projectatmosphere$buildRegionUpload(partialTick, region);
             if (!this.projectatmosphere$isRegionValid(upload)) {
+                rejectedRegions++;
                 continue;
             }
             regions.add(new RegionUpload(region, upload));
             if (regions.size() >= MAX_CLOUD_FORMATIONS) {
                 break;
             }
+        }
+        if (PROJECTATMOSPHERE$LOGGER.isDebugEnabled()) {
+            PROJECTATMOSPHERE$LOGGER.debug(
+                    "Renderable cloud regions={} rejected={} cachedTypes={} cloudGetter={}",
+                    regions.size(),
+                    rejectedRegions,
+                    this.cachedTypes == null ? 0 : this.cachedTypes.length,
+                    this.cloudGetter
+            );
         }
         return regions;
     }
@@ -395,10 +411,23 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (type == null) {
             return -1;
         }
+        int index = ArrayUtils.indexOf(this.cachedTypes, type);
+        if (index >= 0) {
+            return index;
+        }
         for (int i = 0; i < this.cachedTypes.length; i++) {
-            if (Objects.equals(this.cachedTypes[i], type)) {
+            CloudInfo cachedType = this.cachedTypes[i];
+            if (cachedType instanceof CloudType cachedCloudType && Objects.equals(cachedCloudType.id(), type.id())) {
                 return i;
             }
+        }
+        if (PROJECTATMOSPHERE$LOGGER.isDebugEnabled()) {
+            PROJECTATMOSPHERE$LOGGER.debug(
+                    "Cloud type '{}' was not found in the cached Simple Clouds type table; cachedTypes={} getterType={}",
+                    cloudTypeId,
+                    this.cachedTypes.length,
+                    type
+            );
         }
         return -1;
     }
@@ -475,9 +504,19 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     }
 
     @Unique
+    private void projectatmosphere$bindStormBufferToMeshShader(ShaderStorageBufferObject buffer, String name) {
+        ComputeShader shader = this.projectatmosphere$getShader();
+        if (buffer == null || buffer.getId() == -1 || shader == null || !shader.isValid() || shader.getId() <= 0) {
+            return;
+        }
+        buffer.optionalBindToProgram(name, shader.getId());
+    }
+
+    @Unique
     private static Method projectatmosphere$skipSettingsMethod;
     @Unique
     private static Method projectatmosphere$heightSettingsMethod;
+
 
     @Unique
     private ComputeShader projectatmosphere$getShader() {

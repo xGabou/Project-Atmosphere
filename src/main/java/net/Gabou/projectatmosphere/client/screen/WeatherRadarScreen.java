@@ -97,7 +97,7 @@ public class WeatherRadarScreen extends Screen {
         }
 
         // Overlay: Tornadoes (purple) and Hurricanes (black)
-        for (TornadoInstance t : TornadoManager.getActiveTornadoes()) {
+        for (TornadoInstance t : TornadoManager.getClientTornadoes()) {
             float dx = (float) ((t.position.x - player.getX()) / scale);
             float dz = (float) ((t.position.z - player.getZ()) / scale);
             int r = Math.max(2, Math.round(t.radius / scale));

@@ -10,6 +10,8 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
+import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
+import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -35,15 +37,17 @@ public final class TornadoProbabilityManager {
             if (isCellOnCooldown(key, level, now)) continue;
 
             float risk = computeRisk(key, level, now);
+            int stormLevel = StormSeverityScale.resolve(level, key, now);
             float riskMin = AtmoCommonConfig.TORNADO_RISK_MIN_TO_CONSIDER.get().floatValue();
             if (risk < riskMin) continue;
-            float chance = AtmoCommonConfig.TORNADO_BASE_TRIGGER_CHANCE.get().floatValue() * risk;
+            float chance = AtmoCommonConfig.TORNADO_BASE_TRIGGER_CHANCE.get().floatValue() * risk * (0.55F + StormSeverityScale.toNormalized(stormLevel) * 0.75F);
             if (random.nextFloat() < chance) {
                 float intensity = map(risk,
                         riskMin,
                         riskMin + 4f,
                         AtmoCommonConfig.TORNADO_INTENSITY_MIN.get().floatValue(),
                         AtmoCommonConfig.TORNADO_INTENSITY_MAX.get().floatValue());
+                intensity = Math.max(intensity, 0.18F + StormSeverityScale.toNormalized(stormLevel) * 0.52F);
                 TornadoSpawner.spawn(key, level, clamp01(intensity));
                 TornadoStorageManager.setCooldown(key,
                         now + minutesToTicks(AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get()));
@@ -109,6 +113,13 @@ public final class TornadoProbabilityManager {
     }
 
     private static boolean isStormy(RegionInstanceKey key, ServerLevel level) {
+        RegionalWeatherPhase phase = ForecastOrchestrator.getWeatherPhase(level, key, level.getGameTime());
+        if (!phase.isStormCapable()) {
+            return false;
+        }
+        if (StormSeverityScale.resolve(level, key, level.getGameTime()) < 6) {
+            return false;
+        }
         ServerCloudManager manager = (ServerCloudManager) CloudManager.get(level);
         CloudGenerator generator = manager.getCloudGenerator();
         BlockPos pos = key.center();

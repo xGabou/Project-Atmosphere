@@ -31,7 +31,7 @@ public class ClientRenderHook {
         if (Minecraft.getInstance().level == null) return;
 
         ClientLevel level = Minecraft.getInstance().level;
-        List<TornadoInstance> snapshot = new ArrayList<>(TornadoManager.getActiveTornadoes());
+        List<TornadoInstance> snapshot = new ArrayList<>(TornadoManager.getClientTornadoes());
         if (snapshot.isEmpty()) return;
         PoseStack poseStack = event.getPoseStack();
         Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();

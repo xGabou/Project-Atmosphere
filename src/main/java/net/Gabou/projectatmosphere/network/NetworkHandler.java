@@ -7,7 +7,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class NetworkHandler {
-    private static final String PROTOCOL_VERSION = "4";
+    private static final String PROTOCOL_VERSION = "5";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -22,6 +22,16 @@ public class NetworkHandler {
                 .decoder(SpawnTornadoPacket::decode)
                 .encoder(SpawnTornadoPacket::encode)
                 .consumerMainThread(SpawnTornadoPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(RemoveTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(RemoveTornadoPacket::decode)
+                .encoder(RemoveTornadoPacket::encode)
+                .consumerMainThread(RemoveTornadoPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncTornadoesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncTornadoesPacket::decode)
+                .encoder(SyncTornadoesPacket::encode)
+                .consumerMainThread(SyncTornadoesPacket::handle)
                 .add();
         CHANNEL.messageBuilder(SyncWindPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SyncWindPacket::decode)

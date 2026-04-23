@@ -2,7 +2,7 @@ package net.Gabou.projectatmosphere.client;
 
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
-import net.Gabou.projectatmosphere.client.TornadoRenderHandler;
+import net.Gabou.projectatmosphere.client.TornadoClientEffects;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -62,6 +62,7 @@ public class ClientTickHandler {
         if (!ClientSyncLock.isReady()) return;
         if (mc.isPaused()) return;
         if (mc.level == null) {
+            TornadoManager.clearClientTornadoes();
             return;
         }
 
@@ -88,7 +89,7 @@ public class ClientTickHandler {
             culledRegionIds.addAll(nextCulled);
         }
 
-        Set<TornadoInstance> current = new HashSet<>(TornadoManager.getActiveTornadoes());
+        Set<TornadoInstance> current = new HashSet<>(TornadoManager.getClientTornadoes());
         for (TornadoInstance tornado : current) {
             float baseVol = 0.35f + 0.45f * 0.75f;
             TornadoAudioClient.ensure(tornado, baseVol, 140f);
@@ -102,8 +103,8 @@ public class ClientTickHandler {
         prevTornadoes.addAll(current);
 
         if (mc.level.getGameTime() % 2 == 0) {
-            for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
-                TornadoRenderHandler.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
+            for (TornadoInstance tornado : TornadoManager.getClientTornadoes()) {
+                TornadoClientEffects.spawnDebrisParticles(tornado, (ClientLevel) mc.level);
             }
         }
         if (tickCounter % 40 == 0) {
