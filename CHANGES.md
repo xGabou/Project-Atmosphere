@@ -1,5 +1,8 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - IDE workspace cleanup
+- Stopped tracking `.idea/workspace.xml` in Git so local IntelliJ workspace state stays local instead of showing up as a repo change.
+
 ## Unreleased - Hurricane custom volumetric cloud rewrite
 - Abandoned the hurricane fake `CloudRegion` ring path and restored a dedicated one-object hurricane render path, so hurricanes no longer depend on injecting several regular Simple Clouds formations into the world cloud list.
 - Added an explicit `HurricaneCloudVolume` representation for the custom hurricane cloud body and re-enabled the dedicated pipeline mixins that render hurricanes as bounded world-space volumetric formations.
