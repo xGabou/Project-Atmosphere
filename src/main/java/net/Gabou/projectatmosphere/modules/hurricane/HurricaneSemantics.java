@@ -58,7 +58,7 @@ public final class HurricaneSemantics {
         }
         for (HurricaneRenderSnapshot snapshot : ClientHurricaneStateCache.getSemanticSnapshots()) {
             if (intersectsReservation(snapshot, worldX, worldZ, 0.0D)) {
-                return createReservationRegion(snapshot);
+                return ClientHurricaneStateCache.getReservationRegion(snapshot);
             }
         }
         return null;
@@ -108,6 +108,13 @@ public final class HurricaneSemantics {
     public static void updateReservationRegion(CloudRegion region, HurricaneInstance hurricane) {
         region.moveToWorldPos((float)hurricane.position.x, (float)hurricane.position.z);
         region.setWorldRadius(hurricane.getStormExtentRadius() + SimpleCloudsConstants.MIN_SPAWN_DIST_BETWEEN_REGIONS);
+        region.setStretchFactor(1.0F);
+        region.setRotation(0.0F);
+    }
+
+    public static void updateReservationRegion(CloudRegion region, HurricaneRenderSnapshot hurricane) {
+        region.moveToWorldPos((float)hurricane.centerX(), (float)hurricane.centerZ());
+        region.setWorldRadius(hurricane.stormExtentRadius() + SimpleCloudsConstants.MIN_SPAWN_DIST_BETWEEN_REGIONS);
         region.setStretchFactor(1.0F);
         region.setRotation(0.0F);
     }

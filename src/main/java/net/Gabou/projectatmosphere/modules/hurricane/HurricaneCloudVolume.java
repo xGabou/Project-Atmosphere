@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.hurricane;
 
+import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache.RenderableHurricane;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
@@ -70,6 +71,42 @@ public record HurricaneCloudVolume(
                 hurricane.getVisualSpin(partialTick),
                 Mth.clamp(hurricane.getRenderIntensity(partialTick), 0.0F, 1.0F),
                 hurricane.getVisualSeed(),
+                renderPos,
+                scale
+        );
+    }
+
+    public static HurricaneCloudVolume from(RenderableHurricane hurricane, float partialTick) {
+        float scale = SimpleCloudsConstants.CLOUD_SCALE;
+        Vec3 renderPos = new Vec3(hurricane.centerX() * scale, hurricane.anchorY(), hurricane.centerZ() * scale);
+        float intensity = Mth.clamp(hurricane.intensity(), 0.0F, 1.0F);
+        float seed = Mth.clamp(hurricane.seed(), 0.0F, 1.0F);
+        float volumeHeight = Math.max(220.0F / scale, hurricane.bandWidth() * 0.55F);
+        return new HurricaneCloudVolume(
+                hurricane.id(),
+                (float) hurricane.centerX(),
+                (float) hurricane.centerZ(),
+                0.0F,
+                volumeHeight,
+                hurricane.eyeRadius(),
+                hurricane.eyeRadius() + hurricane.bandWidth() * 0.18F,
+                0.94F + intensity * 0.10F,
+                Math.max(hurricane.bandWidth() * 0.30F, 0.05F),
+                hurricane.coreRadius(),
+                hurricane.stormExtentRadius(),
+                0.38F,
+                0.82F,
+                0.28F,
+                0.96F,
+                hurricane.transitionStart(),
+                hurricane.transitionEnd(),
+                hurricane.bandWidth(),
+                Mth.clamp(intensity * 0.85F, 0.0F, 1.0F),
+                hurricane.bandCount(),
+                Mth.clamp(intensity * 0.80F + seed * 0.10F, 0.0F, 1.0F),
+                hurricane.rotationPhase(),
+                intensity,
+                seed,
                 renderPos,
                 scale
         );

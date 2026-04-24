@@ -1,5 +1,9 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Hurricane reservation cache fix
+- Cached client-side hurricane reservation `CloudRegion` objects instead of recreating them on every lookup, which should cut the runaway allocation pressure that was showing up after the tornado-to-hurricane merge.
+- Moved the client hurricane render hooks over to the cached snapshot path so the renderer stops walking the live hurricane manager state every frame.
+
 ## Unreleased - IDE workspace cleanup
 - Stopped tracking `.idea/workspace.xml` in Git so local IntelliJ workspace state stays local instead of showing up as a repo change.
 

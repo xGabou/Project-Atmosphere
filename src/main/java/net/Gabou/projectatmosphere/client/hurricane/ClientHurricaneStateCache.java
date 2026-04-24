@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.client.hurricane;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneSemantics;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
 import net.minecraft.client.Minecraft;
@@ -17,6 +19,7 @@ import java.util.UUID;
 public final class ClientHurricaneStateCache {
     private static final int DEFAULT_BLEND_TICKS = 10;
     private static final Map<UUID, Entry> ENTRIES = new LinkedHashMap<>();
+    private static final Map<UUID, CloudRegion> RESERVATION_REGIONS = new LinkedHashMap<>();
 
     private ClientHurricaneStateCache() {
     }
@@ -26,6 +29,7 @@ public final class ClientHurricaneStateCache {
         long clientTick = mc.level != null ? mc.level.getGameTime() : 0L;
 
         Map<UUID, Entry> next = new LinkedHashMap<>();
+        Map<UUID, CloudRegion> nextReservations = new LinkedHashMap<>();
         for (HurricaneRenderSnapshot snapshot : snapshots) {
             Entry previous = ENTRIES.get(snapshot.id());
             if (previous == null) {
@@ -33,10 +37,13 @@ public final class ClientHurricaneStateCache {
             } else {
                 next.put(snapshot.id(), new Entry(previous.current, snapshot, clientTick));
             }
+            nextReservations.put(snapshot.id(), getReservationRegion(snapshot));
         }
 
         ENTRIES.clear();
         ENTRIES.putAll(next);
+        RESERVATION_REGIONS.clear();
+        RESERVATION_REGIONS.putAll(nextReservations);
     }
 
     public static void tick(ClientLevel level) {
@@ -47,6 +54,7 @@ public final class ClientHurricaneStateCache {
 
     public static void clear() {
         ENTRIES.clear();
+        RESERVATION_REGIONS.clear();
     }
 
     public static List<HurricaneRenderSnapshot> getSemanticSnapshots() {
@@ -92,6 +100,28 @@ public final class ClientHurricaneStateCache {
         return snapshots;
     }
 
+    public static boolean hasHurricanes() {
+        if (!ENTRIES.isEmpty()) {
+            return true;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || !mc.hasSingleplayerServer()) {
+            return false;
+        }
+        return !HurricaneManager.getActiveHurricanes().isEmpty();
+    }
+
+    public static CloudRegion getReservationRegion(HurricaneRenderSnapshot snapshot) {
+        CloudRegion region = RESERVATION_REGIONS.get(snapshot.id());
+        if (region == null) {
+            region = HurricaneSemantics.createReservationRegion(snapshot);
+            RESERVATION_REGIONS.put(snapshot.id(), region);
+        } else {
+            HurricaneSemantics.updateReservationRegion(region, snapshot);
+        }
+        return region;
+    }
+
     private static List<HurricaneRenderSnapshot> projectatmosphere$getIntegratedServerSnapshots(Minecraft mc) {
         if (!mc.hasSingleplayerServer()) {
             return List.of();
@@ -131,7 +161,9 @@ public final class ClientHurricaneStateCache {
                     snapshot.transitionStart() / (float)SimpleCloudsConstants.CLOUD_SCALE,
                     snapshot.transitionEnd() / (float)SimpleCloudsConstants.CLOUD_SCALE,
                     snapshot.cloudTypeId(),
-                    snapshot.ageTicks()
+                    snapshot.ageTicks(),
+                    Mth.clamp((snapshot.bandCount() - 1.5F) / 4.5F, 0.0F, 1.0F),
+                    ((snapshot.id().hashCode() & 0x7fffffff) % 10000) / 10000.0F
             ));
         }
         return renderables;
@@ -157,7 +189,9 @@ public final class ClientHurricaneStateCache {
             float transitionStart,
             float transitionEnd,
             ResourceLocation cloudTypeId,
-            int ageTicks
+            int ageTicks,
+            float intensity,
+            float seed
     ) {
     }
 }

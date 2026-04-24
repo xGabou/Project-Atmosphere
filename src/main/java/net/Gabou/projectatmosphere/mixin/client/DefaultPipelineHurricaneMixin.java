@@ -3,8 +3,8 @@ package net.Gabou.projectatmosphere.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.client.renderer.pipeline.DefaultPipeline;
+import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsHurricaneRenderer;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -28,7 +28,7 @@ public abstract class DefaultPipelineHurricaneMixin {
                                                          double camX, double camY, double camZ, Frustum frustum,
                                                          CallbackInfo ci) {
         ClientLevel level = mc.level;
-        if (level == null || HurricaneManager.getClientHurricanes().isEmpty()) {
+        if (level == null || !ClientHurricaneStateCache.hasHurricanes()) {
             return;
         }
 
@@ -54,7 +54,7 @@ public abstract class DefaultPipelineHurricaneMixin {
                                                                double camX, double camY, double camZ, Frustum frustum,
                                                                CallbackInfo ci) {
         ClientLevel level = mc.level;
-        if (level == null || HurricaneManager.getClientHurricanes().isEmpty()) {
+        if (level == null || !ClientHurricaneStateCache.hasHurricanes()) {
             return;
         }
 

@@ -12,9 +12,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.nonamecrackers2.simpleclouds.client.framebuffer.WeightedBlendingTarget;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
+import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCloudVolume;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -61,7 +60,7 @@ public final class SimpleCloudsHurricaneRenderer {
         this.preparedPartialTick = partialTick;
         this.preparedHurricanes.clear();
 
-        for (HurricaneInstance hurricane : HurricaneManager.getClientHurricanes()) {
+        for (ClientHurricaneStateCache.RenderableHurricane hurricane : ClientHurricaneStateCache.getRenderableHurricanes(partialTick)) {
             if (this.preparedHurricanes.size() >= MAX_STORMS) {
                 break;
             }
