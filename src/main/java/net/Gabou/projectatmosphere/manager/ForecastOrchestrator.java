@@ -23,9 +23,7 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneState;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
