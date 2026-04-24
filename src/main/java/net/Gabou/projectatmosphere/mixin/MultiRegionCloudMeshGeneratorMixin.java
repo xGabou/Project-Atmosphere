@@ -8,14 +8,17 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.CloudInfo;
 import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudGetter;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import dev.nonamecrackers2.simpleclouds.common.noise.NoiseSettings;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.util.Mth;
+import net.minecraft.client.renderer.culling.Frustum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.joml.Matrix2f;
@@ -57,6 +60,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     @Shadow protected ComputeShader regionTextureGenerator;
     @Shadow protected CloudGetter cloudGetter;
     @Shadow protected CloudInfo[] cachedTypes;
+    @Shadow private int currentCloudFormationCount;
 
     @Unique
     private static final int PROJECTATMOSPHERE$MAX_TORNADOES = Math.max(1, Integer.getInteger("projectatmosphere.simpleclouds.maxTornadoes", 64));
@@ -80,6 +84,17 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     private void projectatmosphere$uploadNativeStormData(float partialTick, CallbackInfo ci) {
         this.projectatmosphere$uploadTornadoData(partialTick);
         this.projectatmosphere$uploadHurricaneData(partialTick);
+        int cloudRegions = this.cloudGetter == null ? 0 : this.cloudGetter.getClouds().size();
+        int filteredRegions = Math.max(0, cloudRegions - (this.currentCloudFormationCount));
+        int uploadedRegions = Math.min(MAX_CLOUD_FORMATIONS, this.currentCloudFormationCount);
+        SimpleCloudsRenderDiagnostics.logRegionUpload(
+                cloudRegions,
+                filteredRegions,
+                uploadedRegions,
+                this.cachedTypes == null ? 0 : this.cachedTypes.length,
+                this.regionTextureGenerator == null ? -1 : this.regionTextureGenerator.getId(),
+                this.regionTextureGenerator == null ? "null" : this.regionTextureGenerator.getName()
+        );
     }
 
     @Redirect(
@@ -94,7 +109,16 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (loc != null && "simpleclouds".equals(loc.getNamespace()) && "cloud_regions".equals(loc.getPath())) {
             shaderLoc = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_regions");
         }
-        return ComputeShader.loadShader(shaderLoc, provider, localX, localY, localZ, parameters);
+        ComputeShader shader = ComputeShader.loadShader(shaderLoc, provider, localX, localY, localZ, parameters);
+        SimpleCloudsRenderDiagnostics.logShaderLoad(
+                "cloud_regions",
+                loc,
+                shaderLoc,
+                shader == null ? "null" : shader.getName(),
+                shader == null ? -1 : shader.getId(),
+                shader != null && shader.isValid()
+        );
+        return shader;
     }
 
     @Inject(method = "determineChunkGenSettings", at = @At("HEAD"), cancellable = true)
@@ -158,6 +182,27 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         }
     }
 
+    @Inject(method = "determineChunkGenSettings", at = @At("RETURN"))
+    private void projectatmosphere$logChunkGenDecision(float minX, float minZ, float maxX, float maxZ, CallbackInfoReturnable cir) {
+        if (this.cloudGetter == null) {
+            return;
+        }
+
+        List<String> cornerSamples = new ArrayList<>();
+        float[][] positions = new float[][]{{minX, minZ}, {minX, maxZ}, {maxX, minZ}, {maxX, maxZ}};
+        for (float[] pos : positions) {
+            cornerSamples.add(this.projectatmosphere$describeCloudSample(pos[0], pos[1]));
+        }
+        SimpleCloudsRenderDiagnostics.logChunkGenDecision(
+                minX,
+                minZ,
+                maxX,
+                maxZ,
+                cornerSamples,
+                String.valueOf(cir.getReturnValue())
+        );
+    }
+
     @Inject(method = "close", at = @At("HEAD"))
     private void projectatmosphere$resetStormBuffers(CallbackInfo ci) {
         this.projectatmosphere$tornadoBuffer = null;
@@ -168,6 +213,25 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         this.projectatmosphere$hasHurricaneBlock = false;
         this.projectatmosphere$lastTornadoShaderId = -1;
         this.projectatmosphere$lastHurricaneShaderId = -1;
+    }
+
+    @Inject(method = "prepareMeshGen", at = @At("RETURN"))
+    private void projectatmosphere$logPrepareMeshGen(double originX, double originY, double originZ, float meshGenOffsetX, float meshGenOffsetZ, Frustum frustum, int genInterval, float partialTick, org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Integer> cir) {
+        CloudMeshGeneratorDiagnosticsAccessor accessor = (CloudMeshGeneratorDiagnosticsAccessor)(Object)this;
+        int queuedTasks = accessor.projectatmosphere$getChunkGenTasks() == null ? 0 : accessor.projectatmosphere$getChunkGenTasks().size();
+        int chunkCount = accessor.projectatmosphere$getChunks() == null ? 0 : accessor.projectatmosphere$getChunks().size();
+        SimpleCloudsRenderDiagnostics.logPrepareMeshGen(
+                queuedTasks,
+                chunkCount,
+                cir.getReturnValue() == null ? 0 : cir.getReturnValue(),
+                genInterval,
+                originX,
+                originY,
+                originZ,
+                meshGenOffsetX,
+                meshGenOffsetZ,
+                frustum != null
+        );
     }
 
     @Unique
@@ -521,6 +585,46 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     @Unique
     private ComputeShader projectatmosphere$getShader() {
         return ((CloudMeshGeneratorAccessor)(Object)this).projectatmosphere$getShader();
+    }
+
+    @Unique
+    private int projectatmosphere$countElements(boolean transparent) {
+        CloudMeshGeneratorDiagnosticsAccessor accessor = (CloudMeshGeneratorDiagnosticsAccessor)(Object)this;
+        if (accessor.projectatmosphere$getChunks() == null) {
+            return 0;
+        }
+
+        int total = 0;
+        for (dev.nonamecrackers2.simpleclouds.client.mesh.chunk.MeshChunk chunk : accessor.projectatmosphere$getChunks()) {
+            if (transparent) {
+                total += chunk.getTransparentBuffers().map(dev.nonamecrackers2.simpleclouds.client.mesh.chunk.MeshChunk.BufferSet::getElementCount).orElse(0);
+            } else {
+                total += chunk.getOpaqueBuffers().getElementCount();
+            }
+        }
+        return total;
+    }
+
+    @Unique
+    private String projectatmosphere$describeCloudSample(float x, float z) {
+        var typeAt = this.cloudGetter.getCloudTypeAtPosition(x, z);
+        CloudType type = typeAt.getLeft();
+        float fade = typeAt.getRight();
+        float coverage = 1.0F - fade;
+        NoiseSettings noise = type != null ? type.noiseConfig() : null;
+        return String.format(
+                java.util.Locale.ROOT,
+                "(%.1f, %.1f)->type=%s coverage=%.3f fade=%.3f weather=%s stormStart=%.3f noiseStart=%s noiseEnd=%s",
+                x,
+                z,
+                type != null ? type.id() : "null",
+                coverage,
+                fade,
+                type != null ? type.weatherType() : "null",
+                type != null ? type.stormStart() : Float.NaN,
+                noise != null ? Integer.toString(noise.getStartHeight()) : "null",
+                noise != null ? Integer.toString(noise.getEndHeight()) : "null"
+        );
     }
 
     @Unique

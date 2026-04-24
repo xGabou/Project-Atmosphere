@@ -1,9 +1,12 @@
 package net.Gabou.projectatmosphere.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.client.renderer.pipeline.DefaultPipeline;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsTornadoRenderer;
+import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
+import net.Gabou.projectatmosphere.mixin.CloudMeshGeneratorDiagnosticsAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -15,6 +18,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = DefaultPipeline.class, remap = false)
 public abstract class DefaultPipelineTornadoMixin {
+    @Inject(method = "afterSky", at = @At("HEAD"))
+    private void projectatmosphere$logDefaultPipelineEntry(Minecraft mc, SimpleCloudsRenderer renderer,
+                                                          PoseStack stack, Matrix4f projMat, float partialTick,
+                                                          double camX, double camY, double camZ, Frustum frustum,
+                                                          CallbackInfo ci) {
+        CloudMeshGenerator generator = renderer.getMeshGenerator();
+        CloudMeshGeneratorDiagnosticsAccessor accessor = (CloudMeshGeneratorDiagnosticsAccessor)(Object)generator;
+        SimpleCloudsRenderDiagnostics.logPipelineStage(
+                "default",
+                "afterSky",
+                accessor.projectatmosphere$getChunks() == null ? 0 : accessor.projectatmosphere$getChunks().size(),
+                accessor.projectatmosphere$getChunkGenTasks() == null ? 0 : accessor.projectatmosphere$getChunkGenTasks().size(),
+                accessor.projectatmosphere$getCompletedGenTasks() == null ? 0 : accessor.projectatmosphere$getCompletedGenTasks().size(),
+                generator.canRender(),
+                generator.transparencyEnabled(),
+                accessor.projectatmosphere$getMeshGenStatus()
+        );
+    }
+
     @Inject(
             method = "afterSky",
             at = @At(

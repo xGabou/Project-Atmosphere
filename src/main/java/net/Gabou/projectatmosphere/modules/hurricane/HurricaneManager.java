@@ -86,6 +86,10 @@ public class HurricaneManager {
         return List.copyOf(projectatmosphere$getAllHurricanes());
     }
 
+    public static List<HurricaneInstance> getClientHurricanes() {
+        return getActiveHurricanes();
+    }
+
     public static void clearHurricanes() {
         LINKED_HURRICANES.clear();
         DEBUG_HURRICANES.clear();

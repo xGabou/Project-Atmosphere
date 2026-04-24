@@ -7,11 +7,21 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.List;
+import java.util.Queue;
 
 @Mixin(value = CloudMeshGenerator.class, remap = false)
 public interface CloudMeshGeneratorDiagnosticsAccessor {
     @Accessor("chunks")
     List<MeshChunk> projectatmosphere$getChunks();
+
+    @Accessor("completedGenTasks")
+    List<?> projectatmosphere$getCompletedGenTasks();
+
+    @Accessor("chunkGenTasks")
+    Queue<?> projectatmosphere$getChunkGenTasks();
+
+    @Accessor("tasksPerTick")
+    int projectatmosphere$getTasksPerTick();
 
     @Accessor("opaqueBufferSize")
     int projectatmosphere$getOpaqueBufferSize();

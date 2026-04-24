@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
+import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -109,6 +110,11 @@ public class ClientTickHandler {
         }
         if (tickCounter % 40 == 0) {
             if (mc.player != null) {
+                if (mc.level != null) {
+                    CloudManager<?> manager = CloudManager.get(mc.level);
+                    SimpleCloudsRenderDiagnostics.logPlayerSample(manager, mc.player.getX(), mc.player.getZ());
+                }
+
                 // snapshot
                 BlockPos pos = mc.player.blockPosition();
                 long gameTime = mc.level.getGameTime();

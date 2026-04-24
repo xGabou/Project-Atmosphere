@@ -6,34 +6,34 @@
   "storm_fade_distance": 48.0,
   "noise_settings": [
     {
-      "height": 72.0,
+      "height": 80.0,
       "height_offset": 0.0,
-      "fade_distance": 16.0,
-      "value_offset": 0.10,
-      "value_scale": 0.68,
-      "scale_x": 220.0,
-      "scale_y": 92.0,
-      "scale_z": 220.0
+      "fade_distance": 12.0,
+      "value_offset": 1.2,
+      "value_scale": 1.0,
+      "scale_x": 200.0,
+      "scale_y": 200.0,
+      "scale_z": 200.0
     },
     {
-      "height": 56.0,
-      "height_offset": 34.0,
-      "fade_distance": 14.0,
-      "value_offset": 0.18,
-      "value_scale": 0.52,
+      "height": 64.0,
+      "height_offset": 48.0,
+      "fade_distance": 10.0,
+      "value_offset": 0.6,
+      "value_scale": 0.8,
       "scale_x": 150.0,
-      "scale_y": 70.0,
+      "scale_y": 150.0,
       "scale_z": 150.0
     },
     {
-      "height": 40.0,
-      "height_offset": 82.0,
-      "fade_distance": 10.0,
-      "value_offset": 0.04,
-      "value_scale": 0.34,
-      "scale_x": 92.0,
-      "scale_y": 48.0,
-      "scale_z": 92.0
+      "height": 48.0,
+      "height_offset": 96.0,
+      "fade_distance": 8.0,
+      "value_offset": 0.2,
+      "value_scale": 0.5,
+      "scale_x": 100.0,
+      "scale_y": 100.0,
+      "scale_z": 100.0
     }
   ]
 }

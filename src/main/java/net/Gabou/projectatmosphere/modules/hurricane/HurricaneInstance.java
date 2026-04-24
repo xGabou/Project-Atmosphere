@@ -115,6 +115,10 @@ public class HurricaneInstance {
         return this.ageTicks / 20.0F;
     }
 
+    public UUID getId() {
+        return this.id;
+    }
+
     public int getAgeTicks() {
         return this.ageTicks;
     }
@@ -185,6 +189,30 @@ public class HurricaneInstance {
 
     public float getRotationPhase() {
         return this.ageTicks * this.getRotationSpeed();
+    }
+
+    public Vec3 getRenderPosition(float partialTick) {
+        return this.position;
+    }
+
+    public HurricaneRenderDescriptor getRenderDescriptor(float partialTick) {
+        return HurricaneRenderDescriptor.create(
+                Math.max(this.radius, 1.0F),
+                this.getRenderIntensity(partialTick),
+                this.category
+        );
+    }
+
+    public float getRenderIntensity(float partialTick) {
+        return Mth.clamp(this.destructiveStrength, 0.0F, 1.0F);
+    }
+
+    public float getVisualSpin(float partialTick) {
+        return (this.ageTicks + partialTick) * this.getRotationSpeed();
+    }
+
+    public float getVisualSeed() {
+        return (Math.abs(this.id.hashCode()) % 10000) / 10000.0F;
     }
 
     public HurricaneRenderSnapshot createRenderSnapshot() {

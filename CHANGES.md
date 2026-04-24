@@ -1,11 +1,15 @@
 # Project Atmosphere Ã¢â‚¬â€ Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from gradle.properties at the time of change.
-## Unreleased - Restore shared Simple Clouds rendering
-- Restored the redirected Simple Clouds compute shaders to upstream semantics so Project Atmosphere no longer injects storm-specific logic into the shared base cloud mesh and region generation passes.
-- Fixed the global cloud invisibility regression by keeping the active Simple Clouds client render path aligned with upstream shader contracts instead of a forked shader copy that had drifted from the base renderer.
+## Unreleased - Distant Horizons Simple Clouds compatibility
+- Added a DH-aware fallback that forces Simple Clouds onto its `DhSupportPipeline` when Distant Horizons is present, so the shared cloud renderer stays on the post-DH frame path instead of relying on the default after-sky stage.
+- Added DH-pipeline diagnostics so the next client run can prove whether the DH cloud pass is reached, how many cloud elements it renders, and whether the geometry is being dropped before or after DH composition.
+## Unreleased - Restore ordinary Simple Clouds cloud density
+- Restored the working base Simple Clouds cloud profiles for `altocumulus`, `altostratus`, `cumulus_congestus`, `cumulus_humilis`, `cumulus_mediocris`, `custom_cumulonimbus`, and `stratocumulus_opacus` so the shared mesh generator once again gets the same density inputs as the last known good revision.
+- Restored the `pattern` cloud type and spawn entry, and returned the ordinary cloud library / weather classification tables to the last known good selection semantics.
 - Re-anchored hurricanes against the live Simple Clouds layer instead of a hardcoded Y=64 fallback, so they now sit roughly 200 blocks below the configured cloud height without dropping the volumetric mesh completely out of range.
 - Switched the client hurricane cache to request a full Simple Clouds renderer reload when integrated-server hurricane snapshots appear, change, or clear, so local singleplayer hurricanes can force a fresh mesh pass instead of staying hidden with only rain semantics active.
 - Simplified the tornado admin/debug command flow so `/pa spawnTornado` and `/pa spawnTornadoNoClouds` no longer sit in cloud-seeding wait loops; if cloud attachment fails, they now fall back immediately to a force-spawned standalone tornado.
+- Re-synced `TornadoCommand` and `TornadoManager` to `Dynamic-Forge-1.20.1-Tornado` so the tornado spawn path matches the Tornado branch behavior instead of the newer hurricane-branch force-spawn flow.
 - Restored the tornado branch integration points that the hurricane branch had lost: tornado client snapshot packets are registered again, the Simple Clouds tornado renderer mixins/shaders are back, and client tornado overlays/effects now read from the client tornado list instead of the server-only list.
 - Fixed the local singleplayer hurricane render path by making `ClientHurricaneStateCache` fall back to live integrated-server hurricane snapshots whenever the synced snapshot cache is empty, which lets debug-spawned hurricanes render again in local worlds.
 - Lowered the hurricane anchor by roughly 200 blocks and expanded the outer cumulonimbus storm extent by about 5x, with a broader edge fade and larger hurricane cloud-noise scales so the storm reads as a much larger regional system instead of a compact ring high in the sky.
@@ -39,6 +43,8 @@ This file records functionality additions/removals made during development sessi
 - Added a dedicated simpleclouds:hurricane cloud type for hurricane noise/lighting identity instead of reusing the old custom_cumulonimbus shortcut.
 - Removed the fake hurricane render hook/classes and stopped /spawnHurricane from spawning standalone Simple Clouds cumulonimbus regions outside the native hurricane system.
 - Forced Simple Clouds mesh and region compute shaders to load Project Atmosphere-owned shader resources directly, so the hurricane/tornado SSBO extensions no longer depend on cross-mod asset override order at runtime.
+- Added gated Simple Clouds runtime diagnostics for the shared client pipeline, including player cloud sampling, selected cloud type/profile logging, mesh-region upload counts, chunk-generation decision logs, mesh finalize counts, and per-pass draw counters so a client run can prove whether the failure is in the inputs, the compute path, or the draw path.
+- Relaxed the diagnostics gate so the shared Simple Clouds probes now emit a one-time runtime proof line by default, instead of staying silent unless `-Dprojectatmosphere.simpleclouds.debugRender=true` is present.
 ## Unreleased - Gradle sync fix
 - Removed the duplicate mid-script `import groovy.json.JsonOutput` from `build.gradle`, which could stop the Gradle script from compiling during IDE sync.
 - Replaced legacy archive/version references with Gradle 8-safe values for the jar manifest plus the Modrinth and CurseForge artifact paths.
@@ -337,3 +343,11 @@ This file records functionality additions/removals made during development sessi
 - Added an integrated-world loading bridge so local world startup can push forecast-design stages from the real server generation loops before the later client sync packet phase begins.
 
 
+# 2026-04-23
+
+- Added shared Simple Clouds runtime diagnostics for the client mesh generator base class and both render pipeline branches.
+- Split the pass-summary logger state so an early fallback or finalize event cannot suppress draw-pass evidence.
+- Added pipeline-entry logs so we can prove whether the active path is `DefaultPipeline` or `ShaderSupportPipeline` at runtime.
+- No behavioral render change was made in this step; this is investigation instrumentation to isolate the remaining cloud visibility regression.
+- Restored the Tornado-branch hurricane render stack: `HurricaneShaders`, `SimpleCloudsHurricaneRenderer`, the hurricane mixin hooks, and the `hurricane_*` shader assets.
+- Added compatibility accessors on `HurricaneInstance` and `HurricaneManager` so the restored branch renderer can consume the current hurricane state model without changing the existing sync path.

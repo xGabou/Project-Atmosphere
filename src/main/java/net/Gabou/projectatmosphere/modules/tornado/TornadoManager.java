@@ -87,28 +87,13 @@ public class TornadoManager {
         return spawnServerInternal(level, pos, radius, wind, stormLevel, null, false);
     }
 
-    public static boolean forceSpawnServerWithoutCloud(ServerLevel level, Vec3 pos, float radius, WindVector wind) {
-        int stormLevel = deriveStormLevel(level, null, BlockPos.containing(pos));
-        return forceSpawnServerWithoutCloud(level, pos, radius, wind, stormLevel);
-    }
-
-    public static boolean forceSpawnServerWithoutCloud(ServerLevel level, Vec3 pos, float radius, WindVector wind, int stormLevel) {
-        return spawnServerInternal(level, pos, radius, wind, stormLevel, null, false, true);
-    }
-
     private static boolean spawnServerInternal(ServerLevel level, Vec3 pos, float radius, WindVector wind,
                                                int stormLevel, @Nullable CloudRegion cloud,
                                                boolean requiresCloudAttachment) {
-        return spawnServerInternal(level, pos, radius, wind, stormLevel, cloud, requiresCloudAttachment, false);
-    }
-
-    private static boolean spawnServerInternal(ServerLevel level, Vec3 pos, float radius, WindVector wind,
-                                               int stormLevel, @Nullable CloudRegion cloud,
-                                               boolean requiresCloudAttachment, boolean bypassGuards) {
-        if (!bypassGuards && !AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
             return false;
         }
-        if (!bypassGuards && StormShieldManager.isProtected(level, pos)) {
+        if (StormShieldManager.isProtected(level, pos)) {
             return false;
         }
 

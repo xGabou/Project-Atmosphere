@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -25,6 +26,9 @@ public class TornadoCommand {
     private static final String PROJECTATMOSPHERE$CUMULONIMBUS_ID = "simpleclouds:cumulonimbus";
     private static final int PROJECTATMOSPHERE$SEARCH_RADIUS = 10;
     private static final float PROJECTATMOSPHERE$DEFAULT_RADIUS = 10.0F;
+    private static final int PROJECTATMOSPHERE$SPAWN_DELAY_TICKS = 500;
+    private static final int PROJECTATMOSPHERE$AWAIT_INTERVAL = 100;
+    private static final int PROJECTATMOSPHERE$AWAIT_POLLS = 40;
     private static final double PROJECTATMOSPHERE$DEFAULT_REMOVE_RADIUS = 256.0D;
 
     public static void appendTo(LiteralArgumentBuilder<CommandSourceStack> root) {
@@ -47,7 +51,7 @@ public class TornadoCommand {
                                     (float) Math.toRadians(sample.directionDeg())
                             );
 
-                    if (TornadoManager.forceSpawnServerWithoutCloud(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
+                    if (TornadoManager.spawnServerWithoutCloud(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
                         ctx.getSource().sendSuccess(
                                 () -> Component.literal("Standalone tornado spawned without requiring clouds."),
                                 true
@@ -55,7 +59,7 @@ public class TornadoCommand {
                         return 1;
                     }
 
-                    ctx.getSource().sendFailure(Component.literal("Unable to force-spawn standalone tornado."));
+                    ctx.getSource().sendFailure(Component.literal("Unable to spawn standalone tornado."));
                     return 0;
                 });
         root.then(noCloudsBaseCommand);
@@ -92,15 +96,8 @@ public class TornadoCommand {
                             );
                             return 1;
                         }
-                        if (TornadoManager.forceSpawnServerWithoutCloud(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
-                            ctx.getSource().sendSuccess(
-                                    () -> Component.literal("Cloud attachment failed, so a standalone tornado was force-spawned."),
-                                    true
-                            );
-                            return 1;
-                        }
-                        ctx.getSource().sendFailure(Component.literal("Unable to spawn tornado."));
-                        return 0;
+                        projectatmosphere$awaitCloud(ctx.getSource(), level, tornadoPos, wind, PROJECTATMOSPHERE$AWAIT_POLLS);
+                        return 1;
                     }
 
                     CloudRegion spawnedRegion = SimpleCloudsCompat.spawnCloudInBiome(
@@ -111,26 +108,26 @@ public class TornadoCommand {
                             wind
                     );
                     if (spawnedRegion != null) {
-                        if (TornadoManager.forceSpawnServerWithoutCloud(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
-                            ctx.getSource().sendSuccess(
-                                    () -> Component.literal("Seeded a cumulonimbus and force-spawned a tornado immediately."),
-                                    true
-                            );
-                            return 1;
-                        }
-                        ctx.getSource().sendFailure(Component.literal("Unable to spawn tornado after seeding a cumulonimbus."));
-                        return 0;
-                    }
-
-                    if (TornadoManager.forceSpawnServerWithoutCloud(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
+                        CommandSourceStack source = ctx.getSource();
+                        DelayedTaskScheduler.schedule(PROJECTATMOSPHERE$SPAWN_DELAY_TICKS, () -> {
+                            if (TornadoManager.spawnServer(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
+                                source.sendSuccess(
+                                        () -> Component.literal("Tornado engaged once the seeded cumulonimbus matured."),
+                                        true
+                                );
+                            } else {
+                                projectatmosphere$awaitCloud(source, level, tornadoPos, wind, PROJECTATMOSPHERE$AWAIT_POLLS);
+                            }
+                        });
                         ctx.getSource().sendSuccess(
-                                () -> Component.literal("Forced a standalone tornado because no cumulonimbus could be attached."),
+                                () -> Component.literal("Seeded a cumulonimbus; waiting for SimpleClouds tornado engagement."),
                                 true
                         );
                         return 1;
                     }
-                    ctx.getSource().sendFailure(Component.literal("Unable to spawn tornado."));
-                    return 0;
+
+                    projectatmosphere$awaitCloud(ctx.getSource(), level, tornadoPos, wind, PROJECTATMOSPHERE$AWAIT_POLLS);
+                    return 1;
                 });
 
         root.then(baseCommand);
@@ -194,6 +191,33 @@ public class TornadoCommand {
         TornadoManager.clearTornadoes();
         source.sendSuccess(() -> Component.literal("All tornadoes cleared."), true);
         return 1;
+    }
+
+    private static void projectatmosphere$awaitCloud(CommandSourceStack source,
+                                                     ServerLevel level,
+                                                     Vec3 tornadoPos,
+                                                     net.Gabou.projectatmosphere.modules.core.WindVector wind,
+                                                     int remainingPolls) {
+        if (remainingPolls <= 0) {
+            source.sendFailure(Component.literal("No SimpleClouds cumulonimbus became available for this tornado."));
+            return;
+        }
+
+        DelayedTaskScheduler.schedule(PROJECTATMOSPHERE$AWAIT_INTERVAL, () -> {
+            CloudRegion region = projectatmosphere$findCumulonimbus(level, tornadoPos);
+            if (region != null && TornadoManager.spawnServer(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
+                source.sendSuccess(
+                        () -> Component.literal("Tornado engaged once a SimpleClouds cumulonimbus entered range."),
+                        true
+                );
+                return;
+            }
+            if (remainingPolls - 1 > 0) {
+                projectatmosphere$awaitCloud(source, level, tornadoPos, wind, remainingPolls - 1);
+            } else {
+                source.sendFailure(Component.literal("Timed out waiting for a suitable SimpleClouds cumulonimbus."));
+            }
+        });
     }
 
     private static CloudRegion projectatmosphere$findCumulonimbus(ServerLevel level, Vec3 pos) {
