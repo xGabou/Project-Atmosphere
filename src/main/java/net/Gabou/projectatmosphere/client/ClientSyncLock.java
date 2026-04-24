@@ -1,6 +1,4 @@
 package net.Gabou.projectatmosphere.client;
-
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 
@@ -24,9 +22,6 @@ public class ClientSyncLock {
             return;
         }
         ClientSyncLock.ready = ready;
-        if (ProjectAtmosphere.DEBUG_MODE) {
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Client forecast readiness for {} -> {}", playerUUID, ready);
-        }
     }
 
     public static void setReadyForLocalPlayer(boolean ready) {

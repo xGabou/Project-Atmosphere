@@ -4,13 +4,12 @@ package net.Gabou.projectatmosphere.manager;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.command.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphereStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
@@ -85,8 +84,6 @@ public class AtmosphereManager {
     }
 
     public static void updateForecastAround(ServerLevel world, BlockPos center) {
-        if(ProjectAtmosphere.DEBUG_MODE)
-            ProjectAtmosphere.LOGGER.info("Updating forecast Around");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.updateForecast(world, center);
         });
@@ -121,10 +118,7 @@ public class AtmosphereManager {
                     PacketDistributor.PLAYER.with(() -> player),
                     ForecastLoadingStatusPacket.ready("player_login_ready")
             );
-            if (CompatHandler.isRainbowsLoaded()) {
-                ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(world);
-                RainbowRainBridge.sendSnapshot(player, world, cloudManager.getCloudGenerator());
-            }
+            AtmosphereStatusSyncManager.syncPlayer(player);
             HurricaneManager.syncToPlayer(player);
             future.complete(null);
         });
@@ -141,8 +135,6 @@ public class AtmosphereManager {
     }
 
     public static void onSwapProfiles(ServerLevel world) {
-        if(ProjectAtmosphere.DEBUG_MODE)
-            ProjectAtmosphere.LOGGER.info("Swapping profiles and updating weather");
         AsyncAtmosphereService.runWeather(() -> {
             ForecastOrchestrator.onSwapDay(world);
         });
@@ -150,9 +142,6 @@ public class AtmosphereManager {
 
     public static void onRegenerate(ServerLevel world) {
         ProjectAtmosphere.LOGGER.info("Regenerating weather data for all players");
-        if (CompatHandler.isRainbowsLoaded()) {
-            RainbowRainBridge.clear(world.dimension());
-        }
         AsyncAtmosphereService.runWeather(() -> {
             EventHandler.onRegenerate();
             CloudManager.get(world).getCloudGenerator().removeAllClouds();
@@ -284,4 +273,3 @@ public class AtmosphereManager {
 
     }
 }
-

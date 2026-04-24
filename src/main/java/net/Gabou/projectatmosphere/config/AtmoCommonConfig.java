@@ -106,6 +106,18 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.IntValue CLOUD_FIRE_DAMP_TICKS;
     public static final ForgeConfigSpec.DoubleValue FIRE_EXTINGUISH_BASE_CHANCE;
     public static final ForgeConfigSpec.DoubleValue CAULDRON_FILL_BASE_CHANCE;
+    public static final ForgeConfigSpec.BooleanValue FOG_ENABLED;
+    public static final ForgeConfigSpec.IntValue FOG_SYNC_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.DoubleValue FOG_HUMIDITY_START_PERCENT;
+    public static final ForgeConfigSpec.DoubleValue FOG_HUMIDITY_FULL_PERCENT;
+    public static final ForgeConfigSpec.DoubleValue FOG_WET_BIOME_BASE_STRENGTH;
+    public static final ForgeConfigSpec.DoubleValue FOG_RAIN_BOOST;
+    public static final ForgeConfigSpec.DoubleValue FOG_NEAR_DISTANCE;
+    public static final ForgeConfigSpec.DoubleValue FOG_FAR_DISTANCE;
+    public static final ForgeConfigSpec.DoubleValue FOG_COLOR_BLEND;
+    public static final ForgeConfigSpec.DoubleValue FOG_WET_BIOME_DOWNFALL_MIN;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_IDS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_KEYWORDS;
     public static final ForgeConfigSpec.BooleanValue TELEMETRY_ENABLED;
     public static final ForgeConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
 
@@ -376,6 +388,49 @@ public class AtmoCommonConfig {
         CAULDRON_FILL_BASE_CHANCE = builder
                 .comment("Base chance per sample to fill cauldrons when raining (scaled by rain intensity)")
                 .defineInRange("cauldronFillBaseChance", 0.06d, 0d, 1d);
+        builder.pop();
+
+        builder.push("fog");
+        FOG_ENABLED = builder
+                .comment("Enable humidity-driven dynamic fog rendering on the client")
+                .define("enabled", true);
+        FOG_SYNC_INTERVAL_TICKS = builder
+                .comment("Ticks between lightweight server->client atmosphere sync updates used by fog and sky-effect compatibility sampling")
+                .defineInRange("syncIntervalTicks", 20, 1, 200);
+        FOG_HUMIDITY_START_PERCENT = builder
+                .comment("Humidity percentage where dynamic fog starts to form")
+                .defineInRange("humidityStartPercent", 72d, 0d, 100d);
+        FOG_HUMIDITY_FULL_PERCENT = builder
+                .comment("Humidity percentage where the humidity contribution reaches full strength")
+                .defineInRange("humidityFullPercent", 96d, 0d, 100d);
+        FOG_WET_BIOME_BASE_STRENGTH = builder
+                .comment("Base fog strength added by moisture-heavy biomes such as swamps or rainforests")
+                .defineInRange("wetBiomeBaseStrength", 0.18d, 0d, 1d);
+        FOG_RAIN_BOOST = builder
+                .comment("Additional fog strength contributed by active rain intensity")
+                .defineInRange("rainBoost", 0.22d, 0d, 1d);
+        FOG_NEAR_DISTANCE = builder
+                .comment("Near fog plane used when dynamic fog is fully saturated")
+                .defineInRange("nearDistance", 0.5d, 0d, 64d);
+        FOG_FAR_DISTANCE = builder
+                .comment("Far fog plane used when dynamic fog is fully saturated")
+                .defineInRange("farDistance", 72d, 4d, 512d);
+        FOG_COLOR_BLEND = builder
+                .comment("Color tint blend applied by dynamic fog")
+                .defineInRange("colorBlend", 0.45d, 0d, 1d);
+        FOG_WET_BIOME_DOWNFALL_MIN = builder
+                .comment("Biome downfall value that starts contributing wet-biome fog weighting")
+                .defineInRange("wetBiomeDownfallMin", 0.75d, 0d, 1d);
+        FOG_WET_BIOME_IDS = builder
+                .comment("Explicit biome ids that should always count as moisture-heavy for fog")
+                .defineListAllowEmpty("wetBiomeIds",
+                        List.of("minecraft:swamp", "minecraft:mangrove_swamp"),
+                        value -> value instanceof String);
+        FOG_WET_BIOME_KEYWORDS = builder
+                .comment("Biome path keywords that should count as moisture-heavy for fog")
+                .defineListAllowEmpty("wetBiomeKeywords",
+                        List.of("swamp", "marsh", "bog", "fen", "rainforest", "jungle", "mangrove", "wetland", "bayou"),
+                        value -> value instanceof String);
         builder.pop();
 
         builder.push("telemetry");

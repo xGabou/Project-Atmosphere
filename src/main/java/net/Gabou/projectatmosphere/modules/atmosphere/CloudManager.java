@@ -225,10 +225,6 @@ public final class CloudManager {
             double dx = anchor.getX() - centerX;
             double dz = anchor.getZ() - centerZ;
             double dist = Math.sqrt(dx * dx + dz * dz);
-            if(Objects.equals(state.getRegionId(), new RegionInstanceKey(-2, -2)))
-//            if (AtmoCommonConfig.DEBUG_MODE.get()) {
-//                ProjectAtmosphere.LOGGER.info("CloudManager: Sampling region {}, distance to center: {}", state.getRegionId(), dist);
-//            }
             if (dist > radius+regionRadius) {
                 continue;
             }
@@ -381,10 +377,6 @@ public final class CloudManager {
             state.setCloudCover(cover);
             state.setRainIntensity(rain);
             state.setCloudWater(Math.max(state.getCloudWater(), cover * 0.35f + rain * 0.65f));
-            if (ProjectAtmosphere.DEBUG_MODE && key.regionX() == -2 && key.regionZ() == -2 && key.regionSize() == RegionInstanceKey.DEFAULT_REGION_SIZE) {
-                ProjectAtmosphere.LOGGER.info("[CloudManager] Region {} cover={} rain={} (thicknessSum={}, contributions={})",
-                        key, cover, rain, value.cloudCover, value.rainIntensity);
-            }
             touched.add(key);
             ACTIVE_REGIONS.add(key);
         });

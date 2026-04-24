@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.Gabou.projectatmosphere.modules.fog.FogCommand;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
@@ -24,6 +25,7 @@ public final class ProjectAtmosphereCommands {
         root.then(PressureCommand.build());
         root.then(WindCommand.build());
         root.then(SpawnCloudCommand.build());
+        root.then(FogCommand.build());
 
         LiteralArgumentBuilder<CommandSourceStack> weatherDebug = Commands.literal("weatherdebug");
         DebugAtmoCommand.appendTo(weatherDebug);

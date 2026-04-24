@@ -1,0 +1,128 @@
+{
+  "versions": [
+    {
+      "version": "0.8.0.0",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "current",
+      "notes": "Current version in gradle.properties. Official release notes mention the region-first runtime refactor, telemetry work, a JDK 17 telemetry export fix, temporary PA x TFC incompatibility, and Dynamic Trees remaining work in progress."
+    },
+    {
+      "version": "0.6.0.0-pre2",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Commit history ties this version to sunlight-driven temperature work and baseline temperature bounds."
+    },
+    {
+      "version": "0.5.5.7",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Commit history ties this version to auroras/rainbows compatibility and storm severity tuning."
+    },
+    {
+      "version": "0.5.5.4",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Commit history ties this version to weather instruments and model updates."
+    },
+    {
+      "version": "0.5.5.2",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Detailed public release notes were not found in this bundle source set."
+    },
+    {
+      "version": "0.5.5.0",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Commit history describes a beta release and cloud storminess parameter changes."
+    },
+    {
+      "version": "0.5.4.3",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Commit history mentions cloud region spawn handling improvements."
+    },
+    {
+      "version": "0.5.4.1",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Commit history mentions season change handling improvements."
+    },
+    {
+      "version": "0.5.4.0",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "1.20.1"
+      ],
+      "loaders": [
+        "forge"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history. Commit history mentions sandstorm scheduling changes."
+    },
+    {
+      "version": "0.3.7",
+      "releaseDate": "UNKNOWN",
+      "mcVersions": [
+        "UNKNOWN"
+      ],
+      "loaders": [
+        "UNKNOWN"
+      ],
+      "supportStatus": "UNKNOWN",
+      "notes": "Observed in repository history only. Additional support details are unknown."
+    }
+  ],
+  "notes": [
+    "Only 0.8.0.0 has an official support-focused changelog in this repository.",
+    "Older versions are included only when they are directly visible in repository history."
+  ]
+}

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.network.SyncWindPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
@@ -33,6 +34,11 @@ public class NetworkHandler {
                 .encoder(SyncTornadoesPacket::encode)
                 .consumerMainThread(SyncTornadoesPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(SyncHurricanesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncHurricanesPacket::decode)
+                .encoder(SyncHurricanesPacket::encode)
+                .consumerMainThread(SyncHurricanesPacket::handle)
+                .add();
         CHANNEL.messageBuilder(SyncWindPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SyncWindPacket::decode)
                 .encoder(SyncWindPacket::encode)
@@ -48,10 +54,15 @@ public class NetworkHandler {
                 .encoder(ForecastLoadingStatusPacket::encode)
                 .consumerMainThread(ForecastLoadingStatusPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(RainfallUpdatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(RainfallUpdatePacket::decode)
-                .encoder(RainfallUpdatePacket::encode)
-                .consumerMainThread(RainfallUpdatePacket::handle)
+        CHANNEL.messageBuilder(SyncAtmosphereStatusPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncAtmosphereStatusPacket::decode)
+                .encoder(SyncAtmosphereStatusPacket::encode)
+                .consumerMainThread(SyncAtmosphereStatusPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(FogDebugOverridePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(FogDebugOverridePacket::decode)
+                .encoder(FogDebugOverridePacket::encode)
+                .consumerMainThread(FogDebugOverridePacket::handle)
                 .add();
         CHANNEL.messageBuilder(InstrumentReadoutPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(InstrumentReadoutPacket::decode)
@@ -65,4 +76,5 @@ public class NetworkHandler {
                 .add();
     }
 }
+
 

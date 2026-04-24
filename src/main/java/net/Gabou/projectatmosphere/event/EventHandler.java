@@ -7,13 +7,13 @@ import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsManager;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphereStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.wind.WindForces;
 import net.minecraft.core.BlockPos;
@@ -77,9 +77,7 @@ public class EventHandler {
             cloudBoosterTicks = 0;
         }
 
-        if (CompatHandler.isRainbowsLoaded()) {
-            RainbowRainBridge.sync(serverLevel, generator);
-        }
+        AtmosphereStatusSyncManager.syncPlayers(serverLevel);
         if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
             hasDisplayedMessage = true;
             serverLevel.players().forEach(player -> {player.sendSystemMessage(Component.literal(ForecastGenerator.message) );});
@@ -116,9 +114,8 @@ public class EventHandler {
             return;
         }
         ServerLevel level = player.serverLevel();
-        if (CompatHandler.isRainbowsLoaded() && level.dimension().equals(event.getTo())) {
-            ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(level);
-            RainbowRainBridge.sendSnapshot(player, level, cloudManager.getCloudGenerator());
+        if (level.dimension().equals(event.getTo())) {
+            AtmosphereStatusSyncManager.syncPlayer(player);
         }
     }
 

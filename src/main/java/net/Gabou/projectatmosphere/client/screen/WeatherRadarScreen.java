@@ -208,4 +208,3 @@ public class WeatherRadarScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 }
-

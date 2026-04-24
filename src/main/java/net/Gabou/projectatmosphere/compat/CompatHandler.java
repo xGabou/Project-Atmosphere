@@ -51,9 +51,11 @@ public class CompatHandler {
     public static boolean isLegendarySurvivalLoaded() {
         return getActiveTemperatureMod() == TemperatureMod.LEGENDARY_SURVIVAL;
     }
+
     public static boolean isToughAsNailsLoaded() {
         return getActiveTemperatureMod() == TemperatureMod.TOUGH_AS_NAILS;
     }
+
     public static boolean isColdSweatLoaded() {
         return getActiveTemperatureMod() == TemperatureMod.COLD_SWEAT;
     }
@@ -64,8 +66,9 @@ public class CompatHandler {
 
     public static void init() {
         TemperatureMod mod = getActiveTemperatureMod();
-        if(!ProjectAtmosphere.DEBUG_MODE)
+        if (!ProjectAtmosphere.DEBUG_MODE) {
             return;
+        }
 
         switch (mod) {
             case LEGENDARY_SURVIVAL -> LOGGER.info("Legendary Survival Overhaul loaded");
@@ -77,16 +80,16 @@ public class CompatHandler {
                 ? "Sand Storms mod loaded, enabling compatibility."
                 : "Sand Storms mod not found.");
         LOGGER.info(isAurorasLoaded()
-                ? "Auroras detected – enabling seasonal aurora tuning."
+                ? "Auroras detected - enabling Project Atmosphere aurora bridge."
                 : "Auroras mod not detected.");
         LOGGER.info(isRainbowsLoaded()
-                ? "Rainbows detected – enabling precipitation bridge."
+                ? "Rainbows detected - enabling Project Atmosphere rainbow bridge."
                 : "Rainbows mod not detected.");
         LOGGER.info(isTectonicLoaded()
-                ? "Tectonic detected – enabling refined ocean geometry."
+                ? "Tectonic detected - enabling refined ocean geometry."
                 : "Tectonic mod not detected.");
         LOGGER.info(isContinentsLoaded()
-                ? "Continents detected – enabling refined shoreline geometry."
+                ? "Continents detected - enabling refined shoreline geometry."
                 : "Continents mod not detected.");
         LOGGER.info(isDynamicTreesLoaded()
                 ? "Dynamic Trees detected - enabling seasonal tree integration."

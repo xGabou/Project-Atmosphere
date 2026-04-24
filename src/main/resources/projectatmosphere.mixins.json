@@ -29,6 +29,7 @@
     "client.SimpleCloudsRendererDhFallbackMixin",
     "client.ShaderSupportPipelineHurricaneMixin",
     "client.ShaderSupportPipelineTornadoMixin",
+    "client.MinecraftCrashHandlerMixin",
     "client.LoadingScreenMixin",
     "OverwriteDesertSound",
     "client.LoadingOverlayMixin",
@@ -41,6 +42,3 @@
     "defaultRequire": 1
   }
 }
-
-
-

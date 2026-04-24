@@ -28,8 +28,10 @@ import java.util.function.LongConsumer;
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public final class StormShieldManager {
     public static final double PROTECTION_RADIUS = 96.0D;
+
     private static final ResourceLocation STORM_SHIELD_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "storm_shield");
+
     private static final Map<String, ShieldIndex> SHIELDS_BY_LEVEL = new HashMap<>();
 
     private StormShieldManager() {
@@ -40,8 +42,8 @@ public final class StormShieldManager {
             return;
         }
 
-        ShieldIndex index = projectatmosphere$getOrCreateIndex(level);
-        index.add(projectatmosphere$chunkKey(pos), pos.asLong());
+        ShieldIndex index = getOrCreateIndex(level);
+        index.add(chunkKey(pos), pos.asLong());
     }
 
     public static void unregister(Level level, BlockPos pos) {
@@ -49,14 +51,16 @@ public final class StormShieldManager {
             return;
         }
 
-        ShieldIndex index = SHIELDS_BY_LEVEL.get(level.dimension().location().toString());
+        String levelKey = level.dimension().location().toString();
+        ShieldIndex index = SHIELDS_BY_LEVEL.get(levelKey);
         if (index == null) {
             return;
         }
 
-        index.remove(projectatmosphere$chunkKey(pos), pos.asLong());
+        index.remove(chunkKey(pos), pos.asLong());
+
         if (index.isEmpty()) {
-            SHIELDS_BY_LEVEL.remove(level.dimension().location().toString());
+            SHIELDS_BY_LEVEL.remove(levelKey);
         }
     }
 
@@ -82,8 +86,10 @@ public final class StormShieldManager {
             double shieldX = BlockPos.getX(packed) + 0.5D;
             double shieldY = BlockPos.getY(packed) + 0.5D;
             double shieldZ = BlockPos.getZ(packed) + 0.5D;
+
             Vec3 away = pos.subtract(shieldX, shieldY, shieldZ);
             double distSq = away.lengthSqr();
+
             if (distSq > influenceRadiusSq || distSq < 1.0E-4D) {
                 return;
             }
@@ -91,17 +97,19 @@ public final class StormShieldManager {
             double dist = Math.sqrt(distSq);
             double strength = 1.0D - dist / influenceRadius;
             Vec3 weighted = away.normalize().scale(strength);
+
             accumulated[0] += weighted.x;
             accumulated[1] += weighted.y;
             accumulated[2] += weighted.z;
         });
 
-        Vec3 accumulatedVector = new Vec3(accumulated[0], accumulated[1], accumulated[2]);
+        Vec3 result = new Vec3(accumulated[0], accumulated[1], accumulated[2]);
 
-        if (accumulatedVector.lengthSqr() < 1.0E-4D) {
+        if (result.lengthSqr() < 1.0E-4D) {
             return Vec3.ZERO;
         }
-        return accumulatedVector.normalize().scale(Math.min(accumulatedVector.length(), 1.0D));
+
+        return result.normalize().scale(Math.min(result.length(), 1.0D));
     }
 
     public static double getMaxProtection(Level level, Vec3 pos, double margin) {
@@ -118,6 +126,7 @@ public final class StormShieldManager {
             double shieldX = BlockPos.getX(packed) + 0.5D;
             double shieldY = BlockPos.getY(packed) + 0.5D;
             double shieldZ = BlockPos.getZ(packed) + 0.5D;
+
             double distSq = pos.distanceToSqr(shieldX, shieldY, shieldZ);
             if (distSq > influenceRadiusSq) {
                 return;
@@ -132,10 +141,13 @@ public final class StormShieldManager {
 
     @SubscribeEvent
     public static void onBlockPlaced(BlockEvent.EntityPlaceEvent event) {
-        if (!(event.getLevel() instanceof ServerLevel level) || !projectatmosphere$isStormShield(event.getPlacedBlock())) {
+        if (!(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
-        register(level, event.getPos());
+
+        if (isStormShield(event.getPlacedBlock())) {
+            register(level, event.getPos());
+        }
     }
 
     @SubscribeEvent
@@ -145,10 +157,10 @@ public final class StormShieldManager {
         }
 
         BlockState state = level.getBlockState(event.getPos());
-        if (!projectatmosphere$isStormShield(state)) {
-            return;
+
+        if (isStormShield(state)) {
+            unregister(level, event.getPos());
         }
-        unregister(level, event.getPos());
     }
 
     @SubscribeEvent
@@ -156,6 +168,7 @@ public final class StormShieldManager {
         if (!(event.getLevel() instanceof ServerLevel level) || !(event.getChunk() instanceof LevelChunk chunk)) {
             return;
         }
+
         scanChunk(level, chunk);
     }
 
@@ -165,14 +178,17 @@ public final class StormShieldManager {
             return;
         }
 
-        ShieldIndex index = SHIELDS_BY_LEVEL.get(level.dimension().location().toString());
+        String levelKey = level.dimension().location().toString();
+        ShieldIndex index = SHIELDS_BY_LEVEL.get(levelKey);
+
         if (index == null || index.isEmpty()) {
             return;
         }
 
         index.removeChunk(event.getChunk().getPos().toLong());
+
         if (index.isEmpty()) {
-            SHIELDS_BY_LEVEL.remove(level.dimension().location().toString());
+            SHIELDS_BY_LEVEL.remove(levelKey);
         }
     }
 
@@ -184,31 +200,38 @@ public final class StormShieldManager {
     }
 
     private static void scanChunk(ServerLevel level, LevelChunk chunk) {
-        Block stormShield = projectatmosphere$getStormShieldBlock();
+        Block stormShield = getStormShieldBlock();
         if (stormShield == null) {
             return;
         }
 
-        ShieldIndex index = projectatmosphere$getOrCreateIndex(level);
+        ShieldIndex index = getOrCreateIndex(level);
         long chunkKey = chunk.getPos().toLong();
+
         LongArrayList foundPositions = new LongArrayList(2);
         LevelChunkSection[] sections = chunk.getSections();
+
         int minSection = level.getMinSection();
         int minX = chunk.getPos().getMinBlockX();
         int minZ = chunk.getPos().getMinBlockZ();
+
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
         for (int sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
             LevelChunkSection section = sections[sectionIndex];
+
             if (section == null || section.hasOnlyAir() || !section.maybeHas(state -> state.is(stormShield))) {
                 continue;
             }
 
             int sectionMinY = (minSection + sectionIndex) << 4;
+
             for (int localY = 0; localY < 16; localY++) {
                 int worldY = sectionMinY + localY;
+
                 for (int localZ = 0; localZ < 16; localZ++) {
                     int worldZ = minZ + localZ;
+
                     for (int localX = 0; localX < 16; localX++) {
                         if (!section.getBlockState(localX, localY, localZ).is(stormShield)) {
                             continue;
@@ -222,25 +245,26 @@ public final class StormShieldManager {
         }
 
         index.replaceChunk(chunkKey, foundPositions);
+
         if (index.isEmpty()) {
             SHIELDS_BY_LEVEL.remove(level.dimension().location().toString());
         }
     }
 
-    private static ShieldIndex projectatmosphere$getOrCreateIndex(Level level) {
+    private static ShieldIndex getOrCreateIndex(Level level) {
         return SHIELDS_BY_LEVEL.computeIfAbsent(level.dimension().location().toString(), unused -> new ShieldIndex());
     }
 
-    private static long projectatmosphere$chunkKey(BlockPos pos) {
+    private static long chunkKey(BlockPos pos) {
         return ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
     }
 
-    private static boolean projectatmosphere$isStormShield(BlockState state) {
-        Block stormShield = projectatmosphere$getStormShieldBlock();
+    private static boolean isStormShield(BlockState state) {
+        Block stormShield = getStormShieldBlock();
         return stormShield != null && state.is(stormShield);
     }
 
-    private static Block projectatmosphere$getStormShieldBlock() {
+    private static Block getStormShieldBlock() {
         return ForgeRegistries.BLOCKS.getValue(STORM_SHIELD_ID);
     }
 
@@ -254,11 +278,13 @@ public final class StormShieldManager {
 
         void add(long chunkKey, long packedPos) {
             LongArrayList positions = this.positionsByChunk.computeIfAbsent(chunkKey, unused -> new LongArrayList(1));
+
             for (int i = 0; i < positions.size(); i++) {
                 if (positions.getLong(i) == packedPos) {
                     return;
                 }
             }
+
             positions.add(packedPos);
             this.size++;
         }
@@ -276,15 +302,18 @@ public final class StormShieldManager {
 
                 positions.removeLong(i);
                 this.size--;
+
                 if (positions.isEmpty()) {
                     this.positionsByChunk.remove(chunkKey);
                 }
+
                 return;
             }
         }
 
         void replaceChunk(long chunkKey, LongArrayList newPositions) {
             LongArrayList previous = this.positionsByChunk.remove(chunkKey);
+
             if (previous != null) {
                 this.size -= previous.size();
             }
@@ -299,6 +328,7 @@ public final class StormShieldManager {
 
         void removeChunk(long chunkKey) {
             LongArrayList removed = this.positionsByChunk.remove(chunkKey);
+
             if (removed != null) {
                 this.size -= removed.size();
             }
@@ -313,6 +343,7 @@ public final class StormShieldManager {
             for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
                 for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
                     LongArrayList positions = this.positionsByChunk.get(ChunkPos.asLong(chunkX, chunkZ));
+
                     if (positions == null || positions.isEmpty()) {
                         continue;
                     }

@@ -10,7 +10,22 @@ pluginManagement {
 }
 buildscript {
     repositories {
-        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        maven {
+            name = 'Sponge'
+            url = 'https://repo.spongepowered.org/repository/maven-public/'
+            content {
+                includeGroupByRegex('org\\.spongepowered.*')
+            }
+        }
+        maven {
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+            content {
+                includeGroup('cpw.mods')
+                includeGroupByRegex('net\\.minecraftforge.*')
+            }
+        }
+        mavenCentral()
     }
 }
 
