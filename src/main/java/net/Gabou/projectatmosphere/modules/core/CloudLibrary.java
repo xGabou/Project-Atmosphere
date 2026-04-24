@@ -89,7 +89,6 @@ public class CloudLibrary {
             "stratocumulus",
             "cumulus",
             "altocumulus",
-            "stratocumulus_opacus",
             "altostratus_dry",
             "mammatus_thin"
     };
@@ -99,7 +98,7 @@ public class CloudLibrary {
             "smaller_stratocumulus",
             "islands",
             "spots",
-            //"pattern",
+            "pattern",
             "balls",
             "cumulus_noise",
             "dense_cumulus",
@@ -114,6 +113,8 @@ public class CloudLibrary {
             "pathway",
             "spotted",
             "matrix",
+            "snow",
+            "tall_weirdness",
             "cumulus_humilis"
     };
 
@@ -173,24 +174,25 @@ public class CloudLibrary {
                  "thicker_stratocumulus" -> 4;
             case "dense_itty_bitty",
                  "stratocumulus",
-                 "stratocumulus_opacus",
                  "cumulus" -> 3;
             case "small_cumulus",
                  "smaller_stratocumulus",
                  "islands",
                  "spots",
-                 //"pattern",
+                 "pattern",
                  "balls",
                  "cumulus_noise",
-                 "dense_cumulus"/*,
-                 "tall_noise"*/ -> 2;
+                 "dense_cumulus",
+                 "tall_noise" -> 2;
             case "itty_bitty",
                  "real_itty_bitty",
                  "itty_bitty_bigger",
                  "pathway",
                  "spotted",
                  "matrix",
-                 "mammatus_thin" -> 1;
+                 "snow",
+                 "mammatus_thin",
+                 "tall_weirdness" -> 1;
             default -> 0;
         };
     }

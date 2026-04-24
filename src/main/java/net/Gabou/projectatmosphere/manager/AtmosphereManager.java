@@ -119,6 +119,7 @@ public class AtmosphereManager {
                     ForecastLoadingStatusPacket.ready("player_login_ready")
             );
             AtmosphereStatusSyncManager.syncPlayer(player);
+            HurricaneManager.syncToPlayer(player);
             future.complete(null);
         });
     }

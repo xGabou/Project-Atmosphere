@@ -23,7 +23,9 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneState;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
@@ -609,6 +611,10 @@ public class ForecastOrchestrator {
         return 0f;
     }
 
+    public static RegionalWeatherPhase getWeatherPhase(ServerLevel level, RegionInstanceKey key, long tick) {
+        return ServerWeatherStateResolver.resolve(level, key, tick);
+    }
+
     private static float computeStormChance(RegionAtmosphereState state) {
         float rain = Math.min(1f, state.getRainIntensity());
         float cloud = state.getCloudCover();
@@ -632,10 +638,6 @@ public class ForecastOrchestrator {
             return 0f;
         }
         return region.sampleStorm(tick);
-    }
-
-    public static RegionalWeatherPhase getWeatherPhase(ServerLevel level, RegionInstanceKey key, long tick) {
-        return ServerWeatherStateResolver.resolve(level, key, tick);
     }
 
     public static void tick(ServerLevel level) {
@@ -723,6 +725,7 @@ public class ForecastOrchestrator {
         CycloneManager.initialize(level);
         OceanBasinManager.initialize(level);
     }
+
     private static void sendLoginStage(ServerPlayer player, String subtext, float progress, String source) {
         NetworkHandler.CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),

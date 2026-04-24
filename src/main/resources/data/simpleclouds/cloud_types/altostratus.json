@@ -2,7 +2,7 @@
   "weather_type": "rain",
   "storminess": 0.35,
   "transparency_fade": 0.85,
-  "storm_start": 14.0,
+  "storm_start": 56.0,
   "storm_fade_distance": 12.0,
   "noise_settings": [
     {

@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client.loading;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.ClientSyncLock;
+import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -15,6 +16,7 @@ public final class ClientForecastLoadingLifecycle {
     @SubscribeEvent
     public static void onClientLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         ClientSyncLock.clear();
+        ClientHurricaneStateCache.clear();
         ClientForecastLoadingWorkQueue.reset();
         if (!ForecastLoadingState.snapshot().active()) {
             ForecastLoadingState.start(
@@ -30,7 +32,9 @@ public final class ClientForecastLoadingLifecycle {
     @SubscribeEvent
     public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientSyncLock.clear();
+        ClientHurricaneStateCache.clear();
         ClientForecastLoadingWorkQueue.reset();
         ForecastLoadingState.reset("client_logout");
     }
 }
+

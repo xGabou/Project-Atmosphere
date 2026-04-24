@@ -1,29 +1,19 @@
 {
   "weather_type": "none",
   "storminess": 0.1,
-  "transparency_fade": 0.9,
-  "storm_start": 32.0,
-  "storm_fade_distance": 32.0,
+  "storm_start": 10.0,
+  "transparency_fade": 0.2,
+  "storm_fade_distance": 16.0,
   "noise_settings": [
     {
-      "height": 64.0,
+      "scale_z": 3.0,
+      "fade_distance": 10.0,
       "height_offset": 0.0,
-      "fade_distance": 12.0,
-      "value_offset": 1.1,
-      "value_scale": 0.9,
-      "scale_x": 100.0,
-      "scale_y": 100.0,
-      "scale_z": 100.0
-    },
-    {
+      "value_scale": 1.0,
       "height": 32.0,
-      "height_offset": 24.0,
-      "fade_distance": 6.0,
-      "value_offset": 0.4,
-      "value_scale": 0.6,
-      "scale_x": 60.0,
-      "scale_y": 60.0,
-      "scale_z": 60.0
+      "value_offset": -0.5,
+      "scale_x": 3.0,
+      "scale_y": 1.0
     }
   ]
 }

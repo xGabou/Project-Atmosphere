@@ -91,6 +91,52 @@ This file records functionality additions/removals made during development sessi
 - The new hurricane density field now supports a true empty eye, annular eyewall, upper canopy, outer shield, and early spiral-band structure while still reusing the Project Atmosphere / Simple Clouds texture samplers, fog, depth, and cloud-color language.
 - Hooked the hurricane renderer into both Simple Clouds default and shader-support pipelines, added hurricane shader registration/resources, and disabled the old `SimpleCloudsRendererMixin` ring path from the active mixin config.
 - Extended hurricane client snapshots/interpolation so prepared render data can be cached and reused per frame, and fixed tornado/hurricane motion/constructor mismatches so the current tree builds cleanly again.
+## Unreleased - Distant Horizons Simple Clouds compatibility
+- Added a DH-aware fallback that forces Simple Clouds onto its `DhSupportPipeline` when Distant Horizons is present, so the shared cloud renderer stays on the post-DH frame path instead of relying on the default after-sky stage.
+- Added DH-pipeline diagnostics so the next client run can prove whether the DH cloud pass is reached, how many cloud elements it renders, and whether the geometry is being dropped before or after DH composition.
+## Unreleased - Restore ordinary Simple Clouds cloud density
+- Restored the working base Simple Clouds cloud profiles for `altocumulus`, `altostratus`, `cumulus_congestus`, `cumulus_humilis`, `cumulus_mediocris`, `custom_cumulonimbus`, and `stratocumulus_opacus` so the shared mesh generator once again gets the same density inputs as the last known good revision.
+- Restored the `pattern` cloud type and spawn entry, and returned the ordinary cloud library / weather classification tables to the last known good selection semantics.
+- Re-anchored hurricanes against the live Simple Clouds layer instead of a hardcoded Y=64 fallback, so they now sit roughly 200 blocks below the configured cloud height without dropping the volumetric mesh completely out of range.
+- Switched the client hurricane cache to request a full Simple Clouds renderer reload when integrated-server hurricane snapshots appear, change, or clear, so local singleplayer hurricanes can force a fresh mesh pass instead of staying hidden with only rain semantics active.
+- Simplified the tornado admin/debug command flow so `/pa spawnTornado` and `/pa spawnTornadoNoClouds` no longer sit in cloud-seeding wait loops; if cloud attachment fails, they now fall back immediately to a force-spawned standalone tornado.
+- Re-synced `TornadoCommand` and `TornadoManager` to `Dynamic-Forge-1.20.1-Tornado` so the tornado spawn path matches the Tornado branch behavior instead of the newer hurricane-branch force-spawn flow.
+- Restored the tornado branch integration points that the hurricane branch had lost: tornado client snapshot packets are registered again, the Simple Clouds tornado renderer mixins/shaders are back, and client tornado overlays/effects now read from the client tornado list instead of the server-only list.
+- Fixed the local singleplayer hurricane render path by making `ClientHurricaneStateCache` fall back to live integrated-server hurricane snapshots whenever the synced snapshot cache is empty, which lets debug-spawned hurricanes render again in local worlds.
+- Lowered the hurricane anchor by roughly 200 blocks and expanded the outer cumulonimbus storm extent by about 5x, with a broader edge fade and larger hurricane cloud-noise scales so the storm reads as a much larger regional system instead of a compact ring high in the sky.
+- Changed the tornado admin/debug spawn commands to force-spawn a visible tornado immediately instead of timing out on cloud seeding, while still attaching to a nearby severe cloud when one is available and broadening cloud lookup to a larger severe-cloud fallback radius.
+- Moved the hurricane core-to-cumulonimbus recovery inward so the outer storm body now begins from the eyewall region instead of from far out on the core radius, and added a dedicated inner bridge envelope/noise pass to close the remaining dead ring between the eye wall and the outer storm mass.
+- Optimized `StormShieldManager` to stop hammering chunk-load tick time: shield tracking now uses a chunk-aware primitive index, only scans chunk sections whose palettes can actually contain the storm shield block, updates from block place/break events, and queries nearby chunk buckets instead of mutating/iterating a global concurrent boxed set.
+- Diagnosed the tornado regression against Dynamic-Forge-1.20.1-Tornado: the dynamic branch diverged from merge base 7c30affb6c9a1f46c5526df5bbb7455e4b14a6c0 and never merged the newer tornado stack, so it had drifted back to the old local tornado implementation.
+- Restored the source-of-truth tornado pipeline from Dynamic-Forge-1.20.1-Tornado, including the tornado manager/instance/snapshot/spawner flow, regional storm phase integration, standalone spawn/remove/sync packets, the Simple Clouds tornado renderer/shaders, tornado client effects, and the config/UI hooks needed for render quality and client cleanup on the dynamic branch.
+- Reworked hurricanes to intensify out of the existing cyclone system instead of acting like isolated local storms: CycloneManager now exposes active cyclone snapshots, HurricaneManager tracks cyclone formation eligibility over warm ocean plus convective cloud coverage, and cyclone-linked hurricanes inherit the cyclone's regional disruption while adding stronger wind fields, tree/block destruction, entity pushing, eyewall lightning, and native hurricane rendering/sync.
+- Stabilized hurricane semantic ownership in the eye by keeping the eye visually empty/dry while still reporting `projectatmosphere:hurricane` to Simple Clouds query paths, which should stop the F3 overlay from flipping to `simpleclouds:empty` when crossing the eye.
+- Reworked the hurricane core-to-outer transition again so the inner spiral persists farther out, the outer cumulonimbus mass begins earlier, and new broad outer spiral rainbands give the storm a more cyclone-like top-down silhouette instead of a smooth circular disk.
+- Rebalanced `altocumulus`, `altostratus`, `cumulus_humilis`, `cumulus_mediocris`, `cumulus_congestus`, `custom_cumulonimbus`, and `stratocumulus_opacus` to reduce geometric fill and total cube output while improving vertical anisotropy, contour, and layered/puffy sculpting.
+- Fixed the command-spawn tornado path so `/pa spawnTornado` now creates a managed tornado instance in addition to attaching the cloud descriptor, and relaxed supporting-cloud lookup to use a nearby fallback cloud when strict intersection misses on the client.
+- Added a shared CPU hurricane semantic sampler and wired it into Simple Clouds cloud-type, precipitation, and rain-level queries, so hurricanes now report `projectatmosphere:hurricane`, force visible rain outside the eye, and keep the eye dry without relying on fake cloud regions.
+- Added query-only hurricane reservation regions plus spawn/reconciliation hooks in the Simple Clouds generator, preventing normal cloud formations from spawning into or drifting through the hurricane footprint while keeping the hurricane render path native.
+- Tightened the hurricane core-to-cumulonimbus blend so the outer storm body starts overlapping before the inner spiral fully fades, removing the remaining visible handoff between the core structure and the outer mass.
+- Added per-hurricane vertical anchoring at Y=256, split the preserved eye/core radius from a new world-scale outer storm extent, and updated the Simple Clouds mesh path so hurricane chunks render at the lowered altitude without moving the global cloud layer.
+- Reworked the hurricane region mask into a core-to-cumulonimbus blend, keeping the eye/eyewall near the center while expanding the outer storm body into a much larger continuous cloud shield with smoother radial transitions.
+- Slowed hurricane rotation to long-period large-storm motion and expanded hurricane weather forcing so nearby atmospheric regions get stronger rain/cloud floors while the server now spawns explicit eyewall lightning near players.
+- Slowed hurricane rotation down to large-scale storm pacing, reshaped the mask so the core keeps a clear eye while the outer radius blends into cumulonimbus-style storm mass, and retuned the hurricane cloud profile to borrow a more vertical cumulonimbus volumetric structure instead of a flatter outer shelf.
+- Reworked the hurricane eye mask back into a true open center, replaced the oversized flat outer shelf with a tighter cumulonimbus-style outer mass, and added direct hurricane forcing into nearby atmospheric regions so hurricanes now drive rain/thunder conditions instead of only rendering visually.
+- Removed the artificial spinning eye-core from the hurricane mask, raised the hurricane cloud body higher above the terrain, and expanded the connected cumulonimbus envelope so the storm spans a much larger continuous cloud mass.
+- Fixed the disappearing hurricane regression by bringing projectatmosphere:hurricane back under Simple Clouds' 4-layer noise limit; the outer cavity effect now stays in the hurricane shader mask instead of a fifth cloud noise layer.
+- Mapped projectatmosphere:hurricane into the thunderstorm weather path so hurricane clouds count as rainy/thunderous, and thickened the outer hurricane density with cavity-cut cumulonimbus-style mass instead of a cleaner ring shell.
+- Slowed hurricane rotation, added rotating inner-core coverage, widened connected outer cumulonimbus mass with blended transitions, and switched the native hurricane cloud type identifier to projectatmosphere:hurricane.
+- Moved storm mesh-generator helper DTOs out of the mixin package so RegionUpload/TornadoUpload are no longer loaded as direct mixin-owned classes at runtime.
+- Rebalanced the native Simple Clouds hurricane profile so storms render much larger, sit lower in the cloud layer with deeper base offsets, and use smoother band coverage plus softer lower noise to reduce underside streak artifacts.
+- Replaced the old hurricane ring overlay with a native Simple Clouds integration path driven by explicit hurricane render snapshots synced from the server to the client.
+- Added a client hurricane state cache plus SyncHurricaneStatePacket, so hurricane cloud rendering no longer reaches into server-only hurricane state.
+- Extended the overridden cloud_regions.comp compute shader and MultiRegionCloudMeshGenerator mixin with a dedicated hurricane formation primitive, including a true hollow eye, eyewall banding, spiral coverage, and conservative CPU chunk meshing support.
+- Added a dedicated simpleclouds:hurricane cloud type for hurricane noise/lighting identity instead of reusing the old custom_cumulonimbus shortcut.
+- Removed the fake hurricane render hook/classes and stopped /spawnHurricane from spawning standalone Simple Clouds cumulonimbus regions outside the native hurricane system.
+- Forced Simple Clouds mesh and region compute shaders to load Project Atmosphere-owned shader resources directly, so the hurricane/tornado SSBO extensions no longer depend on cross-mod asset override order at runtime.
+- Added gated Simple Clouds runtime diagnostics for the shared client pipeline, including player cloud sampling, selected cloud type/profile logging, mesh-region upload counts, chunk-generation decision logs, mesh finalize counts, and per-pass draw counters so a client run can prove whether the failure is in the inputs, the compute path, or the draw path.
+- Relaxed the diagnostics gate so the shared Simple Clouds probes now emit a one-time runtime proof line by default, instead of staying silent unless `-Dprojectatmosphere.simpleclouds.debugRender=true` is present.
+
 ## Unreleased - Gradle sync fix
 - Removed the duplicate mid-script `import groovy.json.JsonOutput` from `build.gradle`, which could stop the Gradle script from compiling during IDE sync.
 - Replaced legacy archive/version references with Gradle 8-safe values for the jar manifest plus the Modrinth and CurseForge artifact paths.
@@ -404,3 +450,13 @@ This file records functionality additions/removals made during development sessi
 
 
 
+
+
+# 2026-04-23
+
+- Added shared Simple Clouds runtime diagnostics for the client mesh generator base class and both render pipeline branches.
+- Split the pass-summary logger state so an early fallback or finalize event cannot suppress draw-pass evidence.
+- Added pipeline-entry logs so we can prove whether the active path is `DefaultPipeline` or `ShaderSupportPipeline` at runtime.
+- No behavioral render change was made in this step; this is investigation instrumentation to isolate the remaining cloud visibility regression.
+- Restored the Tornado-branch hurricane render stack: `HurricaneShaders`, `SimpleCloudsHurricaneRenderer`, the hurricane mixin hooks, and the `hurricane_*` shader assets.
+- Added compatibility accessors on `HurricaneInstance` and `HurricaneManager` so the restored branch renderer can consume the current hurricane state model without changing the existing sync path.

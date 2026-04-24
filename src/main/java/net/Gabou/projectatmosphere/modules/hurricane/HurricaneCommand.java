@@ -16,35 +16,7 @@ import net.minecraft.world.phys.Vec3;
 
 public class HurricaneCommand {
     public static void appendTo(LiteralArgumentBuilder<CommandSourceStack> root) {
-        root.then(projectatmosphere$spawnLiteral("spawnHurricane"));
-        root.then(projectatmosphere$spawnLiteral("spawnHurricanes"));
-        root.then(Commands.literal("clearhurricanes")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> {
-                    HurricaneManager.clearHurricanes();
-                    ctx.getSource().sendSuccess(() -> Component.literal("All hurricanes cleared."), true);
-                    return 1;
-                }));
-        root.then(Commands.literal("removehurricane")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> {
-                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                    Vec3 playerPos = player.position();
-                    HurricaneInstance hurricane = HurricaneManager.getActiveHurricanes().stream()
-                            .filter(h -> h.position.distanceToSqr(playerPos) < 400)
-                            .findFirst().orElse(null);
-                    if (hurricane != null) {
-                        HurricaneManager.removeHurricane(hurricane);
-                        ctx.getSource().sendSuccess(() -> Component.literal("Hurricane removed."), true);
-                    } else {
-                        ctx.getSource().sendFailure(Component.literal("No hurricane found near you."));
-                    }
-                    return 1;
-                }));
-    }
-
-    private static LiteralArgumentBuilder<CommandSourceStack> projectatmosphere$spawnLiteral(String name) {
-        return Commands.literal(name)
+        LiteralArgumentBuilder<CommandSourceStack> base = Commands.literal("spawnHurricane")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("category", IntegerArgumentType.integer(1, 5))
                         .executes(ctx -> {
@@ -72,5 +44,30 @@ public class HurricaneCommand {
                             ctx.getSource().sendSuccess(() -> Component.literal("Hurricane category " + catInt + " spawned."), true);
                             return 1;
                         }));
+
+        root.then(base);
+        root.then(Commands.literal("clearhurricanes")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> {
+                    HurricaneManager.clearHurricanes();
+                    ctx.getSource().sendSuccess(() -> Component.literal("All hurricanes cleared."), true);
+                    return 1;
+                }));
+        root.then(Commands.literal("removehurricane")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> {
+                    ServerPlayer player = ctx.getSource().getPlayerOrException();
+                    Vec3 playerPos = player.position();
+                    HurricaneInstance hurricane = HurricaneManager.getActiveHurricanes().stream()
+                            .filter(h -> h.position.distanceToSqr(playerPos) < 400)
+                            .findFirst().orElse(null);
+                    if (hurricane != null) {
+                        HurricaneManager.removeHurricane(hurricane);
+                        ctx.getSource().sendSuccess(() -> Component.literal("Hurricane removed."), true);
+                    } else {
+                        ctx.getSource().sendFailure(Component.literal("No hurricane found near you."));
+                    }
+                    return 1;
+                }));
     }
 }

@@ -3,6 +3,8 @@ package net.Gabou.projectatmosphere.client;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
+import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.client.TornadoClientEffects;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -12,6 +14,7 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
+import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
@@ -58,24 +61,23 @@ public class ClientTickHandler {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        if (!ClientSyncLock.isReady()) return;
         Minecraft mc = Minecraft.getInstance();
+        ClientHurricaneStateCache.tick(mc.level);
+        if (!ClientSyncLock.isReady()) return;
         if (mc.isPaused()) return;
         AtmosphereClientState.tick(mc);
         AtmosphereFogState.tick(mc);
         if (mc.level == null) {
             TornadoManager.clearClientTornadoes();
-            HurricaneManager.clearClientHurricanes();
             return;
         }
 
         SkyEffectState.beginFrame();
         tickCounter++;
-        TornadoManager.tick(Minecraft.getInstance().level);
-        HurricaneManager.tickClient();
+        TornadoManager.tick(mc.level);
         AtmosphereSkyEffectController.tick(mc);
 
-        if (mc.level != null && mc.player != null) {
+        if (mc.player != null) {
             CloudManager<?> manager = CloudManager.get(mc.level);
             List<CloudRegion> regions = manager.getClouds();
             double playerX = mc.player.getX();
@@ -109,7 +111,12 @@ public class ClientTickHandler {
         }
 
         if (tickCounter % 40 == 0) {
-            if (mc.level != null && mc.player != null) {
+            if (mc.player != null) {
+                if (mc.level != null) {
+                    CloudManager<?> manager = CloudManager.get(mc.level);
+                    SimpleCloudsRenderDiagnostics.logPlayerSample(manager, mc.player.getX(), mc.player.getZ());
+                }
+
                 // snapshot
                 BlockPos pos = mc.player.blockPosition();
                 long gameTime = mc.level.getGameTime();

@@ -8,7 +8,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class NetworkHandler {
-    private static final String PROTOCOL_VERSION = "2";
+    private static final String PROTOCOL_VERSION = "5";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -69,8 +69,11 @@ public class NetworkHandler {
                 .encoder(InstrumentReadoutPacket::encode)
                 .consumerMainThread(InstrumentReadoutPacket::handle)
                 .add();
-
-
+        CHANNEL.messageBuilder(SyncHurricaneStatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncHurricaneStatePacket::decode)
+                .encoder(SyncHurricaneStatePacket::encode)
+                .consumerMainThread(SyncHurricaneStatePacket::handle)
+                .add();
     }
 }
 
