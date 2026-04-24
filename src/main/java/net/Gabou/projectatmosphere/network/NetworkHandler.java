@@ -34,11 +34,6 @@ public class NetworkHandler {
                 .encoder(SyncTornadoesPacket::encode)
                 .consumerMainThread(SyncTornadoesPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(SyncHurricanesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(SyncHurricanesPacket::decode)
-                .encoder(SyncHurricanesPacket::encode)
-                .consumerMainThread(SyncHurricanesPacket::handle)
-                .add();
         CHANNEL.messageBuilder(SyncWindPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SyncWindPacket::decode)
                 .encoder(SyncWindPacket::encode)

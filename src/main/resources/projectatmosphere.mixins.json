@@ -15,12 +15,10 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
-    "CloudMeshGeneratorAccessor",
     "CloudMeshGeneratorDiagnosticsAccessor",
     "CloudMeshGeneratorDiagnosticsMixin",
     "CloudMeshGeneratorShaderMixin",
     "MixinSandstormDebugBlocker",
-    "MultiRegionCloudMeshGeneratorMixin",
     "client.DefaultPipelineHurricaneMixin",
     "client.DefaultPipelineTornadoMixin",
     "client.InstanceableMeshDiagnosticsMixin",
