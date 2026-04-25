@@ -566,7 +566,9 @@ void main() {
     }
 
     vec3 ro = CameraPos;
-    vec3 rd = normalize(fragPos - ro);
+    vec2 screenUv = gl_FragCoord.xy / OutSize;
+    vec3 farPlanePos = reconstructPosition(screenUv, 1.0);
+    vec3 rd = normalize(farPlanePos - ro);
     float tNear;
     float tFar;
     if (!intersectAabb(ro, rd, VolumeMin, VolumeMax, tNear, tFar)) {
@@ -590,7 +592,6 @@ void main() {
         return;
     }
 
-    vec2 screenUv = gl_FragCoord.xy / OutSize;
     float sceneDepth = texture(DepthSampler, screenUv).r;
     bool useSceneDepthStop = DebugMode == DEBUG_OFF;
     float maxRay = min(tFar, MaxDistance);
@@ -649,16 +650,16 @@ void main() {
             StormSample storm = debugActive && DebugFreeze != 0
                 ? sampleFrozenStorm(0, samplePos)
                 : sampleStorm(0, samplePos);
-            float sigma = max(storm.cloud, 0.0) * 0.195;
+            float sigma = max(storm.cloud, 0.0) * 0.285;
             if (sigma > 0.0005) {
                 if (!wroteDepth) {
                     firstHitDepth = clamp(cloudSpaceToDepth(samplePos), 0.0, 1.0);
                     wroteDepth = true;
                 }
                 float nearField = 1.0 - saturate(t / 12.0);
-                float alpha = 1.0 - exp(-sigma * stepSize * 8.4);
-                alpha = saturate(alpha * (1.10 + nearField * 0.32));
-                float bodyDark = mix(0.08, 0.25, saturate(storm.material));
+                float alpha = 1.0 - exp(-sigma * stepSize * 10.8);
+                alpha = saturate(alpha * (1.22 + nearField * 0.40));
+                float bodyDark = mix(0.055, 0.21, saturate(storm.material));
                 vec3 cloudBase = CloudColor.rgb * bodyDark;
                 float upperStrength = saturate(storm.upper);
                 vec3 upperCol = mix(cloudBase, CloudColor.rgb * 0.64, upperStrength * 0.62);
@@ -696,5 +697,5 @@ void main() {
     if (wroteDepth) {
         gl_FragDepth = firstHitDepth;
     }
-    fragColor = vec4(color, saturate(alpha));
+    fragColor = vec4(color, saturate(alpha * 1.18));
 }

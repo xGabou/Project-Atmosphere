@@ -1,5 +1,12 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Distant Horizons storm volume rendering fix
+- Hooked the dedicated tornado volume render pass into Simple Clouds' `DhSupportPipeline.afterDistantHorizonsRender`, so PA tornado shaders render into the DH cloud framebuffer path instead of only the default/shader-support pipelines.
+- Switched hurricanes back to the Simple Clouds compute-mesh integration path by restoring the `CloudHurricanes` uploader/chunk scheduler and disabling the standalone hurricane volume pipeline hooks.
+- Made tornado volume rays screen-space stable and increased optical thickness so funnels read as depth-bearing storm bodies instead of flat hatched overlays, without relying on front-face culling that can hide the proxy volume on some pipelines.
+- Synced the active `projectatmosphere` compute shader copies with the Simple Clouds-engine storm shaders, so the redirected cloud-region and cube-mesh programs expose the `CloudTornadoes`/`CloudHurricanes` SSBOs and uniforms they upload.
+- Select Simple Clouds' DH support pipeline through `DetermineCloudRenderPipelineEvent` when Distant Horizons is installed, ensuring PA tornado and hurricane rendering use the DH-compatible path before mesh generation and render preparation run.
+
 ## Unreleased - Hurricane reservation cache fix
 - Cached client-side hurricane reservation `CloudRegion` objects instead of recreating them on every lookup, which should cut the runaway allocation pressure that was showing up after the tornado-to-hurricane merge.
 - Moved the client hurricane render hooks over to the cached snapshot path so the renderer stops walking the live hurricane manager state every frame.
