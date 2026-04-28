@@ -592,13 +592,7 @@ void main() {
         return;
     }
 
-    float sceneDepth = texture(DepthSampler, screenUv).r;
-    bool useSceneDepthStop = DebugMode == DEBUG_OFF;
     float maxRay = min(tFar, MaxDistance);
-    if (useSceneDepthStop && sceneDepth < 1.0) {
-        vec3 rayEnd = reconstructPosition(screenUv, sceneDepth);
-        maxRay = min(maxRay, length(rayEnd - ro));
-    }
     if (maxRay <= tNear + 0.001) {
         discard;
     }
@@ -679,6 +673,10 @@ void main() {
         if (debugValue < 0.01) {
             discard;
         }
+        float sceneDepth = texture(DepthSampler, screenUv).r;
+        if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
+            discard;
+        }
         if (wroteDepth) {
             gl_FragDepth = firstHitDepth;
         }
@@ -688,6 +686,10 @@ void main() {
 
     float alpha = 1.0 - transmittance;
     if (alpha < 0.01) {
+        discard;
+    }
+    float sceneDepth = texture(DepthSampler, screenUv).r;
+    if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
         discard;
     }
 

@@ -139,7 +139,7 @@ public final class SimpleCloudsTornadoRenderer {
         // hard clip plane, which preserves the earlier horizon fix over water and long flat terrain.
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(writeDepth);
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
+        RenderSystem.depthFunc(GL11.GL_ALWAYS);
         RenderSystem.disableCull();
         RenderSystem.setShader(() -> shader);
 
@@ -219,6 +219,7 @@ public final class SimpleCloudsTornadoRenderer {
         }
 
         RenderSystem.depthMask(true);
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
         RenderSystem.enableDepthTest();
         RenderSystem.disableBlend();
         RenderSystem.enableCull();

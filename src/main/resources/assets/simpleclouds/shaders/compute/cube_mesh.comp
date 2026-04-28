@@ -286,6 +286,7 @@ bool isPosValid(float x, float y, float z, int nx, int nz)
     int hurricaneIndex = TotalCloudHurricanes > 0 ? projectatmosphere_findHurricane(vec2(x, z), info.r) : -1;
 #if FADE_NEAR_ORIGIN == 1
     float len = distance(vec2(x, z), Origin.xz);
+    if (hurricaneIndex < 0)
         fade = min(fade, -5.0 * (1.0 - min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0)));
 #endif
 #elif TYPE == 1
@@ -354,22 +355,22 @@ void createCube(float x, float y, float z, float cubeRadius, float brightness, f
 	vec3 norm = normalize(pos - Origin);
 	vec3 center = pos + cubeRadius;
 	//-Y
-	if ((TestFacesFacingAway || dot(norm, vec3(0.0, -1.0, 0.0)) <= 0.0) && (!isPosValid(x, y - Scale, z, group, fade, hurricaneIndex) || shouldNotOcclude(2)))
+	if ((TestFacesFacingAway || hurricaneIndex >= 0 || dot(norm, vec3(0.0, -1.0, 0.0)) <= 0.0) && (!isPosValid(x, y - Scale, z, group, fade, hurricaneIndex) || shouldNotOcclude(2)))
 		createFace(center, cubeRadius, 2, brightness);
 	//+Y
-	if ((TestFacesFacingAway || dot(norm, vec3(0.0, 1.0, 0.0)) <= 0.0) && (!isPosValid(x, y + Scale, z, group, fade, hurricaneIndex) || shouldNotOcclude(3)))
+	if ((TestFacesFacingAway || hurricaneIndex >= 0 || dot(norm, vec3(0.0, 1.0, 0.0)) <= 0.0) && (!isPosValid(x, y + Scale, z, group, fade, hurricaneIndex) || shouldNotOcclude(3)))
 		createFace(center, cubeRadius, 3, brightness);
 	//-X
-	if ((TestFacesFacingAway || dot(norm, vec3(-1.0, 0.0, 0.0)) <= 0.0) && (!isPosValid(x - Scale, y, z, -1, 0) || shouldNotOcclude(0)))
+	if ((TestFacesFacingAway || hurricaneIndex >= 0 || dot(norm, vec3(-1.0, 0.0, 0.0)) <= 0.0) && (!isPosValid(x - Scale, y, z, -1, 0) || shouldNotOcclude(0)))
 		createFace(center, cubeRadius, 0, brightness);
 	//+X
-	if ((TestFacesFacingAway || dot(norm, vec3(1.0, 0.0, 0.0)) <= 0.0) && (!isPosValid(x + Scale, y, z, 1, 0) || shouldNotOcclude(1)))
+	if ((TestFacesFacingAway || hurricaneIndex >= 0 || dot(norm, vec3(1.0, 0.0, 0.0)) <= 0.0) && (!isPosValid(x + Scale, y, z, 1, 0) || shouldNotOcclude(1)))
 		createFace(center, cubeRadius, 1, brightness);
 	//-Z
-	if ((TestFacesFacingAway || dot(norm, vec3(0.0, 0.0, -1.0)) <= 0.0) && (!isPosValid(x, y, z - Scale, 0, -1) || shouldNotOcclude(4)))
+	if ((TestFacesFacingAway || hurricaneIndex >= 0 || dot(norm, vec3(0.0, 0.0, -1.0)) <= 0.0) && (!isPosValid(x, y, z - Scale, 0, -1) || shouldNotOcclude(4)))
 		createFace(center, cubeRadius, 4, brightness);
 	//+Z
-	if ((TestFacesFacingAway || dot(norm, vec3(0.0, 0.0, 1.0)) <= 0.0) && (!isPosValid(x, y, z + Scale, 0, 1) || shouldNotOcclude(5)))
+	if ((TestFacesFacingAway || hurricaneIndex >= 0 || dot(norm, vec3(0.0, 0.0, 1.0)) <= 0.0) && (!isPosValid(x, y, z + Scale, 0, 1) || shouldNotOcclude(5)))
 		createFace(center, cubeRadius, 5, brightness);
 }
 
@@ -419,7 +420,8 @@ void main()
     int hurricaneIndex = TotalCloudHurricanes > 0 ? projectatmosphere_findHurricane(vec2(x, z), info.r) : -1;
 #if FADE_NEAR_ORIGIN == 1
     float len = distance(vec2(x, z), Origin.xz);
-	fade = min(fade, -5.0 * (1.0 - min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0)));
+	if (hurricaneIndex < 0)
+		fade = min(fade, -5.0 * (1.0 - min(max(len - FadeStart, 0.0) / (FadeEnd - FadeStart), 1.0)));
 #endif
 #elif TYPE == 1
 	LayerGroup group = layerGroupings.data[0];

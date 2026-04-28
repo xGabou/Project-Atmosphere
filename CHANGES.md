@@ -6,6 +6,10 @@ This file records functionality additions/removals made during development sessi
 - Made tornado volume rays screen-space stable and increased optical thickness so funnels read as depth-bearing storm bodies instead of flat hatched overlays, without relying on front-face culling that can hide the proxy volume on some pipelines.
 - Synced the active `projectatmosphere` compute shader copies with the Simple Clouds-engine storm shaders, so the redirected cloud-region and cube-mesh programs expose the `CloudTornadoes`/`CloudHurricanes` SSBOs and uniforms they upload.
 - Select Simple Clouds' DH support pipeline through `DetermineCloudRenderPipelineEvent` when Distant Horizons is installed, ensuring PA tornado and hurricane rendering use the DH-compatible path before mesh generation and render preparation run.
+- Stopped the tornado volume raymarch from hard-clipping to copied scene depth, relying on the shader-written first-hit depth for occlusion instead so ground contact is not camera-dependent.
+- Kept hurricane mesh samples opaque near/inside the camera by bypassing Simple Clouds' near-origin fade for hurricane volumes, and rotated the whole hurricane density field slowly around the storm center.
+- Let tornado proxy-volume fragments run regardless of proxy-box depth, then manually discard only when the first real funnel hit is behind scene depth, preventing terrain behind the storm from cutting off ground contact.
+- Stabilized hurricane visibility during camera movement by disabling Simple Clouds chunk dither-fade while hurricanes are active and generating all exposed hurricane mesh faces instead of camera-origin-selected faces.
 
 ## Unreleased - Hurricane reservation cache fix
 - Cached client-side hurricane reservation `CloudRegion` objects instead of recreating them on every lookup, which should cut the runaway allocation pressure that was showing up after the tornado-to-hurricane merge.

@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.mixin.client;
 import dev.nonamecrackers2.simpleclouds.client.mesh.chunk.MeshChunk;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
+import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.mixin.CloudMeshGeneratorDiagnosticsAccessor;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -16,9 +17,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class SimpleCloudsRendererDiagnosticsMixin {
     @Inject(
             method = "renderCloudsOpaque(Ldev/nonamecrackers2/simpleclouds/client/mesh/generator/CloudMeshGenerator;Lcom/mojang/blaze3d/vertex/PoseStack;Lorg/joml/Matrix4f;FFFFFFLnet/minecraft/client/renderer/culling/Frustum;Z)V",
-            at = @At("HEAD")
+            at = @At("HEAD"),
+            cancellable = true
     )
     private static void projectatmosphere$beginOpaquePass(CloudMeshGenerator generator, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float fogStart, float fogEnd, float partialTick, float r, float g, float b, Frustum frustum, boolean ditherFade, CallbackInfo ci) {
+        if (ditherFade && ClientHurricaneStateCache.hasHurricanes()) {
+            SimpleCloudsRenderer.renderCloudsOpaque(generator, stack, projMat, fogStart, fogEnd, partialTick, r, g, b, frustum, false);
+            ci.cancel();
+            return;
+        }
         if (generator == null || SimpleCloudsRenderDiagnostics.isDhPipelineActive()) {
             return;
         }
@@ -47,9 +54,15 @@ public abstract class SimpleCloudsRendererDiagnosticsMixin {
 
     @Inject(
             method = "renderCloudsTransparency(Ldev/nonamecrackers2/simpleclouds/client/mesh/generator/CloudMeshGenerator;Lcom/mojang/blaze3d/vertex/PoseStack;Lorg/joml/Matrix4f;FFFFFFLnet/minecraft/client/renderer/culling/Frustum;Z)V",
-            at = @At("HEAD")
+            at = @At("HEAD"),
+            cancellable = true
     )
     private static void projectatmosphere$beginTransparencyPass(CloudMeshGenerator generator, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float fogStart, float fogEnd, float partialTick, float r, float g, float b, Frustum frustum, boolean ditherFade, CallbackInfo ci) {
+        if (ditherFade && ClientHurricaneStateCache.hasHurricanes()) {
+            SimpleCloudsRenderer.renderCloudsTransparency(generator, stack, projMat, fogStart, fogEnd, partialTick, r, g, b, frustum, false);
+            ci.cancel();
+            return;
+        }
         if (generator == null || SimpleCloudsRenderDiagnostics.isDhPipelineActive()) {
             return;
         }

@@ -60,6 +60,13 @@ float saturate(float value)
     return clamp(value, 0.0, 1.0);
 }
 
+vec2 projectatmosphere_rotate(vec2 value, float angle)
+{
+    float s = sin(angle);
+    float c = cos(angle);
+    return vec2(value.x * c - value.y * s, value.x * s + value.y * c);
+}
+
 vec3 circle(CloudRegion region, vec2 coord)
 {
     vec2 p = vec2(region.posX, region.posZ);
@@ -128,13 +135,14 @@ vec2 projectatmosphere_sampleHurricane(CloudHurricane hurricane, vec2 coord)
     float transitionEnd = max(hurricane.shape3.z, transitionStart + 1.0);
 
     vec2 local = coord - center;
+    vec2 rotatedLocal = projectatmosphere_rotate(local, rotationPhase * 0.18);
     float radius = length(local);
     if (radius > stormExtentRadius + edgeFade * 1.20)
         return vec2(-1.0);
 
-    float angle = atan(local.y, local.x);
+    float angle = atan(rotatedLocal.y, rotatedLocal.x);
     float normalizedRadius = stormExtentRadius > 0.0 ? saturate(radius / stormExtentRadius) : 0.0;
-    float spinPhase = angle + max(radius - eyeRadius, 0.0) * spiralTightness - rotationPhase;
+    float spinPhase = angle + max(radius - eyeRadius, 0.0) * spiralTightness - rotationPhase * 0.35;
 
     float outerMask = 1.0 - smoothstep(stormExtentRadius - edgeFade * 0.34, stormExtentRadius + edgeFade * 0.92, radius);
     float eyeHole = smoothstep(eyeRadius + edgeFade * 0.06, eyeRadius + edgeFade * 0.82, radius);
