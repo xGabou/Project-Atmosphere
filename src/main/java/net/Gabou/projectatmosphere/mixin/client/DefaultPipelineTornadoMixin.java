@@ -37,7 +37,9 @@ public abstract class DefaultPipelineTornadoMixin {
         renderer.getCloudTarget().bindWrite(false);
         SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
                 renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
-                renderer.getCloudTransparencyTarget().getDepthTextureId(), true
+                renderer.getCloudTransparencyTarget().getDepthTextureId(),
+                mc.getMainRenderTarget().getDepthTextureId(),
+                true
         );
         mc.getProfiler().pop();
     }

@@ -4,6 +4,7 @@ uniform sampler2D TornadoSampler;
 uniform sampler2D NoiseSampler;
 uniform sampler2D FlowSampler;
 uniform sampler2D DepthSampler;
+uniform sampler2D SecondaryDepthSampler;
 
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
@@ -21,6 +22,7 @@ uniform vec3 VolumeMin;
 uniform vec3 VolumeMax;
 uniform float CloudScale;
 uniform float RenderQuality;
+uniform int UseSecondaryDepthSampler;
 uniform int StormCount;
 uniform int DebugMode;
 uniform int DebugSelectedStorm;
@@ -168,6 +170,22 @@ float cloudSpaceToDepth(vec3 pos) {
     vec4 clip = ProjMat * ModelViewMat * vec4(pos, 1.0);
     float ndcZ = clip.z / clip.w;
     return ndcZ * 0.5 + 0.5;
+}
+
+float sampleSceneDepth(vec2 uv) {
+    float primaryDepth = texture(DepthSampler, uv).r;
+    if (UseSecondaryDepthSampler == 0) {
+        return primaryDepth;
+    }
+
+    float secondaryDepth = texture(SecondaryDepthSampler, uv).r;
+    if (primaryDepth >= 1.0) {
+        return secondaryDepth;
+    }
+    if (secondaryDepth >= 1.0) {
+        return primaryDepth;
+    }
+    return min(primaryDepth, secondaryDepth);
 }
 
 float sampleFirstHitField(vec3 position, bool debugActive, bool debugMaskMode) {
@@ -708,7 +726,7 @@ void main() {
         if (debugValue < 0.01) {
             discard;
         }
-        float sceneDepth = texture(DepthSampler, screenUv).r;
+        float sceneDepth = sampleSceneDepth(screenUv);
         if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
             discard;
         }
@@ -723,7 +741,7 @@ void main() {
     if (alpha < 0.01) {
         discard;
     }
-    float sceneDepth = texture(DepthSampler, screenUv).r;
+    float sceneDepth = sampleSceneDepth(screenUv);
     if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
         discard;
     }

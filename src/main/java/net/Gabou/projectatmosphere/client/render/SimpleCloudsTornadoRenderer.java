@@ -33,6 +33,7 @@ public final class SimpleCloudsTornadoRenderer {
 
     private static final int MAX_STORMS = 8;
     private static final float CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD = 28.0F;
+    private static final float GROUND_CONTACT_EXTENSION_WORLD = 12.0F;
     private static final float GROUND_CONTACT_PADDING_WORLD = 2.0F;
     private static final float MIN_VISUAL_WORLD_WIDTH = 28.0F;
     private static final float MIN_VISUAL_WORLD_STORM_SIZE = 140.0F;
@@ -104,12 +105,13 @@ public final class SimpleCloudsTornadoRenderer {
 
     public void renderOpaque(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
                              float partialTick, float cloudR, float cloudG, float cloudB) {
-        this.renderOpaque(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB, renderer.getCloudTarget().getDepthTextureId(), true);
+        this.renderOpaque(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB,
+                renderer.getCloudTarget().getDepthTextureId(), -1, true);
     }
 
     public void renderOpaque(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
                              float partialTick, float cloudR, float cloudG, float cloudB,
-                             int depthTextureId, boolean writeDepth) {
+                             int depthTextureId, int secondaryDepthTextureId, boolean writeDepth) {
         ClientLevel level = Minecraft.getInstance().level;
         if (shouldDebugLog(level) && level != null && this.lastRenderOpaqueLogGameTime != level.getGameTime()) {
             this.lastRenderOpaqueLogGameTime = level.getGameTime();
@@ -150,6 +152,7 @@ public final class SimpleCloudsTornadoRenderer {
         shader.setSampler("NoiseSampler", noiseTexture);
         shader.setSampler("FlowSampler", flowTexture);
         shader.setSampler("DepthSampler", depthTextureId);
+        shader.setSampler("SecondaryDepthSampler", secondaryDepthTextureId > 0 ? secondaryDepthTextureId : depthTextureId);
 
         shader.safeGetUniform("ModelViewMat").set(stack.last().pose());
         shader.safeGetUniform("ProjMat").set(projMat);
@@ -173,6 +176,7 @@ public final class SimpleCloudsTornadoRenderer {
                 : TornadoRenderDebugState.Mode.OFF;
         shader.safeGetUniform("CloudScale").set(scale);
         shader.safeGetUniform("RenderQuality").set((float) AtmoCommonConfig.TORNADO_RENDER_QUALITY.get().doubleValue());
+        shader.safeGetUniform("UseSecondaryDepthSampler").set(secondaryDepthTextureId > 0 && secondaryDepthTextureId != depthTextureId ? 1 : 0);
 
         shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
         shader.safeGetUniform("AnimationTime").set(TornadoManager.getShaderTime() + partialTick * 0.05F);
@@ -680,9 +684,11 @@ public final class SimpleCloudsTornadoRenderer {
             float terrainSurfaceY = terrainSurface.surfaceY();
             float centerX = (float) renderPos.x / scale;
             float centerZ = (float) renderPos.z / scale;
-            // `renderBottomY` is already the synced tornado base from the simulation and descriptor.
-            // Extending it downward again makes the volumetric funnel start below the terrain.
-            float bottomWorld = renderBottomY;
+            float contactExtension = Math.max(
+                    GROUND_CONTACT_EXTENSION_WORLD,
+                    renderBottomY - terrainSurfaceY + GROUND_CONTACT_PADDING_WORLD
+            );
+            float bottomWorld = renderBottomY - contactExtension;
             float topWorld = Math.max(
                     renderBottomY + tornado.getRenderHeight(partialTick),
                     cloudHeight + CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD

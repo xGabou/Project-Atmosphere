@@ -20,6 +20,8 @@ This file records functionality additions/removals made during development sessi
 - Kept hurricane mesh samples opaque near/inside the camera by bypassing Simple Clouds' near-origin fade for hurricane volumes, and rotated the whole hurricane density field slowly around the storm center.
 - Let tornado proxy-volume fragments run regardless of proxy-box depth, then manually discard only when the first real funnel hit is behind scene depth, preventing terrain behind the storm from cutting off ground contact.
 - Stabilized hurricane visibility during camera movement by disabling Simple Clouds chunk dither-fade while hurricanes are active and generating all exposed hurricane mesh faces instead of camera-origin-selected faces.
+- Restored terrain-driven tornado contact extension so the volumetric funnel is anchored back down to the sampled surface instead of floating at the synced storm base.
+- Gave the tornado shader separate cloud/DH and main-world depth inputs, allowing it to occlude correctly against both DH LOD depth and vanilla chunk depth in the same frame.
 
 ## Unreleased - Hurricane reservation cache fix
 - Cached client-side hurricane reservation `CloudRegion` objects instead of recreating them on every lookup, which should cut the runaway allocation pressure that was showing up after the tornado-to-hurricane merge.
