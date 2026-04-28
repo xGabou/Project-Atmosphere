@@ -21,6 +21,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.system.MemoryStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +33,6 @@ public final class SimpleCloudsTornadoRenderer {
 
     private static final int MAX_STORMS = 8;
     private static final float CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD = 28.0F;
-    private static final float GROUND_CONTACT_EXTENSION_WORLD = 12.0F;
     private static final float GROUND_CONTACT_PADDING_WORLD = 2.0F;
     private static final float MIN_VISUAL_WORLD_WIDTH = 28.0F;
     private static final float MIN_VISUAL_WORLD_STORM_SIZE = 140.0F;
@@ -183,7 +183,7 @@ public final class SimpleCloudsTornadoRenderer {
         float[] fogColor = RenderSystem.getShaderFogColor();
         shader.safeGetUniform("FogColor").set(fogColor[0], fogColor[1], fogColor[2], fogColor[3]);
 
-        this.maybeEmitDiagnosticReport(level, inverseProj, inverseModelView, cameraPos, cameraPosCloud, writeDepth);
+        this.maybeEmitDiagnosticReport(level, inverseProj, inverseModelView, stack.last().pose(), projMat, cameraPos, cameraPosCloud, writeDepth);
 
         List<Integer> renderOrder = new ArrayList<>();
         for (int i = 0; i < this.preparedTornadoes.size(); i++) {
@@ -335,6 +335,7 @@ public final class SimpleCloudsTornadoRenderer {
     }
 
     private void maybeEmitDiagnosticReport(ClientLevel level, Matrix4f inverseProj, Matrix4f inverseModelView,
+                                           Matrix4f modelView, Matrix4f projMat,
                                            Vec3 cameraPosWorld, Vec3 cameraPosCloud, boolean writeDepth) {
         boolean requested = TornadoRenderDebugState.consumeDiagnosticReportRequest();
         boolean periodic = TornadoRenderDebugState.isActive()
@@ -346,7 +347,7 @@ public final class SimpleCloudsTornadoRenderer {
 
         this.lastDiagnosticReportGameTime = level.getGameTime();
         debug(
-                "renderState mode={} freeze={} writeDepth={} blend=srcalpha,1-srcalpha depthTest=LEQUAL cull=disabled proxyVolume=true resolvedStorm={}",
+                "renderState mode={} freeze={} writeDepth={} blend=srcalpha,1-srcalpha depthFunc=ALWAYS cull=disabled proxyVolume=true resolvedStorm={}",
                 TornadoRenderDebugState.getMode().token(),
                 TornadoRenderDebugState.isFreezeEnabled(),
                 writeDepth,
@@ -359,9 +360,9 @@ public final class SimpleCloudsTornadoRenderer {
         }
 
         PreparedTornado tornado = this.preparedTornadoes.get(this.resolvedDebugStormIndex);
-        CenterRayDiagnostic diagnostic = sampleCenterRayDiagnostic(tornado, inverseProj, inverseModelView, cameraPosCloud);
+        CenterRayDiagnostic diagnostic = sampleCenterRayDiagnostic(tornado, inverseProj, inverseModelView, modelView, projMat, cameraPosCloud);
         debug(
-                "selectedStorm index={} id={} renderPosWorld=({}, {}, {}) cloudHeightWorld={} cloudScale={} renderBottomWorld={} terrainSurfaceWorld={} bottomWorld={} topWorld={} bottomYCloud={} heightCloud={} heightWorld={} widthCloud={} widthWorld={} stormSizeCloud={} stormSizeWorld={} boundsRadiusCloud={} boundsRadiusWorld={} wallcloudRadiusWorld={}",
+                "selectedStorm index={} id={} renderPosWorld=({}, {}, {}) cloudHeightWorld={} cloudScale={} renderBottomWorld={} terrainSurfaceWorld={} terrainLoadedSamples={} terrainFallbackUsed={} bottomWorld={} baseOffsetWorld={} topWorld={} bottomYCloud={} heightCloud={} heightWorld={} widthCloud={} widthWorld={} stormSizeCloud={} stormSizeWorld={} boundsRadiusCloud={} boundsRadiusWorld={} wallcloudRadiusWorld={}",
                 this.resolvedDebugStormIndex,
                 tornado.id(),
                 fmt(tornado.renderPosWorld().x), fmt(tornado.renderPosWorld().y), fmt(tornado.renderPosWorld().z),
@@ -369,7 +370,10 @@ public final class SimpleCloudsTornadoRenderer {
                 fmt(tornado.scale()),
                 fmt(tornado.renderBottomWorld()),
                 fmt(tornado.terrainSurfaceWorld()),
+                tornado.terrainLoadedSamples(),
+                tornado.terrainFallbackUsed(),
                 fmt(tornado.bottomWorld()),
+                fmt(tornado.renderBottomWorld() - tornado.bottomWorld()),
                 fmt(tornado.topWorld()),
                 fmt(tornado.bottomY()),
                 fmt(tornado.height()),
@@ -393,7 +397,7 @@ public final class SimpleCloudsTornadoRenderer {
         }
 
         debug(
-                "centerRay cameraWorld=({}, {}, {}) cameraCloud=({}, {}, {}) rayEndCloud=({}, {}, {}) rayDirCloud=({}, {}, {}) tNear={} tFar={} stepSize={} samplePosCloud=({}, {}, {}) samplePosWorld=({}, {}, {}) tornadoOriginCloud=({}, {}, {}) tornadoOriginWorld=({}, {}, {}) localPosCloud=({}, {}, {}) localPosWorld=({}, {}, {}) radialDistanceWorld={} height01={} heightMask={} funnelRadiusWorld={} density={} alpha={} wallcloudRadiusWorld={} wallcloudLowerWorld={} connectionRadiusWorld={}",
+                "centerRay cameraWorld=({}, {}, {}) cameraCloud=({}, {}, {}) rayEndCloud=({}, {}, {}) rayDirCloud=({}, {}, {}) tNear={} tFar={} stepSize={} sampleT={} projectedDepth={} sceneDepthAtSample={} sceneDepthDelta={} sampleScreen=({}, {}) samplePosCloud=({}, {}, {}) samplePosWorld=({}, {}, {}) tornadoOriginCloud=({}, {}, {}) tornadoOriginWorld=({}, {}, {}) localPosCloud=({}, {}, {}) localPosWorld=({}, {}, {}) radialDistanceWorld={} height01={} heightMask={} funnelRadiusWorld={} density={} alpha={} wallcloudRadiusWorld={} wallcloudLowerWorld={} connectionRadiusWorld={}",
                 fmt(cameraPosWorld.x), fmt(cameraPosWorld.y), fmt(cameraPosWorld.z),
                 fmt(cameraPosCloud.x), fmt(cameraPosCloud.y), fmt(cameraPosCloud.z),
                 fmt(diagnostic.rayEndCloud().x), fmt(diagnostic.rayEndCloud().y), fmt(diagnostic.rayEndCloud().z),
@@ -401,6 +405,12 @@ public final class SimpleCloudsTornadoRenderer {
                 fmt(diagnostic.tNear()),
                 fmt(diagnostic.tFar()),
                 fmt(diagnostic.stepSize()),
+                fmt(diagnostic.sampleT()),
+                fmt(diagnostic.projectedDepth()),
+                fmt(diagnostic.sceneDepth()),
+                fmt(diagnostic.projectedDepth() - diagnostic.sceneDepth()),
+                fmt(diagnostic.sampleScreenX()),
+                fmt(diagnostic.sampleScreenY()),
                 fmt(diagnostic.samplePosCloud().x), fmt(diagnostic.samplePosCloud().y), fmt(diagnostic.samplePosCloud().z),
                 fmt(diagnostic.samplePosWorld().x), fmt(diagnostic.samplePosWorld().y), fmt(diagnostic.samplePosWorld().z),
                 fmt(diagnostic.tornadoOriginCloud().x), fmt(diagnostic.tornadoOriginCloud().y), fmt(diagnostic.tornadoOriginCloud().z),
@@ -420,7 +430,8 @@ public final class SimpleCloudsTornadoRenderer {
     }
 
     private static CenterRayDiagnostic sampleCenterRayDiagnostic(PreparedTornado tornado, Matrix4f inverseProj,
-                                                                Matrix4f inverseModelView, Vec3 cameraPosCloud) {
+                                                                Matrix4f inverseModelView, Matrix4f modelView,
+                                                                Matrix4f projMat, Vec3 cameraPosCloud) {
         Vec3 rayEndCloud = reconstructPosition(0.5F, 0.5F, 1.0F, inverseProj, inverseModelView);
         Vec3 rayDirectionCloud = rayEndCloud.subtract(cameraPosCloud);
         if (rayDirectionCloud.lengthSqr() <= 0.000001D) {
@@ -461,12 +472,18 @@ public final class SimpleCloudsTornadoRenderer {
         Vec3 tornadoOriginWorld = tornado.originWorld();
         Vec3 localPosCloud = samplePosCloud.subtract(tornadoOriginCloud);
         Vec3 localPosWorld = samplePosWorld.subtract(tornadoOriginWorld);
+        ScreenDepthSample projectedDepth = projectDepthSample(samplePosCloud, modelView, projMat);
         return new CenterRayDiagnostic(
                 rayEndCloud,
                 rayDirectionCloud,
                 hit.near(),
                 hit.far(),
                 stepSize,
+                t,
+                projectedDepth.projectedDepth(),
+                projectedDepth.sceneDepth(),
+                projectedDepth.screenX(),
+                projectedDepth.screenY(),
                 samplePosCloud,
                 samplePosWorld,
                 tornadoOriginCloud,
@@ -484,6 +501,38 @@ public final class SimpleCloudsTornadoRenderer {
         inverseModelView.transform(ndc);
         ndc.div(ndc.w);
         return new Vec3(ndc.x, ndc.y, ndc.z);
+    }
+
+    private static ScreenDepthSample projectDepthSample(Vec3 samplePosCloud, Matrix4f modelView, Matrix4f projMat) {
+        Minecraft mc = Minecraft.getInstance();
+        Vector4f clip = new Vector4f((float) samplePosCloud.x, (float) samplePosCloud.y, (float) samplePosCloud.z, 1.0F);
+        modelView.transform(clip);
+        projMat.transform(clip);
+        if (Math.abs(clip.w) <= 0.000001F) {
+            return new ScreenDepthSample(1.0F, 1.0F, -1.0F, -1.0F);
+        }
+
+        float invW = 1.0F / clip.w;
+        float ndcX = clip.x * invW;
+        float ndcY = clip.y * invW;
+        float ndcZ = clip.z * invW;
+        float projectedDepth = ndcZ * 0.5F + 0.5F;
+
+        float screenX = ((ndcX * 0.5F) + 0.5F) * mc.getWindow().getWidth();
+        float screenY = ((ndcY * 0.5F) + 0.5F) * mc.getWindow().getHeight();
+        float sceneDepth = readFramebufferDepth(screenX, screenY, mc.getWindow().getWidth(), mc.getWindow().getHeight());
+        return new ScreenDepthSample(projectedDepth, sceneDepth, screenX, screenY);
+    }
+
+    private static float readFramebufferDepth(float screenX, float screenY, int width, int height) {
+        int pixelX = Mth.clamp(Mth.floor(screenX), 0, Math.max(width - 1, 0));
+        int pixelY = Mth.clamp(Mth.floor(screenY), 0, Math.max(height - 1, 0));
+        int glY = Math.max(height - 1 - pixelY, 0);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            var depthValue = stack.mallocFloat(1);
+            GL11.glReadPixels(pixelX, glY, 1, 1, GL11.GL_DEPTH_COMPONENT, GL11.GL_FLOAT, depthValue);
+            return depthValue.get(0);
+        }
     }
 
     private static AabbHit intersectAabb(Vec3 ro, Vec3 rd, Vec3 bmin, Vec3 bmax) {
@@ -578,17 +627,34 @@ public final class SimpleCloudsTornadoRenderer {
         return TornadoRenderDebugState.isActive() && level != null && level.getGameTime() % 20L == 0L;
     }
 
-    private static float sampleTerrainSurfaceY(ClientLevel level, Vec3 renderPos, float radius) {
+    private static TerrainSurfaceSample sampleTerrainSurfaceY(ClientLevel level, Vec3 renderPos, float radius, float renderBottomY) {
         int centerX = Mth.floor(renderPos.x);
         int centerZ = Mth.floor(renderPos.z);
         int sampleOffset = Math.max(2, Mth.floor(Math.min(radius * 0.45F, 10.0F)));
+        int[][] sampleColumns = {
+                {centerX, centerZ},
+                {centerX + sampleOffset, centerZ},
+                {centerX - sampleOffset, centerZ},
+                {centerX, centerZ + sampleOffset},
+                {centerX, centerZ - sampleOffset}
+        };
 
-        float highestSurface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ) - 1.0F;
-        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX + sampleOffset, centerZ) - 1.0F);
-        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX - sampleOffset, centerZ) - 1.0F);
-        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ + sampleOffset) - 1.0F);
-        highestSurface = Math.max(highestSurface, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ - sampleOffset) - 1.0F);
-        return highestSurface;
+        float highestSurface = Float.NEGATIVE_INFINITY;
+        int loadedSamples = 0;
+        for (int[] sampleColumn : sampleColumns) {
+            if (!level.hasChunkAt(new net.minecraft.core.BlockPos(sampleColumn[0], Mth.floor(renderBottomY), sampleColumn[1]))) {
+                continue;
+            }
+            float surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sampleColumn[0], sampleColumn[1]) - 1.0F;
+            highestSurface = Math.max(highestSurface, surfaceY);
+            loadedSamples++;
+        }
+
+        if (loadedSamples <= 0) {
+            return new TerrainSurfaceSample(renderBottomY - GROUND_CONTACT_PADDING_WORLD, 0, true);
+        }
+
+        return new TerrainSurfaceSample(highestSurface, loadedSamples, false);
     }
 
     private static void debug(String message, Object... args) {
@@ -601,6 +667,7 @@ public final class SimpleCloudsTornadoRenderer {
                                    float width, float stormSize, float spin, float intensity,
                                    float shape, float touchdownProgress, float seed, float animationTime,
                                    Vec3 renderPosWorld, float renderBottomWorld, float terrainSurfaceWorld,
+                                   int terrainLoadedSamples, boolean terrainFallbackUsed,
                                    float bottomWorld, float topWorld, float cloudHeightWorld, float scale,
                                    float boundsRadiusCloud, float boundsRadiusWorld, float wallcloudRadiusWorld) {
         static PreparedTornado from(ClientLevel level, TornadoInstance tornado, float animationTime, float partialTick) {
@@ -609,11 +676,13 @@ public final class SimpleCloudsTornadoRenderer {
             Vec3 renderPos = tornado.getRenderPosition(partialTick);
             float renderBottomY = tornado.getRenderBottomY(partialTick);
             float renderRadius = tornado.getRenderRadius(partialTick);
-            float terrainSurfaceY = sampleTerrainSurfaceY(level, renderPos, renderRadius);
-            float contactExtension = Math.max(GROUND_CONTACT_EXTENSION_WORLD, renderBottomY - terrainSurfaceY + GROUND_CONTACT_PADDING_WORLD);
+            TerrainSurfaceSample terrainSurface = sampleTerrainSurfaceY(level, renderPos, renderRadius, renderBottomY);
+            float terrainSurfaceY = terrainSurface.surfaceY();
             float centerX = (float) renderPos.x / scale;
             float centerZ = (float) renderPos.z / scale;
-            float bottomWorld = renderBottomY - contactExtension;
+            // `renderBottomY` is already the synced tornado base from the simulation and descriptor.
+            // Extending it downward again makes the volumetric funnel start below the terrain.
+            float bottomWorld = renderBottomY;
             float topWorld = Math.max(
                     renderBottomY + tornado.getRenderHeight(partialTick),
                     cloudHeight + CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD
@@ -651,6 +720,8 @@ public final class SimpleCloudsTornadoRenderer {
                     renderPos,
                     renderBottomY,
                     terrainSurfaceY,
+                    terrainSurface.loadedSamples(),
+                    terrainSurface.fallbackUsed(),
                     bottomWorld,
                     topWorld,
                     cloudHeight,
@@ -706,10 +777,17 @@ public final class SimpleCloudsTornadoRenderer {
     }
 
     private record CenterRayDiagnostic(Vec3 rayEndCloud, Vec3 rayDirectionCloud, float tNear, float tFar,
-                                       float stepSize, Vec3 samplePosCloud, Vec3 samplePosWorld,
+                                       float stepSize, float sampleT, float projectedDepth, float sceneDepth,
+                                       float sampleScreenX, float sampleScreenY, Vec3 samplePosCloud, Vec3 samplePosWorld,
                                        Vec3 tornadoOriginCloud, Vec3 tornadoOriginWorld,
                                        Vec3 localPosCloud, Vec3 localPosWorld,
                                        DeterministicFunnelSample funnelSample) {
+    }
+
+    private record ScreenDepthSample(float projectedDepth, float sceneDepth, float screenX, float screenY) {
+    }
+
+    private record TerrainSurfaceSample(float surfaceY, int loadedSamples, boolean fallbackUsed) {
     }
 
     private record DeterministicFunnelSample(float height01, float heightMask, float radialMask,

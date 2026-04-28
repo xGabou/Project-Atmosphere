@@ -3,24 +3,10 @@ package net.Gabou.projectatmosphere.modules.hurricane;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.AbstractGlassBlock;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -246,179 +232,35 @@ public class HurricaneInstance {
         this.refreshAnchorY(level);
         ServerLevel serverLevel = (ServerLevel) level;
         long gameTime = serverLevel.getGameTime();
-
-        if (gameTime - this.lastWindFieldTick >= WIND_FIELD_INTERVAL_TICKS) {
-            this.lastWindFieldTick = gameTime;
-            this.applyWindField(serverLevel);
-        }
-
-        if (gameTime - this.lastDestructionTick >= DESTRUCTION_INTERVAL_TICKS) {
-            this.lastDestructionTick = gameTime;
-            this.applyDestruction(serverLevel);
-        }
+        HurricaneWindField.apply(this, serverLevel, gameTime);
+        HurricaneDestructionManager.apply(this, serverLevel, gameTime);
     }
 
-    private void applyWindField(ServerLevel level) {
-        double effectRadius = Math.min(this.getCoreRadius() * 1.08D, 196.0D);
-        double eyeRadius = this.getVisualEyeRadius();
-        double coreRadius = this.getCoreRadius();
-        AABB box = new AABB(
-                this.position.x - effectRadius, this.position.y - 8.0D, this.position.z - effectRadius,
-                this.position.x + effectRadius, this.position.y + 112.0D, this.position.z + effectRadius
-        );
-
-        for (Entity entity : level.getEntities(null, box)) {
-            if (entity == null || entity.isSpectator() || StormShieldManager.isProtected(level, entity.position())) {
-                continue;
-            }
-            if (entity instanceof Player player && player.isCreative()) {
-                continue;
-            }
-
-            double dx = entity.getX() - this.position.x;
-            double dz = entity.getZ() - this.position.z;
-            double distSq = dx * dx + dz * dz;
-            if (distSq < 1.0D || distSq > effectRadius * effectRadius) {
-                continue;
-            }
-
-            double dist = Math.sqrt(distSq);
-            double invDist = 1.0D / dist;
-            float outerFactor = Mth.clamp((float) (1.0D - dist / effectRadius), 0.0F, 1.0F);
-            float eyewallFactor = projectatmosphere$ringFactor((float) dist, (float) eyeRadius * 1.18F, (float) coreRadius * 0.92F);
-            double tangentialStrength = (0.045D + this.category.ordinal() * 0.012D) * (0.35D + eyewallFactor * 0.65D);
-            double inwardStrength = (0.018D + this.destructiveStrength * 0.050D) * (0.40D + outerFactor * 0.60D);
-            double liftStrength = 0.008D + eyewallFactor * 0.055D;
-
-            if (dist < eyeRadius * 0.92D) {
-                tangentialStrength *= 0.30D;
-                inwardStrength *= -0.10D;
-                liftStrength *= 0.20D;
-            }
-
-            Vec3 tangential = new Vec3(-dz * invDist, 0.0D, dx * invDist).scale(tangentialStrength);
-            Vec3 inward = new Vec3(-dx * invDist, 0.0D, -dz * invDist).scale(inwardStrength);
-            Vec3 motion = tangential.add(inward).add(0.0D, liftStrength, 0.0D);
-
-            entity.push(motion.x, motion.y, motion.z);
-            if (entity instanceof ServerPlayer serverPlayer) {
-                serverPlayer.connection.send(new ClientboundSetEntityMotionPacket(serverPlayer));
-            }
-        }
+    float getDestructiveStrength() {
+        return this.destructiveStrength;
     }
 
-    private void applyDestruction(ServerLevel level) {
-        if (this.destructiveStrength < 0.40F) {
-            return;
-        }
-
-        RandomSource random = level.random;
-        float eyeRadius = this.getVisualEyeRadius();
-        float minRadius = eyeRadius * 1.30F;
-        float maxRadius = Math.min(this.getCoreRadius() * 0.94F, 128.0F + this.category.ordinal() * 24.0F);
-        int samples = 10 + this.category.ordinal() * 6;
-
-        for (int i = 0; i < samples; i++) {
-            float angle = random.nextFloat() * Mth.TWO_PI;
-            float sampleRadius = Mth.lerp(random.nextFloat(), minRadius, maxRadius);
-            int x = Mth.floor(this.position.x + Math.cos(angle) * sampleRadius);
-            int z = Mth.floor(this.position.z + Math.sin(angle) * sampleRadius);
-            int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
-            BlockPos pos = new BlockPos(x, y, z);
-            this.damageSurface(level, pos, random);
-        }
+    float getWindIntensity() {
+        return Mth.clamp(this.cycloneIntensity * 0.55F + this.destructiveStrength * 0.45F, 0.0F, 1.0F);
     }
 
-    private void damageSurface(ServerLevel level, BlockPos pos, RandomSource random) {
-        if (!level.isLoaded(pos) || StormShieldManager.isProtected(level, pos)) {
-            return;
-        }
-
-        BlockState state = level.getBlockState(pos);
-        if (state.isAir() || state.getFluidState().is(FluidTags.WATER)) {
-            return;
-        }
-
-        if (projectatmosphere$isSurfaceSoil(state)) {
-            if (!state.is(Blocks.DIRT)) {
-                level.setBlockAndUpdate(pos, Blocks.DIRT.defaultBlockState());
-                return;
-            }
-            if (this.destructiveStrength > 0.72F && random.nextFloat() < 0.12F) {
-                level.destroyBlock(pos, false);
-            }
-            return;
-        }
-
-        if (state.is(BlockTags.LOGS) || state.is(BlockTags.LEAVES)) {
-            this.destroyNearbyTreePieces(level, pos, random);
-            return;
-        }
-
-        if (projectatmosphere$isWeakStructure(state) && random.nextFloat() < 0.65F + this.destructiveStrength * 0.20F) {
-            level.destroyBlock(pos, false);
-        }
+    float getRotationDirection() {
+        return (this.id.getLeastSignificantBits() & 1L) == 0L ? 1.0F : -1.0F;
     }
 
-    private void destroyNearbyTreePieces(ServerLevel level, BlockPos origin, RandomSource random) {
-        int limit = 2 + this.category.ordinal() * 2;
-        int destroyed = 0;
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        for (int dx = -1; dx <= 1 && destroyed < limit; dx++) {
-            for (int dz = -1; dz <= 1 && destroyed < limit; dz++) {
-                for (int dy = 0; dy <= 6 && destroyed < limit; dy++) {
-                    cursor.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
-                    if (!level.isLoaded(cursor) || StormShieldManager.isProtected(level, cursor)) {
-                        continue;
-                    }
-                    BlockState candidate = level.getBlockState(cursor);
-                    if (!candidate.is(BlockTags.LOGS) && !candidate.is(BlockTags.LEAVES)) {
-                        continue;
-                    }
-                    if (random.nextFloat() > 0.70F + this.destructiveStrength * 0.15F) {
-                        continue;
-                    }
-                    level.destroyBlock(cursor, false);
-                    destroyed++;
-                }
-            }
+    boolean markWindFieldTick(long gameTime) {
+        if (gameTime - this.lastWindFieldTick < WIND_FIELD_INTERVAL_TICKS) {
+            return false;
         }
+        this.lastWindFieldTick = gameTime;
+        return true;
     }
 
-    private static boolean projectatmosphere$isSurfaceSoil(BlockState state) {
-        return state.is(Blocks.GRASS_BLOCK)
-                || state.is(Blocks.DIRT)
-                || state.is(Blocks.COARSE_DIRT)
-                || state.is(Blocks.PODZOL)
-                || state.is(Blocks.MYCELIUM)
-                || state.is(Blocks.ROOTED_DIRT)
-                || state.is(Blocks.DIRT_PATH)
-                || state.is(Blocks.FARMLAND)
-                || state.is(Blocks.MUD);
-    }
-
-    private static boolean projectatmosphere$isWeakStructure(BlockState state) {
-        return state.is(BlockTags.LEAVES)
-                || state.is(BlockTags.LOGS)
-                || state.is(BlockTags.PLANKS)
-                || state.is(BlockTags.WOODEN_STAIRS)
-                || state.is(BlockTags.WOODEN_SLABS)
-                || state.is(BlockTags.WOODEN_FENCES)
-                || state.is(BlockTags.WOODEN_DOORS)
-                || state.is(BlockTags.WOODEN_TRAPDOORS)
-                || state.is(BlockTags.SAPLINGS)
-                || state.is(BlockTags.FLOWERS)
-                || state.is(BlockTags.CROPS)
-                || state.getBlock() instanceof AbstractGlassBlock;
-    }
-
-    private static float projectatmosphere$ringFactor(float radius, float innerRadius, float outerRadius) {
-        if (outerRadius <= innerRadius) {
-            return 0.0F;
+    boolean markDestructionTick(long gameTime) {
+        if (gameTime - this.lastDestructionTick < DESTRUCTION_INTERVAL_TICKS) {
+            return false;
         }
-        float mid = (innerRadius + outerRadius) * 0.5F;
-        float span = Math.max(1.0F, (outerRadius - innerRadius) * 0.5F);
-        float normalized = 1.0F - Math.abs(radius - mid) / span;
-        return Mth.clamp(normalized, 0.0F, 1.0F);
+        this.lastDestructionTick = gameTime;
+        return true;
     }
 }

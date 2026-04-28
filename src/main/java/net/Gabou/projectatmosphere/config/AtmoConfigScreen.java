@@ -29,6 +29,10 @@ public class AtmoConfigScreen extends Screen {
     private int maxStormDebrisPerChunk;
     private boolean autoRepairGlass;
     private boolean damageGlassOnTornado;
+    private boolean enableHurricaneDestruction;
+    private double hurricaneDestructionStrength;
+    private boolean hurricaneDropBrokenBlocks;
+    private boolean hurricaneDamageTrees;
     private double tornadoCheckIntervalSec;
     private double tornadoBaseSpawnRadiusM;
     private double tornadoMinTempContrastC;
@@ -85,6 +89,7 @@ public class AtmoConfigScreen extends Screen {
     private EditBox tornadoIntensityMaxBox;
     private EditBox tornadoCellCooldownBox;
     private EditBox tornadoRenderQualityBox;
+    private EditBox hurricaneDestructionStrengthBox;
     private EditBox fogHumidityStartBox;
     private EditBox fogHumidityFullBox;
     private EditBox fogWetBiomeStrengthBox;
@@ -154,6 +159,10 @@ public class AtmoConfigScreen extends Screen {
         this.maxStormDebrisPerChunk = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
         this.autoRepairGlass = AtmoCommonConfig.AUTO_REPAIR_GLASS.get();
         this.damageGlassOnTornado = AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get();
+        this.enableHurricaneDestruction = AtmoCommonConfig.ENABLE_HURRICANE_DESTRUCTION.get();
+        this.hurricaneDestructionStrength = AtmoCommonConfig.HURRICANE_DESTRUCTION_STRENGTH.get();
+        this.hurricaneDropBrokenBlocks = AtmoCommonConfig.HURRICANE_DROP_BROKEN_BLOCKS.get();
+        this.hurricaneDamageTrees = AtmoCommonConfig.HURRICANE_DAMAGE_TREES.get();
         this.cloudRenderDistance = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
         this.tornadoCheckIntervalSec = AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get();
         this.tornadoBaseSpawnRadiusM = AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get();
@@ -259,6 +268,23 @@ public class AtmoConfigScreen extends Screen {
         addConfigWidget(Button.builder(toggleLabel("Damage Glass On Tornado", damageGlassOnTornado), b -> {
             damageGlassOnTornado = !damageGlassOnTornado;
             b.setMessage(toggleLabel("Damage Glass On Tornado", damageGlassOnTornado));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+        addConfigWidget(Button.builder(toggleLabel("Hurricane Destruction", enableHurricaneDestruction), b -> {
+            enableHurricaneDestruction = !enableHurricaneDestruction;
+            b.setMessage(toggleLabel("Hurricane Destruction", enableHurricaneDestruction));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+        hurricaneDestructionStrengthBox = addNumberField(center, y, "Hurricane Destruction Strength", Double.toString(hurricaneDestructionStrength));
+        y += 34;
+        addConfigWidget(Button.builder(toggleLabel("Drop Hurricane Blocks", hurricaneDropBrokenBlocks), b -> {
+            hurricaneDropBrokenBlocks = !hurricaneDropBrokenBlocks;
+            b.setMessage(toggleLabel("Drop Hurricane Blocks", hurricaneDropBrokenBlocks));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+        addConfigWidget(Button.builder(toggleLabel("Hurricane Tree Damage", hurricaneDamageTrees), b -> {
+            hurricaneDamageTrees = !hurricaneDamageTrees;
+            b.setMessage(toggleLabel("Hurricane Tree Damage", hurricaneDamageTrees));
         }).bounds(center - 100, y, 200, 20).build(), y);
         y += 32;
 
@@ -461,6 +487,7 @@ public class AtmoConfigScreen extends Screen {
         tornadoIntensityMax = parseDouble(tornadoIntensityMaxBox, tornadoIntensityMax);
         tornadoCellCooldownMinutes = parseInt(tornadoCellCooldownBox, tornadoCellCooldownMinutes);
         tornadoRenderQuality = Mth.clamp(parseDouble(tornadoRenderQualityBox, tornadoRenderQuality), 0.25d, 1.0d);
+        hurricaneDestructionStrength = Mth.clamp(parseDouble(hurricaneDestructionStrengthBox, hurricaneDestructionStrength), 0.0d, 3.0d);
         // Buttons already toggled booleans; nothing to parse.
         fogHumidityStartPercent = parseDouble(fogHumidityStartBox, fogHumidityStartPercent);
         fogHumidityFullPercent = parseDouble(fogHumidityFullBox, fogHumidityFullPercent);
@@ -486,6 +513,10 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.CLOUD_RENDER_DISTANCE.set(cloudRenderDistance);
         AtmoCommonConfig.AUTO_REPAIR_GLASS.set(autoRepairGlass);
         AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.set(damageGlassOnTornado);
+        AtmoCommonConfig.ENABLE_HURRICANE_DESTRUCTION.set(enableHurricaneDestruction);
+        AtmoCommonConfig.HURRICANE_DESTRUCTION_STRENGTH.set(hurricaneDestructionStrength);
+        AtmoCommonConfig.HURRICANE_DROP_BROKEN_BLOCKS.set(hurricaneDropBrokenBlocks);
+        AtmoCommonConfig.HURRICANE_DAMAGE_TREES.set(hurricaneDamageTrees);
         AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.set(tornadoCheckIntervalSec);
         AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.set(tornadoBaseSpawnRadiusM);
         AtmoCommonConfig.TORNADO_MIN_TEMP_CONTRAST_C.set(tornadoMinTempContrastC);

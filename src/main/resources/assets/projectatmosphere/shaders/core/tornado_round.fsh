@@ -74,6 +74,11 @@ struct DebugMasks {
     float connection;
 };
 
+float selectDebugMask(DebugMasks masks);
+DebugMasks sampleDebugMasks(int index, vec3 position);
+StormSample sampleFrozenStorm(int index, vec3 position);
+StormSample sampleStorm(int index, vec3 position);
+
 float saturate(float value) {
     return clamp(value, 0.0, 1.0);
 }
@@ -163,6 +168,32 @@ float cloudSpaceToDepth(vec3 pos) {
     vec4 clip = ProjMat * ModelViewMat * vec4(pos, 1.0);
     float ndcZ = clip.z / clip.w;
     return ndcZ * 0.5 + 0.5;
+}
+
+float sampleFirstHitField(vec3 position, bool debugActive, bool debugMaskMode) {
+    if (debugMaskMode) {
+        return selectDebugMask(sampleDebugMasks(0, position));
+    }
+
+    StormSample storm = debugActive && DebugFreeze != 0
+        ? sampleFrozenStorm(0, position)
+        : sampleStorm(0, position);
+    return max(storm.cloud, 0.0) * 0.285;
+}
+
+float refineFirstHitT(vec3 ro, vec3 rd, float startT, float endT, bool debugActive, bool debugMaskMode) {
+    float low = startT;
+    float high = endT;
+    for (int iteration = 0; iteration < 5; iteration++) {
+        float mid = mix(low, high, 0.5);
+        float value = sampleFirstHitField(ro + rd * mid, debugActive, debugMaskMode);
+        if (value > 0.0005) {
+            high = mid;
+        } else {
+            low = mid;
+        }
+    }
+    return high;
 }
 
 bool intersectAabb(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax, out float tNear, out float tFar) {
@@ -620,6 +651,7 @@ void main() {
     float stepSize = interval / float(max(steps, 1));
     float jitter = hash1(screenUv.x * OutSize.x + screenUv.y * OutSize.y + 17.13);
     float t = tNear + stepSize * (0.20 + jitter * 0.80);
+    float previousT = tNear;
 
     for (int step = 0; step < 40; step++) {
         if (step >= steps) {
@@ -636,7 +668,8 @@ void main() {
             if (value > 0.0005) {
                 debugValue = max(debugValue, value);
                 if (!wroteDepth) {
-                    firstHitDepth = clamp(cloudSpaceToDepth(samplePos), 0.0, 1.0);
+                    float firstHitT = refineFirstHitT(ro, rd, previousT, t, debugActive, true);
+                    firstHitDepth = clamp(cloudSpaceToDepth(ro + rd * firstHitT), 0.0, 1.0);
                     wroteDepth = true;
                 }
             }
@@ -647,7 +680,8 @@ void main() {
             float sigma = max(storm.cloud, 0.0) * 0.285;
             if (sigma > 0.0005) {
                 if (!wroteDepth) {
-                    firstHitDepth = clamp(cloudSpaceToDepth(samplePos), 0.0, 1.0);
+                    float firstHitT = refineFirstHitT(ro, rd, previousT, t, debugActive, false);
+                    firstHitDepth = clamp(cloudSpaceToDepth(ro + rd * firstHitT), 0.0, 1.0);
                     wroteDepth = true;
                 }
                 float nearField = 1.0 - saturate(t / 12.0);
@@ -666,6 +700,7 @@ void main() {
             }
         }
 
+        previousT = t;
         t += stepSize;
     }
 

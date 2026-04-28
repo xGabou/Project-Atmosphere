@@ -1,6 +1,16 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Hurricane destructive behavior
+- Split hurricane server-side interaction into `HurricaneWindField`, `HurricaneDestructionManager`, and `HurricaneBlockBreakRules`, so `HurricaneInstance` now only delegates wind and destruction work during its tick.
+- Reworked hurricane entity forces into a rotating wind field with tangential circulation, inward pull toward the eye, light lift, and ambient storm drift scaling from distance to center and storm intensity.
+- Added limited tag-driven hurricane block destruction with explicit protection rules: fragile vegetation can break naturally around the eyewall, leaves can strip more often than logs, trees stay optional behind config, and terrain, ores, portals, command blocks, chests, block entities, and protected areas are excluded.
+- Added the `projectatmosphere:hurricane_fragile`, `projectatmosphere:hurricane_tree_damage`, and `projectatmosphere:hurricane_never_break` block tags plus four user-facing common config options: `enableHurricaneDestruction`, `hurricaneDestructionStrength`, `hurricaneDropBrokenBlocks`, and `hurricaneDamageTrees`.
+
 ## Unreleased - Distant Horizons storm volume rendering fix
+- Fixed the tornado depth source in the Simple Clouds volume pass by snapshotting cloud/depth state into the transparency target before rendering the tornado and sampling that copied depth texture, instead of sampling the same depth attachment the tornado pass is actively writing to.
+- Stopped the Simple Clouds tornado volume renderer from inventing a second ground-contact offset below the synced tornado base; it now uses the server/client `renderBottomY` directly and logs `baseOffsetWorld`, which fixes funnels starting around 11-12 blocks under terrain even when the sampled terrain height is correct.
+- Refined tornado first-hit depth writes by binary-searching the entry point of the occupied raymarch segment instead of dropping depth several blocks into the funnel body, restored the explicit scene-depth rejection for the `GL_ALWAYS` proxy pass, and added projected-vs-scene depth diagnostics so DH depth mismatches can be verified from the log.
+- Made the tornado client ground-contact sampler ignore unloaded client columns and fall back to the server-synced tornado base when DH-visible terrain is outside vanilla client chunk ownership, preventing bogus `-65` terrain heights from stretching the funnel far below the real ground.
 - Hooked the dedicated tornado volume render pass into Simple Clouds' `DhSupportPipeline.afterDistantHorizonsRender`, so PA tornado shaders render into the DH cloud framebuffer path instead of only the default/shader-support pipelines.
 - Switched hurricanes back to the Simple Clouds compute-mesh integration path by restoring the `CloudHurricanes` uploader/chunk scheduler and disabling the standalone hurricane volume pipeline hooks.
 - Made tornado volume rays screen-space stable and increased optical thickness so funnels read as depth-bearing storm bodies instead of flat hatched overlays, without relying on front-face culling that can hide the proxy volume on some pipelines.

@@ -25,6 +25,10 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
     public static final ForgeConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
     public static final ForgeConfigSpec.BooleanValue DAMAGE_GLASS_ON_TORNADO;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_HURRICANE_DESTRUCTION;
+    public static final ForgeConfigSpec.DoubleValue HURRICANE_DESTRUCTION_STRENGTH;
+    public static final ForgeConfigSpec.BooleanValue HURRICANE_DROP_BROKEN_BLOCKS;
+    public static final ForgeConfigSpec.BooleanValue HURRICANE_DAMAGE_TREES;
     public static final ForgeConfigSpec.DoubleValue TORNADO_CHECK_INTERVAL_SEC;
     public static final ForgeConfigSpec.DoubleValue TORNADO_BASE_SPAWN_RADIUS_M;
     public static final ForgeConfigSpec.DoubleValue TORNADO_MIN_TEMP_CONTRAST_C;
@@ -156,6 +160,18 @@ public class AtmoCommonConfig {
         DAMAGE_GLASS_ON_TORNADO = builder
                 .comment("Enable glass damage when a tornado passes over it")
                 .define("damageGlassOnTornado", true);
+        ENABLE_HURRICANE_DESTRUCTION = builder
+                .comment("Enable limited hurricane block destruction")
+                .define("enableHurricaneDestruction", true);
+        HURRICANE_DESTRUCTION_STRENGTH = builder
+                .comment("Overall hurricane destruction strength. Higher values increase checks, break chance, and tree damage.")
+                .defineInRange("hurricaneDestructionStrength", 1.0d, 0.0d, 3.0d);
+        HURRICANE_DROP_BROKEN_BLOCKS = builder
+                .comment("Drop items from blocks broken by hurricanes")
+                .define("hurricaneDropBrokenBlocks", false);
+        HURRICANE_DAMAGE_TREES = builder
+                .comment("Allow hurricanes to damage leaves and occasionally break logs")
+                .define("hurricaneDamageTrees", true);
         builder.push("tornado");
         TORNADO_CHECK_INTERVAL_SEC = builder
                 .comment("Seconds between tornado spawn checks")
