@@ -14,9 +14,11 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
@@ -112,6 +114,13 @@ public final class SimpleCloudsTornadoRenderer {
     public void renderOpaque(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
                              float partialTick, float cloudR, float cloudG, float cloudB,
                              int depthTextureId, int secondaryDepthTextureId, boolean writeDepth) {
+        this.renderOpaque(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB,
+                null, depthTextureId, secondaryDepthTextureId, writeDepth);
+    }
+
+    public void renderOpaque(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
+                             float partialTick, float cloudR, float cloudG, float cloudB,
+                             Frustum frustum, int depthTextureId, int secondaryDepthTextureId, boolean writeDepth) {
         ClientLevel level = Minecraft.getInstance().level;
         if (shouldDebugLog(level) && level != null && this.lastRenderOpaqueLogGameTime != level.getGameTime()) {
             this.lastRenderOpaqueLogGameTime = level.getGameTime();
@@ -203,6 +212,9 @@ public final class SimpleCloudsTornadoRenderer {
 
         for (int index : renderOrder) {
             PreparedTornado tornado = this.preparedTornadoes.get(index);
+            if (!this.isVisible(tornado, frustum)) {
+                continue;
+            }
             this.applyStormUniforms(shader, tornado);
             shader.safeGetUniform("DebugMode").set(debugMode.shaderValue());
             shader.safeGetUniform("DebugSelectedStorm").set(debugMode == TornadoRenderDebugState.Mode.OFF ? -1 : 0);
@@ -227,6 +239,18 @@ public final class SimpleCloudsTornadoRenderer {
         RenderSystem.enableDepthTest();
         RenderSystem.disableBlend();
         RenderSystem.enableCull();
+    }
+
+    public boolean hasVisibleTornado(Frustum frustum) {
+        if (TornadoRenderDebugState.isActive()) {
+            return !this.preparedTornadoes.isEmpty();
+        }
+        for (PreparedTornado tornado : this.preparedTornadoes) {
+            if (this.isVisible(tornado, frustum)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void renderTransparency(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
@@ -631,6 +655,10 @@ public final class SimpleCloudsTornadoRenderer {
         return TornadoRenderDebugState.isActive() && level != null && level.getGameTime() % 20L == 0L;
     }
 
+    private boolean isVisible(PreparedTornado tornado, Frustum frustum) {
+        return frustum == null || frustum.isVisible(tornado.boundsWorld());
+    }
+
     private static TerrainSurfaceSample sampleTerrainSurfaceY(ClientLevel level, Vec3 renderPos, float radius, float renderBottomY) {
         int centerX = Mth.floor(renderPos.x);
         int centerZ = Mth.floor(renderPos.z);
@@ -779,6 +807,17 @@ public final class SimpleCloudsTornadoRenderer {
                     this.centerX + this.boundsRadiusCloud,
                     this.bottomY + this.height + (12.0F / this.scale),
                     this.centerZ + this.boundsRadiusCloud
+            );
+        }
+
+        AABB boundsWorld() {
+            return new AABB(
+                    this.renderPosWorld.x - this.boundsRadiusWorld,
+                    this.bottomWorld - 8.0F,
+                    this.renderPosWorld.z - this.boundsRadiusWorld,
+                    this.renderPosWorld.x + this.boundsRadiusWorld,
+                    this.bottomWorld + this.heightWorld() + 12.0F,
+                    this.renderPosWorld.z + this.boundsRadiusWorld
             );
         }
 

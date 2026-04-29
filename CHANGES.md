@@ -7,6 +7,7 @@ This file records functionality additions/removals made during development sessi
 - Added the `projectatmosphere:hurricane_fragile`, `projectatmosphere:hurricane_tree_damage`, and `projectatmosphere:hurricane_never_break` block tags plus four user-facing common config options: `enableHurricaneDestruction`, `hurricaneDestructionStrength`, `hurricaneDropBrokenBlocks`, and `hurricaneDamageTrees`.
 
 ## Unreleased - Distant Horizons storm volume rendering fix
+- Added frustum visibility gating to the tornado Simple Clouds pipeline hooks so off-screen tornadoes skip the depth-copy and volume draw work instead of submitting the pass whenever a tornado exists.
 - Stopped applying extra ground-contact extension when tornado terrain probing falls back due to missing client samples; in that case the renderer now trusts the synced tornado base instead of inventing a synthetic lower base and opening a visible gap to the touchdown.
 - Reworked the non-DH tornado touchdown shaping so extra ground contact comes from dedicated touchdown and lower-stem density terms instead of shifting the main funnel cutoff, avoiding the slab-like lower-body regression while building a denser bridge from the ground contact back into the main funnel.
 - Tightened the lower tornado stem profile after the first bridge pass oversized the touchdown, keeping the ground connection continuous while tapering the base back toward a funnel shape instead of a bulb.

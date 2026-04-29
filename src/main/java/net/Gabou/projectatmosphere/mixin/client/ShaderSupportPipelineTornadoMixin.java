@@ -33,10 +33,15 @@ public abstract class ShaderSupportPipelineTornadoMixin {
         float[] cloudColor = renderer.getCloudColor(partialTick);
         mc.getProfiler().push("projectatmosphere_tornado_opaque");
         SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
+        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(frustum)) {
+            mc.getProfiler().pop();
+            return;
+        }
         renderer.copyDepthFromCloudsToTransparency();
         renderer.getCloudTarget().bindWrite(false);
         SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
                 renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
+                frustum,
                 renderer.getCloudTransparencyTarget().getDepthTextureId(),
                 -1,
                 true
@@ -63,6 +68,10 @@ public abstract class ShaderSupportPipelineTornadoMixin {
         float[] cloudColor = renderer.getCloudColor(partialTick);
         mc.getProfiler().push("projectatmosphere_tornado_transparency");
         SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
+        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(frustum)) {
+            mc.getProfiler().pop();
+            return;
+        }
         renderer.copyDepthFromCloudsToTransparency();
         renderer.getCloudTransparencyTarget().bindWrite(false);
         SimpleCloudsTornadoRenderer.INSTANCE.renderTransparency(
