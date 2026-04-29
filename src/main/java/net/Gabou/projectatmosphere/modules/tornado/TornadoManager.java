@@ -22,6 +22,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -288,8 +289,21 @@ public class TornadoManager {
         return null;
     }
 
+    static float resolveGroundedBottomY(Level level, Vec3 pos, float fallbackY) {
+        int sampleX = Mth.floor(pos.x);
+        int sampleZ = Mth.floor(pos.z);
+        if (!level.hasChunkAt(new BlockPos(sampleX, Mth.floor(fallbackY), sampleZ))) {
+            return fallbackY;
+        }
+        int height = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sampleX, sampleZ);
+        if (height <= level.getMinBuildHeight()) {
+            return fallbackY;
+        }
+        return height - 1.0F;
+    }
+
     private static TornadoGeometry computeGeometry(Level level, Vec3 pos, float radius) {
-        float bottomY = (float) pos.y;
+        float bottomY = resolveGroundedBottomY(level, pos, (float) pos.y);
         float cloudBase = CloudManager.get(level).getCloudHeight();
         float reachToCloudBase = Math.max(0.0F, cloudBase - bottomY);
         float height = Math.max(MIN_VISUAL_HEIGHT, reachToCloudBase + radius * HEIGHT_RADIUS_FACTOR + HEIGHT_CLOUD_PADDING);

@@ -38,7 +38,7 @@ public abstract class ShaderSupportPipelineTornadoMixin {
         SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
                 renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
                 renderer.getCloudTransparencyTarget().getDepthTextureId(),
-                mc.getMainRenderTarget().getDepthTextureId(),
+                -1,
                 true
         );
         mc.getProfiler().pop();

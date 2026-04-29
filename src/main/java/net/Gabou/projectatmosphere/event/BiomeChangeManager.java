@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @Mod.EventBusSubscriber
 public class BiomeChangeManager {
-    private static final Map<UUID, RegionTrack> regionTrack = new HashMap<>();
+    private static final Map<UUID, Pair<RegionInstanceKey, BlockPos>> regionTrack = new HashMap<>();
     private static final Map<UUID, Pair<ResourceLocation, Boolean>> lastBiome = new HashMap<>();
     private static final int RUN_INTERVAL_TICKS = 2000;
     // Threshold to move the tracked center: 4/5 of default region size.
@@ -48,22 +48,22 @@ public class BiomeChangeManager {
         UUID uuid = player.getUUID();
         BlockPos pos = player.blockPosition();
         RegionInstanceKey region = RegionInstanceKey.from(pos);
-        RegionTrack track = regionTrack.computeIfAbsent(uuid, id -> new RegionTrack(region, pos));
+        Pair<RegionInstanceKey, BlockPos> track = regionTrack.computeIfAbsent(uuid, id -> Pair.of(region, pos));
         ResourceLocation nowBiome = getBiomeKeyAt(player);
         Pair<ResourceLocation, Boolean> last = lastBiome.get(uuid);
         if (last == null || !last.getKey().equals(nowBiome)) {
             lastBiome.put(uuid, Pair.of(nowBiome, isDesert(nowBiome)));
         }
         // If we enter a new region, update and trigger regen.
-        if (!track.region().equals(region)) {
-            track = new RegionTrack(region, pos);
+        if (!track.getLeft().equals(region)) {
+            track = Pair.of(region, pos);
             regionTrack.put(uuid, track);
             onRegionChanged(player, region, nowBiome);
             return;
         }
         // If we moved far from the tracked center within the same region, update center and regen.
-        if (track.center().distManhattan(pos) > MOVE_THRESHOLD) {
-            track = new RegionTrack(region, pos);
+        if (track.getRight().distManhattan(pos) > MOVE_THRESHOLD) {
+            track = Pair.of(region, pos);
             regionTrack.put(uuid, track);
             onRegionChanged(player, region, nowBiome);
         }
@@ -118,6 +118,4 @@ public class BiomeChangeManager {
                 "[Atmosphere] Entered region " + region + ". Forecast regenerated."
         ));
     }
-
-    private record RegionTrack(RegionInstanceKey region, BlockPos center) {}
 }

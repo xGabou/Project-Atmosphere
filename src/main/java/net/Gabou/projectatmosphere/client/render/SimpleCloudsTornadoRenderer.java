@@ -635,6 +635,7 @@ public final class SimpleCloudsTornadoRenderer {
         int centerX = Mth.floor(renderPos.x);
         int centerZ = Mth.floor(renderPos.z);
         int sampleOffset = Math.max(2, Mth.floor(Math.min(radius * 0.45F, 10.0F)));
+        int minBuildHeight = level.getMinBuildHeight();
         int[][] sampleColumns = {
                 {centerX, centerZ},
                 {centerX + sampleOffset, centerZ},
@@ -650,6 +651,9 @@ public final class SimpleCloudsTornadoRenderer {
                 continue;
             }
             float surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sampleColumn[0], sampleColumn[1]) - 1.0F;
+            if (surfaceY <= minBuildHeight) {
+                continue;
+            }
             highestSurface = Math.max(highestSurface, surfaceY);
             loadedSamples++;
         }
@@ -684,11 +688,19 @@ public final class SimpleCloudsTornadoRenderer {
             float terrainSurfaceY = terrainSurface.surfaceY();
             float centerX = (float) renderPos.x / scale;
             float centerZ = (float) renderPos.z / scale;
-            float contactExtension = Math.max(
-                    GROUND_CONTACT_EXTENSION_WORLD,
-                    renderBottomY - terrainSurfaceY + GROUND_CONTACT_PADDING_WORLD
-            );
-            float bottomWorld = renderBottomY - contactExtension;
+            float bottomWorld;
+            if (terrainSurface.fallbackUsed()) {
+                bottomWorld = renderBottomY;
+            } else {
+                float contactExtension = Math.max(
+                        GROUND_CONTACT_EXTENSION_WORLD,
+                        renderBottomY - terrainSurfaceY + GROUND_CONTACT_PADDING_WORLD
+                );
+                bottomWorld = Math.max(
+                        renderBottomY - contactExtension,
+                        terrainSurfaceY - GROUND_CONTACT_PADDING_WORLD
+                );
+            }
             float topWorld = Math.max(
                     renderBottomY + tornado.getRenderHeight(partialTick),
                     cloudHeight + CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD

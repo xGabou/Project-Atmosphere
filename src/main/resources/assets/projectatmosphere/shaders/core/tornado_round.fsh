@@ -457,7 +457,12 @@ StormSample sampleStorm(int index, vec3 position) {
         + ((widthWorld / 2.5) * percFnlHeight * torPerc)
         + ((stormSizeWorld / mix(torShape + 2.0, torShape, torPerc)) * pow(percFnlHeight, 4.0));
     widWorld = mix(widWorld, 0.0, (1.0 - percFnlHeight) * (1.0 - torPerc));
-    float tornadoHeightWorld = mix(fnlTopWorld, posWorld.y - 0.25, torPerc);
+    float lowerBodyHeightWorld = mix(9.0, 15.0, torPerc);
+    float lowerBodyBlend = saturate((positionWorld.y - posWorld.y) / max(lowerBodyHeightWorld, 0.001));
+    lowerBodyBlend = lowerBodyBlend * lowerBodyBlend * (3.0 - 2.0 * lowerBodyBlend);
+    float baseRadiusWorld = mix(max(widthWorld * 0.16, 0.75), max(widthWorld * 0.24, 1.30), intensity);
+    widWorld = mix(baseRadiusWorld, widWorld, lowerBodyBlend);
+    float tornadoHeightWorld = posWorld.y - 0.25;
     float th = 1.0 - saturate((positionWorld.y - tornadoHeightWorld) / 3.75);
     widWorld = mix(widWorld, 0.0, th * th * th);
     float maxWidWorld = (widthWorld / 4.0) + ((widthWorld / 4.0) * torPerc) + ((stormSizeWorld / 8.0) * torPerc);
@@ -557,17 +562,11 @@ StormSample sampleStorm(int index, vec3 position) {
     tornado += innerVeil * (0.80 + materialField * 0.20);
     tornado *= materialField;
     tornado *= mix(0.78, 1.06, intensity);
+    tornado *= mix(1.18, 1.0, lowerBodyBlend);
 
     float dcNoise1 = lowDetail
         ? noise3(torSpinPos3 / 2.5)
         : fbm(torSpinPos3 / 2.5, contactOctaves, 2.0, 0.5, 1.0);
-    float baseContactRadiusWorld = max(widthWorld * 0.24, 0.72) + intensity * 0.42;
-    float baseContactPerc = 1.0 - saturate(torDistWorld / max(baseContactRadiusWorld, 0.001));
-    float touchdown = pow(max(baseContactPerc, 0.0), 0.48);
-    touchdown *= saturate((positionWorld.y - (posWorld.y - 2.2)) / 2.6);
-    touchdown *= 1.0 - saturate((positionWorld.y - (posWorld.y + 1.8)) / 3.4);
-    touchdown *= 0.72 + dcNoise1 * 0.12;
-    tornado = max(tornado, touchdown * 1.05);
 
     float dcPerc = saturate((intensity - 0.35) * 1.9);
     float h = 5.0 + (dcNoise1 * 1.875);
@@ -705,14 +704,13 @@ void main() {
                 float nearField = 1.0 - saturate(t / 12.0);
                 float alpha = 1.0 - exp(-sigma * stepSize * 10.8);
                 alpha = saturate(alpha * (1.22 + nearField * 0.40));
-                float bodyDark = mix(0.055, 0.21, saturate(storm.material));
-                vec3 cloudBase = CloudColor.rgb * bodyDark;
                 float upperStrength = saturate(storm.upper);
-                vec3 upperCol = mix(cloudBase, CloudColor.rgb * 0.64, upperStrength * 0.62);
-                upperCol *= mix(1.0, 1.0 - TORNADO_TOP_DARKEN_FACTOR, upperStrength);
+                alpha = saturate(alpha * (1.0 + upperStrength * 0.32));
+                float bodyDark = mix(0.055, 0.21, saturate(storm.material));
+                vec3 cloudBase = vec3(bodyDark);
                 vec3 dustCol = vec3(0.20, 0.125, 0.071);
                 float dustTint = saturate(pow(storm.dust, 0.55)) * (1.0 - saturate(storm.material * 0.45));
-                vec3 localColor = mix(upperCol, dustCol, dustTint);
+                vec3 localColor = mix(cloudBase, dustCol, dustTint);
                 accum += localColor * alpha * transmittance;
                 transmittance *= (1.0 - alpha);
             }
@@ -737,20 +735,22 @@ void main() {
         return;
     }
 
-    float alpha = 1.0 - transmittance;
-    if (alpha < 0.01) {
+    float rawAlpha = 1.0 - transmittance;
+    if (!wroteDepth || rawAlpha < 0.03) {
         discard;
     }
+    float alpha = 1.0 - pow(1.0 - rawAlpha, 1.80);
+    alpha = saturate(alpha * 1.10);
     float sceneDepth = sampleSceneDepth(screenUv);
     if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
         discard;
     }
 
-    vec3 color = accum / max(alpha, 0.0001);
+    vec3 color = accum / max(rawAlpha, 0.0001);
     float fogFactor = smoothstep(FogStart, FogEnd, nearestT);
     color = mix(color, FogColor.rgb, fogFactor * 0.45);
     if (wroteDepth) {
         gl_FragDepth = firstHitDepth;
     }
-    fragColor = vec4(color, saturate(alpha * 1.18));
+    fragColor = vec4(color, saturate(alpha * 1.08));
 }

@@ -20,6 +20,9 @@ public final class ClientHurricaneStateCache {
     private static final int DEFAULT_BLEND_TICKS = 10;
     private static final Map<UUID, Entry> ENTRIES = new LinkedHashMap<>();
     private static final Map<UUID, CloudRegion> RESERVATION_REGIONS = new LinkedHashMap<>();
+    private static long cachedSemanticTick = Long.MIN_VALUE;
+    private static float cachedSemanticPartialTick = Float.NaN;
+    private static List<HurricaneRenderSnapshot> cachedSemanticSnapshots = List.of();
 
     private ClientHurricaneStateCache() {
     }
@@ -44,6 +47,7 @@ public final class ClientHurricaneStateCache {
         ENTRIES.putAll(next);
         RESERVATION_REGIONS.clear();
         RESERVATION_REGIONS.putAll(nextReservations);
+        invalidateSemanticSnapshotCache();
     }
 
     public static void tick(ClientLevel level) {
@@ -55,6 +59,7 @@ public final class ClientHurricaneStateCache {
     public static void clear() {
         ENTRIES.clear();
         RESERVATION_REGIONS.clear();
+        invalidateSemanticSnapshotCache();
     }
 
     public static List<HurricaneRenderSnapshot> getSemanticSnapshots() {
@@ -66,11 +71,21 @@ public final class ClientHurricaneStateCache {
         if (mc.level == null) {
             return List.of();
         }
-        if (ENTRIES.isEmpty()) {
-            return projectatmosphere$getIntegratedServerSnapshots(mc);
+        long clientTick = mc.level.getGameTime();
+        if (clientTick == cachedSemanticTick && Float.compare(partialTick, cachedSemanticPartialTick) == 0) {
+            return cachedSemanticSnapshots;
         }
 
-        long clientTick = mc.level.getGameTime();
+        List<HurricaneRenderSnapshot> snapshots = ENTRIES.isEmpty()
+                ? projectatmosphere$getIntegratedServerSnapshots(mc)
+                : buildInterpolatedSnapshots(clientTick, partialTick);
+        cachedSemanticTick = clientTick;
+        cachedSemanticPartialTick = partialTick;
+        cachedSemanticSnapshots = snapshots;
+        return snapshots;
+    }
+
+    private static List<HurricaneRenderSnapshot> buildInterpolatedSnapshots(long clientTick, float partialTick) {
         List<HurricaneRenderSnapshot> snapshots = new ArrayList<>(ENTRIES.size());
         for (Entry entry : ENTRIES.values()) {
             float blend = Mth.clamp(((float)(clientTick - entry.clientUpdateTick) + partialTick) / (float)DEFAULT_BLEND_TICKS, 0.0F, 1.0F);
@@ -130,9 +145,21 @@ public final class ClientHurricaneStateCache {
         if (server == null) {
             return List.of();
         }
-        return HurricaneManager.getActiveHurricanes().stream()
-                .map(hurricane -> hurricane.createRenderSnapshot())
-                .toList();
+        List<net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance> active = HurricaneManager.getActiveHurricanes();
+        if (active.isEmpty()) {
+            return List.of();
+        }
+        List<HurricaneRenderSnapshot> snapshots = new ArrayList<>(active.size());
+        for (net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance hurricane : active) {
+            snapshots.add(hurricane.createRenderSnapshot());
+        }
+        return snapshots;
+    }
+
+    private static void invalidateSemanticSnapshotCache() {
+        cachedSemanticTick = Long.MIN_VALUE;
+        cachedSemanticPartialTick = Float.NaN;
+        cachedSemanticSnapshots = List.of();
     }
 
     public static List<RenderableHurricane> getRenderableHurricanes(float partialTick) {

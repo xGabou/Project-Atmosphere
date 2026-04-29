@@ -1,4 +1,5 @@
 package net.Gabou.projectatmosphere.modules.tornado;
+import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
@@ -102,7 +103,7 @@ public class TornadoInstance {
     public float radius;
     public WindVector wind;
     private final float maxRadius;
-    private final float targetVisualHeight;
+    private float targetVisualHeight;
     private float visualBottomY;
     private float visualHeight;
     private float angularSpeed;
@@ -400,6 +401,7 @@ public class TornadoInstance {
         this.pruneCapturedEntities(level);
         this.tickLifecycle();
         this.updateMovement(level, gameTime);
+        this.updateGroundedVisualBase(level);
         this.pushStateToDescriptor();
 
         if (!this.phase.isTerminal() && this.normalizedIntensity >= 0.08F) {
@@ -548,6 +550,17 @@ public class TornadoInstance {
         this.radius = Mth.lerp(growth, this.maxRadius * (0.26F + stormBias * 0.12F), this.maxRadius * (0.90F + stormBias * 0.22F));
         this.visualHeight = Mth.lerp(growth, this.targetVisualHeight * (0.30F + stormBias * 0.08F), this.targetVisualHeight * (0.92F + stormBias * 0.15F));
         this.angularSpeed = 0.08F + growth * 0.16F + StormSeverityScale.toNormalized(this.stormLevel) * 0.05F;
+    }
+
+    private void updateGroundedVisualBase(ServerLevel level) {
+        float groundedBottomY = TornadoManager.resolveGroundedBottomY(level, this.position, this.visualBottomY);
+        this.visualBottomY = groundedBottomY;
+        this.position = new Vec3(this.position.x, groundedBottomY, this.position.z);
+
+        float cloudBase = CloudManager.get(level).getCloudHeight();
+        float reachToCloudBase = Math.max(0.0F, cloudBase - groundedBottomY);
+        this.targetVisualHeight = Math.max(96.0F, reachToCloudBase + this.maxRadius * 6.0F + 40.0F);
+        this.applyIntensityToVisuals();
     }
 
     private void updateMovement(ServerLevel level, long gameTime) {
