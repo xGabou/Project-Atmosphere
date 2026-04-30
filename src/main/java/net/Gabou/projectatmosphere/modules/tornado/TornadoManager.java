@@ -113,9 +113,6 @@ public class TornadoManager {
                 stormLevel,
                 requiresCloudAttachment
         );
-        if (!requiresCloudAttachment) {
-            tornado.activateImmediately();
-        }
         if (cloud != null) {
             attachDescriptor(cloud, tornado);
         }
@@ -138,9 +135,8 @@ public class TornadoManager {
     }
 
     public static void removeTornado(TornadoInstance tornado) {
-        if (SERVER_TORNADOES.remove(tornado)) {
-            removeAttachedDescriptor(tornado);
-            broadcastRemoval(tornado.getId());
+        if (tornado != null && SERVER_TORNADOES.contains(tornado)) {
+            tornado.markDissipating();
             broadcastSnapshots();
         }
     }

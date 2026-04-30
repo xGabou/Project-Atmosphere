@@ -1,5 +1,11 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Storm spawn and despawn transitions
+- Kept tornado command spawns in the forming lifecycle instead of forcing the no-cloud path active immediately, so standalone tornadoes now ease in and the removal command lets them dissipate before cleanup.
+- Added a hurricane lifecycle with forming, active, and dissipating phases, then kept cyclone-linked hurricanes alive until the fade-out completes instead of dropping them the moment the cyclone disappears.
+- Carried hurricane render intensity through the network snapshots and client cache so the custom hurricane volume can grow in and contract out instead of popping in at full size.
+- Kept hurricane block destruction gated behind `enableHurricaneDestruction`, so the new lifecycle does not bypass the existing config-driven protection.
+
 ## Unreleased - Hurricane destructive behavior
 - Split hurricane server-side interaction into `HurricaneWindField`, `HurricaneDestructionManager`, and `HurricaneBlockBreakRules`, so `HurricaneInstance` now only delegates wind and destruction work during its tick.
 - Reworked hurricane entity forces into a rotating wind field with tangential circulation, inward pull toward the eye, light lift, and ambient storm drift scaling from distance to center and storm intensity.
@@ -7,7 +13,11 @@ This file records functionality additions/removals made during development sessi
 - Added the `projectatmosphere:hurricane_fragile`, `projectatmosphere:hurricane_tree_damage`, and `projectatmosphere:hurricane_never_break` block tags plus four user-facing common config options: `enableHurricaneDestruction`, `hurricaneDestructionStrength`, `hurricaneDropBrokenBlocks`, and `hurricaneDamageTrees`.
 
 ## Unreleased - Distant Horizons storm volume rendering fix
+- Bound the tornado shader to Distant Horizons' actual depth texture in the DH Simple Clouds render path, using the DH depth as the primary scene-depth sampler and keeping the cloud transparency depth as the fallback secondary input.
+- Added tornado shader binding diagnostics that log the live shader name, GL program id, fragment program id/name, sampler names/locations, and requested depth texture ids so DH RenderDoc captures can be matched against the actual `ShaderInstance` state.
+- Added GL debug groups around the tornado opaque render pass so RenderDoc and Nsight can isolate the storm frame more easily.
 - Added frustum visibility gating to the tornado Simple Clouds pipeline hooks so off-screen tornadoes skip the depth-copy and volume draw work instead of submitting the pass whenever a tornado exists.
+- Kept the tornado frustum gate disabled in the Simple Clouds Distant Horizons path because that pipeline's frustum can reject the PA tornado volume even when the storm should render.
 - Stopped applying extra ground-contact extension when tornado terrain probing falls back due to missing client samples; in that case the renderer now trusts the synced tornado base instead of inventing a synthetic lower base and opening a visible gap to the touchdown.
 - Reworked the non-DH tornado touchdown shaping so extra ground contact comes from dedicated touchdown and lower-stem density terms instead of shifting the main funnel cutoff, avoiding the slab-like lower-body regression while building a denser bridge from the ground contact back into the main funnel.
 - Tightened the lower tornado stem profile after the first bridge pass oversized the touchdown, keeping the ground connection continuous while tapering the base back toward a funnel shape instead of a bulb.

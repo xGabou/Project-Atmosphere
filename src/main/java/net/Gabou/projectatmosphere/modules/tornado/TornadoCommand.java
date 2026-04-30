@@ -53,7 +53,7 @@ public class TornadoCommand {
 
                     if (TornadoManager.spawnServerWithoutCloud(level, tornadoPos, PROJECTATMOSPHERE$DEFAULT_RADIUS, wind)) {
                         ctx.getSource().sendSuccess(
-                                () -> Component.literal("Standalone tornado spawned without requiring clouds."),
+                                () -> Component.literal("Standalone tornado spawned and is forming."),
                                 true
                         );
                         return 1;
@@ -183,7 +183,7 @@ public class TornadoCommand {
 
         int distance = Mth.floor(Math.sqrt(tornado.position.distanceToSqr(playerPos)));
         TornadoManager.removeTornado(tornado);
-        source.sendSuccess(() -> Component.literal("Removed tornado " + distance + " blocks away."), true);
+        source.sendSuccess(() -> Component.literal("Tornado " + distance + " blocks away is dissipating."), true);
         return 1;
     }
 

@@ -108,6 +108,7 @@ public final class ClientHurricaneStateCache {
                     Mth.lerp(blend, start.rotationSpeed(), end.rotationSpeed()),
                     Mth.lerp(blend, start.transitionStart(), end.transitionStart()),
                     Mth.lerp(blend, start.transitionEnd(), end.transitionEnd()),
+                    Mth.lerp(blend, start.normalizedIntensity(), end.normalizedIntensity()),
                     end.cloudTypeId(),
                     Mth.floor(Mth.lerp(blend, start.ageTicks(), end.ageTicks()) + partialTick)
             ));
@@ -189,7 +190,7 @@ public final class ClientHurricaneStateCache {
                     snapshot.transitionEnd() / (float)SimpleCloudsConstants.CLOUD_SCALE,
                     snapshot.cloudTypeId(),
                     snapshot.ageTicks(),
-                    Mth.clamp((snapshot.bandCount() - 1.5F) / 4.5F, 0.0F, 1.0F),
+                    Mth.clamp(snapshot.normalizedIntensity(), 0.0F, 1.0F),
                     ((snapshot.id().hashCode() & 0x7fffffff) % 10000) / 10000.0F
             ));
         }

@@ -21,6 +21,7 @@ public record HurricaneRenderSnapshot(
         float rotationSpeed,
         float transitionStart,
         float transitionEnd,
+        float normalizedIntensity,
         ResourceLocation cloudTypeId,
         int ageTicks
 ) {
@@ -40,6 +41,7 @@ public record HurricaneRenderSnapshot(
         buf.writeFloat(this.rotationSpeed);
         buf.writeFloat(this.transitionStart);
         buf.writeFloat(this.transitionEnd);
+        buf.writeFloat(this.normalizedIntensity);
         buf.writeResourceLocation(this.cloudTypeId);
         buf.writeVarInt(this.ageTicks);
     }
@@ -55,6 +57,7 @@ public record HurricaneRenderSnapshot(
                 buf.readFloat(),
                 buf.readFloat(),
                 buf.readVarInt(),
+                buf.readFloat(),
                 buf.readFloat(),
                 buf.readFloat(),
                 buf.readFloat(),

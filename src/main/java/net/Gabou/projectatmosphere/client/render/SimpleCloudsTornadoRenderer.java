@@ -22,12 +22,16 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL43;
 import org.lwjgl.system.MemoryStack;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 public final class SimpleCloudsTornadoRenderer {
@@ -60,6 +64,7 @@ public final class SimpleCloudsTornadoRenderer {
     private long lastRenderOpaqueLogGameTime = Long.MIN_VALUE;
     private long lastRenderTransparencyLogGameTime = Long.MIN_VALUE;
     private long lastDiagnosticReportGameTime = Long.MIN_VALUE;
+    private long lastShaderBindingLogGameTime = Long.MIN_VALUE;
 
     private SimpleCloudsTornadoRenderer() {
     }
@@ -143,95 +148,102 @@ public final class SimpleCloudsTornadoRenderer {
             return;
         }
 
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        // Keep the volume depth-aware so it sits inside the world instead of reading like a flat overlay.
-        // The shader still raymarchs against its own max distance rather than using copied scene depth as a
-        // hard clip plane, which preserves the earlier horizon fix over water and long flat terrain.
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(writeDepth);
-        RenderSystem.depthFunc(GL11.GL_ALWAYS);
-        RenderSystem.disableCull();
-        RenderSystem.setShader(() -> shader);
+        this.pushGpuDebugGroup("ProjectAtmosphere Tornado Opaque");
+        try {
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            // Keep the volume depth-aware so it sits inside the world instead of reading like a flat overlay.
+            // The shader still raymarchs against its own max distance rather than using copied scene depth as a
+            // hard clip plane, which preserves the earlier horizon fix over water and long flat terrain.
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthMask(writeDepth);
+            RenderSystem.depthFunc(GL11.GL_ALWAYS);
+            RenderSystem.disableCull();
+            RenderSystem.setShader(() -> shader);
 
-        AbstractTexture tornadoTexture = mc.getTextureManager().getTexture(TornadoShaders.TORNADO_TEXTURE);
-        AbstractTexture noiseTexture = mc.getTextureManager().getTexture(TornadoShaders.NOISE_TEXTURE);
-        AbstractTexture flowTexture = mc.getTextureManager().getTexture(TornadoShaders.FLOW_TEXTURE);
-        shader.setSampler("TornadoSampler", tornadoTexture);
-        shader.setSampler("NoiseSampler", noiseTexture);
-        shader.setSampler("FlowSampler", flowTexture);
-        shader.setSampler("DepthSampler", depthTextureId);
-        shader.setSampler("SecondaryDepthSampler", secondaryDepthTextureId > 0 ? secondaryDepthTextureId : depthTextureId);
+            AbstractTexture tornadoTexture = mc.getTextureManager().getTexture(TornadoShaders.TORNADO_TEXTURE);
+            AbstractTexture noiseTexture = mc.getTextureManager().getTexture(TornadoShaders.NOISE_TEXTURE);
+            AbstractTexture flowTexture = mc.getTextureManager().getTexture(TornadoShaders.FLOW_TEXTURE);
+            shader.setSampler("TornadoSampler", tornadoTexture);
+            shader.setSampler("NoiseSampler", noiseTexture);
+            shader.setSampler("FlowSampler", flowTexture);
+            shader.setSampler("DepthSampler", depthTextureId);
+            shader.setSampler("SecondaryDepthSampler", secondaryDepthTextureId > 0 ? secondaryDepthTextureId : depthTextureId);
 
-        shader.safeGetUniform("ModelViewMat").set(stack.last().pose());
-        shader.safeGetUniform("ProjMat").set(projMat);
-        Matrix4f inverseProj = new Matrix4f(projMat).invert();
-        Matrix4f inverseModelView = new Matrix4f(stack.last().pose()).invert();
-        shader.safeGetUniform("InverseProjMat").set(inverseProj);
-        shader.safeGetUniform("InverseModelViewMat").set(inverseModelView);
+            shader.safeGetUniform("ModelViewMat").set(stack.last().pose());
+            shader.safeGetUniform("ProjMat").set(projMat);
+            Matrix4f inverseProj = new Matrix4f(projMat).invert();
+            Matrix4f inverseModelView = new Matrix4f(stack.last().pose()).invert();
+            shader.safeGetUniform("InverseProjMat").set(inverseProj);
+            shader.safeGetUniform("InverseModelViewMat").set(inverseModelView);
 
-        float scale = SimpleCloudsConstants.CLOUD_SCALE;
-        float cloudHeight = CloudManager.get(level).getCloudHeight();
-        Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
-        Vec3 cameraPosCloud = new Vec3(
-                cameraPos.x / scale,
-                (cameraPos.y - cloudHeight) / scale,
-                cameraPos.z / scale
-        );
-        shader.safeGetUniform("CameraPos").set((float) cameraPosCloud.x, (float) cameraPosCloud.y, (float) cameraPosCloud.z);
-
-        TornadoRenderDebugState.Mode debugMode = TornadoRenderDebugState.isActive()
-                ? TornadoRenderDebugState.getMode()
-                : TornadoRenderDebugState.Mode.OFF;
-        shader.safeGetUniform("CloudScale").set(scale);
-        shader.safeGetUniform("RenderQuality").set((float) AtmoCommonConfig.TORNADO_RENDER_QUALITY.get().doubleValue());
-        shader.safeGetUniform("UseSecondaryDepthSampler").set(secondaryDepthTextureId > 0 && secondaryDepthTextureId != depthTextureId ? 1 : 0);
-
-        shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
-        shader.safeGetUniform("AnimationTime").set(TornadoManager.getShaderTime() + partialTick * 0.05F);
-        shader.safeGetUniform("MaxDistance").set(MAX_RAY_DISTANCE_CLOUD);
-        shader.safeGetUniform("OutSize").set((float) mc.getWindow().getWidth(), (float) mc.getWindow().getHeight());
-        shader.safeGetUniform("FogStart").set(renderer.getFogStart());
-        shader.safeGetUniform("FogEnd").set(renderer.getFogEnd());
-        float[] fogColor = RenderSystem.getShaderFogColor();
-        shader.safeGetUniform("FogColor").set(fogColor[0], fogColor[1], fogColor[2], fogColor[3]);
-
-        this.maybeEmitDiagnosticReport(level, inverseProj, inverseModelView, stack.last().pose(), projMat, cameraPos, cameraPosCloud, writeDepth);
-
-        List<Integer> renderOrder = new ArrayList<>();
-        for (int i = 0; i < this.preparedTornadoes.size(); i++) {
-            if (debugMode != TornadoRenderDebugState.Mode.OFF && i != this.resolvedDebugStormIndex) {
-                continue;
-            }
-            renderOrder.add(i);
-        }
-        renderOrder.sort((left, right) -> Double.compare(
-                this.preparedTornadoes.get(right).centerWorld().distanceToSqr(cameraPos),
-                this.preparedTornadoes.get(left).centerWorld().distanceToSqr(cameraPos)
-        ));
-
-        for (int index : renderOrder) {
-            PreparedTornado tornado = this.preparedTornadoes.get(index);
-            if (!this.isVisible(tornado, frustum)) {
-                continue;
-            }
-            this.applyStormUniforms(shader, tornado);
-            shader.safeGetUniform("DebugMode").set(debugMode.shaderValue());
-            shader.safeGetUniform("DebugSelectedStorm").set(debugMode == TornadoRenderDebugState.Mode.OFF ? -1 : 0);
-            shader.safeGetUniform("DebugFreeze").set(TornadoRenderDebugState.isFreezeEnabled() ? 1 : 0);
-            shader.safeGetUniform("VolumeMin").set(
-                    (float) tornado.boundsMinCloud().x,
-                    (float) tornado.boundsMinCloud().y,
-                    (float) tornado.boundsMinCloud().z
+            float scale = SimpleCloudsConstants.CLOUD_SCALE;
+            float cloudHeight = CloudManager.get(level).getCloudHeight();
+            Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
+            Vec3 cameraPosCloud = new Vec3(
+                    cameraPos.x / scale,
+                    (cameraPos.y - cloudHeight) / scale,
+                    cameraPos.z / scale
             );
-            shader.safeGetUniform("VolumeMax").set(
-                    (float) tornado.boundsMaxCloud().x,
-                    (float) tornado.boundsMaxCloud().y,
-                    (float) tornado.boundsMaxCloud().z
-            );
-            shader.apply();
-            this.volumeBox.draw(shader, stack.last().pose(), projMat);
-            shader.clear();
+            shader.safeGetUniform("CameraPos").set((float) cameraPosCloud.x, (float) cameraPosCloud.y, (float) cameraPosCloud.z);
+
+            TornadoRenderDebugState.Mode debugMode = TornadoRenderDebugState.isActive()
+                    ? TornadoRenderDebugState.getMode()
+                    : TornadoRenderDebugState.Mode.OFF;
+            shader.safeGetUniform("CloudScale").set(scale);
+            shader.safeGetUniform("RenderQuality").set((float) AtmoCommonConfig.TORNADO_RENDER_QUALITY.get().doubleValue());
+            shader.safeGetUniform("UseSecondaryDepthSampler").set(secondaryDepthTextureId > 0 && secondaryDepthTextureId != depthTextureId ? 1 : 0);
+
+            shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
+            shader.safeGetUniform("AnimationTime").set(TornadoManager.getShaderTime() + partialTick * 0.05F);
+            shader.safeGetUniform("MaxDistance").set(MAX_RAY_DISTANCE_CLOUD);
+            shader.safeGetUniform("OutSize").set((float) mc.getWindow().getWidth(), (float) mc.getWindow().getHeight());
+            shader.safeGetUniform("FogStart").set(renderer.getFogStart());
+            shader.safeGetUniform("FogEnd").set(renderer.getFogEnd());
+            float[] fogColor = RenderSystem.getShaderFogColor();
+            shader.safeGetUniform("FogColor").set(fogColor[0], fogColor[1], fogColor[2], fogColor[3]);
+
+            this.maybeLogShaderBindings(level, shader, depthTextureId, secondaryDepthTextureId);
+            this.maybeEmitDiagnosticReport(level, inverseProj, inverseModelView, stack.last().pose(), projMat, cameraPos, cameraPosCloud, writeDepth);
+
+
+            List<Integer> renderOrder = new ArrayList<>();
+            for (int i = 0; i < this.preparedTornadoes.size(); i++) {
+                if (debugMode != TornadoRenderDebugState.Mode.OFF && i != this.resolvedDebugStormIndex) {
+                    continue;
+                }
+                renderOrder.add(i);
+            }
+            renderOrder.sort((left, right) -> Double.compare(
+                    this.preparedTornadoes.get(right).centerWorld().distanceToSqr(cameraPos),
+                    this.preparedTornadoes.get(left).centerWorld().distanceToSqr(cameraPos)
+            ));
+
+            for (int index : renderOrder) {
+                PreparedTornado tornado = this.preparedTornadoes.get(index);
+                if (!this.isVisible(tornado, frustum)) {
+                    continue;
+                }
+                this.applyStormUniforms(shader, tornado);
+                shader.safeGetUniform("DebugMode").set(debugMode.shaderValue());
+                shader.safeGetUniform("DebugSelectedStorm").set(debugMode == TornadoRenderDebugState.Mode.OFF ? -1 : 0);
+                shader.safeGetUniform("DebugFreeze").set(TornadoRenderDebugState.isFreezeEnabled() ? 1 : 0);
+                shader.safeGetUniform("VolumeMin").set(
+                        (float) tornado.boundsMinCloud().x,
+                        (float) tornado.boundsMinCloud().y,
+                        (float) tornado.boundsMinCloud().z
+                );
+                shader.safeGetUniform("VolumeMax").set(
+                        (float) tornado.boundsMaxCloud().x,
+                        (float) tornado.boundsMaxCloud().y,
+                        (float) tornado.boundsMaxCloud().z
+                );
+                shader.apply();
+                this.volumeBox.draw(shader, stack.last().pose(), projMat);
+                shader.clear();
+            }
+        } finally {
+            this.popGpuDebugGroup();
         }
 
         RenderSystem.depthMask(true);
@@ -655,6 +667,65 @@ public final class SimpleCloudsTornadoRenderer {
         return TornadoRenderDebugState.isActive() && level != null && level.getGameTime() % 20L == 0L;
     }
 
+    private void maybeLogShaderBindings(ClientLevel level, ShaderInstance shader, int depthTextureId, int secondaryDepthTextureId) {
+        if (!shouldDebugLog(level) || this.lastShaderBindingLogGameTime == level.getGameTime()) {
+            return;
+        }
+        this.lastShaderBindingLogGameTime = level.getGameTime();
+
+        try {
+            int programId = shader.getId();
+            String shaderName = shader.getName();
+            Object fragmentProgram = getFieldValue(shader, "fragmentProgram");
+            String fragmentName = invokeStringMethod(fragmentProgram, "getName");
+            Integer fragmentId = invokeIntMethod(fragmentProgram, "getId");
+            List<?> samplerNames = getFieldValue(shader, "samplerNames");
+            List<?> samplerLocations = getFieldValue(shader, "samplerLocations");
+            Map<?, ?> samplerMap = getFieldValue(shader, "samplerMap");
+
+            debug(
+                    "shaderBinding shaderName={} programId={} fragmentName={} fragmentId={} requestedDepthSampler={} requestedSecondaryDepthSampler={} samplerNames={} samplerLocations={} samplerKeys={} hasDepthSampler={} hasSecondaryDepthSampler={}",
+                    shaderName,
+                    programId,
+                    fragmentName,
+                    fragmentId,
+                    depthTextureId,
+                    secondaryDepthTextureId,
+                    samplerNames,
+                    samplerLocations,
+                    samplerMap == null ? "null" : samplerMap.keySet(),
+                    samplerNames != null && samplerNames.contains("DepthSampler"),
+                    samplerNames != null && samplerNames.contains("SecondaryDepthSampler")
+            );
+        } catch (Exception exception) {
+            debug("shaderBinding reflection failed: {}", exception.toString());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T getFieldValue(Object target, String fieldName) throws ReflectiveOperationException {
+        if (target == null) {
+            return null;
+        }
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (T) field.get(target);
+    }
+
+    private static String invokeStringMethod(Object target, String methodName) throws ReflectiveOperationException {
+        if (target == null) {
+            return "null";
+        }
+        return (String) target.getClass().getMethod(methodName).invoke(target);
+    }
+
+    private static Integer invokeIntMethod(Object target, String methodName) throws ReflectiveOperationException {
+        if (target == null) {
+            return null;
+        }
+        return (Integer) target.getClass().getMethod(methodName).invoke(target);
+    }
+
     private boolean isVisible(PreparedTornado tornado, Frustum frustum) {
         return frustum == null || frustum.isVisible(tornado.boundsWorld());
     }
@@ -696,6 +767,18 @@ public final class SimpleCloudsTornadoRenderer {
     private static void debug(String message, Object... args) {
         if (TornadoRenderDebugState.isActive()) {
             ProjectAtmosphere.LOGGER.info("[TornadoDebug] " + message, args);
+        }
+    }
+
+    private void pushGpuDebugGroup(String label) {
+        if (GL.getCapabilities() != null && GL.getCapabilities().GL_KHR_debug) {
+            GL43.glPushDebugGroup(GL43.GL_DEBUG_SOURCE_APPLICATION, 0, label);
+        }
+    }
+
+    private void popGpuDebugGroup() {
+        if (GL.getCapabilities() != null && GL.getCapabilities().GL_KHR_debug) {
+            GL43.glPopDebugGroup();
         }
     }
 

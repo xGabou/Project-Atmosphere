@@ -11,6 +11,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.SyncHurricaneStatePacket;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -27,6 +28,7 @@ import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -104,15 +106,10 @@ public class HurricaneManager {
             return;
         }
 
-        boolean removed = DEBUG_HURRICANES.remove(hurricane);
-        UUID cycloneId = hurricane.getCycloneId();
-        if (cycloneId != null) {
-            removed |= LINKED_HURRICANES.remove(cycloneId) != null;
-            FORMATION_TRACKERS.remove(cycloneId);
-            ENVIRONMENT_CACHE.remove(cycloneId);
-        }
-        if (removed) {
-            RESERVATION_REGIONS.remove(hurricane.id);
+        if ((DEBUG_HURRICANES.contains(hurricane) || hurricane.isLinkedToCyclone())
+                && hurricane.getPhase() != StormLifecyclePhase.DISSIPATING
+                && hurricane.getPhase() != StormLifecyclePhase.DISSIPATED) {
+            hurricane.markDissipating();
             dirty = true;
         }
     }
@@ -144,10 +141,7 @@ public class HurricaneManager {
     }
 
     private static void projectatmosphere$tickDebugHurricanes(ServerLevel level) {
-        if (DEBUG_HURRICANES.removeIf(h -> h.getLifetimeSeconds() > 1200.0F)) {
-            dirty = true;
-        }
-
+        List<HurricaneInstance> dead = new ArrayList<>();
         for (HurricaneInstance hurricane : DEBUG_HURRICANES) {
             float speed = hurricane.wind.baseSpeed() * 0.01F;
             hurricane.position = hurricane.position.add(
@@ -156,6 +150,17 @@ public class HurricaneManager {
                     Math.sin(hurricane.wind.angleRadians()) * speed
             );
             hurricane.tick(level);
+            if (hurricane.isDead() || hurricane.getLifetimeSeconds() > 1200.0F) {
+                dead.add(hurricane);
+            }
+        }
+
+        if (!dead.isEmpty()) {
+            for (HurricaneInstance hurricane : dead) {
+                DEBUG_HURRICANES.remove(hurricane);
+                RESERVATION_REGIONS.remove(hurricane.id);
+            }
+            dirty = true;
         }
     }
 
@@ -163,7 +168,19 @@ public class HurricaneManager {
         List<CycloneSnapshot> snapshots = CycloneManager.getActiveCycloneSnapshots();
         Set<UUID> activeCyclones = snapshots.stream().map(CycloneSnapshot::id).collect(Collectors.toCollection(LinkedHashSet::new));
 
-        if (LINKED_HURRICANES.keySet().removeIf(id -> !activeCyclones.contains(id))) {
+        boolean anyDissipating = false;
+        for (Map.Entry<UUID, HurricaneInstance> entry : LINKED_HURRICANES.entrySet()) {
+            if (activeCyclones.contains(entry.getKey())) {
+                continue;
+            }
+            HurricaneInstance hurricane = entry.getValue();
+            if (hurricane.getPhase() != StormLifecyclePhase.DISSIPATING
+                    && hurricane.getPhase() != StormLifecyclePhase.DISSIPATED) {
+                hurricane.markDissipating();
+                anyDissipating = true;
+            }
+        }
+        if (anyDissipating) {
             dirty = true;
         }
         FORMATION_TRACKERS.keySet().removeIf(id -> !activeCyclones.contains(id));
@@ -207,8 +224,32 @@ public class HurricaneManager {
             hurricane.tick(level);
 
             if (tracker.shouldDissipate(snapshot)) {
+                if (hurricane.getPhase() != StormLifecyclePhase.DISSIPATING
+                        && hurricane.getPhase() != StormLifecyclePhase.DISSIPATED) {
+                    hurricane.markDissipating();
+                    dirty = true;
+                }
+            }
+
+            if (hurricane.isDead()) {
                 LINKED_HURRICANES.remove(snapshot.id());
                 RESERVATION_REGIONS.remove(hurricane.id);
+                dirty = true;
+            }
+        }
+
+        Iterator<Map.Entry<UUID, HurricaneInstance>> iterator = LINKED_HURRICANES.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, HurricaneInstance> entry = iterator.next();
+            if (activeCyclones.contains(entry.getKey())) {
+                continue;
+            }
+
+            HurricaneInstance hurricane = entry.getValue();
+            hurricane.tick(level);
+            if (hurricane.isDead()) {
+                RESERVATION_REGIONS.remove(hurricane.id);
+                iterator.remove();
                 dirty = true;
             }
         }

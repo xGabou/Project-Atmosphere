@@ -39,11 +39,11 @@ public class HurricaneCommand {
                             int catInt = IntegerArgumentType.getInteger(ctx, "category");
                             HurricaneCategory cat = HurricaneCategory.fromId(catInt);
                             var wind = ForecastOrchestrator.getWind(level, pos, level.getGameTime());
-                            Vec3 spawnPos = new Vec3(player.getX(), level.getSeaLevel(), player.getZ());
-                            HurricaneManager.spawnServer(level, spawnPos, 40.0F, wind, cat);
-                            ctx.getSource().sendSuccess(() -> Component.literal("Hurricane category " + catInt + " spawned."), true);
-                            return 1;
-                        }));
+                    Vec3 spawnPos = new Vec3(player.getX(), level.getSeaLevel(), player.getZ());
+                    HurricaneManager.spawnServer(level, spawnPos, 40.0F, wind, cat);
+                    ctx.getSource().sendSuccess(() -> Component.literal("Hurricane category " + catInt + " spawned and is forming."), true);
+                    return 1;
+                }));
 
         root.then(base);
         root.then(Commands.literal("clearhurricanes")
@@ -63,7 +63,7 @@ public class HurricaneCommand {
                             .findFirst().orElse(null);
                     if (hurricane != null) {
                         HurricaneManager.removeHurricane(hurricane);
-                        ctx.getSource().sendSuccess(() -> Component.literal("Hurricane removed."), true);
+                        ctx.getSource().sendSuccess(() -> Component.literal("Hurricane is dissipating."), true);
                     } else {
                         ctx.getSource().sendFailure(Component.literal("No hurricane found near you."));
                     }

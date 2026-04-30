@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.mixin.client;
 
+import com.seibel.distanthorizons.api.DhApi;
+import com.seibel.distanthorizons.api.objects.DhApiResult;
 import dev.nonamecrackers2.simpleclouds.client.dh.pipeline.DhSupportPipeline;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
@@ -49,17 +51,22 @@ public abstract class DhSupportPipelineDiagnosticsMixin {
         float[] cloudColor = renderer.getCloudColor(partialTick);
         mc.getProfiler().push("projectatmosphere_dh_storm_opaque");
         SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
-        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(frustum)) {
+        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(null)) {
             mc.getProfiler().pop();
             return;
         }
         renderer.copyDepthFromCloudsToTransparency();
         renderer.getCloudTarget().bindWrite(false);
+        int depthTextureId = resolveDhDepthTextureId(renderer);
+        int secondaryDepthTextureId = renderer.getCloudTransparencyTarget().getDepthTextureId();
+        if (secondaryDepthTextureId <= 0 || secondaryDepthTextureId == depthTextureId) {
+            secondaryDepthTextureId = -1;
+        }
         SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
                 renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
-                frustum,
-                renderer.getCloudTransparencyTarget().getDepthTextureId(),
-                -1,
+                null,
+                depthTextureId,
+                secondaryDepthTextureId,
                 true
         );
 
@@ -84,7 +91,7 @@ public abstract class DhSupportPipelineDiagnosticsMixin {
         float[] cloudColor = renderer.getCloudColor(partialTick);
         mc.getProfiler().push("projectatmosphere_dh_storm_transparency");
         SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
-        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(frustum)) {
+        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(null)) {
             mc.getProfiler().pop();
             return;
         }
@@ -116,5 +123,19 @@ public abstract class DhSupportPipelineDiagnosticsMixin {
             }
         }
         return total;
+    }
+
+    private static int resolveDhDepthTextureId(SimpleCloudsRenderer renderer) {
+        try {
+            if (DhApi.Delayed.renderProxy != null) {
+                DhApiResult<Integer> result = DhApi.Delayed.renderProxy.getDhDepthTextureId();
+                if (result != null && result.success && result.payload != null && result.payload > 0) {
+                    return result.payload;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return renderer.getCloudTransparencyTarget().getDepthTextureId();
     }
 }

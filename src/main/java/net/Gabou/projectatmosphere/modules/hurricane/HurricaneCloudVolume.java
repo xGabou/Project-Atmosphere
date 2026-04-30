@@ -81,26 +81,27 @@ public record HurricaneCloudVolume(
         Vec3 renderPos = new Vec3(hurricane.centerX() * scale, hurricane.anchorY(), hurricane.centerZ() * scale);
         float intensity = Mth.clamp(hurricane.intensity(), 0.0F, 1.0F);
         float seed = Mth.clamp(hurricane.seed(), 0.0F, 1.0F);
-        float volumeHeight = Math.max(220.0F / scale, hurricane.bandWidth() * 0.55F);
+        float growth = Mth.lerp(intensity, 0.45F, 1.0F);
+        float volumeHeight = Math.max(220.0F / scale, hurricane.bandWidth() * (0.42F + intensity * 0.18F));
         return new HurricaneCloudVolume(
                 hurricane.id(),
                 (float) hurricane.centerX(),
                 (float) hurricane.centerZ(),
                 0.0F,
                 volumeHeight,
-                hurricane.eyeRadius(),
-                hurricane.eyeRadius() + hurricane.bandWidth() * 0.18F,
-                0.94F + intensity * 0.10F,
-                Math.max(hurricane.bandWidth() * 0.30F, 0.05F),
-                hurricane.coreRadius(),
-                hurricane.stormExtentRadius(),
+                hurricane.eyeRadius() * growth,
+                hurricane.eyeRadius() * growth + hurricane.bandWidth() * (0.14F + intensity * 0.08F),
+                0.90F + intensity * 0.12F,
+                Math.max(hurricane.bandWidth() * (0.24F + intensity * 0.10F), 0.05F),
+                hurricane.coreRadius() * Mth.lerp(intensity, 0.72F, 1.0F),
+                hurricane.stormExtentRadius() * Mth.lerp(intensity, 0.80F, 1.0F),
                 0.38F,
                 0.82F,
                 0.28F,
                 0.96F,
-                hurricane.transitionStart(),
-                hurricane.transitionEnd(),
-                hurricane.bandWidth(),
+                hurricane.transitionStart() * Mth.lerp(intensity, 0.72F, 1.0F),
+                hurricane.transitionEnd() * Mth.lerp(intensity, 0.80F, 1.0F),
+                hurricane.bandWidth() * (0.55F + intensity * 0.45F),
                 Mth.clamp(intensity * 0.85F, 0.0F, 1.0F),
                 hurricane.bandCount(),
                 Mth.clamp(intensity * 0.80F + seed * 0.10F, 0.0F, 1.0F),

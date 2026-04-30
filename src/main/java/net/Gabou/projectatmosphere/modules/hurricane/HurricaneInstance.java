@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.hurricane;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -35,10 +36,16 @@ public class HurricaneInstance {
     private float cycloneRadius;
     private float cycloneIntensity;
     private float destructiveStrength;
+    private float targetDestructiveStrength;
     private float anchorY = DEFAULT_ANCHOR_Y;
     private int ageTicks;
+    private int phaseTicks;
+    private int formationTicks;
+    private int activeTicks;
+    private int dissipationTicks;
     private long lastWindFieldTick = Long.MIN_VALUE;
     private long lastDestructionTick = Long.MIN_VALUE;
+    private StormLifecyclePhase phase;
 
     private HurricaneInstance(UUID id, @Nullable UUID cycloneId, Vec3 position, float radius, WindVector wind,
                               HurricaneCategory category, boolean debugSpawn) {
@@ -51,7 +58,10 @@ public class HurricaneInstance {
         this.debugSpawn = debugSpawn;
         this.cycloneRadius = Math.max(radius * 6.0F, 260.0F);
         this.cycloneIntensity = 0.55F;
-        this.destructiveStrength = 0.55F;
+        this.targetDestructiveStrength = 0.55F;
+        this.destructiveStrength = 0.18F;
+        this.phase = StormLifecyclePhase.FORMING;
+        this.rebuildLifecycleTimings();
     }
 
     public static HurricaneInstance createDebug(Vec3 position, float radius, WindVector wind, HurricaneCategory category) {
@@ -85,13 +95,14 @@ public class HurricaneInstance {
         this.cycloneIntensity = Mth.clamp(snapshot.intensity(), 0.0F, 1.0F);
         this.radius = Mth.clamp(snapshot.radius() * 0.18F, 38.0F, 64.0F);
         this.category = nextCategory;
-        this.destructiveStrength = Mth.clamp(
+        this.targetDestructiveStrength = Mth.clamp(
                 this.cycloneIntensity * 0.60F + intensificationStrength * 0.40F,
                 0.0F,
                 1.0F
         );
+        this.rebuildLifecycleTimings();
 
-        float boostedBase = Math.max(ambientWind.baseSpeed(), 11.0F + this.destructiveStrength * 22.0F);
+        float boostedBase = Math.max(ambientWind.baseSpeed(), 11.0F + this.targetDestructiveStrength * 22.0F);
         float boostedGust = Math.max(ambientWind.gustSpeed(), boostedBase + 6.0F + this.category.ordinal() * 3.0F);
         this.wind = new WindVector(boostedBase, ambientWind.angleRadians(), boostedGust);
         this.refreshAnchorY(level);
@@ -107,6 +118,10 @@ public class HurricaneInstance {
 
     public int getAgeTicks() {
         return this.ageTicks;
+    }
+
+    public StormLifecyclePhase getPhase() {
+        return this.phase;
     }
 
     public boolean isDebugSpawn() {
@@ -218,6 +233,7 @@ public class HurricaneInstance {
                 this.getRotationSpeed(),
                 this.getTransitionStart(),
                 this.getTransitionEnd(),
+                this.getRenderIntensity(0.0F),
                 HURRICANE_CLOUD_TYPE_ID,
                 this.ageTicks
         );
@@ -230,7 +246,11 @@ public class HurricaneInstance {
 
         this.ageTicks++;
         this.refreshAnchorY(level);
+        this.tickLifecycle();
         ServerLevel serverLevel = (ServerLevel) level;
+        if (this.phase.isTerminal()) {
+            return;
+        }
         long gameTime = serverLevel.getGameTime();
         HurricaneWindField.apply(this, serverLevel, gameTime);
         HurricaneDestructionManager.apply(this, serverLevel, gameTime);
@@ -241,7 +261,7 @@ public class HurricaneInstance {
     }
 
     float getWindIntensity() {
-        return Mth.clamp(this.cycloneIntensity * 0.55F + this.destructiveStrength * 0.45F, 0.0F, 1.0F);
+        return Mth.clamp(this.cycloneIntensity * 0.30F + this.destructiveStrength * 0.70F, 0.0F, 1.0F);
     }
 
     float getRotationDirection() {
@@ -262,5 +282,67 @@ public class HurricaneInstance {
         }
         this.lastDestructionTick = gameTime;
         return true;
+    }
+
+    public void markDissipating() {
+        if (this.phase == StormLifecyclePhase.DISSIPATING || this.phase == StormLifecyclePhase.DISSIPATED) {
+            return;
+        }
+        this.phase = StormLifecyclePhase.DISSIPATING;
+        this.phaseTicks = 0;
+    }
+
+    public void activateImmediately() {
+        this.phase = StormLifecyclePhase.ACTIVE;
+        this.phaseTicks = 0;
+        this.destructiveStrength = this.targetDestructiveStrength;
+    }
+
+    public boolean isDead() {
+        return this.phase.isTerminal();
+    }
+
+    private void tickLifecycle() {
+        switch (this.phase) {
+            case FORMING -> {
+                float rate = 1.0F / Math.max(1, this.formationTicks);
+                this.destructiveStrength = Math.min(this.targetDestructiveStrength, this.destructiveStrength + rate);
+                if (this.phaseTicks >= this.formationTicks || this.destructiveStrength >= this.targetDestructiveStrength - 0.02F) {
+                    this.phase = StormLifecyclePhase.ACTIVE;
+                    this.phaseTicks = 0;
+                }
+            }
+            case ACTIVE -> {
+                this.destructiveStrength = Mth.lerp(0.06F, this.destructiveStrength, this.targetDestructiveStrength);
+                if (this.phaseTicks >= this.activeTicks) {
+                    this.phase = StormLifecyclePhase.DISSIPATING;
+                    this.phaseTicks = 0;
+                }
+            }
+            case DISSIPATING -> {
+                float rate = 1.0F / Math.max(1, this.dissipationTicks);
+                this.destructiveStrength = Math.max(0.0F, this.destructiveStrength - rate);
+                if (this.phaseTicks >= this.dissipationTicks || this.destructiveStrength <= 0.02F) {
+                    this.phase = StormLifecyclePhase.DISSIPATED;
+                    this.destructiveStrength = 0.0F;
+                }
+            }
+            case DISSIPATED -> this.destructiveStrength = 0.0F;
+        }
+        this.phaseTicks++;
+    }
+
+    private void rebuildLifecycleTimings() {
+        float categoryBias = HurricaneCategory.values().length <= 1
+                ? 0.0F
+                : this.category.ordinal() / (float) (HurricaneCategory.values().length - 1);
+        float persistenceFactor = Mth.clamp(
+                this.targetDestructiveStrength * 0.70F + this.cycloneIntensity * 0.30F + categoryBias * 0.20F,
+                0.0F,
+                1.0F
+        );
+        this.formationTicks = Mth.floor(Mth.lerp(persistenceFactor, 20.0F * 10.0F, 20.0F * 26.0F));
+        this.activeTicks = Mth.floor(Mth.lerp(persistenceFactor, 20.0F * 120.0F, 20.0F * 260.0F));
+        this.dissipationTicks = Mth.floor(Mth.lerp(persistenceFactor, 20.0F * 16.0F, 20.0F * 52.0F));
     }
 }
