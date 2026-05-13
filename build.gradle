@@ -156,6 +156,7 @@ dependencies {
 
     compileOnly fg.deobf("curse.maven:project-atmosphere-for-tfc-1391548:7261639")
     compileOnly fg.deobf("curse.maven:dynamictrees-252818:7502488")
+    compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
     //implementation "curse.maven:nolijium-969602:6264798"
 
 
@@ -207,6 +208,8 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 tasks.named('jar', Jar).configure {
+    archiveFileName.set("Forge-${mod_id}-pre-${project.version}.jar")
+
     manifest {
         attributes([
                 "Specification-Title"     : mod_id,
@@ -218,6 +221,7 @@ tasks.named('jar', Jar).configure {
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
+
     finalizedBy 'reobfJar'
 }
 
@@ -232,7 +236,7 @@ tasks.withType(JavaCompile).configureEach {
     ]
 }
 
-def releaseJarFile = layout.buildDirectory.file("libs/${base.archivesName.get()}-pre-${project.version}.jar")
+def releaseJarFile = layout.buildDirectory.file("libs/Forge-${mod_id}-pre-${project.version}.jar")
 
 tasks.register("discordWebhook") {
     doLast {

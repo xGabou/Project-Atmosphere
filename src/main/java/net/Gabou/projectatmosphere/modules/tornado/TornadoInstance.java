@@ -762,6 +762,10 @@ public class TornadoInstance {
     }
 
     private boolean demolishBlocks(ServerLevel level) {
+        if (!AtmoCommonConfig.ENABLE_TORNADO_DESTRUCTION.get()) {
+            return false;
+        }
+
         Vec3 anchor = this.getInteractionAnchor(level);
         BlockPos center = BlockPos.containing(anchor);
         float stormFactor = StormSeverityScale.toNormalized(this.stormLevel);

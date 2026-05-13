@@ -65,7 +65,7 @@ float hash1(float p) {
     return fract(p);
 }
 
-float noise3(vec3 p) {
+float paHurricaneNoise3(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -91,7 +91,7 @@ float noise3(vec3 p) {
 float fbm(vec3 x, int octaves, float lacunarity, float gain, float amplitude) {
     float y = 0.0;
     for (int i = 0; i < octaves; i++) {
-        y += amplitude * noise3(x);
+        y += amplitude * paHurricaneNoise3(x);
         x *= lacunarity;
         amplitude *= gain;
     }

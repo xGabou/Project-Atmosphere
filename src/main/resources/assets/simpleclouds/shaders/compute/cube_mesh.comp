@@ -145,18 +145,9 @@ layout(std430) readonly buffer LayerGroupings {
 layerGroupings;
 
 struct CloudTornado {
-        float typeIndex;
-        vec2 center;
-        float radius;
-        float bottom;
-        float height;
-        vec2 padding;
+        vec4 shape0;
+        vec4 shape1;
 };
-
-layout(std430) readonly buffer CloudTornadoes {
-        CloudTornado data[];
-}
-cloudTornadoes;
 
 struct CloudHurricane {
         vec4 shape0;
@@ -165,10 +156,11 @@ struct CloudHurricane {
         vec4 shape3;
 };
 
-layout(std430) readonly buffer CloudHurricanes {
-        CloudHurricane data[];
+layout(std430) readonly buffer CloudStorms {
+        CloudTornado tornadoes[64];
+        CloudHurricane hurricanes[8];
 }
-cloudHurricanes;
+cloudStorms;
 
 #if TYPE == 0
 uniform sampler2DArray RegionsSampler;
@@ -460,12 +452,12 @@ bool projectatmosphere_insideTornado(vec3 pos, float typeIndex)
 {
         for (int i = 0; i < TotalCloudTornadoes; i++)
         {
-                CloudTornado tornado = cloudTornadoes.data[i];
-                if (abs(tornado.typeIndex - typeIndex) > 0.5)
+                CloudTornado tornado = cloudStorms.tornadoes[i];
+                if (abs(tornado.shape0.x - typeIndex) > 0.5)
                         continue;
-                if (pos.y < tornado.bottom || pos.y > tornado.bottom + tornado.height)
+                if (pos.y < tornado.shape1.x || pos.y > tornado.shape1.x + tornado.shape1.y)
                         continue;
-                if (distance(pos.xz, tornado.center) <= tornado.radius)
+                if (distance(pos.xz, tornado.shape0.yz) <= tornado.shape0.w)
                         return true;
         }
         return false;
@@ -477,7 +469,7 @@ int projectatmosphere_findHurricane(vec2 pos, float typeIndex)
         float bestDistSq = 3.402823466e+38;
         for (int i = 0; i < TotalCloudHurricanes; i++)
         {
-                CloudHurricane hurricane = cloudHurricanes.data[i];
+                CloudHurricane hurricane = cloudStorms.hurricanes[i];
                 if (abs(hurricane.shape0.x - typeIndex) > 0.5)
                         continue;
                 vec2 delta = pos - hurricane.shape0.yz;
@@ -498,7 +490,7 @@ float projectatmosphere_getStormHeightSample(float y, int hurricaneIndex)
 {
         if (hurricaneIndex < 0)
                 return y;
-        return y - cloudHurricanes.data[hurricaneIndex].shape0.w;
+        return y - cloudStorms.hurricanes[hurricaneIndex].shape0.w;
 }
 
 

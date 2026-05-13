@@ -5,6 +5,12 @@ This file records functionality additions/removals made during development sessi
 - Added a hurricane lifecycle with forming, active, and dissipating phases, then kept cyclone-linked hurricanes alive until the fade-out completes instead of dropping them the moment the cyclone disappears.
 - Carried hurricane render intensity through the network snapshots and client cache so the custom hurricane volume can grow in and contract out instead of popping in at full size.
 - Kept hurricane block destruction gated behind `enableHurricaneDestruction`, so the new lifecycle does not bypass the existing config-driven protection.
+- Added `enableTornadoDestruction` and wired it through the config screen, tornado demolition sweep, and tornado glass break queue so tornado block breaking can be disabled separately from tornado spawning.
+- Renamed generic shader `noise3` helpers to Project Atmosphere-specific names in the tornado and hurricane fragment shaders to avoid GPU driver GLSL overload conflicts during shader registration.
+- Made the Simple Clouds tornado and hurricane render mixin hooks tolerant of released/custom pipeline differences by targeting the cloud final composite pass for transparency and preventing missing optional hooks from crashing the client.
+- Merged tornado and hurricane Simple Clouds compute data into a single lazy `CloudStorms` SSBO so Project Atmosphere no longer exhausts 16-slot SSBO binding limits during Simple Clouds startup.
+- Capped Simple Clouds 0.7.4 lightning SSBO buffering to the available positive binding slots and reserved binding `0` for Project Atmosphere's storm compute data on 16-binding GPUs.
+- Targeted the Simple Clouds lightning buffer cap at both the named and SRG reload method names so it applies in packaged CurseForge/Forge client jars, not only the development runtime.
 
 ## Unreleased - Hurricane destructive behavior
 - Split hurricane server-side interaction into `HurricaneWindField`, `HurricaneDestructionManager`, and `HurricaneBlockBreakRules`, so `HurricaneInstance` now only delegates wind and destruction work during its tick.
@@ -517,3 +523,4 @@ This file records functionality additions/removals made during development sessi
 - No behavioral render change was made in this step; this is investigation instrumentation to isolate the remaining cloud visibility regression.
 - Restored the Tornado-branch hurricane render stack: `HurricaneShaders`, `SimpleCloudsHurricaneRenderer`, the hurricane mixin hooks, and the `hurricane_*` shader assets.
 - Added compatibility accessors on `HurricaneInstance` and `HurricaneManager` so the restored branch renderer can consume the current hurricane state model without changing the existing sync path.
+- Added a targeted Simple Clouds 0.7.4 compatibility cap for lightning SSBO buffering on low-binding GPUs and moved Project Atmosphere's `CloudStorms` SSBO onto binding 0 there, preventing reload crashes without disabling tornado/hurricane cloud shaping.

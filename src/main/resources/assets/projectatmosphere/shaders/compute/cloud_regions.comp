@@ -22,17 +22,9 @@ layout(std430) restrict readonly buffer LodScales {
 } lodScales;
 
 struct CloudTornado {
-    float typeIndex;
-    vec2 center;
-    float radius;
-    float bottom;
-    float height;
-    vec2 padding;
+    vec4 shape0;
+    vec4 shape1;
 };
-
-layout(std430) readonly buffer CloudTornadoes {
-    CloudTornado data[];
-} cloudTornadoes;
 
 struct CloudHurricane {
     vec4 shape0;
@@ -41,9 +33,10 @@ struct CloudHurricane {
     vec4 shape3;
 };
 
-layout(std430) readonly buffer CloudHurricanes {
-    CloudHurricane data[];
-} cloudHurricanes;
+layout(std430) readonly buffer CloudStorms {
+    CloudTornado tornadoes[64];
+    CloudHurricane hurricanes[8];
+} cloudStorms;
 
 layout(rg32f) restrict writeonly uniform image2DArray regionTexture;
 
@@ -107,10 +100,10 @@ bool projectatmosphere_insideTornado(vec2 coord, out float typeIndex)
 {
     for (int i = 0; i < TotalCloudTornadoes; i++)
     {
-        CloudTornado tornado = cloudTornadoes.data[i];
-        if (distance(coord, tornado.center) <= tornado.radius)
+        CloudTornado tornado = cloudStorms.tornadoes[i];
+        if (distance(coord, tornado.shape0.yz) <= tornado.shape0.w)
         {
-            typeIndex = tornado.typeIndex;
+            typeIndex = tornado.shape0.x;
             return true;
         }
     }
@@ -264,7 +257,7 @@ void main()
     {
         for (int i = 0; i < TotalCloudHurricanes; i++)
         {
-            result = projectatmosphere_compositeHurricane(result, projectatmosphere_sampleHurricane(cloudHurricanes.data[i], coord));
+            result = projectatmosphere_compositeHurricane(result, projectatmosphere_sampleHurricane(cloudStorms.hurricanes[i], coord));
         }
     }
 

@@ -21,6 +21,7 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADO_DESTRUCTION;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
     public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
     public static final ForgeConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
@@ -148,6 +149,9 @@ public class AtmoCommonConfig {
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);
+        ENABLE_TORNADO_DESTRUCTION = builder
+                .comment("Enable tornado block destruction and terrain scouring")
+                .define("enableTornadoDestruction", true);
         ENABLE_STORM_DEBRIS = builder
                 .comment("Enable random debris spawning during storms")
                 .define("enableStormDebris", false);
@@ -222,7 +226,7 @@ public class AtmoCommonConfig {
                 .comment("Cooldown in minutes before a cell can spawn another tornado")
                 .defineInRange("cellCooldownMinutes", 20, 0, Integer.MAX_VALUE);
         TORNADO_ALLOW_LEGACY_FALLBACK = builder
-                .comment("Allow falling back to the legacy mesh tornado when the SimpleClouds shader pack lacks the CloudTornadoes SSBO. Leave false to require the shader-driven funnel.")
+                .comment("Allow falling back to the legacy mesh tornado when the SimpleClouds shader pack lacks the CloudStorms SSBO. Leave false to require the shader-driven funnel.")
                 .define("allowLegacyTornadoFallback", false);
         TORNADO_DEBUG_LOGGING = builder
                 .comment("Enable verbose tornado logging (SSBO detection, fallback decisions, command outcomes).")

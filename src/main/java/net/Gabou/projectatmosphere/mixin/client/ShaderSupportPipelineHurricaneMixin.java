@@ -21,7 +21,8 @@ public abstract class ShaderSupportPipelineHurricaneMixin {
             at = @At(
                     value = "INVOKE",
                     target = "Ldev/nonamecrackers2/simpleclouds/client/renderer/SimpleCloudsRenderer;getCloudTransparencyTarget()Ldev/nonamecrackers2/simpleclouds/client/framebuffer/WeightedBlendingTarget;"
-            )
+            ),
+            require = 0
     )
     private void projectatmosphere$renderHurricaneOpaque(Minecraft mc, SimpleCloudsRenderer renderer,
                                                          PoseStack stack, Matrix4f projMat, float partialTick,
@@ -46,9 +47,10 @@ public abstract class ShaderSupportPipelineHurricaneMixin {
             method = "afterLevel",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V",
+                    target = "Ldev/nonamecrackers2/simpleclouds/client/renderer/SimpleCloudsRenderer;doFinalCompositePass(Lcom/mojang/blaze3d/vertex/PoseStack;FLorg/joml/Matrix4f;)V",
                     shift = At.Shift.BEFORE
-            )
+            ),
+            require = 0
     )
     private void projectatmosphere$renderHurricaneTransparency(Minecraft mc, SimpleCloudsRenderer renderer,
                                                                PoseStack stack, Matrix4f projMat, float partialTick,

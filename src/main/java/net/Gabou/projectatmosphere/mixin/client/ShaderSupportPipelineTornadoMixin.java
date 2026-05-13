@@ -20,7 +20,8 @@ public abstract class ShaderSupportPipelineTornadoMixin {
             at = @At(
                     value = "INVOKE",
                     target = "Ldev/nonamecrackers2/simpleclouds/client/renderer/SimpleCloudsRenderer;getCloudTransparencyTarget()Ldev/nonamecrackers2/simpleclouds/client/framebuffer/WeightedBlendingTarget;"
-            )
+            ),
+            require = 0
     )
     private void projectatmosphere$renderTornadoOpaque(Minecraft mc, SimpleCloudsRenderer renderer,
                                                        PoseStack stack, Matrix4f projMat, float partialTick,
@@ -53,9 +54,10 @@ public abstract class ShaderSupportPipelineTornadoMixin {
             method = "afterLevel",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V",
+                    target = "Ldev/nonamecrackers2/simpleclouds/client/renderer/SimpleCloudsRenderer;doFinalCompositePass(Lcom/mojang/blaze3d/vertex/PoseStack;FLorg/joml/Matrix4f;)V",
                     shift = At.Shift.BEFORE
-            )
+            ),
+            require = 0
     )
     private void projectatmosphere$renderTornadoTransparency(Minecraft mc, SimpleCloudsRenderer renderer,
                                                              PoseStack stack, Matrix4f projMat, float partialTick,

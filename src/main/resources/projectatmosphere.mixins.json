@@ -26,6 +26,8 @@
     "client.DhSupportPipelineDiagnosticsMixin",
     "client.SimpleCloudsRendererDiagnosticsMixin",
     "client.SimpleCloudsRendererDhFallbackMixin",
+    "client.BindingManagerAccessor",
+    "client.SimpleCloudsRendererLightningBufferMixin",
     "client.ShaderSupportPipelineTornadoMixin",
     "client.MinecraftCrashHandlerMixin",
     "client.LoadingScreenMixin",

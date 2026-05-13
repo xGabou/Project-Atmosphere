@@ -113,7 +113,7 @@ float onoise(vec3 pos) {
     );
 }
 
-float noise3(vec3 p) {
+float paTornadoNoise3(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -139,7 +139,7 @@ float noise3(vec3 p) {
 float fbm(vec3 x, int octaves, float lacunarity, float gain, float amplitude) {
     float y = 0.0;
     for (int i = 0; i < octaves; i++) {
-        y += amplitude * noise3(x);
+        y += amplitude * paTornadoNoise3(x);
         x *= lacunarity;
         amplitude *= gain;
     }
@@ -254,8 +254,8 @@ float sampleMaterialField(vec3 localTorPosWorld, float percFnlHeight, float widP
     }
 
     if (detailQuality < 0.45) {
-        float coarse = noise3(vec3(localTorPosWorld.xz * 0.055, percFnlHeight * 2.2 + animTime * 0.018)) * 0.5 + 0.5;
-        float band = noise3(vec3(localTorPosWorld.xz * 0.028 + vec2(animTime * 0.038, -animTime * 0.032), percFnlHeight * 1.35)) * 0.5 + 0.5;
+        float coarse = paTornadoNoise3(vec3(localTorPosWorld.xz * 0.055, percFnlHeight * 2.2 + animTime * 0.018)) * 0.5 + 0.5;
+        float band = paTornadoNoise3(vec3(localTorPosWorld.xz * 0.028 + vec2(animTime * 0.038, -animTime * 0.032), percFnlHeight * 1.35)) * 0.5 + 0.5;
         float turbulence = saturate(coarse * 0.68 + band * 0.32);
         return mix(0.90, 1.12, turbulence) * mix(0.90, 1.08, widPerc);
     }
@@ -474,24 +474,24 @@ StormSample sampleStorm(int index, vec3 position) {
     float swayTime = AnimationTime / 220.0;
     float nx = mix(
         onoise(vec3(posWorld.xz / 62.5, swayTime)),
-        noise3(vec3(posWorld.xz / 35.0, swayTime * 0.6)),
+        paTornadoNoise3(vec3(posWorld.xz / 35.0, swayTime * 0.6)),
         0.35
     ) * 5.0 * ropeMod;
     float nz = mix(
         onoise(vec3(swayTime, posWorld.zx / 62.5)),
-        noise3(vec3(swayTime * 0.6, posWorld.zx / 35.0)),
+        paTornadoNoise3(vec3(swayTime * 0.6, posWorld.zx / 35.0)),
         0.35
     ) * 5.0 * ropeMod;
     vec3 attachmentPointWorld = vec3(nx, 0.0, nz);
 
     float xAdd = mix(
         onoise(vec3(posWorld.xz / 31.25, swayTime + ((positionWorld.y * ropeMod) / 6.25))),
-        noise3(vec3(posWorld.xz / 18.0, (swayTime * 0.8) + ((positionWorld.y * ropeMod) / 9.5))),
+        paTornadoNoise3(vec3(posWorld.xz / 18.0, (swayTime * 0.8) + ((positionWorld.y * ropeMod) / 9.5))),
         0.30
     ) * 2.5 * ropeMod;
     float zAdd = mix(
         onoise(vec3(swayTime + ((positionWorld.y * ropeMod) / 6.25), posWorld.zx / 31.25)),
-        noise3(vec3((swayTime * 0.8) + ((positionWorld.y * ropeMod) / 9.5), posWorld.zx / 18.0)),
+        paTornadoNoise3(vec3((swayTime * 0.8) + ((positionWorld.y * ropeMod) / 9.5), posWorld.zx / 18.0)),
         0.30
     ) * 2.5 * ropeMod;
     float a = pow(percFnlHeight, 0.75);
@@ -529,7 +529,7 @@ StormSample sampleStorm(int index, vec3 position) {
     float nComp2 = fbm(torSpinPos2 / 5.0, primaryOctaves, 2.0, 0.5, 1.0);
     float torNoise1 = mix(nComp1, nComp2, sqrt(widMaxPerc));
     float torNoise2 = lowDetail
-        ? noise3((torSpinPos + vec3(9.2, -5.7, 3.1)) / 1.6)
+        ? paTornadoNoise3((torSpinPos + vec3(9.2, -5.7, 3.1)) / 1.6)
         : fbm((torSpinPos + vec3(9.2, -5.7, 3.1)) / 1.6, secondaryOctaves, 2.0, 0.55, 1.0);
 
     widWorld *= mix(0.8 + (torNoise1 * 0.2), 0.9, saturate(widthWorld / 125.0) * 0.9);
@@ -565,7 +565,7 @@ StormSample sampleStorm(int index, vec3 position) {
     tornado *= mix(1.18, 1.0, lowerBodyBlend);
 
     float dcNoise1 = lowDetail
-        ? noise3(torSpinPos3 / 2.5)
+        ? paTornadoNoise3(torSpinPos3 / 2.5)
         : fbm(torSpinPos3 / 2.5, contactOctaves, 2.0, 0.5, 1.0);
 
     float dcPerc = saturate((intensity - 0.35) * 1.9);

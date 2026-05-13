@@ -36,6 +36,7 @@ public class GlassDamageManager {
      * @param toProcess A list of block positions (as long values) to process for damage.
      */
     public static void damageGlass(ServerLevel level, it.unimi.dsi.fastutil.longs.LongArrayList toProcess) {
+        if (!AtmoCommonConfig.ENABLE_TORNADO_DESTRUCTION.get()) return;
         if (toProcess.isEmpty()) return;
         for(int i = 0; i < toProcess.size(); i++) {
             BlockPos pos = BlockPos.of(toProcess.getLong(i));
@@ -48,7 +49,7 @@ public class GlassDamageManager {
             glass.damage = Math.min(MAX_DAMAGE, glass.damage + 1);
             glass.lastDamageTime = System.currentTimeMillis();
 
-            if (glass.damage >= MAX_DAMAGE && !glass.broken && doDamageGlass) {
+            if (glass.damage >= MAX_DAMAGE && !glass.broken && AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get()) {
                 toDestroy.add((pos.asLong()));
                 glass.broken = true;
             }
@@ -65,6 +66,11 @@ public class GlassDamageManager {
     private static void processGlassDestruction(ServerLevel level,
                                            it.unimi.dsi.fastutil.longs.LongArrayList list,
                                            int perTick) {
+        if (!AtmoCommonConfig.ENABLE_TORNADO_DESTRUCTION.get() || !AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get()) {
+            _destroyCursor = 0;
+            list.clear();
+            return;
+        }
         if (_destroyCursor >= list.size()) { _destroyCursor = 0; return; }
 
         int end = Math.min(_destroyCursor + perTick, list.size());

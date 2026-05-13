@@ -1,7 +1,9 @@
 package net.Gabou.projectatmosphere.mixin;
 
 import com.google.common.collect.ImmutableMap;
+import com.mojang.blaze3d.platform.GlStateManager;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.MultiRegionCloudMeshGenerator;
+import dev.nonamecrackers2.simpleclouds.client.shader.buffer.BindingManager;
 import dev.nonamecrackers2.simpleclouds.client.shader.buffer.ShaderStorageBufferObject;
 import dev.nonamecrackers2.simpleclouds.client.shader.compute.ComputeShader;
 import dev.nonamecrackers2.simpleclouds.common.cloud.CloudInfo;
@@ -13,12 +15,17 @@ import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance;
+import net.Gabou.projectatmosphere.util.HurricaneUpload;
+import net.Gabou.projectatmosphere.util.RegionUpload;
+import net.Gabou.projectatmosphere.util.TornadoUpload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.minecraft.util.Mth;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.joml.Matrix2f;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL41;
 import org.lwjgl.opengl.GL43;
 import org.spongepowered.asm.mixin.Final;
@@ -30,10 +37,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import net.Gabou.projectatmosphere.util.HurricaneUpload;
-import net.Gabou.projectatmosphere.util.RegionUpload;
-import net.Gabou.projectatmosphere.util.TornadoUpload;
-
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -46,9 +49,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     @Unique
     private static final Logger PROJECTATMOSPHERE$LOGGER = LogManager.getLogger("ProjectAtmosphere/CloudMeshGenerator");
     @Unique
-    private static final String PROJECTATMOSPHERE$TORNADO_BUFFER_NAME = "CloudTornadoes";
-    @Unique
-    private static final String PROJECTATMOSPHERE$HURRICANE_BUFFER_NAME = "CloudHurricanes";
+    private static final String PROJECTATMOSPHERE$STORM_BUFFER_NAME = "CloudStorms";
     @Unique
     private static final ResourceLocation PROJECTATMOSPHERE$HURRICANE_CLOUD_ID = HurricaneInstance.HURRICANE_CLOUD_TYPE_ID;
 
@@ -58,27 +59,27 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     @Shadow protected CloudInfo[] cachedTypes;
 
     @Unique
-    private static final int PROJECTATMOSPHERE$MAX_TORNADOES = Math.max(1, Integer.getInteger("projectatmosphere.simpleclouds.maxTornadoes", 64));
+    private static final int PROJECTATMOSPHERE$MAX_TORNADOES = 64;
     @Unique
-    private static final int PROJECTATMOSPHERE$MAX_HURRICANES = Math.max(1, Integer.getInteger("projectatmosphere.simpleclouds.maxHurricanes", 8));
+    private static final int PROJECTATMOSPHERE$MAX_HURRICANES = 8;
     @Unique
     private static final int PROJECTATMOSPHERE$TORNADO_STRIDE = 32;
     @Unique
     private static final int PROJECTATMOSPHERE$HURRICANE_STRIDE = 64;
+    @Unique
+    private static final int PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING = 0;
 
-    @Unique private ShaderStorageBufferObject projectatmosphere$tornadoBuffer;
-    @Unique private ShaderStorageBufferObject projectatmosphere$hurricaneBuffer;
+    @Unique private ShaderStorageBufferObject projectatmosphere$stormBuffer;
+    @Unique private boolean projectatmosphere$stormBufferUsesBindingManager;
     @Unique private int projectatmosphere$currentTornadoCount;
     @Unique private int projectatmosphere$currentHurricaneCount;
-    @Unique private boolean projectatmosphere$hasTornadoBlock;
-    @Unique private boolean projectatmosphere$hasHurricaneBlock;
-    @Unique private int projectatmosphere$lastTornadoShaderId = -1;
-    @Unique private int projectatmosphere$lastHurricaneShaderId = -1;
+    @Unique private boolean projectatmosphere$hasStormBlock;
+    @Unique private boolean projectatmosphere$stormBufferUnavailableLogged;
+    @Unique private int projectatmosphere$lastStormShaderId = -1;
 
     @Inject(method = "uploadCloudRegionData", at = @At("TAIL"))
     private void projectatmosphere$uploadNativeStormData(float partialTick, CallbackInfo ci) {
-        this.projectatmosphere$uploadTornadoData(partialTick);
-        this.projectatmosphere$uploadHurricaneData(partialTick);
+        this.projectatmosphere$uploadStormData(partialTick);
     }
 
     @Redirect(
@@ -159,33 +160,45 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
 
     @Inject(method = "close", at = @At("HEAD"))
     private void projectatmosphere$resetStormBuffers(CallbackInfo ci) {
-        this.projectatmosphere$tornadoBuffer = null;
-        this.projectatmosphere$hurricaneBuffer = null;
+        this.projectatmosphere$closeManualStormBuffer();
+        this.projectatmosphere$stormBuffer = null;
+        this.projectatmosphere$stormBufferUsesBindingManager = false;
         this.projectatmosphere$currentTornadoCount = 0;
         this.projectatmosphere$currentHurricaneCount = 0;
-        this.projectatmosphere$hasTornadoBlock = false;
-        this.projectatmosphere$hasHurricaneBlock = false;
-        this.projectatmosphere$lastTornadoShaderId = -1;
-        this.projectatmosphere$lastHurricaneShaderId = -1;
+        this.projectatmosphere$hasStormBlock = false;
+        this.projectatmosphere$stormBufferUnavailableLogged = false;
+        this.projectatmosphere$lastStormShaderId = -1;
     }
 
     @Unique
-    private void projectatmosphere$uploadTornadoData(float partialTick) {
+    private void projectatmosphere$uploadStormData(float partialTick) {
         if (this.regionTextureGenerator == null || !this.regionTextureGenerator.isValid()) {
-            return;
-        }
-        this.projectatmosphere$ensureTornadoBuffer();
-        if (this.projectatmosphere$tornadoBuffer == null) {
-            this.projectatmosphere$updateTornadoUniforms(0);
-            this.projectatmosphere$currentTornadoCount = 0;
             return;
         }
 
         List<TornadoUpload> uploads = this.projectatmosphere$collectTornadoUploads(partialTick);
-        int count = Math.min(uploads.size(), PROJECTATMOSPHERE$MAX_TORNADOES);
-        if (count > 0) {
-            this.projectatmosphere$tornadoBuffer.writeData(buffer -> {
-                for (int i = 0; i < count; i++) {
+        List<HurricaneUpload> hurricaneUploads = this.projectatmosphere$collectHurricaneUploads(partialTick);
+        int tornadoCount = Math.min(uploads.size(), PROJECTATMOSPHERE$MAX_TORNADOES);
+        int hurricaneCount = Math.min(hurricaneUploads.size(), PROJECTATMOSPHERE$MAX_HURRICANES);
+        if (tornadoCount <= 0 && hurricaneCount <= 0) {
+            this.projectatmosphere$updateStormUniforms(0, 0);
+            this.projectatmosphere$currentTornadoCount = 0;
+            this.projectatmosphere$currentHurricaneCount = 0;
+            return;
+        }
+
+        this.projectatmosphere$ensureStormBuffer();
+        if (this.projectatmosphere$stormBuffer == null) {
+            this.projectatmosphere$updateStormUniforms(0, 0);
+            this.projectatmosphere$currentTornadoCount = 0;
+            this.projectatmosphere$currentHurricaneCount = 0;
+            return;
+        }
+
+        this.projectatmosphere$bindStormBufferToShaders();
+        this.projectatmosphere$stormBuffer.writeData(buffer -> {
+            for (int i = 0; i < PROJECTATMOSPHERE$MAX_TORNADOES; i++) {
+                if (i < tornadoCount) {
                     TornadoUpload upload = uploads.get(i);
                     buffer.putFloat(upload.typeIndex);
                     buffer.putFloat(upload.centerX);
@@ -195,32 +208,15 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
                     buffer.putFloat(upload.height);
                     buffer.putFloat(0.0F);
                     buffer.putFloat(0.0F);
+                } else {
+                    for (int j = 0; j < PROJECTATMOSPHERE$TORNADO_STRIDE / Float.BYTES; j++) {
+                        buffer.putFloat(0.0F);
+                    }
                 }
-                buffer.flip();
-            }, count * PROJECTATMOSPHERE$TORNADO_STRIDE, false);
-        }
-        this.projectatmosphere$currentTornadoCount = count;
-        this.projectatmosphere$updateTornadoUniforms(count);
-    }
-
-    @Unique
-    private void projectatmosphere$uploadHurricaneData(float partialTick) {
-        if (this.regionTextureGenerator == null || !this.regionTextureGenerator.isValid()) {
-            return;
-        }
-        this.projectatmosphere$ensureHurricaneBuffer();
-        if (this.projectatmosphere$hurricaneBuffer == null) {
-            this.projectatmosphere$updateHurricaneUniforms(0);
-            this.projectatmosphere$currentHurricaneCount = 0;
-            return;
-        }
-
-        List<HurricaneUpload> uploads = this.projectatmosphere$collectHurricaneUploads(partialTick);
-        int count = Math.min(uploads.size(), PROJECTATMOSPHERE$MAX_HURRICANES);
-        if (count > 0) {
-            this.projectatmosphere$hurricaneBuffer.writeData(buffer -> {
-                for (int i = 0; i < count; i++) {
-                    HurricaneUpload upload = uploads.get(i);
+            }
+            for (int i = 0; i < PROJECTATMOSPHERE$MAX_HURRICANES; i++) {
+                if (i < hurricaneCount) {
+                    HurricaneUpload upload = hurricaneUploads.get(i);
                     buffer.putFloat(upload.typeIndex());
                     buffer.putFloat(upload.centerX());
                     buffer.putFloat(upload.centerZ());
@@ -237,46 +233,68 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
                     buffer.putFloat(upload.transitionStart());
                     buffer.putFloat(upload.transitionEnd());
                     buffer.putFloat(0.0F);
+                } else {
+                    for (int j = 0; j < PROJECTATMOSPHERE$HURRICANE_STRIDE / Float.BYTES; j++) {
+                        buffer.putFloat(0.0F);
+                    }
                 }
-                buffer.flip();
-            }, count * PROJECTATMOSPHERE$HURRICANE_STRIDE, false);
-        }
-        this.projectatmosphere$currentHurricaneCount = count;
-        this.projectatmosphere$updateHurricaneUniforms(count);
+            }
+            buffer.flip();
+        }, this.projectatmosphere$stormBufferSize(), false);
+
+        this.projectatmosphere$currentTornadoCount = tornadoCount;
+        this.projectatmosphere$currentHurricaneCount = hurricaneCount;
+        this.projectatmosphere$updateStormUniforms(tornadoCount, hurricaneCount);
     }
 
     @Unique
-    private void projectatmosphere$ensureTornadoBuffer() {
-        if (this.projectatmosphere$tornadoBuffer != null && this.projectatmosphere$tornadoBuffer.getId() == -1) {
-            this.projectatmosphere$tornadoBuffer = null;
+    private void projectatmosphere$ensureStormBuffer() {
+        if (this.projectatmosphere$stormBuffer != null && this.projectatmosphere$stormBuffer.getId() == -1) {
+            this.projectatmosphere$stormBuffer = null;
+            this.projectatmosphere$stormBufferUsesBindingManager = false;
         }
-        if (this.regionTextureGenerator == null || this.projectatmosphere$tornadoBuffer != null) {
+        if (this.regionTextureGenerator == null || this.projectatmosphere$stormBuffer != null) {
             return;
         }
-        if (!this.projectatmosphere$supportsTornadoBuffer()) {
+        if (!this.projectatmosphere$supportsStormBuffer()) {
             return;
         }
-        this.projectatmosphere$tornadoBuffer = this.regionTextureGenerator.createAndBindSSBO(PROJECTATMOSPHERE$TORNADO_BUFFER_NAME, GL43.GL_DYNAMIC_DRAW);
-        if (this.projectatmosphere$tornadoBuffer != null) {
-            this.projectatmosphere$tornadoBuffer.allocateBuffer(PROJECTATMOSPHERE$MAX_TORNADOES * PROJECTATMOSPHERE$TORNADO_STRIDE);
+        ShaderStorageBufferObject newBuffer = null;
+        try {
+            newBuffer = this.projectatmosphere$createStormBuffer();
+            if (newBuffer != null) {
+                newBuffer.allocateBuffer(this.projectatmosphere$stormBufferSize());
+                this.projectatmosphere$stormBuffer = newBuffer;
+                this.projectatmosphere$bindStormBufferToShaders();
+            }
+        } catch (RuntimeException e) {
+            if (newBuffer != null) {
+                this.projectatmosphere$closeFailedStormBuffer(newBuffer);
+            }
+            this.projectatmosphere$stormBuffer = null;
+            this.projectatmosphere$stormBufferUsesBindingManager = false;
+            if (!this.projectatmosphere$stormBufferUnavailableLogged) {
+                this.projectatmosphere$stormBufferUnavailableLogged = true;
+                PROJECTATMOSPHERE$LOGGER.warn("Unable to allocate Simple Clouds storm SSBO '{}'; tornado cloud carving and hurricane cloud shaping are disabled for this client. Cause: {}", PROJECTATMOSPHERE$STORM_BUFFER_NAME, e.getMessage());
+            }
         }
     }
 
     @Unique
-    private void projectatmosphere$ensureHurricaneBuffer() {
-        if (this.projectatmosphere$hurricaneBuffer != null && this.projectatmosphere$hurricaneBuffer.getId() == -1) {
-            this.projectatmosphere$hurricaneBuffer = null;
-        }
-        if (this.regionTextureGenerator == null || this.projectatmosphere$hurricaneBuffer != null) {
+    private void projectatmosphere$bindStormBufferToShaders() {
+        if (this.projectatmosphere$stormBuffer == null || this.projectatmosphere$stormBuffer.getId() == -1) {
             return;
         }
-        if (!this.projectatmosphere$supportsHurricaneBuffer()) {
-            return;
+        ComputeShader shader = this.projectatmosphere$getShader();
+        if (shader != null && shader.isValid()) {
+            this.projectatmosphere$stormBuffer.optionalBindToProgram(PROJECTATMOSPHERE$STORM_BUFFER_NAME, shader.getId());
         }
-        this.projectatmosphere$hurricaneBuffer = this.regionTextureGenerator.createAndBindSSBO(PROJECTATMOSPHERE$HURRICANE_BUFFER_NAME, GL43.GL_DYNAMIC_DRAW);
-        if (this.projectatmosphere$hurricaneBuffer != null) {
-            this.projectatmosphere$hurricaneBuffer.allocateBuffer(PROJECTATMOSPHERE$MAX_HURRICANES * PROJECTATMOSPHERE$HURRICANE_STRIDE);
-        }
+    }
+
+    @Unique
+    private int projectatmosphere$stormBufferSize() {
+        return PROJECTATMOSPHERE$MAX_TORNADOES * PROJECTATMOSPHERE$TORNADO_STRIDE
+                + PROJECTATMOSPHERE$MAX_HURRICANES * PROJECTATMOSPHERE$HURRICANE_STRIDE;
     }
 
     @Unique
@@ -414,7 +432,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     }
 
     @Unique
-    private boolean projectatmosphere$supportsTornadoBuffer() {
+    private boolean projectatmosphere$supportsStormBuffer() {
         if (this.regionTextureGenerator == null || !this.regionTextureGenerator.isValid()) {
             return false;
         }
@@ -422,55 +440,59 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (shaderId <= 0) {
             return false;
         }
-        if (shaderId != this.projectatmosphere$lastTornadoShaderId) {
-            this.projectatmosphere$lastTornadoShaderId = shaderId;
-            int index = GL43.glGetProgramResourceIndex(shaderId, GL43.GL_SHADER_STORAGE_BLOCK, PROJECTATMOSPHERE$TORNADO_BUFFER_NAME);
-            this.projectatmosphere$hasTornadoBlock = index != GL43.GL_INVALID_INDEX;
-            if (!this.projectatmosphere$hasTornadoBlock) {
-                PROJECTATMOSPHERE$LOGGER.warn("Missing '{}' SSBO on shader '{}'; tornado rendering disabled until the shader is updated.", PROJECTATMOSPHERE$TORNADO_BUFFER_NAME, this.regionTextureGenerator.getName());
+        if (shaderId != this.projectatmosphere$lastStormShaderId) {
+            this.projectatmosphere$lastStormShaderId = shaderId;
+            int index = GL43.glGetProgramResourceIndex(shaderId, GL43.GL_SHADER_STORAGE_BLOCK, PROJECTATMOSPHERE$STORM_BUFFER_NAME);
+            this.projectatmosphere$hasStormBlock = index != GL43.GL_INVALID_INDEX;
+            if (!this.projectatmosphere$hasStormBlock) {
+                PROJECTATMOSPHERE$LOGGER.warn("Missing '{}' SSBO on shader '{}'; tornado cloud carving and hurricane cloud shaping are disabled until the shader is updated.", PROJECTATMOSPHERE$STORM_BUFFER_NAME, this.regionTextureGenerator.getName());
             }
         }
-        return this.projectatmosphere$hasTornadoBlock;
+        return this.projectatmosphere$hasStormBlock;
     }
 
     @Unique
-    private boolean projectatmosphere$supportsHurricaneBuffer() {
-        if (this.regionTextureGenerator == null || !this.regionTextureGenerator.isValid()) {
-            return false;
+    private ShaderStorageBufferObject projectatmosphere$createStormBuffer() {
+        int maxBindings = GL11.glGetInteger(GL43.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS);
+        if (maxBindings > PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING && maxBindings <= 16) {
+            int bufferId = GlStateManager._glGenBuffers();
+            GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING, bufferId);
+            ShaderStorageBufferObject buffer = new ShaderStorageBufferObject(bufferId, PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING, GL43.GL_DYNAMIC_DRAW);
+            buffer.optionalBindToProgram(PROJECTATMOSPHERE$STORM_BUFFER_NAME, this.regionTextureGenerator.getId());
+            this.projectatmosphere$stormBufferUsesBindingManager = false;
+            return buffer;
         }
-        int shaderId = this.regionTextureGenerator.getId();
-        if (shaderId <= 0) {
-            return false;
-        }
-        if (shaderId != this.projectatmosphere$lastHurricaneShaderId) {
-            this.projectatmosphere$lastHurricaneShaderId = shaderId;
-            int index = GL43.glGetProgramResourceIndex(shaderId, GL43.GL_SHADER_STORAGE_BLOCK, PROJECTATMOSPHERE$HURRICANE_BUFFER_NAME);
-            this.projectatmosphere$hasHurricaneBlock = index != GL43.GL_INVALID_INDEX;
-            if (!this.projectatmosphere$hasHurricaneBlock) {
-                PROJECTATMOSPHERE$LOGGER.warn("Missing '{}' SSBO on shader '{}'; hurricane rendering disabled until the shader is updated.", PROJECTATMOSPHERE$HURRICANE_BUFFER_NAME, this.regionTextureGenerator.getName());
-            }
-        }
-        return this.projectatmosphere$hasHurricaneBlock;
+        this.projectatmosphere$stormBufferUsesBindingManager = true;
+        return this.regionTextureGenerator.createAndBindSSBO(PROJECTATMOSPHERE$STORM_BUFFER_NAME, GL43.GL_DYNAMIC_DRAW);
     }
 
     @Unique
-    private void projectatmosphere$updateTornadoUniforms(int count) {
-        if (this.regionTextureGenerator != null && this.regionTextureGenerator.isValid()) {
-            this.regionTextureGenerator.forUniform("TotalCloudTornadoes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
+    private void projectatmosphere$closeFailedStormBuffer(ShaderStorageBufferObject buffer) {
+        if (this.projectatmosphere$stormBufferUsesBindingManager) {
+            BindingManager.freeSSBO(buffer);
+        } else {
+            buffer.close();
         }
-        ComputeShader shader = this.projectatmosphere$getShader();
-        if (shader != null && shader.isValid()) {
-            shader.forUniform("TotalCloudTornadoes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
+        this.projectatmosphere$stormBufferUsesBindingManager = false;
+    }
+
+    @Unique
+    private void projectatmosphere$closeManualStormBuffer() {
+        if (this.projectatmosphere$stormBuffer != null && !this.projectatmosphere$stormBufferUsesBindingManager && this.projectatmosphere$stormBuffer.getId() != -1) {
+            this.projectatmosphere$stormBuffer.close();
         }
     }
+
     @Unique
-    private void projectatmosphere$updateHurricaneUniforms(int count) {
+    private void projectatmosphere$updateStormUniforms(int tornadoCount, int hurricaneCount) {
         if (this.regionTextureGenerator != null && this.regionTextureGenerator.isValid()) {
-            this.regionTextureGenerator.forUniform("TotalCloudHurricanes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
+            this.regionTextureGenerator.forUniform("TotalCloudTornadoes", (program, location) -> GL41.glProgramUniform1i(program, location, tornadoCount));
+            this.regionTextureGenerator.forUniform("TotalCloudHurricanes", (program, location) -> GL41.glProgramUniform1i(program, location, hurricaneCount));
         }
         ComputeShader shader = this.projectatmosphere$getShader();
         if (shader != null && shader.isValid()) {
-            shader.forUniform("TotalCloudHurricanes", (program, location) -> GL41.glProgramUniform1i(program, location, count));
+            shader.forUniform("TotalCloudTornadoes", (program, location) -> GL41.glProgramUniform1i(program, location, tornadoCount));
+            shader.forUniform("TotalCloudHurricanes", (program, location) -> GL41.glProgramUniform1i(program, location, hurricaneCount));
         }
     }
 
