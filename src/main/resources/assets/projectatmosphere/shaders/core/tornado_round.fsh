@@ -202,7 +202,7 @@ float sampleFirstHitField(vec3 position, bool debugActive, bool debugMaskMode) {
 float refineFirstHitT(vec3 ro, vec3 rd, float startT, float endT, bool debugActive, bool debugMaskMode) {
     float low = startT;
     float high = endT;
-    for (int iteration = 0; iteration < 5; iteration++) {
+    for (int iteration = 0; iteration < 3; iteration++) {
         float mid = mix(low, high, 0.5);
         float value = sampleFirstHitField(ro + rd * mid, debugActive, debugMaskMode);
         if (value > 0.0005) {
@@ -445,7 +445,7 @@ StormSample sampleStorm(int index, vec3 position) {
     outSample.upper = wallcloud;
     outSample.material = wallcloud * 0.45;
 
-    if (!(positionWorld.y < baseHeightWorld - wallcloudLowerWorld && positionWorld.y > posWorld.y - 8.5 && distWorld < max(widthWorld * 5.0, stormSizeWorld / 2.6))) {
+    if (!(positionWorld.y < baseHeightWorld - wallcloudLowerWorld && positionWorld.y > posWorld.y - 8.5 && distWorld < max(widthWorld * 4.0, stormSizeWorld / 3.0))) {
         return outSample;
     }
 
@@ -503,8 +503,8 @@ StormSample sampleStorm(int index, vec3 position) {
     vec3 localTorPosWorld = positionWorld - torPosWorld;
 
     float influenceRadiusWorld = max(
-        max(widWorld * mix(1.8, 2.5, intensity), stormSizeWorld * 0.28),
-        max((widthWorld / 1.5) + 6.25, widthWorld * 1.8)
+        max(widWorld * mix(1.7, 2.25, intensity), stormSizeWorld * 0.24),
+        max((widthWorld / 1.55) + 5.0, widthWorld * 1.65)
     );
     if (torDistWorld > influenceRadiusWorld) {
         return outSample;
@@ -615,6 +615,7 @@ void main() {
 
     vec3 ro = CameraPos;
     vec2 screenUv = gl_FragCoord.xy / OutSize;
+    float sceneDepth = sampleSceneDepth(screenUv);
     vec3 farPlanePos = reconstructPosition(screenUv, 1.0);
     vec3 rd = normalize(farPlanePos - ro);
     float tNear;
@@ -640,7 +641,13 @@ void main() {
         return;
     }
 
-    float maxRay = min(tFar, MaxDistance);
+    float depthLimitedMaxRay = MaxDistance;
+    if (sceneDepth < 1.0) {
+        vec3 scenePos = reconstructPosition(screenUv, sceneDepth);
+        depthLimitedMaxRay = max(length(scenePos - ro) + 0.35, 0.0);
+    }
+
+    float maxRay = min(min(tFar, MaxDistance), depthLimitedMaxRay);
     if (maxRay <= tNear + 0.001) {
         discard;
     }
@@ -661,9 +668,9 @@ void main() {
     bool wroteDepth = false;
 
     float interval = maxRay - tNear;
-    float stepSpacing = mix(1.40, 0.60, detailQuality);
-    float minSteps = mix(8.0, 14.0, detailQuality);
-    float maxSteps = mix(22.0, 40.0, detailQuality);
+    float stepSpacing = mix(1.80, 0.82, detailQuality);
+    float minSteps = mix(6.0, 10.0, detailQuality);
+    float maxSteps = mix(14.0, 28.0, detailQuality);
     int steps = int(clamp(interval / stepSpacing, minSteps, maxSteps));
     float stepSize = interval / float(max(steps, 1));
     float jitter = hash1(screenUv.x * OutSize.x + screenUv.y * OutSize.y + 17.13);
@@ -724,7 +731,6 @@ void main() {
         if (debugValue < 0.01) {
             discard;
         }
-        float sceneDepth = sampleSceneDepth(screenUv);
         if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
             discard;
         }
@@ -741,7 +747,6 @@ void main() {
     }
     float alpha = 1.0 - pow(1.0 - rawAlpha, 1.80);
     alpha = saturate(alpha * 1.10);
-    float sceneDepth = sampleSceneDepth(screenUv);
     if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
         discard;
     }

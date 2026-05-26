@@ -1,7 +1,5 @@
 package net.Gabou.projectatmosphere.seasons;
 
-import com.teamtea.eclipticseasons.api.EclipticSeasonsApi;
-import com.teamtea.eclipticseasons.api.util.EclipticUtil;
 import net.Gabou.projectatmospherefortfc.seasons.TfcSeasonDelegate;
 import net.minecraftforge.fml.ModList;
 import org.apache.logging.log4j.LogManager;
@@ -22,6 +20,11 @@ public final class SeasonBootstrap {
 
     public static void initOrCrash() {
         ModList mods = ModList.get();
+        if (mods.isLoaded(ECLIPTIC_ID)) {
+            LOGGER.info("Detected Ecliptic Seasons; using EclipticSeasonsSeasonDelegate.");
+            SeasonTimeHelper.setDelegate(new EclipticSeasonsSeasonDelegate());
+            return;
+        }
         if (mods.isLoaded(SERENE_ID)) {
             LOGGER.info("Detected Serene Seasons; using SereneSeasonsSeasonDelegate.");
             SeasonTimeHelper.setDelegate(new SereneSeasonsSeasonDelegate());
@@ -30,11 +33,6 @@ public final class SeasonBootstrap {
         if (mods.isLoaded(PA_TFC_ID)) {
             LOGGER.info("Detected Project Atmosphere for TFC; using placeholder delegate (replace with real provider when available).");
             SeasonTimeHelper.setDelegate(new TfcSeasonDelegate());
-            return;
-        }
-        if(mods.isLoaded(ECLIPTIC_ID)) {
-            LOGGER.info("Detected Ecliptic Seasons; using EclipticSeasonsSeasonDelegate.");
-            SeasonTimeHelper.setDelegate(new EclipticSeasonsSeasonDelegate());
             return;
         }
         throw new IllegalStateException("""

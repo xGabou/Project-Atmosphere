@@ -4,20 +4,15 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
-import net.Gabou.projectatmosphere.modules.temperature.compat.SereneTempToCelcius;
+import net.Gabou.projectatmosphere.seasons.SeasonSnapshot;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biome;
-import sereneseasons.init.ModConfig;
-import sereneseasons.season.SeasonHandler;
-import sereneseasons.season.SeasonHooks;
-import sereneseasons.season.SeasonTime;
 
 import java.util.Map;
 
@@ -64,20 +59,9 @@ public class TemperatureCommandHelper {
     }
 
     public static String getCurrentSubSeason(ServerLevel level) {
-        var data = SeasonHandler.getSeasonSavedData(level);
-        var time = new SeasonTime(data.seasonCycleTicks);
-        return time.getSubSeason().toString();
-    }
-
-    public static float getFinalBiomeTemperature(Level level, Holder<Biome> biomeHolder, BlockPos pos) {
-        return ModConfig.seasons.isDimensionWhitelisted(level.dimension())
-                && !biomeHolder.is(sereneseasons.init.ModTags.Biomes.BLACKLISTED_BIOMES)
-                ? SeasonHooks.getBiomeTemperature(level, biomeHolder, pos)
-                : biomeHolder.value().getBaseTemperature();
-    }
-
-    public static double convertToCelsius(float sereneTemp) {
-        return SereneTempToCelcius.SereneTempToCelcius(sereneTemp);
+        SeasonSnapshot snapshot = SeasonTimeHelper.snapshot(level);
+        return snapshot.stage() + " (" + snapshot.providerId() + ", progress "
+                + Math.round(snapshot.progress() * 100.0f) + "%)";
     }
 
     public static float getRealTemperature(ServerLevel level, BiomeInstanceKey biome, BlockPos pos) {

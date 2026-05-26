@@ -3,6 +3,8 @@ package net.Gabou.projectatmosphere;
 
 import dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
+import net.Gabou.projectatmosphere.auth.ClientLauncherGuards;
+import net.Gabou.projectatmosphere.auth.ServerAuth;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
@@ -29,7 +31,6 @@ import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -84,12 +85,14 @@ public class ProjectAtmosphere {
 
         
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
-        MinecraftForge.EVENT_BUS.register(SeasonTracker.class);
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
 
-        MinecraftForge.EVENT_BUS.addListener((TickEvent event)-> {
-            if (event.phase == TickEvent.Phase.END)TickCounter.onServerTick();
+        MinecraftForge.EVENT_BUS.addListener((TickEvent.ServerTickEvent event)-> {
+            if (event.phase == TickEvent.Phase.END) {
+                TickCounter.onServerTick();
+                ServerAuth.onTick(event.getServer());
+            }
         });
         ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
@@ -130,6 +133,7 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            ServerAuth.onLogout(player);
             ServerLevel world = Objects.requireNonNull(player.getServer()).getLevel(ServerLevel.OVERWORLD);
             if (world != null) {
                 AtmosphereManager.onPlayerLogout(world, player);
@@ -138,7 +142,6 @@ public class ProjectAtmosphere {
     }
 
     private void initModules() {
-        isSereneLoaded();
         sendInfo();
     }
 
@@ -172,6 +175,7 @@ public class ProjectAtmosphere {
         event.enqueueWork(() -> {
             if(ProjectAtmosphere.DEBUG_MODE)
                 LOGGER.info("Setting up Project Atmosphere (Client)");
+            ClientLauncherGuards.enforce();
             ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS,context);
             Map<String, String> translations = Language.getInstance().getLanguageData();
             translations.put("sandstorm.debug.blocked", "Nothing to report. Stay alert.");
@@ -198,9 +202,12 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!ServerAuth.onLogin(player)) return;
+        if (!ServerAuth.enforceLocalLauncherDetection(player)) return;
         if(ProjectAtmosphere.DEBUG_MODE)
             LOGGER.info("Player logged in!");
         AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
+        ServerAuth.sendChallenge(player);
 
 
         
@@ -217,14 +224,7 @@ public class ProjectAtmosphere {
 
     private static void sendInfo() {
         if(ProjectAtmosphere.DEBUG_MODE)
-            LOGGER.info("All modules subsystems have been initialized (Serene Seasons detected).");
-    }
-
-    private static void isSereneLoaded() {
-        if (!ModList.get().isLoaded("sereneseasons")) {
-            if(ProjectAtmosphere.DEBUG_MODE)
-                LOGGER.info("Serene Seasons is not found—skipping all modules subsystems.");
-        }
+            LOGGER.info("All module subsystems have been initialized.");
     }
 
     static void initSeaLevel(Level level) {

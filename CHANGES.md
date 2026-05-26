@@ -1,5 +1,19 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Ecliptic Seasons forecast integration
+- Routed forecast/debug temperature season reads and Simple Clouds rain lifecycle notifications through the shared `SeasonTimeHelper` delegate instead of calling Serene Seasons directly.
+- Preferred Ecliptic Seasons when both Ecliptic and Serene are loaded, and fixed the Ecliptic delegate's cycle tick reporting so forecast temperature curves advance from the current solar term position instead of a constant season duration.
+- Moved Serene-specific season-change callbacks into the Serene season integration bridge and stopped registering them from the main mod bootstrap.
+
+## Unreleased - Launcher auth guard
+- Ported the Identity2 launcher auth guard into Project Atmosphere with a Forge SimpleChannel challenge/reply flow, client-side TLauncher marker detection, strict offline UUID rejection, timeout kicking, and player/IP ban handling when the marker is reported.
+
+## Unreleased - Tornado render performance pass
+- Moved the Simple Clouds tornado volume pass onto a configurable low-resolution render target with an upsample composite shader, defaulting to a 2.5x downsample so tornado raymarching shades far fewer pixels on mid-range GPUs.
+- Changed tornado volume rendering to use depth-aware `LEQUAL` proxy rendering, cull proxy backfaces when the camera is outside the volume, and sample scene depth before raymarching so occluded pixels skip the expensive storm loop earlier.
+- Reduced tornado raymarch and first-hit refinement work, tightened the shader influence radius, and shrank the Java-side proxy bounds so the shader spends less time marching empty air around the funnel.
+- Removed the tornado transparency mixin hooks because the transparency renderer was a no-op but still copied depth and rebound targets every visible tornado frame.
+
 ## Unreleased - Storm spawn and despawn transitions
 - Kept tornado command spawns in the forming lifecycle instead of forcing the no-cloud path active immediately, so standalone tornadoes now ease in and the removal command lets them dissipate before cleanup.
 - Added a hurricane lifecycle with forming, active, and dissipating phases, then kept cyclone-linked hurricanes alive until the fade-out completes instead of dropping them the moment the cyclone disappears.

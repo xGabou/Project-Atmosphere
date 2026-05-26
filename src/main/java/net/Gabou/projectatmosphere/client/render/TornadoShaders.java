@@ -19,8 +19,10 @@ public final class TornadoShaders {
     public static final ResourceLocation FLOW_TEXTURE = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "textures/effects/flowmap.png");
 
     private static final ResourceLocation SHADER_ID = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "tornado_round");
+    private static final ResourceLocation COMPOSITE_SHADER_ID = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "tornado_composite");
 
     private static ShaderInstance shader;
+    private static ShaderInstance compositeShader;
 
     private TornadoShaders() {
     }
@@ -28,10 +30,15 @@ public final class TornadoShaders {
     @SubscribeEvent
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> shader = loaded);
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), COMPOSITE_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> compositeShader = loaded);
     }
 
     public static ShaderInstance getShader() {
         return shader;
+    }
+
+    public static ShaderInstance getCompositeShader() {
+        return compositeShader;
     }
 
     public static boolean isReady() {

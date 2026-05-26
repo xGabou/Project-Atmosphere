@@ -38,46 +38,17 @@ public abstract class DefaultPipelineTornadoMixin {
             mc.getProfiler().pop();
             return;
         }
-        renderer.copyDepthFromCloudsToTransparency();
+        boolean downsampled = SimpleCloudsTornadoRenderer.INSTANCE.usesDownsamplePath();
+        if (!downsampled) {
+            renderer.copyDepthFromCloudsToTransparency();
+        }
         renderer.getCloudTarget().bindWrite(false);
         SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
                 renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
                 frustum,
-                renderer.getCloudTransparencyTarget().getDepthTextureId(),
+                downsampled ? renderer.getCloudTarget().getDepthTextureId() : renderer.getCloudTransparencyTarget().getDepthTextureId(),
                 mc.getMainRenderTarget().getDepthTextureId(),
                 true
-        );
-        mc.getProfiler().pop();
-    }
-
-    @Inject(
-            method = "afterSky",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Ldev/nonamecrackers2/simpleclouds/client/renderer/SimpleCloudsRenderer;doFinalCompositePass(Lcom/mojang/blaze3d/vertex/PoseStack;FLorg/joml/Matrix4f;)V",
-                    shift = At.Shift.BEFORE
-            ),
-            require = 0
-    )
-    private void projectatmosphere$renderTornadoTransparency(Minecraft mc, SimpleCloudsRenderer renderer,
-                                                             PoseStack stack, Matrix4f projMat, float partialTick,
-                                                             double camX, double camY, double camZ, Frustum frustum,
-                                                             CallbackInfo ci) {
-        ClientLevel level = mc.level;
-        if (level == null) {
-            return;
-        }
-        float[] cloudColor = renderer.getCloudColor(partialTick);
-        mc.getProfiler().push("projectatmosphere_tornado_transparency");
-        SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
-        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(frustum)) {
-            mc.getProfiler().pop();
-            return;
-        }
-        renderer.copyDepthFromCloudsToTransparency();
-        renderer.getCloudTransparencyTarget().bindWrite(false);
-        SimpleCloudsTornadoRenderer.INSTANCE.renderTransparency(
-                renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2]
         );
         mc.getProfiler().pop();
     }

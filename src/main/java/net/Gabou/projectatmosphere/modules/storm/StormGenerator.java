@@ -2,10 +2,9 @@ package net.Gabou.projectatmosphere.modules.storm;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
-import sereneseasons.api.season.Season;
 
 import java.util.Random;
 
@@ -23,7 +22,7 @@ public class StormGenerator {
             float[][] humidity,
             float[][] pressure,
             WindVector[] wind,
-            Season season
+            SeasonStage season
     ) {
         float[][] stormWeek = new float[7][2];
         BlockPos pos = biome.samplePos();
@@ -98,29 +97,32 @@ public class StormGenerator {
         return Math.max(min, Math.min(max, val));
     }
 
-    private static float getSeasonalStormMultiplier(Season season) {
+    private static float getSeasonalStormMultiplier(SeasonStage season) {
         return switch (season) {
             case SPRING -> 1.1f;
             case SUMMER -> 1.4f;
             case AUTUMN -> 1.6f;
             case WINTER -> 0.8f;
+            case NEUTRAL -> 1.0f;
         };
     }
 
-    private static float getSeasonalStormMin(Season season) {
+    private static float getSeasonalStormMin(SeasonStage season) {
         return switch (season) {
             case SPRING -> 0.18f;
             case SUMMER -> 0.12f;
             case AUTUMN -> 0.0f;
             case WINTER -> 0.08f;
+            case NEUTRAL -> 0.12f;
         };
     }
 
-    private static float getSeasonalStormMax(Season currentSeason) {
+    private static float getSeasonalStormMax(SeasonStage currentSeason) {
         return switch (currentSeason) {
             case SPRING -> 0.9f;
             case SUMMER, AUTUMN -> 1.0f;
             case WINTER -> 0.7f;
+            case NEUTRAL -> 0.9f;
         };
     }
 

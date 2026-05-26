@@ -1,7 +1,14 @@
 package net.Gabou.projectatmosphere.client.render;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexBuffer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
@@ -54,15 +61,18 @@ public final class SimpleCloudsTornadoRenderer {
     private static final float WALLCLOUD_GATE_BELOW_ORIGIN_WORLD = 8.5F;
     private static final float TOUCHDOWN_TOP_BLEND_WORLD = 3.75F;
     private static final float CONNECTION_BLEND_WORLD = 1.8F;
+    private static final float DIRECT_RENDER_DOWNSAMPLE_THRESHOLD = 1.01F;
 
     private ClientLevel preparedLevel;
     private long preparedGameTime = Long.MIN_VALUE;
     private float preparedPartialTick = Float.NaN;
     private final List<PreparedTornado> preparedTornadoes = new ArrayList<>();
     private final VolumeBoxMesh volumeBox = new VolumeBoxMesh();
+    private boolean initialized;
+    private VertexBuffer fullscreenQuad;
+    private TextureTarget downsampleTarget;
     private int resolvedDebugStormIndex = -1;
     private long lastRenderOpaqueLogGameTime = Long.MIN_VALUE;
-    private long lastRenderTransparencyLogGameTime = Long.MIN_VALUE;
     private long lastDiagnosticReportGameTime = Long.MIN_VALUE;
     private long lastShaderBindingLogGameTime = Long.MIN_VALUE;
 
@@ -148,17 +158,25 @@ public final class SimpleCloudsTornadoRenderer {
             return;
         }
 
+        float downsample = getConfiguredDownsample();
+        boolean useDownsample = this.usesDownsamplePath();
+        RenderTarget renderTarget = useDownsample ? this.prepareDownsampleTarget(renderer, downsample) : renderer.getCloudTarget();
+        if (renderTarget == null) {
+            return;
+        }
+
         this.pushGpuDebugGroup("ProjectAtmosphere Tornado Opaque");
         try {
+            if (useDownsample) {
+                this.clearDownsampleTarget();
+            }
+
+            renderTarget.bindWrite(false);
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
-            // Keep the volume depth-aware so it sits inside the world instead of reading like a flat overlay.
-            // The shader still raymarchs against its own max distance rather than using copied scene depth as a
-            // hard clip plane, which preserves the earlier horizon fix over water and long flat terrain.
             RenderSystem.enableDepthTest();
             RenderSystem.depthMask(writeDepth);
-            RenderSystem.depthFunc(GL11.GL_ALWAYS);
-            RenderSystem.disableCull();
+            RenderSystem.depthFunc(GL11.GL_LEQUAL);
             RenderSystem.setShader(() -> shader);
 
             AbstractTexture tornadoTexture = mc.getTextureManager().getTexture(TornadoShaders.TORNADO_TEXTURE);
@@ -197,7 +215,7 @@ public final class SimpleCloudsTornadoRenderer {
             shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
             shader.safeGetUniform("AnimationTime").set(TornadoManager.getShaderTime() + partialTick * 0.05F);
             shader.safeGetUniform("MaxDistance").set(MAX_RAY_DISTANCE_CLOUD);
-            shader.safeGetUniform("OutSize").set((float) mc.getWindow().getWidth(), (float) mc.getWindow().getHeight());
+            shader.safeGetUniform("OutSize").set((float) renderTarget.width, (float) renderTarget.height);
             shader.safeGetUniform("FogStart").set(renderer.getFogStart());
             shader.safeGetUniform("FogEnd").set(renderer.getFogEnd());
             float[] fogColor = RenderSystem.getShaderFogColor();
@@ -224,6 +242,7 @@ public final class SimpleCloudsTornadoRenderer {
                 if (!this.isVisible(tornado, frustum)) {
                     continue;
                 }
+                this.setProxyCullState(cameraPos, tornado);
                 this.applyStormUniforms(shader, tornado);
                 shader.safeGetUniform("DebugMode").set(debugMode.shaderValue());
                 shader.safeGetUniform("DebugSelectedStorm").set(debugMode == TornadoRenderDebugState.Mode.OFF ? -1 : 0);
@@ -241,6 +260,10 @@ public final class SimpleCloudsTornadoRenderer {
                 shader.apply();
                 this.volumeBox.draw(shader, stack.last().pose(), projMat);
                 shader.clear();
+            }
+
+            if (useDownsample) {
+                this.compositeDownsampleTarget(renderer.getCloudTarget());
             }
         } finally {
             this.popGpuDebugGroup();
@@ -265,13 +288,89 @@ public final class SimpleCloudsTornadoRenderer {
         return false;
     }
 
-    public void renderTransparency(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
-                                   float partialTick, float cloudR, float cloudG, float cloudB) {
-        ClientLevel level = Minecraft.getInstance().level;
-        if (shouldDebugLog(level) && level != null && this.lastRenderTransparencyLogGameTime != level.getGameTime()) {
-            this.lastRenderTransparencyLogGameTime = level.getGameTime();
-            debug("renderTransparency called gameTime={} tornadoes={}", level.getGameTime(), this.preparedTornadoes.size());
+    public boolean usesDownsamplePath() {
+        return getConfiguredDownsample() > DIRECT_RENDER_DOWNSAMPLE_THRESHOLD
+                && !TornadoRenderDebugState.isActive()
+                && TornadoShaders.getCompositeShader() != null;
+    }
+
+    private void ensureInitialized() {
+        if (this.initialized) {
+            return;
         }
+
+        BufferBuilder builder = Tesselator.getInstance().getBuilder();
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        builder.vertex(-1.0F, -1.0F, 0.0F).uv(0.0F, 0.0F).endVertex();
+        builder.vertex(1.0F, -1.0F, 0.0F).uv(1.0F, 0.0F).endVertex();
+        builder.vertex(1.0F, 1.0F, 0.0F).uv(1.0F, 1.0F).endVertex();
+        builder.vertex(-1.0F, 1.0F, 0.0F).uv(0.0F, 1.0F).endVertex();
+        this.fullscreenQuad = new VertexBuffer(VertexBuffer.Usage.STATIC);
+        this.fullscreenQuad.bind();
+        this.fullscreenQuad.upload(builder.end());
+        VertexBuffer.unbind();
+        this.initialized = true;
+    }
+
+    private RenderTarget prepareDownsampleTarget(SimpleCloudsRenderer renderer, float downsample) {
+        this.ensureInitialized();
+        RenderTarget cloudTarget = renderer.getCloudTarget();
+        int width = Math.max(1, Mth.ceil(cloudTarget.width / downsample));
+        int height = Math.max(1, Mth.ceil(cloudTarget.height / downsample));
+
+        if (this.downsampleTarget == null
+                || this.downsampleTarget.width != width
+                || this.downsampleTarget.height != height) {
+            if (this.downsampleTarget != null) {
+                this.downsampleTarget.destroyBuffers();
+            }
+            this.downsampleTarget = new TextureTarget(width, height, true, Minecraft.ON_OSX);
+            this.downsampleTarget.setFilterMode(GL11.GL_LINEAR);
+        }
+
+        return this.downsampleTarget;
+    }
+
+    private void clearDownsampleTarget() {
+        if (this.downsampleTarget == null) {
+            return;
+        }
+        this.downsampleTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        this.downsampleTarget.clear(Minecraft.ON_OSX);
+    }
+
+    private void compositeDownsampleTarget(RenderTarget destination) {
+        ShaderInstance shader = TornadoShaders.getCompositeShader();
+        if (shader == null || this.downsampleTarget == null) {
+            return;
+        }
+
+        destination.bindWrite(false);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(false);
+        RenderSystem.disableCull();
+        RenderSystem.setShader(() -> shader);
+        shader.setSampler("TornadoColorSampler", this.downsampleTarget.getColorTextureId());
+        shader.apply();
+
+        this.fullscreenQuad.bind();
+        this.fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
+        VertexBuffer.unbind();
+        shader.clear();
+    }
+
+    private void setProxyCullState(Vec3 cameraPos, PreparedTornado tornado) {
+        if (tornado.boundsWorld().contains(cameraPos)) {
+            RenderSystem.disableCull();
+        } else {
+            RenderSystem.enableCull();
+        }
+    }
+
+    private static float getConfiguredDownsample() {
+        return (float) Mth.clamp(AtmoCommonConfig.TORNADO_RENDER_DOWNSAMPLE.get(), 1.0D, 4.0D);
     }
 
     private void applyStormUniforms(ShaderInstance shader, PreparedTornado tornado) {
@@ -335,6 +434,15 @@ public final class SimpleCloudsTornadoRenderer {
         this.preparedTornadoes.clear();
         this.resolvedDebugStormIndex = -1;
         this.volumeBox.close();
+        if (this.fullscreenQuad != null) {
+            this.fullscreenQuad.close();
+            this.fullscreenQuad = null;
+        }
+        if (this.downsampleTarget != null) {
+            this.downsampleTarget.destroyBuffers();
+            this.downsampleTarget = null;
+        }
+        this.initialized = false;
     }
 
     private int resolveDebugStormIndex(Vec3 cameraPosWorld, Vec3 cameraLook) {
@@ -387,10 +495,11 @@ public final class SimpleCloudsTornadoRenderer {
 
         this.lastDiagnosticReportGameTime = level.getGameTime();
         debug(
-                "renderState mode={} freeze={} writeDepth={} blend=srcalpha,1-srcalpha depthFunc=ALWAYS cull=disabled proxyVolume=true resolvedStorm={}",
+                "renderState mode={} freeze={} writeDepth={} blend=srcalpha,1-srcalpha depthFunc=LEQUAL cull=outside-only downsample={} proxyVolume=true resolvedStorm={}",
                 TornadoRenderDebugState.getMode().token(),
                 TornadoRenderDebugState.isFreezeEnabled(),
                 writeDepth,
+                getConfiguredDownsample(),
                 this.resolvedDebugStormIndex
         );
 
@@ -819,8 +928,8 @@ public final class SimpleCloudsTornadoRenderer {
             float bottomY = (bottomWorld - cloudHeight) / scale;
             float height = Math.max((topWorld - bottomWorld) / scale, MIN_VISUAL_WORLD_HEIGHT / scale);
             float width = Math.max(renderRadius * 2.0F, MIN_VISUAL_WORLD_WIDTH) / scale;
-            float stormSize = Math.max(MIN_VISUAL_WORLD_STORM_SIZE / scale, Math.max(width * 4.25F, height * 0.34F));
-            float boundsRadiusCloud = Math.max(width * 5.4F, stormSize * 0.58F);
+            float stormSize = Math.max(MIN_VISUAL_WORLD_STORM_SIZE / scale, Math.max(width * 3.75F, height * 0.30F));
+            float boundsRadiusCloud = Math.max(width * 4.25F, stormSize * 0.50F);
             float boundsRadiusWorld = boundsRadiusCloud * scale;
             float wallcloudRadiusWorld = stormSize * scale * 0.35F;
             float intensity = Mth.clamp(tornado.getNormalizedIntensity(), 0.0F, 1.0F);

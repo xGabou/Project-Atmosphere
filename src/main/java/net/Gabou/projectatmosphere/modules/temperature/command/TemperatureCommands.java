@@ -114,13 +114,12 @@ public class TemperatureCommands {
                                     var biomeHolder = level.getBiome(pos);
                                     BiomeInstanceKey biomeId = new BiomeInstanceKey(biomeHolder.unwrapKey().get().location(), pos);
 
-                                    float serene = TemperatureCommandHelper.getFinalBiomeTemperature(level, biomeHolder, pos);
-                                    double celsius = TemperatureCommandHelper.convertToCelsius(serene);
+                                    float biomeBase = biomeHolder.value().getBaseTemperature();
                                     float realTemp = TemperatureCommandHelper.getRealTemperature(level, biomeId, pos);
 
-                                    ctx.getSource().sendSuccess(() -> Component.literal("Current temperature (raw): " + serene), false);
-                                    ctx.getSource().sendSuccess(() -> Component.literal("Converted: " + net.Gabou.projectatmosphere.util.UnitFormatter.formatTemperature((float) celsius)), false);
-                                    ctx.getSource().sendSuccess(() -> Component.literal("Current (converted): " + net.Gabou.projectatmosphere.util.UnitFormatter.formatTemperature(realTemp)), false);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("Biome base temperature: " + biomeBase), false);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("Season provider: " + TemperatureCommandHelper.getCurrentSubSeason(level)), false);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("Current forecast temperature: " + net.Gabou.projectatmosphere.util.UnitFormatter.formatTemperature(realTemp)), false);
                                     return 1;
                                 }))
 
@@ -156,8 +155,8 @@ public class TemperatureCommands {
                                                     "/pa temperature forecast - Show 7-day forecast for your current biome.\n" +
                                                     "/pa temperature get <biome|current> - Display the current temperature at a specific biome and tick.\n" +
                                                     "/pa temperature dayprofile - View the 240-point daily temperature curve.\n" +
-                                                    "/pa temperature getseason - Show the current Serene Seasons sub-season.\n" +
-                                                    "/pa temperature gettemp - Raw and converted temperatures.\n" +
+                                                    "/pa temperature getseason - Show the current season provider state.\n" +
+                                                    "/pa temperature gettemp - Show biome base and PA forecast temperatures.\n" +
                                                     "/pa temperature regenerate - Clear forecast cache and regenerate missing data.\n" +
                                                     "/pa temperature resetSpikes - Clear spike simulation state cache."
                                     ), false);
