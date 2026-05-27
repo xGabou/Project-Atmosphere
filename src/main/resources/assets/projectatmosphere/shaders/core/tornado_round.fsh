@@ -27,6 +27,7 @@ uniform int StormCount;
 uniform int DebugMode;
 uniform int DebugSelectedStorm;
 uniform int DebugFreeze;
+uniform int DistantHorizonsDepthMode;
 uniform float StormPositions[24];
 uniform float StormHeights[8];
 uniform float StormWidths[8];
@@ -55,9 +56,15 @@ const int DEBUG_DENSITY = 8;
 const int DEBUG_ALPHA = 9;
 const int DEBUG_WALLCLOUD = 10;
 const int DEBUG_CONNECTION = 11;
-const int DEBUG_FULL = 12;
+const int DEBUG_GROUNDSKIRT = 12;
+const int DEBUG_FULL = 13;
+const int DEBUG_DEPTH = 14;
+const int DEBUG_DEPTH_NO_FRAMEBUFFER = 15;
+const int DEBUG_OCCLUSION = 16;
+const int DEBUG_COVERAGE = 17;
 const float TORNADO_ROTATION_SPEED_MULTIPLIER = 3.0;
 const float TORNADO_TOP_DARKEN_FACTOR = 0.45;
+const float SOFT_TERRAIN_OCCLUSION_BIAS = 0.50;
 
 struct StormSample {
     float cloud;
@@ -74,6 +81,7 @@ struct DebugMasks {
     float alpha;
     float wallcloud;
     float connection;
+    float groundSkirt;
 };
 
 float selectDebugMask(DebugMasks masks);
@@ -186,6 +194,14 @@ float sampleSceneDepth(vec2 uv) {
         return primaryDepth;
     }
     return min(primaryDepth, secondaryDepth);
+}
+
+float samplePrimarySceneDepth(vec2 uv) {
+    return texture(DepthSampler, uv).r;
+}
+
+float sampleSecondarySceneDepth(vec2 uv) {
+    return texture(SecondaryDepthSampler, uv).r;
 }
 
 float sampleFirstHitField(vec3 position, bool debugActive, bool debugMaskMode) {
@@ -364,6 +380,11 @@ DebugMasks sampleDebugMasks(int index, vec3 position) {
     connection *= smoothstep(funnelTopWorld - 1.8, baseHeightWorld + 1.8, positionWorld.y);
     connection *= saturate((intensity - 0.25) * 1.7);
 
+    float groundSkirtRadiusWorld = max(funnelRadiusWorld * mix(0.85, 1.15, intensity), stormSizeWorld * 0.08);
+    float groundSkirtPerc = 1.0 - saturate(radialDistanceWorld / max(groundSkirtRadiusWorld, 0.001));
+    float groundSkirtHeight = 1.0 - smoothstep(0.0, 6.0, max(positionWorld.y - posWorld.y, 0.0));
+    float groundSkirt = pow(max(groundSkirtPerc, 0.0), 0.9) * groundSkirtHeight * mix(0.06, 0.18, intensity);
+
     DebugMasks masks;
     masks.heightMask = heightMask * verticalGate;
     masks.radialMask = radialMask;
@@ -372,12 +393,13 @@ DebugMasks sampleDebugMasks(int index, vec3 position) {
     masks.alpha = alpha;
     masks.wallcloud = wallcloud;
     masks.connection = connection;
+    masks.groundSkirt = groundSkirt;
     return masks;
 }
 
 float selectDebugMask(DebugMasks masks) {
     if (DebugMode == DEBUG_FUNNEL) {
-        return max(masks.density, max(masks.wallcloud, masks.connection));
+        return max(masks.density, max(masks.wallcloud, max(masks.connection, masks.groundSkirt)));
     }
     if (DebugMode == DEBUG_HEIGHT) {
         return masks.heightMask;
@@ -400,16 +422,19 @@ float selectDebugMask(DebugMasks masks) {
     if (DebugMode == DEBUG_CONNECTION) {
         return masks.connection;
     }
+    if (DebugMode == DEBUG_GROUNDSKIRT) {
+        return masks.groundSkirt;
+    }
     return 0.0;
 }
 
 StormSample sampleFrozenStorm(int index, vec3 position) {
     DebugMasks masks = sampleDebugMasks(index, position);
     StormSample outSample;
-    outSample.cloud = max(masks.density, max(masks.wallcloud, masks.connection * 0.9));
+    outSample.cloud = masks.density;
     outSample.dust = 0.0;
-    outSample.upper = max(masks.wallcloud, masks.connection);
-    outSample.material = saturate(masks.alpha + masks.connection * 0.25);
+    outSample.upper = max(masks.wallcloud, masks.connection * 0.25);
+    outSample.material = masks.alpha;
     return outSample;
 }
 
@@ -427,7 +452,6 @@ StormSample sampleStorm(int index, vec3 position) {
     float detailQuality = computeStormDetailQuality(index);
     bool reducedDetail = detailQuality < 0.72;
     bool lowDetail = detailQuality < 0.45;
-
     float distWorld = distance(positionWorld.xz, posWorld.xz);
     float wallcloudRadiusWorld = stormSizeWorld * 0.35;
     float wallcloudLowerWorld = 15.0 * pow(max(1.0 - saturate(distWorld / max(wallcloudRadiusWorld, 0.001)), 0.0), 0.25) * saturate((intensity - 0.45) * 2.2);
@@ -440,17 +464,19 @@ StormSample sampleStorm(int index, vec3 position) {
     }
 
     StormSample outSample;
-    outSample.cloud = wallcloud;
+    outSample.cloud = wallcloud * 0.08;
     outSample.dust = 0.0;
     outSample.upper = wallcloud;
     outSample.material = wallcloud * 0.45;
 
-    if (!(positionWorld.y < baseHeightWorld - wallcloudLowerWorld && positionWorld.y > posWorld.y - 8.5 && distWorld < max(widthWorld * 4.0, stormSizeWorld / 3.0))) {
+    if (!(positionWorld.y < baseHeightWorld - wallcloudLowerWorld && positionWorld.y > posWorld.y - 14.0 && distWorld < max(widthWorld * 4.0, stormSizeWorld / 3.0))) {
         return outSample;
     }
 
     float fnlTopWorld = max(baseHeightWorld - 13.125, posWorld.y + 3.75);
     float percFnlHeight = saturate((positionWorld.y - posWorld.y) / max(fnlTopWorld - posWorld.y, 0.001));
+    float groundBlendWorld = 16.0;
+    float contactHeight = saturate((positionWorld.y - posWorld.y) / groundBlendWorld);
     float percCos = (-cos(percFnlHeight * PI) + 1.0) * 0.5;
     float torShape = mix(tornadoShape, 20.0, pow(saturate(widthWorld / 62.5), 1.75));
     float widWorld = (widthWorld / 2.5)
@@ -460,11 +486,8 @@ StormSample sampleStorm(int index, vec3 position) {
     float lowerBodyHeightWorld = mix(9.0, 15.0, torPerc);
     float lowerBodyBlend = saturate((positionWorld.y - posWorld.y) / max(lowerBodyHeightWorld, 0.001));
     lowerBodyBlend = lowerBodyBlend * lowerBodyBlend * (3.0 - 2.0 * lowerBodyBlend);
-    float baseRadiusWorld = mix(max(widthWorld * 0.16, 0.75), max(widthWorld * 0.24, 1.30), intensity);
+    float baseRadiusWorld = mix(max(widthWorld * 0.26, 2.25), max(widthWorld * 0.42, 4.0), intensity);
     widWorld = mix(baseRadiusWorld, widWorld, lowerBodyBlend);
-    float tornadoHeightWorld = posWorld.y - 0.25;
-    float th = 1.0 - saturate((positionWorld.y - tornadoHeightWorld) / 3.75);
-    widWorld = mix(widWorld, 0.0, th * th * th);
     float maxWidWorld = (widthWorld / 4.0) + ((widthWorld / 4.0) * torPerc) + ((stormSizeWorld / 8.0) * torPerc);
 
     float ropeMod = mix(3.0, 1.0, saturate(widthWorld / 3.75));
@@ -555,7 +578,7 @@ StormSample sampleStorm(int index, vec3 position) {
     float innerVeil = smoothstep(0.18, 0.74, widPerc) * (1.0 - smoothstep(0.78, 0.98, widPerc));
     innerVeil *= 0.18 + intensity * 0.16;
     float turbulence = 0.82 + (torNoise1 * 0.14) + (torNoise2 * 0.08);
-    float tornado = innerDensity * saturate((positionWorld.y - tornadoHeightWorld) / 2.5) * turbulence;
+    float tornado = innerDensity * (0.52 + smoothstep(0.0, 0.22, contactHeight) * 0.48) * turbulence;
     tornado += shearBand * 0.55 * (0.85 + materialField * 0.25);
     tornado += shellDensity * 0.78;
     tornado += coreFill * 0.65;
@@ -581,12 +604,20 @@ StormSample sampleStorm(int index, vec3 position) {
     dustWidPerc *= edge * edge * edge;
     float dust = 0.0;
     if (!lowDetail) {
-        dust = pow(max(dustWidPerc, 0.0), 1.5) * 0.15;
+        dust = pow(max(dustWidPerc, 0.0), 1.35) * mix(0.10, 0.18, intensity);
         dust *= saturate((dcTopWorld - positionWorld.y) / 2.5);
-        dust *= saturate((positionWorld.y - (posWorld.y - 2.5)) / 2.5);
+        dust *= saturate((positionWorld.y - posWorld.y) / 3.0);
         dust *= 0.8 + (dcNoise1 * 0.2);
         dust *= dcPerc;
         dust *= 1.0 - saturate((widthWorld - 6.25) / 25.0);
+    }
+
+    float groundSkirtRadiusWorld = max(widthWorld * mix(0.78, 1.10, intensity), stormSizeWorld * 0.10);
+    float groundSkirtPerc = 1.0 - saturate(torDistWorld / max(groundSkirtRadiusWorld, 0.001));
+    float groundSkirtHeight = 1.0 - smoothstep(0.0, 5.0, max(positionWorld.y - posWorld.y, 0.0));
+    float groundSkirt = pow(max(groundSkirtPerc, 0.0), 1.2) * groundSkirtHeight * mix(0.03, 0.10, intensity);
+    if (!reducedDetail) {
+        groundSkirt *= 0.80 + onoise(vec3(positionWorld.xz / 7.5, AnimationTime / 45.0)) * 0.20;
     }
 
     float connectionRadiusWorld = max(widWorld * mix(1.8, 2.5, intensity), stormSizeWorld * 0.28);
@@ -598,12 +629,11 @@ StormSample sampleStorm(int index, vec3 position) {
         connection *= 0.82 + onoise(vec3((positionWorld.xz + posWorld.xz) / 20.0, AnimationTime / 140.0)) * 0.18;
     }
 
-    outSample.cloud = max(outSample.cloud, max(tornado, dust));
-    outSample.cloud = max(outSample.cloud, connection * 0.9);
-    outSample.dust = max(outSample.dust, dust);
-    outSample.upper = max(outSample.upper, wallcloud + tornado * smoothstep(0.68, 1.0, percFnlHeight) * 0.30);
-    outSample.upper = max(outSample.upper, connection);
-    outSample.material = max(outSample.material, materialField * saturate(tornado + connection * 0.35));
+    outSample.cloud = tornado;
+    outSample.dust = max(dust, groundSkirt);
+    outSample.dust = max(outSample.dust, dustWidPerc * mix(0.04, 0.10, intensity));
+    outSample.upper = max(wallcloud, connection * 0.25);
+    outSample.material = saturate(materialField * mix(0.55, 0.95, saturate(tornado)));
     return outSample;
 }
 
@@ -641,22 +671,29 @@ void main() {
         return;
     }
 
-    float depthLimitedMaxRay = MaxDistance;
+    float sceneDistance = MaxDistance;
     if (sceneDepth < 1.0) {
         vec3 scenePos = reconstructPosition(screenUv, sceneDepth);
-        depthLimitedMaxRay = max(length(scenePos - ro) + 0.35, 0.0);
+        sceneDistance = max(length(scenePos - ro), 0.0);
     }
 
+    float depthLimitedMaxRay = MaxDistance;
     float maxRay = min(min(tFar, MaxDistance), depthLimitedMaxRay);
     if (maxRay <= tNear + 0.001) {
         discard;
     }
 
     bool debugActive = DebugMode != DEBUG_OFF;
+    bool debugDepthMode = DebugMode == DEBUG_DEPTH || DebugMode == DEBUG_DEPTH_NO_FRAMEBUFFER;
+    bool debugOcclusionMode = DebugMode == DEBUG_OCCLUSION;
+    bool debugCoverageMode = DebugMode == DEBUG_COVERAGE;
     bool debugMaskMode = debugActive
         && DebugMode != DEBUG_BOX
         && DebugMode != DEBUG_HIT
         && DebugMode != DEBUG_FILL
+        && !debugDepthMode
+        && !debugOcclusionMode
+        && !debugCoverageMode
         && DebugMode != DEBUG_FULL;
     float detailQuality = debugActive ? 1.0 : computeStormDetailQuality(0);
 
@@ -693,6 +730,7 @@ void main() {
                 debugValue = max(debugValue, value);
                 if (!wroteDepth) {
                     float firstHitT = refineFirstHitT(ro, rd, previousT, t, debugActive, true);
+                    nearestT = firstHitT;
                     firstHitDepth = clamp(cloudSpaceToDepth(ro + rd * firstHitT), 0.0, 1.0);
                     wroteDepth = true;
                 }
@@ -705,6 +743,7 @@ void main() {
             if (sigma > 0.0005) {
                 if (!wroteDepth) {
                     float firstHitT = refineFirstHitT(ro, rd, previousT, t, debugActive, false);
+                    nearestT = firstHitT;
                     firstHitDepth = clamp(cloudSpaceToDepth(ro + rd * firstHitT), 0.0, 1.0);
                     wroteDepth = true;
                 }
@@ -731,31 +770,93 @@ void main() {
         if (debugValue < 0.01) {
             discard;
         }
-        if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
-            discard;
-        }
-        if (wroteDepth) {
-            gl_FragDepth = firstHitDepth;
-        }
-        fragColor = vec4(vec3(debugValue), saturate(debugValue));
+        fragColor = vec4(vec3(debugValue), 1.0);
         return;
     }
 
     float rawAlpha = 1.0 - transmittance;
-    if (!wroteDepth || rawAlpha < 0.03) {
+    float minBodyAlpha = DistantHorizonsDepthMode != 0 ? 0.045 : 0.03;
+    bool sceneReject = wroteDepth && sceneDepth < 1.0 && nearestT > sceneDistance + SOFT_TERRAIN_OCCLUSION_BIAS;
+    if (debugCoverageMode) {
+        if (!wroteDepth) {
+            fragColor = vec4(0.05, 0.20, 1.0, 1.0);
+            return;
+        }
+        if (sceneReject) {
+            fragColor = vec4(1.0, 0.05, 0.05, 1.0);
+            return;
+        }
+        if (rawAlpha < minBodyAlpha) {
+            fragColor = vec4(1.0, 0.90, 0.05, 1.0);
+            return;
+        }
+        if (DistantHorizonsDepthMode != 0 && rawAlpha < 0.105) {
+            fragColor = vec4(0.05, 0.95, 1.0, 1.0);
+            return;
+        }
+        fragColor = vec4(0.05, 1.0, 0.18, 1.0);
+        return;
+    }
+
+    if (debugDepthMode || debugOcclusionMode) {
+        if (!wroteDepth) {
+            fragColor = vec4(0.05, 0.20, 1.0, 1.0);
+            return;
+        }
+        if (rawAlpha < 0.03) {
+            fragColor = vec4(1.0, 0.90, 0.05, 1.0);
+            return;
+        }
+        if (debugOcclusionMode) {
+            float primaryDepth = samplePrimarySceneDepth(screenUv);
+            float secondaryDepth = UseSecondaryDepthSampler != 0 ? sampleSecondarySceneDepth(screenUv) : 1.0;
+            bool primaryReject = primaryDepth < 1.0 && firstHitDepth > primaryDepth + 0.0005;
+            bool secondaryReject = secondaryDepth < 1.0 && firstHitDepth > secondaryDepth + 0.0005;
+            if (primaryReject && secondaryReject) {
+                fragColor = vec4(1.0, 1.0, 1.0, 1.0);
+                return;
+            }
+            if (primaryReject) {
+                fragColor = vec4(1.0, 0.05, 0.05, 1.0);
+                return;
+            }
+            if (secondaryReject) {
+                fragColor = vec4(1.0, 0.05, 1.0, 1.0);
+                return;
+            }
+            fragColor = vec4(0.05, 1.0, 0.18, 1.0);
+            return;
+        }
+        if (sceneReject) {
+            fragColor = vec4(1.0, 0.05, 0.05, 1.0);
+            return;
+        }
+        fragColor = vec4(0.05, 1.0, 0.18, 1.0);
+        return;
+    }
+
+    if (!wroteDepth || rawAlpha < minBodyAlpha) {
         discard;
     }
     float alpha = 1.0 - pow(1.0 - rawAlpha, 1.80);
     alpha = saturate(alpha * 1.10);
-    if (wroteDepth && sceneDepth < 1.0 && firstHitDepth > sceneDepth + 0.0006) {
+    if (sceneReject) {
         discard;
+    }
+    if (DistantHorizonsDepthMode != 0) {
+        float dhBodyOcclusion = smoothstep(0.045, 0.105, rawAlpha);
+        alpha = max(alpha, dhBodyOcclusion * 0.998);
     }
 
     vec3 color = accum / max(rawAlpha, 0.0001);
     float fogFactor = smoothstep(FogStart, FogEnd, nearestT);
     color = mix(color, FogColor.rgb, fogFactor * 0.45);
     if (wroteDepth) {
-        gl_FragDepth = firstHitDepth;
+        float outputDepth = firstHitDepth;
+        if (sceneDepth < 1.0 && nearestT <= sceneDistance + SOFT_TERRAIN_OCCLUSION_BIAS && firstHitDepth > sceneDepth) {
+            outputDepth = max(0.0, sceneDepth - 0.0005);
+        }
+        gl_FragDepth = outputDepth;
     }
     fragColor = vec4(color, saturate(alpha * 1.08));
 }

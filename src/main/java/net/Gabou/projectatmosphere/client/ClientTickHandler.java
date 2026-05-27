@@ -100,6 +100,7 @@ public class ClientTickHandler {
             for (TornadoInstance tornado : current) {
                 float baseVol = 0.35f + 0.45f * 0.75f;
                 TornadoAudioClient.ensure(tornado, baseVol, 140f);
+                TornadoClientEffects.tickTornadoDust(tornado, mc.level, tickCounter);
             }
             for (TornadoInstance t : prevTornadoes) {
                 if (!current.contains(t)) {

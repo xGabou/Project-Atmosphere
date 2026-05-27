@@ -8,7 +8,6 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.client.render.SimpleCloudsTornadoRenderer;
 import net.Gabou.projectatmosphere.modules.fog.FogHeuristics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -43,8 +42,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
         Vec3 cameraPos = event.getCamera().getPosition();
         FogHeuristics.FogProfile dynamicFog = AtmosphereFogState.sample(level, cameraPos, partialTick);
         float cloudWhiteout = renderer == null ? 0.0F : computeCloudWhiteout(level, renderer, cameraPos);
-        float tornadoWhiteout = SimpleCloudsTornadoRenderer.INSTANCE.sampleWhiteoutAtCamera(level, cameraPos, partialTick);
-        float whiteout = Math.max(cloudWhiteout, tornadoWhiteout);
+        float whiteout = cloudWhiteout;
         float dynamicStrength = dynamicFog.strength();
 
         if (whiteout <= 0.0F && dynamicStrength <= 0.0F) {
@@ -72,7 +70,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
         }
         if (whiteout > 0.0F) {
             nearPlane = 0.0F;
-            farPlane = Math.min(farPlane, Math.max(0.5F, Mth.lerp(whiteout, baseFar, 6.0F)));
+            farPlane = Math.min(farPlane, Math.max(0.35F, Mth.lerp(whiteout, baseFar, 0.85F)));
         }
 
         event.setNearPlaneDistance(nearPlane);
@@ -92,8 +90,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
         Vec3 cameraPos = event.getCamera().getPosition();
         FogHeuristics.FogProfile dynamicFog = AtmosphereFogState.sample(level, cameraPos, partialTick);
         float cloudWhiteout = renderer == null ? 0.0F : computeCloudWhiteout(level, renderer, cameraPos);
-        float tornadoWhiteout = SimpleCloudsTornadoRenderer.INSTANCE.sampleWhiteoutAtCamera(level, cameraPos, partialTick);
-        float whiteout = Math.max(cloudWhiteout, tornadoWhiteout);
+        float whiteout = cloudWhiteout;
         float dynamicStrength = dynamicFog.strength();
 
         if (whiteout <= 0.0F && dynamicStrength <= 0.0F) {
@@ -119,11 +116,15 @@ public final class SimpleCloudsWhiteoutFogHandler {
             event.setBlue(Mth.lerp(colorBlend, event.getBlue(), dampBlue));
         }
 
-        if (whiteout > 0.0F && renderer != null) {
-            float[] cloudColor = renderer.getCloudColor(partialTick);
-            event.setRed(Mth.lerp(whiteout, event.getRed(), cloudColor[0]));
-            event.setGreen(Mth.lerp(whiteout, event.getGreen(), cloudColor[1]));
-            event.setBlue(Mth.lerp(whiteout, event.getBlue(), cloudColor[2]));
+        if (whiteout > 0.0F) {
+            float[] cloudColor = renderer == null ? null : renderer.getCloudColor(partialTick);
+            float dustyRed = cloudColor == null ? 0.30F : Mth.clamp(cloudColor[0] * 0.62F + 0.10F, 0.0F, 1.0F);
+            float dustyGreen = cloudColor == null ? 0.25F : Mth.clamp(cloudColor[1] * 0.55F + 0.08F, 0.0F, 1.0F);
+            float dustyBlue = cloudColor == null ? 0.20F : Mth.clamp(cloudColor[2] * 0.45F + 0.06F, 0.0F, 1.0F);
+            float dustyBlend = Mth.clamp(whiteout * 1.18F, 0.0F, 1.0F);
+            event.setRed(Mth.lerp(dustyBlend, event.getRed(), dustyRed));
+            event.setGreen(Mth.lerp(dustyBlend, event.getGreen(), dustyGreen));
+            event.setBlue(Mth.lerp(dustyBlend, event.getBlue(), dustyBlue));
         }
     }
 

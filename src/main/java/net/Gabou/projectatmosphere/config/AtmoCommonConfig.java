@@ -47,6 +47,7 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
     public static final ForgeConfigSpec.BooleanValue TORNADO_ALLOW_LEGACY_FALLBACK;
+    public static final ForgeConfigSpec.BooleanValue DISABLE_SIMPLE_CLOUDS_TORNADO_SSBO;
     public static final ForgeConfigSpec.BooleanValue TORNADO_DEBUG_LOGGING;
     public static final ForgeConfigSpec.DoubleValue TORNADO_RENDER_QUALITY;
     public static final ForgeConfigSpec.DoubleValue TORNADO_RENDER_DOWNSAMPLE;
@@ -232,6 +233,9 @@ public class AtmoCommonConfig {
         TORNADO_ALLOW_LEGACY_FALLBACK = builder
                 .comment("Allow falling back to the legacy mesh tornado when the SimpleClouds shader pack lacks the CloudStorms SSBO. Leave false to require the shader-driven funnel.")
                 .define("allowLegacyTornadoFallback", false);
+        DISABLE_SIMPLE_CLOUDS_TORNADO_SSBO = builder
+                .comment("Disable Project Atmosphere's Simple Clouds storm SSBO integration. Tornado cloud carving uses safer uniforms; hurricane cloud shaping falls back off when this is enabled.")
+                .define("disableSimpleCloudsTornadoSSBO", false);
         TORNADO_DEBUG_LOGGING = builder
                 .comment("Enable verbose tornado logging (SSBO detection, fallback decisions, command outcomes).")
                 .define("debugTornadoLogging", false);

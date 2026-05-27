@@ -7,6 +7,7 @@ This repository hosts **Project Atmosphere**, a Minecraft Forge 1.20.1 mod writt
 - Keep braces on the same line as declarations (`if (...) {`).
 - Ensure files end with a newline.
 - When finished, do the summary inside CHANGES.md. if you added functionality, fixed bugs, or made other notable changes.
+- For iterative rendering, compatibility, or crash investigations, log each attempted fix and result in a Markdown investigation log before trying another fix. Check that log first so failed approaches are not repeated.
 
 ## Build / Checks
 - The project uses Gradle. The wrapper is not included, so use the system `gradle` command.

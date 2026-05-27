@@ -20,7 +20,14 @@ public final class TornadoRenderDebugState {
         ALPHA("alpha", 9),
         WALLCLOUD("wallcloud", 10),
         CONNECTION("connection", 11),
-        FULL("full", 12);
+        GROUND_SKIRT("groundskirt", 12),
+        FULL("full", 13),
+        DEPTH("depth", 14),
+        DEPTH_NO_FRAMEBUFFER("depth_nofb", 15),
+        DEPTH_MAIN_FRAMEBUFFER("depth_mainfb", 14),
+        OCCLUSION("occlusion", 16),
+        COVERAGE("coverage", 17),
+        LATE("late", 0);
 
         private final String token;
         private final int shaderValue;

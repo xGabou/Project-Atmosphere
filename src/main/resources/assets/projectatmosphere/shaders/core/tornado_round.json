@@ -39,6 +39,7 @@
     { "name": "DebugMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "DebugSelectedStorm", "type": "int", "count": 1, "values": [ -1 ] },
     { "name": "DebugFreeze", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "DistantHorizonsDepthMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "StormPositions", "type": "float", "count": 24, "values": [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ] },
     { "name": "StormHeights", "type": "float", "count": 8, "values": [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ] },
     { "name": "StormWidths", "type": "float", "count": 8, "values": [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ] },
