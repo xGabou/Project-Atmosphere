@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.seasons;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import net.Gabou.projectatmosphere.event.SeasonTracker;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -12,11 +11,16 @@ import com.Gabou.sereneseasonsplus.api.SSPApi;
  * Season delegate backed by Serene Seasons.
  */
 public class SereneSeasonsSeasonDelegate implements SeasonTimeDelegate {
+    private static final String PROVIDER_ID = "sereneseasons";
 
     public SereneSeasonsSeasonDelegate() {
-        SeasonTracker.register();
+        SereneSeasonsEventBridge.register();
     }
 
+    @Override
+    public String providerId() {
+        return PROVIDER_ID;
+    }
 
     @Override
     public SeasonSnapshot snapshot(Level level) {
@@ -51,11 +55,13 @@ public class SereneSeasonsSeasonDelegate implements SeasonTimeDelegate {
     }
 
 
-    public static void  handleRainStarted(ServerLevel level, CloudRegion cloudRegion) {
+    @Override
+    public void onRainStarted(ServerLevel level, CloudRegion cloudRegion) {
         SSPApi.getINSTANCE().onSimpleCloudsSpawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
     }
 
-    public static void handleRainEnded(ServerLevel level, CloudRegion cloudRegion) {
+    @Override
+    public void onRainEnded(ServerLevel level, CloudRegion cloudRegion) {
         SSPApi.getINSTANCE().onCloudsDespawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
     }
 }

@@ -53,6 +53,7 @@ public class AtmoConfigScreen extends Screen {
     private boolean tornadoAllowLegacyFallback;
     private boolean tornadoDebugLogging;
     private double tornadoRenderQuality;
+    private double tornadoRenderDownsample;
     private double windBaseRetargetSec;
     private double windDirRetargetSec;
     private double windGustMeanSec;
@@ -90,6 +91,7 @@ public class AtmoConfigScreen extends Screen {
     private EditBox tornadoIntensityMaxBox;
     private EditBox tornadoCellCooldownBox;
     private EditBox tornadoRenderQualityBox;
+    private EditBox tornadoRenderDownsampleBox;
     private EditBox hurricaneDestructionStrengthBox;
     private EditBox fogHumidityStartBox;
     private EditBox fogHumidityFullBox;
@@ -185,6 +187,7 @@ public class AtmoConfigScreen extends Screen {
         this.tornadoAllowLegacyFallback = AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.get();
         this.tornadoDebugLogging = AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get();
         this.tornadoRenderQuality = AtmoCommonConfig.TORNADO_RENDER_QUALITY.get();
+        this.tornadoRenderDownsample = AtmoCommonConfig.TORNADO_RENDER_DOWNSAMPLE.get();
         this.windBaseRetargetSec = AtmoCommonConfig.WIND_BASE_RETARGET_SEC.get();
         this.windDirRetargetSec = AtmoCommonConfig.WIND_DIR_RETARGET_SEC.get();
         this.windGustMeanSec = AtmoCommonConfig.WIND_GUST_MEAN_SEC.get();
@@ -211,6 +214,8 @@ public class AtmoConfigScreen extends Screen {
         }).bounds(center - 100, y, 200, 20).build(), y);
         y += 32;
         tornadoRenderQualityBox = addNumberField(center, y, "Tornado Render Quality", Double.toString(tornadoRenderQuality));
+        y += 34;
+        tornadoRenderDownsampleBox = addNumberField(center, y, "Tornado Render Downsample", Double.toString(tornadoRenderDownsample));
         y += 34;
 
         addTitle("Display", y);
@@ -494,6 +499,7 @@ public class AtmoConfigScreen extends Screen {
         tornadoIntensityMax = parseDouble(tornadoIntensityMaxBox, tornadoIntensityMax);
         tornadoCellCooldownMinutes = parseInt(tornadoCellCooldownBox, tornadoCellCooldownMinutes);
         tornadoRenderQuality = Mth.clamp(parseDouble(tornadoRenderQualityBox, tornadoRenderQuality), 0.25d, 1.0d);
+        tornadoRenderDownsample = Mth.clamp(parseDouble(tornadoRenderDownsampleBox, tornadoRenderDownsample), 1.0d, 4.0d);
         hurricaneDestructionStrength = Mth.clamp(parseDouble(hurricaneDestructionStrengthBox, hurricaneDestructionStrength), 0.0d, 3.0d);
         // Buttons already toggled booleans; nothing to parse.
         fogHumidityStartPercent = parseDouble(fogHumidityStartBox, fogHumidityStartPercent);
@@ -544,6 +550,7 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.set(tornadoAllowLegacyFallback);
         AtmoCommonConfig.TORNADO_DEBUG_LOGGING.set(tornadoDebugLogging);
         AtmoCommonConfig.TORNADO_RENDER_QUALITY.set(tornadoRenderQuality);
+        AtmoCommonConfig.TORNADO_RENDER_DOWNSAMPLE.set(tornadoRenderDownsample);
         AtmoCommonConfig.FOG_HUMIDITY_START_PERCENT.set(fogHumidityStartPercent);
         AtmoCommonConfig.FOG_HUMIDITY_FULL_PERCENT.set(fogHumidityFullPercent);
         AtmoCommonConfig.FOG_WET_BIOME_BASE_STRENGTH.set(fogWetBiomeBaseStrength);

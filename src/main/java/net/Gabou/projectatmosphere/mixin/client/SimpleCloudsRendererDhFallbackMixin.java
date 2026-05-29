@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.mixin.client;
 
+import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
 import dev.nonamecrackers2.simpleclouds.client.dh.pipeline.DhSupportPipeline;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
@@ -12,7 +13,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import net.minecraftforge.fml.ModList;
 
 import javax.annotation.Nullable;
 
@@ -24,7 +24,7 @@ public abstract class SimpleCloudsRendererDhFallbackMixin {
 
     @Inject(method = "renderBeforeLevel", at = @At("TAIL"))
     private void projectatmosphere$forceDhSupportPipeline(com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, CallbackInfo ci) {
-        if (!ModList.get().isLoaded("distanthorizons") || this.renderPipelineThisPass == DhSupportPipeline.INSTANCE) {
+        if (!SimpleCloudsMod.dhLoaded() || this.renderPipelineThisPass == DhSupportPipeline.INSTANCE) {
             return;
         }
 

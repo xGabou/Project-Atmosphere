@@ -157,6 +157,7 @@ dependencies {
     compileOnly fg.deobf("curse.maven:project-atmosphere-for-tfc-1391548:7261639")
     compileOnly fg.deobf("curse.maven:dynamictrees-252818:7502488")
     compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
+    compileOnly "maven.modrinth:protomanlys-weather:0.16.4-1.20.1-alpha"
     //implementation "curse.maven:nolijium-969602:6264798"
 
 
@@ -169,7 +170,7 @@ dependencies {
 
     runtimeOnly fg.deobf("curse.maven:chloride-931925:6615986")
     runtimeOnly fg.deobf("curse.maven:embeddium-908741:5681725")
-    implementation fg.deobf("curse.maven:distant-horizons-508933:7948170")
+    compileOnly fg.deobf("curse.maven:distant-horizons-508933:7948170")
 
     // Local dependency, ensure the file exists in the libs directory
     // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings

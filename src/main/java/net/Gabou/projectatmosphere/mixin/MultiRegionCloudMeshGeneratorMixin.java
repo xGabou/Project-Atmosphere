@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.mixin;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.blaze3d.platform.GlStateManager;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.MultiRegionCloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.shader.buffer.BindingManager;
 import dev.nonamecrackers2.simpleclouds.client.shader.buffer.ShaderStorageBufferObject;
@@ -14,6 +13,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.common.cloud.region.ITornadoRegion;
 import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance;
 import net.Gabou.projectatmosphere.util.HurricaneUpload;
 import net.Gabou.projectatmosphere.util.RegionUpload;
@@ -25,7 +25,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.joml.Matrix2f;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL41;
 import org.lwjgl.opengl.GL43;
 import org.spongepowered.asm.mixin.Final;
@@ -61,13 +60,13 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
     @Unique
     private static final int PROJECTATMOSPHERE$MAX_TORNADOES = 64;
     @Unique
+    private static final int PROJECTATMOSPHERE$MAX_UNIFORM_TORNADOES = 16;
+    @Unique
     private static final int PROJECTATMOSPHERE$MAX_HURRICANES = 8;
     @Unique
     private static final int PROJECTATMOSPHERE$TORNADO_STRIDE = 32;
     @Unique
     private static final int PROJECTATMOSPHERE$HURRICANE_STRIDE = 64;
-    @Unique
-    private static final int PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING = 0;
 
     @Unique private ShaderStorageBufferObject projectatmosphere$stormBuffer;
     @Unique private boolean projectatmosphere$stormBufferUsesBindingManager;
@@ -179,6 +178,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         List<TornadoUpload> uploads = this.projectatmosphere$collectTornadoUploads(partialTick);
         List<HurricaneUpload> hurricaneUploads = this.projectatmosphere$collectHurricaneUploads(partialTick);
         int tornadoCount = Math.min(uploads.size(), PROJECTATMOSPHERE$MAX_TORNADOES);
+        int uniformTornadoCount = Math.min(tornadoCount, PROJECTATMOSPHERE$MAX_UNIFORM_TORNADOES);
         int hurricaneCount = Math.min(hurricaneUploads.size(), PROJECTATMOSPHERE$MAX_HURRICANES);
         if (tornadoCount <= 0 && hurricaneCount <= 0) {
             this.projectatmosphere$updateStormUniforms(0, 0);
@@ -187,10 +187,18 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             return;
         }
 
+        this.projectatmosphere$updateTornadoUniformData(uploads, uniformTornadoCount);
+        if (hurricaneCount <= 0) {
+            this.projectatmosphere$updateStormUniforms(uniformTornadoCount, 0);
+            this.projectatmosphere$currentTornadoCount = uniformTornadoCount;
+            this.projectatmosphere$currentHurricaneCount = 0;
+            return;
+        }
+
         this.projectatmosphere$ensureStormBuffer();
         if (this.projectatmosphere$stormBuffer == null) {
-            this.projectatmosphere$updateStormUniforms(0, 0);
-            this.projectatmosphere$currentTornadoCount = 0;
+            this.projectatmosphere$updateStormUniforms(uniformTornadoCount, 0);
+            this.projectatmosphere$currentTornadoCount = uniformTornadoCount;
             this.projectatmosphere$currentHurricaneCount = 0;
             return;
         }
@@ -242,9 +250,9 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             buffer.flip();
         }, this.projectatmosphere$stormBufferSize(), false);
 
-        this.projectatmosphere$currentTornadoCount = tornadoCount;
+        this.projectatmosphere$currentTornadoCount = uniformTornadoCount;
         this.projectatmosphere$currentHurricaneCount = hurricaneCount;
-        this.projectatmosphere$updateStormUniforms(tornadoCount, hurricaneCount);
+        this.projectatmosphere$updateStormUniforms(uniformTornadoCount, hurricaneCount);
     }
 
     @Unique
@@ -267,7 +275,7 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
                 this.projectatmosphere$stormBuffer = newBuffer;
                 this.projectatmosphere$bindStormBufferToShaders();
             }
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             if (newBuffer != null) {
                 this.projectatmosphere$closeFailedStormBuffer(newBuffer);
             }
@@ -436,6 +444,21 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
         if (this.regionTextureGenerator == null || !this.regionTextureGenerator.isValid()) {
             return false;
         }
+        if (AtmoCommonConfig.DISABLE_SIMPLE_CLOUDS_TORNADO_SSBO.get()) {
+            if (!this.projectatmosphere$stormBufferUnavailableLogged) {
+                this.projectatmosphere$stormBufferUnavailableLogged = true;
+                PROJECTATMOSPHERE$LOGGER.warn("Simple Clouds storm SSBO integration is disabled by config; tornado cloud carving will use uniforms and hurricane cloud shaping is disabled.");
+            }
+            return false;
+        }
+        int maxBindings = GL11.glGetInteger(GL43.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS);
+        if (maxBindings <= 16) {
+            if (!this.projectatmosphere$stormBufferUnavailableLogged) {
+                this.projectatmosphere$stormBufferUnavailableLogged = true;
+                PROJECTATMOSPHERE$LOGGER.warn("Disabling Simple Clouds storm SSBO integration because this GPU exposes only {} shader storage buffer bindings. Tornado cloud carving will use uniforms and hurricane cloud shaping is disabled.", maxBindings);
+            }
+            return false;
+        }
         int shaderId = this.regionTextureGenerator.getId();
         if (shaderId <= 0) {
             return false;
@@ -453,15 +476,6 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
 
     @Unique
     private ShaderStorageBufferObject projectatmosphere$createStormBuffer() {
-        int maxBindings = GL11.glGetInteger(GL43.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS);
-        if (maxBindings > PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING && maxBindings <= 16) {
-            int bufferId = GlStateManager._glGenBuffers();
-            GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING, bufferId);
-            ShaderStorageBufferObject buffer = new ShaderStorageBufferObject(bufferId, PROJECTATMOSPHERE$RESERVED_STORM_SSBO_BINDING, GL43.GL_DYNAMIC_DRAW);
-            buffer.optionalBindToProgram(PROJECTATMOSPHERE$STORM_BUFFER_NAME, this.regionTextureGenerator.getId());
-            this.projectatmosphere$stormBufferUsesBindingManager = false;
-            return buffer;
-        }
         this.projectatmosphere$stormBufferUsesBindingManager = true;
         return this.regionTextureGenerator.createAndBindSSBO(PROJECTATMOSPHERE$STORM_BUFFER_NAME, GL43.GL_DYNAMIC_DRAW);
     }
@@ -494,6 +508,42 @@ public abstract class MultiRegionCloudMeshGeneratorMixin {
             shader.forUniform("TotalCloudTornadoes", (program, location) -> GL41.glProgramUniform1i(program, location, tornadoCount));
             shader.forUniform("TotalCloudHurricanes", (program, location) -> GL41.glProgramUniform1i(program, location, hurricaneCount));
         }
+    }
+
+    @Unique
+    private void projectatmosphere$updateTornadoUniformData(List<TornadoUpload> uploads, int tornadoCount) {
+        float[] data0 = new float[PROJECTATMOSPHERE$MAX_UNIFORM_TORNADOES * 4];
+        float[] data1 = new float[PROJECTATMOSPHERE$MAX_UNIFORM_TORNADOES * 4];
+        for (int i = 0; i < tornadoCount; i++) {
+            TornadoUpload upload = uploads.get(i);
+            int base = i * 4;
+            data0[base] = upload.typeIndex;
+            data0[base + 1] = upload.centerX;
+            data0[base + 2] = upload.centerZ;
+            data0[base + 3] = upload.radius;
+            data1[base] = upload.bottom;
+            data1[base + 1] = upload.height;
+        }
+
+        this.projectatmosphere$setTornadoRegionUniforms(this.regionTextureGenerator, data0);
+        this.projectatmosphere$setTornadoMeshUniforms(this.projectatmosphere$getShader(), data0, data1);
+    }
+
+    @Unique
+    private void projectatmosphere$setTornadoRegionUniforms(ComputeShader shader, float[] data0) {
+        if (shader == null || !shader.isValid()) {
+            return;
+        }
+        shader.forUniform("CloudTornadoData0[0]", (program, location) -> GL41.glProgramUniform4fv(program, location, data0));
+    }
+
+    @Unique
+    private void projectatmosphere$setTornadoMeshUniforms(ComputeShader shader, float[] data0, float[] data1) {
+        if (shader == null || !shader.isValid()) {
+            return;
+        }
+        shader.forUniform("CloudTornadoData0[0]", (program, location) -> GL41.glProgramUniform4fv(program, location, data0));
+        shader.forUniform("CloudTornadoData1[0]", (program, location) -> GL41.glProgramUniform4fv(program, location, data1));
     }
 
     @Unique

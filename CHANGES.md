@@ -1,5 +1,32 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - AMD and Intel Simple Clouds compatibility
+- Moved Simple Clouds tornado cloud-carving metadata from the `CloudStorms` SSBO to uniform arrays capped at 16 tornadoes, avoiding an extra SSBO dependency for the tornado path on strict AMD and Intel OpenGL drivers.
+- Disabled Project Atmosphere's Simple Clouds storm SSBO allocation on GPUs exposing 16 or fewer shader storage buffer bindings, falling back to uniform tornado cloud carving and disabling hurricane cloud shaping instead of crashing.
+- Added `storms.tornado.disableSimpleCloudsTornadoSSBO` so users can force the safer no-SSBO Simple Clouds storm integration path when diagnosing GPU driver issues.
+
+## Unreleased - Ecliptic Seasons forecast integration
+- Routed forecast/debug temperature season reads and Simple Clouds rain lifecycle notifications through the shared `SeasonTimeHelper` delegate instead of calling Serene Seasons directly.
+- Preferred Ecliptic Seasons when both Ecliptic and Serene are loaded, and fixed the Ecliptic delegate's cycle tick reporting so forecast temperature curves advance from the current solar term position instead of a constant season duration.
+- Moved Serene-specific season-change callbacks into the Serene season integration bridge and stopped registering them from the main mod bootstrap.
+
+## Unreleased - Launcher auth guard
+- Ported the Identity2 launcher auth guard into Project Atmosphere with a Forge SimpleChannel challenge/reply flow, client-side TLauncher marker detection, strict offline UUID rejection, timeout kicking, and player/IP ban handling when the marker is reported.
+
+## Unreleased - Tornado render performance pass
+- Moved the Simple Clouds tornado volume pass onto a configurable low-resolution render target with an upsample composite shader, defaulting to a 2.5x downsample so tornado raymarching shades far fewer pixels on mid-range GPUs.
+- Fixed the downsampled tornado pass to set the viewport to the low-resolution target before raymarching and restore the cloud-target viewport before compositing, preventing camera-dependent tornado placement.
+- Disabled the tornado downsample path automatically under Distant Horizons so the tornado follows the same full-resolution depth path Simple Clouds uses for its own DH cloud rendering.
+- Softened near-terrain tornado depth rejection and biased close dusty intersections in front of the scene depth so ground-contact funnels no longer get visibly cut open by nearby terrain.
+- Expanded in-tornado dusty volume/fog when the camera is inside or near the funnel and added a sparse client-only falling dust curtain on the far side of tornadoes.
+- Removed camera-dependent funnel widening so tornado visual size stays fixed by tornado strength/radius, then increased ground-contact padding and inside-funnel whiteout so tornadoes touch terrain more reliably and feel dustier from within.
+- Corrected inverted ground-contact height math, anchored the visual tornado base near sampled terrain, added a dense low dust skirt at touchdown, and pushed inside-tornado fog toward a short dusty brown-gray whiteout.
+- Separated the tornado shader contributions into distinct wallcloud, connection, ground skirt, and main funnel paths, added a `groundskirt` render debug mode, reduced the terrain depth bias to a small local contact helper, and removed the downsample composite's alpha unpremultiply so semi-transparent dark pixels are no longer exaggerated.
+- Changed debug-mask tornado modes to render as opaque field overlays so `density`, `wallcloud`, `connection`, and `groundskirt` remain readable even under Distant Horizons' alternate depth path.
+- Changed tornado volume rendering to use depth-aware `LEQUAL` proxy rendering, cull proxy backfaces when the camera is outside the volume, and sample scene depth before raymarching so occluded pixels skip the expensive storm loop earlier.
+- Reduced tornado raymarch and first-hit refinement work, tightened the shader influence radius, and shrank the Java-side proxy bounds so the shader spends less time marching empty air around the funnel.
+- Removed the tornado transparency mixin hooks because the transparency renderer was a no-op but still copied depth and rebound targets every visible tornado frame.
+
 ## Unreleased - Storm spawn and despawn transitions
 - Kept tornado command spawns in the forming lifecycle instead of forcing the no-cloud path active immediately, so standalone tornadoes now ease in and the removal command lets them dissipate before cleanup.
 - Added a hurricane lifecycle with forming, active, and dissipating phases, then kept cyclone-linked hurricanes alive until the fade-out completes instead of dropping them the moment the cyclone disappears.
@@ -19,7 +46,33 @@ This file records functionality additions/removals made during development sessi
 - Added the `projectatmosphere:hurricane_fragile`, `projectatmosphere:hurricane_tree_damage`, and `projectatmosphere:hurricane_never_break` block tags plus four user-facing common config options: `enableHurricaneDestruction`, `hurricaneDestructionStrength`, `hurricaneDropBrokenBlocks`, and `hurricaneDamageTrees`.
 
 ## Unreleased - Distant Horizons storm volume rendering fix
-- Bound the tornado shader to Distant Horizons' actual depth texture in the DH Simple Clouds render path, using the DH depth as the primary scene-depth sampler and keeping the cloud transparency depth as the fallback secondary input.
+- Fixed the current non-DH no-render regression by disabling the Simple Clouds pipeline frustum as a hard gate for Project Atmosphere tornado volume draws after diagnostics showed valid prepared tornadoes were being rejected before the renderer reached the shader.
+- Added rate-limited `[TornadoPath]` diagnostics for the non-DH Simple Clouds tornado hooks and renderer early-return/draw-state decisions so the current non-DH no-render regression can be isolated before further render changes.
+- Bound the tornado shader to Simple Clouds' DH-filled cloud target depth in the DH render path so the shader samples the same depth buffer that the cloud framebuffer uses for depth testing.
+- Removed the tornado's secondary depth sampler from the DH render path so the shader no longer mixes in cloud-transparency depth while deciding terrain contact.
+- Added a `depth` tornado render debug mode that colors shader depth acceptance, scene-depth rejection, low-alpha rejection, and missing-density paths for DH diagnosis.
+- Added a `depth_nofb` tornado render debug mode that uses the same shader-side depth colors while disabling framebuffer depth testing, allowing DH tests to distinguish fixed-function depth rejection from shader raymarch/discard rejection.
+- Added a `depth_mainfb` tornado render debug mode that temporarily restores Minecraft's main depth attachment for the DH tornado draw, allowing comparison against Simple Clouds' temporary `cloudTarget` depth attachment.
+- Added an `occlusion` tornado render debug mode that detaches framebuffer depth and colors whether vanilla main depth, Simple Clouds/DH cloud depth, both, or neither would occlude each tornado pixel.
+- Added a `late` tornado render diagnostic mode that skips the Simple Clouds DH hook and draws the tornado at Forge `AFTER_LEVEL`, testing whether terrain is being composited over the earlier DH tornado pass.
+- Added a `coverage` tornado render debug mode that colors whether the single late DH pass is missing depth, below the raw-alpha cutoff, inside the DH opacity ramp, solid body coverage, or rejected by scene depth.
+- Promoted the late `AFTER_LEVEL` path to the normal Distant Horizons tornado render path after diagnostics showed terrain was compositing over the earlier Simple Clouds DH hook, while keeping explicit depth debug modes on the old hook.
+- Made the Distant Horizons tornado render path single-stage by routing debug and normal tornado draws through Forge `AFTER_LEVEL`, removing the old DH post-composite tornado draw, and guarding default/shader Simple Clouds hooks while DH is loaded.
+- Limited the late Distant Horizons tornado pass to Minecraft's main scene depth sampler after `coverage` debug showed the remaining seam was shader scene-depth rejection, preventing Simple Clouds' older cloud/DH depth target from falsely cutting the funnel.
+- Reintroduced tornado downscaling for the corrected Distant Horizons late pass by raymarching into the low-resolution tornado target and compositing directly back into the same final framebuffer, while keeping debug modes full-resolution.
+- Added an alpha-aware 9-tap tornado upsample filter for the downsample composite so aggressive tornado downscaling keeps most of its FPS gain without exposing a blocky low-resolution alpha grid.
+- Removed tornado camera whiteout from the fog handler while keeping normal cloud/dynamic fog behavior.
+- Split DH and non-DH tornado shader behavior: DH keeps the corrected late main-depth path, while normal non-DH rendering uses the shader's `full` path without enabling Java debug filtering.
+- Disabled tornado downscaling for the non-DH forced-full render path so vanilla rendering matches explicit `full` mode more closely, while keeping the confirmed DH late-path downscaling enabled.
+- Kept non-DH tornado rendering on the confirmed full-resolution forced-full path after the downsample reintroduction hid the tornado, while preserving DH late-path downscaling.
+- Restored the non-DH Simple Clouds hook depth-source behavior from the last known-good state, so the hook still passes cloud-target depth when Simple Clouds reports the tornado path as downsample-capable.
+- Fixed DH pipeline selection to use Simple Clouds' active `dhLoaded()` state instead of only checking whether the Distant Horizons mod is installed, preventing the DH pipeline from being forced while the late DH tornado pass is disabled.
+- Made tornado debug modes render all prepared tornadoes if no debug storm selection resolves instead of filtering the render order to zero storms.
+- Strengthened the DH-only accumulated-body alpha floor so already-rendered far terrain lines do not bleed through dense tornado body pixels after the late render-order fix.
+- Tightened the DH-only low-alpha discard and body opacity curve so thin surviving tornado pixels no longer reveal a hard sky/terrain background seam after the late render pass.
+- Removed ground-skirt and broad dust-only contributions from the tornado shader's primary cloud density so local ground effects no longer create a large flattened volumetric blob beneath the funnel.
+- Added a DH-only tornado alpha floor for depth-accepted body pixels so Simple Clouds' color-only final composite does not let terrain color bleed through the funnel.
+- Moved the DH tornado volume draw to Simple Clouds' post-composite main-framebuffer depth-attachment window so it renders with the same DH-filled `cloudTarget` depth Simple Clouds uses for DH-aware world effects, while sampling the detached vanilla main depth texture in the shader so near terrain still occludes the tornado.
 - Added tornado shader binding diagnostics that log the live shader name, GL program id, fragment program id/name, sampler names/locations, and requested depth texture ids so DH RenderDoc captures can be matched against the actual `ShaderInstance` state.
 - Added GL debug groups around the tornado opaque render pass so RenderDoc and Nsight can isolate the storm frame more easily.
 - Added frustum visibility gating to the tornado Simple Clouds pipeline hooks so off-screen tornadoes skip the depth-copy and volume draw work instead of submitting the pass whenever a tornado exists.

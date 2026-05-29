@@ -15,11 +15,8 @@ import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
-import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
-import net.Gabou.projectatmosphere.seasons.SeasonProviderRegistry;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
-import net.Gabou.projectatmosphere.seasons.SereneSeasonsSeasonDelegate;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.CloudRegionQueue;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
@@ -242,8 +239,9 @@ public class AtmosphereManager {
             return;
         }
         cloudRegions.add(cloudRegion);
-        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()) && SeasonTimeHelper.isSereneSeasonsPresent())
-            SereneSeasonsSeasonDelegate.handleRainStarted(level, cloudRegion);
+        if (WeatherType.isRainy(cloudRegion.getCloudTypeId())) {
+            SeasonTimeHelper.onRainStarted(level, cloudRegion);
+        }
 
     }
 
@@ -253,8 +251,9 @@ public class AtmosphereManager {
         }
 
         cloudRegions.remove(cloudRegion);
-        if (WeatherType.isRainy(cloudRegion.getCloudTypeId()) && SeasonTimeHelper.isSereneSeasonsPresent())
-            SereneSeasonsSeasonDelegate.handleRainEnded(level, cloudRegion);
+        if (WeatherType.isRainy(cloudRegion.getCloudTypeId())) {
+            SeasonTimeHelper.onRainEnded(level, cloudRegion);
+        }
 
     }
 

@@ -1,15 +1,11 @@
 package net.Gabou.projectatmosphere.mixin.client;
 
-import com.seibel.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.api.objects.DhApiResult;
 import dev.nonamecrackers2.simpleclouds.client.dh.pipeline.DhSupportPipeline;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
-import net.Gabou.projectatmosphere.client.render.SimpleCloudsTornadoRenderer;
 import net.Gabou.projectatmosphere.mixin.CloudMeshGeneratorDiagnosticsAccessor;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.culling.Frustum;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
@@ -35,75 +31,6 @@ public abstract class DhSupportPipelineDiagnosticsMixin {
         );
     }
 
-    @Inject(
-            method = "afterDistantHorizonsRender",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Ldev/nonamecrackers2/simpleclouds/client/renderer/SimpleCloudsRenderer;getCloudTransparencyTarget()Ldev/nonamecrackers2/simpleclouds/client/framebuffer/WeightedBlendingTarget;"
-            )
-    )
-    private void projectatmosphere$renderStormOpaque(Minecraft mc, SimpleCloudsRenderer renderer, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, Frustum frustum, int dhFbo, CallbackInfo ci) {
-        ClientLevel level = mc.level;
-        if (level == null) {
-            return;
-        }
-
-        float[] cloudColor = renderer.getCloudColor(partialTick);
-        mc.getProfiler().push("projectatmosphere_dh_storm_opaque");
-        SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
-        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(null)) {
-            mc.getProfiler().pop();
-            return;
-        }
-        renderer.copyDepthFromCloudsToTransparency();
-        renderer.getCloudTarget().bindWrite(false);
-        int depthTextureId = resolveDhDepthTextureId(renderer);
-        int secondaryDepthTextureId = renderer.getCloudTransparencyTarget().getDepthTextureId();
-        if (secondaryDepthTextureId <= 0 || secondaryDepthTextureId == depthTextureId) {
-            secondaryDepthTextureId = -1;
-        }
-        SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
-                renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
-                null,
-                depthTextureId,
-                secondaryDepthTextureId,
-                true
-        );
-
-        mc.getProfiler().pop();
-    }
-
-    @Inject(
-            method = "afterDistantHorizonsRender",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V",
-                    ordinal = 0,
-                    shift = At.Shift.BEFORE
-            )
-    )
-    private void projectatmosphere$renderStormTransparency(Minecraft mc, SimpleCloudsRenderer renderer, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, Frustum frustum, int dhFbo, CallbackInfo ci) {
-        ClientLevel level = mc.level;
-        if (level == null) {
-            return;
-        }
-
-        float[] cloudColor = renderer.getCloudColor(partialTick);
-        mc.getProfiler().push("projectatmosphere_dh_storm_transparency");
-        SimpleCloudsTornadoRenderer.INSTANCE.prepareFrame(level, partialTick);
-        if (!SimpleCloudsTornadoRenderer.INSTANCE.hasVisibleTornado(null)) {
-            mc.getProfiler().pop();
-            return;
-        }
-        renderer.copyDepthFromCloudsToTransparency();
-        renderer.getCloudTransparencyTarget().bindWrite(false);
-        SimpleCloudsTornadoRenderer.INSTANCE.renderTransparency(
-                renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2]
-        );
-
-        mc.getProfiler().pop();
-    }
-
     @Inject(method = "afterDistantHorizonsRender", at = @At("RETURN"))
     private void projectatmosphere$endDhPass(Minecraft mc, SimpleCloudsRenderer renderer, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, Frustum frustum, int dhFbo, CallbackInfo ci) {
         SimpleCloudsRenderDiagnostics.endDhPipelinePass();
@@ -125,17 +52,4 @@ public abstract class DhSupportPipelineDiagnosticsMixin {
         return total;
     }
 
-    private static int resolveDhDepthTextureId(SimpleCloudsRenderer renderer) {
-        try {
-            if (DhApi.Delayed.renderProxy != null) {
-                DhApiResult<Integer> result = DhApi.Delayed.renderProxy.getDhDepthTextureId();
-                if (result != null && result.success && result.payload != null && result.payload > 0) {
-                    return result.payload;
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        return renderer.getCloudTransparencyTarget().getDepthTextureId();
-    }
 }

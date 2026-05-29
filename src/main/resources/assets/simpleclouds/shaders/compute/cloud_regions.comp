@@ -47,6 +47,7 @@ vec2 projectatmosphere_sampleHurricane(CloudHurricane hurricane, vec2 coord);
 vec2 projectatmosphere_compositeHurricane(vec2 current, vec2 hurricane);
 uniform int TotalCloudTornadoes;
 uniform int TotalCloudHurricanes;
+uniform vec4 CloudTornadoData0[16];
 
 float saturate(float value)
 {
@@ -100,10 +101,10 @@ bool projectatmosphere_insideTornado(vec2 coord, out float typeIndex)
 {
     for (int i = 0; i < TotalCloudTornadoes; i++)
     {
-        CloudTornado tornado = cloudStorms.tornadoes[i];
-        if (distance(coord, tornado.shape0.yz) <= tornado.shape0.w)
+        vec4 tornadoShape = CloudTornadoData0[i];
+        if (distance(coord, tornadoShape.yz) <= tornadoShape.w)
         {
-            typeIndex = tornado.shape0.x;
+            typeIndex = tornadoShape.x;
             return true;
         }
     }

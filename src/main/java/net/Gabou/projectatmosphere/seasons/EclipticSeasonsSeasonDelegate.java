@@ -1,23 +1,26 @@
 package net.Gabou.projectatmosphere.seasons;
 
-import com.teamtea.eclipticseasons.api.event.SolarTermChangeEvent;
 import com.teamtea.eclipticseasons.common.core.SolarHolders;
 import com.teamtea.eclipticseasons.common.core.solar.SolarDataManager;
-import com.teamtea.eclipticseasons.api.constant.solar.SolarTerm;
 import net.Gabou.projectatmosphere.event.EclipticTracker;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.common.MinecraftForge;
 
 public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
-
+    private static final String PROVIDER_ID = "eclipticseasons";
+    private static final long DEFAULT_DAYS_PER_TERM = 5L;
 
     public EclipticSeasonsSeasonDelegate() {
         MinecraftForge.EVENT_BUS.addListener(EclipticTracker::onSolarTermChange);
     }
 
     private static final int TERMS_PER_SEASON = 6;
-    private static final int TOTAL_TERMS = 24;
+
+    @Override
+    public String providerId() {
+        return PROVIDER_ID;
+    }
 
     @Override
     public SeasonSnapshot snapshot(Level level) {
@@ -30,7 +33,6 @@ public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
             return SeasonSnapshot.neutral();
         }
 
-        SolarTerm term = data.getSolarTerm();
         int termIndex = data.getSolarTermIndex(); // 0..23
         int daysPerTerm = data.getSolarTermLastingDays();
 
@@ -64,27 +66,29 @@ public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
     @Override
     public long seasonCycleTicks(Level level) {
         if (level == null) {
-            return 24000L * 30 * 4;
+            return 0L;
         }
 
         SolarDataManager data = SolarHolders.getSaveData(level);
         if (data == null) {
-            return 24000L * 30 * 4;
+            return 0L;
         }
 
-        long daysPerSeason = (long) data.getSolarTermLastingDays() * TERMS_PER_SEASON;
-        return daysPerSeason * 24000L;
+        long dayInCycle = (long) data.getSolarTermIndex() * data.getSolarTermLastingDays()
+                + Math.max(0, data.getSolarTermDaysInPeriod());
+        long dayTime = Math.floorMod(level.getDayTime(), 24000L);
+        return dayInCycle * 24000L + dayTime;
     }
 
     @Override
     public long seasonDuration(Level level) {
         if (level == null) {
-            return 24000L * 30;
+            return DEFAULT_DAYS_PER_TERM * TERMS_PER_SEASON * 24000L;
         }
 
         SolarDataManager data = SolarHolders.getSaveData(level);
         if (data == null) {
-            return 24000L * 30;
+            return DEFAULT_DAYS_PER_TERM * TERMS_PER_SEASON * 24000L;
         }
 
         return (long) data.getSolarTermLastingDays() * TERMS_PER_SEASON * 24000L;
