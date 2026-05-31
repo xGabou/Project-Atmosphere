@@ -1,6 +1,9 @@
 #version 150
 
 uniform sampler2D TornadoColorSampler;
+uniform sampler2D TornadoDepthSampler;
+uniform sampler2D SceneDepthSampler;
+uniform int UseSceneDepth;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -26,6 +29,14 @@ void main() {
     float alpha = weightedAlpha / max(totalWeight, 0.0001);
     if (alpha <= 0.006) {
         discard;
+    }
+
+    if (UseSceneDepth != 0) {
+        float tornadoDepth = texture(TornadoDepthSampler, texCoord).r;
+        float sceneDepth = texture(SceneDepthSampler, texCoord).r;
+        if (sceneDepth < 1.0 && tornadoDepth > sceneDepth + 0.0005) {
+            discard;
+        }
     }
 
     vec3 color = weightedColor / max(weightedAlpha, 0.0001);

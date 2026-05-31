@@ -434,3 +434,45 @@ This log tracks Distant Horizons tornado depth attempts. Check this file before 
   - Add a direct `hasPreparedTornadoes()` check.
   - Use that check in default/shader-support hooks.
   - Pass `null` as the renderer frustum for those non-DH tornado draws so the renderer does not cull the same valid tornado again inside the draw loop.
+
+## Reset And Non-DH Downscale Investigation
+- Reset local `Dynamic-Forge-1.20.1-Hurricane` to `c08213f`, the origin hurricane commit containing the `tornado-render-findings-1-5` squash.
+- Verified the render-mode tests are present again: `density`, `wallcloud`, `connection`, and `groundskirt` modes exist in `TornadoRenderDebugState` and `tornado_round.fsh`.
+- Verified DH still has its dedicated late path through `TornadoLateRenderDiagnostics`, rendering after `AFTER_LEVEL` into the main target with main-depth sampling and `distantHorizonsDepthMode=true`.
+- Current non-DH downscale issue:
+  - The non-DH mixins call `usesDownsamplePath()` and can choose cloud-target depth / skip transparency-depth copy based on that prediction.
+  - The renderer then blocks actual non-DH downscale with `forceNonDhFullPath`, so mixin depth decisions and renderer behavior can disagree.
+  - When downscale is enabled, the low-resolution target is transparent, but the tornado pass uses normal alpha blending while drawing into it. That weakens alpha before the composite shader's discard. DH can survive because DH mode raises dense-body alpha, while non-DH can become invisible or clipped.
+- Next fix:
+  - Keep DH late rendering behavior intact.
+  - Make non-DH depth source independent of downscale: always copy and pass `cloudTransparencyTarget` depth before tornado rendering.
+  - Re-enable non-DH downscale only as a color-resolution change.
+  - For non-DH downsample renders, disable blending into the intermediate target so the composite receives straight color/alpha instead of already-weakened alpha.
+- Implementation:
+  - Removed the renderer-side `forceNonDhFullPath` block from downsample selection.
+  - Default and shader-support non-DH hooks now always copy cloud depth to the transparency target and pass that copied depth to the tornado shader, whether or not color downsample is active.
+  - Non-DH downsample rendering now disables blending while writing the low-resolution intermediate target; the existing composite shader remains responsible for blending into the cloud target.
+- Build result: `.\gradlew.bat build` passed.
+- Result: pending user test.
+
+## Non-DH Downscale Terrain Cut Regression
+- User result:
+  - DH still works.
+  - Non-DH downscale renders again, but terrain depth cuts a large horizontal/diagonal chunk through the tornado.
+- Finding from code inspection:
+  - The low-resolution tornado pass samples the full-resolution scene depth at one normalized UV per low-res pixel.
+  - If that one sampled terrain depth is in front of the first tornado hit, the shader discards the entire low-res tornado pixel.
+  - After upscaling, that discarded low-res pixel covers many screen pixels, so the terrain cut becomes much wider than the real full-resolution terrain edge.
+  - This is why the problem looks like depth, but the damaging part is the low-resolution pre-discard before composite.
+- Next fix:
+  - For non-DH downscale only, defer scene-depth rejection out of the low-resolution raymarch.
+  - Still write the tornado first-hit depth into the low-resolution depth attachment.
+  - During full-resolution composite, sample the low-res tornado color/depth and compare against the full-resolution scene depth per final screen pixel.
+  - Keep DH late rendering behavior unchanged.
+- Implementation:
+  - Added `DeferSceneDepthReject` to the tornado volume shader and enable it only for non-DH downsample rendering.
+  - Non-DH downsample now renders the low-resolution tornado with depth test `ALWAYS` and depth writes enabled, so the downsample target stores first-hit tornado depth without letting low-res terrain depth discard the color.
+  - The composite shader now samples low-res tornado color, low-res tornado depth, and full-resolution scene depth; when enabled, it performs the final scene-depth rejection at full output resolution.
+  - DH downsample/late behavior keeps the old composite behavior by leaving composite scene-depth testing disabled.
+- Build result: `.\gradlew.bat build` passed.
+- Result: pending user test.

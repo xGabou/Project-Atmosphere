@@ -11,8 +11,11 @@
     "UV0"
   ],
   "samplers": [
-    { "name": "TornadoColorSampler" }
+    { "name": "TornadoColorSampler" },
+    { "name": "TornadoDepthSampler" },
+    { "name": "SceneDepthSampler" }
   ],
   "uniforms": [
+    { "name": "UseSceneDepth", "type": "int", "count": 1, "values": [ 0 ] }
   ]
 }

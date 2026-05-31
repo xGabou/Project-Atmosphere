@@ -68,14 +68,12 @@ public abstract class ShaderSupportPipelineTornadoMixin {
             return;
         }
         boolean downsampled = SimpleCloudsTornadoRenderer.INSTANCE.usesDownsamplePath();
-        if (!downsampled) {
-            renderer.copyDepthFromCloudsToTransparency();
-        }
-        int primaryDepth = downsampled ? renderer.getCloudTarget().getDepthTextureId() : renderer.getCloudTransparencyTarget().getDepthTextureId();
+        renderer.copyDepthFromCloudsToTransparency();
+        int primaryDepth = renderer.getCloudTransparencyTarget().getDepthTextureId();
         int secondaryDepth = -1;
         if (pathLog) {
             SimpleCloudsTornadoRenderer.path(
-                    "ShaderSupportPipeline drawing downsampled={} primaryDepth={} secondaryDepth={} cloudTarget={}x{} transparencyTarget={}x{}",
+                    "ShaderSupportPipeline drawing downsampled={} copiedTransparencyDepth=true primaryDepth={} secondaryDepth={} cloudTarget={}x{} transparencyTarget={}x{}",
                     downsampled,
                     primaryDepth,
                     secondaryDepth,

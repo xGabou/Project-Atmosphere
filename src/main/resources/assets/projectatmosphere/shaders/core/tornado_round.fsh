@@ -28,6 +28,7 @@ uniform int DebugMode;
 uniform int DebugSelectedStorm;
 uniform int DebugFreeze;
 uniform int DistantHorizonsDepthMode;
+uniform int DeferSceneDepthReject;
 uniform float StormPositions[24];
 uniform float StormHeights[8];
 uniform float StormWidths[8];
@@ -776,7 +777,8 @@ void main() {
 
     float rawAlpha = 1.0 - transmittance;
     float minBodyAlpha = DistantHorizonsDepthMode != 0 ? 0.045 : 0.03;
-    bool sceneReject = wroteDepth && sceneDepth < 1.0 && nearestT > sceneDistance + SOFT_TERRAIN_OCCLUSION_BIAS;
+    bool deferSceneDepthReject = DeferSceneDepthReject != 0;
+    bool sceneReject = !deferSceneDepthReject && wroteDepth && sceneDepth < 1.0 && nearestT > sceneDistance + SOFT_TERRAIN_OCCLUSION_BIAS;
     if (debugCoverageMode) {
         if (!wroteDepth) {
             fragColor = vec4(0.05, 0.20, 1.0, 1.0);
@@ -853,7 +855,7 @@ void main() {
     color = mix(color, FogColor.rgb, fogFactor * 0.45);
     if (wroteDepth) {
         float outputDepth = firstHitDepth;
-        if (sceneDepth < 1.0 && nearestT <= sceneDistance + SOFT_TERRAIN_OCCLUSION_BIAS && firstHitDepth > sceneDepth) {
+        if (!deferSceneDepthReject && sceneDepth < 1.0 && nearestT <= sceneDistance + SOFT_TERRAIN_OCCLUSION_BIAS && firstHitDepth > sceneDepth) {
             outputDepth = max(0.0, sceneDepth - 0.0005);
         }
         gl_FragDepth = outputDepth;

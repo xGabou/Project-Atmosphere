@@ -212,9 +212,7 @@ public final class SimpleCloudsTornadoRenderer {
         float downsample = getConfiguredDownsample();
         boolean useTargetOverride = target != null;
         RenderTarget destinationTarget = useTargetOverride ? target : renderer.getCloudTarget();
-        boolean forceNonDhFullPath = !distantHorizonsDepthMode && debugMode == TornadoRenderDebugState.Mode.OFF;
         boolean useDownsample = this.canUseDownsamplePath()
-                && !forceNonDhFullPath
                 && (!useTargetOverride || distantHorizonsDepthMode);
         RenderTarget renderTarget = useDownsample ? this.prepareDownsampleTarget(destinationTarget, downsample) : destinationTarget;
         if (renderTarget == null) {
@@ -228,21 +226,24 @@ public final class SimpleCloudsTornadoRenderer {
                 || debugMode == TornadoRenderDebugState.Mode.LATE
                 || forceDisableFramebufferDepth
                 || useDownsample;
+        boolean deferSceneDepthReject = useDownsample && !distantHorizonsDepthMode;
+        boolean writeDownsampleDepth = deferSceneDepthReject;
         if (pathLog) {
             path(
-                    "renderOpaque state debugMode={} shaderMode={} configuredDownsample={} canDownsample={} useDownsample={} forceNonDhFullPath={} targetOverride={} destination={}x{} renderTarget={}x{} disableFramebufferDepth={}",
+                    "renderOpaque state debugMode={} shaderMode={} configuredDownsample={} canDownsample={} useDownsample={} targetOverride={} destination={}x{} renderTarget={}x{} disableFramebufferDepth={} deferSceneDepthReject={} writeDownsampleDepth={}",
                     debugMode,
                     shaderMode,
                     downsample,
                     this.canUseDownsamplePath(),
                     useDownsample,
-                    forceNonDhFullPath,
                     useTargetOverride,
                     destinationTarget.width,
                     destinationTarget.height,
                     renderTarget.width,
                     renderTarget.height,
-                    disableFramebufferDepth
+                    disableFramebufferDepth,
+                    deferSceneDepthReject,
+                    writeDownsampleDepth
             );
         }
 
@@ -253,16 +254,23 @@ public final class SimpleCloudsTornadoRenderer {
             }
 
             renderTarget.bindWrite(useDownsample);
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            if (disableFramebufferDepth) {
+            if (useDownsample && !distantHorizonsDepthMode) {
+                RenderSystem.disableBlend();
+            } else {
+                RenderSystem.enableBlend();
+                RenderSystem.defaultBlendFunc();
+            }
+            if (writeDownsampleDepth) {
+                RenderSystem.enableDepthTest();
+                RenderSystem.depthMask(true);
+            } else if (disableFramebufferDepth) {
                 RenderSystem.disableDepthTest();
                 RenderSystem.depthMask(false);
             } else {
                 RenderSystem.enableDepthTest();
                 RenderSystem.depthMask(writeDepth);
             }
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
+            RenderSystem.depthFunc(writeDownsampleDepth ? GL11.GL_ALWAYS : GL11.GL_LEQUAL);
             RenderSystem.setShader(() -> shader);
 
             AbstractTexture tornadoTexture = mc.getTextureManager().getTexture(TornadoShaders.TORNADO_TEXTURE);
@@ -295,6 +303,7 @@ public final class SimpleCloudsTornadoRenderer {
             shader.safeGetUniform("RenderQuality").set((float) AtmoCommonConfig.TORNADO_RENDER_QUALITY.get().doubleValue());
             shader.safeGetUniform("UseSecondaryDepthSampler").set(secondaryDepthTextureId > 0 && secondaryDepthTextureId != depthTextureId ? 1 : 0);
             shader.safeGetUniform("DistantHorizonsDepthMode").set(distantHorizonsDepthMode ? 1 : 0);
+            shader.safeGetUniform("DeferSceneDepthReject").set(deferSceneDepthReject ? 1 : 0);
 
             shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
             shader.safeGetUniform("AnimationTime").set(TornadoManager.getShaderTime() + partialTick * 0.05F);
@@ -354,7 +363,7 @@ public final class SimpleCloudsTornadoRenderer {
             }
 
             if (useDownsample) {
-                this.compositeDownsampleTarget(destinationTarget);
+                this.compositeDownsampleTarget(destinationTarget, depthTextureId, deferSceneDepthReject);
             }
         } finally {
             this.popGpuDebugGroup();
@@ -439,7 +448,7 @@ public final class SimpleCloudsTornadoRenderer {
         this.downsampleTarget.clear(Minecraft.ON_OSX);
     }
 
-    private void compositeDownsampleTarget(RenderTarget destination) {
+    private void compositeDownsampleTarget(RenderTarget destination, int sceneDepthTextureId, boolean useSceneDepth) {
         ShaderInstance shader = TornadoShaders.getCompositeShader();
         if (shader == null || this.downsampleTarget == null) {
             return;
@@ -453,6 +462,9 @@ public final class SimpleCloudsTornadoRenderer {
         RenderSystem.disableCull();
         RenderSystem.setShader(() -> shader);
         shader.setSampler("TornadoColorSampler", this.downsampleTarget.getColorTextureId());
+        shader.setSampler("TornadoDepthSampler", this.downsampleTarget.getDepthTextureId());
+        shader.setSampler("SceneDepthSampler", sceneDepthTextureId);
+        shader.safeGetUniform("UseSceneDepth").set(useSceneDepth ? 1 : 0);
         shader.apply();
 
         this.fullscreenQuad.bind();
