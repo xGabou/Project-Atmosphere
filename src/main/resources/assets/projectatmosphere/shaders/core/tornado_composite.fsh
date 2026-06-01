@@ -3,7 +3,7 @@
 uniform sampler2D TornadoColorSampler;
 uniform sampler2D TornadoDepthSampler;
 uniform sampler2D SceneDepthSampler;
-uniform int UseSceneDepth;
+uniform int WriteCompositeDepth;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -31,12 +31,12 @@ void main() {
         discard;
     }
 
-    if (UseSceneDepth != 0) {
+    if (WriteCompositeDepth != 0) {
         float tornadoDepth = texture(TornadoDepthSampler, texCoord).r;
-        float sceneDepth = texture(SceneDepthSampler, texCoord).r;
-        if (sceneDepth < 1.0 && tornadoDepth > sceneDepth + 0.0005) {
+        if (tornadoDepth >= 1.0) {
             discard;
         }
+        gl_FragDepth = tornadoDepth;
     }
 
     vec3 color = weightedColor / max(weightedAlpha, 0.0001);

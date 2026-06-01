@@ -16,6 +16,6 @@
     { "name": "SceneDepthSampler" }
   ],
   "uniforms": [
-    { "name": "UseSceneDepth", "type": "int", "count": 1, "values": [ 0 ] }
+    { "name": "WriteCompositeDepth", "type": "int", "count": 1, "values": [ 0 ] }
   ]
 }

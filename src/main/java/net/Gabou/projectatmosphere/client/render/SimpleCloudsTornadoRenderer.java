@@ -448,7 +448,7 @@ public final class SimpleCloudsTornadoRenderer {
         this.downsampleTarget.clear(Minecraft.ON_OSX);
     }
 
-    private void compositeDownsampleTarget(RenderTarget destination, int sceneDepthTextureId, boolean useSceneDepth) {
+    private void compositeDownsampleTarget(RenderTarget destination, int sceneDepthTextureId, boolean writeCompositeDepth) {
         ShaderInstance shader = TornadoShaders.getCompositeShader();
         if (shader == null || this.downsampleTarget == null) {
             return;
@@ -457,14 +457,20 @@ public final class SimpleCloudsTornadoRenderer {
         destination.bindWrite(true);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
+        if (writeCompositeDepth) {
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthMask(true);
+            RenderSystem.depthFunc(GL11.GL_ALWAYS);
+        } else {
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
+        }
         RenderSystem.disableCull();
         RenderSystem.setShader(() -> shader);
         shader.setSampler("TornadoColorSampler", this.downsampleTarget.getColorTextureId());
         shader.setSampler("TornadoDepthSampler", this.downsampleTarget.getDepthTextureId());
         shader.setSampler("SceneDepthSampler", sceneDepthTextureId);
-        shader.safeGetUniform("UseSceneDepth").set(useSceneDepth ? 1 : 0);
+        shader.safeGetUniform("WriteCompositeDepth").set(writeCompositeDepth ? 1 : 0);
         shader.apply();
 
         this.fullscreenQuad.bind();

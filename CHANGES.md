@@ -14,6 +14,7 @@ This file records functionality additions/removals made during development sessi
 - Ported the Identity2 launcher auth guard into Project Atmosphere with a Forge SimpleChannel challenge/reply flow, client-side TLauncher marker detection, strict offline UUID rejection, timeout kicking, and player/IP ban handling when the marker is reported.
 
 ## Unreleased - Tornado render performance pass
+- Made the non-DH tornado downsample composite stamp sampled tornado depth back into the full-resolution cloud target, preventing later terrain/depth composition from cutting through the already-drawn funnel.
 - Moved non-DH downsample terrain occlusion from the low-resolution raymarch into the full-resolution composite, preserving the FPS path while preventing one low-res terrain-depth sample from cutting large chunks out of the funnel.
 - Re-enabled non-DH tornado downscaling as a color-only resolution reduction: default/shader-support paths now always use copied transparency depth, while the low-resolution intermediate target stores straight alpha before compositing so non-DH funnels do not disappear from pre-weakened alpha.
 - Moved the Simple Clouds tornado volume pass onto a configurable low-resolution render target with an upsample composite shader, defaulting to a 2.5x downsample so tornado raymarching shades far fewer pixels on mid-range GPUs.

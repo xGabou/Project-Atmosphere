@@ -455,6 +455,42 @@ This log tracks Distant Horizons tornado depth attempts. Check this file before 
 - Build result: `.\gradlew.bat build` passed.
 - Result: pending user test.
 
+## Non-DH Downscale Still Cut By Terrain
+- User log result:
+  - `dhLoaded=false`
+  - `downsampled=true`
+  - `useDownsample=true`
+  - `deferSceneDepthReject=true`
+  - `writeDownsampleDepth=true`
+  - `drawn=1`
+- Finding:
+  - The tornado is not being skipped; the low-resolution pass draws and writes depth into the low-resolution target.
+  - The composite pass blends color back into the full-resolution cloud target, but it leaves depth writes disabled.
+  - Therefore the full-resolution cloud target does not receive tornado depth for the composited pixels.
+  - Later Simple Clouds/world compositing can still use terrain/old depth as the foreground depth, making terrain appear to cut across the composited tornado.
+- Next fix:
+  - For non-DH downsample composite only, enable destination depth writes with `GL_ALWAYS`.
+  - Have the composite shader write `gl_FragDepth` from the sampled low-resolution tornado depth.
+  - Keep DH composite behavior unchanged unless its already-working path explicitly enables this later.
+
+## Non-DH Downscale Log Follow-Up
+- User-provided logs confirm the current failing frame still reaches the renderer:
+  - `prepared tornadoes=1`
+  - `hasPrepared=true`
+  - `frustumGate=disabled`
+  - `useDownsample=true`
+  - `deferSceneDepthReject=true`
+  - `writeDownsampleDepth=true`
+  - `drawn=1`
+- Finding:
+  - The remaining issue is not a skipped hook, frustum rejection, missing shader, or missing low-resolution draw.
+  - The low-resolution pass produces tornado color and first-hit depth, but the full-resolution composite only blends color back into the destination target.
+  - Because destination depth stays stale, later Simple Clouds/world composition can still treat terrain depth as the foreground depth and cut through the downsampled tornado.
+- Next fix:
+  - Change the non-DH deferred composite from "full-resolution scene-depth discard only" to "write sampled low-resolution tornado depth into the full-resolution destination depth buffer".
+  - Use `GL_ALWAYS` during this composite so every surviving tornado color pixel also stamps its corresponding tornado depth.
+  - Leave DH composite behavior unchanged by keeping this enabled only when the existing non-DH deferred-depth flag is active.
+
 ## Non-DH Downscale Terrain Cut Regression
 - User result:
   - DH still works.
