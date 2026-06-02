@@ -16,6 +16,7 @@ import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.SyncHurricaneStatePacket;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BiomeTags;
@@ -98,6 +99,36 @@ public class HurricaneManager {
         FORMATION_TRACKERS.clear();
         ENVIRONMENT_CACHE.clear();
         RESERVATION_REGIONS.clear();
+        dirty = true;
+    }
+
+    public static List<CompoundTag> savePersistentHurricanes() {
+        List<CompoundTag> tags = new ArrayList<>();
+        for (HurricaneInstance hurricane : projectatmosphere$getAllHurricanes()) {
+            if (!hurricane.isDead()) {
+                tags.add(hurricane.toPersistentTag());
+            }
+        }
+        return tags;
+    }
+
+    public static void loadPersistentHurricanes(ServerLevel level, List<CompoundTag> tags) {
+        LINKED_HURRICANES.clear();
+        DEBUG_HURRICANES.clear();
+        FORMATION_TRACKERS.clear();
+        ENVIRONMENT_CACHE.clear();
+        RESERVATION_REGIONS.clear();
+
+        for (CompoundTag tag : tags) {
+            HurricaneInstance hurricane = HurricaneInstance.fromPersistentTag(tag);
+            hurricane.refreshAnchorY(level);
+            if (hurricane.isDebugSpawn() || hurricane.getCycloneId() == null) {
+                DEBUG_HURRICANES.add(hurricane);
+            } else {
+                LINKED_HURRICANES.put(hurricane.getCycloneId(), hurricane);
+            }
+            RESERVATION_REGIONS.put(hurricane.id, HurricaneSemantics.createReservationRegion(hurricane));
+        }
         dirty = true;
     }
 

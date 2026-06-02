@@ -53,7 +53,8 @@
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM__Changes_2.xml
 .idea/
 
-.tmp_dynamictrees/
-.tmp_dynamictrees_full/
+docs/decompiled-mods/Dynamic Trees/.tmp_dynamictrees/
+docs/decompiled-mods/Dynamic Trees/.tmp_dynamictrees_full/
 
-/pa_realistic_cloud_renderer_design.md
+/docs/PA-docs/Studies/pa_realistic_cloud_renderer_design.md
+/docs/PA-docs/Core Systems/Studies/pa_realistic_cloud_renderer_design.md

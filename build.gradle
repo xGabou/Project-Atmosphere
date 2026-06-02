@@ -125,9 +125,6 @@ repositories {
     }
 
 
-
-
-
 }
 
 
@@ -270,22 +267,28 @@ tasks.register("discordWebhook") {
         }
     }
 }
-modrinth {
-    token = System.getenv("MODRINTH_TOKEN")
-    projectId = "qIWoLcKJ" // from your Modrinth project URL
-    versionNumber = "Forge-${project.version}"
-    versionName = "Project Atmosphere ${mod_version}"
-    changelog = rootProject.file("PAchangelog.md").text
-    gameVersions = ["1.20.1"]
-    loaders = ["forge"]
-    versionType = "beta"
-    dependencies {
-        optional.project "e0bNACJD"
-        optional.project "4Al4H3t9"
-        required.project "LtZfKhel"
-        required.project "N8aGZtvj"
+def modrinthToken = System.getenv("MODRINTH_TOKEN")?.trim()
+if (modrinthToken) {
+    modrinth {
+        token = modrinthToken
+        projectId = "qIWoLcKJ" // from your Modrinth project URL
+        versionNumber = "Forge-${project.version}"
+        versionName = "Project Atmosphere ${mod_version}"
+        changelog = rootProject.file("PAchangelog.md").text
+        gameVersions = ["1.20.1"]
+        loaders = ["forge"]
+        versionType = "beta"
+        dependencies {
+            optional.project "e0bNACJD"
+            optional.project "4Al4H3t9"
+            required.project "LtZfKhel"
+            required.project "N8aGZtvj"
+        }
+        uploadFile = releaseJarFile.get().asFile
     }
-    uploadFile = releaseJarFile.get().asFile
+} else {
+    logger.lifecycle("MODRINTH_TOKEN not set; Modrinth upload tasks will be disabled.")
+    tasks.matching { it.name.toLowerCase().contains("modrinth") }.configureEach { enabled = false }
 }
 def curseForgeToken = System.getenv("CURSEFORGE_TOKEN")?.trim()
 if (curseForgeToken) {

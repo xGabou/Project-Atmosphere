@@ -16,13 +16,11 @@ public class CloudLibrary {
             "stratus",
             "floating_farlands",
             "thicker_stratocumulus",
-            "altostratus",
             "nimbostratus",
             "severe_nimbostratus",
             "cumulus_congestus",
             "cumulus_mediocris",
-            "mammatus_thin",
-            "altocumulus"
+            "mammatus_thin"
 
     };
     private static final Set<String> SNOW_CLOUDS = Set.of(RAINSTORM_CLOUDS);
@@ -80,7 +78,6 @@ public class CloudLibrary {
             "nimbostratus",
             "floating_farlands",
             "thicker_stratocumulus",
-            "altostratus",
             "cumulus_mediocris"
     };
 
@@ -88,8 +85,6 @@ public class CloudLibrary {
             "dense_itty_bitty",
             "stratocumulus",
             "cumulus",
-            "altocumulus",
-            "altostratus_dry",
             "mammatus_thin"
     };
 
@@ -112,10 +107,7 @@ public class CloudLibrary {
             "itty_bitty_bigger",
             "pathway",
             "spotted",
-            "matrix",
-            "snow",
-            "tall_weirdness",
-            "cumulus_humilis"
+            "tall_weirdness"
     };
 
     private static String getRandomFrom(String[] clouds) {
@@ -189,8 +181,6 @@ public class CloudLibrary {
                  "itty_bitty_bigger",
                  "pathway",
                  "spotted",
-                 "matrix",
-                 "snow",
                  "mammatus_thin",
                  "tall_weirdness" -> 1;
             default -> 0;

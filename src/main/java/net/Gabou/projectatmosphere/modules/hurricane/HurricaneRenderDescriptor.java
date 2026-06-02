@@ -46,16 +46,16 @@ public record HurricaneRenderDescriptor(
         float bandStrength = Mth.clamp(0.22F + normalizedIntensity * 0.34F + categoryBias * 0.12F, 0.0F, 1.0F);
         float bandCount = 2.0F + category.ordinal();
         float fringeStrength = Mth.clamp(0.30F + normalizedIntensity * 0.34F + categoryBias * 0.12F, 0.0F, 1.0F);
-        float baseOffset = 56.0F + normalizedIntensity * 92.0F + categoryBias * 20.0F;
+        float baseOffset = 36.0F + normalizedIntensity * 44.0F + categoryBias * 12.0F;
         float volumeHeight = Mth.clamp(
-                220.0F + torusMinorRadius * 2.8F + normalizedIntensity * 80.0F + categoryBias * 36.0F,
-                220.0F,
-                430.0F
+                140.0F + torusMinorRadius * 1.35F + normalizedIntensity * 40.0F + categoryBias * 24.0F,
+                150.0F,
+                280.0F
         );
-        float canopyBase = 0.38F - categoryBias * 0.03F;
-        float canopyTop = 0.82F + normalizedIntensity * 0.05F;
-        float shieldBase = 0.28F;
-        float shieldTop = 0.96F;
+        float canopyBase = 0.30F - categoryBias * 0.02F;
+        float canopyTop = 0.68F + normalizedIntensity * 0.04F;
+        float shieldBase = 0.22F;
+        float shieldTop = 0.78F;
         float eyeSlope = 0.94F + normalizedIntensity * 0.16F + categoryBias * 0.05F;
         float eyewallThickness = torusMinorRadius;
 

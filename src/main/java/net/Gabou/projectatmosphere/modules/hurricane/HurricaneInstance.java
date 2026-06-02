@@ -4,6 +4,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -17,9 +18,10 @@ public class HurricaneInstance {
     public static final ResourceLocation HURRICANE_CLOUD_TYPE_ID =
             ResourceLocation.fromNamespaceAndPath("projectatmosphere", "hurricane");
 
-    private static final float DEFAULT_ANCHOR_Y = 384.0F;
-    private static final float MIN_WORLD_ANCHOR_Y = 256.0F;
-    private static final float CLOUD_LAYER_DESCENT = 200.0F;
+    private static final float DEFAULT_ANCHOR_Y = 180.0F;
+    private static final float MIN_WORLD_ANCHOR_Y = 128.0F;
+    private static final float CLOUD_LAYER_DESCENT = 360.0F;
+    private static final float GROUND_CLEARANCE = 96.0F;
     private static final int WIND_FIELD_INTERVAL_TICKS = 2;
     private static final int DESTRUCTION_INTERVAL_TICKS = 8;
 
@@ -85,7 +87,11 @@ public class HurricaneInstance {
         }
 
         float cloudHeight = manager.getCloudHeight();
-        this.anchorY = Math.max(MIN_WORLD_ANCHOR_Y, cloudHeight - CLOUD_LAYER_DESCENT);
+        this.anchorY = Mth.clamp(
+                cloudHeight - CLOUD_LAYER_DESCENT,
+                level.getSeaLevel() + GROUND_CLEARANCE,
+                cloudHeight - 64.0F
+        );
     }
 
     public void updateFromCyclone(ServerLevel level, CycloneSnapshot snapshot, WindVector ambientWind,
@@ -237,6 +243,81 @@ public class HurricaneInstance {
                 HURRICANE_CLOUD_TYPE_ID,
                 this.ageTicks
         );
+    }
+
+    public CompoundTag toPersistentTag() {
+        CompoundTag tag = new CompoundTag();
+        tag.putUUID("id", this.id);
+        if (this.cycloneId != null) {
+            tag.putUUID("cycloneId", this.cycloneId);
+        }
+        tag.putBoolean("debugSpawn", this.debugSpawn);
+        tag.putDouble("x", this.position.x);
+        tag.putDouble("y", this.position.y);
+        tag.putDouble("z", this.position.z);
+        tag.putFloat("radius", this.radius);
+        tag.putFloat("windSpeed", this.wind.baseSpeed());
+        tag.putFloat("windAngle", this.wind.angleRadians());
+        tag.putFloat("windGust", this.wind.gustSpeed());
+        tag.putString("category", this.category.name());
+        tag.putFloat("cycloneRadius", this.cycloneRadius);
+        tag.putFloat("cycloneIntensity", this.cycloneIntensity);
+        tag.putFloat("destructiveStrength", this.destructiveStrength);
+        tag.putFloat("targetDestructiveStrength", this.targetDestructiveStrength);
+        tag.putFloat("anchorY", this.anchorY);
+        tag.putInt("ageTicks", this.ageTicks);
+        tag.putInt("phaseTicks", this.phaseTicks);
+        tag.putInt("formationTicks", this.formationTicks);
+        tag.putInt("activeTicks", this.activeTicks);
+        tag.putInt("dissipationTicks", this.dissipationTicks);
+        tag.putString("phase", this.phase.name());
+        return tag;
+    }
+
+    public static HurricaneInstance fromPersistentTag(CompoundTag tag) {
+        UUID id = tag.hasUUID("id") ? tag.getUUID("id") : UUID.randomUUID();
+        UUID cycloneId = tag.hasUUID("cycloneId") ? tag.getUUID("cycloneId") : null;
+        Vec3 position = new Vec3(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"));
+        float radius = tag.getFloat("radius");
+        WindVector wind = new WindVector(tag.getFloat("windSpeed"), tag.getFloat("windAngle"), tag.getFloat("windGust"));
+        HurricaneCategory category = parseCategory(tag.getString("category"));
+        boolean debugSpawn = !tag.contains("debugSpawn") || tag.getBoolean("debugSpawn");
+
+        HurricaneInstance hurricane = new HurricaneInstance(id, cycloneId, position, radius, wind, category, debugSpawn);
+        hurricane.cycloneRadius = tag.contains("cycloneRadius") ? tag.getFloat("cycloneRadius") : hurricane.cycloneRadius;
+        hurricane.cycloneIntensity = tag.contains("cycloneIntensity") ? tag.getFloat("cycloneIntensity") : hurricane.cycloneIntensity;
+        hurricane.destructiveStrength = tag.contains("destructiveStrength") ? tag.getFloat("destructiveStrength") : hurricane.destructiveStrength;
+        hurricane.targetDestructiveStrength = tag.contains("targetDestructiveStrength") ? tag.getFloat("targetDestructiveStrength") : hurricane.targetDestructiveStrength;
+        hurricane.anchorY = tag.contains("anchorY") ? tag.getFloat("anchorY") : hurricane.anchorY;
+        hurricane.ageTicks = tag.getInt("ageTicks");
+        hurricane.phaseTicks = tag.getInt("phaseTicks");
+        hurricane.formationTicks = tag.contains("formationTicks") ? tag.getInt("formationTicks") : hurricane.formationTicks;
+        hurricane.activeTicks = tag.contains("activeTicks") ? tag.getInt("activeTicks") : hurricane.activeTicks;
+        hurricane.dissipationTicks = tag.contains("dissipationTicks") ? tag.getInt("dissipationTicks") : hurricane.dissipationTicks;
+        hurricane.phase = parsePhase(tag.getString("phase"), hurricane.phase);
+        return hurricane;
+    }
+
+    private static HurricaneCategory parseCategory(String name) {
+        if (name == null || name.isBlank()) {
+            return HurricaneCategory.ONE;
+        }
+        try {
+            return HurricaneCategory.valueOf(name);
+        } catch (IllegalArgumentException ignored) {
+            return HurricaneCategory.ONE;
+        }
+    }
+
+    private static StormLifecyclePhase parsePhase(String name, StormLifecyclePhase fallback) {
+        if (name == null || name.isBlank()) {
+            return fallback;
+        }
+        try {
+            return StormLifecyclePhase.valueOf(name);
+        } catch (IllegalArgumentException ignored) {
+            return fallback;
+        }
     }
 
     public void tick(Level level) {

@@ -18,8 +18,10 @@ import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
 import net.Gabou.projectatmosphere.network.SyncTornadoesPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -46,6 +48,7 @@ public class TornadoManager {
     private static final int SYNC_INTERVAL_TICKS = 5;
 
     private static float shaderTime = 0.0F;
+    private static long lastClientSnapshotLogGameTime = Long.MIN_VALUE;
 
     @OnlyIn(Dist.CLIENT)
     public static void spawnClient(UUID id, Vec3 pos, float radius, WindVector wind, float bottomY, float height) {
@@ -158,6 +161,37 @@ public class TornadoManager {
         CLIENT_TORNADOES.clear();
     }
 
+    public static void syncToPlayer(ServerPlayer player) {
+        NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), createSyncPacket());
+    }
+
+    public static List<CompoundTag> savePersistentTornadoes() {
+        List<CompoundTag> tags = new ArrayList<>(SERVER_TORNADOES.size());
+        for (TornadoInstance tornado : SERVER_TORNADOES) {
+            if (!tornado.isDead()) {
+                tags.add(tornado.toPersistentTag());
+            }
+        }
+        return tags;
+    }
+
+    public static void loadPersistentTornadoes(ServerLevel level, List<CompoundTag> tags) {
+        for (TornadoInstance tornado : new ArrayList<>(SERVER_TORNADOES)) {
+            removeAttachedDescriptor(tornado);
+        }
+        SERVER_TORNADOES.clear();
+
+        for (CompoundTag tag : tags) {
+            TornadoInstance tornado = TornadoInstance.fromPersistentTag(tag);
+            CloudRegion cloud = findIntersectingCloud(level, tornado.position, tornado.radius);
+            tornado.setCloudRegion(cloud);
+            if (cloud != null) {
+                attachDescriptor(cloud, tornado);
+            }
+            SERVER_TORNADOES.add(tornado);
+        }
+    }
+
     @OnlyIn(Dist.CLIENT)
     public static float getShaderTime() {
         return shaderTime;
@@ -231,6 +265,7 @@ public class TornadoManager {
         }
         CLIENT_TORNADOES.clear();
         CLIENT_TORNADOES.addAll(next);
+        maybeLogClientSnapshots("sync", snapshots);
     }
 
     @OnlyIn(Dist.CLIENT)
@@ -252,6 +287,7 @@ public class TornadoManager {
             CLIENT_TORNADOES.add(existing);
         }
         existing.applySnapshot(snapshot, cloud);
+        maybeLogClientSnapshots("spawn", List.of(snapshot));
     }
 
     @OnlyIn(Dist.CLIENT)
@@ -272,6 +308,41 @@ public class TornadoManager {
             return null;
         }
         return findIntersectingCloud(level, pos, radius);
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    private static void maybeLogClientSnapshots(String source, List<TornadoSnapshot> snapshots) {
+        if (!AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
+            return;
+        }
+        long gameTime = minecraft.level.getGameTime();
+        if (lastClientSnapshotLogGameTime != Long.MIN_VALUE && gameTime - lastClientSnapshotLogGameTime < 20L) {
+            return;
+        }
+        lastClientSnapshotLogGameTime = gameTime;
+
+        if (snapshots.isEmpty()) {
+            ProjectAtmosphere.LOGGER.info("[TornadoSync] client {} received empty snapshot list at gameTime={}", source, gameTime);
+            return;
+        }
+
+        TornadoSnapshot first = snapshots.get(0);
+        TornadoInstance existing = findClient(first.id());
+        Vec3 renderPos = existing == null ? null : existing.getRenderPosition(1.0F);
+        ProjectAtmosphere.LOGGER.info(
+                "[TornadoSync] client {} received count={} firstId={} snapshotPos={} renderPos={} phase={} gameTime={}",
+                source,
+                snapshots.size(),
+                first.id(),
+                first.position(),
+                renderPos,
+                first.phase(),
+                gameTime
+        );
     }
 
     @Nullable
@@ -345,11 +416,15 @@ public class TornadoManager {
     }
 
     private static void broadcastSnapshots() {
+        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), createSyncPacket());
+    }
+
+    private static SyncTornadoesPacket createSyncPacket() {
         List<TornadoSnapshot> snapshots = new ArrayList<>(SERVER_TORNADOES.size());
         for (TornadoInstance tornado : SERVER_TORNADOES) {
             snapshots.add(tornado.snapshot());
         }
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new SyncTornadoesPacket(snapshots));
+        return new SyncTornadoesPacket(snapshots);
     }
 
     private record TornadoGeometry(float bottomY, float height) {

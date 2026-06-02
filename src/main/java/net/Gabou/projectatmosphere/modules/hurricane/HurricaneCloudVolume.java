@@ -82,7 +82,7 @@ public record HurricaneCloudVolume(
         float intensity = Mth.clamp(hurricane.intensity(), 0.0F, 1.0F);
         float seed = Mth.clamp(hurricane.seed(), 0.0F, 1.0F);
         float growth = Mth.lerp(intensity, 0.45F, 1.0F);
-        float volumeHeight = Math.max(220.0F / scale, hurricane.bandWidth() * (0.42F + intensity * 0.18F));
+        float volumeHeight = Math.max(120.0F / scale, hurricane.bandWidth() * (0.24F + intensity * 0.10F));
         return new HurricaneCloudVolume(
                 hurricane.id(),
                 (float) hurricane.centerX(),
@@ -95,10 +95,10 @@ public record HurricaneCloudVolume(
                 Math.max(hurricane.bandWidth() * (0.24F + intensity * 0.10F), 0.05F),
                 hurricane.coreRadius() * Mth.lerp(intensity, 0.72F, 1.0F),
                 hurricane.stormExtentRadius() * Mth.lerp(intensity, 0.80F, 1.0F),
-                0.38F,
-                0.82F,
-                0.28F,
-                0.96F,
+                0.30F,
+                0.68F,
+                0.22F,
+                0.78F,
                 hurricane.transitionStart() * Mth.lerp(intensity, 0.72F, 1.0F),
                 hurricane.transitionEnd() * Mth.lerp(intensity, 0.80F, 1.0F),
                 hurricane.bandWidth() * (0.55F + intensity * 0.45F),

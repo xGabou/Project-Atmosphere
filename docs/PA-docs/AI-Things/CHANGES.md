@@ -14,6 +14,8 @@ This file records functionality additions/removals made during development sessi
 - Ported the Identity2 launcher auth guard into Project Atmosphere with a Forge SimpleChannel challenge/reply flow, client-side TLauncher marker detection, strict offline UUID rejection, timeout kicking, and player/IP ban handling when the marker is reported.
 
 ## Unreleased - Tornado render performance pass
+- Kept client tornado interpolation ticking even while the forecast cache is not marked ready, preventing rendered funnels from freezing at an old position while server-side destruction keeps moving.
+- Added rate-limited client tornado snapshot diagnostics behind the existing tornado debug logging option to verify received snapshot positions versus rendered positions.
 - Made the non-DH tornado downsample composite stamp sampled tornado depth back into the full-resolution cloud target, preventing later terrain/depth composition from cutting through the already-drawn funnel.
 - Moved non-DH downsample terrain occlusion from the low-resolution raymarch into the full-resolution composite, preserving the FPS path while preventing one low-res terrain-depth sample from cutting large chunks out of the funnel.
 - Re-enabled non-DH tornado downscaling as a color-only resolution reduction: default/shader-support paths now always use copied transparency depth, while the low-resolution intermediate target stores straight alpha before compositing so non-DH funnels do not disappear from pre-weakened alpha.
@@ -31,6 +33,10 @@ This file records functionality additions/removals made during development sessi
 - Removed the tornado transparency mixin hooks because the transparency renderer was a no-op but still copied depth and rebound targets every visible tornado frame.
 
 ## Unreleased - Storm spawn and despawn transitions
+- Persisted active tornadoes, active hurricanes, and tornado cooldowns into world saved data on server stop and restored them on server start so storms survive world exit/reload.
+- Synced restored tornadoes directly to players on login, matching the existing hurricane login sync path instead of waiting for the next periodic broadcast.
+- Removed the matrix, altocumulus, altostratus, altostratus_dry, snow, and cumulus_humilis Simple Clouds variants from Project Atmosphere selection, weather mapping, and bundled Simple Clouds spawn definitions.
+- Lowered hurricane cloud anchoring and vertical descriptor ranges so hurricane visuals sit closer to the playable weather layer instead of hundreds of blocks too high.
 - Kept tornado command spawns in the forming lifecycle instead of forcing the no-cloud path active immediately, so standalone tornadoes now ease in and the removal command lets them dissipate before cleanup.
 - Added a hurricane lifecycle with forming, active, and dissipating phases, then kept cyclone-linked hurricanes alive until the fade-out completes instead of dropping them the moment the cyclone disappears.
 - Carried hurricane render intensity through the network snapshots and client cache so the custom hurricane volume can grow in and contract out instead of popping in at full size.

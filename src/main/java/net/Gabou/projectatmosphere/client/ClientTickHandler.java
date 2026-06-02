@@ -63,18 +63,20 @@ public class ClientTickHandler {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
         ClientHurricaneStateCache.tick(mc.level);
-        if (!ClientSyncLock.isReady()) return;
-        if (mc.isPaused()) return;
-        AtmosphereClientState.tick(mc);
-        AtmosphereFogState.tick(mc);
         if (mc.level == null) {
             TornadoManager.clearClientTornadoes();
             return;
         }
+        if (mc.isPaused()) return;
+
+        TornadoManager.tick(mc.level);
+        if (!ClientSyncLock.isReady()) return;
+
+        AtmosphereClientState.tick(mc);
+        AtmosphereFogState.tick(mc);
 
         SkyEffectState.beginFrame();
         tickCounter++;
-        TornadoManager.tick(mc.level);
         AtmosphereSkyEffectController.tick(mc);
 
         if (mc.player != null) {

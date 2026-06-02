@@ -26,4 +26,5 @@ This repository hosts **Project Atmosphere**, a Minecraft Forge 1.20.1 mod writt
   sudo dpkg --configure -a
   ```
 - Set `java` and `javac` to the OpenJDK 17 binaries via `update-alternatives` and ensure they appear first in `PATH` when building.
-
+# Project Atmosphere — Developer Change Log
+This `docs/PA-docs/AI-Things/CHANGES.md` records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.

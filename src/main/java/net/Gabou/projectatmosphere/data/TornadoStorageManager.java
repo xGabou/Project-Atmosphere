@@ -1,23 +1,46 @@
 package net.Gabou.projectatmosphere.data;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.saveddata.SavedData;
 
 public final class TornadoStorageManager {
+    private static final String STORAGE_ID = "project_atmosphere_runtime_storms";
+    private static final String COOLDOWNS_KEY = "cooldowns";
+    private static final String TORNADOES_KEY = "tornadoes";
+    private static final String HURRICANES_KEY = "hurricanes";
     private static final Map<String, Long> COOLDOWNS = new ConcurrentHashMap<>();
 
     private TornadoStorageManager() {}
 
     public static void load(ServerLevel level) {
-        // Placeholder for future persistence
+        RuntimeStormData data = RuntimeStormData.get(level);
+        COOLDOWNS.clear();
+        COOLDOWNS.putAll(data.cooldowns);
+        TornadoManager.loadPersistentTornadoes(level, data.tornadoes);
+        HurricaneManager.loadPersistentHurricanes(level, data.hurricanes);
     }
 
     public static void save(ServerLevel level) {
-        // Placeholder for future persistence
+        RuntimeStormData data = RuntimeStormData.get(level);
+        data.cooldowns.clear();
+        data.cooldowns.putAll(COOLDOWNS);
+        data.tornadoes.clear();
+        data.tornadoes.addAll(TornadoManager.savePersistentTornadoes());
+        data.hurricanes.clear();
+        data.hurricanes.addAll(HurricaneManager.savePersistentHurricanes());
+        data.setDirty();
     }
 
     public static void setCooldown(BiomeInstanceKey key, long untilTick) {
@@ -51,6 +74,61 @@ public final class TornadoStorageManager {
         }
         Long until = COOLDOWNS.get(key.toString());
         return until != null && nowTick < until;
+    }
+
+    private static final class RuntimeStormData extends SavedData {
+        private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
+        private final List<CompoundTag> tornadoes = new ArrayList<>();
+        private final List<CompoundTag> hurricanes = new ArrayList<>();
+
+        private static RuntimeStormData get(ServerLevel level) {
+            return level.getDataStorage().computeIfAbsent(RuntimeStormData::load, RuntimeStormData::new, STORAGE_ID);
+        }
+
+        private static RuntimeStormData load(CompoundTag tag) {
+            RuntimeStormData data = new RuntimeStormData();
+            ListTag cooldownTags = tag.getList(COOLDOWNS_KEY, Tag.TAG_COMPOUND);
+            for (int i = 0; i < cooldownTags.size(); i++) {
+                CompoundTag cooldownTag = cooldownTags.getCompound(i);
+                data.cooldowns.put(cooldownTag.getString("key"), cooldownTag.getLong("until"));
+            }
+
+            ListTag tornadoTags = tag.getList(TORNADOES_KEY, Tag.TAG_COMPOUND);
+            for (int i = 0; i < tornadoTags.size(); i++) {
+                data.tornadoes.add(tornadoTags.getCompound(i));
+            }
+
+            ListTag hurricaneTags = tag.getList(HURRICANES_KEY, Tag.TAG_COMPOUND);
+            for (int i = 0; i < hurricaneTags.size(); i++) {
+                data.hurricanes.add(hurricaneTags.getCompound(i));
+            }
+            return data;
+        }
+
+        @Override
+        public CompoundTag save(CompoundTag tag) {
+            ListTag cooldownTags = new ListTag();
+            for (Map.Entry<String, Long> entry : this.cooldowns.entrySet()) {
+                CompoundTag cooldownTag = new CompoundTag();
+                cooldownTag.putString("key", entry.getKey());
+                cooldownTag.putLong("until", entry.getValue());
+                cooldownTags.add(cooldownTag);
+            }
+            tag.put(COOLDOWNS_KEY, cooldownTags);
+
+            ListTag tornadoTags = new ListTag();
+            for (CompoundTag tornado : this.tornadoes) {
+                tornadoTags.add(tornado.copy());
+            }
+            tag.put(TORNADOES_KEY, tornadoTags);
+
+            ListTag hurricaneTags = new ListTag();
+            for (CompoundTag hurricane : this.hurricanes) {
+                hurricaneTags.add(hurricane.copy());
+            }
+            tag.put(HURRICANES_KEY, hurricaneTags);
+            return tag;
+        }
     }
 }
 

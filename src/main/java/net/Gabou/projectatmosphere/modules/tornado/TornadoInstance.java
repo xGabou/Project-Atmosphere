@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -448,6 +449,110 @@ public class TornadoInstance {
                 this.recentDebrisScore,
                 this.phase
         );
+    }
+
+    public CompoundTag toPersistentTag() {
+        CompoundTag tag = new CompoundTag();
+        tag.putUUID("id", this.id);
+        tag.putDouble("x", this.position.x);
+        tag.putDouble("y", this.position.y);
+        tag.putDouble("z", this.position.z);
+        tag.putFloat("radius", this.radius);
+        tag.putFloat("windSpeed", this.wind.baseSpeed());
+        tag.putFloat("windAngle", this.wind.angleRadians());
+        tag.putFloat("windGust", this.wind.gustSpeed());
+        tag.putFloat("angularSpeed", this.angularSpeed);
+        tag.putFloat("visualBottomY", this.visualBottomY);
+        tag.putFloat("visualHeight", this.visualHeight);
+        tag.putFloat("targetVisualHeight", this.targetVisualHeight);
+        tag.putFloat("normalizedIntensity", this.normalizedIntensity);
+        tag.putFloat("targetIntensity", this.targetIntensity);
+        tag.putInt("stormLevel", this.stormLevel);
+        tag.putString("phase", this.phase.name());
+        tag.putInt("ageTicks", this.ageTicks);
+        tag.putInt("phaseTicks", this.phaseTicks);
+        tag.putInt("formationTicks", this.formationTicks);
+        tag.putInt("activeTicks", this.activeTicks);
+        tag.putInt("dissipationTicks", this.dissipationTicks);
+        tag.putInt("detachedTicks", this.detachedTicks);
+        tag.putLong("spawnGameTime", this.spawnGameTime);
+        tag.putFloat("headingRadians", this.headingRadians);
+        tag.putFloat("targetHeadingRadians", this.targetHeadingRadians);
+        tag.putDouble("motionX", this.motion.x);
+        tag.putDouble("motionZ", this.motion.z);
+        tag.putFloat("plannedMoveSpeed", this.plannedMoveSpeed);
+        tag.putFloat("targetMoveSpeed", this.targetMoveSpeed);
+        tag.putInt("routeTicksRemaining", this.routeTicksRemaining);
+        tag.putFloat("anchorX", this.anchorX);
+        tag.putFloat("anchorZ", this.anchorZ);
+        tag.putFloat("recentDebrisScore", this.recentDebrisScore);
+        tag.putBoolean("requiresCloudAttachment", this.requiresCloudAttachment);
+        if (this.routeWaypoint != null) {
+            tag.putBoolean("hasRouteWaypoint", true);
+            tag.putDouble("routeX", this.routeWaypoint.x);
+            tag.putDouble("routeZ", this.routeWaypoint.z);
+        }
+        return tag;
+    }
+
+    public static TornadoInstance fromPersistentTag(CompoundTag tag) {
+        UUID id = tag.hasUUID("id") ? tag.getUUID("id") : UUID.randomUUID();
+        Vec3 position = new Vec3(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"));
+        float radius = tag.getFloat("radius");
+        WindVector wind = new WindVector(tag.getFloat("windSpeed"), tag.getFloat("windAngle"), tag.getFloat("windGust"));
+        float angularSpeed = tag.contains("angularSpeed") ? tag.getFloat("angularSpeed") : 0.05F;
+        float visualBottomY = tag.contains("visualBottomY") ? tag.getFloat("visualBottomY") : (float) position.y;
+        float visualHeight = tag.contains("visualHeight") ? tag.getFloat("visualHeight") : Math.max(96.0F, radius * 12.0F);
+        int stormLevel = tag.contains("stormLevel") ? tag.getInt("stormLevel") : StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F));
+        boolean requiresCloudAttachment = !tag.contains("requiresCloudAttachment") || tag.getBoolean("requiresCloudAttachment");
+
+        TornadoInstance tornado = new TornadoInstance(
+                id,
+                position,
+                radius,
+                wind,
+                angularSpeed,
+                visualBottomY,
+                visualHeight,
+                null,
+                stormLevel,
+                requiresCloudAttachment
+        );
+        tornado.targetVisualHeight = tag.contains("targetVisualHeight") ? tag.getFloat("targetVisualHeight") : tornado.targetVisualHeight;
+        tornado.normalizedIntensity = tag.contains("normalizedIntensity") ? tag.getFloat("normalizedIntensity") : tornado.normalizedIntensity;
+        tornado.targetIntensity = tag.contains("targetIntensity") ? tag.getFloat("targetIntensity") : tornado.targetIntensity;
+        tornado.phase = parsePhase(tag.getString("phase"), tornado.phase);
+        tornado.ageTicks = tag.getInt("ageTicks");
+        tornado.phaseTicks = tag.getInt("phaseTicks");
+        tornado.formationTicks = tag.contains("formationTicks") ? tag.getInt("formationTicks") : tornado.formationTicks;
+        tornado.activeTicks = tag.contains("activeTicks") ? tag.getInt("activeTicks") : tornado.activeTicks;
+        tornado.dissipationTicks = tag.contains("dissipationTicks") ? tag.getInt("dissipationTicks") : tornado.dissipationTicks;
+        tornado.detachedTicks = tag.getInt("detachedTicks");
+        tornado.spawnGameTime = tag.getLong("spawnGameTime");
+        tornado.headingRadians = tag.contains("headingRadians") ? tag.getFloat("headingRadians") : tornado.headingRadians;
+        tornado.targetHeadingRadians = tag.contains("targetHeadingRadians") ? tag.getFloat("targetHeadingRadians") : tornado.targetHeadingRadians;
+        tornado.motion = new Vec3(tag.getDouble("motionX"), 0.0D, tag.getDouble("motionZ"));
+        tornado.plannedMoveSpeed = tag.contains("plannedMoveSpeed") ? tag.getFloat("plannedMoveSpeed") : tornado.plannedMoveSpeed;
+        tornado.targetMoveSpeed = tag.contains("targetMoveSpeed") ? tag.getFloat("targetMoveSpeed") : tornado.targetMoveSpeed;
+        tornado.routeTicksRemaining = tag.getInt("routeTicksRemaining");
+        tornado.anchorX = tag.contains("anchorX") ? tag.getFloat("anchorX") : (float) position.x;
+        tornado.anchorZ = tag.contains("anchorZ") ? tag.getFloat("anchorZ") : (float) position.z;
+        tornado.recentDebrisScore = tag.getFloat("recentDebrisScore");
+        if (tag.getBoolean("hasRouteWaypoint")) {
+            tornado.routeWaypoint = new Vec3(tag.getDouble("routeX"), visualBottomY, tag.getDouble("routeZ"));
+        }
+        return tornado;
+    }
+
+    private static StormLifecyclePhase parsePhase(String name, StormLifecyclePhase fallback) {
+        if (name == null || name.isBlank()) {
+            return fallback;
+        }
+        try {
+            return StormLifecyclePhase.valueOf(name);
+        } catch (IllegalArgumentException ignored) {
+            return fallback;
+        }
     }
 
     public void applySnapshot(TornadoSnapshot snapshot, @Nullable CloudRegion region) {
