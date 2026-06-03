@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.client.render;
+package net.Gabou.projectatmosphere.client.render.mesh;
 
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
