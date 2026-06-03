@@ -143,3 +143,12 @@
 - Cleanup type: Remaining-files architectural restructure
 - Build result: `.\gradlew.bat build` succeeded
 - Short notes: Moved the whiteout fog handler, tornado client effects, and todo tools into better packages, deleted an empty client hook, updated the client tick import, and classified the remaining set with explicit handled statuses.
+
+## 019_risky_files_cluster_restructure
+- Batch number: 019
+- Target modules: Risky remaining files clustered from `03_remaining_files_handling_matrix.md`
+- Files reviewed: 76 risky files clustered into 10 groups
+- Files changed: 4 source files plus handled registry and log updates
+- Cleanup type: Risk-cluster refactor
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Moved the shared render mesh helpers into a tighter render mesh package, updated renderer imports, deleted an empty client hook, and recorded the remaining risky classes for manual review.

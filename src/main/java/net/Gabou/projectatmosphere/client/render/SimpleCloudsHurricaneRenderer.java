@@ -14,6 +14,7 @@ import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCloudVolume;
+import net.Gabou.projectatmosphere.client.render.mesh.VolumeBoxMesh;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;

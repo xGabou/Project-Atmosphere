@@ -11,14 +11,23 @@ public final class CloudDebugRenderer {
         if(snapshot == null || poseStack == null) return;
         if(cameraPosition == null) cameraPosition = Vec3.ZERO;
 
+        if (!snapshot.isEnabled()) return;
+
         Vec3 center = snapshot.getRegionCenter();
         float radius = snapshot.getRegionRadius();
+
+        float cloudBaseY = snapshot.getCloudBaseY();
+        float cloudTopY = snapshot.getCloudTopY();
+
+        if(center == null) return;
+        if(radius <= 0) return;
+        if(cloudTopY <= cloudBaseY) return;
 
         double minX = center.x() - radius - cameraPosition.x();
         double maxX = center.x() + radius - cameraPosition.x();
 
-        double minY = snapshot.getCloudBaseY() - radius - cameraPosition.y();
-        double maxY = snapshot.getCloudTopY() - cameraPosition.y();
+        double minY = cloudBaseY - cameraPosition.y();
+        double maxY = cloudTopY - cameraPosition.y();
 
         double minZ = center.z() - radius - cameraPosition.z();
         double maxZ = center.z() + radius - cameraPosition.z();
