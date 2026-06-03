@@ -119,7 +119,7 @@ public class TemperatureGenerator {
     ) {}
 
     /**
-     * If {@code v} lies outside {@code [boundLow..boundHigh]}, then:
+     * If {@code CloudDebugSnapshotFactory} lies outside {@code [boundLow..boundHigh]}, then:
      * <ol>
      *   <li>globally cap to ±65 °C,</li>
      *   <li>credit back a scaled portion of the overshoot,</li>
@@ -173,7 +173,7 @@ public class TemperatureGenerator {
 
 
     /**
-     * Eases {@code v} toward {@code avg} in four bands:
+     * Eases {@code CloudDebugSnapshotFactory} toward {@code avg} in four bands:
      * <ul>
      *   <li>|Δ| ≤ 3°C  → 10% pull</li>
      *   <li>|Δ| ≤ 6°C  → 35% pull</li>
@@ -181,7 +181,7 @@ public class TemperatureGenerator {
      *   <li>|Δ| > 10°C → 100% pull</li>
      * </ul>
      * Does not enforce any bounds—it simply returns an eased value:
-     * {@code eased = avg + (v - avg) * (1 - factor)}.
+     * {@code eased = avg + (CloudDebugSnapshotFactory - avg) * (1 - factor)}.
      *
      * @param v   the value to ease
      * @param avg the target average

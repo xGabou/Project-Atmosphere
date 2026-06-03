@@ -17,6 +17,9 @@ import java.nio.file.Path;
 import java.util.Map;
 
 public class StorageUtils {
+    // ---------------------------------------------------------------------
+    // Loading
+    // ---------------------------------------------------------------------
     public static void loadAll(ServerLevel world, Map<BiomeInstanceKey, float[][]> cache, String fileName, Gson gson) {
             Path SAVE_PATH = getPerWorldSavePath(world, fileName);
             if (!Files.exists(SAVE_PATH)) return;
@@ -68,6 +71,9 @@ public class StorageUtils {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Saving
+    // ---------------------------------------------------------------------
     /**
      * Saves the temperature forecasts to the JSON file.
      * This method is called asynchronously to avoid blocking the main thread.
@@ -134,6 +140,9 @@ public class StorageUtils {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Paths
+    // ---------------------------------------------------------------------
     public static Path getPerWorldSavePath(ServerLevel world, String fileName) {
         String dimensionPath = world.dimension().location().getNamespace().equals("minecraft")
                 ? world.dimension().location().getPath()

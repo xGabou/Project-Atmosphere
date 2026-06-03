@@ -12,6 +12,9 @@ public class ModSounds {
     public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
             DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, ProjectAtmosphere.MODID);
 
+    // ---------------------------------------------------------------------
+    // Registered sounds
+    // ---------------------------------------------------------------------
     public static final RegistryObject<SoundEvent> WEATHER_SIREN = registerSound("weather_siren");
 
     public static final RegistryObject<SoundEvent> TORNADO_ROAR = registerSound("tornado_roar");
@@ -20,6 +23,9 @@ public class ModSounds {
         SOUND_EVENTS.register(eventBus);
     }
 
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
     private static RegistryObject<SoundEvent> registerSound(String name) {
         return SOUND_EVENTS.register(name, () -> SoundEvent.createVariableRangeEvent(
                 ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, name)));

@@ -12,6 +12,9 @@ public class ModTabs {
     public static final DeferredRegister<CreativeModeTab> REGISTRY
             = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, ProjectAtmosphere.MODID);
 
+    // ---------------------------------------------------------------------
+    // Creative tab registration
+    // ---------------------------------------------------------------------
     public static final RegistryObject<CreativeModeTab> PROJECTATMO = REGISTRY.register(
             "thermometer",  
             () -> CreativeModeTab.builder()

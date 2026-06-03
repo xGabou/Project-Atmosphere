@@ -8,8 +8,7 @@ import java.util.EnumSet;
 
 /**
  * Event fired when the environment around a position indicates crop stress.
- * Listeners can use this to apply custom crop logic or integrate with
- * other mods.
+ * This is a read-only event payload for listeners; it must not be used to mutate climate state.
  */
 public class CropStressEvent extends Event {
     private final ServerLevel level;

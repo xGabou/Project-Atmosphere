@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.api;
 
 /**
- * Represents different types of environmental stress that can affect crops.
+ * Enumerates read-only crop stress categories exposed through the API.
  */
 public enum CropStressType {
     DROUGHT,

@@ -9,7 +9,8 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * Client-side overlay message for instrument readouts.
+ * Server-to-client packet carrying a single instrument readout string.
+ * It updates the HUD overlay only and must not own any simulation state.
  */
 public class InstrumentReadoutPacket {
     private final String message;
@@ -26,6 +27,9 @@ public class InstrumentReadoutPacket {
         buf.writeUtf(message, 256);
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static InstrumentReadoutPacket decode(FriendlyByteBuf buf) {
         return new InstrumentReadoutPacket(buf);
     }

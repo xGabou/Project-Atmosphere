@@ -33,10 +33,16 @@ public class TemperatureCommands {
         return builder.buildFuture();
     };
 
+    // ---------------------------------------------------------------------
+    // Registration
+    // ---------------------------------------------------------------------
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(build());
     }
 
+    // ---------------------------------------------------------------------
+    // Command tree
+    // ---------------------------------------------------------------------
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("temperature")
                         .then(Commands.literal("forecast")
@@ -52,6 +58,7 @@ public class TemperatureCommands {
                                     return 1;
                                 }))
 
+                        // Lookup and sampling commands
                         .then(Commands.literal("get")
                                 .then(Commands.argument("biome", StringArgumentType.word())
                                         .suggests(BIOME_SUGGESTIONS)
@@ -88,6 +95,7 @@ public class TemperatureCommands {
                                     return 1;
                                 }))
 
+                        // Seasonal state and raw temperature inspection
                         .then(Commands.literal("getseason")
                                 .requires(source -> source.hasPermission(2))
                                 .executes(ctx -> {
@@ -122,6 +130,7 @@ public class TemperatureCommands {
                                     return 1;
                                 }))
 
+                        // Maintenance and diagnostics
                         .then(Commands.literal("regenerate")
                                 .requires(source -> source.hasPermission(2))
                                 .executes(ctx -> {
@@ -147,6 +156,7 @@ public class TemperatureCommands {
                                     return 1;
                                 }))
 
+                        // Help output
                         .then(Commands.literal("help")
                                 .executes(ctx -> {
                                     ctx.getSource().sendSuccess(() -> Component.literal(

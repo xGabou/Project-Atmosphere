@@ -9,6 +9,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BiomeClientTemperatureCache {
     private static volatile Map<ResourceLocation, float[]> DAILY_FORECASTS = new ConcurrentHashMap<>();
 
+    // ---------------------------------------------------------------------
+    // Cache updates
+    // ---------------------------------------------------------------------
     /**
      * Updates the client-side forecast cache with the new per-biome daily temperature arrays.
      */
@@ -22,8 +25,11 @@ public class BiomeClientTemperatureCache {
         DAILY_FORECASTS = new ConcurrentHashMap<>(newData);
     }
 
+    // ---------------------------------------------------------------------
+    // Lookups
+    // ---------------------------------------------------------------------
     /**
-     * Retrieves the forecasted temperature for a biome at the given tick of the current day (0–23999).
+     * Retrieves the forecasted temperature for a biome at the given tick of the current day (0-23999).
      * Converts the tick value into an index for the forecast array.
      *
      * @param biome The biome ID.
@@ -35,7 +41,7 @@ public class BiomeClientTemperatureCache {
         if (arr == null || arr.length == 0) return 0.5F;
         if (level == null) return arr[0];
 
-        // Convert in-game time (ticks) → array index
+        // Convert in-game time (ticks) -> array index
         long timeOfDay = level.getDayTime() % 24000L;
         int i = (int) ((timeOfDay / 24000.0F) * arr.length);
 
@@ -55,6 +61,9 @@ public class BiomeClientTemperatureCache {
         return getTemperature(biome, level) < 0.0F;
     }
 
+    // ---------------------------------------------------------------------
+    // Reset
+    // ---------------------------------------------------------------------
     /**
      * Clears all cached forecast data.
      */

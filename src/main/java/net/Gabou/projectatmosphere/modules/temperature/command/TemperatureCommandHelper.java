@@ -18,6 +18,9 @@ import java.util.Map;
 
 public class TemperatureCommandHelper {
 
+    // ---------------------------------------------------------------------
+    // Biome and position helpers
+    // ---------------------------------------------------------------------
     public static BiomeInstanceKey getCurrentBiome(Player player) {
         return new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), player.level()), player.blockPosition());
     }
@@ -38,6 +41,13 @@ public class TemperatureCommandHelper {
         }
     }
 
+    public static boolean isInOverworld(Level level) {
+        return level.dimension().equals(Level.OVERWORLD);
+    }
+
+    // ---------------------------------------------------------------------
+    // Forecast and season helpers
+    // ---------------------------------------------------------------------
     public static long getCurrentTick(ServerLevel level) {
         return level.getDayTime() % 24000L;
     }
@@ -90,10 +100,6 @@ public class TemperatureCommandHelper {
             }
         }
         return sb.toString();
-    }
-
-    public static boolean isInOverworld(Level level) {
-        return level.dimension().equals(Level.OVERWORLD);
     }
 }
 

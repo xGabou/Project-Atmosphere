@@ -11,6 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
+/**
+ * Server-to-client packet carrying hurricane render snapshots.
+ * It updates the client hurricane cache and must not own hurricane simulation logic.
+ */
 public class SyncHurricaneStatePacket {
     private final List<HurricaneRenderSnapshot> snapshots;
 
@@ -34,6 +38,9 @@ public class SyncHurricaneStatePacket {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static SyncHurricaneStatePacket decode(FriendlyByteBuf buf) {
         return new SyncHurricaneStatePacket(buf);
     }

@@ -7,6 +7,10 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
+/**
+ * Client-to-server authentication reply carrying the nonce response and launcher reason.
+ * This packet updates the server auth flow only and must not own gameplay state.
+ */
 public class AuthChallengeReplyPacket {
     private final long nonce;
     private final String response;
@@ -42,6 +46,9 @@ public class AuthChallengeReplyPacket {
         buf.writeUtf(launcherReason, 256);
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static AuthChallengeReplyPacket decode(FriendlyByteBuf buf) {
         return new AuthChallengeReplyPacket(buf);
     }

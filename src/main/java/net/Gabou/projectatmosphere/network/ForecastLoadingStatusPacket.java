@@ -11,6 +11,10 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
+/**
+ * Server-to-client packet carrying forecast loading progress and readiness state.
+ * It updates the client loading cache only and must not own forecast generation.
+ */
 public class ForecastLoadingStatusPacket {
     private final ForecastLoadingStage stage;
     private final String message;
@@ -76,6 +80,9 @@ public class ForecastLoadingStatusPacket {
         buf.writeUtf(source == null ? "unknown" : source, 128);
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static ForecastLoadingStatusPacket decode(FriendlyByteBuf buf) {
         return new ForecastLoadingStatusPacket(buf);
     }

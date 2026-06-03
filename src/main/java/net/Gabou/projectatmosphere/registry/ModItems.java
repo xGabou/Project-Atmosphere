@@ -13,10 +13,16 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 public class ModItems {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ProjectAtmosphere.MODID);
+    // ---------------------------------------------------------------------
+    // Registration
+    // ---------------------------------------------------------------------
     public static void register(IEventBus eventBus) {
         ITEMS.register(eventBus);
     }
 
+    // ---------------------------------------------------------------------
+    // Block-linked items
+    // ---------------------------------------------------------------------
     public static final RegistryObject<Item> WEATHER_VANE = blockUtilities(ModBlocks.WEATHER_VANE);
     public static final RegistryObject<Item> THERMOMETER = ITEMS.register("thermometer_block", () ->
             new Thermometre(ModBlocks.THERMOMETER_BLOCK.get(), new Item.Properties()));
@@ -97,6 +103,9 @@ public class ModItems {
     public static final RegistryObject<Item> STORM_SIREN = blockUtilities(ModBlocks.STORM_SIREN);
     public static final RegistryObject<Item> STORM_SHIELD = blockUtilities(ModBlocks.STORM_SHIELD);
 
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
     private static RegistryObject<Item> blockUtilities(RegistryObject<Block> block) {
         return ITEMS.register(block.getId().getPath(), () -> new BlockItem(block.get(), new Item.Properties()));
     }

@@ -5,9 +5,8 @@ import dev.nonamecrackers2.simpleclouds.api.common.cloud.region.ScAPICloudRegion
 import java.util.List;
 
 /**
- * Convenience bridge that exposes the tornado container methods directly on {@link ScAPICloudRegion} instances.
- * Mods should call {@link #of(ScAPICloudRegion)} to obtain an accessor and then append/remove {@link TornadoDescriptor}
- * objects as needed.  The server will automatically stream the descriptors to connected clients.
+ * Convenience bridge that exposes read-only tornado container access on {@link ScAPICloudRegion} instances.
+ * This is an adapter contract only; it must not own simulation or networking policy.
  */
 public interface ScAPICloudRegionTornadoAccess extends ScAPICloudRegion, ITornadoRegion {
 

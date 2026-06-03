@@ -14,7 +14,8 @@ import net.minecraft.server.level.ServerLevel;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 
 /**
- * Public-facing API for accessing Project Atmosphere forecasts and current weather.
+ * Public-facing read-only API for accessing Project Atmosphere forecasts and current weather.
+ * Callers should treat this as a query surface only; it must not be used to mutate backend weather state.
  */
 public class AtmoApi {
 
@@ -32,8 +33,12 @@ public class AtmoApi {
         return INSTANCE;
     }
 
+    // ---------------------------------------------------------------------
+    // Forecast access
+    // ---------------------------------------------------------------------
     /**
      * Gets the weather forecast for the given position and level.
+     * This is a read-only lookup into the forecast system.
      * @param level The server level to sample
      * @param pos The position in the world
      * @return The ForecastRegion for that position
@@ -44,13 +49,18 @@ public class AtmoApi {
 
     /**
      * Region-id based accessor for callers that already have a region key.
+     * This is still a read-only view and should not mutate the region state.
      */
     public ForecastRegion getWeatherForecast(ServerLevel level, RegionInstanceKey regionKey) {
         return ForecastOrchestrator.getRegionOrchestrator(level).ensureLoaded(regionKey);
     }
 
+    // ---------------------------------------------------------------------
+    // Snapshot access
+    // ---------------------------------------------------------------------
     /**
      * Gets the current weather conditions at the given position.
+     * This returns a snapshot view and must not mutate climate state.
      * @param level The server level
      * @param pos The position
      * @return A WeatherSnapshot representing current conditions
@@ -104,11 +114,19 @@ public class AtmoApi {
         return new WeatherSnapshot(cloudCover, rainIntensity, temperature, windSpeed, windAngle, storming, snowing);
     }
 
+    // ---------------------------------------------------------------------
+    // World effect registration
+    // ---------------------------------------------------------------------
+    /**
+     * Registers a world effect handler without exposing the internal manager to callers.
+     */
     public void registerWorldEffect(AtmosphereWorldEffect effect) {
         AtmosphereWorldEffectsManager.registerWorldEffect(effect);
     }
 
-
+    // ---------------------------------------------------------------------
+    // Convenience weather checks
+    // ---------------------------------------------------------------------
     /**
      * Checks if it is currently raining or thundering at the specified position in the given level.
      * @param level The server level to check
@@ -116,33 +134,9 @@ public class AtmoApi {
      * @return true if it is raining or thundering at the position, false otherwise
      */
     public boolean isRainingOrThundering(ServerLevel level, BlockPos pos) {
-
         WeatherSnapshot snapshot = getWeatherSnapshot(level, pos, level.getGameTime());
         return snapshot.rainIntensity() > 0f || snapshot.isStorming();
     }
-
-    /**
-     * Gets any active weather alerts for the given position.
-     * @param level The server level
-     * @param pos The position
-     * @return An object representing alerts (to be defined)
-     */
-    public Object getWeatherAlerts(ServerLevel level, BlockPos pos) {
-        
-        return null;
-    }
-
-    /**
-     * Gets historical weather data (could return past forecasts or measurements).
-     * @param level The server level
-     * @param pos The position
-     * @return Historical data object (to be defined)
-     */
-    public Object getWeatherHistory(ServerLevel level, BlockPos pos) {
-        
-        return null;
-    }
-
 
     /**
      * Checks if it is currently raining at the specified position in the given level.
@@ -155,9 +149,30 @@ public class AtmoApi {
         return CloudManager.get(level).isRainingAt(pos);
     }
 
-
-
     public boolean isRainningLevel(ServerLevel level, BlockPos pos) {
-        return  CloudManager.get(level).getClouds().stream().anyMatch(cloud -> WeatherType.isRainy(cloud.getCloudTypeId()));
+        return CloudManager.get(level).getClouds().stream().anyMatch(cloud -> WeatherType.isRainy(cloud.getCloudTypeId()));
+    }
+
+    // ---------------------------------------------------------------------
+    // Legacy placeholders
+    // ---------------------------------------------------------------------
+    /**
+     * Gets any active weather alerts for the given position.
+     * @param level The server level
+     * @param pos The position
+     * @return An object representing alerts (to be defined)
+     */
+    public Object getWeatherAlerts(ServerLevel level, BlockPos pos) {
+        return null;
+    }
+
+    /**
+     * Gets historical weather data (could return past forecasts or measurements).
+     * @param level The server level
+     * @param pos The position
+     * @return Historical data object (to be defined)
+     */
+    public Object getWeatherHistory(ServerLevel level, BlockPos pos) {
+        return null;
     }
 }

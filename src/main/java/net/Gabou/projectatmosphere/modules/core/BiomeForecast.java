@@ -3,6 +3,9 @@ package net.Gabou.projectatmosphere.modules.core;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
 public class BiomeForecast {
+    // ---------------------------------------------------------------------
+    // Raw weekly fields
+    // ---------------------------------------------------------------------
     private float[][] temperature; 
     private float[][] pressure;
     private float[][] humidity;
@@ -28,6 +31,9 @@ public class BiomeForecast {
     public BiomeForecast() {
     }
 
+    // ---------------------------------------------------------------------
+    // Accessors
+    // ---------------------------------------------------------------------
     public BiomeForecast(float[][] temperature, float[][] pressure, float[][] humidity, WindVector[] wind) {
         this.temperature = temperature;
         this.pressure = pressure;

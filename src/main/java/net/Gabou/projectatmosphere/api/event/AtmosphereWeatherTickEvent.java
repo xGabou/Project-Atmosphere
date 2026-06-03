@@ -6,7 +6,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.eventbus.api.Event;
 
 /**
- * Fired during Project Atmosphere weather sampling ticks.
+ * Read-only weather sampling event fired during Project Atmosphere weather ticks.
+ * Listeners should inspect the snapshot rather than mutate weather state.
  */
 public class AtmosphereWeatherTickEvent extends Event {
     private final ServerLevel level;

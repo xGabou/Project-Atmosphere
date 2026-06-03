@@ -5,7 +5,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 
 /**
- * Weather-driven world effect hook for modders.
+ * Weather-driven world effect contract for modders.
+ * Implementations should read the provided snapshot and apply only local world effects.
  */
 public interface AtmosphereWorldEffect {
     String id();

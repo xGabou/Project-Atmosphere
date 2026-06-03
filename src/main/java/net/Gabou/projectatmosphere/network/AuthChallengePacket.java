@@ -8,6 +8,10 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
+/**
+ * Server-to-client authentication challenge carrying the nonce to validate.
+ * This packet updates the client auth flow only and must not own any gameplay state.
+ */
 public class AuthChallengePacket {
     private final long nonce;
 
@@ -27,6 +31,9 @@ public class AuthChallengePacket {
         buf.writeLong(nonce);
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static AuthChallengePacket decode(FriendlyByteBuf buf) {
         return new AuthChallengePacket(buf);
     }

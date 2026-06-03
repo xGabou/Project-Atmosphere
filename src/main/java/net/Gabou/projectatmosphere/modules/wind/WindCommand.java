@@ -15,10 +15,16 @@ import net.minecraft.world.entity.player.Player;
 import java.util.Arrays;
 
 public class WindCommand {
+    // ---------------------------------------------------------------------
+    // Registration
+    // ---------------------------------------------------------------------
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(build());
     }
 
+    // ---------------------------------------------------------------------
+    // Command tree
+    // ---------------------------------------------------------------------
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("windSpeed")
                 .then(Commands.literal("get") 

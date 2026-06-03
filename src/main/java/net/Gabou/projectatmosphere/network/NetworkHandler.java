@@ -19,6 +19,9 @@ public class NetworkHandler {
     private static int id = 0;
 
     public static void init() {
+        // -----------------------------------------------------------------
+        // Client-bound packets
+        // -----------------------------------------------------------------
         CHANNEL.messageBuilder(SpawnTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SpawnTornadoPacket::decode)
                 .encoder(SpawnTornadoPacket::encode)
@@ -69,6 +72,10 @@ public class NetworkHandler {
                 .encoder(SyncHurricaneStatePacket::encode)
                 .consumerMainThread(SyncHurricaneStatePacket::handle)
                 .add();
+
+        // -----------------------------------------------------------------
+        // Handshake / server-bound packets
+        // -----------------------------------------------------------------
         CHANNEL.messageBuilder(AuthChallengePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(AuthChallengePacket::decode)
                 .encoder(AuthChallengePacket::encode)

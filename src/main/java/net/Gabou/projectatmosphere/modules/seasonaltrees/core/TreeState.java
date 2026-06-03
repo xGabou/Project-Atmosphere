@@ -17,6 +17,9 @@ public final class TreeState {
     private long lastSeasonTick;
     private long lastVigorDay;
 
+    // ---------------------------------------------------------------------
+    // Construction
+    // ---------------------------------------------------------------------
     public TreeState(LeafState leafState, float progress, SeasonPhase lastSeasonApplied, float vigor, long lastSeasonTick, long lastVigorDay) {
         this.leafState = leafState;
         this.progress = progress;
@@ -30,6 +33,9 @@ public final class TreeState {
         return new TreeState(LeafState.FULL, 1.0f, SeasonPhase.SUMMER, 0.75f, 0L, -1L);
     }
 
+    // ---------------------------------------------------------------------
+    // Accessors
+    // ---------------------------------------------------------------------
     public LeafState leafState() {
         return leafState;
     }

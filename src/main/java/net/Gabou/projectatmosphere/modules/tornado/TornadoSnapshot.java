@@ -20,6 +20,9 @@ public record TornadoSnapshot(
         float recentDebrisScore,
         StormLifecyclePhase phase
 ) {
+    // ---------------------------------------------------------------------
+    // Network serialization
+    // ---------------------------------------------------------------------
     public void write(FriendlyByteBuf buf) {
         buf.writeUUID(this.id);
         buf.writeDouble(this.position.x);

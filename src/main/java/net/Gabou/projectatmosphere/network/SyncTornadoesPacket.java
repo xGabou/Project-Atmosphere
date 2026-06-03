@@ -9,6 +9,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
+/**
+ * Server-to-client packet carrying tornado snapshots.
+ * It updates the client tornado cache and must not own tornado simulation logic.
+ */
 public class SyncTornadoesPacket {
     private final List<TornadoSnapshot> snapshots;
 
@@ -32,6 +36,9 @@ public class SyncTornadoesPacket {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static SyncTornadoesPacket decode(FriendlyByteBuf buf) {
         return new SyncTornadoesPacket(buf);
     }

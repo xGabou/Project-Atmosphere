@@ -8,12 +8,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Capability-like contract that marks a {@link dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion} as being able
- * to carry one or more {@link TornadoDescriptor}s.  Server-side controllers should construct descriptors with offsets that are
- * relative to the cloud region centre (in block coordinates), plus optional velocities for slow drift.  The associated radius,
- * bottom, and height describe the cylinder sampled in the shaders.  The list is serialized through every
- * {@link dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion} constructor, packet, and tag so clients automatically
- * receive the tornado metadata without implementing their own sync logic.
+ * Capability-like contract for a cloud region that can carry tornado descriptors.
+ * This is a container contract only; it must not own rendering or synchronization policy.
  */
 public interface ITornadoRegion {
     String TORNADO_LIST_KEY = "projectatmosphere_tornadoes";

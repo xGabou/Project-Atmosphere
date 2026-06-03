@@ -10,11 +10,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Lightweight description of a funnel attached to a {@link dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion}.
- * Offsets are measured relative to the region’s current centre so descriptors naturally follow the region when it drifts.
- * Controller mods (such as Project Atmosphere) can create a descriptor server-side, attach it to a region, and the
- * serialization helpers automatically mirror the state to every connected client.  The renderer uploads the descriptors
- * to a dedicated SSBO so shaders can punch holes/boost density without touching the base cloud noise field.
+ * Immutable-ish transport description of a tornado attached to a cloud region.
+ * This is a serialized data contract for clients and controllers, not a simulation owner.
  */
 public class TornadoDescriptor {
     public static final String KEY_UUID = "uuid";
@@ -133,8 +130,8 @@ public class TornadoDescriptor {
     }
 
     /**
-     * Applies the velocity of the tornado and the delta movement of the parent region to the cached offsets.  Call this
-     * once per region tick to keep the render-side position in sync.
+     * Applies the velocity of the tornado and the delta movement of the parent region to the cached offsets.
+     * This keeps the serialized descriptor aligned with the owning cloud region.
      */
     public void tick(float regionDeltaX, float regionDeltaZ) {
         this.offsetX += regionDeltaX + this.velocityX;

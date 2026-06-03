@@ -17,6 +17,9 @@ public class ModBlocks {
     public static final DeferredRegister<Block> REGISTRY =
             DeferredRegister.create(ForgeRegistries.BLOCKS, ProjectAtmosphere.MODID);
 
+    // ---------------------------------------------------------------------
+    // Weather and instrument blocks
+    // ---------------------------------------------------------------------
     public static final RegistryObject<Block> DUST = REGISTRY.register("dust", () ->
             new DustLayerBlock(BlockBehaviour.Properties
                     .of()

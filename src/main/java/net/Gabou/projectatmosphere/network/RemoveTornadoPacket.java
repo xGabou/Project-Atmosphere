@@ -1,4 +1,5 @@
 package net.Gabou.projectatmosphere.network;
+
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -6,6 +7,10 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+/**
+ * Server-to-client packet removing a tornado by UUID from the client cache.
+ * It only updates client tornado state and must not own tornado lifecycle logic.
+ */
 public class RemoveTornadoPacket {
     private final UUID id;
 
@@ -21,6 +26,9 @@ public class RemoveTornadoPacket {
         buf.writeUUID(this.id);
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static RemoveTornadoPacket decode(FriendlyByteBuf buf) {
         return new RemoveTornadoPacket(buf);
     }

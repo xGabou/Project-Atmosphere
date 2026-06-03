@@ -9,7 +9,8 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * Client sync packet for coarse atmosphere state.
+ * Server-to-client packet for coarse atmosphere state.
+ * It updates the client atmosphere cache and must not own any weather logic.
  */
 public class SyncAtmosphereStatusPacket {
     private final float humidityPercent;
@@ -34,6 +35,9 @@ public class SyncAtmosphereStatusPacket {
         buf.writeFloat(this.cloudCover);
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static SyncAtmosphereStatusPacket decode(FriendlyByteBuf buf) {
         return new SyncAtmosphereStatusPacket(buf);
     }

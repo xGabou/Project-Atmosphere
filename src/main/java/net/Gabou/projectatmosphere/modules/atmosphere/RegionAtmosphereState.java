@@ -97,17 +97,6 @@ public class RegionAtmosphereState {
         return new RegionAtmosphereState(id, forecastRegion.getAnchor(), forecastRegion, dominantBiome, temperature, humidity, pressure, wind);
     }
 
-    /**
-     * Legacy compatibility path: wraps a biome forecast into a region forecast using the default grid.
-     */
-    @Deprecated
-    public static RegionAtmosphereState fromForecast(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
-        ForecastRegion region = new ForecastRegion(net.Gabou.projectatmosphere.util.RegionInstanceKey.from(biomeKey.samplePos()));
-        region.addBiomeForecast(biomeKey, forecast);
-        region.finalizeAggregation();
-        return fromForecast(region.getKey(), region);
-    }
-
     private static ResourceLocation selectDominantBiome(Map<ResourceLocation, Integer> weights) {
         ResourceLocation dominant = null;
         int best = Integer.MIN_VALUE;
@@ -141,14 +130,6 @@ public class RegionAtmosphereState {
 
     public net.Gabou.projectatmosphere.util.RegionInstanceKey getRegionId() {
         return regionId;
-    }
-
-    /**
-     * Legacy view for components still expecting RegionInstanceKey.
-     */
-    @Deprecated
-    public net.Gabou.projectatmosphere.util.RegionInstanceKey getKey() {
-        return legacyKey;
     }
 
     public BlockPos getPosition() {
@@ -365,6 +346,28 @@ public class RegionAtmosphereState {
     public float getSunlightDrivenTemperature(float sunlightFactor) {
         float clamped = Mth.clamp(sunlightFactor, 0f, 1f);
         return Mth.lerp(clamped, baselineMinTemp, baselineMaxTemp);
+    }
+
+    // ---------------------------------------------------------------------
+    // Legacy, fallback, diagnostic, or rarely used code pending cleanup
+    // ---------------------------------------------------------------------
+    /**
+     * Legacy compatibility path: wraps a biome forecast into a region forecast using the default grid.
+     */
+    @Deprecated
+    public static RegionAtmosphereState fromForecast(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
+        ForecastRegion region = new ForecastRegion(net.Gabou.projectatmosphere.util.RegionInstanceKey.from(biomeKey.samplePos()));
+        region.addBiomeForecast(biomeKey, forecast);
+        region.finalizeAggregation();
+        return fromForecast(region.getKey(), region);
+    }
+
+    /**
+     * Legacy view for components still expecting RegionInstanceKey.
+     */
+    @Deprecated
+    public net.Gabou.projectatmosphere.util.RegionInstanceKey getKey() {
+        return legacyKey;
     }
 
     private static float clampHumidity(float value) {

@@ -41,6 +41,9 @@ public record HurricaneCloudVolume(
         Vec3 renderPosWorld,
         float cloudScale
 ) {
+    // ---------------------------------------------------------------------
+    // Factories
+    // ---------------------------------------------------------------------
     public static HurricaneCloudVolume from(HurricaneInstance hurricane, float partialTick) {
         float scale = SimpleCloudsConstants.CLOUD_SCALE;
         Vec3 renderPos = hurricane.getRenderPosition(partialTick);
@@ -113,6 +116,9 @@ public record HurricaneCloudVolume(
         );
     }
 
+    // ---------------------------------------------------------------------
+    // Bounds helpers
+    // ---------------------------------------------------------------------
     public Vec3 centerWorld() {
         return new Vec3(this.renderPosWorld.x, this.baseWorld() + this.heightWorld() * 0.5F, this.renderPosWorld.z);
     }

@@ -17,6 +17,9 @@ public final class GlobalStormHistoryData extends SavedData {
     private int recentSevereCount = 0;
     private int cooldownDaysRemaining = 0;
 
+    // ---------------------------------------------------------------------
+    // State access
+    // ---------------------------------------------------------------------
     public int getLastSevereDay() { return lastSevereDay; }
     public int getRecentSevereCount() { return recentSevereCount; }
     public int getCooldownDaysRemaining() { return cooldownDaysRemaining; }
@@ -39,7 +42,9 @@ public final class GlobalStormHistoryData extends SavedData {
             recentSevereCount = 0;
     }
 
-
+    // ---------------------------------------------------------------------
+    // Saved data access
+    // ---------------------------------------------------------------------
     public static GlobalStormHistoryData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(GlobalStormHistoryData::load,
                 GlobalStormHistoryData::new,

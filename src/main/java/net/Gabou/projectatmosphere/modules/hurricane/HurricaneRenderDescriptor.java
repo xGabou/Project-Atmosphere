@@ -23,6 +23,9 @@ public record HurricaneRenderDescriptor(
         float bandCount,
         float fringeStrength
 ) {
+    // ---------------------------------------------------------------------
+    // Descriptor construction
+    // ---------------------------------------------------------------------
     public static HurricaneRenderDescriptor create(float stormRadiusWorld, float intensity, HurricaneCategory category) {
         float normalizedIntensity = Mth.clamp(intensity, 0.0F, 1.0F);
         float categoryBias = category.ordinal() / (float) (HurricaneCategory.values().length - 1);
@@ -105,6 +108,9 @@ public record HurricaneRenderDescriptor(
         );
     }
 
+    // ---------------------------------------------------------------------
+    // Serialization
+    // ---------------------------------------------------------------------
     public void write(FriendlyByteBuf buf) {
         buf.writeFloat(this.baseOffsetWorld);
         buf.writeFloat(this.volumeHeightWorld);

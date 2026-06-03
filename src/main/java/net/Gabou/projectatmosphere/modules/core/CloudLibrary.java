@@ -9,6 +9,9 @@ public class CloudLibrary {
 
     private static final Random RANDOM = new Random();
 
+    // ---------------------------------------------------------------------
+    // Cloud groupings
+    // ---------------------------------------------------------------------
     private static final String[] RAINSTORM_CLOUDS = {
             "heavy_stratus",
             "dense_stratocumulus",
@@ -110,6 +113,9 @@ public class CloudLibrary {
             "tall_weirdness"
     };
 
+    // ---------------------------------------------------------------------
+    // Cloud selection helpers
+    // ---------------------------------------------------------------------
     private static String getRandomFrom(String[] clouds) {
         return clouds[RANDOM.nextInt(clouds.length)];
     }

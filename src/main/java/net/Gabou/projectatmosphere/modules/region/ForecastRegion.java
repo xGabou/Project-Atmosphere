@@ -104,6 +104,9 @@ public final class ForecastRegion {
         return anchor;
     }
 
+    // ---------------------------------------------------------------------
+    // Derived state
+    // ---------------------------------------------------------------------
     public Map<ResourceLocation, Integer> getBiomeWeights() {
         if (biomeWeights.isEmpty()) {
             for (BiomeInstanceKey sample : getSamples()) {
@@ -161,6 +164,9 @@ public final class ForecastRegion {
         return windDay;
     }
 
+    // ---------------------------------------------------------------------
+    // Region sampling
+    // ---------------------------------------------------------------------
     public float sampleTemperature(Vec3 inRegionPos, long gameTime) {
         if (curves == null) {
             return 0f;
@@ -194,6 +200,29 @@ public final class ForecastRegion {
             return 0f;
         }
         return curves.sampleStorm(gameTime, sections);
+    }
+
+    // ---------------------------------------------------------------------
+    // Legacy, fallback, or migration code pending cleanup
+    // ---------------------------------------------------------------------
+    private void syncFromCurves() {
+        temperature = curves.temperatureWeek();
+        humidity = curves.humidityWeek();
+        pressure = curves.pressureWeek();
+        wind = curves.windWeek();
+        windDay = wind != null && wind.length > 0 ? wind[0] : WindVector.fromBase(0f, 0f);
+    }
+
+    private void buildFallback() {
+        temperature = flatWeek(12f);
+        humidity = flatWeek(65f);
+        pressure = flatWeek(1013.25f);
+        wind = new WindVector[7];
+        for (int i = 0; i < wind.length; i++) {
+            wind[i] = WindVector.fromBase(1.2f, 0f);
+        }
+        windDay = wind[0];
+        curves = new DefaultRegionCurves(temperature, humidity, pressure, wind, new float[0]);
     }
 
     /**
@@ -253,26 +282,6 @@ public final class ForecastRegion {
         windDay = wind.length > 0 ? wind[0] : WindVector.fromBase(0f, 0f);
         curves = new DefaultRegionCurves(temperature, humidity, pressure, wind, new float[0]);
         legacyFinalized = true;
-    }
-
-    private void syncFromCurves() {
-        temperature = curves.temperatureWeek();
-        humidity = curves.humidityWeek();
-        pressure = curves.pressureWeek();
-        wind = curves.windWeek();
-        windDay = wind != null && wind.length > 0 ? wind[0] : WindVector.fromBase(0f, 0f);
-    }
-
-    private void buildFallback() {
-        temperature = flatWeek(12f);
-        humidity = flatWeek(65f);
-        pressure = flatWeek(1013.25f);
-        wind = new WindVector[7];
-        for (int i = 0; i < wind.length; i++) {
-            wind[i] = WindVector.fromBase(1.2f, 0f);
-        }
-        windDay = wind[0];
-        curves = new DefaultRegionCurves(temperature, humidity, pressure, wind, new float[0]);
     }
 
     private static BlockPos resolveAnchor(RegionInstanceKey id, @Nullable BlockPos anchor, List<BiomeInstanceKey> sourceBiomes) {

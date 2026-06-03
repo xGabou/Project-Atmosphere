@@ -1,4 +1,5 @@
 package net.Gabou.projectatmosphere.network;
+
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.network.FriendlyByteBuf;
@@ -8,6 +9,10 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+/**
+ * Server-to-client packet spawning a tornado in the client cache.
+ * It transports spawn data only and must not own tornado simulation or render policy.
+ */
 public class SpawnTornadoPacket {
     private final UUID id;
     private final Vec3 pos;
@@ -53,6 +58,9 @@ public class SpawnTornadoPacket {
         buf.writeFloat(gust);
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static SpawnTornadoPacket decode(FriendlyByteBuf buf) {
         return new SpawnTornadoPacket(buf);
     }

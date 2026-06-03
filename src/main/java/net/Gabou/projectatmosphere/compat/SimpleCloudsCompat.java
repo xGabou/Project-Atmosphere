@@ -50,6 +50,9 @@ public class SimpleCloudsCompat {
 
     public static final int MAX_RADIUS = Math.round(9429F / SCALE);
 
+    // ---------------------------------------------------------------------
+    // Initialization
+    // ---------------------------------------------------------------------
     public static void init(ServerLevel level) {
         cloudManager = (ServerCloudManager) CloudManager.get(level);
         generator = cloudManager.getCloudGenerator();
@@ -65,6 +68,9 @@ public class SimpleCloudsCompat {
         return isInit;
     }
 
+    // ---------------------------------------------------------------------
+    // Spawn entry points
+    // ---------------------------------------------------------------------
     public static CloudRegion spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
         if (key == null || key.samplePos() == null) {
             return null;
@@ -79,6 +85,9 @@ public class SimpleCloudsCompat {
         return spawnCloud(cloudId, key.center(), null, level, dummy, windVector);
     }
 
+    // ---------------------------------------------------------------------
+    // Region creation
+    // ---------------------------------------------------------------------
     private static CloudRegion spawnCloud(String cloudId, BlockPos anchor, @Nullable ResourceLocation biomeId, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
 
         if (!isInit) {
@@ -126,7 +135,9 @@ public class SimpleCloudsCompat {
         return Optional.of(region);
     }
 
-
+    // ---------------------------------------------------------------------
+    // Cloud region factory
+    // ---------------------------------------------------------------------
     public static Optional<CloudRegion> createRegion(
             SpawnInfo info,
             BiomeInstanceKey biomeKey,
@@ -277,6 +288,9 @@ public class SimpleCloudsCompat {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Misc helpers
+    // ---------------------------------------------------------------------
     public static double getCloudScale() {
         return SimpleCloudsConstants.CLOUD_SCALE;
     }

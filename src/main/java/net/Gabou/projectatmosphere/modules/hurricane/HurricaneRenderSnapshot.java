@@ -25,6 +25,9 @@ public record HurricaneRenderSnapshot(
         ResourceLocation cloudTypeId,
         int ageTicks
 ) {
+    // ---------------------------------------------------------------------
+    // Network serialization
+    // ---------------------------------------------------------------------
     public void encode(FriendlyByteBuf buf) {
         buf.writeUUID(this.id);
         buf.writeDouble(this.centerX);

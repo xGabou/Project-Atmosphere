@@ -14,6 +14,9 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 @OnlyIn(Dist.CLIENT)
 public class ClientOnlyRegistrar {
+    // ---------------------------------------------------------------------
+    // Client registration
+    // ---------------------------------------------------------------------
     public static void registerClient(IEventBus modEventBus, FMLJavaModLoadingContext context) {
         modEventBus.register(ClientTickHandler.class);
         context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,

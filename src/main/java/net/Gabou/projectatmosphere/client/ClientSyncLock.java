@@ -7,6 +7,9 @@ import java.util.UUID;
 public class ClientSyncLock {
     private static volatile boolean ready;
 
+    // ---------------------------------------------------------------------
+    // State access
+    // ---------------------------------------------------------------------
     public static boolean isReady() {
         return ready;
     }
@@ -16,6 +19,9 @@ public class ClientSyncLock {
         return player != null && player.getUUID().equals(playerUUID) && ready;
     }
 
+    // ---------------------------------------------------------------------
+    // State updates
+    // ---------------------------------------------------------------------
     public static void setReady(UUID playerUUID, boolean ready) {
         LocalPlayer player = Minecraft.getInstance().player;
         if (player == null || !player.getUUID().equals(playerUUID)) {
@@ -33,6 +39,9 @@ public class ClientSyncLock {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Reset
+    // ---------------------------------------------------------------------
     public static void clear() {
         ready = false;
     }

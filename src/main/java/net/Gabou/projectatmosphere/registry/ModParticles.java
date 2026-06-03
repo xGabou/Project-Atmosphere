@@ -13,6 +13,9 @@ public class ModParticles {
     public static final DeferredRegister<ParticleType<?>> PARTICLES =
             DeferredRegister.create(Registries.PARTICLE_TYPE, "projectatmosphere");
 
+    // ---------------------------------------------------------------------
+    // Particle registrations
+    // ---------------------------------------------------------------------
     public static final RegistryObject<SimpleParticleType> WIND_STREAK =
             PARTICLES.register("wind_streak", () -> new SimpleParticleType(true));
 
@@ -48,6 +51,9 @@ public class ModParticles {
                 }
             });
 
+    // ---------------------------------------------------------------------
+    // Registration
+    // ---------------------------------------------------------------------
     public static void register(IEventBus bus) {
         PARTICLES.register(bus);
     }

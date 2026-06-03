@@ -19,6 +19,9 @@ public final class WeatherSampler {
     private WeatherSampler() {
     }
 
+    // ---------------------------------------------------------------------
+    // Region sampling
+    // ---------------------------------------------------------------------
     public static Map<RegionInstanceKey, Integer> sampleRegionsInRegion(SpawnRegion region, ServerLevel level) {
         Map<RegionInstanceKey, Integer> weights = new HashMap<>();
 
@@ -53,6 +56,9 @@ public final class WeatherSampler {
         return result;
     }
 
+    // ---------------------------------------------------------------------
+    // Weather aggregation
+    // ---------------------------------------------------------------------
     public static WeatherStats computeWeatherStats(Map<RegionInstanceKey, Integer> regionWeights, long tick) {
         if (regionWeights == null || regionWeights.isEmpty()) {
             return null;
@@ -117,6 +123,9 @@ public final class WeatherSampler {
         );
     }
 
+    // ---------------------------------------------------------------------
+    // Fallback resolution
+    // ---------------------------------------------------------------------
     private static ResourceLocation resolveDominantBiome(RegionInstanceKey regionKey) {
         RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
         if (state != null && state.getDominantBiome() != null) {
@@ -153,6 +162,9 @@ public final class WeatherSampler {
         return regionKey.center();
     }
 
+    // ---------------------------------------------------------------------
+    // Output contract
+    // ---------------------------------------------------------------------
     public record WeatherStats(
             float humidity,
             float temperature,

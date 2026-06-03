@@ -19,6 +19,9 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
     private static final float MAX_HUMIDITY_MIX_DELTA = 0.08f;
     private static final float MAX_PRESSURE_MIX_DELTA = 6f;
 
+    // ---------------------------------------------------------------------
+    // Vector math
+    // ---------------------------------------------------------------------
     public WindVector add(WindVector other) {
         return new WindVector(
                 this.baseSpeed + other.baseSpeed,
@@ -50,6 +53,9 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
         return new WindVector(baseSpeed, angleRadians, baseSpeed);
     }
 
+    // ---------------------------------------------------------------------
+    // Runtime update
+    // ---------------------------------------------------------------------
     public static void update(ServerLevel level) {
         if (AtmosphericStateRegistry.getActiveStates().isEmpty()) return;
         Map<RegionInstanceKey, RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
@@ -120,6 +126,9 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
         CURRENT.put(key, new WindSample(effectiveSpeed, directionDeg));
     }
 
+    // ---------------------------------------------------------------------
+    // Sampling
+    // ---------------------------------------------------------------------
     public static WindSample getOrFallback(RegionInstanceKey key) {
         return CURRENT.computeIfAbsent(key, k -> randomSample(new Random()));
     }

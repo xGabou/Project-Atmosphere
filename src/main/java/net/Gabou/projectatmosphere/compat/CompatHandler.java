@@ -13,6 +13,9 @@ public class CompatHandler {
 
     public static final Logger LOGGER = LogManager.getLogger(MODID);
 
+    // ---------------------------------------------------------------------
+    // Module detection
+    // ---------------------------------------------------------------------
     public static boolean isSandStormsLoaded() {
         return ModList.get().isLoaded("sandstorm");
     }
@@ -37,6 +40,9 @@ public class CompatHandler {
         return ModList.get().isLoaded("dynamictrees");
     }
 
+    // ---------------------------------------------------------------------
+    // Temperature mod selection
+    // ---------------------------------------------------------------------
     public static TemperatureMod getActiveTemperatureMod() {
         if (ModList.get().isLoaded("legendarysurvivaloverhaul")) {
             return TemperatureMod.LEGENDARY_SURVIVAL;
@@ -64,6 +70,9 @@ public class CompatHandler {
         return getActiveTemperatureMod() != TemperatureMod.NONE;
     }
 
+    // ---------------------------------------------------------------------
+    // Initialization logging
+    // ---------------------------------------------------------------------
     public static void init() {
         TemperatureMod mod = getActiveTemperatureMod();
         if (!ProjectAtmosphere.DEBUG_MODE) {

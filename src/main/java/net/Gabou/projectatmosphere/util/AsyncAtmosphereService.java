@@ -47,6 +47,9 @@ public final class AsyncAtmosphereService {
 
     private AsyncAtmosphereService() {}
 
+    // ---------------------------------------------------------------------
+    // Bootstrap
+    // ---------------------------------------------------------------------
     /** prefer this: we’ll size pools using the detected SystemProfile */
     public static void init(boolean isClient) {
         if (initialized) return;
@@ -146,7 +149,9 @@ public final class AsyncAtmosphereService {
         init(false);
     }
 
-    // ----------------- public API (unchanged) -----------------
+    // ---------------------------------------------------------------------
+    // Public API
+    // ---------------------------------------------------------------------
 
     public static void runStorm(Runnable task) {
         ensureInit();
@@ -291,8 +296,9 @@ public final class AsyncAtmosphereService {
         }, pool.name()));
     }
 
-
-    // ----------------- helpers -----------------
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
 
     private static void ensureInit() {
         if (!initialized) init(false);

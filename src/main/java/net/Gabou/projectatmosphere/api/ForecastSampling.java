@@ -7,9 +7,16 @@ import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
+/**
+ * Small read-only contract for forecast sampling at different resolution levels.
+ * Callers should use these helpers instead of reaching into orchestrator state directly.
+ */
 public final class ForecastSampling {
     private ForecastSampling() {}
 
+    // ---------------------------------------------------------------------
+    // Temperature
+    // ---------------------------------------------------------------------
     @Deprecated
     public static float getTemperatureC(BiomeInstanceKey key, ServerLevel level) {
         RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
@@ -27,6 +34,9 @@ public final class ForecastSampling {
         return ForecastOrchestrator.getCurrentTemperature(regionKey, tick);
     }
 
+    // ---------------------------------------------------------------------
+    // Humidity
+    // ---------------------------------------------------------------------
     @Deprecated
     public static float getHumidityPercent(BiomeInstanceKey key, ServerLevel level) {
         RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
@@ -44,6 +54,9 @@ public final class ForecastSampling {
         return ForecastOrchestrator.getCurrentHumidity(regionKey, tick);
     }
 
+    // ---------------------------------------------------------------------
+    // Pressure
+    // ---------------------------------------------------------------------
     @Deprecated
     public static float getPressureHpa(BiomeInstanceKey key, ServerLevel level) {
         RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
