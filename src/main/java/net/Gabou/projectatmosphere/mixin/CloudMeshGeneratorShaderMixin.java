@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.shader.compute.ComputeShader;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
+import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import org.spongepowered.asm.mixin.Mixin;

@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.mixin.client;
 import dev.nonamecrackers2.simpleclouds.client.dh.pipeline.DhSupportPipeline;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
-import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
+import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.mixin.CloudMeshGeneratorDiagnosticsAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.culling.Frustum;

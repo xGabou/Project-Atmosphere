@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.mixin;
 
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
-import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
+import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import org.apache.commons.lang3.tuple.Pair;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

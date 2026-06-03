@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.mixin.client;
 
 import dev.nonamecrackers2.simpleclouds.client.mesh.instancing.InstanceableMesh;
-import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
+import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

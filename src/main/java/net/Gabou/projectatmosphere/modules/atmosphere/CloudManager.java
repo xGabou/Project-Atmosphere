@@ -19,7 +19,7 @@ import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PrecipitationDecisi
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
-import net.Gabou.projectatmosphere.util.WeatherSampler;
+import net.Gabou.projectatmosphere.modules.weather.WeatherSampler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;

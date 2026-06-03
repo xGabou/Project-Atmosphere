@@ -5,7 +5,7 @@ import dev.nonamecrackers2.simpleclouds.client.dh.pipeline.DhSupportPipeline;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.client.renderer.pipeline.CloudsRenderPipeline;
-import net.Gabou.projectatmosphere.client.render.SimpleCloudsRenderDiagnostics;
+import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.mixin.CloudMeshGeneratorDiagnosticsAccessor;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;

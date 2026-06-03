@@ -15,7 +15,7 @@ import net.Gabou.projectatmosphere.modules.storm.GlobalStormHistoryData;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
-import net.Gabou.projectatmosphere.util.WeatherSampler;
+import net.Gabou.projectatmosphere.modules.weather.WeatherSampler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;

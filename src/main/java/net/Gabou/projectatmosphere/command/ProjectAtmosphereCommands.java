@@ -7,7 +7,6 @@ import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommands;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoCommand;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoDebug;
 import net.Gabou.projectatmosphere.modules.wind.WindCommand;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCommand;
 import net.minecraft.commands.CommandSourceStack;
