@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.registry;
 import com.mojang.logging.LogUtils;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.*;
-import net.minecraft.client.resources.model.Material;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.PushReaction;

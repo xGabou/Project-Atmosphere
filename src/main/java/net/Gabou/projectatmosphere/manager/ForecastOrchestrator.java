@@ -10,7 +10,6 @@ import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler
 import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;

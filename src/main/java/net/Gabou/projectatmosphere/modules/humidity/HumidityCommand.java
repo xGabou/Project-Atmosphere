@@ -13,11 +13,17 @@ import net.minecraft.world.entity.player.Player;
 
 import java.util.Arrays;
 
+/**
+ * Command entry point for inspecting humidity forecasts.
+ */
 public class HumidityCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(build());
     }
 
+    // ---------------------------------------------------------------------
+    // Command registration
+    // ---------------------------------------------------------------------
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("humidity")
                 .then(Commands.literal("get") 

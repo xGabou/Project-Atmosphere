@@ -2,10 +2,8 @@ package net.Gabou.projectatmosphere.tools.debug;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
-import dev.nonamecrackers2.simpleclouds.client.mesh.generator.SingleRegionCloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.CloudImageRenderer;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
-import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;

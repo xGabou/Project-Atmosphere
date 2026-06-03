@@ -13,11 +13,17 @@ import net.minecraft.world.entity.player.Player;
 
 import java.util.Arrays;
 
+/**
+ * Command entry point for inspecting pressure forecasts.
+ */
 public class PressureCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(build());
     }
 
+    // ---------------------------------------------------------------------
+    // Command registration
+    // ---------------------------------------------------------------------
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("pressure")
                 .then(Commands.literal("get") 

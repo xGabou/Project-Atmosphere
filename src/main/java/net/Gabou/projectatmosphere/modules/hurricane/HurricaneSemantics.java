@@ -10,8 +10,6 @@ import net.minecraft.world.phys.Vec2;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
-import java.util.List;
-
 public final class HurricaneSemantics {
     private static final float MIN_COVERAGE = 0.02F;
     private static final float OUTER_RAIN_FLOOR = 0.58F;

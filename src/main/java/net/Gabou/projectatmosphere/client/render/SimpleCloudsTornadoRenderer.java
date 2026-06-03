@@ -16,7 +16,6 @@ import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
-import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;

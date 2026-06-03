@@ -4,7 +4,6 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.particles.DebrisParticle;
 import net.Gabou.projectatmosphere.particles.WindLeafParticle;
 import net.Gabou.projectatmosphere.particles.WindStreakParticle;
-import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterParticleProvidersEvent;

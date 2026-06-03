@@ -13,6 +13,9 @@ import net.minecraft.world.level.biome.Biome;
 
 import java.util.Random;
 
+/**
+ * Generates humidity forecasts from backend climate state and temperature forecasts.
+ */
 public class HumidityGenerator {
 
     private static final float CELSIUS_TO_KELVIN = 273.15f;
@@ -21,13 +24,9 @@ public class HumidityGenerator {
     public static final float MIN_VANILLA_TEMP_TROPICAL_BIOME = 1.8f;
     public static final float MIN_HUMIDITY_DESERT_BIOME = 5f;
 
-
-
-
-
-
-
-
+    // ---------------------------------------------------------------------
+    // Forecast generation
+    // ---------------------------------------------------------------------
     public static float[][] generateWeekForecast(ServerLevel level, BiomeInstanceKey b, Long day) {
         BlockPos pos = b.samplePos();
         ResourceLocation biomeId = b.biomeType();

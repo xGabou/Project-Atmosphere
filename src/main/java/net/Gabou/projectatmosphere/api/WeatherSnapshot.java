@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.api;
 
 /**
- * Immutable snapshot of atmosphere conditions at a position.
+ * Immutable backend weather snapshot used by gameplay, sync, and future render consumers.
  */
 public record WeatherSnapshot(
         float cloudCover,

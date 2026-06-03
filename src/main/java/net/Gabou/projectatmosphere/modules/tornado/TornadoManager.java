@@ -11,7 +11,6 @@ import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
-import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.RemoveTornadoPacket;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;

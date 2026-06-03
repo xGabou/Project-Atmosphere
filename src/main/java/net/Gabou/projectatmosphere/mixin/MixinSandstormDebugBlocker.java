@@ -4,9 +4,6 @@ import com.BreadRes.desertstormwarming.client.SandstormDebugBlocker;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
-
 @Mixin(SandstormDebugBlocker.class)
 public class MixinSandstormDebugBlocker {
 

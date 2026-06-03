@@ -2,7 +2,6 @@ package net.Gabou.projectatmosphere.modules.temperature.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;

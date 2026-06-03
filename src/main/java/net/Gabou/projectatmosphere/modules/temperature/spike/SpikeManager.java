@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.modules.temperature.spike;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.ApplyOngoingSpikeCommand;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.ApplyRandomJoltCommand;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.StartNewSpikeCommand;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 

@@ -1,6 +1,4 @@
 package net.Gabou.projectatmosphere.client;
-
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;

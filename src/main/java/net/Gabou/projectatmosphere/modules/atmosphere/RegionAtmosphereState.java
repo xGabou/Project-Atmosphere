@@ -4,7 +4,6 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Range;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;

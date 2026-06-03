@@ -9,19 +9,21 @@ import net.Gabou.projectatmosphere.util.AtmosphericPhysics;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
-
 import java.util.Random;
 
 
 /**
- * Generates a raw, biome‐isolated 7‐day [min,max] pressure forecast.
+ * Generates a raw, biome-isolated 7-day [min,max] pressure forecast.
  */
 public class PressureGenerator {
 
     public static final float PRESSION_MOYENNE = 1013.25f; 
     private static final float MIN_PRESSURE_HPA = 900f;
     private static final float MAX_PRESSURE_HPA = 1080f;
+
+    // ---------------------------------------------------------------------
+    // Forecast generation
+    // ---------------------------------------------------------------------
     public static float[][] generateWeekForecast(BiomeInstanceKey key,Long day) {
 
         ResourceLocation biome = key.biomeType();

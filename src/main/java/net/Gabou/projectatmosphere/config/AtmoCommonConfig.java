@@ -1,21 +1,6 @@
 package net.Gabou.projectatmosphere.config;
-
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.registries.ForgeRegistries;
-
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-
-
-
 public class AtmoCommonConfig {
     public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;

@@ -7,6 +7,9 @@ import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
+/**
+ * Server-to-client packet carrying the current wind state for a region.
+ */
 public class SyncWindPacket {
     private final RegionInstanceKey regionId;
     private final float baseSpeed;

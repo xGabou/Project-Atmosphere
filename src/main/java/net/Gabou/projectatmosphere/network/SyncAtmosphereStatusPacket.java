@@ -8,6 +8,9 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
+/**
+ * Client sync packet for coarse atmosphere state.
+ */
 public class SyncAtmosphereStatusPacket {
     private final float humidityPercent;
     private final float rainIntensity;

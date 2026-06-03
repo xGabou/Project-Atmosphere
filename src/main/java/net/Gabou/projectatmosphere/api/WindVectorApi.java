@@ -6,9 +6,15 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
+/**
+ * Small API wrapper for reading wind values without exposing engine internals.
+ */
 public final class WindVectorApi {
     private WindVectorApi() {}
 
+    // ---------------------------------------------------------------------
+    // Simple wind read helpers
+    // ---------------------------------------------------------------------
     public record WindSample(float speedMps, float directionDeg) {}
 
     public static WindSample getSurface(BiomeInstanceKey key) {
