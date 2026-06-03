@@ -82,13 +82,7 @@ public final class AtmosphereFogState {
         }
 
         BlockPos pos = minecraft.player.blockPosition();
-        targetWetBiomeFactor = FogBiomeClassifier.computeWetBiomeFactor(level, pos);
-        if (!hasServerSample) {
-            targetHumidityPercent = FogBiomeClassifier.computeFallbackHumidityPercent(level, pos);
-            targetRainIntensity = FogBiomeClassifier.computeClientRainIntensity(level, pos);
-        } else {
-            targetRainIntensity = Math.max(targetRainIntensity, FogBiomeClassifier.computeClientRainIntensity(level, pos) * 0.75F);
-        }
+        updateTargets(level, pos);
         trackVisuals();
     }
 
@@ -124,6 +118,17 @@ public final class AtmosphereFogState {
                 targetDebugStrength = 0.0F;
             }
         }
+    }
+
+    private static void updateTargets(ClientLevel level, BlockPos pos) {
+        targetWetBiomeFactor = FogBiomeClassifier.computeWetBiomeFactor(level, pos);
+        if (!hasServerSample) {
+            targetHumidityPercent = FogBiomeClassifier.computeFallbackHumidityPercent(level, pos);
+            targetRainIntensity = FogBiomeClassifier.computeClientRainIntensity(level, pos);
+            return;
+        }
+
+        targetRainIntensity = Math.max(targetRainIntensity, FogBiomeClassifier.computeClientRainIntensity(level, pos) * 0.75F);
     }
 
     private static boolean hasDebugOverride() {

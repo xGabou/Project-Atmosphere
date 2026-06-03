@@ -152,3 +152,12 @@
 - Cleanup type: Risk-cluster refactor
 - Build result: `.\gradlew.bat build` succeeded
 - Short notes: Moved the shared render mesh helpers into a tighter render mesh package, updated renderer imports, deleted an empty client hook, and recorded the remaining risky classes for manual review.
+
+## 020_risky_client_state_cluster_restructure
+- Batch number: 020
+- Target modules: Client state or tick lifecycle risk cluster
+- Files reviewed: 5 cluster files from the risky manual review set
+- Files changed: 2 source files plus docs/log updates
+- Cleanup type: Client state helper extraction
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Extracted internal target-update helpers from the client atmosphere and fog state classes without changing tick order or smoothing behavior.

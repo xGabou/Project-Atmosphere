@@ -72,18 +72,11 @@ public final class AtmosphereClientState {
         float fallbackCloud = estimateFallbackCloudCover(level, pos, fallbackRain);
 
         if (!Level.OVERWORLD.equals(dimension)) {
-            targetHumidityPercent = 0.0F;
-            targetRainIntensity = 0.0F;
-            targetCloudCover = 0.0F;
-            hasServerSample = false;
+            resetTargetsForNonOverworld();
         } else if (!hasServerSample) {
-            targetHumidityPercent = fallbackHumidity;
-            targetRainIntensity = fallbackRain;
-            targetCloudCover = fallbackCloud;
+            applyFallbackTargets(fallbackHumidity, fallbackRain, fallbackCloud);
         } else {
-            targetHumidityPercent = Mth.clamp(targetHumidityPercent, 0.0F, 100.0F);
-            targetRainIntensity = Math.max(Mth.clamp(targetRainIntensity, 0.0F, 1.0F), fallbackRain * 0.75F);
-            targetCloudCover = Math.max(Mth.clamp(targetCloudCover, 0.0F, 1.0F), fallbackCloud * 0.65F);
+            clampTargetsAgainstFallback(fallbackRain, fallbackCloud);
         }
 
         float previousCloudCover = visualCloudCover;
@@ -135,6 +128,25 @@ public final class AtmosphereClientState {
         } catch (Exception ignored) {
             return fallbackRain > 0.0F ? 0.72F : 0.0F;
         }
+    }
+
+    private static void resetTargetsForNonOverworld() {
+        targetHumidityPercent = 0.0F;
+        targetRainIntensity = 0.0F;
+        targetCloudCover = 0.0F;
+        hasServerSample = false;
+    }
+
+    private static void applyFallbackTargets(float fallbackHumidity, float fallbackRain, float fallbackCloud) {
+        targetHumidityPercent = fallbackHumidity;
+        targetRainIntensity = fallbackRain;
+        targetCloudCover = fallbackCloud;
+    }
+
+    private static void clampTargetsAgainstFallback(float fallbackRain, float fallbackCloud) {
+        targetHumidityPercent = Mth.clamp(targetHumidityPercent, 0.0F, 100.0F);
+        targetRainIntensity = Math.max(Mth.clamp(targetRainIntensity, 0.0F, 1.0F), fallbackRain * 0.75F);
+        targetCloudCover = Math.max(Mth.clamp(targetCloudCover, 0.0F, 1.0F), fallbackCloud * 0.65F);
     }
 
     private static void clearVisuals() {
