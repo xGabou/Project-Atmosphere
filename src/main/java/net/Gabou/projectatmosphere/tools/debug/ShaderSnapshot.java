@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.debug;
+package net.Gabou.projectatmosphere.tools.debug;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
