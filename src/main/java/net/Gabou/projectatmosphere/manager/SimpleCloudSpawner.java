@@ -6,12 +6,10 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudSpawningConfig;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.modules.storm.GlobalStormHistoryData;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -32,6 +30,8 @@ import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
 import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MAX_RADIUS;
 import static net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.MIN_RADIUS;
+import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.calculateDewPoint;
+import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.determineCloudSeverity;
 
 public class SimpleCloudSpawner {
 
@@ -39,8 +39,6 @@ public class SimpleCloudSpawner {
 
     private static long LAST_SPAWN_TICK = 0;
 
-
-    private static float PRESSION_MOYENNE = 1013.25f;
 
     private static int NB_MAX_CLOUDS_TYPES = 4;
 
@@ -51,7 +49,6 @@ public class SimpleCloudSpawner {
     private static float HUMIDITY_MODIFIER = 1.0f;
     private static float TEMPERATURE_MODIFIER = 1.0f;
 
-    private static final float STORM_BIAS = 1.1f;
     private static final float SUNNY_THRESHOLD = 0.45f;
 
     public static int getCurrentViolence() {
@@ -171,12 +168,7 @@ public class SimpleCloudSpawner {
 
 
     public static float calculateDewPoint(float temperature, float humidity) {
-
-        final float ACONST = 17.62f;
-        final float BCONST = 243.12f;
-
-        float result = (ACONST * temperature) / (BCONST + temperature) + (float) Math.log(humidity / 100.0f);
-        return (BCONST * result) / (ACONST - result);
+        return CloudSpawnSeverityRules.calculateDewPoint(temperature, humidity);
     }
 
     public static int determineCloudSeverity(
@@ -187,93 +179,7 @@ public class SimpleCloudSpawner {
             float stormFactor,
             ServerLevel level
     ) {
-        RandomSource random = RandomSource.create();
-        float dewGap = Math.max(0f, temperature - dewPoint);
-        float dewGapFactor = 1.0f - Math.min(dewGap / 12.0f, 1.0f);
-
-        float pressureFactor = (PRESSION_MOYENNE - pressure) / 60.0f;
-        pressureFactor = Math.max(-1f, Math.min(pressureFactor, 1f));
-
-        float humidityFactor = humidity / 100.0f;
-        float tempIdealness = 1.0f - Math.abs(temperature - 18.0f) / 45.0f;
-
-        float instability = (dewGapFactor * 0.4f)
-                + (pressureFactor * 0.25f)
-                + (humidityFactor * 0.55f)
-                + (tempIdealness * 0.3f);
-        instability = Math.min(Math.max(instability, 0f), 1f);
-
-        int currentDay = (int) (level.getDayTime() / 24000L);
-        GlobalStormHistoryData data = GlobalStormHistoryData.get(level);
-
-        int lastStrong = data.getLastSevereDay();
-        int daysSince = (lastStrong == Integer.MIN_VALUE)
-                ? Integer.MAX_VALUE : Math.max(0, currentDay - lastStrong);
-
-        // === Check recent storm streak ===
-        int recentStreak = data.getRecentSevereCount(); // track last consecutive severe storms
-        int cooldown = data.getCooldownDaysRemaining();
-
-        // If we hit 4 severe storms, start a cooldown of 3–5 days
-        if (recentStreak >= 4 && cooldown <= 0) {
-            cooldown = 3 + random.nextInt(3); // 3–5 days cooldown
-            data.setCooldownDaysRemaining(cooldown);
-        }
-
-        // Decrease cooldown daily if active
-        if (cooldown > 0 && daysSince > 0) {
-            cooldown = Math.max(0, cooldown - daysSince);
-            data.setCooldownDaysRemaining(cooldown);
-        }
-
-        // During cooldown, clamp storm factor and instability to reduce event frequency
-        if (cooldown > 0) {
-            stormFactor *= 0.25f;
-            instability *= 0.5f;
-        }
-
-        int severity = getSeverity(stormFactor, daysSince, instability);
-
-        // Record storm results
-        if (severity >= 5) {
-            data.recordSevere(currentDay);
-        } else {
-            data.resetIfCalm(currentDay);
-        }
-
-        return severity;
-    }
-
-
-    private static int getSeverity(float stormFactor, int daysSince, float instability) {
-        float boost = 0f;
-        if (daysSince <= 2) {
-            boost = 1f/(5-daysSince);
-        } else {
-            boost = 1f + 0.07f * daysSince;
-            boost = Math.min(boost, 1.7f);
-        }
-
-
-        float adjustedChance = Math.min(1f, stormFactor * boost * STORM_BIAS);
-
-        // === Smooth Probability Curve ===
-        return calculateSeverity(daysSince, instability, adjustedChance);
-    }
-
-    private static int calculateSeverity(int daysSince, float instability, float adjustedChance) {
-        double weighted = instability * adjustedChance * AtmoCommonConfig.STORM_SEVERITY_BOOSTER.get();
-        float raw = (float) (1.0 / (1.0 + Math.exp(-2.3 * (weighted - 1.0)))); // sigmoid
-
-        // === Temporal Bias Toward 5 + Events ===
-        // grows linearly up to 10 days, pushing score upward by ≤ 0.25
-        float dayBias = Math.min(1f, daysSince / 10f);
-        float biasAdjusted = raw + (0.25f * dayBias * (1f - raw));
-
-        // Map 0–1 → 1–7
-        int severity = (int) Math.floor(biasAdjusted * 6.0f) + 1;
-        severity = Math.max(1, Math.min(7, severity));
-        return severity;
+        return CloudSpawnSeverityRules.determineCloudSeverity(temperature, humidity, pressure, dewPoint, stormFactor, level);
     }
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {

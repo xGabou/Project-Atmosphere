@@ -3,8 +3,10 @@ package net.Gabou.projectatmosphere.client;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
-import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.TornadoClientEffects;
+import net.Gabou.projectatmosphere.clouds.CloudDebugRenderer;
+import net.Gabou.projectatmosphere.clouds.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -18,7 +20,7 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkyEffectController;
-import net.Gabou.projectatmosphere.client.render.SkyEffectState;
+import net.Gabou.projectatmosphere.client.render.sky.SkyEffectState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -55,7 +57,6 @@ public class ClientTickHandler {
     public static boolean isRegionCulled(CloudRegion region) {
         return culledRegionIds.contains(getRegionId(region));
     }
-
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
@@ -147,7 +148,6 @@ public class ClientTickHandler {
                 }
             }
         }
-
     }
 
     public static SimpleParticleType getSeasonalLeafParticle(ClientLevel level, BlockPos pos, RandomSource random) {

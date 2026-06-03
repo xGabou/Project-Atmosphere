@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
@@ -19,16 +18,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * Coordinates creation, loading, and runtime access to ForecastRegion instances.
- */
 public final class RegionForecastOrchestrator {
-    private static final float CORRUPTION_TEMP_MIN = -90f;
-    private static final float CORRUPTION_TEMP_MAX = 70f;
-    private static final float CORRUPTION_HUMIDITY_MIN = 0f;
-    private static final float CORRUPTION_HUMIDITY_MAX = 100f;
-    private static final float CORRUPTION_PRESSURE_MIN = 880f;
-    private static final float CORRUPTION_PRESSURE_MAX = 1085f;
     private final RegionIndex regionIndex;
     private final RegionPersistence persistence;
     private final BiomeForecastGenerator biomeGenerator;
@@ -55,9 +45,9 @@ public final class RegionForecastOrchestrator {
         Optional<ForecastRegion> persisted = persistence.loadRegion(id);
         if (persisted.isPresent()) {
             ForecastRegion region = persisted.get();
-            CorruptionReport report = detectCorruption(region);
+            RegionForecastCorruptionValidator.CorruptionReport report = RegionForecastCorruptionValidator.detect(region);
             if (report.corrupted()) {
-                ProjectAtmosphere.LOGGER.warn(
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.warn(
                         "[Atmosphere] Region {} primary save appears corrupted ({}). Falling back to migration path.",
                         id,
                         report.message()
@@ -69,9 +59,9 @@ public final class RegionForecastOrchestrator {
         Optional<BiomeFallbackSnapshot> fb = persistence.loadFallback(id);
         if (fb.isPresent()) {
             ForecastRegion region = fromFallback(fb.get());
-            CorruptionReport report = detectCorruption(region);
+            RegionForecastCorruptionValidator.CorruptionReport report = RegionForecastCorruptionValidator.detect(region);
             if (report.corrupted()) {
-                ProjectAtmosphere.LOGGER.warn(
+                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.warn(
                         "[Atmosphere] Region {} fallback appears corrupted ({}). Regenerating from biome forecasts.",
                         id,
                         report.message()
@@ -179,61 +169,6 @@ public final class RegionForecastOrchestrator {
                 new Modifiers(false, null, null, false, null)
         );
         TelemetryCollector.get().recordForecastSnapshot(snapshot);
-    }
-
-    private static CorruptionReport detectCorruption(ForecastRegion region) {
-        if (region == null) {
-            return new CorruptionReport(false, "");
-        }
-        boolean tempCorrupt = usesOnlyExtremes(region.getTemperature(), CORRUPTION_TEMP_MIN, CORRUPTION_TEMP_MAX);
-        boolean humidityCorrupt = usesOnlyExtremes(region.getHumidity(), CORRUPTION_HUMIDITY_MIN, CORRUPTION_HUMIDITY_MAX);
-        boolean pressureCorrupt = usesOnlyExtremes(region.getPressure(), CORRUPTION_PRESSURE_MIN, CORRUPTION_PRESSURE_MAX);
-
-        if (!tempCorrupt && !humidityCorrupt && !pressureCorrupt) {
-            return new CorruptionReport(false, "");
-        }
-        StringBuilder message = new StringBuilder();
-        if (tempCorrupt) {
-            message.append("temperature");
-        }
-        if (humidityCorrupt) {
-            if (message.length() > 0) {
-                message.append(", ");
-            }
-            message.append("humidity");
-        }
-        if (pressureCorrupt) {
-            if (message.length() > 0) {
-                message.append(", ");
-            }
-            message.append("pressure");
-        }
-        return new CorruptionReport(true, message.toString());
-    }
-
-    private static boolean usesOnlyExtremes(float[][] curve, float minValue, float maxValue) {
-        if (curve == null || curve.length == 0) {
-            return false;
-        }
-        boolean sawValue = false;
-        for (float[] row : curve) {
-            if (row == null) {
-                continue;
-            }
-            for (float value : row) {
-                if (!Float.isFinite(value)) {
-                    continue;
-                }
-                sawValue = true;
-                if (value != minValue && value != maxValue) {
-                    return false;
-                }
-            }
-        }
-        return sawValue;
-    }
-
-    private record CorruptionReport(boolean corrupted, String message) {
     }
 
     private static ChannelSummary summarizeCurve(float[][] curve) {

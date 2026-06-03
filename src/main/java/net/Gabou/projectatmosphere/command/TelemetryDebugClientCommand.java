@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.Gabou.projectatmosphere.clouds.CloudDebugRenderHook;
+import net.Gabou.projectatmosphere.clouds.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
 import net.minecraft.commands.CommandSourceStack;
@@ -11,6 +13,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 
 @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class TelemetryDebugClientCommand {
@@ -44,6 +47,21 @@ public class TelemetryDebugClientCommand {
                                             return 1;
                                         })
                                 )
+                                .then(Commands.literal("cloudDebug")
+                                        .executes(ctx -> {
+                                            if (FMLEnvironment.production) {
+                                                ctx.getSource().sendFailure(Component.literal("This command is only available in a development environment."));
+                                                return 0;
+                                            }
+                                            else {
+                                                CloudDebugRenderHook.changeCloudDebugRenderHook();
+                                                ctx.getSource().sendSuccess(() -> Component.literal("Toggled cloud debug render."), false);
+                                                return 1;
+                                            }
+
+                                        })
+                                )
+
                         )
         );
     }

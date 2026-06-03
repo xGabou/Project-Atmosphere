@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.modules.hurricane;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec2;

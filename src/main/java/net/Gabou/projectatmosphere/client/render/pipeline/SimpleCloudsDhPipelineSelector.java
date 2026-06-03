@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.client.render;
+package net.Gabou.projectatmosphere.client.render.pipeline;
 
 import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
 import dev.nonamecrackers2.simpleclouds.client.dh.pipeline.DhSupportPipeline;

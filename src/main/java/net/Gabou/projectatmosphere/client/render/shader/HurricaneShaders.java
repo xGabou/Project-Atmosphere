@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.client.render;
+package net.Gabou.projectatmosphere.client.render.shader;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;

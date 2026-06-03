@@ -40,41 +40,15 @@ public final class AtmosphericStateRegistry {
         for (ServerPlayer player : level.players()) {
             BlockPos p = player.blockPosition();
             for (RegionAtmosphereState state : STATES.values()) {
-                if (state == null) {
-                    continue;
-                }
-                RegionInstanceKey key = state.getRegionId();
-                if (key == null) {
-                    continue;
-                }
-                if (key.contains(p) || isWithinRegionRadius(key, p, r2)) {
+                if (isStateActiveForPlayer(state, p, r2)) {
+                    RegionInstanceKey key = state.getRegionId();
+                    if (key == null) {
+                        continue;
+                    }
                     ACTIVE.add(key);
                 }
             }
         }
-    }
-
-    private static boolean isWithinRegionRadius(RegionInstanceKey key, BlockPos pos, int radiusSquared) {
-        int size = key.regionSize();
-        int minX = key.regionX() * size;
-        int minZ = key.regionZ() * size;
-        int maxX = minX + size - 1;
-        int maxZ = minZ + size - 1;
-        int px = pos.getX();
-        int pz = pos.getZ();
-        int dx = 0;
-        int dz = 0;
-        if (px < minX) {
-            dx = minX - px;
-        } else if (px > maxX) {
-            dx = px - maxX;
-        }
-        if (pz < minZ) {
-            dz = minZ - pz;
-        } else if (pz > maxZ) {
-            dz = pz - maxZ;
-        }
-        return (dx * dx + dz * dz) <= radiusSquared;
     }
 
     public static void replaceActiveStates(Set<RegionInstanceKey> next) {
@@ -88,17 +62,8 @@ public final class AtmosphericStateRegistry {
         forecast.finalizeAggregation();
         RegionAtmosphereState state = RegionAtmosphereState.fromForecast(id, forecast);
         STATES.put(id, state);
-        indexLegacyKeys(forecast);
+        AtmosphericStateLookup.indexLegacyKeys(forecast, LEGACY_INDEX);
         return state;
-    }
-
-    private static void indexLegacyKeys(ForecastRegion region) {
-        RegionInstanceKey regionId = region.getKey();
-        for (BiomeInstanceKey sample : region.getSamples()) {
-            if (sample != null) {
-                LEGACY_INDEX.put(sample, regionId);
-            }
-        }
     }
 
     public static RegionAtmosphereState getState(RegionInstanceKey key) {
@@ -197,16 +162,14 @@ public final class AtmosphericStateRegistry {
     }
 
     public static RegionInstanceKey resolveRegionKey(BiomeInstanceKey biomeKey) {
-        if (biomeKey == null) {
-            return null;
+        return AtmosphericStateLookup.resolveRegionKey(biomeKey, LEGACY_INDEX);
+    }
+
+    private static boolean isStateActiveForPlayer(RegionAtmosphereState state, BlockPos pos, int radiusSquared) {
+        if (state == null) {
+            return false;
         }
-        RegionInstanceKey mapped = LEGACY_INDEX.get(biomeKey);
-        if (mapped != null) {
-            return mapped;
-        }
-        if (biomeKey.samplePos() == null) {
-            return null;
-        }
-        return RegionInstanceKey.from(biomeKey.samplePos());
+        RegionInstanceKey key = state.getRegionId();
+        return key != null && (key.contains(pos) || AtmosphericStateLookup.isWithinRegionRadius(key, pos, radiusSquared));
     }
 }

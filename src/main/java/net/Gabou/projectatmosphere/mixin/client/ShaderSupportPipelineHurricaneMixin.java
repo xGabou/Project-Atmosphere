@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.client.renderer.pipeline.ShaderSupportPipeline;
-import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsHurricaneRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;

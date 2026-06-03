@@ -34,8 +34,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.calculateDewPoint;
-import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.determineCloudSeverity;
+import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.calculateDewPoint;
+import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.determineCloudSeverity;
+import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.selectCloudId;
 
 /**
  * Region-driven cloud controller that mirrors SimpleClouds regions instead of storing per-biome state.
@@ -716,17 +717,6 @@ public final class CloudManager {
                 passed,
                 failed
         ));
-    }
-
-    private static String selectCloudId(int severity, boolean freezing) {
-        if (severity > 5 && freezing) {
-            return CloudLibrary.getSnowstormCloudId();
-        }
-        String cloudId = CloudLibrary.getCloudIdFromSeverity(severity);
-        if (CloudLibrary.isThunderCloud(cloudId) && freezing) {
-            return CloudLibrary.getCloudIdFromSeverity(5);
-        }
-        return cloudId;
     }
 
     private static int extractId(CloudRegion region) {

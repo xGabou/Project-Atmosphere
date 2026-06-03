@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.client.render;
+package net.Gabou.projectatmosphere.client.render.sky;
 
 import net.minecraft.world.phys.Vec3;
 

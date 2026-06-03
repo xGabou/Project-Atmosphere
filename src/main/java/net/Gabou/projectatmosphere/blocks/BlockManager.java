@@ -1,21 +1,21 @@
 package net.Gabou.projectatmosphere.blocks;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.registry.ModBlocks;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
@@ -25,41 +25,15 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BlockManager {
-    // Add these near your other static fields
     private static final String WEATHER_DROP_TAG = "PA_WEATHER_DROP";
 
-    /**
-     * Global per-tick budget for weather-spawned ItemEntity (tokens refresh every tick).
-     */
-    private static final int GLOBAL_WEATHER_ITEM_BUDGET_PER_TICK = 64; // tune this (e.g., 32–128)
-    private static int globalWeatherItemTokens = GLOBAL_WEATHER_ITEM_BUDGET_PER_TICK;
+    private BlockManager() {
+    }
 
-    /**
-     * Called by EventHandler once per server tick (END phase) to reset the token bucket.
-     */
     public static void resetGlobalWeatherItemBudget() {
-        globalWeatherItemTokens = GLOBAL_WEATHER_ITEM_BUDGET_PER_TICK;
+        WeatherDebrisBudget.reset();
     }
 
-    /**
-     * Try consume N tokens from the global weather item budget.
-     */
-    private static boolean tryConsumeWeatherItemTokens(int n) {
-        if (globalWeatherItemTokens >= n) {
-            globalWeatherItemTokens -= n;
-            return true;
-        }
-        return false;
-    }
-
-
-    /**
-     * Spawns dust blocks around the player depending on wind strength.
-     * Call this every 1000 ticks or conditionally.
-     *
-     * @param level     The server world
-     * @param centerPos The central position (e.g., player's position)
-     */
     public static void spawnDust(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
         WindVector windVector = ForecastOrchestrator.getWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
@@ -77,7 +51,7 @@ public class BlockManager {
             int x = centerPos.getX() + dx;
             int z = centerPos.getZ() + dz;
             int y = level.getHeightmapPos(
-                    net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                     new BlockPos(x, 0, z)
             ).getY();
 
@@ -99,13 +73,6 @@ public class BlockManager {
         }
     }
 
-    /**
-     * Spawns sand layers around the player depending on wind strength.
-     * Converts to a full sand block once eight layers accumulate.
-     *
-     * @param level     The server world
-     * @param centerPos The central position (e.g., player's position)
-     */
     public static void spawnSand(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
         WindVector windVector = ForecastOrchestrator.getWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
@@ -150,15 +117,7 @@ public class BlockManager {
         }
     }
 
-
-    /**
-     * Clears all dust blocks around the player.
-     *
-     * @param level     The server world
-     * @param centerPos The central position (e.g., player's position)
-     */
     public static void clearDust(ServerLevel level, BlockPos centerPos) {
-        RandomSource random = level.getRandom();
         int radius = 20;
 
         for (int dx = -radius; dx <= radius; dx++) {
@@ -171,20 +130,8 @@ public class BlockManager {
         }
     }
 
-    /**
-     * Spawns lightweight "debris" items such as sticks or leaves to simulate wind-blown junk.
-     *
-     * @param level     The server world
-     * @param centerPos Central position where debris should spawn around
-     */
-
-
     public static void spawnCochonnerie(ServerLevel level, BlockPos centerPos) {
-
-
-
-        int ENTITY_THRESHOLD = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
-
+        int entityThreshold = AtmoCommonConfig.MAX_STORM_DEBRIS_PER_CHUNK.get();
 
         ChunkPos chunkPos = new ChunkPos(centerPos);
         AABB chunkBox = new AABB(
@@ -192,31 +139,30 @@ public class BlockManager {
                 chunkPos.getMaxBlockX() + 1, level.getMaxBuildHeight(), chunkPos.getMaxBlockZ() + 1
         );
 
-
         long itemCount = level.getEntitiesOfClass(ItemEntity.class, chunkBox).size();
-
-        if (itemCount >= ENTITY_THRESHOLD) {
+        if (itemCount >= entityThreshold) {
             ProjectAtmosphere.LOGGER.debug("[Atmosphere] Skipping debris spawn — too many items in chunk at {}", chunkPos);
             return;
         }
 
         RandomSource random = level.getRandom();
         int debrisCount = 3 + random.nextInt(5);
-        int allowedSpawn = Math.max(0, ENTITY_THRESHOLD - (int) itemCount);
+        int allowedSpawn = Math.max(0, entityThreshold - (int) itemCount);
         if (allowedSpawn <= 0) {
             return;
         }
         debrisCount = Math.min(debrisCount, allowedSpawn);
 
-        int toSpawn = debrisCount;
-
-
-        toSpawn = Math.min(toSpawn, globalWeatherItemTokens);
+        int toSpawn = WeatherDebrisBudget.clampSpawnCount(debrisCount);
         if (toSpawn <= 0) {
             return;
         }
-        for (int i = 0; i < debrisCount; i++) {
-            if (!tryConsumeWeatherItemTokens(1)) break;
+
+        for (int i = 0; i < toSpawn; i++) {
+            if (!WeatherDebrisBudget.tryConsume(1)) {
+                break;
+            }
+
             double dx = centerPos.getX() + random.nextGaussian() * 5;
             double dy = centerPos.getY() + 1 + random.nextDouble();
             double dz = centerPos.getZ() + random.nextGaussian() * 5;
@@ -241,22 +187,17 @@ public class BlockManager {
             level.addFreshEntity(entity);
 
             DelayedTaskScheduler.schedule(400 + level.random.nextInt(100), () -> {
-                if (!entity.isRemoved()) entity.discard();
+                if (!entity.isRemoved()) {
+                    entity.discard();
+                }
             });
         }
     }
 
-
-    /**
-     * Simulates a tempest effect by sparsely spawning dust and debris in a region.
-     *
-     * @param level  The server world
-     * @param center The center position (e.g., storm eye)
-     * @param radius The radius (in blocks) to affect
-     */
     public static void simulateTempesta(ServerLevel level, BlockPos center, int radius) {
-        if(ProjectAtmosphere.DEBUG_MODE)
+        if (ProjectAtmosphere.DEBUG_MODE) {
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simulating tempest at {} with radius {}", center, radius);
+        }
 
         AsyncAtmosphereService.runStorm(() -> {
             RandomSource random = RandomSource.create();
@@ -271,8 +212,6 @@ public class BlockManager {
                 for (int dz = -radius; dz <= radius; dz += step) {
                     int x = center.getX() + dx;
                     int z = center.getZ() + dz;
-
-
                     BlockPos posXZ = new BlockPos(x, 0, z);
 
                     AtomicInteger dustSpawned = new AtomicInteger(0);
@@ -293,13 +232,9 @@ public class BlockManager {
                             dustSpawned.incrementAndGet();
                             DelayedTaskScheduler.schedule(2000, () -> dustSpawned.updateAndGet(v -> Math.max(0, v - 1)));
                         }
-
                     });
-
-
                 }
             }
-
 
             int batchSize = 100;
             for (int i = 0; i < mainThreadTasks.size(); i += batchSize) {
@@ -316,6 +251,4 @@ public class BlockManager {
             resetGlobalWeatherItemBudget();
         });
     }
-
-
 }

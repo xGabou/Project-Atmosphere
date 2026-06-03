@@ -234,25 +234,29 @@ public final class AtmosphericUpdateScheduler {
             if (state == null || state.getPosition() == null) {
                 continue;
             }
-            views.add(new StateView(
-                    key,
-                    state.getTemperature(),
-                    state.getHumidity(),
-                    state.getPressure(),
-                    state.getCloudCover(),
-                    state.getCloudWater(),
-                    state.getSunlight(),
-                    state.getRainIntensity(),
-                    state.getTargetTemperature(dayTime),
-                    state.getTargetHumidity(dayTime),
-                    state.getTargetPressure(dayTime),
-                    state.getBiomeSunlightMultiplier(),
-                    state.getBaselineMinTemperature(),
-                    state.getBaselineMaxTemperature(),
-                    state.getDominantBiome() == null ? "unknown" : state.getDominantBiome().toString()
-            ));
+            views.add(buildStateView(key, state, dayTime));
         }
         return views;
+    }
+
+    private static StateView buildStateView(RegionInstanceKey key, RegionAtmosphereState state, long dayTime) {
+        return new StateView(
+                key,
+                state.getTemperature(),
+                state.getHumidity(),
+                state.getPressure(),
+                state.getCloudCover(),
+                state.getCloudWater(),
+                state.getSunlight(),
+                state.getRainIntensity(),
+                state.getTargetTemperature(dayTime),
+                state.getTargetHumidity(dayTime),
+                state.getTargetPressure(dayTime),
+                state.getBiomeSunlightMultiplier(),
+                state.getBaselineMinTemperature(),
+                state.getBaselineMaxTemperature(),
+                state.getDominantBiome() == null ? "unknown" : state.getDominantBiome().toString()
+        );
     }
 
     private static List<StateDelta> computeDeltas(List<StateView> snapshot, float daylight, float seasonal, UpdateMode mode) {
@@ -379,13 +383,7 @@ public final class AtmosphericUpdateScheduler {
             if (mode == UpdateMode.ACTIVE) {
                 state.recordDailySnapshot(dayTime);
             }
-            if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
-                if (mode == UpdateMode.ACTIVE) {
-                    recordAtmosphereCoupling(state, delta, temperatureBefore, pressureBefore, humidityBefore, dayTime, dimensionId, mode);
-                    recordHumidityBudget(state, delta, humidityBefore, cloudWaterBefore, dayTime, dimensionId, mode);
-                }
-                recordAnomalies(state, dayTime);
-            }
+            AtmosphericTelemetryReporter.recordFor(state, delta, temperatureBefore, pressureBefore, humidityBefore, cloudWaterBefore, dayTime, dimensionId, mode);
         }
     }
 
@@ -544,7 +542,7 @@ public final class AtmosphericUpdateScheduler {
         return Mth.clamp(value, min, max);
     }
 
-    private record StateView(
+    record StateView(
             RegionInstanceKey key,
             float temperature,
             float humidity,
@@ -563,7 +561,7 @@ public final class AtmosphericUpdateScheduler {
     ) {
     }
 
-    private record StateDelta(
+    record StateDelta(
             RegionInstanceKey key,
             float temperatureDelta,
             float humidityDelta,
@@ -581,7 +579,7 @@ public final class AtmosphericUpdateScheduler {
     ) {
     }
 
-    private enum UpdateMode {
+    enum UpdateMode {
         ACTIVE(1f, 0.0005f, 0.6f, 1f, 1f, ACTIVE_INTERVAL_TICKS),
         PASSIVE(0.35f, 0.0002f, 0.45f, 0.5f, 0.45f, 0f);
 

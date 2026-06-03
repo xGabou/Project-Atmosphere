@@ -2,7 +2,7 @@ package net.Gabou.projectatmosphere.mixin.compat.auroras;
 
 import auroras.util.AuroraData;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.Gabou.projectatmosphere.client.render.SkyEffectState;
+import net.Gabou.projectatmosphere.client.render.sky.SkyEffectState;
 import net.Gabou.projectatmosphere.compat.auroras.AuroraCompatController;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.level.Level;

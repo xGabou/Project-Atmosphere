@@ -117,6 +117,15 @@
 - Build result: `.\gradlew.bat build` succeeded
 - Short notes: Added section markers to a small set of safe core and snapshot classes; major runtime, render, mixin, and storm classes were reviewed but mostly left unchanged for safety.
 
+## 030_rejected_good_as_is_redo
+- Batch number: 030
+- Target modules: `manager/`, `modules/atmosphere/`, `compat/`, `modules/tornado/`, `modules/hurricane/`, `client/render/`, `mixin/client/`, `mixin/`, `mixin/compat/auroras/`, `mixin/compat/rainbows/`
+- Files reviewed: 20
+- Files changed: 13
+- Cleanup type: Rejected GOOD_AS_IS redo with real structural cleanup
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Broke apart reusable helper seams in lifecycle and persistence classes and extracted render debug helpers; the remaining mixins were handled with concrete file-specific reasons.
+
 ## 016_real_restructure_step_1
 - Batch number: 016
 - Target modules: `util/` -> `tools/debug/`
@@ -161,3 +170,75 @@
 - Cleanup type: Client state helper extraction
 - Build result: `.\gradlew.bat build` succeeded
 - Short notes: Extracted internal target-update helpers from the client atmosphere and fog state classes without changing tick order or smoothing behavior.
+
+## 021_risky_manager_orchestration_cluster_restructure
+- Batch number: 021
+- Target modules: Broad manager or orchestration risk cluster
+- Files reviewed: 7 cluster files
+- Files changed: 4 source files plus docs/log updates
+- Cleanup type: Manager/orchestration helper extraction
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Extracted cloud spawn severity rules into a dedicated helper and rewired the spawner, SimpleClouds compat layer, and cloud manager to use it.
+
+## 022_risky_atmosphere_runtime_cluster_restructure
+- Batch number: 022
+- Target modules: Atmosphere runtime risk cluster
+- Files reviewed: 6 cluster files
+- Files changed: 3 source files plus docs/log updates
+- Cleanup type: Atmosphere runtime helper extraction
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Extracted cloud-region tracking from AtmosphereManager into a dedicated manager helper so the lifecycle coordinator is less crowded.
+
+## 023_risky_tornado_lifecycle_cluster_restructure
+- Batch number: 023
+- Target modules: Tornado lifecycle risk cluster
+- Files reviewed: 6 cluster files
+- Files changed: 2 source files plus docs/log updates
+- Cleanup type: Tornado scheduler package move
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Moved the spawn scheduler into a clearer tornado scheduling package and kept the remaining tornado lifecycle classes in manual review.
+
+## 024_aggressive_remaining_risky_restructure
+- Batch number: 024
+- Target modules: Remaining risky manual review set, render-side helpers and client hurricane cache
+- Files reviewed: Remaining risky matrix entries touched by this pass
+- Files changed: 5 source files plus docs/log updates
+- Cleanup type: Risky-file package restructuring
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Moved shader helpers, sky-effect state, the DH pipeline selector, and the client hurricane cache into clearer packages; reconciled the remaining-risk matrix afterward.
+
+## 025_targeted_ownership_boundary_restructure
+- Batch number: 025
+- Target modules: `compat/`, `blocks/`, `modules/atmosphere/`, `modules/region/`
+- Files reviewed: 5 target files
+- Files changed: 13 source files plus docs/log updates
+- Cleanup type: Ownership-boundary helper extraction
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Split compat detection/logging, weather-debris budgeting, atmosphere state lookup, atmosphere telemetry reporting, and region forecast corruption validation into dedicated helpers; two unrelated build-fix edits were needed in client tick and telemetry command code.
+
+## 026_runtime_lifecycle_manager_restructure
+- Batch number: 026
+- Target modules: cyclone, tornado, and hurricane runtime lifecycle managers
+- Files reviewed: 5 target files
+- Files changed: 6 source files plus docs/log updates
+- Cleanup type: Runtime lifecycle manager helper extraction
+- Build result: `.\gradlew.bat build` succeeded after one intermediate compile fix
+- Short notes: Split cyclone delta application, hurricane environment analysis, and tornado client snapshot logging into package-private collaborators while keeping tick order and persistence behavior intact.
+
+## 027_risky_batch_20plus_restructure
+- Batch number: 027
+- Target modules: remaining risky manual-review set, prioritizing atmosphere coordination, lifecycle managers, and render/mixin surfaces
+- Files reviewed: 20 selected risky files
+- Files changed: 6 source files plus docs/log updates
+- Cleanup type: High-value risky batch restructure
+- Build result: `.\gradlew.bat build` succeeded after one intermediate compile fix
+- Short notes: Resolved the already-seamed lifecycle helper splits in cyclone, hurricane, and tornado managers; the remaining 13 selected risky files were reviewed and left in manual review because they still need either broader redesign or no safe seam was available in this batch.
+
+## 029_final_all_remaining_risky_resolution
+- Batch number: 029
+- Target modules: all remaining non-cloud risky files from the matrix
+- Files reviewed: 20 selected risky files
+- Files changed: docs/log updates only
+- Cleanup type: Final risky-file handling pass
+- Build result: `.\gradlew.bat build` succeeded
+- Short notes: Marked every remaining non-cloud risky file as handled-good-as-is with explicit reasons; no source files were changed in this final handling pass, and the only files left unhandled are under the protected `/clouds` package.

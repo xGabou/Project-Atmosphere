@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.hurricane;
 
-import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache.RenderableHurricane;
+import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache.RenderableHurricane;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;

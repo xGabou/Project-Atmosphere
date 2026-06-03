@@ -64,7 +64,7 @@ public final class CycloneManager {
                         if (result == null) {
                             return;
                         }
-                        applyCyclone(result);
+                        CycloneImpactApplier.apply(result);
                         if (result.remove()) {
                             ACTIVE_CYCLONES.remove(cyclone);
                             ACTIVE_SNAPSHOTS.remove(cyclone.id);
@@ -142,29 +142,36 @@ public final class CycloneManager {
         lastSpawnTick = level.getDayTime();
     }
     private static List<RegionAtmosphereState> findNearbyStates(ServerLevel level) {
-        List<BlockPos> players = level.players().stream()
-                .map(ServerPlayer::blockPosition)
-                .toList();
+        List<BlockPos> players = collectPlayerPositions(level);
 
         if (players.isEmpty()) return List.of();
 
         final double MAX_DIST_SQ = 5000d * 5000d;
 
         return AtmosphericStateRegistry.snapshot().stream()
-                .filter(state -> {
-                    BlockPos pos = state.getPosition();
-                    if (pos == null) return false;
-
-                    for (BlockPos player : players) {
-                        double dx = pos.getX() - player.getX();
-                        double dz = pos.getZ() - player.getZ();
-                        if ((dx * dx + dz * dz) <= MAX_DIST_SQ) {
-                            return true;
-                        }
-                    }
-                    return false;
-                })
+                .filter(state -> isNearAnyPlayer(state, players, MAX_DIST_SQ))
                 .toList();
+    }
+
+    private static List<BlockPos> collectPlayerPositions(ServerLevel level) {
+        return level.players().stream()
+                .map(ServerPlayer::blockPosition)
+                .toList();
+    }
+
+    private static boolean isNearAnyPlayer(RegionAtmosphereState state, List<BlockPos> players, double maxDistanceSq) {
+        BlockPos pos = state.getPosition();
+        if (pos == null) {
+            return false;
+        }
+        for (BlockPos player : players) {
+            double dx = pos.getX() - player.getX();
+            double dz = pos.getZ() - player.getZ();
+            if ((dx * dx + dz * dz) <= maxDistanceSq) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -186,8 +193,8 @@ public final class CycloneManager {
             this.lifetimeTicks = lifetimeTicks;
         }
 
-        private CycloneStep tick(List<RegionAtmosphereState> snapshot, long gameTime) {
-            List<CycloneDelta> deltas = List.of();
+        private CycloneImpactApplier.CycloneStep tick(List<RegionAtmosphereState> snapshot, long gameTime) {
+            List<CycloneImpactApplier.CycloneDelta> deltas = List.of();
             if (counter++ % 20 == 0) {
                 deltas = applyEffects(snapshot);
             }
@@ -195,14 +202,14 @@ public final class CycloneManager {
             lifetimeTicks--;
             intensity *= 0.9995f;
             if (lifetimeTicks <= 0 || intensity < 0.05f) {
-                return new CycloneStep(true, deltas);
+                return new CycloneImpactApplier.CycloneStep(true, deltas);
             }
             radius = Mth.clamp(radius + (intensity - 0.5f) * 0.8f, 120f, 420f);
-            return new CycloneStep(false, deltas);
+            return new CycloneImpactApplier.CycloneStep(false, deltas);
         }
 
-        private List<CycloneDelta> applyEffects(List<RegionAtmosphereState> states) {
-            List<CycloneDelta> deltas = new ArrayList<>();
+        private List<CycloneImpactApplier.CycloneDelta> applyEffects(List<RegionAtmosphereState> states) {
+            List<CycloneImpactApplier.CycloneDelta> deltas = new ArrayList<>();
             if (states.isEmpty()) {
                 return deltas;
             }
@@ -221,7 +228,7 @@ public final class CycloneManager {
                 float temperatureDelta = Mth.clamp(-scaledInfluence * 2f, -8f, 0f);
                 float rainCeil = Mth.clamp(scaledInfluence, 0f, 1f);
                 float cloudCeil = Mth.clamp(state.getCloudCover() + scaledInfluence * 0.25f, 0f, 1f);
-                deltas.add(new CycloneDelta(state.getKey(), temperatureDelta, humidityDelta, pressureDelta, rainCeil, cloudCeil));
+                deltas.add(new CycloneImpactApplier.CycloneDelta(state.getKey(), temperatureDelta, humidityDelta, pressureDelta, rainCeil, cloudCeil));
             }
             return deltas;
         }
@@ -265,33 +272,4 @@ public final class CycloneManager {
         }
     }
 
-    private static void applyCyclone(CycloneStep step) {
-        if (step.deltas().isEmpty()) {
-            return;
-        }
-        for (CycloneDelta delta : step.deltas()) {
-            RegionAtmosphereState state = AtmosphericStateRegistry.getState(delta.key());
-            if (state == null) {
-                continue;
-            }
-            state.adjustTemperature(delta.temperatureDelta());
-            state.adjustHumidity(delta.humidityDelta());
-            state.adjustPressure(delta.pressureDelta());
-            state.applyCycloneVisualFloor(delta.cloudCeil(), delta.rainCeil());
-            state.setRainIntensity(Math.min(1f, Math.max(state.getRainIntensity(), delta.rainCeil())));
-            state.setCloudCover(Math.min(1f, Math.max(state.getCloudCover(), delta.cloudCeil())));
-            state.setCloudWater(Math.max(state.getCloudWater(), delta.cloudCeil() * 0.35f + delta.rainCeil() * 0.65f));
-        }
-    }
-
-    private record CycloneStep(boolean remove, List<CycloneDelta> deltas) {
-    }
-
-    private record CycloneDelta(RegionInstanceKey key,
-                                float temperatureDelta,
-                                float humidityDelta,
-                                float pressureDelta,
-                                float rainCeil,
-                                float cloudCeil) {
-    }
 }

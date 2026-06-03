@@ -14,6 +14,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.SimpleCloudsMod;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.client.render.shader.TornadoShaders;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -906,13 +907,16 @@ public final class SimpleCloudsTornadoRenderer {
     }
 
     private static boolean shouldDebugLog(ClientLevel level) {
-        return TornadoRenderDebugState.isActive() && level != null && level.getGameTime() % 20L == 0L;
+        return isTwentyTickDebugFrame(level) && TornadoRenderDebugState.isActive();
     }
 
     public static boolean shouldPathLog(ClientLevel level) {
-        return level != null
-                && level.getGameTime() % 20L == 0L
+        return isTwentyTickDebugFrame(level)
                 && (TornadoRenderDebugState.isActive() || AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get());
+    }
+
+    private static boolean isTwentyTickDebugFrame(ClientLevel level) {
+        return level != null && level.getGameTime() % 20L == 0L;
     }
 
     private void maybeLogShaderBindings(ClientLevel level, ShaderInstance shader, int depthTextureId, int secondaryDepthTextureId) {

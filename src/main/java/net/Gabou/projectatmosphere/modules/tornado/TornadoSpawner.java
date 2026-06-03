@@ -18,22 +18,19 @@ public final class TornadoSpawner {
     private TornadoSpawner() {}
 
     public static void spawn(BiomeInstanceKey key, ServerLevel level, float intensity) {
-        float radiusSetting = AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get().floatValue();
-        BlockPos center = pickSpawnPosNear(key, level, radiusSetting);
-        WindVectorApi.WindSample wind = WindVectorApi.getSurface(key);
-        int stormLevel = StormSeverityScale.resolve(level, net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry.resolveRegionKey(key), level.getGameTime());
-        float radius = 5f + 18f * intensity + stormLevel * 1.5F;
-        net.Gabou.projectatmosphere.modules.core.WindVector w =
-                net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(wind.speedMps(),
-                        (float) Math.toRadians(wind.directionDeg()));
-        TornadoManager.spawnServer(level, Vec3.atCenterOf(center), radius, w, stormLevel);
+        BlockPos center = pickSpawnPosNear(key, level, AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get().floatValue());
+        spawnInternal(center, WindVectorApi.getSurface(key), level,
+                StormSeverityScale.resolve(level, net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry.resolveRegionKey(key), level.getGameTime()),
+                intensity);
     }
 
     public static void spawn(RegionInstanceKey key, ServerLevel level, float intensity) {
-        float radiusSetting = AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get().floatValue();
-        BlockPos center = pickSpawnPosNear(key, level, radiusSetting);
-        WindVectorApi.WindSample wind = WindVectorApi.getSurface(key, level.getGameTime());
-        int stormLevel = StormSeverityScale.resolve(level, key, level.getGameTime());
+        BlockPos center = pickSpawnPosNear(key, level, AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get().floatValue());
+        spawnInternal(center, WindVectorApi.getSurface(key, level.getGameTime()), level,
+                StormSeverityScale.resolve(level, key, level.getGameTime()), intensity);
+    }
+
+    private static void spawnInternal(BlockPos center, WindVectorApi.WindSample wind, ServerLevel level, int stormLevel, float intensity) {
         float radius = 5f + 18f * intensity + stormLevel * 1.5F;
         net.Gabou.projectatmosphere.modules.core.WindVector w =
                 net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(wind.speedMps(),

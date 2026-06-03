@@ -17,9 +17,6 @@ import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.ICloudRegionId;
-import net.Gabou.projectatmosphere.modules.core.WeatherType;
-import net.Gabou.projectatmosphere.manager.CloudRegionQueue;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -29,7 +26,6 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import net.minecraftforge.network.PacketDistributor;
 
 public class AtmosphereManager {
@@ -41,8 +37,6 @@ public class AtmosphereManager {
      */
     private static final Map<UUID, CompletableFuture<Void>> playerReadyMap = new ConcurrentHashMap<>();
     private static final Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, SeasonStage> lastSeasonStage = new ConcurrentHashMap<>();
-
-    private static List<CloudRegion> cloudRegions = new ArrayList<>();
 
     public static boolean isInitialGenerationDone = false;
 
@@ -59,23 +53,18 @@ public class AtmosphereManager {
     }
 
     public static void onServerStarted(ServerLevel world) {
-        playerReadyMap.clear();
-        lastSeasonStage.clear();
+        resetRuntimeState();
         isInitialGenerationDone = ForecastOrchestrator.onServerStart(world);
-        count = 0;
+        AtmosphereCloudRegionTracker.reset(world);
         CloudRegionQueue.clear();
-        cloudRegions = new ArrayList<>(CloudManager.get(world).getClouds());
         recordSeasonStage(world);
     }
 
     public static void onServerStopping(ServerLevel world) {
         ForecastOrchestrator.onServerStop(world);
-        playerReadyMap.clear();
-        lastSeasonStage.clear();
-        isInitialGenerationDone = false;
-        count = 0;
+        resetRuntimeState();
         CloudRegionQueue.clear();
-        cloudRegions.clear();
+        AtmosphereCloudRegionTracker.clear();
 
     }
 
@@ -97,26 +86,8 @@ public class AtmosphereManager {
 
         world.getServer().execute(() -> {
             ForecastOrchestrator.onPlayerLogin(player, world);
-            Map<net.minecraft.resources.ResourceLocation, float[]> forecastSnapshot = ForecastGenerator.createDailyTemperatureSnapshotForSync();
-            int forecastProfileCount = forecastSnapshot.size();
-            NetworkHandler.CHANNEL.send(
-                    PacketDistributor.PLAYER.with(() -> player),
-                    ForecastLoadingStatusPacket.status(
-                            ForecastLoadingStage.RECEIVING_FORECAST_DATA,
-                            null,
-                            forecastProfileCount > 0 ? forecastProfileCount + " biome profiles queued" : "Preparing forecast snapshot",
-                            0.42F,
-                            "player_login_forecast_snapshot"
-                    )
-            );
-            ForecastGenerator.sendDailyForecastsToPlayer(player, forecastSnapshot);
-            NetworkHandler.CHANNEL.send(
-                    PacketDistributor.PLAYER.with(() -> player),
-                    ForecastLoadingStatusPacket.ready("player_login_ready")
-            );
-            AtmosphereStatusSyncManager.syncPlayer(player);
-            TornadoManager.syncToPlayer(player);
-            HurricaneManager.syncToPlayer(player);
+            sendPlayerForecastSnapshot(player);
+            syncPlayerRuntimeState(player);
             future.complete(null);
         });
     }
@@ -146,7 +117,7 @@ public class AtmosphereManager {
             HurricaneManager.clearHurricanes();
             ForecastOrchestrator.clearAndRegenerate(world);
         });
-        cloudRegions.clear();
+        AtmosphereCloudRegionTracker.clear();
         CloudRegionQueue.clear();
 
     }
@@ -173,43 +144,11 @@ public class AtmosphereManager {
             ForecastOrchestrator.tick(level);
         }
         if (count % 20 != 0) {
-            CloudManager<ServerLevel> manager = CloudManager.get(level);
-
-            // Current clouds still existing in the manager
-            List<CloudRegion> activeRegions = new ArrayList<>(manager.getClouds());
-
-            // For matching IDs only
-            Set<Integer> activeIds = activeRegions.stream()
-                    .filter(r -> r instanceof ICloudRegionId)
-                    .map(r -> ((ICloudRegionId) r).projectatmosphere$getId())
-                    .collect(Collectors.toSet());
-
-            for (CloudRegion cloudRegion : new ArrayList<>(cloudRegions)) {
-                if (cloudRegion instanceof ICloudRegionId id) {
-                    if (!activeIds.contains(id.projectatmosphere$getId())) {
-                        queueRemoveCloudRegion(cloudRegion);
-                    }
-                }
-            }
+            AtmosphereCloudRegionTracker.reconcile(level);
         }
 
         count++;
-        if (CloudRegionQueue.isEmpty()) {
-            CloudRegionQueue.shuffle();
-            return;
-        }
-        CloudRegionQueue.Entry entry;
-        while ((entry = CloudRegionQueue.poll()) != null) {
-            switch (entry.type()) {
-                case ADD -> {
-                    handleCloudRegionToQueue(level, entry.region());
-                }
-                case REMOVE -> {
-                    handleCloudRegionToRemove(level, entry.region());
-                }
-
-            }
-        }
+        AtmosphereCloudRegionTracker.pollQueue(level);
     }
 
     private static void checkSeasonTransition(ServerLevel level) {
@@ -234,41 +173,51 @@ public class AtmosphereManager {
         }
     }
 
-    private static void handleCloudRegionToQueue(ServerLevel level, CloudRegion cloudRegion) {
-        if (cloudRegions.contains(cloudRegion)) {
-            return;
-        }
-        cloudRegions.add(cloudRegion);
-        if (WeatherType.isRainy(cloudRegion.getCloudTypeId())) {
-            SeasonTimeHelper.onRainStarted(level, cloudRegion);
-        }
-
+    private static void resetRuntimeState() {
+        playerReadyMap.clear();
+        lastSeasonStage.clear();
+        isInitialGenerationDone = false;
+        count = 0;
     }
 
-    private static void handleCloudRegionToRemove(ServerLevel level, CloudRegion cloudRegion) {
-        if (CloudManager.get(level).getClouds().contains(cloudRegion) && !cloudRegions.contains(cloudRegion)) {
-            return;
-        }
+    private static void sendPlayerForecastSnapshot(ServerPlayer player) {
+        Map<net.minecraft.resources.ResourceLocation, float[]> forecastSnapshot = ForecastGenerator.createDailyTemperatureSnapshotForSync();
+        int forecastProfileCount = forecastSnapshot.size();
+        NetworkHandler.CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                ForecastLoadingStatusPacket.status(
+                        ForecastLoadingStage.RECEIVING_FORECAST_DATA,
+                        null,
+                        forecastProfileCount > 0 ? forecastProfileCount + " biome profiles queued" : "Preparing forecast snapshot",
+                        0.42F,
+                        "player_login_forecast_snapshot"
+                )
+        );
+        ForecastGenerator.sendDailyForecastsToPlayer(player, forecastSnapshot);
+        NetworkHandler.CHANNEL.send(
+                PacketDistributor.PLAYER.with(() -> player),
+                ForecastLoadingStatusPacket.ready("player_login_ready")
+        );
+    }
 
-        cloudRegions.remove(cloudRegion);
-        if (WeatherType.isRainy(cloudRegion.getCloudTypeId())) {
-            SeasonTimeHelper.onRainEnded(level, cloudRegion);
-        }
-
+    private static void syncPlayerRuntimeState(ServerPlayer player) {
+        AtmosphereStatusSyncManager.syncPlayer(player);
+        TornadoManager.syncToPlayer(player);
+        HurricaneManager.syncToPlayer(player);
     }
 
     public static List<CloudRegion> getCloudRegions() {
-        return Collections.unmodifiableList(cloudRegions);
+        return AtmosphereCloudRegionTracker.getCloudRegions();
     }
 
 
     public static void queueAddCloudRegion(CloudRegion cloudRegion) {
-        CloudRegionQueue.enqueueAdd(cloudRegion);
+        AtmosphereCloudRegionTracker.queueAdd(cloudRegion);
 
     }
 
     public static void queueRemoveCloudRegion(CloudRegion cloudRegion) {
-        CloudRegionQueue.enqueueRemove(cloudRegion);
+        AtmosphereCloudRegionTracker.queueRemove(cloudRegion);
 
     }
 }

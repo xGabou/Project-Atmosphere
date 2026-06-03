@@ -29,8 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.calculateDewPoint;
-import static net.Gabou.projectatmosphere.manager.SimpleCloudSpawner.determineCloudSeverity;
+import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.calculateDewPoint;
+import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.determineCloudSeverity;
 
 public class SimpleCloudsCompat {
 

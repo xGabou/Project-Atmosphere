@@ -1,4 +1,6 @@
-package net.Gabou.projectatmosphere.modules.tornado;
+package net.Gabou.projectatmosphere.modules.tornado.scheduling;
+
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 
 /**
  * Manages tornado spawn slots and cooldowns.

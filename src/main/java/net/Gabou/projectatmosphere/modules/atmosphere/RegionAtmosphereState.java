@@ -356,9 +356,7 @@ public class RegionAtmosphereState {
      */
     @Deprecated
     public static RegionAtmosphereState fromForecast(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
-        ForecastRegion region = new ForecastRegion(net.Gabou.projectatmosphere.util.RegionInstanceKey.from(biomeKey.samplePos()));
-        region.addBiomeForecast(biomeKey, forecast);
-        region.finalizeAggregation();
+        ForecastRegion region = createLegacyForecastRegion(biomeKey, forecast);
         return fromForecast(region.getKey(), region);
     }
 
@@ -513,5 +511,12 @@ public class RegionAtmosphereState {
                 clamped,
                 new RuntimeException("Temperature clamp trace")
         );
+    }
+
+    private static ForecastRegion createLegacyForecastRegion(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
+        ForecastRegion region = new ForecastRegion(net.Gabou.projectatmosphere.util.RegionInstanceKey.from(biomeKey.samplePos()));
+        region.addBiomeForecast(biomeKey, forecast);
+        region.finalizeAggregation();
+        return region;
     }
 }

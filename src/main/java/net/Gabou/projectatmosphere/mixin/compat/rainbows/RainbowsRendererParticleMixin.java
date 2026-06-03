@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.mixin.compat.rainbows;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.Gabou.projectatmosphere.client.render.SkyEffectState;
+import net.Gabou.projectatmosphere.client.render.sky.SkyEffectState;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;

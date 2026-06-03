@@ -1,6 +1,11 @@
 package net.Gabou.projectatmosphere.clouds;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 public final class CloudDebugRenderer {
@@ -8,8 +13,8 @@ public final class CloudDebugRenderer {
     private CloudDebugRenderer() {
     }
 
-    public static void render(CloudRenderSnapshot snapshot, PoseStack poseStack, Vec3 cameraPosition) {
-        if (snapshot == null || poseStack == null) {
+    public static void render(CloudRenderSnapshot snapshot, PoseStack poseStack, MultiBufferSource bufferSource, Vec3 cameraPosition) {
+        if (snapshot == null || poseStack == null || bufferSource == null) {
             return;
         }
         if (cameraPosition == null) {
@@ -41,10 +46,28 @@ public final class CloudDebugRenderer {
         if (minX > maxX || minY > maxY || minZ > maxZ) {
             return;
         }
-        drawBox(poseStack, minX, minY, minZ, maxX, maxY, maxZ, snapshot.getDebugColorOrTint());
+        drawBox(poseStack, bufferSource, minX, minY, minZ, maxX, maxY, maxZ, snapshot.getDebugColorOrTint());
     }
 
-    private static void drawBox(PoseStack poseStack, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, int color) {
+    private static void drawBox(PoseStack poseStack, MultiBufferSource bufferSource, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, int color) {
 
+        float alpha = ((color >> 24) & 255) / 255.0F;
+        float red = ((color >> 16) & 255) / 255.0F;
+        float green = ((color >> 8) & 255) / 255.0F;
+        float blue = (color & 255) / 255.0F;
+
+        AABB box = new AABB(minX, minY, minZ, maxX, maxY, maxZ);
+
+        VertexConsumer consumer = bufferSource.getBuffer(RenderType.lines());
+
+        LevelRenderer.renderLineBox(
+                poseStack,
+                consumer,
+                box,
+                red,
+                green,
+                blue,
+                alpha
+        );
     }
 }

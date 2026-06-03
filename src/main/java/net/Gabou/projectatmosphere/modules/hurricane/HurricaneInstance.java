@@ -284,17 +284,7 @@ public class HurricaneInstance {
         boolean debugSpawn = !tag.contains("debugSpawn") || tag.getBoolean("debugSpawn");
 
         HurricaneInstance hurricane = new HurricaneInstance(id, cycloneId, position, radius, wind, category, debugSpawn);
-        hurricane.cycloneRadius = tag.contains("cycloneRadius") ? tag.getFloat("cycloneRadius") : hurricane.cycloneRadius;
-        hurricane.cycloneIntensity = tag.contains("cycloneIntensity") ? tag.getFloat("cycloneIntensity") : hurricane.cycloneIntensity;
-        hurricane.destructiveStrength = tag.contains("destructiveStrength") ? tag.getFloat("destructiveStrength") : hurricane.destructiveStrength;
-        hurricane.targetDestructiveStrength = tag.contains("targetDestructiveStrength") ? tag.getFloat("targetDestructiveStrength") : hurricane.targetDestructiveStrength;
-        hurricane.anchorY = tag.contains("anchorY") ? tag.getFloat("anchorY") : hurricane.anchorY;
-        hurricane.ageTicks = tag.getInt("ageTicks");
-        hurricane.phaseTicks = tag.getInt("phaseTicks");
-        hurricane.formationTicks = tag.contains("formationTicks") ? tag.getInt("formationTicks") : hurricane.formationTicks;
-        hurricane.activeTicks = tag.contains("activeTicks") ? tag.getInt("activeTicks") : hurricane.activeTicks;
-        hurricane.dissipationTicks = tag.contains("dissipationTicks") ? tag.getInt("dissipationTicks") : hurricane.dissipationTicks;
-        hurricane.phase = parsePhase(tag.getString("phase"), hurricane.phase);
+        hurricane.applyPersistentState(tag);
         return hurricane;
     }
 
@@ -318,6 +308,22 @@ public class HurricaneInstance {
         } catch (IllegalArgumentException ignored) {
             return fallback;
         }
+    }
+
+    private void applyPersistentState(CompoundTag tag) {
+        this.cycloneRadius = tag.contains("cycloneRadius") ? tag.getFloat("cycloneRadius") : this.cycloneRadius;
+        this.cycloneIntensity = tag.contains("cycloneIntensity") ? tag.getFloat("cycloneIntensity") : this.cycloneIntensity;
+        this.destructiveStrength = tag.contains("destructiveStrength") ? tag.getFloat("destructiveStrength") : this.destructiveStrength;
+        this.targetDestructiveStrength = tag.contains("targetDestructiveStrength") ? tag.getFloat("targetDestructiveStrength") : this.targetDestructiveStrength;
+        this.anchorY = tag.contains("anchorY") ? tag.getFloat("anchorY") : this.anchorY;
+        this.ageTicks = tag.getInt("ageTicks");
+        this.phaseTicks = tag.getInt("phaseTicks");
+        this.formationTicks = tag.contains("formationTicks") ? tag.getInt("formationTicks") : this.formationTicks;
+        this.activeTicks = tag.contains("activeTicks") ? tag.getInt("activeTicks") : this.activeTicks;
+        this.dissipationTicks = tag.contains("dissipationTicks") ? tag.getInt("dissipationTicks") : this.dissipationTicks;
+        this.lastWindFieldTick = tag.contains("lastWindFieldTick") ? tag.getLong("lastWindFieldTick") : this.lastWindFieldTick;
+        this.lastDestructionTick = tag.contains("lastDestructionTick") ? tag.getLong("lastDestructionTick") : this.lastDestructionTick;
+        this.phase = parsePhase(tag.getString("phase"), this.phase);
     }
 
     public void tick(Level level) {

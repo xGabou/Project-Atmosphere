@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.client.hurricane;
+package net.Gabou.projectatmosphere.client.hurricane.cache;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;

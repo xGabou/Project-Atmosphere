@@ -12,7 +12,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import dev.nonamecrackers2.simpleclouds.client.framebuffer.WeightedBlendingTarget;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
-import net.Gabou.projectatmosphere.client.hurricane.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.client.render.shader.HurricaneShaders;
+import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCloudVolume;
 import net.Gabou.projectatmosphere.client.render.mesh.VolumeBoxMesh;
 import net.minecraft.client.Minecraft;
@@ -504,27 +505,27 @@ public final class SimpleCloudsHurricaneRenderer {
             float[] stormSeeds
     ) {
         static StormUniforms from(List<HurricaneCloudVolume> hurricanes) {
-            float[] stormPositions = new float[MAX_STORMS * 3];
-            float[] stormHeights = new float[MAX_STORMS];
-            float[] eyeRadii = new float[MAX_STORMS];
-            float[] eyeClearRadii = new float[MAX_STORMS];
-            float[] eyeSlopes = new float[MAX_STORMS];
-            float[] eyewallThicknesses = new float[MAX_STORMS];
-            float[] canopyRadii = new float[MAX_STORMS];
-            float[] shieldRadii = new float[MAX_STORMS];
-            float[] canopyBaseFactors = new float[MAX_STORMS];
-            float[] canopyTopFactors = new float[MAX_STORMS];
-            float[] shieldBaseFactors = new float[MAX_STORMS];
-            float[] shieldTopFactors = new float[MAX_STORMS];
-            float[] bandStartRadii = new float[MAX_STORMS];
-            float[] bandEndRadii = new float[MAX_STORMS];
-            float[] bandWidths = new float[MAX_STORMS];
-            float[] bandStrengths = new float[MAX_STORMS];
-            float[] bandCounts = new float[MAX_STORMS];
-            float[] fringeStrengths = new float[MAX_STORMS];
-            float[] stormSpins = new float[MAX_STORMS];
-            float[] stormIntensities = new float[MAX_STORMS];
-            float[] stormSeeds = new float[MAX_STORMS];
+            float[] stormPositions = newStormArray(MAX_STORMS * 3);
+            float[] stormHeights = newStormArray();
+            float[] eyeRadii = newStormArray();
+            float[] eyeClearRadii = newStormArray();
+            float[] eyeSlopes = newStormArray();
+            float[] eyewallThicknesses = newStormArray();
+            float[] canopyRadii = newStormArray();
+            float[] shieldRadii = newStormArray();
+            float[] canopyBaseFactors = newStormArray();
+            float[] canopyTopFactors = newStormArray();
+            float[] shieldBaseFactors = newStormArray();
+            float[] shieldTopFactors = newStormArray();
+            float[] bandStartRadii = newStormArray();
+            float[] bandEndRadii = newStormArray();
+            float[] bandWidths = newStormArray();
+            float[] bandStrengths = newStormArray();
+            float[] bandCounts = newStormArray();
+            float[] fringeStrengths = newStormArray();
+            float[] stormSpins = newStormArray();
+            float[] stormIntensities = newStormArray();
+            float[] stormSeeds = newStormArray();
 
             for (int i = 0; i < hurricanes.size(); i++) {
                 HurricaneCloudVolume hurricane = hurricanes.get(i);
@@ -577,6 +578,14 @@ public final class SimpleCloudsHurricaneRenderer {
                     stormIntensities,
                     stormSeeds
             );
+        }
+
+        private static float[] newStormArray() {
+            return new float[MAX_STORMS];
+        }
+
+        private static float[] newStormArray(int size) {
+            return new float[size];
         }
     }
 }

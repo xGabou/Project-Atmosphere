@@ -518,29 +518,7 @@ public class TornadoInstance {
                 stormLevel,
                 requiresCloudAttachment
         );
-        tornado.targetVisualHeight = tag.contains("targetVisualHeight") ? tag.getFloat("targetVisualHeight") : tornado.targetVisualHeight;
-        tornado.normalizedIntensity = tag.contains("normalizedIntensity") ? tag.getFloat("normalizedIntensity") : tornado.normalizedIntensity;
-        tornado.targetIntensity = tag.contains("targetIntensity") ? tag.getFloat("targetIntensity") : tornado.targetIntensity;
-        tornado.phase = parsePhase(tag.getString("phase"), tornado.phase);
-        tornado.ageTicks = tag.getInt("ageTicks");
-        tornado.phaseTicks = tag.getInt("phaseTicks");
-        tornado.formationTicks = tag.contains("formationTicks") ? tag.getInt("formationTicks") : tornado.formationTicks;
-        tornado.activeTicks = tag.contains("activeTicks") ? tag.getInt("activeTicks") : tornado.activeTicks;
-        tornado.dissipationTicks = tag.contains("dissipationTicks") ? tag.getInt("dissipationTicks") : tornado.dissipationTicks;
-        tornado.detachedTicks = tag.getInt("detachedTicks");
-        tornado.spawnGameTime = tag.getLong("spawnGameTime");
-        tornado.headingRadians = tag.contains("headingRadians") ? tag.getFloat("headingRadians") : tornado.headingRadians;
-        tornado.targetHeadingRadians = tag.contains("targetHeadingRadians") ? tag.getFloat("targetHeadingRadians") : tornado.targetHeadingRadians;
-        tornado.motion = new Vec3(tag.getDouble("motionX"), 0.0D, tag.getDouble("motionZ"));
-        tornado.plannedMoveSpeed = tag.contains("plannedMoveSpeed") ? tag.getFloat("plannedMoveSpeed") : tornado.plannedMoveSpeed;
-        tornado.targetMoveSpeed = tag.contains("targetMoveSpeed") ? tag.getFloat("targetMoveSpeed") : tornado.targetMoveSpeed;
-        tornado.routeTicksRemaining = tag.getInt("routeTicksRemaining");
-        tornado.anchorX = tag.contains("anchorX") ? tag.getFloat("anchorX") : (float) position.x;
-        tornado.anchorZ = tag.contains("anchorZ") ? tag.getFloat("anchorZ") : (float) position.z;
-        tornado.recentDebrisScore = tag.getFloat("recentDebrisScore");
-        if (tag.getBoolean("hasRouteWaypoint")) {
-            tornado.routeWaypoint = new Vec3(tag.getDouble("routeX"), visualBottomY, tag.getDouble("routeZ"));
-        }
+        tornado.applyPersistentState(tag, position, visualBottomY);
         return tornado;
     }
 
@@ -552,6 +530,32 @@ public class TornadoInstance {
             return StormLifecyclePhase.valueOf(name);
         } catch (IllegalArgumentException ignored) {
             return fallback;
+        }
+    }
+
+    private void applyPersistentState(CompoundTag tag, Vec3 position, float visualBottomY) {
+        this.targetVisualHeight = tag.contains("targetVisualHeight") ? tag.getFloat("targetVisualHeight") : this.targetVisualHeight;
+        this.normalizedIntensity = tag.contains("normalizedIntensity") ? tag.getFloat("normalizedIntensity") : this.normalizedIntensity;
+        this.targetIntensity = tag.contains("targetIntensity") ? tag.getFloat("targetIntensity") : this.targetIntensity;
+        this.phase = parsePhase(tag.getString("phase"), this.phase);
+        this.ageTicks = tag.getInt("ageTicks");
+        this.phaseTicks = tag.getInt("phaseTicks");
+        this.formationTicks = tag.contains("formationTicks") ? tag.getInt("formationTicks") : this.formationTicks;
+        this.activeTicks = tag.contains("activeTicks") ? tag.getInt("activeTicks") : this.activeTicks;
+        this.dissipationTicks = tag.contains("dissipationTicks") ? tag.getInt("dissipationTicks") : this.dissipationTicks;
+        this.detachedTicks = tag.getInt("detachedTicks");
+        this.spawnGameTime = tag.getLong("spawnGameTime");
+        this.headingRadians = tag.contains("headingRadians") ? tag.getFloat("headingRadians") : this.headingRadians;
+        this.targetHeadingRadians = tag.contains("targetHeadingRadians") ? tag.getFloat("targetHeadingRadians") : this.targetHeadingRadians;
+        this.motion = new Vec3(tag.getDouble("motionX"), 0.0D, tag.getDouble("motionZ"));
+        this.plannedMoveSpeed = tag.contains("plannedMoveSpeed") ? tag.getFloat("plannedMoveSpeed") : this.plannedMoveSpeed;
+        this.targetMoveSpeed = tag.contains("targetMoveSpeed") ? tag.getFloat("targetMoveSpeed") : this.targetMoveSpeed;
+        this.routeTicksRemaining = tag.getInt("routeTicksRemaining");
+        this.anchorX = tag.contains("anchorX") ? tag.getFloat("anchorX") : (float) position.x;
+        this.anchorZ = tag.contains("anchorZ") ? tag.getFloat("anchorZ") : (float) position.z;
+        this.recentDebrisScore = tag.getFloat("recentDebrisScore");
+        if (tag.getBoolean("hasRouteWaypoint")) {
+            this.routeWaypoint = new Vec3(tag.getDouble("routeX"), visualBottomY, tag.getDouble("routeZ"));
         }
     }
 

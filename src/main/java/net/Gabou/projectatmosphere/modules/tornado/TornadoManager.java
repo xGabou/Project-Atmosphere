@@ -15,10 +15,10 @@ import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.network.RemoveTornadoPacket;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
 import net.Gabou.projectatmosphere.network.SyncTornadoesPacket;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -47,7 +47,6 @@ public class TornadoManager {
     private static final int SYNC_INTERVAL_TICKS = 5;
 
     private static float shaderTime = 0.0F;
-    private static long lastClientSnapshotLogGameTime = Long.MIN_VALUE;
 
     @OnlyIn(Dist.CLIENT)
     public static void spawnClient(UUID id, Vec3 pos, float radius, WindVector wind, float bottomY, float height) {
@@ -244,31 +243,23 @@ public class TornadoManager {
     public static void applyClientSnapshots(List<TornadoSnapshot> snapshots) {
         List<TornadoInstance> next = new ArrayList<>(snapshots.size());
         for (TornadoSnapshot snapshot : snapshots) {
-            TornadoInstance existing = findClient(snapshot.id());
-            CloudRegion cloud = findClientCloud(snapshot.position(), snapshot.radius());
-            if (existing == null) {
-                existing = new TornadoInstance(
-                        snapshot.id(),
-                        snapshot.position(),
-                        snapshot.radius(),
-                        new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust()),
-                        DEFAULT_ANGULAR_SPEED,
-                        snapshot.visualBottomY(),
-                        snapshot.visualHeight(),
-                        cloud,
-                        snapshot.stormLevel()
-                );
-            }
-            existing.applySnapshot(snapshot, cloud);
-            next.add(existing);
+            next.add(createOrUpdateClientTornado(snapshot));
         }
         CLIENT_TORNADOES.clear();
         CLIENT_TORNADOES.addAll(next);
-        maybeLogClientSnapshots("sync", snapshots);
+        TornadoClientSnapshotLogger.log("sync", snapshots, TornadoManager::findClient);
     }
 
     @OnlyIn(Dist.CLIENT)
     private static void applyClientSnapshot(TornadoSnapshot snapshot) {
+        TornadoInstance tornado = createOrUpdateClientTornado(snapshot);
+        if (!CLIENT_TORNADOES.contains(tornado)) {
+            CLIENT_TORNADOES.add(tornado);
+        }
+        TornadoClientSnapshotLogger.log("spawn", List.of(snapshot), TornadoManager::findClient);
+    }
+
+    private static TornadoInstance createOrUpdateClientTornado(TornadoSnapshot snapshot) {
         TornadoInstance existing = findClient(snapshot.id());
         CloudRegion cloud = findClientCloud(snapshot.position(), snapshot.radius());
         if (existing == null) {
@@ -283,10 +274,9 @@ public class TornadoManager {
                     cloud,
                     snapshot.stormLevel()
             );
-            CLIENT_TORNADOES.add(existing);
         }
         existing.applySnapshot(snapshot, cloud);
-        maybeLogClientSnapshots("spawn", List.of(snapshot));
+        return existing;
     }
 
     @OnlyIn(Dist.CLIENT)
@@ -307,41 +297,6 @@ public class TornadoManager {
             return null;
         }
         return findIntersectingCloud(level, pos, radius);
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private static void maybeLogClientSnapshots(String source, List<TornadoSnapshot> snapshots) {
-        if (!AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get()) {
-            return;
-        }
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
-            return;
-        }
-        long gameTime = minecraft.level.getGameTime();
-        if (lastClientSnapshotLogGameTime != Long.MIN_VALUE && gameTime - lastClientSnapshotLogGameTime < 20L) {
-            return;
-        }
-        lastClientSnapshotLogGameTime = gameTime;
-
-        if (snapshots.isEmpty()) {
-            ProjectAtmosphere.LOGGER.info("[TornadoSync] client {} received empty snapshot list at gameTime={}", source, gameTime);
-            return;
-        }
-
-        TornadoSnapshot first = snapshots.get(0);
-        TornadoInstance existing = findClient(first.id());
-        Vec3 renderPos = existing == null ? null : existing.getRenderPosition(1.0F);
-        ProjectAtmosphere.LOGGER.info(
-                "[TornadoSync] client {} received count={} firstId={} snapshotPos={} renderPos={} phase={} gameTime={}",
-                source,
-                snapshots.size(),
-                first.id(),
-                first.position(),
-                renderPos,
-                first.phase(),
-                gameTime
-        );
     }
 
     @Nullable
