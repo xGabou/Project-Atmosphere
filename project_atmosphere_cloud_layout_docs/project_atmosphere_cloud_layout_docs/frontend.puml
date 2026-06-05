@@ -1,0 +1,67 @@
+@startuml
+package Frontend {
+    class CloudRenderSnapshot
+    class CloudRenderSnapshotBuilder
+    class CloudRenderStateCache
+    class CloudRenderStateHolder
+    class CloudRenderStateUpdater
+    class CloudRenderController
+    class CloudRenderer
+    class CloudRenderHook
+    class CloudRenderFrameContext
+    class CloudRenderProfile
+    class CloudRenderTargetManager
+    class CloudDensityProvider
+    class CloudRaymarchRenderer
+    class CloudShadowRenderer
+    class CloudLightingBridge
+    class FallbackDarkeningPass
+    class CloudUniformUploader
+    class CloudRenderDiagnostics
+}
+
+package Debug {
+    class CloudDebugSnapshotFactory
+    class CloudDebugStateInitializer
+    class CloudDebugRenderHook
+    class CloudWireframeRenderer
+}
+
+class CloudRegionRenderData
+class RenderLevelStageEvent
+class ShaderInstance
+class RenderTarget
+
+CloudRenderSnapshotBuilder ..> CloudRegionRenderData
+CloudRenderSnapshotBuilder ..> CloudRenderSnapshot
+CloudRenderStateUpdater ..> CloudRenderSnapshotBuilder
+CloudRenderStateUpdater ..> CloudRenderStateCache
+CloudRenderStateHolder ..> CloudRenderStateCache
+CloudRenderController ..> CloudRenderStateCache
+CloudRenderController ..> CloudRenderSnapshot
+CloudRenderer ..> CloudRenderController
+CloudRenderer ..> CloudRenderFrameContext
+CloudRenderer ..> CloudRaymarchRenderer
+CloudRenderer ..> CloudShadowRenderer
+CloudRenderHook ..> RenderLevelStageEvent
+CloudRenderHook ..> CloudRenderer
+
+CloudRaymarchRenderer ..> CloudDensityProvider
+CloudRaymarchRenderer ..> CloudRenderTargetManager
+CloudShadowRenderer ..> CloudDensityProvider
+CloudShadowRenderer ..> CloudRenderTargetManager
+CloudLightingBridge ..> CloudShadowRenderer
+CloudLightingBridge ..> CloudUniformUploader
+CloudUniformUploader ..> ShaderInstance
+CloudRenderTargetManager ..> RenderTarget
+FallbackDarkeningPass ..> CloudDensityProvider
+FallbackDarkeningPass ..> CloudRenderTargetManager
+CloudRenderDiagnostics ..> CloudRenderer
+
+CloudDebugSnapshotFactory ..> CloudRenderSnapshot
+CloudDebugStateInitializer ..> CloudDebugSnapshotFactory
+CloudDebugStateInitializer ..> CloudRenderStateCache
+CloudDebugRenderHook ..> CloudWireframeRenderer
+CloudDebugRenderHook ..> CloudRenderStateCache
+CloudWireframeRenderer ..> CloudRenderSnapshot
+@enduml
