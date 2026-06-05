@@ -53,7 +53,7 @@ public final class CloudRenderController {
      *
      * @return true si un snapshot live valide existe
      */
-    public static boolean hasRenderableLiveSnapshot() {
+    public static boolean hasRenderableLiveSnapshots() {
         return !getRenderableLiveSnapshots().isEmpty();
     }
 }

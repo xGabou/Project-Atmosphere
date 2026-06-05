@@ -107,16 +107,19 @@ public final class CloudRegionState {
             float baseY,
             float topY,
             @Nullable RegionInstanceKey sourceRegionKey
-    ){
-        this.regionId = Objects.requireNonNull(regionId, "regionId");
-        this.dimension = Objects.requireNonNull(dimension, "dimension");
-        this.sourceRegionKey = sourceRegionKey;
-
-        setCenter(center);
-        setRadius(radius);
-        setVerticalBounds(baseY, topY);
-        this.active = true;
-
+    ) {
+        this(
+                regionId,
+                dimension,
+                center,
+                radius,
+                baseY,
+                topY,
+                0.65F,
+                0.75F,
+                0.35F,
+                sourceRegionKey
+        );
     }
 
     public UUID getRegionId() {

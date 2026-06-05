@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.backend;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.UUID;
+import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * Donnée de rendu transportable pour une région de nuage PA.
@@ -93,5 +94,72 @@ public final class CloudRegionRenderData {
 
     public int getDebugColorOrTint() {
         return debugColorOrTint;
+    }
+
+    /**
+     * Écrit cette donnée transportable dans un buffer réseau.
+     *
+     * @param buffer buffer réseau cible
+     */
+    public void encode(FriendlyByteBuf buffer) {
+        buffer.writeUUID(regionId);
+        buffer.writeUtf(dimensionId);
+
+        buffer.writeDouble(center.x());
+        buffer.writeDouble(center.y());
+        buffer.writeDouble(center.z());
+
+        buffer.writeFloat(radius);
+        buffer.writeFloat(baseY);
+        buffer.writeFloat(topY);
+
+        buffer.writeFloat(density);
+        buffer.writeFloat(coverage);
+        buffer.writeFloat(edgeSoftness);
+
+        buffer.writeBoolean(active);
+        buffer.writeInt(debugColorOrTint);
+    }
+
+    /**
+     * Lit une donnée transportable depuis un buffer réseau.
+     *
+     * @param buffer buffer réseau source
+     * @return donnée de région de nuage décodée
+     */
+    public static CloudRegionRenderData decode(FriendlyByteBuf buffer) {
+        UUID regionId = buffer.readUUID();
+        String dimensionId = buffer.readUtf();
+
+        Vec3 center = new Vec3(
+                buffer.readDouble(),
+                buffer.readDouble(),
+                buffer.readDouble()
+        );
+
+        float radius = buffer.readFloat();
+        float baseY = buffer.readFloat();
+        float topY = buffer.readFloat();
+
+        float density = buffer.readFloat();
+        float coverage = buffer.readFloat();
+        float edgeSoftness = buffer.readFloat();
+
+        boolean active = buffer.readBoolean();
+        int debugColorOrTint = buffer.readInt();
+
+        return new CloudRegionRenderData(
+                regionId,
+                dimensionId,
+                center,
+                radius,
+                baseY,
+                topY,
+                density,
+                coverage,
+                edgeSoftness,
+                active,
+                debugColorOrTint
+        );
     }
 }

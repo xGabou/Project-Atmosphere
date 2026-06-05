@@ -55,7 +55,7 @@ public final class CloudRegionRegistry {
 
         for (CloudRegionState state : regionsById.values()) {
             if (state != null && state.isActive()) {
-                renderDataList.add(CloudRegionRenderDataFactory.createDebug(state));
+                renderDataList.add(CloudRegionRenderDataFactory.create(state));
             }
         }
 

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.network.SyncCloudRegionsPacket;
 import net.Gabou.projectatmosphere.network.SyncWindPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkDirection;
@@ -85,6 +86,16 @@ public class NetworkHandler {
                 .decoder(AuthChallengeReplyPacket::decode)
                 .encoder(AuthChallengeReplyPacket::encode)
                 .consumerMainThread(AuthChallengeReplyPacket::handle)
+                .add();
+
+
+        // -----------------------------------------------------------------
+        // Clouds
+        // -----------------------------------------------------------------
+        CHANNEL.messageBuilder(SyncCloudRegionsPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncCloudRegionsPacket::decode)
+                .encoder(SyncCloudRegionsPacket::encode)
+                .consumerMainThread(SyncCloudRegionsPacket::handle)
                 .add();
     }
 }
