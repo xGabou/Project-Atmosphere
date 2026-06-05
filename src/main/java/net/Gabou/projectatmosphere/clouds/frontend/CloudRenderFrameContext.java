@@ -16,11 +16,13 @@ public final class CloudRenderFrameContext {
     private final Vec3 cameraPosition;
     private final long worldTime;
     private final float partialTick;
+    private final CloudRenderProfile renderProfile;
 
     public CloudRenderFrameContext(
             @NotNull ClientLevel level,
             @NotNull PoseStack poseStack,
             @NotNull Vec3 cameraPosition,
+            @NotNull CloudRenderProfile renderProfile,
             long worldTime,
             float partialTick
     ) {
@@ -29,6 +31,7 @@ public final class CloudRenderFrameContext {
         this.cameraPosition = cameraPosition;
         this.worldTime = worldTime;
         this.partialTick = partialTick;
+        this.renderProfile = renderProfile;
     }
 
     public @NotNull ClientLevel getLevel() {
@@ -49,5 +52,8 @@ public final class CloudRenderFrameContext {
 
     public float getPartialTick() {
         return partialTick;
+    }
+    public @NotNull CloudRenderProfile getRenderProfile() {
+        return renderProfile;
     }
 }

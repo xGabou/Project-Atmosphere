@@ -38,8 +38,10 @@ public final class CloudRenderHook {
                 level,
                 event.getPoseStack(),
                 event.getCamera().getPosition(),
+                CloudRenderProfile.createDefault(),
                 level.getGameTime(),
                 event.getPartialTick()
+
         );
 
         CloudRenderStateUpdater.updateCurrentSnapshots(

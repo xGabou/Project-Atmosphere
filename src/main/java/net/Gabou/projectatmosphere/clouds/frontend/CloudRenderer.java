@@ -19,14 +19,14 @@ public final class CloudRenderer {
      * @param frameContext contexte de rendu de la frame courante
      */
     public static void render(@NotNull CloudRenderFrameContext frameContext) {
+        CloudRenderTargetManager.prepareTargets();
         for (CloudRenderSnapshot snapshot : CloudRenderController.getRenderableLiveSnapshots()) {
             renderSnapshot(frameContext, snapshot);
         }
     }
 
     /**
-     * Reçoit un snapshot live valide.
-     * Le rendu réel sera ajouté ici plus tard.
+     * Route un snapshot live valide vers la passe de rendu appropriée.
      *
      * @param frameContext contexte de rendu de la frame courante
      * @param snapshot snapshot live valide
@@ -38,7 +38,6 @@ public final class CloudRenderer {
         if (snapshot == null) {
             return;
         }
-
-        // Futur rendu live ici.
+        CloudRaymarchRenderer.renderSnapshot(frameContext, snapshot);
     }
 }
