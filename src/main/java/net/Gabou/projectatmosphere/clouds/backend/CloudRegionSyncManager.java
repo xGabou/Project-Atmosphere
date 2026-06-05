@@ -27,6 +27,9 @@ public final class CloudRegionSyncManager {
         if (level == null) {
             return;
         }
+        if (level.getGameTime() % 20L != 0L) {
+            return;
+        }
 
         for (ServerPlayer player : level.players()) {
             syncPlayer(player);
@@ -42,6 +45,7 @@ public final class CloudRegionSyncManager {
         if (player == null) {
             return;
         }
+
 
         ServerLevel level = player.serverLevel();
 

@@ -6,6 +6,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -57,6 +58,8 @@ public class EventHandler {
         if (serverLevel.players().isEmpty()) {
             return;
         }
+
+        CloudRegionManager.getInstance().tickCloudRegions(serverLevel);
 
         if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
 

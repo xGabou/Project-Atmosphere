@@ -18,6 +18,9 @@ public final class CloudRegionManager {
 
     private static final CloudRegionManager INSTANCE = new CloudRegionManager();
 
+    private final CloudRegionMotionController motionController = new CloudRegionMotionController();
+    private final CloudRegionLifecycleController lifecycleController = new CloudRegionLifecycleController();
+
     private CloudRegionManager() {
 
     }
@@ -123,13 +126,19 @@ public final class CloudRegionManager {
      */
     public void tickCloudRegions(@NotNull ServerLevel level) {
         CloudRegionRegistry registry = CloudRegionBackend.getRegistry(level);
+        boolean changed = false;
 
         for (CloudRegionState state : registry.getActiveRegions()) {
             if (state == null) {
                 continue;
             }
 
-            // Futur mouvement, croissance, decay et lifetime ici.
+            changed |= motionController.tick(level, state);
+            changed |= lifecycleController.tick(level, state);
+        }
+
+        if (changed) {
+            CloudRegionBackend.markDirty(level);
         }
     }
 }
