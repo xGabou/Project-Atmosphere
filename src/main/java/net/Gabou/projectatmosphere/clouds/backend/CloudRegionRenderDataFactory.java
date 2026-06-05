@@ -18,7 +18,7 @@ public final class CloudRegionRenderDataFactory {
     }
 
     /**
-     * Creates transport safe render data from a backend cloud region state.
+     * Creates transport safe render data debug from a backend cloud region state.
      *
      * @param state backend cloud region state
      * @return transport safe cloud render data
@@ -36,6 +36,28 @@ public final class CloudRegionRenderDataFactory {
                 DEFAULT_EDGE_SOFTNESS,
                 state.isActive(),
                 DEFAULT_DEBUG_COLOR
+        );
+    }
+
+    /**
+     * Creates transport safe render data from a backend cloud region state.
+     *
+     * @param state backend cloud region state
+     * @return transport safe cloud render data
+     */
+    public static @NotNull CloudRegionRenderData create(@NotNull CloudRegionState state) {
+        return new CloudRegionRenderData(
+                state.getRegionId(),
+                state.getDimension().location().toString(),
+                state.getCenter(),
+                state.getRadius(),
+                state.getBaseY(),
+                state.getTopY(),
+                state.getDensity(),
+                state.getCoverage(),
+                state.getEdgeSoftness(),
+                state.isActive(),
+                0xFFFFFFFF
         );
     }
 }

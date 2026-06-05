@@ -17,13 +17,9 @@ public final class CloudRenderer {
      * Pour l'instant, cette méthode valide seulement que le chemin live existe.
      */
     public static void render() {
-        CloudRenderSnapshot snapshot = CloudRenderController.getRenderableLiveSnapshot();
-
-        if (snapshot == null) {
-            return;
+        for (CloudRenderSnapshot snapshot : CloudRenderController.getRenderableLiveSnapshots()) {
+            renderSnapshot(snapshot);
         }
-
-        renderSnapshot(snapshot);
     }
 
     /**
@@ -33,9 +29,6 @@ public final class CloudRenderer {
      * @param snapshot snapshot live valide
      */
     private static void renderSnapshot(@Nullable CloudRenderSnapshot snapshot) {
-        if (snapshot == null) {
-            return;
-        }
 
         // Futur rendu live ici.
     }

@@ -2,12 +2,15 @@ package net.Gabou.projectatmosphere.clouds.frontend;
 
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRenderData;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Met à jour l'état de rendu live des nuages.
- * Cette classe écrit seulement dans currentSnapshot et ne touche jamais au debugSnapshot.
+ * Cette classe écrit seulement dans currentSnapshots et ne touche jamais au debugSnapshot.
  */
 public final class CloudRenderStateUpdater {
 
@@ -16,55 +19,78 @@ public final class CloudRenderStateUpdater {
     }
 
     /**
-     * Met à jour le snapshot live à partir d'une donnée de région transportable.
+     * Met à jour les snapshots live à partir de données de régions transportables.
      *
-     * @param renderData donnée transportable venant du backend
+     * @param renderDataList données transportables venant du backend
      * @param worldTime temps monde côté client
      * @param partialTick interpolation de rendu
      * @param cameraPosition position actuelle de la caméra
      */
-    public static void updateCurrentSnapshot(
-            @NotNull CloudRegionRenderData renderData,
+    public static void updateCurrentSnapshots(
+            @Nullable Collection<CloudRegionRenderData> renderDataList,
             long worldTime,
             float partialTick,
-            @NotNull Vec3 cameraPosition
+            @Nullable Vec3 cameraPosition
     ) {
-        CloudRenderSnapshot snapshot = CloudRenderSnapshotBuilder.create(
-                renderData,
-                worldTime,
-                partialTick,
-                cameraPosition
-        );
+        if (renderDataList == null || renderDataList.isEmpty() || cameraPosition == null) {
+            clearCurrentSnapshots();
+            return;
+        }
 
-        CloudRenderStateHolder.getInstance().setCurrentSnapshot(snapshot);
+        List<CloudRenderSnapshot> snapshots = new ArrayList<>();
+
+        for (CloudRegionRenderData renderData : renderDataList) {
+            if (renderData == null) {
+                continue;
+            }
+
+            snapshots.add(CloudRenderSnapshotBuilder.create(
+                    renderData,
+                    worldTime,
+                    partialTick,
+                    cameraPosition
+            ));
+        }
+
+        if (snapshots.isEmpty()) {
+            clearCurrentSnapshots();
+            return;
+        }
+
+        CloudRenderStateHolder.getInstance().setCurrentSnapshots(snapshots);
     }
 
     /**
-     * Met à jour le snapshot live si la donnée reçue est valide.
+     * Met à jour les snapshots live avec une seule donnée de région si elle est valide.
      *
      * @param renderData donnée transportable venant du backend
      * @param worldTime temps monde côté client
      * @param partialTick interpolation de rendu
      * @param cameraPosition position actuelle de la caméra
      */
-    public static void updateCurrentSnapshotIfPresent(
+    public static void updateSingleCurrentSnapshotIfPresent(
             @Nullable CloudRegionRenderData renderData,
             long worldTime,
             float partialTick,
             @Nullable Vec3 cameraPosition
     ) {
         if (renderData == null || cameraPosition == null) {
-            clearCurrentSnapshot();
+            clearCurrentSnapshots();
             return;
         }
 
-        updateCurrentSnapshot(renderData, worldTime, partialTick, cameraPosition);
+        updateCurrentSnapshots(
+                List.of(renderData),
+                worldTime,
+                partialTick,
+                cameraPosition
+        );
     }
 
     /**
-     * Efface le snapshot live courant.
+     * Efface les snapshots live courants.
      */
-    public static void clearCurrentSnapshot() {
-        CloudRenderStateHolder.getInstance().clearCurrentSnapshot();
+    public static void clearCurrentSnapshots() {
+        CloudRenderStateHolder.getInstance().clearCurrentSnapshots();
     }
 }

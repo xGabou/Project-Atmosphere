@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.frontend;
 
-import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Contrôleur du futur rendu live des nuages.
@@ -17,30 +19,33 @@ public final class CloudRenderController {
      *
      * @return snapshot live courant, ou null si aucun snapshot valide n'existe
      */
-    public static @Nullable CloudRenderSnapshot getRenderableLiveSnapshot() {
-        CloudRenderSnapshot snapshot = CloudRenderStateHolder.getInstance().getCurrentSnapshot();
+    public static List<CloudRenderSnapshot> getRenderableLiveSnapshots() {
+        List<CloudRenderSnapshot> snapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots();
+        List<CloudRenderSnapshot> liveSnapshots = new ArrayList<>();
+        for (CloudRenderSnapshot snapshot : snapshots) {
+            if (snapshot == null) {
+                continue;
+            }
 
-        if (snapshot == null) {
-            return null;
+            if (!snapshot.isEnabled()) {
+                continue;
+            }
+
+            if (snapshot.getRegionCenter() == null) {
+                continue;
+            }
+
+            if (snapshot.getRegionRadius() <= 0.0F) {
+                continue;
+            }
+
+            if (snapshot.getCloudTopY() <= snapshot.getCloudBaseY()) {
+                continue;
+            }
+            liveSnapshots.add(snapshot);
+
         }
-
-        if (!snapshot.isEnabled()) {
-            return null;
-        }
-
-        if (snapshot.getRegionCenter() == null) {
-            return null;
-        }
-
-        if (snapshot.getRegionRadius() <= 0.0F) {
-            return null;
-        }
-
-        if (snapshot.getCloudTopY() <= snapshot.getCloudBaseY()) {
-            return null;
-        }
-
-        return snapshot;
+        return liveSnapshots;
     }
 
     /**
@@ -49,6 +54,6 @@ public final class CloudRenderController {
      * @return true si un snapshot live valide existe
      */
     public static boolean hasRenderableLiveSnapshot() {
-        return getRenderableLiveSnapshot() != null;
+        return !getRenderableLiveSnapshots().isEmpty();
     }
 }

@@ -37,6 +37,10 @@ public final class CloudRegionState {
     private static final String TAG_REGION_Z = "RegionZ";
     private static final String TAG_REGION_SIZE = "RegionSize";
 
+    private static final String TAG_DENSITY = "Density";
+    private static final String TAG_COVERAGE = "Coverage";
+    private static final String TAG_EDGE_SOFTNESS = "EdgeSoftness";
+
     // Identité stable de cette région de nuage.
     private final UUID regionId;
 
@@ -65,6 +69,10 @@ public final class CloudRegionState {
     // Région météo actuelle du nuage. Utile plus tard si le nuage se déplace.
     private RegionInstanceKey currentRegionKey;
 
+    private float density;
+    private float coverage;
+    private float edgeSoftness;
+
     public CloudRegionState(
             UUID regionId,
             ResourceKey<Level> dimension,
@@ -72,6 +80,9 @@ public final class CloudRegionState {
             float radius,
             float baseY,
             float topY,
+            float density,
+            float coverage,
+            float edgeSoftness,
             @Nullable RegionInstanceKey sourceRegionKey
     ) {
         this.regionId = Objects.requireNonNull(regionId, "regionId");
@@ -81,8 +92,31 @@ public final class CloudRegionState {
         setCenter(center);
         setRadius(radius);
         setVerticalBounds(baseY, topY);
+        setDensity(density);
+        setCoverage(coverage);
+        setEdgeSoftness(edgeSoftness);
 
         this.active = true;
+    }
+
+    public CloudRegionState(
+            UUID regionId,
+            ResourceKey<Level> dimension,
+            Vec3 center,
+            float radius,
+            float baseY,
+            float topY,
+            @Nullable RegionInstanceKey sourceRegionKey
+    ){
+        this.regionId = Objects.requireNonNull(regionId, "regionId");
+        this.dimension = Objects.requireNonNull(dimension, "dimension");
+        this.sourceRegionKey = sourceRegionKey;
+
+        setCenter(center);
+        setRadius(radius);
+        setVerticalBounds(baseY, topY);
+        this.active = true;
+
     }
 
     public UUID getRegionId() {
@@ -123,6 +157,42 @@ public final class CloudRegionState {
 
     public float getTopY() {
         return topY;
+    }
+
+    public float getDensity() {
+        return density;
+    }
+
+    public void setDensity(float density) {
+        this.density = clamp01(density);
+    }
+
+    public float getCoverage() {
+        return coverage;
+    }
+
+    public void setCoverage(float coverage) {
+        this.coverage = clamp01(coverage);
+    }
+
+    public float getEdgeSoftness() {
+        return edgeSoftness;
+    }
+
+    public void setEdgeSoftness(float edgeSoftness) {
+        this.edgeSoftness = clamp01(edgeSoftness);
+    }
+
+    private static float clamp01(float value) {
+        if (value < 0.0F) {
+            return 0.0F;
+        }
+
+        if (value > 1.0F) {
+            return 1.0F;
+        }
+
+        return value;
     }
 
     /**
@@ -176,6 +246,10 @@ public final class CloudRegionState {
         tag.putFloat(TAG_TOP_Y, topY);
         tag.putBoolean(TAG_ACTIVE, active);
 
+        tag.putFloat(TAG_DENSITY, density);
+        tag.putFloat(TAG_COVERAGE, coverage);
+        tag.putFloat(TAG_EDGE_SOFTNESS, edgeSoftness);
+
         if (sourceRegionKey != null) {
             tag.put(TAG_SOURCE_REGION, saveRegionKey(sourceRegionKey));
         }
@@ -209,6 +283,10 @@ public final class CloudRegionState {
         float baseY = tag.getFloat(TAG_BASE_Y);
         float topY = tag.getFloat(TAG_TOP_Y);
 
+        float density = tag.contains(TAG_DENSITY) ? tag.getFloat(TAG_DENSITY) : 0.65F;
+        float coverage = tag.contains(TAG_COVERAGE) ? tag.getFloat(TAG_COVERAGE) : 0.75F;
+        float edgeSoftness = tag.contains(TAG_EDGE_SOFTNESS) ? tag.getFloat(TAG_EDGE_SOFTNESS) : 0.35F;
+
         RegionInstanceKey sourceRegionKey = null;
         if (tag.contains(TAG_SOURCE_REGION, Tag.TAG_COMPOUND)) {
             sourceRegionKey = loadRegionKey(tag.getCompound(TAG_SOURCE_REGION));
@@ -221,6 +299,9 @@ public final class CloudRegionState {
                 radius,
                 baseY,
                 topY,
+                density,
+                coverage,
+                edgeSoftness,
                 sourceRegionKey
         );
 

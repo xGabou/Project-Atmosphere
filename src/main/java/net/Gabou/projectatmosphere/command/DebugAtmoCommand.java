@@ -240,6 +240,9 @@ public class DebugAtmoCommand {
                                 64.0F,
                                 pos.getY() + 72.0F,
                                 pos.getY() + 88.0F,
+                                0.65F,
+                                0.75F,
+                                0.35F,
                                 sourceRegionKey
                         );
 
@@ -253,10 +256,8 @@ public class DebugAtmoCommand {
                         );
 
                         return 1;
-
                     }
                 })
-
         );
 
         root.then(Commands.literal("Clouds count")
