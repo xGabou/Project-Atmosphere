@@ -5,6 +5,7 @@ package net.Gabou.projectatmosphere.manager;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.command.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
@@ -203,6 +204,7 @@ public class AtmosphereManager {
 
     private static void syncPlayerRuntimeState(ServerPlayer player) {
         AtmosphereStatusSyncManager.syncPlayer(player);
+        CloudRegionSyncManager.syncPlayer(player);
         TornadoManager.syncToPlayer(player);
         HurricaneManager.syncToPlayer(player);
     }

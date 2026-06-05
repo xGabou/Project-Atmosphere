@@ -9,7 +9,7 @@ import org.jetbrains.annotations.NotNull;
  * Données sauvegardées du monde pour les régions de nuage backend.
  * Cette classe gère seulement la persistance des nuages.
  */
-public final class CloudRegionSavedData extends SavedData {
+final class CloudRegionSavedData extends SavedData {
 
     private static final String DATA_NAME = "projectatmosphere_cloud_regions";
 
@@ -29,7 +29,7 @@ public final class CloudRegionSavedData extends SavedData {
      * @param level niveau serveur
      * @return données sauvegardées des régions de nuage
      */
-    public static @NotNull CloudRegionSavedData get(@NotNull ServerLevel level) {
+    static @NotNull CloudRegionSavedData get(@NotNull ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
                 CloudRegionSavedData::new,
                 CloudRegionSavedData::new,
@@ -42,14 +42,14 @@ public final class CloudRegionSavedData extends SavedData {
      *
      * @return registre des régions de nuage
      */
-    public @NotNull CloudRegionRegistry getRegistry() {
+    @NotNull CloudRegionRegistry getRegistry() {
         return registry;
     }
 
     /**
      * Marque les données comme modifiées.
      */
-    public void markChanged() {
+    void markChanged() {
         setDirty();
     }
 

@@ -5,7 +5,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import org.jetbrains.annotations.NotNull;
 
-public final class CloudRegionStorage {
+final class CloudRegionStorage {
 
     private static final String TAG_REGIONS = "CloudRegions";
 
@@ -19,7 +19,7 @@ public final class CloudRegionStorage {
      * @param registry registre de régions de nuage à sauvegarder
      * @return tag racine sérialisé
      */
-    public static @NotNull CompoundTag save(@NotNull CloudRegionRegistry registry) {
+    static @NotNull CompoundTag save(@NotNull CloudRegionRegistry registry) {
         CompoundTag root = new CompoundTag();
         ListTag regions = new ListTag();
 
@@ -39,7 +39,7 @@ public final class CloudRegionStorage {
      * @param root tag racine sérialisé
      * @param targetRegistry registre à remplir
      */
-    public static void load(
+    static void load(
             @NotNull CompoundTag root,
             @NotNull CloudRegionRegistry targetRegistry
     ) {

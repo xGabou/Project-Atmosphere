@@ -6,7 +6,7 @@ import org.jetbrains.annotations.NotNull;
  * Converts backend cloud region state into transport safe cloud render data.
  * This class does not read client render classes and does not create client snapshots.
  */
-public final class CloudRegionRenderDataFactory {
+final class CloudRegionRenderDataFactory {
 
     private static final float DEFAULT_DENSITY = 0.65F;
     private static final float DEFAULT_COVERAGE = 0.75F;
@@ -23,7 +23,7 @@ public final class CloudRegionRenderDataFactory {
      * @param state backend cloud region state
      * @return transport safe cloud render data
      */
-    public static @NotNull CloudRegionRenderData createDebug(@NotNull CloudRegionState state) {
+    static @NotNull CloudRegionRenderData createDebug(@NotNull CloudRegionState state) {
         return new CloudRegionRenderData(
                 state.getRegionId(),
                 state.getDimension().location().toString(),
@@ -45,7 +45,7 @@ public final class CloudRegionRenderDataFactory {
      * @param state backend cloud region state
      * @return transport safe cloud render data
      */
-    public static @NotNull CloudRegionRenderData create(@NotNull CloudRegionState state) {
+    static @NotNull CloudRegionRenderData create(@NotNull CloudRegionState state) {
         return new CloudRegionRenderData(
                 state.getRegionId(),
                 state.getDimension().location().toString(),

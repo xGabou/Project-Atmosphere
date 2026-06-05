@@ -9,8 +9,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.AtmoApi;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionBackend;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRegistry;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionState;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -233,9 +232,8 @@ public class DebugAtmoCommand {
 
                         RegionInstanceKey sourceRegionKey = RegionInstanceKey.from(pos);
 
-                        CloudRegionState state = new CloudRegionState(
-                                UUID.randomUUID(),
-                                level.dimension(),
+                        CloudRegionState state = CloudRegionManager.getInstance().createCloudRegion(
+                                level,
                                 new Vec3(pos.getX(), pos.getY() + 80.0D, pos.getZ()),
                                 64.0F,
                                 pos.getY() + 72.0F,
@@ -245,13 +243,8 @@ public class DebugAtmoCommand {
                                 0.35F,
                                 sourceRegionKey
                         );
-
-                        CloudRegionRegistry registry = CloudRegionBackend.getRegistry(level);
-                        registry.add(state);
-                        CloudRegionBackend.markDirty(level);
-
                         source.sendSuccess(
-                                () -> Component.literal("Cloud region créée. Total: " + registry.size()),
+                                () -> Component.literal("Cloud region créée. Total: " + CloudRegionManager.getInstance().getCloudRegionCount(level)),
                                 false
                         );
 
@@ -264,10 +257,8 @@ public class DebugAtmoCommand {
                 .executes(ctx -> {
                     CommandSourceStack source = ctx.getSource();
                     ServerLevel level = source.getLevel();
-                    CloudRegionRegistry registry = CloudRegionBackend.getRegistry(level);
-
                     source.sendSuccess(
-                            () -> Component.literal("Cloud regions sauvegardées: " + registry.size()),
+                            () -> Component.literal("Cloud regions sauvegardées: " + CloudRegionManager.getInstance().getCloudRegionCount(level)),
                             false
                     );
 

@@ -5,7 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
-@Deprecated
+@Deprecated(forRemoval = true, since = "10.0.0")
 public record BiomeInstanceKey(ResourceLocation biomeType, BlockPos samplePos) {
 
     @Override

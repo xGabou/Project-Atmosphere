@@ -6,6 +6,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsManager;
@@ -77,6 +78,7 @@ public class EventHandler {
         }
 
         AtmosphereStatusSyncManager.syncPlayers(serverLevel);
+        CloudRegionSyncManager.syncPlayers(serverLevel);
         if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
             hasDisplayedMessage = true;
             serverLevel.players().forEach(player -> {player.sendSystemMessage(Component.literal(ForecastGenerator.message) );});
@@ -115,6 +117,8 @@ public class EventHandler {
         ServerLevel level = player.serverLevel();
         if (level.dimension().equals(event.getTo())) {
             AtmosphereStatusSyncManager.syncPlayer(player);
+            CloudRegionSyncManager.syncPlayer(player);
+
         }
     }
 

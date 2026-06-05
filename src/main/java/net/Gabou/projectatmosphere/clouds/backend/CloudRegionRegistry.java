@@ -11,34 +11,34 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Stores backend cloud region states owned by Project Atmosphere.
- * This class owns cloud region lookup only. It does not render, sync, or run weather simulation.
+ * Registre interne des régions de nuage backend.
+ * Cette classe est volontairement package private afin d'éviter les accès directs depuis l'extérieur du backend.
  */
-public final class CloudRegionRegistry {
+final class CloudRegionRegistry {
 
     private final ConcurrentMap<UUID, CloudRegionState> regionsById = new ConcurrentHashMap<>();
 
-    public void add(@NotNull CloudRegionState state) {
+    void add(@NotNull CloudRegionState state) {
         regionsById.put(state.getRegionId(), state);
     }
 
-    public @Nullable CloudRegionState get(@NotNull UUID regionId) {
+    @Nullable CloudRegionState get(@NotNull UUID regionId) {
         return regionsById.get(regionId);
     }
 
-    public void remove(@NotNull UUID regionId) {
+    void remove(@NotNull UUID regionId) {
         regionsById.remove(regionId);
     }
 
-    public boolean contains(@NotNull UUID regionId) {
+    boolean contains(@NotNull UUID regionId) {
         return regionsById.containsKey(regionId);
     }
 
-    public Collection<CloudRegionState> getAll() {
+    Collection<CloudRegionState> getAll() {
         return Collections.unmodifiableCollection(regionsById.values());
     }
 
-    public Collection<CloudRegionState> getActiveRegions() {
+    Collection<CloudRegionState> getActiveRegions() {
         ArrayList<CloudRegionState> activeRegions = new ArrayList<>();
 
         for (CloudRegionState state : regionsById.values()) {
@@ -50,7 +50,7 @@ public final class CloudRegionRegistry {
         return activeRegions;
     }
 
-    public Collection<CloudRegionRenderData> createRenderDataForActiveRegions() {
+    Collection<CloudRegionRenderData> createRenderDataForActiveRegions() {
         ArrayList<CloudRegionRenderData> renderDataList = new ArrayList<>();
 
         for (CloudRegionState state : regionsById.values()) {
@@ -62,11 +62,11 @@ public final class CloudRegionRegistry {
         return renderDataList;
     }
 
-    public void clear() {
+    void clear() {
         regionsById.clear();
     }
 
-    public int size() {
+    int size() {
         return regionsById.size();
     }
 }
