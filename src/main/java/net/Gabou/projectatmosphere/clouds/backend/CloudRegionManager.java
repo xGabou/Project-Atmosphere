@@ -120,7 +120,7 @@ public final class CloudRegionManager {
 
     /**
      * Met à jour les régions de nuage backend.
-     * Le mouvement, la croissance et la durée de vie seront branchés ici plus tard.
+     * Le mouvement, la croissance, la disparition et la durée de vie passent ici.
      *
      * @param level niveau serveur
      */

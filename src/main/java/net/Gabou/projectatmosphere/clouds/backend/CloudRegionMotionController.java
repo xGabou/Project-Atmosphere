@@ -1,11 +1,12 @@
 package net.Gabou.projectatmosphere.clouds.backend;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Gère le mouvement des régions de nuage backend.
- * Cette classe ne crée pas de nuage et ne fait aucun rendu.
+ * Cette classe ne crée pas de nuage, ne sauvegarde rien directement et ne fait aucun rendu.
  */
 final class CloudRegionMotionController {
 
@@ -17,6 +18,22 @@ final class CloudRegionMotionController {
      * @return true si la région a été modifiée
      */
     boolean tick(@NotNull ServerLevel level, @NotNull CloudRegionState state) {
-        return false;
+        if (!state.isActive()) {
+            return false;
+        }
+
+        Vec3 velocity = state.getVelocity();
+
+        if (velocity == null || velocity.lengthSqr() <= 0.000001D) {
+            return false;
+        }
+
+        Vec3 currentCenter = state.getCenter();
+        Vec3 nextCenter = currentCenter.add(velocity);
+
+        state.setPreviousCenter(currentCenter);
+        state.setCenter(nextCenter);
+
+        return true;
     }
 }

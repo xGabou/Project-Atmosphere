@@ -41,6 +41,19 @@ public final class CloudRegionState {
     private static final String TAG_COVERAGE = "Coverage";
     private static final String TAG_EDGE_SOFTNESS = "EdgeSoftness";
 
+    private static final String TAG_PREVIOUS_CENTER_X = "PreviousCenterX";
+    private static final String TAG_PREVIOUS_CENTER_Y = "PreviousCenterY";
+    private static final String TAG_PREVIOUS_CENTER_Z = "PreviousCenterZ";
+
+    private static final String TAG_VELOCITY_X = "VelocityX";
+    private static final String TAG_VELOCITY_Y = "VelocityY";
+    private static final String TAG_VELOCITY_Z = "VelocityZ";
+
+    private static final String TAG_AGE_TICKS = "AgeTicks";
+    private static final String TAG_LIFETIME_TICKS = "LifetimeTicks";
+    private static final String TAG_GROWTH = "Growth";
+    private static final String TAG_DECAY = "Decay";
+
     // Identité stable de cette région de nuage.
     private final UUID regionId;
 
@@ -73,6 +86,27 @@ public final class CloudRegionState {
     private float coverage;
     private float edgeSoftness;
 
+    // Centre précédent du nuage. Sert plus tard à l'interpolation client.
+    private Vec3 previousCenter;
+
+    // Vitesse actuelle du nuage en blocs par tick.
+    private Vec3 velocity;
+
+    // Âge actuel du nuage en ticks.
+    private int ageTicks;
+
+    // Durée de vie prévue du nuage en ticks.
+    private int lifetimeTicks;
+
+    // Facteur de croissance du nuage entre 0 et 1.
+    private float growth;
+
+    // Facteur de disparition du nuage entre 0 et 1.
+    private float decay;
+
+
+
+
     public CloudRegionState(
             UUID regionId,
             ResourceKey<Level> dimension,
@@ -95,6 +129,12 @@ public final class CloudRegionState {
         setDensity(density);
         setCoverage(coverage);
         setEdgeSoftness(edgeSoftness);
+        this.previousCenter = center;
+        this.velocity = Vec3.ZERO;
+        this.ageTicks = 0;
+        this.lifetimeTicks = 20 * 60 * 10;
+        this.growth = 1.0F;
+        this.decay = 0.0F;
 
         this.active = true;
     }
@@ -221,6 +261,54 @@ public final class CloudRegionState {
         this.active = active;
     }
 
+    public Vec3 getPreviousCenter() {
+        return previousCenter;
+    }
+
+    public void setPreviousCenter(Vec3 previousCenter) {
+        this.previousCenter = Objects.requireNonNull(previousCenter, "previousCenter");
+    }
+
+    public Vec3 getVelocity() {
+        return velocity;
+    }
+
+    public void setVelocity(Vec3 velocity) {
+        this.velocity = Objects.requireNonNull(velocity, "velocity");
+    }
+
+    public int getAgeTicks() {
+        return ageTicks;
+    }
+
+    public void setAgeTicks(int ageTicks) {
+        this.ageTicks = Math.max(0, ageTicks);
+    }
+
+    public int getLifetimeTicks() {
+        return lifetimeTicks;
+    }
+
+    public void setLifetimeTicks(int lifetimeTicks) {
+        this.lifetimeTicks = Math.max(1, lifetimeTicks);
+    }
+
+    public float getGrowth() {
+        return growth;
+    }
+
+    public void setGrowth(float growth) {
+        this.growth = clamp01(growth);
+    }
+
+    public float getDecay() {
+        return decay;
+    }
+
+    public void setDecay(float decay) {
+        this.decay = clamp01(decay);
+    }
+
     public @Nullable RegionInstanceKey getCurrentRegionKey() {
         return currentRegionKey;
     }
@@ -252,6 +340,19 @@ public final class CloudRegionState {
         tag.putFloat(TAG_DENSITY, density);
         tag.putFloat(TAG_COVERAGE, coverage);
         tag.putFloat(TAG_EDGE_SOFTNESS, edgeSoftness);
+
+        tag.putDouble(TAG_PREVIOUS_CENTER_X, previousCenter.x());
+        tag.putDouble(TAG_PREVIOUS_CENTER_Y, previousCenter.y());
+        tag.putDouble(TAG_PREVIOUS_CENTER_Z, previousCenter.z());
+
+        tag.putDouble(TAG_VELOCITY_X, velocity.x());
+        tag.putDouble(TAG_VELOCITY_Y, velocity.y());
+        tag.putDouble(TAG_VELOCITY_Z, velocity.z());
+
+        tag.putInt(TAG_AGE_TICKS, ageTicks);
+        tag.putInt(TAG_LIFETIME_TICKS, lifetimeTicks);
+        tag.putFloat(TAG_GROWTH, growth);
+        tag.putFloat(TAG_DECAY, decay);
 
         if (sourceRegionKey != null) {
             tag.put(TAG_SOURCE_REGION, saveRegionKey(sourceRegionKey));
@@ -290,6 +391,26 @@ public final class CloudRegionState {
         float coverage = tag.contains(TAG_COVERAGE) ? tag.getFloat(TAG_COVERAGE) : 0.75F;
         float edgeSoftness = tag.contains(TAG_EDGE_SOFTNESS) ? tag.getFloat(TAG_EDGE_SOFTNESS) : 0.35F;
 
+        Vec3 previousCenter = tag.contains(TAG_PREVIOUS_CENTER_X)
+                ? new Vec3(
+                tag.getDouble(TAG_PREVIOUS_CENTER_X),
+                tag.getDouble(TAG_PREVIOUS_CENTER_Y),
+                tag.getDouble(TAG_PREVIOUS_CENTER_Z)
+        )
+                : center;
+
+        Vec3 velocity = tag.contains(TAG_VELOCITY_X)
+                ? new Vec3(
+                tag.getDouble(TAG_VELOCITY_X),
+                tag.getDouble(TAG_VELOCITY_Y),
+                tag.getDouble(TAG_VELOCITY_Z)
+        )
+                : Vec3.ZERO;
+        int ageTicks = tag.contains(TAG_AGE_TICKS) ? tag.getInt(TAG_AGE_TICKS) : 0;
+        int lifetimeTicks = tag.contains(TAG_LIFETIME_TICKS) ? tag.getInt(TAG_LIFETIME_TICKS) : 20 * 60 * 10;
+        float growth = tag.contains(TAG_GROWTH) ? tag.getFloat(TAG_GROWTH) : 1.0F;
+        float decay = tag.contains(TAG_DECAY) ? tag.getFloat(TAG_DECAY) : 0.0F;
+
         RegionInstanceKey sourceRegionKey = null;
         if (tag.contains(TAG_SOURCE_REGION, Tag.TAG_COMPOUND)) {
             sourceRegionKey = loadRegionKey(tag.getCompound(TAG_SOURCE_REGION));
@@ -309,6 +430,12 @@ public final class CloudRegionState {
         );
 
         state.setActive(tag.getBoolean(TAG_ACTIVE));
+        state.setPreviousCenter(previousCenter);
+        state.setVelocity(velocity);
+        state.setAgeTicks(ageTicks);
+        state.setLifetimeTicks(lifetimeTicks);
+        state.setGrowth(growth);
+        state.setDecay(decay);
 
         if (tag.contains(TAG_CURRENT_REGION, Tag.TAG_COMPOUND)) {
             state.setCurrentRegionKey(loadRegionKey(tag.getCompound(TAG_CURRENT_REGION)));

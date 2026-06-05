@@ -35,7 +35,13 @@ final class CloudRegionRenderDataFactory {
                 DEFAULT_COVERAGE,
                 DEFAULT_EDGE_SOFTNESS,
                 state.isActive(),
-                DEFAULT_DEBUG_COLOR
+                DEFAULT_DEBUG_COLOR,
+                state.getPreviousCenter(),
+                state.getVelocity(),
+                state.getAgeTicks(),
+                state.getLifetimeTicks(),
+                state.getGrowth(),
+                state.getDecay()
         );
     }
 
@@ -57,7 +63,13 @@ final class CloudRegionRenderDataFactory {
                 state.getCoverage(),
                 state.getEdgeSoftness(),
                 state.isActive(),
-                0xFFFFFFFF
+                0xFFFFFFFF,
+                state.getPreviousCenter(),
+                state.getVelocity(),
+                state.getAgeTicks(),
+                state.getLifetimeTicks(),
+                state.getGrowth(),
+                state.getDecay()
         );
     }
 }
