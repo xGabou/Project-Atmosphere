@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.frontend;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -26,19 +27,28 @@ public final class CloudRenderHook {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
+        ClientLevel level = minecraft.level;
 
-        if (minecraft.level == null) {
+        if (level == null) {
             CloudRenderStateUpdater.clearCurrentSnapshots();
             return;
         }
 
-        CloudRenderStateUpdater.updateCurrentSnapshots(
-                ClientCloudRegionDataCache.getCurrentRegions(),
-                minecraft.level.getGameTime(),
-                event.getPartialTick(),
-                event.getCamera().getPosition()
+        CloudRenderFrameContext frameContext = new CloudRenderFrameContext(
+                level,
+                event.getPoseStack(),
+                event.getCamera().getPosition(),
+                level.getGameTime(),
+                event.getPartialTick()
         );
 
-        CloudRenderer.render();
+        CloudRenderStateUpdater.updateCurrentSnapshots(
+                ClientCloudRegionDataCache.getCurrentRegions(),
+                frameContext.getWorldTime(),
+                frameContext.getPartialTick(),
+                frameContext.getCameraPosition()
+        );
+
+        CloudRenderer.render(frameContext);
     }
 }

@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.frontend;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -13,12 +14,13 @@ public final class CloudRenderer {
     }
 
     /**
-     * Prépare le rendu live des nuages à partir du snapshot courant.
-     * Pour l'instant, cette méthode valide seulement que le chemin live existe.
+     * Prépare le rendu live des nuages à partir du contexte de frame courant.
+     *
+     * @param frameContext contexte de rendu de la frame courante
      */
-    public static void render() {
+    public static void render(@NotNull CloudRenderFrameContext frameContext) {
         for (CloudRenderSnapshot snapshot : CloudRenderController.getRenderableLiveSnapshots()) {
-            renderSnapshot(snapshot);
+            renderSnapshot(frameContext, snapshot);
         }
     }
 
@@ -26,9 +28,16 @@ public final class CloudRenderer {
      * Reçoit un snapshot live valide.
      * Le rendu réel sera ajouté ici plus tard.
      *
+     * @param frameContext contexte de rendu de la frame courante
      * @param snapshot snapshot live valide
      */
-    private static void renderSnapshot(@Nullable CloudRenderSnapshot snapshot) {
+    private static void renderSnapshot(
+            @NotNull CloudRenderFrameContext frameContext,
+            @Nullable CloudRenderSnapshot snapshot
+    ) {
+        if (snapshot == null) {
+            return;
+        }
 
         // Futur rendu live ici.
     }

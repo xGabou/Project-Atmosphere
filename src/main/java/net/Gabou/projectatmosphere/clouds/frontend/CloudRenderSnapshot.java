@@ -1,9 +1,9 @@
 package net.Gabou.projectatmosphere.clouds.frontend;
 
-
 import net.minecraft.world.phys.Vec3;
 
 public final class CloudRenderSnapshot {
+
     private final boolean enabled;
     private final String dimension;
     private final long worldTime;
@@ -11,7 +11,8 @@ public final class CloudRenderSnapshot {
 
     private final Vec3 cameraPosition;
     private final Vec3 regionCenter;
-
+    private final Vec3 previousRegionCenter;
+    private final Vec3 velocity;
 
     private final float regionRadius;
     private final float cloudBaseY;
@@ -24,16 +25,45 @@ public final class CloudRenderSnapshot {
     private final float windOffsetX;
     private final float windOffsetZ;
 
+    private final int ageTicks;
+    private final int lifetimeTicks;
+
+    private final float growth;
+    private final float decay;
+
     private final int debugColorOrTint;
 
-
-    public CloudRenderSnapshot(boolean enabled, String dimension, long worldTime, float partialTick, Vec3 cameraPosition, Vec3 regionCenter, float regionRadius, float cloudBaseY, float cloudTopY, float density, float coverage, float edgeSoftness, float windOffsetX, float windOffsetZ, int debugColorOrTint) {
+    public CloudRenderSnapshot(
+            boolean enabled,
+            String dimension,
+            long worldTime,
+            float partialTick,
+            Vec3 cameraPosition,
+            Vec3 regionCenter,
+            Vec3 previousRegionCenter,
+            Vec3 velocity,
+            float regionRadius,
+            float cloudBaseY,
+            float cloudTopY,
+            float density,
+            float coverage,
+            float edgeSoftness,
+            float windOffsetX,
+            float windOffsetZ,
+            int ageTicks,
+            int lifetimeTicks,
+            float growth,
+            float decay,
+            int debugColorOrTint
+    ) {
         this.enabled = enabled;
         this.dimension = dimension;
         this.worldTime = worldTime;
         this.partialTick = partialTick;
         this.cameraPosition = cameraPosition;
         this.regionCenter = regionCenter;
+        this.previousRegionCenter = previousRegionCenter;
+        this.velocity = velocity;
         this.regionRadius = regionRadius;
         this.cloudBaseY = cloudBaseY;
         this.cloudTopY = cloudTopY;
@@ -42,12 +72,12 @@ public final class CloudRenderSnapshot {
         this.edgeSoftness = edgeSoftness;
         this.windOffsetX = windOffsetX;
         this.windOffsetZ = windOffsetZ;
+        this.ageTicks = ageTicks;
+        this.lifetimeTicks = lifetimeTicks;
+        this.growth = growth;
+        this.decay = decay;
         this.debugColorOrTint = debugColorOrTint;
     }
-
-    // ---------------------------------------------------------------------
-    // Getters for all fields. These provide read-only access to the snapshot data.
-    // ---------------------------------------------------------------------
 
     public boolean isEnabled() {
         return enabled;
@@ -71,6 +101,14 @@ public final class CloudRenderSnapshot {
 
     public Vec3 getRegionCenter() {
         return regionCenter;
+    }
+
+    public Vec3 getPreviousRegionCenter() {
+        return previousRegionCenter;
+    }
+
+    public Vec3 getVelocity() {
+        return velocity;
     }
 
     public float getRegionRadius() {
@@ -103,6 +141,22 @@ public final class CloudRenderSnapshot {
 
     public float getWindOffsetZ() {
         return windOffsetZ;
+    }
+
+    public int getAgeTicks() {
+        return ageTicks;
+    }
+
+    public int getLifetimeTicks() {
+        return lifetimeTicks;
+    }
+
+    public float getGrowth() {
+        return growth;
+    }
+
+    public float getDecay() {
+        return decay;
     }
 
     public int getDebugColorOrTint() {

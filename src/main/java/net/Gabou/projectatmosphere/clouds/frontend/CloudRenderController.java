@@ -42,6 +42,9 @@ public final class CloudRenderController {
             if (snapshot.getCloudTopY() <= snapshot.getCloudBaseY()) {
                 continue;
             }
+            if (!CloudDensityProvider.hasVisibleDensity(snapshot)) {
+                continue;
+            }
             liveSnapshots.add(snapshot);
 
         }

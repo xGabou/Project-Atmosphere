@@ -32,13 +32,23 @@ public final class CloudRenderSnapshotBuilder {
             float partialTick,
             @NotNull Vec3 cameraPosition
     ) {
+        Vec3 previousCenter = renderData.getPreviousCenter();
+        Vec3 currentCenter = renderData.getCenter();
+
+        Vec3 interpolatedCenter = previousCenter.lerp(
+                currentCenter,
+                partialTick
+        );
+
         return new CloudRenderSnapshot(
                 renderData.isActive(),
                 renderData.getDimensionId(),
                 worldTime,
                 partialTick,
                 cameraPosition,
-                renderData.getCenter(),
+                interpolatedCenter,
+                previousCenter,
+                renderData.getVelocity(),
                 renderData.getRadius(),
                 renderData.getBaseY(),
                 renderData.getTopY(),
@@ -47,6 +57,10 @@ public final class CloudRenderSnapshotBuilder {
                 renderData.getEdgeSoftness(),
                 DEFAULT_WIND_OFFSET_X,
                 DEFAULT_WIND_OFFSET_Z,
+                renderData.getAgeTicks(),
+                renderData.getLifetimeTicks(),
+                renderData.getGrowth(),
+                renderData.getDecay(),
                 renderData.getDebugColorOrTint()
         );
     }

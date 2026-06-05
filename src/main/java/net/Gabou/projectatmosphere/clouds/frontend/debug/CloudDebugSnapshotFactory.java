@@ -40,6 +40,8 @@ public final class CloudDebugSnapshotFactory {
                 0.0F,
                 safeCameraPosition,
                 safeCenter,
+                safeCenter,
+                Vec3.ZERO,
                 DEBUG_RADIUS,
                 cloudBaseY,
                 cloudTopY,
@@ -47,6 +49,10 @@ public final class CloudDebugSnapshotFactory {
                 DEBUG_COVERAGE,
                 DEBUG_EDGE_SOFTNESS,
                 0.0F,
+                0.0F,
+                0,
+                20 * 60 * 10,
+                1.0F,
                 0.0F,
                 DEBUG_COLOR
         );
@@ -64,6 +70,8 @@ public final class CloudDebugSnapshotFactory {
                 base.getPartialTick(),
                 base.getCameraPosition(),
                 base.getRegionCenter(),
+                base.getPreviousRegionCenter(),
+                base.getVelocity(),
                 base.getRegionRadius(),
                 base.getCloudBaseY(),
                 base.getCloudTopY(),
@@ -72,6 +80,10 @@ public final class CloudDebugSnapshotFactory {
                 base.getEdgeSoftness(),
                 base.getWindOffsetX(),
                 base.getWindOffsetZ(),
+                base.getAgeTicks(),
+                base.getLifetimeTicks(),
+                base.getGrowth(),
+                base.getDecay(),
                 debugColorOrTint
         );
     }
