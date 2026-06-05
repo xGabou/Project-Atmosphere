@@ -58,7 +58,7 @@ public class WindSeedTransport implements SeasonalTreesSeedTransport {
                 iterator.remove();
                 continue;
             }
-            WindVector wind = ForecastOrchestrator.getWind(level, BlockPos.containing(particle.position), tick);
+            WindVector wind = ForecastOrchestrator.getWind(BlockPos.containing(particle.position), tick);
             float speed = wind.gustSpeed() > 0f ? wind.gustSpeed() : wind.baseSpeed();
             double angle = wind.angleRadians();
             Vec3 windVel = new Vec3(-Math.sin(angle), 0.0d, Math.cos(angle)).scale(speed * windScale);
@@ -82,7 +82,7 @@ public class WindSeedTransport implements SeasonalTreesSeedTransport {
     }
 
     private Vec3 initialWindVelocity(ServerLevel level, BlockPos pos) {
-        WindVector wind = ForecastOrchestrator.getWind(level, pos, level.getGameTime());
+        WindVector wind = ForecastOrchestrator.getWind(pos, level.getGameTime());
         float speed = wind.gustSpeed() > 0f ? wind.gustSpeed() : wind.baseSpeed();
         double angle = wind.angleRadians();
         double scale = AtmoCommonConfig.SEASONAL_TREES_SEED_BASE_SPEED.get();

@@ -12,7 +12,6 @@ import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.modules.weather.WeatherSampler;
 import net.minecraft.core.BlockPos;
@@ -71,12 +70,6 @@ public class SimpleCloudsCompat {
     // ---------------------------------------------------------------------
     // Spawn entry points
     // ---------------------------------------------------------------------
-    public static CloudRegion spawnCloudInBiome(String cloudId, BiomeInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
-        if (key == null || key.samplePos() == null) {
-            return null;
-        }
-        return spawnCloud(cloudId, key.samplePos(), key.biomeType(), level, dummy, windVector);
-    }
 
     public static CloudRegion spawnCloudInRegion(String cloudId, RegionInstanceKey key, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
         if (key == null) {
@@ -138,19 +131,6 @@ public class SimpleCloudsCompat {
     // ---------------------------------------------------------------------
     // Cloud region factory
     // ---------------------------------------------------------------------
-    public static Optional<CloudRegion> createRegion(
-            SpawnInfo info,
-            BiomeInstanceKey biomeKey,
-            ServerLevel level,
-            RandomSource random,
-            WindVector wind,
-            CloudGenerator generator
-    ) {
-        if (biomeKey == null || biomeKey.samplePos() == null) {
-            return Optional.empty();
-        }
-        return createRegion(info, biomeKey.samplePos(), level, random, wind, generator);
-    }
 
     public static Optional<CloudRegion> createRegion(
             SpawnInfo info,

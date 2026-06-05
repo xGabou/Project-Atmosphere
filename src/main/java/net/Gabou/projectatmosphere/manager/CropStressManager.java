@@ -2,8 +2,7 @@ package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.api.CropStressEvent;
 import net.Gabou.projectatmosphere.api.CropStressType;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.common.MinecraftForge;
@@ -30,7 +29,7 @@ public class CropStressManager {
      * @return the set of stress types detected (empty if none)
      */
     public static EnumSet<CropStressType> evaluate(ServerLevel level, BlockPos pos) {
-        BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(level, pos);
+        RegionInstanceKey key = RegionInstanceKey.from(pos);
         long tick = level.getGameTime();
         float humidity = ForecastOrchestrator.getCurrentHumidity(key, tick);
         float temperature = ForecastOrchestrator.getCurrentTemperature(key, tick);

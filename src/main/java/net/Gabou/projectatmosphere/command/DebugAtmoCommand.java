@@ -9,8 +9,12 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.AtmoApi;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionBackend;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRegistry;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionState;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
@@ -19,8 +23,7 @@ import net.Gabou.projectatmosphere.client.fog.FogBiomeClassifier;
 import net.Gabou.projectatmosphere.modules.fog.FogHeuristics;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.util.UnitFormatter;
 import net.minecraft.commands.CommandSourceStack;
@@ -33,10 +36,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
+
+import java.util.UUID;
 
 public class DebugAtmoCommand {
 
@@ -84,6 +91,30 @@ public class DebugAtmoCommand {
                             .getKey(world.getBiome(pos).value());
                     return sendForecast(ctx, pos, biome);
                 })
+                // Maintenance and diagnostics
+                .then(Commands.literal("regenerate")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> {
+                            if (ctx.getSource().getPlayer() == null)
+                                ctx.getSource().sendFailure(Component.literal("This command can only be run by a player."));
+                            ServerLevel level = ctx.getSource().getLevel();
+                            if (!TemperatureCommandHelper.isInOverworld(level)) {
+                                ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
+                                return 0;
+                            }
+                            AtmosphereManager.onRegenerate(level);
+
+
+                            ctx.getSource().sendSuccess(() -> Component.literal("Temperature forecast cache has been cleared."), false);
+                            return 1;
+                        }))
+                .then(Commands.literal("resetSpikes")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> {
+                            SpikeManager.clearSpikeCache(ctx.getSource().getLevel());
+                            ctx.getSource().sendSuccess(() -> Component.literal("Spike's cache has been cleared."), false);
+                            return 1;
+                        }))
                 .then(Commands.argument("biome", ResourceLocationArgument.id())
                         .executes(ctx -> {
                             if (!TemperatureCommandHelper.isInOverworld(ctx.getSource().getLevel())) {
@@ -173,6 +204,7 @@ public class DebugAtmoCommand {
                 })
         );
 
+
         root.then(Commands.literal("debugmode")
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> {
@@ -187,6 +219,60 @@ public class DebugAtmoCommand {
                             return 1;
                         })
                 )
+        );
+
+        root.then(Commands.literal("createCloudDebug")
+                .executes(ctx -> {
+                    if (FMLEnvironment.production) {
+                        ctx.getSource().sendFailure(Component.literal("This command is only available in a development environment."));
+                        return 0;
+                    } else {
+                        CommandSourceStack source = ctx.getSource();
+                        ServerLevel level = source.getLevel();
+                        BlockPos pos = BlockPos.containing(source.getPosition());
+
+                        RegionInstanceKey sourceRegionKey = RegionInstanceKey.from(pos);
+
+                        CloudRegionState state = new CloudRegionState(
+                                UUID.randomUUID(),
+                                level.dimension(),
+                                new Vec3(pos.getX(), pos.getY() + 80.0D, pos.getZ()),
+                                64.0F,
+                                pos.getY() + 72.0F,
+                                pos.getY() + 88.0F,
+                                sourceRegionKey
+                        );
+
+                        CloudRegionRegistry registry = CloudRegionBackend.getRegistry(level);
+                        registry.add(state);
+                        CloudRegionBackend.markDirty(level);
+
+                        source.sendSuccess(
+                                () -> Component.literal("Cloud region créée. Total: " + registry.size()),
+                                false
+                        );
+
+                        return 1;
+
+                    }
+                })
+
+        );
+
+        root.then(Commands.literal("Clouds count")
+                .executes(ctx -> {
+                    CommandSourceStack source = ctx.getSource();
+                    ServerLevel level = source.getLevel();
+                    CloudRegionRegistry registry = CloudRegionBackend.getRegistry(level);
+
+                    source.sendSuccess(
+                            () -> Component.literal("Cloud regions sauvegardées: " + registry.size()),
+                            false
+                    );
+
+                    return 1;
+
+                })
         );
     }
 
@@ -209,9 +295,8 @@ public class DebugAtmoCommand {
             generator.removeClouds(r -> r == existing);
         }
 
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        WindVector wind = ForecastOrchestrator.getWind(level, pos, level.getGameTime());
-        return SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
+        WindVector wind = ForecastOrchestrator.getWind(pos, level.getGameTime());
+        return SimpleCloudsCompat.spawnCloudInRegion(cloudId, RegionInstanceKey.from(pos), level, null, wind);
     }
 
     private static int sendFogDebug(CommandContext<CommandSourceStack> ctx) {

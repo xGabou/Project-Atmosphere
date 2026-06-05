@@ -29,7 +29,7 @@ final class TornadoClientSnapshotLogger {
         lastClientSnapshotLogGameTime = gameTime;
 
         if (snapshots.isEmpty()) {
-            ProjectAtmosphere.LOGGER.info("[TornadoSync] client {} received empty snapshot list at gameTime={}", source, gameTime);
+            //ProjectAtmosphere.LOGGER.info("[TornadoSync] client {} received empty snapshot list at gameTime={}", source, gameTime);
             return;
         }
 

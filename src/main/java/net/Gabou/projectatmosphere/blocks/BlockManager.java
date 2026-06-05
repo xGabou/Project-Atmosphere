@@ -36,7 +36,7 @@ public class BlockManager {
 
     public static void spawnDust(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
-        WindVector windVector = ForecastOrchestrator.getWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
+        WindVector windVector = ForecastOrchestrator.getWind(centerPos, level.getGameTime());
         float windStrength = windVector.baseSpeed();
         int maxSpawn = Math.min(10, (int) (windStrength * 8));
 
@@ -75,7 +75,7 @@ public class BlockManager {
 
     public static void spawnSand(ServerLevel level, BlockPos centerPos) {
         RandomSource random = level.getRandom();
-        WindVector windVector = ForecastOrchestrator.getWind(AtmosphereUtils.getBiomeKey(level, centerPos), level.getGameTime());
+        WindVector windVector = ForecastOrchestrator.getWind(centerPos, level.getGameTime());
         float windStrength = windVector.baseSpeed();
         int maxSpawn = Math.min(10, (int) (windStrength * 8));
 

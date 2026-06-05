@@ -1,5 +1,7 @@
 # Phase 0 Cloud Renderer Contract
 
+> Canonical entry point: `Renderer/cloud_backend_start_here.md`
+
 ## 1. Purpose
 
 Phase 0 exists only to create a safe renderer boundary and a fake snapshot path.
@@ -257,4 +259,3 @@ First implementation should touch existing PA weather: **no**
 First implementation should touch SimpleClouds renderers: **no**
 
 First implementation should create only isolated client render boundary classes: **yes**
-

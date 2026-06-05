@@ -48,7 +48,7 @@ public final class WindForces {
         if (exposure <= 0f) {
             return;
         }
-        WindVector wind = ForecastOrchestrator.getWind(level, entity.blockPosition(), level.getGameTime());
+        WindVector wind = ForecastOrchestrator.getWind(entity.blockPosition(), level.getGameTime());
         float windSpeed = wind.baseSpeed();
         if (allowGusts) {
             float gustDelta = Math.max(0f, wind.gustSpeed() - windSpeed);
@@ -93,7 +93,7 @@ public final class WindForces {
             PLAYER_GUSTS.remove(id);
             return;
         }
-        WindVector wind = ForecastOrchestrator.getWind(level, player.blockPosition(), level.getGameTime());
+        WindVector wind = ForecastOrchestrator.getWind(player.blockPosition(), level.getGameTime());
         float baseSpeed = wind.baseSpeed();
         float threshold = WindConfig.playerWindThresholdMps();
         if (baseSpeed <= threshold) {

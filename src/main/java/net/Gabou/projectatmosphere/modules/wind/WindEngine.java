@@ -3,11 +3,8 @@ package net.Gabou.projectatmosphere.modules.wind;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
-import net.Gabou.projectatmosphere.modules.region.RegionIdCodec;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
@@ -24,14 +21,6 @@ public final class WindEngine {
     private static final Map<RegionInstanceKey, WindRuntimeState> STATES = new HashMap<>();
 
     private WindEngine() { }
-
-    public static void rebuildFromForecasts(Map<BiomeInstanceKey, BiomeForecast> biomeForecasts) {
-        FORECASTS.clear();
-        biomeForecasts.forEach((key, forecast) -> {
-            RegionInstanceKey id = RegionIdCodec.ofBlockPos(key.samplePos());
-            FORECASTS.put(id, WindForecast.fromBiomeForecast(forecast));
-        });
-    }
 
     public static void rebuildFromRegions(Map<RegionInstanceKey, ForecastRegion> regionForecasts) {
         FORECASTS.clear();
@@ -65,11 +54,6 @@ public final class WindEngine {
         }
     }
 
-    public static WindVector getCurrentHighWindVector(BiomeInstanceKey key, long worldTime) {
-        RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
-        return getCurrentHighWindVector(regionId, worldTime);
-    }
-
     public static WindVector getCurrentHighWindVector(RegionInstanceKey regionId, long worldTime) {
         WindRuntimeState runtime = STATES.computeIfAbsent(regionId, k -> new WindRuntimeState());
         WindForecast forecast = FORECASTS.get(regionId);
@@ -77,11 +61,6 @@ public final class WindEngine {
             return WindVector.fromBase(0f, 0f);
         }
         return HighWindModel.sample(forecast, runtime, worldTime);
-    }
-
-    public static WindVector getCurrentLowWindVector(BiomeInstanceKey key, long worldTime) {
-        RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
-        return getCurrentLowWindVector(regionId, worldTime, ForecastOrchestrator.getCurrentStormChance(key, worldTime));
     }
 
     public static WindVector getCurrentLowWindVector(RegionInstanceKey regionId, long worldTime, float stormChance) {
@@ -93,10 +72,6 @@ public final class WindEngine {
         return LowWindModel.sample(forecast, runtime, worldTime, stormChance);
     }
 
-    public static boolean isGustActive(BiomeInstanceKey key) {
-        WindRuntimeState runtime = STATES.get(RegionIdCodec.ofBlockPos(key.samplePos()));
-        return runtime != null && runtime.isGustActive();
-    }
 
     public static TornadoWindModel.TornadoForces getCurrentTornadoForce(Vec3 position) {
         return TornadoWindModel.compute(position);

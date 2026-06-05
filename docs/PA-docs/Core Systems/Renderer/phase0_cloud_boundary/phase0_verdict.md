@@ -1,5 +1,7 @@
 # Phase 0 Verdict
 
+> Canonical entry point: `Renderer/cloud_backend_start_here.md`
+
 ## Can We Build A Fake Debug Cloud Without Cleaning PA First?
 
 Yes. A fake debug cloud can be built without cleaning the whole codebase first, as long as it uses a tiny snapshot/cache boundary and does not pull directly from live simulation classes.
@@ -30,4 +32,3 @@ Create a tiny fake-cloud snapshot and client cache boundary, then connect a sing
 ## Final Phase 0 Position
 
 Phase 0 should stay intentionally small. The next step is not a large cleanup. It is a narrow contract that makes a future fake debug cloud safe to add and later replace with PA-driven cloud data.
-

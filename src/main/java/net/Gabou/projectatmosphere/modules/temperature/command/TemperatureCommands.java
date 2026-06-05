@@ -130,32 +130,6 @@ public class TemperatureCommands {
                                     return 1;
                                 }))
 
-                        // Maintenance and diagnostics
-                        .then(Commands.literal("regenerate")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(ctx -> {
-                                    if (ctx.getSource().getPlayer() == null)
-                                        ctx.getSource().sendFailure(Component.literal("This command can only be run by a player."));
-                                    ServerLevel level = ctx.getSource().getLevel();
-                                    if(!TemperatureCommandHelper.isInOverworld(level))
-                                    {
-                                        ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
-                                        return 0;
-                                    }
-                                    AtmosphereManager.onRegenerate(level);
-
-
-                                    ctx.getSource().sendSuccess(() -> Component.literal("Temperature forecast cache has been cleared."), false);
-                                    return 1;
-                                }))
-                        .then(Commands.literal("resetSpikes")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(ctx -> {
-                                    SpikeManager.clearSpikeCache(ctx.getSource().getLevel());
-                                    ctx.getSource().sendSuccess(() -> Component.literal("Spike's cache has been cleared."), false);
-                                    return 1;
-                                }))
-
                         // Help output
                         .then(Commands.literal("help")
                                 .executes(ctx -> {

@@ -1,5 +1,7 @@
 # Backend Readiness For Cloud Renderer
 
+> Canonical entry point: `Renderer/cloud_backend_start_here.md`
+
 ## What Backend Values Are Solid
 
 - Temperature forecasts and region-level temperature curves.
@@ -60,4 +62,3 @@
 ## Readiness Verdict
 
 The backend is **close enough to support a future cloud renderer**, but it is **not yet clean enough to be the direct source of renderer truth**. The missing piece is not more simulation complexity. The missing piece is a stable, documented render data contract.
-

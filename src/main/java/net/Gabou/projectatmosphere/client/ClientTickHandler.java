@@ -5,8 +5,6 @@ import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.TornadoClientEffects;
-import net.Gabou.projectatmosphere.clouds.CloudDebugRenderer;
-import net.Gabou.projectatmosphere.clouds.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -17,8 +15,6 @@ import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkyEffectController;
 import net.Gabou.projectatmosphere.client.render.sky.SkyEffectState;
 import net.minecraft.client.Minecraft;
@@ -123,9 +119,7 @@ public class ClientTickHandler {
                 // snapshot
                 BlockPos pos = mc.player.blockPosition();
                 long gameTime = mc.level.getGameTime();
-                BiomeInstanceKey key = new BiomeInstanceKey(
-                        AtmosphereUtils.getBiomeLocation(pos, mc.level), pos);
-                WindVector wind = ForecastOrchestrator.getWind(key, gameTime);
+                WindVector wind = ForecastOrchestrator.getWind(pos, gameTime);
                 float speed = WindMath.getSmoothGustedSpeed(wind, gameTime);
 
                 if (speed >= 2.0f) {

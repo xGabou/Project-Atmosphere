@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.clouds;
+package net.Gabou.projectatmosphere.clouds.frontend;
 
 
 import net.minecraft.world.phys.Vec3;

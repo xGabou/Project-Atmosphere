@@ -4,10 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -41,24 +39,6 @@ public final class TornadoStorageManager {
         data.hurricanes.clear();
         data.hurricanes.addAll(HurricaneManager.savePersistentHurricanes());
         data.setDirty();
-    }
-
-    public static void setCooldown(BiomeInstanceKey key, long untilTick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            setCooldown(regionKey, untilTick);
-            return;
-        }
-        COOLDOWNS.put(key.toString(), untilTick);
-    }
-
-    public static boolean isOnCooldown(BiomeInstanceKey key, long nowTick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return isOnCooldown(regionKey, nowTick);
-        }
-        Long until = COOLDOWNS.get(key.toString());
-        return until != null && nowTick < until;
     }
 
     public static void setCooldown(RegionInstanceKey key, long untilTick) {

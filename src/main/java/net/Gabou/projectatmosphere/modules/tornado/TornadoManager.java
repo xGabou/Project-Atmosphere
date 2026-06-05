@@ -247,7 +247,7 @@ public class TornadoManager {
         }
         CLIENT_TORNADOES.clear();
         CLIENT_TORNADOES.addAll(next);
-        TornadoClientSnapshotLogger.log("sync", snapshots, TornadoManager::findClient);
+        //TornadoClientSnapshotLogger.log("sync", snapshots, TornadoManager::findClient);
     }
 
     @OnlyIn(Dist.CLIENT)
@@ -256,7 +256,7 @@ public class TornadoManager {
         if (!CLIENT_TORNADOES.contains(tornado)) {
             CLIENT_TORNADOES.add(tornado);
         }
-        TornadoClientSnapshotLogger.log("spawn", List.of(snapshot), TornadoManager::findClient);
+        //TornadoClientSnapshotLogger.log("spawn", List.of(snapshot), TornadoManager::findClient);
     }
 
     private static TornadoInstance createOrUpdateClientTornado(TornadoSnapshot snapshot) {

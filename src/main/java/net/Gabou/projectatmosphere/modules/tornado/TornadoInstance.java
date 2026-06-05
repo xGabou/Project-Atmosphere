@@ -393,7 +393,7 @@ public class TornadoInstance {
 
         this.resetRuntimeDebugStats();
 
-        WindVector sampledWind = ForecastOrchestrator.getWind(level, BlockPos.containing(this.position), gameTime);
+        WindVector sampledWind = ForecastOrchestrator.getWind(BlockPos.containing(this.position), gameTime);
         this.wind = sampledWind;
         this.refreshStormLevel(level, gameTime);
         float waterExposure = this.sampleWaterExposure(level);

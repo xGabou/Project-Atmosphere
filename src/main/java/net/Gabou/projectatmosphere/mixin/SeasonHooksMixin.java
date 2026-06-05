@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import sereneseasons.season.SeasonHooks;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
 /**
  * Injected by Project Atmosphere to replace Serene Seasons'
@@ -33,14 +32,8 @@ public class SeasonHooksMixin {
 
             if(serverLevel.dimension() != Level.OVERWORLD) return;
 
-            // Build a BiomeInstanceKey for PA
-            BiomeInstanceKey key = new BiomeInstanceKey(
-                    serverLevel.getBiome(pos).unwrapKey().orElseThrow().location(),
-                    pos
-            );
-
             // Get real forecasted temperature
-            float temperature = ForecastOrchestrator.getCurrentTemperature(key, serverLevel.getDayTime());
+            float temperature = ForecastOrchestrator.getCurrentTemperature(serverLevel,pos, serverLevel.getDayTime());
 
             // If below 0°C → not warm enough to rain (means it’s freezing)
             if (temperature < 0.0F) {

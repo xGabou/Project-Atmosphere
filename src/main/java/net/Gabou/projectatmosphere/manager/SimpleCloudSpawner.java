@@ -11,7 +11,6 @@ import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.modules.weather.WeatherSampler;
 import net.minecraft.core.BlockPos;
@@ -183,9 +182,8 @@ public class SimpleCloudSpawner {
     }
 
     public static void spawnCloudForPlayer(ServerPlayer player, ServerLevel level) {
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(player.blockPosition(), level), player.blockPosition());
         RegionInstanceKey regionKey = RegionInstanceKey.from(player.blockPosition());
-        SimpleCloudsCompat.spawnCloudInBiome("itty_bitty", key, level, null, ForecastOrchestrator.getWind(regionKey, level.getGameTime()));
+        SimpleCloudsCompat.spawnCloudInRegion("itty_bitty", regionKey, level, null, ForecastOrchestrator.getWind(regionKey, level.getGameTime()));
     }
 
 

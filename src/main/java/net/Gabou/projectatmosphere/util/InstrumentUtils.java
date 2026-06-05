@@ -30,7 +30,7 @@ public class InstrumentUtils {
         if (!ensureForecastReady(serverLevel, serverPlayer, pos)) {
             return;
         }
-        WindVector wind = ForecastOrchestrator.getWind(serverLevel, pos, serverLevel.getDayTime());
+        WindVector wind = ForecastOrchestrator.getWind(pos, serverLevel.getDayTime());
         String msg = "Wind: " + UnitFormatter.formatWindSpeed(wind.baseSpeed()) +
                 " at " + String.format("%.0f\u00B0", Math.toDegrees(wind.angleRadians()));
         send(serverPlayer, msg);

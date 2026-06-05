@@ -2,10 +2,11 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.Gabou.projectatmosphere.clouds.CloudDebugRenderHook;
-import net.Gabou.projectatmosphere.clouds.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugRenderHook;
+import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
+import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -55,6 +56,9 @@ public class TelemetryDebugClientCommand {
                                             }
                                             else {
                                                 CloudDebugRenderHook.changeCloudDebugRenderHook();
+                                                if (CloudDebugRenderHook.isCloudDebugRenderEnabled() && Minecraft.getInstance().player != null) {
+                                                    CloudDebugStateInitializer.initialize(Minecraft.getInstance().player.position());
+                                                }
                                                 ctx.getSource().sendSuccess(() -> Component.literal("Toggled cloud debug render."), false);
                                                 return 1;
                                             }
@@ -65,4 +69,5 @@ public class TelemetryDebugClientCommand {
                         )
         );
     }
+
 }

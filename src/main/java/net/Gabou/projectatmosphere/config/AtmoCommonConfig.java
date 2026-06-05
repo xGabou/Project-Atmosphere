@@ -135,7 +135,7 @@ public class AtmoCommonConfig {
         builder.push("storms");
         STORM_SEVERITY_BOOSTER = builder
                 .comment("Global multiplier for storm severity calculations")
-                .defineInRange("stormSeverityBooster", 3.2d, 0.5d, 8d);
+                .defineInRange("stormSeverityBooster", 3.2d, 0.5d, 28d);
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);

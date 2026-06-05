@@ -58,6 +58,7 @@ public class AtmosphereManager {
         AtmosphereCloudRegionTracker.reset(world);
         CloudRegionQueue.clear();
         recordSeasonStage(world);
+
     }
 
     public static void onServerStopping(ServerLevel world) {

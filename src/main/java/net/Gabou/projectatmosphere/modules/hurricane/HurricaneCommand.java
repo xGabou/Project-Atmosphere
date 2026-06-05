@@ -38,7 +38,7 @@ public class HurricaneCommand {
                             }
                             int catInt = IntegerArgumentType.getInteger(ctx, "category");
                             HurricaneCategory cat = HurricaneCategory.fromId(catInt);
-                            var wind = ForecastOrchestrator.getWind(level, pos, level.getGameTime());
+                            var wind = ForecastOrchestrator.getWind(pos, level.getGameTime());
                     Vec3 spawnPos = new Vec3(player.getX(), level.getSeaLevel(), player.getZ());
                     HurricaneManager.spawnServer(level, spawnPos, 40.0F, wind, cat);
                     ctx.getSource().sendSuccess(() -> Component.literal("Hurricane category " + catInt + " spawned and is forming."), true);

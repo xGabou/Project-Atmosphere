@@ -2,7 +2,7 @@ package net.Gabou.projectatmosphere.mixin;
 
 import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -93,7 +93,7 @@ public class BiomeFreezingMixin {
             if (biomeId == null) {
                 return null;
             }
-            BiomeInstanceKey key = new BiomeInstanceKey(biomeId, pos);
+            RegionInstanceKey key = RegionInstanceKey.from(pos);
             return ForecastOrchestrator.getCurrentTemperature(key, serverLevel.getGameTime());
         }
         if (level instanceof Level clientLevel

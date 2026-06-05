@@ -14,7 +14,6 @@ import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
 import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.tornado.scheduling.TornadoSpawnScheduler;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -69,27 +68,11 @@ public final class TornadoProbabilityManager {
         return risk;
     }
 
-    @Deprecated
-    public static float computeRisk(BiomeInstanceKey key, ServerLevel level, long nowTick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey == null) {
-            return 0f;
-        }
-        return computeRisk(regionKey, level, nowTick);
-    }
 
     public static boolean isCellOnCooldown(RegionInstanceKey key, ServerLevel level, long nowTick) {
         return TornadoStorageManager.isOnCooldown(key, nowTick);
     }
 
-    @Deprecated
-    public static boolean isCellOnCooldown(BiomeInstanceKey key, ServerLevel level, long nowTick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey == null) {
-            return false;
-        }
-        return isCellOnCooldown(regionKey, level, nowTick);
-    }
 
     private static boolean isStormy(RegionInstanceKey key, ServerLevel level) {
         RegionalWeatherPhase phase = ForecastOrchestrator.getWeatherPhase(level, key, level.getGameTime());

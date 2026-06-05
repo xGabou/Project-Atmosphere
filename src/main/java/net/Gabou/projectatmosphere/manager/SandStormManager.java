@@ -1,3 +1,4 @@
+//TODO remove biomeInstanceKeys
 package net.Gabou.projectatmosphere.manager;
 
 import com.BreadRes.desertstormwarming.logic.SandstormPhase;
@@ -42,10 +43,6 @@ public class SandStormManager {
     static BiomeInstanceKey scheduledStormBiome = null;
     static SandstormPhase scheduledStormPhase = null;
     static long scheduledStormTime = -1L;
-
-    public static BiomeInstanceKey getScheduledSandstormBiome() {
-        return scheduledStormBiome;
-    }
 
     public static final Set<ResourceLocation> SANDSTORM_BIOMES = Set.of(
             ResourceLocation.fromNamespaceAndPath("minecraft", "desert"),

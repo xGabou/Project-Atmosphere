@@ -465,8 +465,8 @@ public class ForecastOrchestrator {
      * Region-based wind sampling. Preferred over biome APIs.
      */
     @Deprecated
-    public static WindVector getCurrentWind(ServerLevel level, BlockPos pos, long tick) {
-        return getWind(level, pos, tick);
+    public static WindVector getCurrentWind(BlockPos pos, long tick) {
+        return getWind(pos, tick);
     }
 
     /**
@@ -483,7 +483,7 @@ public class ForecastOrchestrator {
     /**
      * Canonical wind selector: dynamic state if available, forecast fallback, then safe default.
      */
-    public static WindVector getWind(ServerLevel level, BlockPos pos, long tick) {
+    public static WindVector getWind(BlockPos pos, long tick) {
         if (pos == null) {
             return SAFE_DEFAULT_WIND;
         }

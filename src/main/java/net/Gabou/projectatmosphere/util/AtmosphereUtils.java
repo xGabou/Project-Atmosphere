@@ -34,16 +34,6 @@ public class AtmosphereUtils {
         return new BlockPos(x, y, z);
     }
 
-    /**
-     * Gets the biome key at a given position in a level.
-     */
-    public static BiomeInstanceKey getBiomeKey(ServerLevel level, BlockPos pos) {
-        ResourceLocation biomeId = level.registryAccess()
-                .registryOrThrow(net.minecraft.core.registries.Registries.BIOME)
-                .getKey(level.getBiome(pos).value());
-
-        return new BiomeInstanceKey(biomeId, pos);
-    }
     public static ResourceLocation getBiomeLocation(BlockPos pos, Level world) {
         return world.getBiome(pos).unwrapKey().get().location();
     }

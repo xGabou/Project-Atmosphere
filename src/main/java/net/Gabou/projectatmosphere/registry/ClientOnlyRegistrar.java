@@ -1,8 +1,9 @@
 package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
-import net.Gabou.projectatmosphere.clouds.CloudDebugRenderHook;
-import net.Gabou.projectatmosphere.clouds.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderHook;
+import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugRenderHook;
+import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.auroras.AuroraCompatController;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
@@ -24,6 +25,7 @@ public class ClientOnlyRegistrar {
     public static void registerClient(IEventBus modEventBus, FMLJavaModLoadingContext context) {
         modEventBus.register(ClientTickHandler.class);
         MinecraftForge.EVENT_BUS.register(CloudDebugRenderHook.class);
+        MinecraftForge.EVENT_BUS.register(CloudRenderHook.class);
         context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
                 () -> new ConfigScreenHandler.ConfigScreenFactory((mc, screen) -> new AtmoConfigScreen(screen)));
         RainbowWeatherTracker.setEnabled(CompatHandler.isRainbowsLoaded());

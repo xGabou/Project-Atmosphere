@@ -19,7 +19,7 @@ public final class ProjectAtmosphereCommands {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("pa");
 
-        root.then(TemperatureCommands.build());
+        //root.then(TemperatureCommands.build());
         root.then(HumidityCommand.build());
         root.then(PressureCommand.build());
         root.then(WindCommand.build());

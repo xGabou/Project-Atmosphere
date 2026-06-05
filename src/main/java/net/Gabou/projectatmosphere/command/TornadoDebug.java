@@ -13,7 +13,6 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoSpawner;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -36,7 +35,6 @@ public final class TornadoDebug {
                                         ctx.getSource().sendFailure(Component.literal("Cloud spawning is only available in the Overworld."));
                                         return 0;
                                     }
-                                    var key = AtmosphereUtils.getBiomeKey(level, player.blockPosition());
                                     RegionInstanceKey regionKey = RegionInstanceKey.from(player.blockPosition());
 
                                     WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
@@ -47,7 +45,7 @@ public final class TornadoDebug {
                                             );
 
                                     String cloudId = StringArgumentType.getString(ctx, "id");
-                                    var region = SimpleCloudsCompat.spawnCloudInBiome(cloudId, key, level, null, wind);
+                                    var region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
 
                                     if (region != null) {
                                         ctx.getSource().sendSuccess(

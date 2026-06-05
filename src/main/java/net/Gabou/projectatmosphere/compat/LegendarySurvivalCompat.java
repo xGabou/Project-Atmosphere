@@ -1,8 +1,6 @@
 package net.Gabou.projectatmosphere.compat;
 
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -20,11 +18,11 @@ public class LegendarySurvivalCompat {
      * Generates a 7-day forecast using current LSO temp as base, with estimated min/max per day.
      * @return float[7][2] => [ [minDay1, maxDay1], [minDay2, maxDay2], ..., [minDay7, maxDay7] ]
      */
-    public static float[][] injectForecastForLSO(BiomeInstanceKey key, ServerLevel level) {
-        BlockPos sample = key.samplePos();
-        float baseTemp = TemperatureUtil.getWorldTemperature(level, sample);
-        return generateMinMaxCurve(baseTemp, level.getRandom());
-    }
+//    public static float[][] injectForecastForLSO(BiomeInstanceKey key, ServerLevel level) {
+//        BlockPos sample = key.samplePos();
+//        float baseTemp = TemperatureUtil.getWorldTemperature(level, sample);
+//        return generateMinMaxCurve(baseTemp, level.getRandom());
+//    }
 
     /**
      * Creates a sinusoidal 7-day swing curve around a base temperature.

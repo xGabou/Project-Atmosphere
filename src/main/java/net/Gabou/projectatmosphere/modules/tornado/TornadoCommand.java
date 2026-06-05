@@ -7,8 +7,6 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
@@ -75,10 +73,6 @@ public class TornadoCommand {
 
                     Vec3 playerPos = player.position();
                     Vec3 tornadoPos = new Vec3(playerPos.x, level.getSeaLevel(), playerPos.z);
-                    BiomeInstanceKey key = new BiomeInstanceKey(
-                            AtmosphereUtils.getBiomeLocation(player.blockPosition(), level),
-                            player.blockPosition()
-                    );
                     RegionInstanceKey regionKey = RegionInstanceKey.from(player.blockPosition());
                     WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
                     net.Gabou.projectatmosphere.modules.core.WindVector wind =
@@ -100,9 +94,9 @@ public class TornadoCommand {
                         return 1;
                     }
 
-                    CloudRegion spawnedRegion = SimpleCloudsCompat.spawnCloudInBiome(
+                    CloudRegion spawnedRegion = SimpleCloudsCompat.spawnCloudInRegion(
                             "cumulonimbus",
-                            key,
+                            regionKey,
                             level,
                             null,
                             wind

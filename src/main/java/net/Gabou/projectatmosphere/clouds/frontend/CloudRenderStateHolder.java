@@ -1,4 +1,4 @@
-package net.Gabou.projectatmosphere.clouds;
+package net.Gabou.projectatmosphere.clouds.frontend;
 
 public final class CloudRenderStateHolder {
     private CloudRenderStateHolder() {

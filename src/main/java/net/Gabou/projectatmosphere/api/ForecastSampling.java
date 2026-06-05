@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.api;
 
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -17,14 +16,6 @@ public final class ForecastSampling {
     // ---------------------------------------------------------------------
     // Temperature
     // ---------------------------------------------------------------------
-    @Deprecated
-    public static float getTemperatureC(BiomeInstanceKey key, ServerLevel level) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return getTemperatureC(regionKey, level.getGameTime());
-        }
-        return ForecastOrchestrator.getCurrentTemperature(key, level.getGameTime());
-    }
 
     public static float getTemperatureC(ServerLevel level, BlockPos pos) {
         return ForecastOrchestrator.getCurrentTemperature(level, pos, level.getGameTime());
@@ -37,14 +28,6 @@ public final class ForecastSampling {
     // ---------------------------------------------------------------------
     // Humidity
     // ---------------------------------------------------------------------
-    @Deprecated
-    public static float getHumidityPercent(BiomeInstanceKey key, ServerLevel level) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return getHumidityPercent(regionKey, level.getGameTime());
-        }
-        return ForecastOrchestrator.getCurrentHumidity(key, level.getGameTime());
-    }
 
     public static float getHumidityPercent(ServerLevel level, BlockPos pos) {
         return ForecastOrchestrator.getCurrentHumidity(level, pos, level.getGameTime());
@@ -57,14 +40,6 @@ public final class ForecastSampling {
     // ---------------------------------------------------------------------
     // Pressure
     // ---------------------------------------------------------------------
-    @Deprecated
-    public static float getPressureHpa(BiomeInstanceKey key, ServerLevel level) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return getPressureHpa(regionKey, level.getGameTime());
-        }
-        return ForecastOrchestrator.getCurrentPressure(key, level.getGameTime());
-    }
 
     public static float getPressureHpa(ServerLevel level, BlockPos pos) {
         return ForecastOrchestrator.getCurrentPressure(level, pos, level.getGameTime());
@@ -72,18 +47,6 @@ public final class ForecastSampling {
 
     public static float getPressureHpa(RegionInstanceKey regionKey, long tick) {
         return ForecastOrchestrator.getCurrentPressure(regionKey, tick);
-    }
-
-    public static float minNeighborPressureHpa(BiomeInstanceKey key, ServerLevel level) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return minNeighborPressureHpa(regionKey, level.getGameTime());
-        }
-        BlockPos base = key.samplePos();
-        if (base == null) {
-            return getPressureHpa(key, level);
-        }
-        return minNeighborPressureHpa(level, base);
     }
 
     public static float minNeighborPressureHpa(ServerLevel level, BlockPos pos) {
