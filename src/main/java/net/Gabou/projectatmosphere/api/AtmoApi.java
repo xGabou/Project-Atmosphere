@@ -6,12 +6,10 @@ import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.core.WeatherType;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 
 /**
  * Public-facing read-only API for accessing Project Atmosphere forecasts and current weather.
@@ -146,11 +144,11 @@ public class AtmoApi {
      */
     @Deprecated(since ="0.5.4.0", forRemoval = true)
     public boolean isRainningAt(ServerLevel level, BlockPos pos) {
-        return CloudManager.get(level).isRainingAt(pos);
+        return getWeatherSnapshot(level, pos, level.getGameTime()).rainIntensity() > 0.0F;
     }
 
     public boolean isRainningLevel(ServerLevel level, BlockPos pos) {
-        return CloudManager.get(level).getClouds().stream().anyMatch(cloud -> WeatherType.isRainy(cloud.getCloudTypeId()));
+        return getWeatherSnapshot(level, pos, level.getGameTime()).rainIntensity() > 0.0F;
     }
 
     // ---------------------------------------------------------------------

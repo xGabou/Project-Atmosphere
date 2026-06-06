@@ -1,12 +1,10 @@
 package net.Gabou.projectatmosphere;
 
 
-import dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI;
-import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import net.Gabou.projectatmosphere.auth.ClientLauncherGuards;
 import net.Gabou.projectatmosphere.auth.ServerAuth;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -74,8 +72,6 @@ public class ProjectAtmosphere {
         ModSounds.register(modEventBus);
         NetworkHandler.init();
 
-        SimpleCloudsConstants.SPAWN_RADIUS = Math.min(DEFAULT_RADIUS/5,10000);
-
         modEventBus.addListener(this::setup);
         modEventBus.addListener((FMLClientSetupEvent event) -> {
             clientSetup(event,context);
@@ -107,7 +103,7 @@ public class ProjectAtmosphere {
             if(!world.isClientSide)
             {
                 AsyncAtmosphereService.init(false);
-                SimpleCloudsCompat.init(world);
+                AtmosphereCloudServices.get().onServerStarting(world);
                 seed = world.getSeed();
             }
             else{
@@ -161,11 +157,26 @@ public class ProjectAtmosphere {
         TornadoProbabilityManager.init();
         event.enqueueWork(() -> {
 
-            SimpleCloudsAPI.getApi().getHooks().setExternalWeatherControl(true);
+            configureOptionalCloudHooks();
             // Load user biome temperature overrides after defaults are initialized
             net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempUserConfig.load();
         });
 
+    }
+
+    private void configureOptionalCloudHooks() {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
+
+        try {
+            Class<?> apiClass = Class.forName("dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI");
+            Object api = apiClass.getMethod("getApi").invoke(null);
+            Object hooks = api.getClass().getMethod("getHooks").invoke(api);
+            hooks.getClass().getMethod("setExternalWeatherControl", boolean.class).invoke(hooks, true);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            LOGGER.warn("[Atmosphere] Failed to configure Simple Clouds hooks.", exception);
+        }
     }
 
 

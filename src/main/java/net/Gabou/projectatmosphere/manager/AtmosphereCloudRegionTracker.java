@@ -13,24 +13,24 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-final class AtmosphereCloudRegionTracker {
+public final class AtmosphereCloudRegionTracker {
     private static final List<CloudRegion> CLOUD_REGIONS = new ArrayList<>();
 
     private AtmosphereCloudRegionTracker() {
     }
 
-    static void reset(ServerLevel level) {
+    public static void reset(ServerLevel level) {
         CLOUD_REGIONS.clear();
         if (level != null) {
             CLOUD_REGIONS.addAll(CloudManager.get(level).getClouds());
         }
     }
 
-    static void clear() {
+    public static void clear() {
         CLOUD_REGIONS.clear();
     }
 
-    static void reconcile(ServerLevel level) {
+    public static void reconcile(ServerLevel level) {
         if (level == null) {
             return;
         }
@@ -53,7 +53,7 @@ final class AtmosphereCloudRegionTracker {
         }
     }
 
-    static void pollQueue(ServerLevel level) {
+    public static void pollQueue(ServerLevel level) {
         if (CloudRegionQueue.isEmpty()) {
             CloudRegionQueue.shuffle();
             return;
@@ -67,15 +67,15 @@ final class AtmosphereCloudRegionTracker {
         }
     }
 
-    static List<CloudRegion> getCloudRegions() {
+    public static List<CloudRegion> getCloudRegions() {
         return Collections.unmodifiableList(CLOUD_REGIONS);
     }
 
-    static void queueAdd(CloudRegion cloudRegion) {
+    public static void queueAdd(CloudRegion cloudRegion) {
         CloudRegionQueue.enqueueAdd(cloudRegion);
     }
 
-    static void queueRemove(CloudRegion cloudRegion) {
+    public static void queueRemove(CloudRegion cloudRegion) {
         CloudRegionQueue.enqueueRemove(cloudRegion);
     }
 

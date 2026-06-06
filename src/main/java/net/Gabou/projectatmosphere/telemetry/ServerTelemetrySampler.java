@@ -15,9 +15,7 @@ import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ChannelSummary;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.OccupiedChunk;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PlayerExperienceSample;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.RegionForecastSample;
-import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -71,11 +69,12 @@ public final class ServerTelemetrySampler {
     }
 
     private static void recordPlayerSample(ServerLevel level, ServerPlayer player, BlockPos pos, long gameTime) {
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        float temperature = ForecastOrchestrator.getCurrentTemperature(key, gameTime);
-        float humidity = ForecastOrchestrator.getCurrentHumidity(key, gameTime);
-        float pressure = ForecastOrchestrator.getCurrentPressure(key, gameTime);
-        WindVector wind = ForecastOrchestrator.getWind(key, gameTime);
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        ResourceLocation biomeId = AtmosphereUtils.getBiomeLocation(pos, level);
+        float temperature = ForecastOrchestrator.getCurrentTemperature(level, pos, gameTime);
+        float humidity = ForecastOrchestrator.getCurrentHumidity(level, pos, gameTime);
+        float pressure = ForecastOrchestrator.getCurrentPressure(level, pos, gameTime);
+        WindVector wind = ForecastOrchestrator.getWind(regionKey, gameTime);
         boolean isRaining = level.isRainingAt(pos);
         boolean temperatureOutOfRange = temperature < -60f || temperature > 60f;
 
@@ -86,7 +85,7 @@ public final class ServerTelemetrySampler {
                 level.dimension().location().toString(),
                 pos.getX() >> 4,
                 pos.getZ() >> 4,
-                key.biomeType().toString(),
+                biomeId.toString(),
                 temperature,
                 humidity,
                 pressure,

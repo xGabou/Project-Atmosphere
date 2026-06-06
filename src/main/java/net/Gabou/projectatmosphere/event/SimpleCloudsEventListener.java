@@ -6,9 +6,8 @@ import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionRemovedEvent
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionTickEvent;
 import dev.nonamecrackers2.simpleclouds.api.common.event.ModifyCloudSpeedEvent;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.Gabou.projectatmosphere.manager.AtmosphereCloudRegionTracker;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
@@ -20,9 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec2;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public class SimpleCloudsEventListener {
     private static final float CLOUD_DIRECTION_VARIANCE_RAD = 0.15f;
     private static final float CLOUD_DIRECTION_WOBBLE_RAD = 0.06f;
@@ -34,10 +31,9 @@ public class SimpleCloudsEventListener {
     public static void onCloudRegionSpawn(CloudRegionNaturallySpawnEvent event) {
        if(!(event.getLevel() instanceof ServerLevel serverLevel)) {
            return;
-       }
+        }
         CloudRegion region =(CloudRegion) event.getCloudRegion();
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getWorldX(), region.getWorldZ());
-        AtmosphereManager.queueAddCloudRegion(region);
+        AtmosphereCloudRegionTracker.queueAdd(region);
     }
 
     @SubscribeEvent

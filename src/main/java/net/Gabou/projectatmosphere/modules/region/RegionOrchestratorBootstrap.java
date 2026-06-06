@@ -12,7 +12,6 @@ public final class RegionOrchestratorBootstrap {
     public static RegionForecastOrchestrator bootstrap(ServerLevel level) {
         RegionIndex index = new GridRegionIndex();
         RegionPersistence persistence = new FileRegionPersistence(level);
-        BiomeForecastGenerator generator = new LegacyBiomeForecastGenerator();
-        return new RegionForecastOrchestrator(index, persistence, generator);
+        return new RegionForecastOrchestrator(level, index, persistence);
     }
 }

@@ -7,7 +7,6 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Range;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -348,18 +347,6 @@ public class RegionAtmosphereState {
         return Mth.lerp(clamped, baselineMinTemp, baselineMaxTemp);
     }
 
-    // ---------------------------------------------------------------------
-    // Legacy, fallback, diagnostic, or rarely used code pending cleanup
-    // ---------------------------------------------------------------------
-    /**
-     * Legacy compatibility path: wraps a biome forecast into a region forecast using the default grid.
-     */
-    @Deprecated
-    public static RegionAtmosphereState fromForecast(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
-        ForecastRegion region = createLegacyForecastRegion(biomeKey, forecast);
-        return fromForecast(region.getKey(), region);
-    }
-
     /**
      * Legacy view for components still expecting RegionInstanceKey.
      */
@@ -513,10 +500,4 @@ public class RegionAtmosphereState {
         );
     }
 
-    private static ForecastRegion createLegacyForecastRegion(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
-        ForecastRegion region = new ForecastRegion(net.Gabou.projectatmosphere.util.RegionInstanceKey.from(biomeKey.samplePos()));
-        region.addBiomeForecast(biomeKey, forecast);
-        region.finalizeAggregation();
-        return region;
-    }
 }

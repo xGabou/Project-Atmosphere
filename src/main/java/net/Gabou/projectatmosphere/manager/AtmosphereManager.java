@@ -2,10 +2,9 @@ package net.Gabou.projectatmosphere.manager;
 
 
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.command.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
@@ -56,8 +55,7 @@ public class AtmosphereManager {
     public static void onServerStarted(ServerLevel world) {
         resetRuntimeState();
         isInitialGenerationDone = ForecastOrchestrator.onServerStart(world);
-        AtmosphereCloudRegionTracker.reset(world);
-        CloudRegionQueue.clear();
+        AtmosphereCloudServices.get().onServerStarted(world);
         recordSeasonStage(world);
 
     }
@@ -65,8 +63,7 @@ public class AtmosphereManager {
     public static void onServerStopping(ServerLevel world) {
         ForecastOrchestrator.onServerStop(world);
         resetRuntimeState();
-        CloudRegionQueue.clear();
-        AtmosphereCloudRegionTracker.clear();
+        AtmosphereCloudServices.get().onServerStopping(world);
 
     }
 
@@ -114,13 +111,12 @@ public class AtmosphereManager {
         ProjectAtmosphere.LOGGER.info("Regenerating weather data for all players");
         AsyncAtmosphereService.runWeather(() -> {
             EventHandler.onRegenerate();
-            CloudManager.get(world).getCloudGenerator().removeAllClouds();
+            AtmosphereCloudServices.get().clearForRegeneration(world);
             TornadoManager.clearTornadoes();
             HurricaneManager.clearHurricanes();
             ForecastOrchestrator.clearAndRegenerate(world);
         });
-        AtmosphereCloudRegionTracker.clear();
-        CloudRegionQueue.clear();
+        AtmosphereCloudServices.get().clearForRegeneration(world);
 
     }
 
@@ -145,12 +141,8 @@ public class AtmosphereManager {
             // Still advance orchestrator's internal timing (e.g., tornado check scheduling) safely
             ForecastOrchestrator.tick(level);
         }
-        if (count % 20 == 0) {
-            AtmosphereCloudRegionTracker.reconcile(level);
-        }
-
+        AtmosphereCloudServices.get().tick(level, count);
         count++;
-        AtmosphereCloudRegionTracker.pollQueue(level);
     }
 
     private static void checkSeasonTransition(ServerLevel level) {
@@ -209,18 +201,4 @@ public class AtmosphereManager {
         HurricaneManager.syncToPlayer(player);
     }
 
-    public static List<CloudRegion> getCloudRegions() {
-        return AtmosphereCloudRegionTracker.getCloudRegions();
-    }
-
-
-    public static void queueAddCloudRegion(CloudRegion cloudRegion) {
-        AtmosphereCloudRegionTracker.queueAdd(cloudRegion);
-
-    }
-
-    public static void queueRemoveCloudRegion(CloudRegion cloudRegion) {
-        AtmosphereCloudRegionTracker.queueRemove(cloudRegion);
-
-    }
 }

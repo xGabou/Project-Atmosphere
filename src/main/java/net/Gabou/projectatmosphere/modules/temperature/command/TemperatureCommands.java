@@ -4,9 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import net.Gabou.projectatmosphere.manager.AtmosphereManager;
-import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -53,7 +51,7 @@ public class TemperatureCommands {
                                         ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
                                         return 0;
                                     }
-                                    String forecast = TemperatureCommandHelper.getWeeklyForecast(TemperatureCommandHelper.getCurrentBiomeResourceLocation(player));
+                                    String forecast = TemperatureCommandHelper.getWeeklyForecast(ctx.getSource().getLevel(), player.blockPosition());
                                     ctx.getSource().sendSuccess(() -> Component.literal(forecast), false);
                                     return 1;
                                 }))
@@ -70,11 +68,11 @@ public class TemperatureCommands {
                                                 return 0;
                                             }
                                             String biomeStr = StringArgumentType.getString(ctx, "biome");
-                                            BiomeInstanceKey biome = TemperatureCommandHelper.resolveBiome(player, biomeStr);
                                             long tick = TemperatureCommandHelper.getCurrentTick(ctx.getSource().getLevel());
-                                            float temp = TemperatureCommandHelper.getTemperatureAt(biome, tick);
+                                            float temp = TemperatureCommandHelper.getTemperatureAt(ctx.getSource().getLevel(), player.blockPosition(), tick);
+                                            RegionInstanceKey region = TemperatureCommandHelper.getCurrentRegion(player);
                                             ctx.getSource().sendSuccess(
-                                                    () -> Component.literal(biome.biomeType() + " @ tick " + tick + ": " +
+                                                    () -> Component.literal(region + " @ tick " + tick + ": " +
                                                             net.Gabou.projectatmosphere.util.UnitFormatter.formatTemperature(temp)), false);
                                             return 1;
                                         })))
@@ -87,8 +85,8 @@ public class TemperatureCommands {
                                         ctx.getSource().sendFailure(Component.literal("Temperature forecast is only available in the Overworld."));
                                         return 0;
                                     }
-                                    BiomeInstanceKey biome = TemperatureCommandHelper.getCurrentBiome(player);
-                                    float[] profile = TemperatureCommandHelper.getDayProfile(biome);
+                                    RegionInstanceKey region = TemperatureCommandHelper.getCurrentRegion(player);
+                                    float[] profile = TemperatureCommandHelper.getDayProfile(region);
                                     ctx.getSource().sendSuccess(
                                             () -> Component.literal("Day profile: " +
                                                     java.util.Arrays.toString(profile)), false);
@@ -119,10 +117,8 @@ public class TemperatureCommands {
                                     BlockPos pos = player.getOnPos();
 
                                     var biomeHolder = level.getBiome(pos);
-                                    BiomeInstanceKey biomeId = new BiomeInstanceKey(biomeHolder.unwrapKey().get().location(), pos);
-
                                     float biomeBase = biomeHolder.value().getBaseTemperature();
-                                    float realTemp = TemperatureCommandHelper.getRealTemperature(level, biomeId, pos);
+                                    float realTemp = TemperatureCommandHelper.getRealTemperature(level, pos);
 
                                     ctx.getSource().sendSuccess(() -> Component.literal("Biome base temperature: " + biomeBase), false);
                                     ctx.getSource().sendSuccess(() -> Component.literal("Season provider: " + TemperatureCommandHelper.getCurrentSubSeason(level)), false);

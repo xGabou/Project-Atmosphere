@@ -17,13 +17,13 @@ public interface RegionCurves {
 
     float[] stormWeek();
 
-    float sampleTemperature(Vec3 inRegionPos, long gameTime, ForecastRegion.Section[] sections);
+    float sampleTemperature(Vec3 inRegionPos, long gameTime);
 
-    float sampleHumidity(Vec3 inRegionPos, long gameTime, ForecastRegion.Section[] sections);
+    float sampleHumidity(Vec3 inRegionPos, long gameTime);
 
-    float samplePressure(long gameTime, ForecastRegion.Section[] sections);
+    float samplePressure(long gameTime);
 
-    WindVector sampleWind(long gameTime, ForecastRegion.Section[] sections);
+    WindVector sampleWind(long gameTime);
 
-    float sampleStorm(long gameTime, ForecastRegion.Section[] sections);
+    float sampleStorm(long gameTime);
 }

@@ -1,14 +1,12 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.minecraft.util.Mth;
 
 /**
  * Unified wind forecast describing both the upper-level (high) and ground-level (low) wind curves.
- * The forecast is derived from the weekly {@link BiomeForecast} produced by {@link net.Gabou.projectatmosphere.manager.ForecastGenerator}
- * without modifying the generator itself.
+ * The forecast is derived from the weekly wind curve stored on a ForecastRegion.
  */
 public final class WindForecast {
     public static final class WindSlice {
@@ -97,37 +95,6 @@ public final class WindForecast {
         float wave = (float) Math.sin(timeOfDay * (float) (Math.PI * 2));
         float dailyScale = 0.8f + 0.2f * wave;
         return Math.max(0f, base * dailyScale);
-    }
-
-    /**
-     * Creates a unified forecast from the immutable BiomeForecast generated elsewhere.
-     */
-    public static WindForecast fromBiomeForecast(BiomeForecast biomeForecast) {
-        WindVector[] week = biomeForecast.getWind();
-        if (week == null || week.length == 0) {
-            return new WindForecast(new WindSlice[]{new WindSlice(0f, 0f, 0f, 0f, 0f)}, 0f, 0f, 0f);
-        }
-
-        WindSlice[] slices = new WindSlice[week.length];
-        float baseProb = 0.15f;
-        for (int i = 0; i < week.length; i++) {
-            WindVector vector = week[i] == null ? WindVector.fromBase(0f, 0f) : week[i];
-            float baseSpeed = vector.baseSpeed();
-            float gustSpeed = Math.max(vector.gustSpeed(), baseSpeed);
-            float dirDeg = (float) Math.toDegrees(vector.angleRadians());
-
-            float highBase = baseSpeed;
-            float highGust = gustSpeed;
-            float lowBase = baseSpeed * 0.65f;
-            float lowGust = lowBase + (gustSpeed - baseSpeed) * 0.55f;
-
-            slices[i] = new WindSlice(highBase, highGust, lowBase, lowGust, dirDeg);
-            baseProb = Math.max(baseProb, Math.min(0.6f, (gustSpeed - baseSpeed) * 0.02f));
-        }
-
-        float spikeChance = Mth.clamp(baseProb * 0.5f, 0.05f, 0.35f);
-        float stormProb = Mth.clamp(baseProb * 1.5f, baseProb, 0.8f);
-        return new WindForecast(slices, baseProb, stormProb, spikeChance);
     }
 
     public static WindForecast fromRegionForecast(ForecastRegion regionForecast) {

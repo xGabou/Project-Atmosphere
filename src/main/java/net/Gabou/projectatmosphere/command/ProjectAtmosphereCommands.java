@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.fog.FogCommand;
 import net.Gabou.projectatmosphere.modules.humidity.HumidityCommand;
 import net.Gabou.projectatmosphere.modules.pressure.PressureCommand;
@@ -31,8 +32,10 @@ public final class ProjectAtmosphereCommands {
         TornadoDebug.appendTo(weatherDebug);
         root.then(weatherDebug);
 
-        TornadoCommand.appendTo(root);
-        HurricaneCommand.appendTo(root);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoCommand.appendTo(root);
+            HurricaneCommand.appendTo(root);
+        }
 
         dispatcher.register(root);
     }

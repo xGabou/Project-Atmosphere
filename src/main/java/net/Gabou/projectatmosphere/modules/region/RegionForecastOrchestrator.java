@@ -1,35 +1,29 @@
 package net.Gabou.projectatmosphere.modules.region;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
-import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ChannelSummary;
-import net.Gabou.projectatmosphere.telemetry.TelemetryModels.DayCurve;
-import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ForecastSnapshot;
-import net.Gabou.projectatmosphere.telemetry.TelemetryModels.Modifiers;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 public final class RegionForecastOrchestrator {
+    private final ServerLevel level;
     private final RegionIndex regionIndex;
     private final RegionPersistence persistence;
-    private final BiomeForecastGenerator biomeGenerator;
     private final Map<RegionInstanceKey, ForecastRegion> regions = new ConcurrentHashMap<>();
 
-    public RegionForecastOrchestrator(RegionIndex regionIndex,
-                                      RegionPersistence persistence,
-                                      BiomeForecastGenerator biomeGenerator) {
+    public RegionForecastOrchestrator(ServerLevel level,
+                                      RegionIndex regionIndex,
+                                      RegionPersistence persistence) {
+        this.level = level;
         this.regionIndex = regionIndex;
         this.persistence = persistence;
-        this.biomeGenerator = biomeGenerator;
     }
 
     public ForecastRegion resolve(BlockPos pos, ResourceKey<Level> dimension) {
@@ -46,160 +40,23 @@ public final class RegionForecastOrchestrator {
         if (persisted.isPresent()) {
             ForecastRegion region = persisted.get();
             RegionForecastCorruptionValidator.CorruptionReport report = RegionForecastCorruptionValidator.detect(region);
-            if (report.corrupted()) {
-                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.warn(
-                        "[Atmosphere] Region {} primary save appears corrupted ({}). Falling back to migration path.",
-                        id,
-                        report.message()
-                );
-            } else {
+            if (!report.corrupted()) {
                 return region;
             }
+            ProjectAtmosphere.LOGGER.warn(
+                    "[Atmosphere] Region {} save appears corrupted ({}). Regenerating region forecast.",
+                    id,
+                    report.message()
+            );
         }
-        Optional<BiomeFallbackSnapshot> fb = persistence.loadFallback(id);
-        if (fb.isPresent()) {
-            ForecastRegion region = fromFallback(fb.get());
-            RegionForecastCorruptionValidator.CorruptionReport report = RegionForecastCorruptionValidator.detect(region);
-            if (report.corrupted()) {
-                net.Gabou.projectatmosphere.ProjectAtmosphere.LOGGER.warn(
-                        "[Atmosphere] Region {} fallback appears corrupted ({}). Regenerating from biome forecasts.",
-                        id,
-                        report.message()
-                );
-                return generateFromBiomes(id);
-            }
-            persistence.saveRegion(region);
-            return region;
-        }
-        return generateFromBiomes(id);
-    }
 
-    private ForecastRegion fromFallback(BiomeFallbackSnapshot fb) {
-        ForecastRegion.Section[] sections = fb.toSections();
-        RegionCurves curves = aggregateSections(sections);
-        ForecastRegion region = new ForecastRegion(fb.id(), fb.sourceBiomes(), sections, curves, fb);
-        region.clearBiomeForecasts();
-        return region;
-    }
-
-    private ForecastRegion generateFromBiomes(RegionInstanceKey id) {
-        List<BiomeInstanceKey> biomes = regionIndex.biomesFor(id);
-        ForecastRegion.Section[] sections = sliceIntoEight(biomes);
-        RegionCurves curves = aggregateSections(sections);
-        BiomeFallbackSnapshot fb = new BiomeFallbackSnapshot(id, biomes, sections);
-        ForecastRegion region = new ForecastRegion(id, biomes, sections, curves, fb);
-        region.clearBiomeForecasts();
-        persistence.saveRegion(region);
-        return region;
+        ForecastRegion generated = ForecastGenerator.generateForecastForRegionKey(id, level);
+        persistence.saveRegion(generated);
+        return generated;
     }
 
     public void tick(long gameTime) {
-        // Hook for per-tick advancement (diffusion, cloud state, gusts) keyed by region id.
-    }
-
-    private RegionCurves aggregateSections(ForecastRegion.Section[] sections) {
-        WeightedCurve temperature = WeightedCurve.empty();
-        WeightedCurve humidity = WeightedCurve.empty();
-        WeightedCurve pressure = WeightedCurve.empty();
-        WeightedCurve storm = WeightedCurve.empty();
-        WeightedWindCurve wind = WeightedWindCurve.empty();
-        for (ForecastRegion.Section section : sections) {
-            BiomeForecastSnapshot snapshot = section.snapshot();
-            if (snapshot == null) {
-                continue;
-            }
-            temperature.add(section.factor(), snapshot.temperatureCurve());
-            humidity.add(section.factor(), snapshot.humidityCurve());
-            pressure.add(section.factor(), snapshot.pressureCurve());
-            // Storm curve currently absent in BiomeForecast; keep zeroed via WeightedCurve.
-            wind.add(section.factor(), snapshot.windCurve());
-        }
-        float[][] tempWeek = temperature.normalize();
-        float[][] humidityWeek = humidity.normalize();
-        float[][] pressureWeek = pressure.normalize();
-        WindVector[] windWeek = wind.normalize();
-        float[] stormWeek = flattenTwoColumn(storm.normalize());
-        return new DefaultRegionCurves(tempWeek, humidityWeek, pressureWeek, windWeek, stormWeek);
-    }
-
-    private ForecastRegion.Section[] sliceIntoEight(List<BiomeInstanceKey> biomes) {
-        ForecastRegion.Section[] out = new ForecastRegion.Section[8];
-        for (int i = 0; i < out.length; i++) {
-            BiomeForecastSnapshot snap = biomeGenerator.generateSlice(biomes, i);
-            float factor = Math.max(0f, biomeGenerator.factorForSlice(biomes, i));
-            if (AtmoCommonConfig.TELEMETRY_ENABLED.get() && snap != null) {
-                recordForecastSnapshot(snap, i);
-            }
-            out[i] = new ForecastRegion.Section(factor, snap);
-        }
-        return out;
-    }
-
-    private static float[] flattenTwoColumn(float[][] curve) {
-        if (curve == null || curve.length == 0) {
-            return new float[0];
-        }
-        float[] result = new float[curve.length];
-        for (int i = 0; i < curve.length; i++) {
-            float[] row = curve[i];
-            if (row == null || row.length == 0) {
-                result[i] = 0f;
-            } else {
-                result[i] = row[0];
-            }
-        }
-        return result;
-    }
-
-    private static void recordForecastSnapshot(BiomeForecastSnapshot snap, int dayIndex) {
-        ChannelSummary temp = summarizeCurve(snap.temperatureCurve());
-        ChannelSummary humidity = summarizeCurve(snap.humidityCurve());
-        ChannelSummary pressure = summarizeCurve(snap.pressureCurve());
-        DayCurve curve = deriveDayCurve(snap.temperatureCurve());
-        ForecastSnapshot snapshot = new ForecastSnapshot(
-                snap.biomeKey().biomeType().toString(),
-                snap.biomeKey().samplePos() == null ? 0 : snap.biomeKey().samplePos().getX() >> 4,
-                snap.biomeKey().samplePos() == null ? 0 : snap.biomeKey().samplePos().getZ() >> 4,
-                dayIndex,
-                temp,
-                humidity,
-                pressure,
-                new ChannelSummary(0f, 0f),
-                curve,
-                new Modifiers(false, null, null, false, null)
-        );
-        TelemetryCollector.get().recordForecastSnapshot(snapshot);
-    }
-
-    private static ChannelSummary summarizeCurve(float[][] curve) {
-        if (curve == null || curve.length == 0) {
-            return new ChannelSummary(0f, 0f);
-        }
-        float min = Float.MAX_VALUE;
-        float max = -Float.MAX_VALUE;
-        for (float[] row : curve) {
-            if (row == null) {
-                continue;
-            }
-            for (float v : row) {
-                min = Math.min(min, v);
-                max = Math.max(max, v);
-            }
-        }
-        if (min == Float.MAX_VALUE) {
-            return new ChannelSummary(0f, 0f);
-        }
-        return new ChannelSummary(min, max);
-    }
-
-    private static DayCurve deriveDayCurve(float[][] curve) {
-        if (curve == null || curve.length == 0 || curve[0] == null || curve[0].length == 0) {
-            return new DayCurve(null, null, null, null);
-        }
-        float[] day = curve[0];
-        Float morning = day.length > 0 ? day[0] : null;
-        Float afternoon = day.length > 1 ? day[1] : null;
-        return new DayCurve(morning, afternoon, afternoon, morning);
+        // Hook for per-tick advancement keyed by region id.
     }
 
     public Vec3 toRegionLocal(BlockPos pos) {

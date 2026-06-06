@@ -2,8 +2,8 @@ package net.Gabou.projectatmosphere.modules.storm;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.RegionBiomeSample;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
 
 import java.util.Random;
@@ -17,7 +17,7 @@ public class StormGenerator {
      * Returns a 7-day storm profile, each day having [min, max] chance.
      */
     public static float[][] generateWeeklyStormProfile(
-            BiomeInstanceKey biome,
+            RegionBiomeSample sample,
             float[][] temperature,
             float[][] humidity,
             float[][] pressure,
@@ -25,7 +25,7 @@ public class StormGenerator {
             SeasonStage season
     ) {
         float[][] stormWeek = new float[7][2];
-        BlockPos pos = biome.samplePos();
+        BlockPos pos = sample.pos();
 
         for (int day = 0; day < 7; day++) {
             float stormScore = 0f;
@@ -55,7 +55,7 @@ public class StormGenerator {
             stormScore *= seasonalMultiplier;
 
             
-            long seed = ProjectAtmosphere.seed ^ pos.asLong() ^ biome.hashCode() ^ day;
+            long seed = ProjectAtmosphere.seed ^ pos.asLong() ^ sample.biomeId().hashCode() ^ day;
             Random rand = new Random(seed);
             stormScore += (rand.nextFloat() - 0.5f) * 0.15f;
 

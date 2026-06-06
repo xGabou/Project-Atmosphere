@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -22,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class AtmosphericStateRegistry {
     private static final Map<RegionInstanceKey, RegionAtmosphereState> STATES = new ConcurrentHashMap<>();
     private static final Map<RegionInstanceKey, List<RegionInstanceKey>> NEIGHBORS = new ConcurrentHashMap<>();
-    private static final Map<BiomeInstanceKey, RegionInstanceKey> LEGACY_INDEX = new ConcurrentHashMap<>();
     private static final Set<RegionInstanceKey> ACTIVE = ConcurrentHashMap.newKeySet();
 
     private AtmosphericStateRegistry() {
@@ -62,19 +60,10 @@ public final class AtmosphericStateRegistry {
         forecast.finalizeAggregation();
         RegionAtmosphereState state = RegionAtmosphereState.fromForecast(id, forecast);
         STATES.put(id, state);
-        AtmosphericStateLookup.indexLegacyKeys(forecast, LEGACY_INDEX);
         return state;
     }
 
     public static RegionAtmosphereState getState(RegionInstanceKey key) {
-        if (key == null) {
-            return null;
-        }
-        return STATES.get(key);
-    }
-
-    public static RegionAtmosphereState getState(BiomeInstanceKey biomeKey) {
-        RegionInstanceKey key = resolveRegionKey(biomeKey);
         if (key == null) {
             return null;
         }
@@ -100,7 +89,6 @@ public final class AtmosphericStateRegistry {
     public static void clear() {
         STATES.clear();
         NEIGHBORS.clear();
-        LEGACY_INDEX.clear();
         ACTIVE.clear();
     }
 
@@ -159,10 +147,6 @@ public final class AtmosphericStateRegistry {
     @Unmodifiable
     public static List<RegionAtmosphereState> snapshot() {
         return Collections.unmodifiableList(new ArrayList<>(STATES.values()));
-    }
-
-    public static RegionInstanceKey resolveRegionKey(BiomeInstanceKey biomeKey) {
-        return AtmosphericStateLookup.resolveRegionKey(biomeKey, LEGACY_INDEX);
     }
 
     private static boolean isStateActiveForPlayer(RegionAtmosphereState state, BlockPos pos, int radiusSquared) {

@@ -5,9 +5,10 @@ import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
@@ -20,6 +21,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 
 public final class TornadoDebug {
     private TornadoDebug() {}
@@ -45,15 +47,26 @@ public final class TornadoDebug {
                                             );
 
                                     String cloudId = StringArgumentType.getString(ctx, "id");
-                                    var region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
+                                    var region = CloudRegionManager.getInstance().createCloudRegion(
+                                            level,
+                                            new Vec3(player.getX(), player.getY() + 80.0D, player.getZ()),
+                                            64.0F,
+                                            (float) player.getY() + 72.0F,
+                                            (float) player.getY() + 88.0F,
+                                            cloudId.contains("thunder") ? 0.85F : 0.65F,
+                                            0.75F,
+                                            0.35F,
+                                            regionKey
+                                    );
 
                                     if (region != null) {
+                                        CloudRegionSyncManager.syncPlayer(player);
                                         ctx.getSource().sendSuccess(
-                                                () -> Component.literal("Spawned cloud '" + cloudId + "' at your position."),
+                                                () -> Component.literal("Created PA cloud region '" + cloudId + "' at your position."),
                                                 true);
                                         return 1;
                                     } else {
-                                        ctx.getSource().sendFailure(Component.literal("Failed to spawn cloud '" + cloudId + "'. SimpleClouds may not be initialized yet."));
+                                        ctx.getSource().sendFailure(Component.literal("Failed to create PA cloud region '" + cloudId + "'."));
                                         return 0;
                                     }
                                 })))

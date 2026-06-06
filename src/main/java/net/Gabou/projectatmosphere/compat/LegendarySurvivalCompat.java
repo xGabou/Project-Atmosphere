@@ -18,12 +18,6 @@ public class LegendarySurvivalCompat {
      * Generates a 7-day forecast using current LSO temp as base, with estimated min/max per day.
      * @return float[7][2] => [ [minDay1, maxDay1], [minDay2, maxDay2], ..., [minDay7, maxDay7] ]
      */
-//    public static float[][] injectForecastForLSO(BiomeInstanceKey key, ServerLevel level) {
-//        BlockPos sample = key.samplePos();
-//        float baseTemp = TemperatureUtil.getWorldTemperature(level, sample);
-//        return generateMinMaxCurve(baseTemp, level.getRandom());
-//    }
-
     /**
      * Creates a sinusoidal 7-day swing curve around a base temperature.
      * Each day has a generated min and max temperature.

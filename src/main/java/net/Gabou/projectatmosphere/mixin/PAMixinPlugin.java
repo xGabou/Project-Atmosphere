@@ -12,6 +12,7 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
     private static Boolean SANDSTORMLOADED = null;
     private static Boolean AURORASLOADED = null;
     private static Boolean RAINBOWSLOADED = null;
+    private static Boolean SIMPLECLOUDSLOADED = null;
 
 
     private boolean isSandStormLoaded() {
@@ -49,6 +50,28 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
         return RAINBOWSLOADED;
     }
 
+    private boolean isSimpleCloudsLoaded() {
+        if (SIMPLECLOUDSLOADED != null) return SIMPLECLOUDSLOADED;
+        SIMPLECLOUDSLOADED = isClassPresent("dev.nonamecrackers2.simpleclouds.SimpleCloudsMod");
+        System.out.println("[Project Atmosphere] Simple Clouds detected: " + SIMPLECLOUDSLOADED);
+        return SIMPLECLOUDSLOADED;
+    }
+
+    private boolean isSimpleCloudsMixin(String mixinClassName) {
+        return mixinClassName.contains("CloudGenerator")
+                || mixinClassName.contains("CloudRegion")
+                || mixinClassName.contains("SimpleClouds")
+                || mixinClassName.contains("CloudMeshGenerator")
+                || mixinClassName.contains("MultiRegionCloudMeshGenerator")
+                || mixinClassName.contains("DefaultPipelineTornado")
+                || mixinClassName.contains("DefaultPipelineHurricane")
+                || mixinClassName.contains("ShaderSupportPipelineTornado")
+                || mixinClassName.contains("ShaderSupportPipelineHurricane")
+                || mixinClassName.contains("DhSupportPipeline")
+                || mixinClassName.contains("InstanceableMesh")
+                || mixinClassName.contains("BindingManager");
+    }
+
     private boolean isClassPresent(String className) {
         try {
             Class.forName(className, false, getClass().getClassLoader());
@@ -72,6 +95,9 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         if (!FMLEnvironment.dist.isClient() && mixinClassName.contains(".client.")) {
+            return false;
+        }
+        if (isSimpleCloudsMixin(mixinClassName) && !isSimpleCloudsLoaded()) {
             return false;
         }
         if (mixinClassName.endsWith("OverwriteDesertSound") && !isSandStormLoaded()) {

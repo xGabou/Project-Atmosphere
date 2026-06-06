@@ -1,8 +1,7 @@
 package net.Gabou.projectatmosphere.blocks;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.registry.ModSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -24,14 +23,11 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Block that acts as a storm siren. Periodically samples the surrounding
- * biomes for storm intensity and plays a warning sound when a dangerous
- * storm is nearby.
+ * Bloc de sirène météo qui surveille les tornades et les régions de nuages PA proches.
  */
 public class StormSirenBlock extends Block {
 
@@ -149,18 +145,23 @@ public class StormSirenBlock extends Block {
     }
 
     private static boolean isSevereStormNearby(ServerLevel level, BlockPos pos) {
-        List<CloudRegion> clouds = CloudManager.get(level).getClouds().stream()
-                .filter(cloudRegion -> CloudLibrary.getSeverityFromRessourceLocation(cloudRegion.getCloudTypeId()) >= INTENSITY_THRESHOLD)
-                .toList();
-        if (clouds.isEmpty()) {
-            return false;
-        }
         double radiusSq = STORM_WARNING_RADIUS * STORM_WARNING_RADIUS;
-        return clouds.stream().anyMatch(cloudRegion -> {
-            double dx = cloudRegion.getWorldX() - pos.getX();
-            double dz = cloudRegion.getWorldZ() - pos.getZ();
+        return CloudRegionManager.getInstance().getActiveRenderData(level).stream().anyMatch(region -> {
+            if (!isSevereRegion(region)) {
+                return false;
+            }
+            double dx = region.getCenter().x() - pos.getX();
+            double dz = region.getCenter().z() - pos.getZ();
             return dx * dx + dz * dz <= radiusSq;
         });
+    }
+
+    private static boolean isSevereRegion(CloudRegionRenderData region) {
+        if (region == null || !region.isActive()) {
+            return false;
+        }
+        float intensity = region.getDensity() * 6.0F + region.getCoverage() * 4.0F;
+        return intensity >= INTENSITY_THRESHOLD;
     }
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {

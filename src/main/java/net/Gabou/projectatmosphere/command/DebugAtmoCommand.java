@@ -5,23 +5,17 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.AtmoApi;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionState;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
-import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.client.fog.FogBiomeClassifier;
 import net.Gabou.projectatmosphere.modules.fog.FogHeuristics;
-import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -191,14 +185,8 @@ public class DebugAtmoCommand {
 
         root.then(Commands.argument("violence", ResourceLocationArgument.id())
                 .executes(ctx -> {
-                    int violence = SimpleCloudSpawner.getCurrentViolence();
-                    if (violence == 0) {
-                        ctx.getSource().sendFailure(Component.literal("No violence detected"));
-                        return 0;
-                    }
                     ctx.getSource().sendSuccess(() -> Component.literal(
-                            "Violence is: " + violence +
-                                    "\nCloudViolence: [" + violence + "]"
+                            "Violence debug Simple Clouds indisponible dans le chemin PA natif."
                     ), false);
                     return 1;
                 })
@@ -369,27 +357,23 @@ public class DebugAtmoCommand {
         return 1;
     }
 
-    private static CloudRegion spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {
-        if (SimpleCloudsCompat.generator == null) {
-            LOGGER.warn("Simple Clouds generator is null, cannot spawn cloud.");
-            return null;
-        }
-        if (cloudId == null) {
-            LOGGER.warn("Cloud ID is null, cannot spawn cloud.");
-            return null;
-        }
+    private static CloudRegionState spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {
         if (!level.dimension().equals(Level.OVERWORLD)) {
             return null;
         }
-
-        CloudGenerator generator = SimpleCloudsCompat.generator;
-        CloudRegion existing = generator.getCloudAtWorldPosition(pos.getX(), pos.getZ());
-        if (existing != null) {
-            generator.removeClouds(r -> r == existing);
-        }
-
-        WindVector wind = ForecastOrchestrator.getWind(pos, level.getGameTime());
-        return SimpleCloudsCompat.spawnCloudInRegion(cloudId, RegionInstanceKey.from(pos), level, null, wind);
+        float density = cloudId != null && cloudId.contains("thunder") ? 0.85F : 0.65F;
+        float coverage = cloudId != null && cloudId.contains("snow") ? 0.85F : 0.75F;
+        return CloudRegionManager.getInstance().createCloudRegion(
+                level,
+                new Vec3(pos.getX(), pos.getY() + 80.0D, pos.getZ()),
+                64.0F,
+                pos.getY() + 72.0F,
+                pos.getY() + 88.0F,
+                density,
+                coverage,
+                0.35F,
+                RegionInstanceKey.from(pos)
+        );
     }
 
     private static int sendFogDebug(CommandContext<CommandSourceStack> ctx) {
@@ -461,7 +445,10 @@ public class DebugAtmoCommand {
             intensity = 1;
         }
         String cloudId = CloudLibrary.getRandomRainCloud(intensity, !noThunder);
-        spawnCloud(level, pos, cloudId);
+        CloudRegionState state = spawnCloud(level, pos, cloudId);
+        if (state != null && ctx.getSource().getPlayer() != null) {
+            CloudRegionSyncManager.syncPlayer(ctx.getSource().getPlayer());
+        }
         ctx.getSource().sendSuccess(() -> Component.literal("Spawned rain cloud: " + cloudId), true);
         return 1;
     }
@@ -485,7 +472,10 @@ public class DebugAtmoCommand {
             intensity = 1;
         }
         String cloudId = CloudLibrary.getRandomThunderCloud(intensity);
-        spawnCloud(level, pos, cloudId);
+        CloudRegionState state = spawnCloud(level, pos, cloudId);
+        if (state != null && ctx.getSource().getPlayer() != null) {
+            CloudRegionSyncManager.syncPlayer(ctx.getSource().getPlayer());
+        }
         ctx.getSource().sendSuccess(() -> Component.literal("Spawned thunder cloud: " + cloudId), true);
         return 1;
     }
@@ -524,9 +514,15 @@ public class DebugAtmoCommand {
             ctx.getSource().sendSuccess(() -> Component.literal("Proceeding despite non-winter season (no season override available)."), true);
         }
         String cloudId = CloudLibrary.getSnowstormCloudId();
-        CloudRegion region = spawnCloud(level, pos, cloudId);
-        SnowstormManager.startSnowstorm(intensity, region);
-        ctx.getSource().sendSuccess(() -> Component.literal("Spawned snowstorm cloud."), true);
+        CloudRegionState region = spawnCloud(level, pos, cloudId);
+        if (region == null) {
+            ctx.getSource().sendFailure(Component.literal("Could not create PA snowstorm cloud region."));
+            return 0;
+        }
+        if (ctx.getSource().getPlayer() != null) {
+            CloudRegionSyncManager.syncPlayer(ctx.getSource().getPlayer());
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("Created PA snowstorm cloud region: " + region.getRegionId()), true);
         return 1;
     }
 

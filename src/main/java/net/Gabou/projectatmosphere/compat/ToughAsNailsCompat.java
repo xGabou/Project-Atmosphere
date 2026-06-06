@@ -3,8 +3,6 @@ package net.Gabou.projectatmosphere.compat;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.async.ThreadingDetector;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -27,8 +25,7 @@ public class ToughAsNailsCompat {
      * - On main thread: runs directly.
      * - On async thread: schedules temperature lookup on main, then continues math async.
      */
-    public static float[][] injectForecastForTAN(BiomeInstanceKey key, ServerLevel level) {
-        BlockPos sample = key.samplePos();
+    public static float[][] injectForecastForTAN(ServerLevel level, BlockPos sample) {
         RandomSource rng = RandomSource.create(sample.asLong() ^ level.getSeed());
 
         // If already on main thread → run inline

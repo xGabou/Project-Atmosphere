@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.modules.sandStorm;
 import com.BreadRes.desertstormwarming.logic.SandstormManager;
 import com.BreadRes.desertstormwarming.logic.SandstormPhase;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -30,10 +30,10 @@ public class SandStormAPI {
     public static SandstormPhase getSandstormPhase() {
        return SandstormManager.getPhase();
     }
-    private static final List<BiomeInstanceKey> scheduledStormBiome = new ArrayList<>();
+    private static final List<RegionInstanceKey> scheduledStormRegions = new ArrayList<>();
 
-    public static List<BiomeInstanceKey> getScheduledStormBiome() {
-        return scheduledStormBiome;
+    public static List<RegionInstanceKey> getScheduledStormRegions() {
+        return scheduledStormRegions;
     }
 
     /**
@@ -42,18 +42,17 @@ public class SandStormAPI {
      *
      * @param phase The sandstorm phase to begin with.
      */
-    public static void startSandstorm(SandstormPhase phase, BiomeInstanceKey biomeInstanceKey) {
+    public static void startSandstorm(SandstormPhase phase, RegionInstanceKey regionKey) {
         SandstormManager.start(phase);
-
-        scheduledStormBiome.add(biomeInstanceKey);
+        scheduledStormRegions.add(regionKey);
     }
 
     /**
      * Stops the currently active sandstorm, if any.
      */
-    public static void stopSandstorm(BiomeInstanceKey biomeInstanceKey) {
+    public static void stopSandstorm(RegionInstanceKey regionKey) {
         SandstormManager.stop();
-        scheduledStormBiome.remove(biomeInstanceKey);
+        scheduledStormRegions.remove(regionKey);
     }
 
     /**
@@ -106,9 +105,8 @@ public class SandStormAPI {
             }
         }
     }
-    public static void blowSandInBiome(ServerLevel level, BiomeInstanceKey key, WindVector wind) {
-
-        BlockPos center = key.samplePos();
+    public static void blowSandInRegion(ServerLevel level, RegionInstanceKey key, BlockPos anchor, WindVector wind) {
+        BlockPos center = anchor == null ? key.center() : anchor;
 
         
         int radiusXZ = 8;

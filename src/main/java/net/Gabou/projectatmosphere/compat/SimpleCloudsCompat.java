@@ -24,6 +24,7 @@ import net.minecraft.world.phys.Vec2;
 import org.joml.Vector2i;
 
 import javax.annotation.Nullable;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,6 +53,10 @@ public class SimpleCloudsCompat {
     // ---------------------------------------------------------------------
     // Initialization
     // ---------------------------------------------------------------------
+    public static void configureConstants() {
+        SimpleCloudsConstants.SPAWN_RADIUS = Math.min(ProjectAtmosphere.DEFAULT_RADIUS / 5, 10000);
+    }
+
     public static void init(ServerLevel level) {
         cloudManager = (ServerCloudManager) CloudManager.get(level);
         generator = cloudManager.getCloudGenerator();
@@ -76,6 +81,118 @@ public class SimpleCloudsCompat {
             return null;
         }
         return spawnCloud(cloudId, key.center(), null, level, dummy, windVector);
+    }
+
+    public static CloudRegion ensureCloudAtPosition(BlockPos pos, ServerLevel level) {
+        if (pos == null || level == null || generator == null || spawnConfig == null) {
+            return null;
+        }
+        if (generator.getCloudAtWorldPosition(pos.getX(), pos.getZ()) != null) {
+            return null;
+        }
+
+        Map<RegionInstanceKey, Integer> sampledRegions = WeatherSampler.sampleRegionsInArea(
+                pos.getX(),
+                pos.getZ(),
+                (int) ProjectAtmosphere.DEFAULT_REGION_RADIUS,
+                level
+        );
+        WeatherSampler.WeatherStats stats = WeatherSampler.computeWeatherStats(sampledRegions, level.getGameTime());
+        RegionInstanceKey currentRegion = RegionInstanceKey.from(pos);
+        WindVector wind = stats == null ? WindVector.fromBase(1f, 0f) : stats.windVector();
+        int severity = stats == null ? 1 : determineCloudSeverity(
+                stats.temperature(),
+                stats.humidity(),
+                stats.pressure(),
+                calculateDewPoint(stats.temperature(), stats.humidity()),
+                stats.stormFactor(),
+                level
+        );
+        String cloudId = CloudLibrary.getCloudIdFromSeverity(Math.max(1, severity));
+        CloudSpawningConfig.Info info = resolveSpawnInfo(cloudId);
+        if (info == null) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Could not find a SimpleClouds spawn info for forced local cloud at {}", currentRegion);
+            return null;
+        }
+
+        SpawnRegion activeRegion = generator.getSpawnRegions().stream()
+                .filter(r -> r.includesPoint(pos.getX(), pos.getZ()))
+                .findFirst()
+                .orElseGet(() -> new SpawnRegion(pos.getX(), pos.getZ(), SimpleCloudsConstants.SPAWN_RADIUS));
+
+        Optional<CloudRegion> candidate = createLocalCloudCandidate(info, pos, level, wind);
+        if (candidate.isEmpty()) {
+            CloudRegion nearest = nearestNonCoveringCloud(activeRegion, pos);
+            if (nearest == null) {
+                return null;
+            }
+            generator.removeClouds(existing -> existing == nearest);
+            candidate = createLocalCloudCandidate(info, pos, level, wind);
+            if (candidate.isEmpty()) {
+                return null;
+            }
+        }
+
+        CloudRegion cloud = candidate.get();
+        if (generator.addCloud(cloud, CloudGenerator.Order.USE_WEIGHT)) {
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Forced local cloud coverage for {} at {}", currentRegion, pos);
+            return cloud;
+        }
+
+        CloudRegion farthest = generator.getCloudsInRegion(activeRegion).stream()
+                .filter(existing -> generator.getCloudAtWorldPosition(pos.getX(), pos.getZ()) != existing)
+                .max(Comparator.comparingDouble(existing -> distanceSquared(existing, pos)))
+                .orElse(null);
+        if (farthest != null) {
+            generator.removeClouds(existing -> existing == farthest);
+            if (generator.addCloud(cloud, CloudGenerator.Order.USE_WEIGHT)) {
+                ProjectAtmosphere.LOGGER.info("[Atmosphere] Replaced distant cloud to force local coverage for {} at {}", currentRegion, pos);
+                return cloud;
+            }
+        }
+
+        return null;
+    }
+
+    private static Optional<CloudRegion> createLocalCloudCandidate(CloudSpawningConfig.Info info, BlockPos pos, ServerLevel level, WindVector wind) {
+        Optional<CloudRegion> candidate = createRegion(info, pos, level, random, wind, generator);
+        candidate.ifPresent(cloud -> cloud.setWorldRadius(ProjectAtmosphere.DEFAULT_REGION_RADIUS));
+        return candidate;
+    }
+
+    private static CloudRegion nearestNonCoveringCloud(SpawnRegion activeRegion, BlockPos pos) {
+        return generator.getCloudsInRegion(activeRegion).stream()
+                .filter(existing -> generator.getCloudAtWorldPosition(pos.getX(), pos.getZ()) != existing)
+                .min(Comparator.comparingDouble(existing -> distanceSquared(existing, pos)))
+                .orElse(null);
+    }
+
+    private static CloudSpawningConfig.Info resolveSpawnInfo(String preferredCloudId) {
+        CloudSpawningConfig.Info info = spawnInfo(preferredCloudId);
+        if (info != null) {
+            return info;
+        }
+        for (String fallback : List.of("real_itty_bitty", "itty_bitty", "itty_bitty_bigger", "dense_itty_bitty")) {
+            info = spawnInfo(fallback);
+            if (info != null) {
+                return info;
+            }
+        }
+        return null;
+    }
+
+    private static CloudSpawningConfig.Info spawnInfo(String cloudId) {
+        if (cloudId == null || spawnConfig == null) {
+            return null;
+        }
+        ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(SimpleCloudsMod.MODID, cloudId);
+        return spawnConfig.getWeightInfo(rl);
+    }
+
+    private static double distanceSquared(CloudRegion region, BlockPos pos) {
+        double dx = region.getWorldX() - pos.getX();
+        double dz = region.getWorldZ() - pos.getZ();
+        return dx * dx + dz * dz;
     }
 
     // ---------------------------------------------------------------------
@@ -187,7 +304,7 @@ public class SimpleCloudsCompat {
         float accel = acc + ACCEL_PER_WIND * wind.baseSpeed();
         accel = Mth.clamp(accel, 0.001F, 0.01F);
         cloudRegion.setAccelerationFactor(accel);
-        cloudRegion.setRadius(ProjectAtmosphere.DEFAULT_REGION_RADIUS);
+        cloudRegion.setWorldRadius(ProjectAtmosphere.DEFAULT_REGION_RADIUS);
 
         return Optional.of(cloudRegion);
     }

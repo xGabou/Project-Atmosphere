@@ -1,8 +1,8 @@
 package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.client.loading.IntegratedForecastLoadingBridge;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
@@ -19,7 +19,6 @@ import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.region.RegionOrchestratorBootstrap;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
@@ -187,9 +186,17 @@ public class ForecastOrchestrator {
     public static void onPlayerLogin(ServerPlayer player, ServerLevel level) {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
+        RegionInstanceKey playerRegion = RegionInstanceKey.from(playerPos);
         sendLoginStage(player, "Collecting nearby forecast regions", 0.16F, "player_login_collect_regions");
+        ensureForecastRegionLoaded(level, playerRegion);
         getNearbyRegions(level, player, 1000);
-        if (!ForecastDataStorage.playerData.containsKey(uuid)) {
+        BlockPos savedCenter = ForecastDataStorage.playerData.get(uuid);
+        if (savedCenter != null && !RegionInstanceKey.from(savedCenter).equals(playerRegion)) {
+            ForecastDataStorage.playerData.put(uuid, playerPos);
+            clearActiveRegionsForPlayer(player);
+            getNearbyRegions(level, player, 1000);
+        }
+        if (savedCenter == null) {
             boolean shouldGenerate = true;
             for (BlockPos center : ForecastDataStorage.playerData.values()) {
                 if (center.distManhattan(playerPos) < MIN_DISTANCE_BETWEEN_CENTERS) {
@@ -201,13 +208,33 @@ public class ForecastOrchestrator {
             if (shouldGenerate) {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 sendLoginStage(player, "Seeding local weather systems", 0.28F, "player_login_seed_weather");
-                SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
+                if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+                    net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
+                }
             }
 
         }
-        SimpleCloudsCompat.setIsInit(true);
+        AtmosphereCloudServices.get().ensureCloudAtPosition(playerPos, level);
         sendLoginStage(player, "Forecast regions ready", 0.38F, "player_login_regions_ready");
 
+    }
+
+    private static void ensureForecastRegionLoaded(ServerLevel level, RegionInstanceKey playerRegion) {
+        if (playerRegion == null) {
+            return;
+        }
+        if (ForecastGenerator.getRegionForecasts().containsKey(playerRegion)
+                && AtmosphericStateRegistry.getState(playerRegion) != null) {
+            return;
+        }
+        ForecastRegion region = getRegionOrchestrator(level).ensureLoaded(playerRegion);
+        if (region == null) {
+            return;
+        }
+        ForecastGenerator.putRegionForecast(region);
+        WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+        AtmosphericStateRegistry.rebuildNeighbors();
+        ProjectAtmosphere.LOGGER.info("[Atmosphere] Loaded missing player region {} during login.", playerRegion);
     }
 
     /**
@@ -343,17 +370,6 @@ public class ForecastOrchestrator {
 
 
     /**
-     * Get temperature for any biome
-     */
-    public static float getCurrentTemperature(BiomeInstanceKey key, long tick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return getCurrentTemperature(regionKey, tick);
-        }
-        return ForecastGenerator.getTemperatureValue(key, tick);
-    }
-
-    /**
      * Region-based temperature sampling. Preferred over biome APIs.
      */
     public static float getCurrentTemperature(ServerLevel level, BlockPos pos, long tick) {
@@ -361,18 +377,7 @@ public class ForecastOrchestrator {
         if (region == null) {
             return 0f;
         }
-        return region.sampleTemperature(REGION_ORCHESTRATOR.toRegionLocal(pos), tick);
-    }
-
-    /**
-     * Get humidity for any biome
-     */
-    public static float getCurrentHumidity(BiomeInstanceKey key, long tick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return getCurrentHumidity(regionKey, tick);
-        }
-        return ForecastGenerator.getHumidityValue(key, tick);
+        return region.sampleTemperature(getRegionOrchestrator(level).toRegionLocal(pos), tick);
     }
 
     /**
@@ -383,18 +388,7 @@ public class ForecastOrchestrator {
         if (region == null) {
             return 0f;
         }
-        return region.sampleHumidity(REGION_ORCHESTRATOR.toRegionLocal(pos), tick);
-    }
-
-    /**
-     * Get pressure for any biome
-     */
-    public static float getCurrentPressure(BiomeInstanceKey key, long tick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return getCurrentPressure(regionKey, tick);
-        }
-        return ForecastGenerator.getPressureValue(key, tick);
+        return region.sampleHumidity(getRegionOrchestrator(level).toRegionLocal(pos), tick);
     }
 
     /**
@@ -454,30 +448,11 @@ public class ForecastOrchestrator {
     }
 
     /**
-     * Get wind for any biome
-     */
-    @Deprecated
-    public static WindVector getCurrentWind(BiomeInstanceKey key, long tick) {
-        return getWind(key, tick);
-    }
-
-    /**
      * Region-based wind sampling. Preferred over biome APIs.
      */
     @Deprecated
     public static WindVector getCurrentWind(BlockPos pos, long tick) {
         return getWind(pos, tick);
-    }
-
-    /**
-     * Canonical wind selector: dynamic state if available, forecast fallback, then safe default.
-     */
-    public static WindVector getWind(BiomeInstanceKey key, long tick) {
-        if (key == null) {
-            return SAFE_DEFAULT_WIND;
-        }
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        return selectWind(regionKey, tick);
     }
 
     /**
@@ -496,17 +471,6 @@ public class ForecastOrchestrator {
      */
     public static WindVector getWind(RegionInstanceKey regionKey, long tick) {
         return selectWind(regionKey, tick);
-    }
-
-    /**
-     * Explicit forecast wind access (no dynamic state).
-     */
-    public static WindVector getForecastWind(BiomeInstanceKey key, long tick) {
-        if (key == null) {
-            return SAFE_DEFAULT_WIND;
-        }
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        return getForecastWind(regionKey, tick);
     }
 
     /**
@@ -584,18 +548,6 @@ public class ForecastOrchestrator {
                 && Float.isFinite(wind.angleRadians());
     }
 
-    public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey != null) {
-            return getCurrentStormChance(regionKey, tick);
-        }
-        var state = AtmosphericStateRegistry.getState(key);
-        if (state == null) {
-            return 0f;
-        }
-        return computeStormChance(state);
-    }
-
     public static float getCurrentStormChance(RegionInstanceKey regionKey, long tick) {
         var state = AtmosphericStateRegistry.getState(regionKey);
         if (state != null) {
@@ -649,7 +601,9 @@ public class ForecastOrchestrator {
         OceanBasinManager.update(level, activeRegions);
         CycloneManager.update(level);
         WindVector.update(level);
-        CloudManager.update(level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            CloudManager.update(level);
+        }
         WindEngine.tick(level, activeRegions);
 
         long now = level.getGameTime();
@@ -718,7 +672,9 @@ public class ForecastOrchestrator {
 
     private static void initializeDynamicSystems(ServerLevel level) {
         AtmosphericStateRegistry.rebuildNeighbors();
-        CloudManager.initialize(level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            CloudManager.initialize(level);
+        }
         CycloneManager.initialize(level);
         OceanBasinManager.initialize(level);
     }

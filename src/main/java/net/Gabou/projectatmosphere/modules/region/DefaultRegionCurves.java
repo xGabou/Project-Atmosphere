@@ -52,22 +52,22 @@ public final class DefaultRegionCurves implements RegionCurves {
     }
 
     @Override
-    public float sampleTemperature(Vec3 inRegionPos, long gameTime, ForecastRegion.Section[] sections) {
+    public float sampleTemperature(Vec3 inRegionPos, long gameTime) {
         return sampleTwoColumn(temperatureWeek, gameTime);
     }
 
     @Override
-    public float sampleHumidity(Vec3 inRegionPos, long gameTime, ForecastRegion.Section[] sections) {
+    public float sampleHumidity(Vec3 inRegionPos, long gameTime) {
         return sampleTwoColumn(humidityWeek, gameTime);
     }
 
     @Override
-    public float samplePressure(long gameTime, ForecastRegion.Section[] sections) {
+    public float samplePressure(long gameTime) {
         return sampleTwoColumn(pressureWeek, gameTime);
     }
 
     @Override
-    public WindVector sampleWind(long gameTime, ForecastRegion.Section[] sections) {
+    public WindVector sampleWind(long gameTime) {
         if (windWeek == null || windWeek.length == 0) {
             return WindVector.fromBase(0f, 0f);
         }
@@ -76,7 +76,7 @@ public final class DefaultRegionCurves implements RegionCurves {
     }
 
     @Override
-    public float sampleStorm(long gameTime, ForecastRegion.Section[] sections) {
+    public float sampleStorm(long gameTime) {
         if (stormWeek == null || stormWeek.length == 0) {
             return 0f;
         }

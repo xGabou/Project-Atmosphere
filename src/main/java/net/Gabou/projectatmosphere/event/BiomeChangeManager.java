@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.event;
 
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
@@ -27,7 +26,7 @@ public class BiomeChangeManager {
     private static final Map<UUID, Pair<ResourceLocation, Boolean>> lastBiome = new HashMap<>();
     private static final int RUN_INTERVAL_TICKS = 2000;
     // Threshold to move the tracked center: 4/5 of default region size.
-    private static final int MOVE_THRESHOLD = (int) (ProjectAtmosphere.DEFAULT_RADIUS * 0.8);
+    private static final int MOVE_THRESHOLD = (int) (RegionInstanceKey.DEFAULT_REGION_SIZE * 0.8);
 
 
     private static final boolean sandStormsLoaded = CompatHandler.isSandStormsLoaded();
