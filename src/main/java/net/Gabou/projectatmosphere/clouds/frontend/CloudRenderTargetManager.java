@@ -36,15 +36,18 @@ public final class CloudRenderTargetManager {
      * Supprime les render targets quand elles ne sont plus nécessaires.
      */
     public static void clearTargets() {
-        if (cloudColorTarget != null) {
+        RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
+
+        if (cloudColorTarget != null && cloudColorTarget != mainTarget) {
             cloudColorTarget.destroyBuffers();
-            cloudColorTarget = null;
         }
 
-        if (cloudShadowTarget != null) {
+        if (cloudShadowTarget != null && cloudShadowTarget != mainTarget) {
             cloudShadowTarget.destroyBuffers();
-            cloudShadowTarget = null;
         }
+
+        cloudColorTarget = null;
+        cloudShadowTarget = null;
     }
 
     /**
@@ -77,11 +80,12 @@ public final class CloudRenderTargetManager {
         }
 
         if (cloudColorTarget == null || cloudColorTarget.width != width || cloudColorTarget.height != height) {
-            if (cloudColorTarget != null) {
+            RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
+            if (cloudColorTarget != null && cloudColorTarget != mainTarget) {
                 cloudColorTarget.destroyBuffers();
             }
 
-            cloudColorTarget = Minecraft.getInstance().getMainRenderTarget();
+            cloudColorTarget = mainTarget;
         }
 
         if (cloudShadowTarget == null) {

@@ -14,6 +14,8 @@ public final class CloudRegionRenderData {
     private final UUID regionId;
     private final String dimensionId;
     private final Vec3 center;
+    private final Vec3 previousCenter;
+    private final Vec3 velocity;
 
     private final float radius;
     private final float baseY;
@@ -26,9 +28,6 @@ public final class CloudRegionRenderData {
     private final boolean active;
     private final int debugColorOrTint;
 
-    private final Vec3 previousCenter;
-    private final Vec3 velocity;
-
     private final int ageTicks;
     private final int lifetimeTicks;
 
@@ -39,6 +38,8 @@ public final class CloudRegionRenderData {
             UUID regionId,
             String dimensionId,
             Vec3 center,
+            Vec3 previousCenter,
+            Vec3 velocity,
             float radius,
             float baseY,
             float topY,
@@ -47,8 +48,6 @@ public final class CloudRegionRenderData {
             float edgeSoftness,
             boolean active,
             int debugColorOrTint,
-            Vec3 previousCenter,
-            Vec3 velocity,
             int ageTicks,
             int lifetimeTicks,
             float growth,
@@ -57,6 +56,8 @@ public final class CloudRegionRenderData {
         this.regionId = regionId;
         this.dimensionId = dimensionId;
         this.center = center;
+        this.previousCenter = previousCenter;
+        this.velocity = velocity;
         this.radius = radius;
         this.baseY = baseY;
         this.topY = topY;
@@ -65,8 +66,6 @@ public final class CloudRegionRenderData {
         this.edgeSoftness = edgeSoftness;
         this.active = active;
         this.debugColorOrTint = debugColorOrTint;
-        this.previousCenter = previousCenter;
-        this.velocity = velocity;
         this.ageTicks = ageTicks;
         this.lifetimeTicks = lifetimeTicks;
         this.growth = growth;
@@ -131,6 +130,14 @@ public final class CloudRegionRenderData {
         buffer.writeDouble(center.y());
         buffer.writeDouble(center.z());
 
+        buffer.writeDouble(previousCenter.x());
+        buffer.writeDouble(previousCenter.y());
+        buffer.writeDouble(previousCenter.z());
+
+        buffer.writeDouble(velocity.x());
+        buffer.writeDouble(velocity.y());
+        buffer.writeDouble(velocity.z());
+
         buffer.writeFloat(radius);
         buffer.writeFloat(baseY);
         buffer.writeFloat(topY);
@@ -141,13 +148,6 @@ public final class CloudRegionRenderData {
 
         buffer.writeBoolean(active);
         buffer.writeInt(debugColorOrTint);
-        buffer.writeDouble(previousCenter.x());
-        buffer.writeDouble(previousCenter.y());
-        buffer.writeDouble(previousCenter.z());
-
-        buffer.writeDouble(velocity.x());
-        buffer.writeDouble(velocity.y());
-        buffer.writeDouble(velocity.z());
         buffer.writeVarInt(ageTicks);
         buffer.writeVarInt(lifetimeTicks);
         buffer.writeFloat(growth);
@@ -170,17 +170,6 @@ public final class CloudRegionRenderData {
                 buffer.readDouble()
         );
 
-        float radius = buffer.readFloat();
-        float baseY = buffer.readFloat();
-        float topY = buffer.readFloat();
-
-        float density = buffer.readFloat();
-        float coverage = buffer.readFloat();
-        float edgeSoftness = buffer.readFloat();
-
-        boolean active = buffer.readBoolean();
-        int debugColorOrTint = buffer.readInt();
-
         Vec3 previousCenter = new Vec3(
                 buffer.readDouble(),
                 buffer.readDouble(),
@@ -193,6 +182,17 @@ public final class CloudRegionRenderData {
                 buffer.readDouble()
         );
 
+        float radius = buffer.readFloat();
+        float baseY = buffer.readFloat();
+        float topY = buffer.readFloat();
+
+        float density = buffer.readFloat();
+        float coverage = buffer.readFloat();
+        float edgeSoftness = buffer.readFloat();
+
+        boolean active = buffer.readBoolean();
+        int debugColorOrTint = buffer.readInt();
+
         int ageTicks = buffer.readVarInt();
         int lifetimeTicks = buffer.readVarInt();
 
@@ -203,6 +203,8 @@ public final class CloudRegionRenderData {
                 regionId,
                 dimensionId,
                 center,
+                previousCenter,
+                velocity,
                 radius,
                 baseY,
                 topY,
@@ -211,8 +213,6 @@ public final class CloudRegionRenderData {
                 edgeSoftness,
                 active,
                 debugColorOrTint,
-                previousCenter,
-                velocity,
                 ageTicks,
                 lifetimeTicks,
                 growth,

@@ -145,7 +145,7 @@ public class AtmosphereManager {
             // Still advance orchestrator's internal timing (e.g., tornado check scheduling) safely
             ForecastOrchestrator.tick(level);
         }
-        if (count % 20 != 0) {
+        if (count % 20 == 0) {
             AtmosphereCloudRegionTracker.reconcile(level);
         }
 

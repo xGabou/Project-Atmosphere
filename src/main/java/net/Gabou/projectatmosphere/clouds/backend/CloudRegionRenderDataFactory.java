@@ -3,8 +3,8 @@ package net.Gabou.projectatmosphere.clouds.backend;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Converts backend cloud region state into transport safe cloud render data.
- * This class does not read client render classes and does not create client snapshots.
+ * Convertit l'état backend d'une région de nuage en donnée de rendu transportable.
+ * Cette classe ne lit aucune classe de rendu client et ne crée aucun snapshot client.
  */
 final class CloudRegionRenderDataFactory {
 
@@ -18,16 +18,18 @@ final class CloudRegionRenderDataFactory {
     }
 
     /**
-     * Creates transport safe render data debug from a backend cloud region state.
+     * Crée une donnée de rendu debug transportable depuis un état backend.
      *
-     * @param state backend cloud region state
-     * @return transport safe cloud render data
+     * @param state état backend de région de nuage
+     * @return donnée de rendu de nuage transportable
      */
     static @NotNull CloudRegionRenderData createDebug(@NotNull CloudRegionState state) {
         return new CloudRegionRenderData(
                 state.getRegionId(),
                 state.getDimension().location().toString(),
                 state.getCenter(),
+                state.getPreviousCenter(),
+                state.getVelocity(),
                 state.getRadius(),
                 state.getBaseY(),
                 state.getTopY(),
@@ -36,8 +38,6 @@ final class CloudRegionRenderDataFactory {
                 DEFAULT_EDGE_SOFTNESS,
                 state.isActive(),
                 DEFAULT_DEBUG_COLOR,
-                state.getPreviousCenter(),
-                state.getVelocity(),
                 state.getAgeTicks(),
                 state.getLifetimeTicks(),
                 state.getGrowth(),
@@ -46,16 +46,18 @@ final class CloudRegionRenderDataFactory {
     }
 
     /**
-     * Creates transport safe render data from a backend cloud region state.
+     * Crée une donnée de rendu transportable depuis un état backend.
      *
-     * @param state backend cloud region state
-     * @return transport safe cloud render data
+     * @param state état backend de région de nuage
+     * @return donnée de rendu de nuage transportable
      */
     static @NotNull CloudRegionRenderData create(@NotNull CloudRegionState state) {
         return new CloudRegionRenderData(
                 state.getRegionId(),
                 state.getDimension().location().toString(),
                 state.getCenter(),
+                state.getPreviousCenter(),
+                state.getVelocity(),
                 state.getRadius(),
                 state.getBaseY(),
                 state.getTopY(),
@@ -64,8 +66,6 @@ final class CloudRegionRenderDataFactory {
                 state.getEdgeSoftness(),
                 state.isActive(),
                 0xFFFFFFFF,
-                state.getPreviousCenter(),
-                state.getVelocity(),
                 state.getAgeTicks(),
                 state.getLifetimeTicks(),
                 state.getGrowth(),

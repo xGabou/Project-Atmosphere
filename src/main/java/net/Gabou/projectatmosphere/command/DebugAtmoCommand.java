@@ -10,6 +10,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.AtmoApi;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionState;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -42,7 +43,7 @@ import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
-import java.util.UUID;
+import java.util.List;
 
 public class DebugAtmoCommand {
 
@@ -220,52 +221,152 @@ public class DebugAtmoCommand {
                 )
         );
 
+        root.then(Commands.literal("clouds")
+                .then(Commands.literal("create")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(DebugAtmoCommand::createDebugCloudRegion)
+                )
+                .then(Commands.literal("count")
+                        .executes(DebugAtmoCommand::sendCloudRegionCount)
+                )
+                .then(Commands.literal("list")
+                        .executes(DebugAtmoCommand::listCloudRegions)
+                )
+                .then(Commands.literal("clear")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(DebugAtmoCommand::clearCloudRegions)
+                )
+                .then(Commands.literal("clearInactive")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(DebugAtmoCommand::clearInactiveCloudRegions)
+                )
+                .then(Commands.literal("sync")
+                        .executes(DebugAtmoCommand::syncCloudRegions)
+                )
+        );
+
         root.then(Commands.literal("createCloudDebug")
-                .executes(ctx -> {
-                    if (FMLEnvironment.production) {
-                        ctx.getSource().sendFailure(Component.literal("This command is only available in a development environment."));
-                        return 0;
-                    } else {
-                        CommandSourceStack source = ctx.getSource();
-                        ServerLevel level = source.getLevel();
-                        BlockPos pos = BlockPos.containing(source.getPosition());
-
-                        RegionInstanceKey sourceRegionKey = RegionInstanceKey.from(pos);
-
-                        CloudRegionState state = CloudRegionManager.getInstance().createCloudRegion(
-                                level,
-                                new Vec3(pos.getX(), pos.getY() + 80.0D, pos.getZ()),
-                                64.0F,
-                                pos.getY() + 72.0F,
-                                pos.getY() + 88.0F,
-                                0.65F,
-                                0.75F,
-                                0.35F,
-                                sourceRegionKey
-                        );
-                        source.sendSuccess(
-                                () -> Component.literal("Cloud region créée. Total: " + CloudRegionManager.getInstance().getCloudRegionCount(level)),
-                                false
-                        );
-
-                        return 1;
-                    }
-                })
+                .requires(source -> source.hasPermission(2))
+                .executes(DebugAtmoCommand::createDebugCloudRegion)
         );
 
         root.then(Commands.literal("Clouds count")
-                .executes(ctx -> {
-                    CommandSourceStack source = ctx.getSource();
-                    ServerLevel level = source.getLevel();
-                    source.sendSuccess(
-                            () -> Component.literal("Cloud regions sauvegardées: " + CloudRegionManager.getInstance().getCloudRegionCount(level)),
-                            false
-                    );
-
-                    return 1;
-
-                })
+                .executes(DebugAtmoCommand::sendCloudRegionCount)
         );
+    }
+
+    private static int createDebugCloudRegion(CommandContext<CommandSourceStack> ctx) {
+        if (FMLEnvironment.production) {
+            ctx.getSource().sendFailure(Component.literal("This command is only available in a development environment."));
+            return 0;
+        }
+
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos pos = BlockPos.containing(source.getPosition());
+        RegionInstanceKey sourceRegionKey = RegionInstanceKey.from(pos);
+
+        CloudRegionState state = CloudRegionManager.getInstance().createCloudRegion(
+                level,
+                new Vec3(pos.getX(), pos.getY() + 80.0D, pos.getZ()),
+                64.0F,
+                pos.getY() + 72.0F,
+                pos.getY() + 88.0F,
+                0.65F,
+                0.75F,
+                0.35F,
+                sourceRegionKey
+        );
+
+        if (source.getPlayer() != null) {
+            CloudRegionSyncManager.syncPlayer(source.getPlayer());
+        }
+
+        int count = CloudRegionManager.getInstance().getCloudRegionCount(level);
+        source.sendSuccess(
+                () -> Component.literal("Cloud backend créé: " + state.getRegionId() + "\nCloud regions sauvegardées: " + count + "\nSync client immédiate envoyée."),
+                false
+        );
+
+        return 1;
+    }
+
+    private static int sendCloudRegionCount(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        int storedCount = CloudRegionManager.getInstance().getCloudRegionCount(level);
+        int activeRenderDataCount = CloudRegionManager.getInstance().getActiveRenderData(level).size();
+
+        source.sendSuccess(
+                () -> Component.literal("Cloud backend: stored=" + storedCount + " activeRenderData=" + activeRenderDataCount),
+                false
+        );
+
+        return 1;
+    }
+
+    private static int listCloudRegions(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        List<String> lines = CloudRegionManager.getInstance().describeCloudRegions(level);
+
+        if (lines.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("Aucune cloud region backend sauvegardée."), false);
+            return 1;
+        }
+
+        StringBuilder message = new StringBuilder("Cloud regions backend sauvegardées: ").append(lines.size());
+        int limit = Math.min(lines.size(), 8);
+        for (int i = 0; i < limit; i++) {
+            message.append("\n").append(i + 1).append(". ").append(lines.get(i));
+        }
+        if (lines.size() > limit) {
+            message.append("\n... ").append(lines.size() - limit).append(" autres régions");
+        }
+
+        source.sendSuccess(() -> Component.literal(message.toString()), false);
+        return 1;
+    }
+
+    private static int clearCloudRegions(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        CloudRegionManager.getInstance().clearCloudRegions(level);
+
+        if (source.getPlayer() != null) {
+            CloudRegionSyncManager.syncPlayer(source.getPlayer());
+        }
+
+        source.sendSuccess(() -> Component.literal("Cloud regions backend effacées et sync client envoyée."), false);
+        return 1;
+    }
+
+    private static int clearInactiveCloudRegions(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        int removed = CloudRegionManager.getInstance().clearInactiveCloudRegions(level);
+
+        if (source.getPlayer() != null) {
+            CloudRegionSyncManager.syncPlayer(source.getPlayer());
+        }
+
+        source.sendSuccess(
+                () -> Component.literal("Cloud regions inactives supprimées: " + removed + "\nSync client envoyée."),
+                false
+        );
+        return 1;
+    }
+
+    private static int syncCloudRegions(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        if (source.getPlayer() == null) {
+            source.sendFailure(Component.literal("Cette commande doit être exécutée par un joueur."));
+            return 0;
+        }
+
+        CloudRegionSyncManager.syncPlayer(source.getPlayer());
+        source.sendSuccess(() -> Component.literal("Sync cloud regions envoyée au client."), false);
+        return 1;
     }
 
     private static CloudRegion spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {

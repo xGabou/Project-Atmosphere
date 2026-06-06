@@ -37,6 +37,8 @@ public class EventHandler {
 
     private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
 
+    private static final int LIVING_WEATHER_EFFECT_INTERVAL_TICKS = 5;
+
     private static int tickCounter = 0;
 
     private static boolean hasDisplayedMessage = false;
@@ -158,11 +160,14 @@ public class EventHandler {
         if (!level.dimension().equals(Level.OVERWORLD)) {
             return;
         }
+        if ((entity.tickCount + entity.getId()) % LIVING_WEATHER_EFFECT_INTERVAL_TICKS != 0) {
+            return;
+        }
         AtmosphereWorldEffectsManager.applyCloudCoverEffects(level, entity);
         if (entity instanceof ServerPlayer) {
             return;
         }
-        WindForces.applyToEntity(level, entity, 1.0f);
+        WindForces.applyToEntity(level, entity, LIVING_WEATHER_EFFECT_INTERVAL_TICKS);
     }
 
     public static void onRegenerate() {

@@ -24,7 +24,7 @@ final class CloudRegionMotionController {
 
         Vec3 velocity = state.getVelocity();
 
-        if (velocity == null || velocity.lengthSqr() <= 0.000001D) {
+        if (velocity == null || velocity.equals(Vec3.ZERO)) {
             return false;
         }
 

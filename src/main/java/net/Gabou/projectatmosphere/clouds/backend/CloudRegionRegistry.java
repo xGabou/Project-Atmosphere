@@ -66,6 +66,18 @@ final class CloudRegionRegistry {
         regionsById.clear();
     }
 
+    int removeInactiveRegions() {
+        int removed = 0;
+
+        for (CloudRegionState state : new ArrayList<>(regionsById.values())) {
+            if (state != null && !state.isActive() && regionsById.remove(state.getRegionId(), state)) {
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
     int size() {
         return regionsById.size();
     }

@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.frontend;
 
+import net.minecraft.world.phys.Vec3;
+
 /**
  * Fournit les valeurs de densité effectives utilisées par le rendu live.
  * Cette classe ne fait aucun draw call et ne lit jamais le backend.
@@ -64,6 +66,56 @@ public final class CloudDensityProvider {
         return getEffectiveDensity(snapshot) > 0.001F && getEffectiveCoverage(snapshot) > 0.001F;
     }
 
+    /**
+     * Échantillonne une densité CPU simple pour le premier test de pipeline.
+     * Cette méthode n'utilise pas de bruit et ne remplace pas le futur shader.
+     *
+     * @param snapshot snapshot de rendu live
+     * @param worldPosition position monde à échantillonner
+     * @return densité échantillonnée entre 0 et 1
+     */
+    public static float sampleDensity(CloudRenderSnapshot snapshot, Vec3 worldPosition) {
+        if (snapshot == null || worldPosition == null || snapshot.getRegionCenter() == null) {
+            return 0.0F;
+        }
+
+        float radius = snapshot.getRegionRadius();
+        if (radius <= 0.0F) {
+            return 0.0F;
+        }
+
+        double dx = worldPosition.x() - snapshot.getRegionCenter().x();
+        double dz = worldPosition.z() - snapshot.getRegionCenter().z();
+        float horizontalDistance = (float) Math.sqrt(dx * dx + dz * dz);
+        float normalizedHorizontal = horizontalDistance / radius;
+
+        if (normalizedHorizontal >= 1.0F) {
+            return 0.0F;
+        }
+
+        float baseY = snapshot.getCloudBaseY();
+        float topY = snapshot.getCloudTopY();
+        if (topY <= baseY || worldPosition.y() < baseY || worldPosition.y() > topY) {
+            return 0.0F;
+        }
+
+        float edgeSoftness = clamp01(snapshot.getEdgeSoftness());
+        float horizontalFade = edgeSoftness <= 0.0F
+                ? 1.0F
+                : smoothstep(1.0F, 1.0F - edgeSoftness, normalizedHorizontal);
+
+        float normalizedVertical = (float) ((worldPosition.y() - baseY) / (topY - baseY));
+        float verticalFade = smoothstep(0.0F, 0.15F, normalizedVertical)
+                * (1.0F - smoothstep(0.85F, 1.0F, normalizedVertical));
+
+        float density = getEffectiveDensity(snapshot)
+                * getEffectiveCoverage(snapshot)
+                * horizontalFade
+                * verticalFade;
+
+        return clamp01(density);
+    }
+
     private static float clamp01(float value) {
         if (value < 0.0F) {
             return 0.0F;
@@ -74,5 +126,14 @@ public final class CloudDensityProvider {
         }
 
         return value;
+    }
+
+    private static float smoothstep(float edge0, float edge1, float value) {
+        if (edge0 == edge1) {
+            return value < edge0 ? 0.0F : 1.0F;
+        }
+
+        float t = clamp01((value - edge0) / (edge1 - edge0));
+        return t * t * (3.0F - 2.0F * t);
     }
 }

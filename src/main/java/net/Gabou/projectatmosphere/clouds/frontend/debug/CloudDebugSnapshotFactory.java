@@ -3,6 +3,10 @@ package net.Gabou.projectatmosphere.clouds.frontend.debug;
 import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderSnapshot;
 import net.minecraft.world.phys.Vec3;
 
+/**
+ * Crée les snapshots utilisés uniquement par le rendu debug.
+ * Cette classe ne modifie jamais les snapshots live courants.
+ */
 public final class CloudDebugSnapshotFactory {
     private static final Vec3 DEFAULT_CENTER = new Vec3(0.0D, 110.0D, 0.0D);
 
@@ -18,14 +22,32 @@ public final class CloudDebugSnapshotFactory {
     private CloudDebugSnapshotFactory() {
     }
 
+    /**
+     * Crée un snapshot debug factice au centre par défaut.
+     *
+     * @return snapshot debug factice
+     */
     public static CloudRenderSnapshot createFakeSnapshot() {
         return createFakeSnapshot(Vec3.ZERO, DEFAULT_CENTER);
     }
 
+    /**
+     * Crée un snapshot debug factice autour du centre demandé.
+     *
+     * @param center centre monde du snapshot debug
+     * @return snapshot debug factice
+     */
     public static CloudRenderSnapshot createFakeSnapshot(Vec3 center) {
         return createFakeSnapshot(Vec3.ZERO, center);
     }
 
+    /**
+     * Crée un snapshot debug factice avec une caméra et un centre explicites.
+     *
+     * @param cameraPosition position caméra utilisée par le debug
+     * @param center centre monde du snapshot debug
+     * @return snapshot debug factice
+     */
     public static CloudRenderSnapshot createFakeSnapshot(Vec3 cameraPosition, Vec3 center) {
         Vec3 safeCameraPosition = cameraPosition != null ? cameraPosition : Vec3.ZERO;
         Vec3 safeCenter = center != null ? center : DEFAULT_CENTER;
@@ -58,6 +80,13 @@ public final class CloudDebugSnapshotFactory {
         );
     }
 
+    /**
+     * Crée une variante debug d'un snapshot existant avec une couleur dédiée.
+     *
+     * @param base snapshot source
+     * @param debugColorOrTint couleur debug ARGB
+     * @return snapshot debug dérivé
+     */
     public static CloudRenderSnapshot createDebugSnapshot(CloudRenderSnapshot base, int debugColorOrTint) {
         if (base == null) {
             base = createFakeSnapshot();

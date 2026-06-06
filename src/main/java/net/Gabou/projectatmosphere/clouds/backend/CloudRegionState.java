@@ -54,6 +54,14 @@ public final class CloudRegionState {
     private static final String TAG_GROWTH = "Growth";
     private static final String TAG_DECAY = "Decay";
 
+    private static final float DEFAULT_RADIUS = 64.0F;
+    private static final float DEFAULT_BASE_Y = 128.0F;
+    private static final float DEFAULT_TOP_Y = 144.0F;
+    private static final float DEFAULT_DENSITY = 0.65F;
+    private static final float DEFAULT_COVERAGE = 0.75F;
+    private static final float DEFAULT_EDGE_SOFTNESS = 0.35F;
+    private static final int DEFAULT_LIFETIME_TICKS = 20 * 60 * 10;
+
     // Identité stable de cette région de nuage.
     private final UUID regionId;
 
@@ -122,6 +130,7 @@ public final class CloudRegionState {
         this.regionId = Objects.requireNonNull(regionId, "regionId");
         this.dimension = Objects.requireNonNull(dimension, "dimension");
         this.sourceRegionKey = sourceRegionKey;
+        this.currentRegionKey = sourceRegionKey;
 
         setCenter(center);
         setRadius(radius);
@@ -132,7 +141,7 @@ public final class CloudRegionState {
         this.previousCenter = center;
         this.velocity = Vec3.ZERO;
         this.ageTicks = 0;
-        this.lifetimeTicks = 20 * 60 * 10;
+        this.lifetimeTicks = DEFAULT_LIFETIME_TICKS;
         this.growth = 1.0F;
         this.decay = 0.0F;
 
@@ -155,9 +164,9 @@ public final class CloudRegionState {
                 radius,
                 baseY,
                 topY,
-                0.65F,
-                0.75F,
-                0.35F,
+                DEFAULT_DENSITY,
+                DEFAULT_COVERAGE,
+                DEFAULT_EDGE_SOFTNESS,
                 sourceRegionKey
         );
     }
@@ -372,9 +381,12 @@ public final class CloudRegionState {
      * @return état de nuage chargé
      */
     public static CloudRegionState load(CompoundTag tag) {
-        UUID regionId = tag.getUUID(TAG_REGION_ID);
+        UUID regionId = tag.hasUUID(TAG_REGION_ID) ? tag.getUUID(TAG_REGION_ID) : UUID.randomUUID();
 
-        ResourceLocation dimensionLocation = new ResourceLocation(tag.getString(TAG_DIMENSION));
+        String dimensionId = tag.contains(TAG_DIMENSION, Tag.TAG_STRING)
+                ? tag.getString(TAG_DIMENSION)
+                : Level.OVERWORLD.location().toString();
+        ResourceLocation dimensionLocation = new ResourceLocation(dimensionId);
         ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionLocation);
 
         Vec3 center = new Vec3(
@@ -383,13 +395,20 @@ public final class CloudRegionState {
                 tag.getDouble(TAG_CENTER_Z)
         );
 
-        float radius = tag.getFloat(TAG_RADIUS);
-        float baseY = tag.getFloat(TAG_BASE_Y);
-        float topY = tag.getFloat(TAG_TOP_Y);
+        float radius = tag.contains(TAG_RADIUS) ? tag.getFloat(TAG_RADIUS) : DEFAULT_RADIUS;
+        if (radius <= 0.0F) {
+            radius = DEFAULT_RADIUS;
+        }
 
-        float density = tag.contains(TAG_DENSITY) ? tag.getFloat(TAG_DENSITY) : 0.65F;
-        float coverage = tag.contains(TAG_COVERAGE) ? tag.getFloat(TAG_COVERAGE) : 0.75F;
-        float edgeSoftness = tag.contains(TAG_EDGE_SOFTNESS) ? tag.getFloat(TAG_EDGE_SOFTNESS) : 0.35F;
+        float baseY = tag.contains(TAG_BASE_Y) ? tag.getFloat(TAG_BASE_Y) : DEFAULT_BASE_Y;
+        float topY = tag.contains(TAG_TOP_Y) ? tag.getFloat(TAG_TOP_Y) : DEFAULT_TOP_Y;
+        if (topY <= baseY) {
+            topY = baseY + (DEFAULT_TOP_Y - DEFAULT_BASE_Y);
+        }
+
+        float density = tag.contains(TAG_DENSITY) ? tag.getFloat(TAG_DENSITY) : DEFAULT_DENSITY;
+        float coverage = tag.contains(TAG_COVERAGE) ? tag.getFloat(TAG_COVERAGE) : DEFAULT_COVERAGE;
+        float edgeSoftness = tag.contains(TAG_EDGE_SOFTNESS) ? tag.getFloat(TAG_EDGE_SOFTNESS) : DEFAULT_EDGE_SOFTNESS;
 
         Vec3 previousCenter = tag.contains(TAG_PREVIOUS_CENTER_X)
                 ? new Vec3(
@@ -407,7 +426,7 @@ public final class CloudRegionState {
         )
                 : Vec3.ZERO;
         int ageTicks = tag.contains(TAG_AGE_TICKS) ? tag.getInt(TAG_AGE_TICKS) : 0;
-        int lifetimeTicks = tag.contains(TAG_LIFETIME_TICKS) ? tag.getInt(TAG_LIFETIME_TICKS) : 20 * 60 * 10;
+        int lifetimeTicks = tag.contains(TAG_LIFETIME_TICKS) ? tag.getInt(TAG_LIFETIME_TICKS) : DEFAULT_LIFETIME_TICKS;
         float growth = tag.contains(TAG_GROWTH) ? tag.getFloat(TAG_GROWTH) : 1.0F;
         float decay = tag.contains(TAG_DECAY) ? tag.getFloat(TAG_DECAY) : 0.0F;
 
@@ -429,7 +448,7 @@ public final class CloudRegionState {
                 sourceRegionKey
         );
 
-        state.setActive(tag.getBoolean(TAG_ACTIVE));
+        state.setActive(!tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE));
         state.setPreviousCenter(previousCenter);
         state.setVelocity(velocity);
         state.setAgeTicks(ageTicks);
@@ -439,6 +458,8 @@ public final class CloudRegionState {
 
         if (tag.contains(TAG_CURRENT_REGION, Tag.TAG_COMPOUND)) {
             state.setCurrentRegionKey(loadRegionKey(tag.getCompound(TAG_CURRENT_REGION)));
+        } else {
+            state.setCurrentRegionKey(sourceRegionKey);
         }
 
         return state;

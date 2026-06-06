@@ -8,6 +8,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -109,6 +112,23 @@ public final class CloudRegionManager {
     }
 
     /**
+     * Supprime les régions inactives du registre backend.
+     *
+     * @param level niveau serveur
+     * @return nombre de régions supprimées
+     */
+    public int clearInactiveCloudRegions(@NotNull ServerLevel level) {
+        CloudRegionRegistry registry = CloudRegionBackend.getRegistry(level);
+        int removed = registry.removeInactiveRegions();
+
+        if (removed > 0) {
+            CloudRegionBackend.markDirty(level);
+        }
+
+        return removed;
+    }
+
+    /**
      * Retourne les données transportables des régions de nuage actives.
      *
      * @param level niveau serveur
@@ -116,6 +136,43 @@ public final class CloudRegionManager {
      */
     public @NotNull Collection<CloudRegionRenderData> getActiveRenderData(@NotNull ServerLevel level) {
         return CloudRegionBackend.getRegistry(level).createRenderDataForActiveRegions();
+    }
+
+    /**
+     * Retourne des lignes de diagnostic lisibles pour les régions sauvegardées.
+     *
+     * @param level niveau serveur
+     * @return lignes de diagnostic des régions de nuage
+     */
+    public @NotNull List<String> describeCloudRegions(@NotNull ServerLevel level) {
+        CloudRegionRegistry registry = CloudRegionBackend.getRegistry(level);
+        List<String> lines = new ArrayList<>();
+
+        for (CloudRegionState state : registry.getAll()) {
+            if (state == null) {
+                continue;
+            }
+
+            Vec3 center = state.getCenter();
+            lines.add(String.format(
+                    Locale.ROOT,
+                    "%s active=%s center=%.1f %.1f %.1f radius=%.1f age=%d/%d density=%.2f coverage=%.2f growth=%.2f decay=%.2f",
+                    state.getRegionId(),
+                    state.isActive(),
+                    center.x(),
+                    center.y(),
+                    center.z(),
+                    state.getRadius(),
+                    state.getAgeTicks(),
+                    state.getLifetimeTicks(),
+                    state.getDensity(),
+                    state.getCoverage(),
+                    state.getGrowth(),
+                    state.getDecay()
+            ));
+        }
+
+        return lines;
     }
 
     /**

@@ -2,6 +2,11 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.clouds.frontend.ClientCloudRegionDataCache;
+import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderController;
+import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderSnapshot;
+import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderStateHolder;
 import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -63,6 +68,49 @@ public class TelemetryDebugClientCommand {
                                                 return 1;
                                             }
 
+                                        })
+                                )
+                                .then(Commands.literal("cloudStatus")
+                                        .executes(ctx -> {
+                                            int cachedRegions = ClientCloudRegionDataCache.getCurrentRegions().size();
+                                            int currentSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots().size();
+                                            int renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots().size();
+                                            boolean hasDebugSnapshot = CloudRenderStateHolder.getInstance().hasDebugSnapshot();
+
+                                            StringBuilder message = new StringBuilder("Cloud client status")
+                                                    .append("\ncacheRegions=").append(cachedRegions)
+                                                    .append("\ncurrentSnapshots=").append(currentSnapshots)
+                                                    .append("\nrenderableLiveSnapshots=").append(renderableSnapshots)
+                                                    .append("\ndebugSnapshot=").append(hasDebugSnapshot);
+
+                                            if (cachedRegions > 0) {
+                                                CloudRegionRenderData data = ClientCloudRegionDataCache.getCurrentRegions().get(0);
+                                                message.append("\nfirstRegion=")
+                                                        .append(data.getRegionId())
+                                                        .append(" dim=")
+                                                        .append(data.getDimensionId())
+                                                        .append(" active=")
+                                                        .append(data.isActive())
+                                                        .append(" center=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.1f %.1f %.1f", data.getCenter().x(), data.getCenter().y(), data.getCenter().z()));
+                                            }
+
+                                            if (currentSnapshots > 0) {
+                                                CloudRenderSnapshot snapshot = CloudRenderStateHolder.getInstance().getCurrentSnapshots().get(0);
+                                                message.append("\nfirstSnapshot=")
+                                                        .append(snapshot.getDimension())
+                                                        .append(" enabled=")
+                                                        .append(snapshot.isEnabled())
+                                                        .append(" radius=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.1f", snapshot.getRegionRadius()))
+                                                        .append(" age=")
+                                                        .append(snapshot.getAgeTicks())
+                                                        .append("/")
+                                                        .append(snapshot.getLifetimeTicks());
+                                            }
+
+                                            ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);
+                                            return 1;
                                         })
                                 )
 

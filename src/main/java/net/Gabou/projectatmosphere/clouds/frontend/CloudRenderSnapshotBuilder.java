@@ -5,8 +5,8 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Builds immutable frontend cloud render snapshots from transport safe cloud region data.
- * This class belongs to the frontend layer and does not read CloudRegionState directly.
+ * Construit des snapshots frontend immutables depuis les données de région transportables.
+ * Cette classe appartient à la couche frontend et ne lit jamais CloudRegionState directement.
  */
 public final class CloudRenderSnapshotBuilder {
 
@@ -18,13 +18,13 @@ public final class CloudRenderSnapshotBuilder {
     }
 
     /**
-     * Creates a frontend render snapshot from transport safe cloud region data.
+     * Crée un snapshot de rendu frontend depuis une donnée de région transportable.
      *
-     * @param renderData transport safe cloud region data
-     * @param worldTime current client world time
-     * @param partialTick current render partial tick
-     * @param cameraPosition current camera position
-     * @return immutable cloud render snapshot
+     * @param renderData donnée de région de nuage transportable
+     * @param worldTime temps monde client courant
+     * @param partialTick interpolation de rendu courante
+     * @param cameraPosition position actuelle de la caméra
+     * @return snapshot de rendu de nuage immutable
      */
     public static @NotNull CloudRenderSnapshot create(
             @NotNull CloudRegionRenderData renderData,

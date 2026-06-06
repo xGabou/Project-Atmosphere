@@ -9,7 +9,9 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 final class AtmosphereCloudRegionTracker {
     private static final List<CloudRegion> CLOUD_REGIONS = new ArrayList<>();
@@ -35,14 +37,16 @@ final class AtmosphereCloudRegionTracker {
         if (CLOUD_REGIONS.isEmpty()) {
             return;
         }
-        List<CloudRegion> activeRegions = new ArrayList<>(CloudManager.get(level).getClouds());
+        Set<Integer> activeIds = new HashSet<>();
+        for (CloudRegion activeRegion : CloudManager.get(level).getClouds()) {
+            if (activeRegion instanceof net.Gabou.projectatmosphere.util.ICloudRegionId id) {
+                activeIds.add(id.projectatmosphere$getId());
+            }
+        }
+
         for (CloudRegion cloudRegion : new ArrayList<>(CLOUD_REGIONS)) {
             if (cloudRegion instanceof net.Gabou.projectatmosphere.util.ICloudRegionId id) {
-                boolean stillActive = activeRegions.stream()
-                        .filter(r -> r instanceof net.Gabou.projectatmosphere.util.ICloudRegionId)
-                        .map(r -> (net.Gabou.projectatmosphere.util.ICloudRegionId) r)
-                        .anyMatch(r -> r.projectatmosphere$getId() == id.projectatmosphere$getId());
-                if (!stillActive) {
+                if (!activeIds.contains(id.projectatmosphere$getId())) {
                     queueRemove(cloudRegion);
                 }
             }
