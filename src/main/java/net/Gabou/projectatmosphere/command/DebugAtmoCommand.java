@@ -9,10 +9,11 @@ import com.mojang.brigadier.context.CommandContext;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.api.AtmoApi;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionState;
+import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
+import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -256,7 +257,8 @@ public class DebugAtmoCommand {
                 0.65F,
                 0.75F,
                 0.35F,
-                sourceRegionKey
+                sourceRegionKey,
+                CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID
         );
 
         if (source.getPlayer() != null) {
@@ -410,6 +412,7 @@ public class DebugAtmoCommand {
         if (!level.dimension().equals(Level.OVERWORLD)) {
             return null;
         }
+        String cloudTypeId = resolveNativeCloudTypeId(cloudId);
         float density = cloudId != null && cloudId.contains("thunder") ? 0.85F : 0.65F;
         float coverage = cloudId != null && cloudId.contains("snow") ? 0.85F : 0.75F;
         return CloudRegionManager.getInstance().createCloudRegion(
@@ -421,8 +424,25 @@ public class DebugAtmoCommand {
                 density,
                 coverage,
                 0.35F,
-                RegionInstanceKey.from(pos)
+                RegionInstanceKey.from(pos),
+                cloudTypeId
         );
+    }
+
+    private static String resolveNativeCloudTypeId(String cloudId) {
+        if (CloudTypeRegistry.get(cloudId).isPresent()) {
+            return cloudId;
+        }
+        if (cloudId != null && cloudId.contains("thunder")) {
+            return "cumulonimbus_calvus";
+        }
+        if (cloudId != null && cloudId.contains("rain")) {
+            return "nimbostratus";
+        }
+        if (cloudId != null && cloudId.contains("snow")) {
+            return "nimbostratus";
+        }
+        return CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
     }
 
     private static int sendFogDebug(CommandContext<CommandSourceStack> ctx) {

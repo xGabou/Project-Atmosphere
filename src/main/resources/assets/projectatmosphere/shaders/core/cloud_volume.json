@@ -49,6 +49,20 @@
     { "name": "CloudLifetimeTicks", "type": "int", "count": 1, "values": [ 12000 ] },
     { "name": "CloudGrowth", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CloudDecay", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudVerticalThickness", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CloudEdgeErosionStrength", "type": "float", "count": 1, "values": [ 0.35 ] },
+    { "name": "CloudTopSoftness", "type": "float", "count": 1, "values": [ 0.20 ] },
+    { "name": "CloudBaseSoftness", "type": "float", "count": 1, "values": [ 0.18 ] },
+    { "name": "CloudBaseDarkness", "type": "float", "count": 1, "values": [ 0.25 ] },
+    { "name": "CloudNoiseScale", "type": "float", "count": 1, "values": [ 0.020 ] },
+    { "name": "CloudDetailNoiseScale", "type": "float", "count": 1, "values": [ 0.105 ] },
+    { "name": "CloudErosionNoiseScale", "type": "float", "count": 1, "values": [ 0.118 ] },
+    { "name": "CloudDensityMultiplier", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CloudCoverageMultiplier", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CloudHeightSquash", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CloudTowerStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudAnvilStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudPrecipitationCoreStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 32 ] }
   ]
 }

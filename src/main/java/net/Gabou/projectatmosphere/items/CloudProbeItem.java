@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.items;
 
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;

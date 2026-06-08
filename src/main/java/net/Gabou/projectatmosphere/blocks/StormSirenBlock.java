@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.blocks;
 
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.registry.ModSounds;
 import net.minecraft.core.BlockPos;

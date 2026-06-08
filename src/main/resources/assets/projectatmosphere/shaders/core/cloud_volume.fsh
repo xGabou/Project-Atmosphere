@@ -37,6 +37,20 @@ uniform int CloudAgeTicks;
 uniform int CloudLifetimeTicks;
 uniform float CloudGrowth;
 uniform float CloudDecay;
+uniform float CloudVerticalThickness;
+uniform float CloudEdgeErosionStrength;
+uniform float CloudTopSoftness;
+uniform float CloudBaseSoftness;
+uniform float CloudBaseDarkness;
+uniform float CloudNoiseScale;
+uniform float CloudDetailNoiseScale;
+uniform float CloudErosionNoiseScale;
+uniform float CloudDensityMultiplier;
+uniform float CloudCoverageMultiplier;
+uniform float CloudHeightSquash;
+uniform float CloudTowerStrength;
+uniform float CloudAnvilStrength;
+uniform float CloudPrecipitationCoreStrength;
 uniform int RaymarchSteps;
 
 in vec2 texCoord;
@@ -135,7 +149,7 @@ float sampleCloudField(vec3 samplePos) {
     }
 
     float lifecycleFactor = saturate(CloudGrowth * (1.0 - CloudDecay));
-    float effectiveDensity = saturate(CloudDensity * CloudCoverage * lifecycleFactor);
+    float effectiveDensity = saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier * lifecycleFactor);
 
     float edgeSoftness = max(saturate(CloudEdgeSoftness), 0.001);
     float horizontalFade = 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, normalizedHorizontal);
@@ -143,24 +157,39 @@ float sampleCloudField(vec3 samplePos) {
 
     vec3 motion = (CloudCenter - CloudPreviousCenter) * (0.35 + CloudPartialTick * 0.15);
     vec3 baseNoisePos = samplePos + motion * 0.2;
+    float visualThickness = max(CloudVerticalThickness, 0.05);
+    float heightSquash = max(CloudHeightSquash, 0.10);
+    float shapedVertical = (vertical - 0.5) * heightSquash / visualThickness + 0.5;
+    if (shapedVertical < 0.0 || shapedVertical > 1.0) {
+        return 0.0;
+    }
 
     float topWarp = fbm(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1), 2) - 0.5;
     float baseWarp = fbm(baseNoisePos * vec3(0.014, 0.0, 0.014) + vec3(3.4, CloudWorldTime * -0.0008, 27.5), 2) - 0.5;
-    float warpedVertical = vertical + topWarp * 0.16 * smoothstep(0.45, 1.0, vertical) - baseWarp * 0.08 * (1.0 - smoothstep(0.0, 0.35, vertical));
-    float verticalFade = smoothstep(0.0, 0.16, warpedVertical) * (1.0 - smoothstep(0.78, 1.0, warpedVertical));
+    float warpedVertical = shapedVertical + topWarp * 0.16 * smoothstep(0.45, 1.0, shapedVertical) - baseWarp * 0.08 * (1.0 - smoothstep(0.0, 0.35, shapedVertical));
+    float baseSoftness = max(CloudBaseSoftness, 0.01);
+    float topSoftness = max(CloudTopSoftness, 0.01);
+    float verticalFade = smoothstep(0.0, baseSoftness, warpedVertical) * (1.0 - smoothstep(1.0 - topSoftness, 1.0, warpedVertical));
     float interiorFade = 1.0;
 
-    float lobeNoise = fbm(baseNoisePos * vec3(0.020, 0.035, 0.020) + vec3(0.0, CloudWorldTime * 0.0015, 0.0), 3);
-    float layerNoise = fbm(baseNoisePos * vec3(0.052, 0.105, 0.052) + vec3(12.0, CloudWorldTime * 0.0025, 8.0), 3);
-    float detailNoise = fbm(baseNoisePos * vec3(0.118, 0.150, 0.118) + vec3(31.0, CloudWorldTime * -0.0030, 6.0), 2);
+    float noiseScale = max(CloudNoiseScale, 0.001);
+    float detailNoiseScale = max(CloudDetailNoiseScale, 0.001);
+    float erosionNoiseScale = max(CloudErosionNoiseScale, 0.001);
+    float lobeNoise = fbm(baseNoisePos * vec3(noiseScale, noiseScale * 1.75, noiseScale) + vec3(0.0, CloudWorldTime * 0.0015, 0.0), 3);
+    float layerNoise = fbm(baseNoisePos * vec3(detailNoiseScale * 0.50, detailNoiseScale, detailNoiseScale * 0.50) + vec3(12.0, CloudWorldTime * 0.0025, 8.0), 3);
+    float detailNoise = fbm(baseNoisePos * vec3(erosionNoiseScale, erosionNoiseScale * 1.25, erosionNoiseScale) + vec3(31.0, CloudWorldTime * -0.0030, 6.0), 2);
 
     float lobeShape = mix(0.74, 1.18, lobeNoise);
     float layeredShape = mix(0.82, 1.10, layerNoise);
-    float edgeCarve = mix(1.0, smoothstep(0.24, 0.86, detailNoise), edgeFactor);
+    float edgeCarve = mix(1.0, smoothstep(0.24, 0.86, detailNoise), edgeFactor * saturate(CloudEdgeErosionStrength));
     float centerWeight = 1.0 - smoothstep(0.0, 0.58, normalizedHorizontal);
     float corePreserve = mix(edgeCarve, max(edgeCarve, 0.86), centerWeight);
+    float towerBoost = 1.0 + CloudTowerStrength * centerWeight * smoothstep(0.22, 0.86, warpedVertical) * 0.42;
+    float anvilBoost = 1.0 + CloudAnvilStrength * smoothstep(0.58, 1.0, warpedVertical) * smoothstep(0.20, 0.92, normalizedHorizontal) * 0.34;
+    float precipitationCore = 1.0 + CloudPrecipitationCoreStrength * centerWeight * (1.0 - smoothstep(0.28, 0.72, warpedVertical)) * 0.35;
+    float baseProfile = mix(1.0, 0.94, saturate(CloudBaseDarkness) * (1.0 - smoothstep(0.0, 0.42, warpedVertical)));
 
-    return saturate(effectiveDensity * horizontalFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve);
+    return saturate(effectiveDensity * horizontalFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve * towerBoost * anvilBoost * precipitationCore * baseProfile);
 }
 
 vec3 computeSampleLighting(vec3 samplePos, float density, vec3 rayDir) {
@@ -181,7 +210,8 @@ vec3 computeSampleLighting(vec3 samplePos, float density, vec3 rayDir) {
 
     float densityDarkening = exp(-density * LightAbsorption);
     vec3 compatibilityTint = mix(CloudColor.rgb, vec3(1.0), 0.85);
-    vec3 baseLighting = AmbientCloudColor * compatibilityTint * mix(1.0 - UndersideDarkening, 1.0, vertical);
+    float undersideDarkening = saturate(UndersideDarkening + CloudBaseDarkness * 0.30);
+    vec3 baseLighting = AmbientCloudColor * compatibilityTint * mix(1.0 - undersideDarkening, 1.0, vertical);
     vec3 sunLighting = SunColor * rimLight;
     vec3 horizonGlow = SunColor
         * HorizonGlowStrength

@@ -2,13 +2,13 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRenderData;
-import net.Gabou.projectatmosphere.clouds.frontend.ClientCloudRegionDataCache;
-import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderController;
-import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderSnapshot;
-import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderStateHolder;
-import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugRenderHook;
-import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
+import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
+import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
+import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
+import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
 import net.minecraft.client.Minecraft;
@@ -91,6 +91,10 @@ public class TelemetryDebugClientCommand {
                                                         .append(data.getDimensionId())
                                                         .append(" active=")
                                                         .append(data.isActive())
+                                                        .append(" type=")
+                                                        .append(data.getCloudTypeId())
+                                                        .append(" profileDensity=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", data.getDensityMultiplier()))
                                                         .append(" center=")
                                                         .append(String.format(java.util.Locale.ROOT, "%.1f %.1f %.1f", data.getCenter().x(), data.getCenter().y(), data.getCenter().z()));
                                             }
@@ -107,6 +111,12 @@ public class TelemetryDebugClientCommand {
                                                         .append(snapshot.getAgeTicks())
                                                         .append("/")
                                                         .append(snapshot.getLifetimeTicks());
+                                                message.append(" type=")
+                                                        .append(snapshot.getCloudTypeId())
+                                                        .append(" tower=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getTowerStrength()))
+                                                        .append(" anvil=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getAnvilStrength()));
                                             }
 
                                             ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);

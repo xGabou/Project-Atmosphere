@@ -2,9 +2,9 @@ package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
-import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderHook;
-import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugRenderHook;
-import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.auroras.AuroraCompatController;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;

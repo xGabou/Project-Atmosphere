@@ -1,8 +1,8 @@
 package net.Gabou.projectatmosphere.event;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
+import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudService;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;

@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.manager;
 
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.command.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
