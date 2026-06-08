@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.client.screen;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
@@ -96,24 +97,26 @@ public class WeatherRadarScreen extends Screen {
         }
 
         // Overlay: Tornadoes (purple) and Hurricanes (black)
-        for (TornadoInstance t : TornadoManager.getClientTornadoes()) {
-            float dx = (float) ((t.position.x - player.getX()) / scale);
-            float dz = (float) ((t.position.z - player.getZ()) / scale);
-            int r = Math.max(2, Math.round(t.radius / scale));
-            int x = left + MAP_SIZE / 2 + Math.round(dx);
-            int y = top + MAP_SIZE / 2 + Math.round(dz);
-            int color = (0xC0 << 24) | 0x800080; // semi-opaque purple
-            fillEllipse(guiGraphics, x, y, Math.max(2, r), Math.max(2, (int) (r * 0.7f)), color);
-        }
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            for (TornadoInstance t : TornadoManager.getClientTornadoes()) {
+                float dx = (float) ((t.position.x - player.getX()) / scale);
+                float dz = (float) ((t.position.z - player.getZ()) / scale);
+                int r = Math.max(2, Math.round(t.radius / scale));
+                int x = left + MAP_SIZE / 2 + Math.round(dx);
+                int y = top + MAP_SIZE / 2 + Math.round(dz);
+                int color = (0xC0 << 24) | 0x800080; // semi-opaque purple
+                fillEllipse(guiGraphics, x, y, Math.max(2, r), Math.max(2, (int) (r * 0.7f)), color);
+            }
 
-        for (var h : ClientHurricaneStateCache.getSemanticSnapshots(partialTick)) {
-            float dx = (float) ((h.centerX() - player.getX()) / scale);
-            float dz = (float) ((h.centerZ() - player.getZ()) / scale);
-            int r = Math.max(3, Math.round(h.coreRadius() / scale));
-            int x = left + MAP_SIZE / 2 + Math.round(dx);
-            int y = top + MAP_SIZE / 2 + Math.round(dz);
-            int color = (0xC0 << 24) | 0x000000; // semi-opaque black
-            fillEllipse(guiGraphics, x, y, Math.max(3, r), Math.max(3, (int) (r * 0.8f)), color);
+            for (var h : ClientHurricaneStateCache.getSemanticSnapshots(partialTick)) {
+                float dx = (float) ((h.centerX() - player.getX()) / scale);
+                float dz = (float) ((h.centerZ() - player.getZ()) / scale);
+                int r = Math.max(3, Math.round(h.coreRadius() / scale));
+                int x = left + MAP_SIZE / 2 + Math.round(dx);
+                int y = top + MAP_SIZE / 2 + Math.round(dz);
+                int color = (0xC0 << 24) | 0x000000; // semi-opaque black
+                fillEllipse(guiGraphics, x, y, Math.max(3, r), Math.max(3, (int) (r * 0.8f)), color);
+            }
         }
 
         // Legend (top-left of the map)

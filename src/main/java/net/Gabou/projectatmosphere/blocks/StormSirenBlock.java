@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.blocks;
 
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.registry.ModSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -135,6 +136,9 @@ public class StormSirenBlock extends Block {
     }
 
     private static boolean isTornadoNearby(ServerLevel level, BlockPos pos) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return false;
+        }
         double radiusSq = TORNADO_WARNING_RADIUS * TORNADO_WARNING_RADIUS;
         return net.Gabou.projectatmosphere.modules.tornado.TornadoManager.getActiveTornadoes().stream()
                 .anyMatch(tornado -> {

@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.temperature.variation;
 
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 
 import java.util.Random;
@@ -25,7 +26,7 @@ public class VariationGenerator {
 
         for (int i = 0; i < 7; i++) {
             if (RANDOM.nextFloat() < 0.9f) {
-                float delta = getNaturalDailyVariation();
+                float delta = getNaturalDailyVariation() * Math.max(0.0f, AtmoCommonConfig.FORECAST_DEVIATION_MULTIPLIER.get().floatValue());
 
                 newWeek[i][0] += delta;
                 newWeek[i][1] += delta;

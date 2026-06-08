@@ -4,6 +4,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.fml.ModList;
 import sereneseasons.api.season.SeasonHelper;
 import com.Gabou.sereneseasonsplus.api.SSPApi;
 
@@ -57,11 +58,24 @@ public class SereneSeasonsSeasonDelegate implements SeasonTimeDelegate {
 
     @Override
     public void onRainStarted(ServerLevel level, CloudRegion cloudRegion) {
-        SSPApi.getINSTANCE().onSimpleCloudsSpawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        if (isSereneSeasonsPlusLoaded()) {
+            SSPApi.getINSTANCE().onSimpleCloudsSpawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        }
     }
 
     @Override
     public void onRainEnded(ServerLevel level, CloudRegion cloudRegion) {
-        SSPApi.getINSTANCE().onCloudsDespawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        if (isSereneSeasonsPlusLoaded()) {
+            SSPApi.getINSTANCE().onCloudsDespawned(level, ((ICloudRegionId) cloudRegion).projectatmosphere$getId());
+        }
+    }
+
+    /**
+     * Vérifie si Serene Seasons Plus est chargé avant d'appeler son API.
+     *
+     * @return true si l'intégration SSP peut s'exécuter
+     */
+    private static boolean isSereneSeasonsPlusLoaded() {
+        return ModList.get().isLoaded("sereneseasonsplus");
     }
 }

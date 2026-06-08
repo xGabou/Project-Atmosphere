@@ -60,19 +60,22 @@ public class EventHandler {
         if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
 
         AtmosphereCloudService cloudService = AtmosphereCloudServices.get();
-        AtmosphereManager.tick(serverLevel);
-        AtmosphereWorldEffectsManager.tick(serverLevel);
-        if(ForecastOrchestrator.isRegenerating()) {
-            finishedRegenerating = false;
-        } else if (!finishedRegenerating) {
-            wasRegenerating = true;
-        }
+        boolean eventsEnabled = AtmoCommonConfig.EVENTS_ENABLED.get();
+        if (eventsEnabled) {
+            AtmosphereManager.tick(serverLevel);
+            AtmosphereWorldEffectsManager.tick(serverLevel);
+            if (ForecastOrchestrator.isRegenerating()) {
+                finishedRegenerating = false;
+            } else if (!finishedRegenerating) {
+                wasRegenerating = true;
+            }
 
-        if (cloudService.shouldTrySpawn(serverLevel, cloudBoosterTicks, wasRegenerating)) {
-            cloudService.trySpawnClouds(serverLevel);
-            wasRegenerating = false;
-            finishedRegenerating = true;
-            cloudBoosterTicks = 0;
+            if (cloudService.shouldTrySpawn(serverLevel, cloudBoosterTicks, wasRegenerating)) {
+                cloudService.trySpawnClouds(serverLevel);
+                wasRegenerating = false;
+                finishedRegenerating = true;
+                cloudBoosterTicks = 0;
+            }
         }
 
         AtmosphereStatusSyncManager.syncPlayers(serverLevel);
@@ -83,12 +86,12 @@ public class EventHandler {
         }
 
 
-        if (!AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
-            return;
-        } else if (tickCounter % MIN_TICKS_BETWEEN_TEMPESTA == 0) {
-            cloudService.simulateSevereCloudDebris(serverLevel);
+        if (eventsEnabled && AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
+            if (tickCounter % MIN_TICKS_BETWEEN_TEMPESTA == 0) {
+                cloudService.simulateSevereCloudDebris(serverLevel);
+            }
+            cloudBoosterTicks = cloudService.updateCloudBoosterTicks(serverLevel, cloudBoosterTicks);
         }
-        cloudBoosterTicks = cloudService.updateCloudBoosterTicks(serverLevel, cloudBoosterTicks);
 
         tickCounter++;
     }

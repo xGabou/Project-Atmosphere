@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.registry;
 
-import net.Gabou.projectatmosphere.client.ClientTickHandler;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.frontend.CloudRenderHook;
 import net.Gabou.projectatmosphere.clouds.frontend.debug.CloudDebugRenderHook;
@@ -24,9 +24,7 @@ public class ClientOnlyRegistrar {
     // Client registration
     // ---------------------------------------------------------------------
     public static void registerClient(IEventBus modEventBus, FMLJavaModLoadingContext context) {
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            modEventBus.register(ClientTickHandler.class);
-        }
+        registerSimpleCloudsClientCompat();
         MinecraftForge.EVENT_BUS.register(CloudDebugRenderHook.class);
         MinecraftForge.EVENT_BUS.register(CloudRenderHook.class);
         context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,
@@ -36,6 +34,25 @@ public class ClientOnlyRegistrar {
 
         if (!FMLEnvironment.production) {
             CloudDebugStateInitializer.initialize();
+        }
+    }
+
+    private static void registerSimpleCloudsClientCompat() {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
+        registerForgeSubscriber("net.Gabou.projectatmosphere.client.ClientTickHandler");
+        registerForgeSubscriber("net.Gabou.projectatmosphere.client.fog.SimpleCloudsWhiteoutFogHandler");
+        registerForgeSubscriber("net.Gabou.projectatmosphere.client.render.pipeline.SimpleCloudsDhPipelineSelector");
+        registerForgeSubscriber("net.Gabou.projectatmosphere.command.CloudDumpCommand");
+        registerForgeSubscriber("net.Gabou.projectatmosphere.tools.debug.TornadoLateRenderDiagnostics");
+    }
+
+    private static void registerForgeSubscriber(String className) {
+        try {
+            MinecraftForge.EVENT_BUS.register(Class.forName(className));
+        } catch (ClassNotFoundException | LinkageError error) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Simple Clouds client compat ignorée: {}", className, error);
         }
     }
 }

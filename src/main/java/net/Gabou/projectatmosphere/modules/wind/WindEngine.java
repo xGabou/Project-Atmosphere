@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -74,6 +75,9 @@ public final class WindEngine {
 
 
     public static TornadoWindModel.TornadoForces getCurrentTornadoForce(Vec3 position) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return null;
+        }
         return TornadoWindModel.compute(position);
     }
 }

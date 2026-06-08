@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.hurricane;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
@@ -19,6 +20,9 @@ public final class HurricaneSemantics {
     }
 
     public static HurricaneSemanticSample sampleBest(Level level, double worldX, double worldZ) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return HurricaneSemanticSample.none();
+        }
         HurricaneSemanticSample best = HurricaneSemanticSample.none();
         if (level.isClientSide) {
             for (HurricaneRenderSnapshot hurricane : ClientHurricaneStateCache.getSemanticSnapshots()) {
@@ -48,6 +52,9 @@ public final class HurricaneSemantics {
     }
 
     public static boolean intersectsReservation(Level level, double worldX, double worldZ, double extraRadius) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return false;
+        }
         if (level.isClientSide) {
             for (HurricaneRenderSnapshot hurricane : ClientHurricaneStateCache.getSemanticSnapshots()) {
                 if (intersectsReservation(hurricane, worldX, worldZ, extraRadius)) {
@@ -74,6 +81,9 @@ public final class HurricaneSemantics {
     }
 
     public static @Nullable CloudRegion getReservationRegionAt(Level level, double worldX, double worldZ) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return null;
+        }
         if (!level.isClientSide) {
             return HurricaneManager.getReservationRegionAt(worldX, worldZ);
         }
@@ -86,6 +96,9 @@ public final class HurricaneSemantics {
     }
 
     public static CloudRegion createReservationRegion(HurricaneInstance hurricane) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return null;
+        }
         CloudRegion region = new CloudRegion(
                 hurricane.createRenderSnapshot().cloudTypeId(),
                 new Vec2(0.0F, 0.0F),
@@ -105,6 +118,9 @@ public final class HurricaneSemantics {
     }
 
     public static CloudRegion createReservationRegion(HurricaneRenderSnapshot hurricane) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return null;
+        }
         CloudRegion region = new CloudRegion(
                 hurricane.cloudTypeId(),
                 new Vec2(0.0F, 0.0F),

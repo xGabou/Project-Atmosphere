@@ -2,12 +2,25 @@ package net.Gabou.projectatmosphere.config;
 import net.minecraftforge.common.ForgeConfigSpec;
 import java.util.List;
 public class AtmoCommonConfig {
+    public enum CloudMode {
+        FULL,
+        HYBRID,
+        VANILLA;
+
+        public CloudMode next() {
+            CloudMode[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
     public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
+    public static final ForgeConfigSpec.EnumValue<CloudMode> CLOUD_MODE;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADO_DESTRUCTION;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
+    public static final ForgeConfigSpec.BooleanValue EVENTS_ENABLED;
     public static final ForgeConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
     public static final ForgeConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
     public static final ForgeConfigSpec.BooleanValue DAMAGE_GLASS_ON_TORNADO;
@@ -99,6 +112,7 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue FIRE_EXTINGUISH_BASE_CHANCE;
     public static final ForgeConfigSpec.DoubleValue CAULDRON_FILL_BASE_CHANCE;
     public static final ForgeConfigSpec.BooleanValue FOG_ENABLED;
+    public static final ForgeConfigSpec.DoubleValue FORECAST_DEVIATION_MULTIPLIER;
     public static final ForgeConfigSpec.IntValue FOG_SYNC_INTERVAL_TICKS;
     public static final ForgeConfigSpec.DoubleValue FOG_HUMIDITY_START_PERCENT;
     public static final ForgeConfigSpec.DoubleValue FOG_HUMIDITY_FULL_PERCENT;
@@ -131,11 +145,23 @@ public class AtmoCommonConfig {
         DISPLAY_UNITS_IMPERIAL = builder
                 .comment("Display values in imperial units (F, mph, inHg) instead of metric (C, m/s, hPa)")
                 .define("imperialUnits", false);
+        CLOUD_MODE = builder
+                .comment("Select how Project Atmosphere cloud rendering should behave")
+                .defineEnum("cloudMode", CloudMode.FULL);
+        builder.pop();
+
+        builder.push("forecast");
+        FORECAST_DEVIATION_MULTIPLIER = builder
+                .comment("Multiplier applied to daily forecast variation")
+                .defineInRange("forecastDeviationMultiplier", 1.0d, 0.0d, 3.0d);
         builder.pop();
         builder.push("storms");
         STORM_SEVERITY_BOOSTER = builder
                 .comment("Global multiplier for storm severity calculations")
                 .defineInRange("stormSeverityBooster", 3.2d, 0.5d, 28d);
+        EVENTS_ENABLED = builder
+                .comment("Enable storm and weather event spawning/processing")
+                .define("eventsEnabled", true);
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);

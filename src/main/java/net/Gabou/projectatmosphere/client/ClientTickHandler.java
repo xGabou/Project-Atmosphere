@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.TornadoClientEffects;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -58,14 +59,20 @@ public class ClientTickHandler {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
-        ClientHurricaneStateCache.tick(mc.level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            ClientHurricaneStateCache.tick(mc.level);
+        }
         if (mc.level == null) {
-            TornadoManager.clearClientTornadoes();
+            if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+                TornadoManager.clearClientTornadoes();
+            }
             return;
         }
         if (mc.isPaused()) return;
 
-        TornadoManager.tick(mc.level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoManager.tick(mc.level);
+        }
         if (!ClientSyncLock.isReady()) return;
 
         AtmosphereClientState.tick(mc);
@@ -93,7 +100,7 @@ public class ClientTickHandler {
             culledRegionIds.addAll(nextCulled);
         }
 
-        if (mc.level != null) {
+        if (mc.level != null && AtmosphereCloudServices.isSimpleCloudsLoaded()) {
             Set<TornadoInstance> current = new HashSet<>(TornadoManager.getClientTornadoes());
             for (TornadoInstance tornado : current) {
                 float baseVol = 0.35f + 0.45f * 0.75f;

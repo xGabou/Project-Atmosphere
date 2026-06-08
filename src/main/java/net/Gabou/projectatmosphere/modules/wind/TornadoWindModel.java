@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.world.phys.Vec3;
@@ -15,6 +16,9 @@ public final class TornadoWindModel {
     private TornadoWindModel() { }
 
     public static TornadoForces compute(Vec3 position) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return null;
+        }
         List<TornadoInstance> active = TornadoManager.getActiveTornadoes();
         TornadoInstance nearest = null;
         double nearestDistSq = Double.MAX_VALUE;

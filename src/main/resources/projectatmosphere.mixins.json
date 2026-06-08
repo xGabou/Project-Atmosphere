@@ -24,6 +24,8 @@
     "client.DefaultPipelineTornadoMixin",
     "client.InstanceableMeshDiagnosticsMixin",
     "client.DhSupportPipelineDiagnosticsMixin",
+    "client.OptionsScreenMixin",
+    "client.ScreenInvoker",
     "client.SimpleCloudsRendererDiagnosticsMixin",
     "client.SimpleCloudsRendererDhFallbackMixin",
     "client.BindingManagerAccessor",

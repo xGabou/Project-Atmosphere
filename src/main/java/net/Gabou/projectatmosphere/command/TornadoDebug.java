@@ -2,11 +2,7 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.Gabou.projectatmosphere.api.WindVectorApi;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
-import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
@@ -21,56 +17,12 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.phys.Vec3;
 
 public final class TornadoDebug {
     private TornadoDebug() {}
 
     public static void appendTo(LiteralArgumentBuilder<CommandSourceStack> root) {
-        root.then(Commands.literal("cloud")
-                        .requires(src -> src.hasPermission(2))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    ServerLevel level = player.serverLevel();
-                                    if (!TemperatureCommandHelper.isInOverworld(level)) {
-                                        ctx.getSource().sendFailure(Component.literal("Cloud spawning is only available in the Overworld."));
-                                        return 0;
-                                    }
-                                    RegionInstanceKey regionKey = RegionInstanceKey.from(player.blockPosition());
-
-                                    WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
-                                    net.Gabou.projectatmosphere.modules.core.WindVector wind =
-                                            net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(
-                                                    sample.speedMps(),
-                                                    (float) Math.toRadians(sample.directionDeg())
-                                            );
-
-                                    String cloudId = StringArgumentType.getString(ctx, "id");
-                                    var region = CloudRegionManager.getInstance().createCloudRegion(
-                                            level,
-                                            new Vec3(player.getX(), player.getY() + 80.0D, player.getZ()),
-                                            64.0F,
-                                            (float) player.getY() + 72.0F,
-                                            (float) player.getY() + 88.0F,
-                                            cloudId.contains("thunder") ? 0.85F : 0.65F,
-                                            0.75F,
-                                            0.35F,
-                                            regionKey
-                                    );
-
-                                    if (region != null) {
-                                        CloudRegionSyncManager.syncPlayer(player);
-                                        ctx.getSource().sendSuccess(
-                                                () -> Component.literal("Created PA cloud region '" + cloudId + "' at your position."),
-                                                true);
-                                        return 1;
-                                    } else {
-                                        ctx.getSource().sendFailure(Component.literal("Failed to create PA cloud region '" + cloudId + "'."));
-                                        return 0;
-                                    }
-                                })))
-                .then(Commands.literal("tornado")
+        root.then(Commands.literal("tornado")
                         .requires(src -> src.hasPermission(2))
                         .then(Commands.literal("risk")
                                 .executes(ctx -> {

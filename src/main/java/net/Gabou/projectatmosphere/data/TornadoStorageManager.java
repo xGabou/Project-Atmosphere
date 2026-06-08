@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -23,6 +24,9 @@ public final class TornadoStorageManager {
     private TornadoStorageManager() {}
 
     public static void load(ServerLevel level) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
         RuntimeStormData data = RuntimeStormData.get(level);
         COOLDOWNS.clear();
         COOLDOWNS.putAll(data.cooldowns);
@@ -31,6 +35,9 @@ public final class TornadoStorageManager {
     }
 
     public static void save(ServerLevel level) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
         RuntimeStormData data = RuntimeStormData.get(level);
         data.cooldowns.clear();
         data.cooldowns.putAll(COOLDOWNS);
@@ -111,4 +118,3 @@ public final class TornadoStorageManager {
         }
     }
 }
-

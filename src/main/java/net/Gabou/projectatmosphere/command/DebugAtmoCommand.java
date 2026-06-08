@@ -3,14 +3,18 @@ package net.Gabou.projectatmosphere.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.api.AtmoApi;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudRegionState;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
@@ -29,6 +33,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.fml.loading.FMLEnvironment;
@@ -67,11 +72,11 @@ public class DebugAtmoCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("weatherdebug");
-        appendTo(root);
+        appendTo(root, !AtmosphereCloudServices.isSimpleCloudsLoaded());
         dispatcher.register(root);
     }
 
-    public static void appendTo(LiteralArgumentBuilder<CommandSourceStack> root) {
+    public static void appendTo(LiteralArgumentBuilder<CommandSourceStack> root, boolean includeNativeCloudBackendCommands) {
         root.then(Commands.literal("forecast")
                 .executes(ctx -> {
                     ServerLevel world = ctx.getSource().getLevel();
@@ -121,6 +126,11 @@ public class DebugAtmoCommand {
                         })
                 )
         );
+        root.then(Commands.literal("cloud")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("id", StringArgumentType.word())
+                        .executes(DebugAtmoCommand::spawnDebugCloud)));
+
         root.then(Commands.literal("fog")
                 .executes(DebugAtmoCommand::sendFogDebug)
                 .then(Commands.argument("pos", BlockPosArgument.blockPos())
@@ -150,49 +160,6 @@ public class DebugAtmoCommand {
                 })
         );
 
-        root.then(Commands.literal("rain")
-                .executes(DebugAtmoCommand::spawnRain)
-                .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                        .executes(DebugAtmoCommand::spawnRain)
-                        .then(Commands.argument("noThunder", BoolArgumentType.bool())
-                                .executes(DebugAtmoCommand::spawnRain)
-                                .then(Commands.argument("intensity", IntegerArgumentType.integer(1, 2))
-                                        .executes(DebugAtmoCommand::spawnRain)
-                                )
-                        )
-                )
-        );
-
-        root.then(Commands.literal("thunder")
-                .executes(DebugAtmoCommand::spawnThunder)
-                .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                        .executes(DebugAtmoCommand::spawnThunder)
-                        .then(Commands.argument("intensity", IntegerArgumentType.integer(1, 2))
-                                .executes(DebugAtmoCommand::spawnThunder)
-                        )
-                )
-        );
-
-        root.then(Commands.literal("snowstorm")
-                .executes(DebugAtmoCommand::spawnSnowstorm)
-                .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                        .executes(DebugAtmoCommand::spawnSnowstorm)
-                        .then(Commands.argument("overwrite", BoolArgumentType.bool())
-                                .executes(DebugAtmoCommand::spawnSnowstorm)
-                        )
-                )
-        );
-
-        root.then(Commands.argument("violence", ResourceLocationArgument.id())
-                .executes(ctx -> {
-                    ctx.getSource().sendSuccess(() -> Component.literal(
-                            "Violence debug Simple Clouds indisponible dans le chemin PA natif."
-                    ), false);
-                    return 1;
-                })
-        );
-
-
         root.then(Commands.literal("debugmode")
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> {
@@ -209,38 +176,64 @@ public class DebugAtmoCommand {
                 )
         );
 
-        root.then(Commands.literal("clouds")
-                .then(Commands.literal("create")
-                        .requires(source -> source.hasPermission(2))
-                        .executes(DebugAtmoCommand::createDebugCloudRegion)
-                )
-                .then(Commands.literal("count")
-                        .executes(DebugAtmoCommand::sendCloudRegionCount)
-                )
-                .then(Commands.literal("list")
-                        .executes(DebugAtmoCommand::listCloudRegions)
-                )
-                .then(Commands.literal("clear")
-                        .requires(source -> source.hasPermission(2))
-                        .executes(DebugAtmoCommand::clearCloudRegions)
-                )
-                .then(Commands.literal("clearInactive")
-                        .requires(source -> source.hasPermission(2))
-                        .executes(DebugAtmoCommand::clearInactiveCloudRegions)
-                )
-                .then(Commands.literal("sync")
-                        .executes(DebugAtmoCommand::syncCloudRegions)
-                )
-        );
+        if (includeNativeCloudBackendCommands) {
+            root.then(Commands.literal("rain")
+                    .executes(DebugAtmoCommand::spawnRain)
+                    .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                            .executes(DebugAtmoCommand::spawnRain)
+                            .then(Commands.argument("noThunder", BoolArgumentType.bool())
+                                    .executes(DebugAtmoCommand::spawnRain)
+                                    .then(Commands.argument("intensity", IntegerArgumentType.integer(1, 2))
+                                            .executes(DebugAtmoCommand::spawnRain)
+                                    )
+                            )
+                    )
+            );
 
-        root.then(Commands.literal("createCloudDebug")
-                .requires(source -> source.hasPermission(2))
-                .executes(DebugAtmoCommand::createDebugCloudRegion)
-        );
+            root.then(Commands.literal("thunder")
+                    .executes(DebugAtmoCommand::spawnThunder)
+                    .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                            .executes(DebugAtmoCommand::spawnThunder)
+                            .then(Commands.argument("intensity", IntegerArgumentType.integer(1, 2))
+                                    .executes(DebugAtmoCommand::spawnThunder)
+                            )
+                    )
+            );
 
-        root.then(Commands.literal("Clouds count")
-                .executes(DebugAtmoCommand::sendCloudRegionCount)
-        );
+            root.then(Commands.literal("snowstorm")
+                    .executes(DebugAtmoCommand::spawnSnowstorm)
+                    .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                            .executes(DebugAtmoCommand::spawnSnowstorm)
+                            .then(Commands.argument("overwrite", BoolArgumentType.bool())
+                                    .executes(DebugAtmoCommand::spawnSnowstorm)
+                            )
+                    )
+            );
+
+            root.then(Commands.literal("clouds")
+                    .then(Commands.literal("create")
+                            .requires(source -> source.hasPermission(2))
+                            .executes(DebugAtmoCommand::createDebugCloudRegion)
+                    )
+                    .then(Commands.literal("count")
+                            .executes(DebugAtmoCommand::sendCloudRegionCount)
+                    )
+                    .then(Commands.literal("list")
+                            .executes(DebugAtmoCommand::listCloudRegions)
+                    )
+                    .then(Commands.literal("clear")
+                            .requires(source -> source.hasPermission(2))
+                            .executes(DebugAtmoCommand::clearCloudRegions)
+                    )
+                    .then(Commands.literal("clearInactive")
+                            .requires(source -> source.hasPermission(2))
+                            .executes(DebugAtmoCommand::clearInactiveCloudRegions)
+                    )
+                    .then(Commands.literal("sync")
+                            .executes(DebugAtmoCommand::syncCloudRegions)
+                    )
+            );
+        }
     }
 
     private static int createDebugCloudRegion(CommandContext<CommandSourceStack> ctx) {
@@ -357,7 +350,63 @@ public class DebugAtmoCommand {
         return 1;
     }
 
-    private static CloudRegionState spawnCloud(ServerLevel level, BlockPos pos, String cloudId) {
+    private static int spawnDebugCloud(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerPlayer player;
+        try {
+            player = source.getPlayerOrException();
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException exception) {
+            source.sendFailure(Component.literal("This command can only be run by a player."));
+            return 0;
+        }
+
+        ServerLevel level = player.serverLevel();
+        if (!TemperatureCommandHelper.isInOverworld(level)) {
+            source.sendFailure(Component.literal("Cloud spawning is only available in the Overworld."));
+            return 0;
+        }
+
+        String cloudId = StringArgumentType.getString(ctx, "id");
+        BlockPos pos = player.blockPosition();
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
+        net.Gabou.projectatmosphere.modules.core.WindVector wind =
+                net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(
+                        sample.speedMps(),
+                        (float) Math.toRadians(sample.directionDeg())
+                );
+
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            var region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
+            if (region != null) {
+                source.sendSuccess(
+                        () -> Component.literal("Created SimpleClouds cloud '" + cloudId + "' at your position."),
+                        true
+                );
+                return 1;
+            }
+
+            source.sendFailure(Component.literal("Failed to create SimpleClouds cloud '" + cloudId + "'."));
+            return 0;
+        }
+
+        CloudRegionState state = spawnNativeCloud(level, pos, cloudId);
+        if (state != null) {
+            if (source.getPlayer() != null) {
+                CloudRegionSyncManager.syncPlayer(source.getPlayer());
+            }
+            source.sendSuccess(
+                    () -> Component.literal("Created PA cloud region '" + cloudId + "' at your position."),
+                    true
+            );
+            return 1;
+        }
+
+        source.sendFailure(Component.literal("Failed to create PA cloud region '" + cloudId + "'."));
+        return 0;
+    }
+
+    private static CloudRegionState spawnNativeCloud(ServerLevel level, BlockPos pos, String cloudId) {
         if (!level.dimension().equals(Level.OVERWORLD)) {
             return null;
         }
@@ -445,7 +494,7 @@ public class DebugAtmoCommand {
             intensity = 1;
         }
         String cloudId = CloudLibrary.getRandomRainCloud(intensity, !noThunder);
-        CloudRegionState state = spawnCloud(level, pos, cloudId);
+        CloudRegionState state = spawnNativeCloud(level, pos, cloudId);
         if (state != null && ctx.getSource().getPlayer() != null) {
             CloudRegionSyncManager.syncPlayer(ctx.getSource().getPlayer());
         }
@@ -472,7 +521,7 @@ public class DebugAtmoCommand {
             intensity = 1;
         }
         String cloudId = CloudLibrary.getRandomThunderCloud(intensity);
-        CloudRegionState state = spawnCloud(level, pos, cloudId);
+        CloudRegionState state = spawnNativeCloud(level, pos, cloudId);
         if (state != null && ctx.getSource().getPlayer() != null) {
             CloudRegionSyncManager.syncPlayer(ctx.getSource().getPlayer());
         }
@@ -514,7 +563,7 @@ public class DebugAtmoCommand {
             ctx.getSource().sendSuccess(() -> Component.literal("Proceeding despite non-winter season (no season override available)."), true);
         }
         String cloudId = CloudLibrary.getSnowstormCloudId();
-        CloudRegionState region = spawnCloud(level, pos, cloudId);
+        CloudRegionState region = spawnNativeCloud(level, pos, cloudId);
         if (region == null) {
             ctx.getSource().sendFailure(Component.literal("Could not create PA snowstorm cloud region."));
             return 0;

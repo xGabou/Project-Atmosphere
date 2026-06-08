@@ -4,10 +4,12 @@ import com.Gabou.sereneseasonsplus.util.EnvironmentHelper;
 import glitchcore.event.EventManager;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraftforge.fml.ModList;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonChangedEvent;
 
 public final class SereneSeasonsEventBridge {
+    private static final String SERENE_SEASONS_PLUS_MOD_ID = "sereneseasonsplus";
     private static boolean registered;
 
     private SereneSeasonsEventBridge() {
@@ -25,7 +27,7 @@ public final class SereneSeasonsEventBridge {
                     AtmosphereManager.onSeasonChange(serverLevel);
                     Season.SubSeason oldSeason = event.getPrevSeason();
                     Season.SubSeason newSeason = event.getNewSeason();
-                    if (newSeason != oldSeason) {
+                    if (newSeason != oldSeason && isSereneSeasonsPlusLoaded()) {
                         EnvironmentHelper.onSeasonChange(serverLevel, Math.abs(newSeason.ordinal() - oldSeason.ordinal()) != 1);
                     }
                 }
@@ -39,11 +41,20 @@ public final class SereneSeasonsEventBridge {
                     Season.TropicalSeason oldSeason = event.getPrevSeason();
                     Season.TropicalSeason newSeason = event.getNewSeason();
                     boolean skippedAdjacentSeason = Math.abs(newSeason.ordinal() - oldSeason.ordinal()) != 1;
-                    if (newSeason != oldSeason) {
+                    if (newSeason != oldSeason && isSereneSeasonsPlusLoaded()) {
                         EnvironmentHelper.onSeasonChange(serverLevel, skippedAdjacentSeason);
                     }
                 }
             }
         });
+    }
+
+    /**
+     * Vérifie si Serene Seasons Plus est chargé avant d'appeler son helper d'environnement.
+     *
+     * @return true si le compat SSP est disponible
+     */
+    private static boolean isSereneSeasonsPlusLoaded() {
+        return ModList.get().isLoaded(SERENE_SEASONS_PLUS_MOD_ID);
     }
 }

@@ -4,6 +4,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import org.joml.Matrix4f;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 /**
  * Hook de rendu live des nuages Project Atmosphere.
@@ -34,14 +36,20 @@ public final class CloudRenderHook {
             return;
         }
 
+        if (AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.VANILLA) {
+            CloudRenderStateUpdater.clearCurrentSnapshots();
+            return;
+        }
+
         CloudRenderFrameContext frameContext = new CloudRenderFrameContext(
                 level,
                 event.getPoseStack(),
                 event.getCamera().getPosition(),
+                new Matrix4f(event.getPoseStack().last().pose()),
+                new Matrix4f(event.getProjectionMatrix()),
                 CloudRenderProfile.createDefault(),
-                level.getGameTime(),
+                level.getDayTime(),
                 event.getPartialTick()
-
         );
 
         CloudRenderStateUpdater.updateCurrentSnapshots(

@@ -1,21 +1,15 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import net.Gabou.projectatmosphere.api.ForecastSampling;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
 import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
-import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.tornado.scheduling.TornadoSpawnScheduler;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
-import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 
@@ -24,10 +18,16 @@ public final class TornadoProbabilityManager {
     private TornadoProbabilityManager() {}
 
     public static void init() {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
         // No-op for now
     }
 
     public static void onScheduledCheck(ServerLevel level) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         long now = level.getGameTime();
         if (!TornadoSpawnScheduler.isSlotAvailable(now)) return;
@@ -82,20 +82,7 @@ public final class TornadoProbabilityManager {
         if (StormSeverityScale.resolve(level, key, level.getGameTime()) < 6) {
             return false;
         }
-        ServerCloudManager manager = (ServerCloudManager) CloudManager.get(level);
-        CloudGenerator generator = manager.getCloudGenerator();
-        BlockPos pos = key.center();
-        for (CloudRegion region : generator.getClouds()) {
-            int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
-            if (severity < 7) continue;
-            double dx = region.getWorldX() - pos.getX();
-            double dz = region.getWorldZ() - pos.getZ();
-            double r = region.getRadius();
-            if (dx * dx + dz * dz <= r * r) {
-                return true;
-            }
-        }
-        return false;
+        return AtmosphereCloudServices.get().hasSevereCloudNearby(level, key.center(), 7);
     }
 
     private static float thermalRisk(RegionInstanceKey key, ServerLevel level) {

@@ -110,15 +110,6 @@ repositories {
     }
     maven { url "https://maven.theillusivec4.top/" }
     flatDir { dir 'libs' }
-    if (hasGithubPackagesCredentials) {
-        maven {
-            url = uri("https://maven.pkg.github.com/xGabou/Gabou-s-Libs")
-            credentials {
-                username = githubPackagesUser
-                password = githubPackagesToken
-            }
-        }
-    }
     maven {
         name = "Architectury"
         url = "https://maven.architectury.dev/"
@@ -141,7 +132,7 @@ dependencies {
     implementation fg.deobf("curse.maven:betterdays-895618:7013807")
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
-    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7325179")
+    compileOnly fg.deobf("curse.maven:serene-seasons-plus-1288843:7325179")
     compileOnly fg.deobf("curse.maven:rainboows-1121832:6421980")
     compileOnly fg.deobf("curse.maven:auroras-1105290:6040671")
     implementation fg.deobf("curse.maven:gabous-libs-1367332:7519775")

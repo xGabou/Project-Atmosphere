@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client.hurricane.cache;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneSemantics;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
@@ -28,6 +29,10 @@ public final class ClientHurricaneStateCache {
     }
 
     public static void applySnapshots(List<HurricaneRenderSnapshot> snapshots) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            clear();
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         long clientTick = mc.level != null ? mc.level.getGameTime() : 0L;
 
@@ -51,6 +56,10 @@ public final class ClientHurricaneStateCache {
     }
 
     public static void tick(ClientLevel level) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            clear();
+            return;
+        }
         if (level == null) {
             clear();
         }
@@ -63,10 +72,16 @@ public final class ClientHurricaneStateCache {
     }
 
     public static List<HurricaneRenderSnapshot> getSemanticSnapshots() {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return List.of();
+        }
         return getSemanticSnapshots(0.0F);
     }
 
     public static List<HurricaneRenderSnapshot> getSemanticSnapshots(float partialTick) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return List.of();
+        }
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) {
             return List.of();
@@ -117,6 +132,9 @@ public final class ClientHurricaneStateCache {
     }
 
     public static boolean hasHurricanes() {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return false;
+        }
         if (!ENTRIES.isEmpty()) {
             return true;
         }
@@ -128,6 +146,9 @@ public final class ClientHurricaneStateCache {
     }
 
     public static CloudRegion getReservationRegion(HurricaneRenderSnapshot snapshot) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return null;
+        }
         CloudRegion region = RESERVATION_REGIONS.get(snapshot.id());
         if (region == null) {
             region = HurricaneSemantics.createReservationRegion(snapshot);
@@ -139,6 +160,9 @@ public final class ClientHurricaneStateCache {
     }
 
     private static List<HurricaneRenderSnapshot> projectatmosphere$getIntegratedServerSnapshots(Minecraft mc) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return List.of();
+        }
         if (!mc.hasSingleplayerServer()) {
             return List.of();
         }
@@ -164,6 +188,9 @@ public final class ClientHurricaneStateCache {
     }
 
     public static List<RenderableHurricane> getRenderableHurricanes(float partialTick) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return List.of();
+        }
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) {
             return List.of();

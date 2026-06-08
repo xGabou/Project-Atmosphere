@@ -99,6 +99,18 @@ public interface AtmosphereCloudService {
     }
 
     /**
+     * Indique si une région de nuage suffisamment sévère est proche d'une position.
+     *
+     * @param level niveau serveur
+     * @param pos position de référence
+     * @param minimumSeverity sévérité minimale requise
+     * @return true si un nuage sévère est trouvé à proximité
+     */
+    default boolean hasSevereCloudNearby(ServerLevel level, BlockPos pos, int minimumSeverity) {
+        return false;
+    }
+
+    /**
      * Indique si le service externe est disponible.
      *
      * @return true si le service externe est actif

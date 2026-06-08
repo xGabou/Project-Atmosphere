@@ -101,17 +101,20 @@ public final class CloudDensityProvider {
 
         float edgeSoftness = clamp01(snapshot.getEdgeSoftness());
         float horizontalFade = edgeSoftness <= 0.0F
-                ? 1.0F
-                : smoothstep(1.0F, 1.0F - edgeSoftness, normalizedHorizontal);
+                ? 1.0F - smoothstep(0.82F, 1.0F, normalizedHorizontal)
+                : 1.0F - smoothstep(1.0F - edgeSoftness, 1.0F, normalizedHorizontal);
 
         float normalizedVertical = (float) ((worldPosition.y() - baseY) / (topY - baseY));
         float verticalFade = smoothstep(0.0F, 0.15F, normalizedVertical)
                 * (1.0F - smoothstep(0.85F, 1.0F, normalizedVertical));
 
+        float interiorFade = 1.0F - smoothstep(0.38F, 0.92F, normalizedHorizontal);
+
         float density = getEffectiveDensity(snapshot)
                 * getEffectiveCoverage(snapshot)
                 * horizontalFade
-                * verticalFade;
+                * verticalFade
+                * interiorFade;
 
         return clamp01(density);
     }

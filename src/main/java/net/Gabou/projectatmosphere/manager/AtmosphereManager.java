@@ -112,8 +112,10 @@ public class AtmosphereManager {
         AsyncAtmosphereService.runWeather(() -> {
             EventHandler.onRegenerate();
             AtmosphereCloudServices.get().clearForRegeneration(world);
-            TornadoManager.clearTornadoes();
-            HurricaneManager.clearHurricanes();
+            if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+                TornadoManager.clearTornadoes();
+                HurricaneManager.clearHurricanes();
+            }
             ForecastOrchestrator.clearAndRegenerate(world);
         });
         AtmosphereCloudServices.get().clearForRegeneration(world);
@@ -134,9 +136,11 @@ public class AtmosphereManager {
         // During regeneration, skip dependent ticks to avoid using transient/cleared state
         if (!ForecastOrchestrator.isRegenerating()) {
             ForecastOrchestrator.tick(level);
-            TornadoManager.tick(level);
-            HurricaneManager.tick(level);
             SnowstormManager.tick(level);
+            if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+                TornadoManager.tick(level);
+                HurricaneManager.tick(level);
+            }
         } else {
             // Still advance orchestrator's internal timing (e.g., tornado check scheduling) safely
             ForecastOrchestrator.tick(level);
@@ -197,8 +201,10 @@ public class AtmosphereManager {
     private static void syncPlayerRuntimeState(ServerPlayer player) {
         AtmosphereStatusSyncManager.syncPlayer(player);
         CloudRegionSyncManager.syncPlayer(player);
-        TornadoManager.syncToPlayer(player);
-        HurricaneManager.syncToPlayer(player);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoManager.syncToPlayer(player);
+            HurricaneManager.syncToPlayer(player);
+        }
     }
 
 }

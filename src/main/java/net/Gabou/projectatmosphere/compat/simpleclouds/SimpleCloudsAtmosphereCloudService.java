@@ -107,6 +107,28 @@ public final class SimpleCloudsAtmosphereCloudService implements AtmosphereCloud
         SimpleCloudsCompat.ensureCloudAtPosition(pos, level);
     }
 
+    @Override
+    public boolean hasSevereCloudNearby(ServerLevel level, BlockPos pos, int minimumSeverity) {
+        CloudGenerator generator = getGenerator(level);
+        if (generator == null || pos == null) {
+            return false;
+        }
+
+        double radiusSq = 500.0D * 500.0D;
+        for (CloudRegion region : generator.getClouds()) {
+            int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
+            if (severity < minimumSeverity) {
+                continue;
+            }
+            double dx = region.getWorldX() - pos.getX();
+            double dz = region.getWorldZ() - pos.getZ();
+            if (dx * dx + dz * dz <= radiusSq) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private CloudGenerator getGenerator(ServerLevel level) {
         if (level == null) {
             return null;

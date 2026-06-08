@@ -79,7 +79,9 @@ public class ForecastOrchestrator {
                 "server_start_begin"
         );
         ForecastDataStorage.loadAll(level);
-        TornadoStorageManager.load(level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoStorageManager.load(level);
+        }
         ForecastGenerator.seed = level.getSeed();
         REGION_ORCHESTRATOR = RegionOrchestratorBootstrap.bootstrap(level);
 
@@ -175,7 +177,9 @@ public class ForecastOrchestrator {
      */
     public static void onServerStop(ServerLevel level) {
         ForecastDataStorage.saveAll(level);
-        TornadoStorageManager.save(level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoStorageManager.save(level);
+        }
         ForecastGenerator.clearForecasts();
         REGION_ORCHESTRATOR = null;
     }
@@ -607,7 +611,9 @@ public class ForecastOrchestrator {
         WindEngine.tick(level, activeRegions);
 
         long now = level.getGameTime();
-        if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()
+                && now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f)
+                && !level.players().isEmpty()) {
             lastTornadoCheckTick = now;
             if (REGENERATING) {
                 runAfterRegen(() -> AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level)));

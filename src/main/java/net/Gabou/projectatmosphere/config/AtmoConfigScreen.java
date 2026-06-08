@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.config;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.client.screen.CloudShaderEditorScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -202,6 +203,10 @@ public class AtmoConfigScreen extends Screen {
         this.fogRainBoost = AtmoCommonConfig.FOG_RAIN_BOOST.get();
         this.fogFarDistance = AtmoCommonConfig.FOG_FAR_DISTANCE.get();
         this.fogColorBlend = AtmoCommonConfig.FOG_COLOR_BLEND.get();
+
+        addRenderableWidget(Button.builder(Component.literal("Shader"), button -> Minecraft.getInstance().setScreen(new CloudShaderEditorScreen(this)))
+                .bounds(this.width - 88, 8, 80, 20)
+                .build());
 
         int center = this.width / 2;
         int y = 40;

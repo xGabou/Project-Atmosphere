@@ -154,7 +154,9 @@ public class ProjectAtmosphere {
         if(ProjectAtmosphere.DEBUG_MODE)
             LOGGER.info("Setting up Project Atmosphere (Common)");
         initModules();
-        TornadoProbabilityManager.init();
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoProbabilityManager.init();
+        }
         event.enqueueWork(() -> {
 
             configureOptionalCloudHooks();

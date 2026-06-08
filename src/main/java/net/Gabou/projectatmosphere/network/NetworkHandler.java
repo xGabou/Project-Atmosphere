@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.network.SyncCloudRegionsPacket;
 import net.Gabou.projectatmosphere.network.SyncWindPacket;
 import net.minecraft.resources.ResourceLocation;
@@ -23,21 +24,6 @@ public class NetworkHandler {
         // -----------------------------------------------------------------
         // Client-bound packets
         // -----------------------------------------------------------------
-        CHANNEL.messageBuilder(SpawnTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(SpawnTornadoPacket::decode)
-                .encoder(SpawnTornadoPacket::encode)
-                .consumerMainThread(SpawnTornadoPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(RemoveTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(RemoveTornadoPacket::decode)
-                .encoder(RemoveTornadoPacket::encode)
-                .consumerMainThread(RemoveTornadoPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(SyncTornadoesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(SyncTornadoesPacket::decode)
-                .encoder(SyncTornadoesPacket::encode)
-                .consumerMainThread(SyncTornadoesPacket::handle)
-                .add();
         CHANNEL.messageBuilder(SyncWindPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SyncWindPacket::decode)
                 .encoder(SyncWindPacket::encode)
@@ -68,11 +54,28 @@ public class NetworkHandler {
                 .encoder(InstrumentReadoutPacket::encode)
                 .consumerMainThread(InstrumentReadoutPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(SyncHurricaneStatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(SyncHurricaneStatePacket::decode)
-                .encoder(SyncHurricaneStatePacket::encode)
-                .consumerMainThread(SyncHurricaneStatePacket::handle)
-                .add();
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            CHANNEL.messageBuilder(SpawnTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                    .decoder(SpawnTornadoPacket::decode)
+                    .encoder(SpawnTornadoPacket::encode)
+                    .consumerMainThread(SpawnTornadoPacket::handle)
+                    .add();
+            CHANNEL.messageBuilder(RemoveTornadoPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                    .decoder(RemoveTornadoPacket::decode)
+                    .encoder(RemoveTornadoPacket::encode)
+                    .consumerMainThread(RemoveTornadoPacket::handle)
+                    .add();
+            CHANNEL.messageBuilder(SyncTornadoesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                    .decoder(SyncTornadoesPacket::decode)
+                    .encoder(SyncTornadoesPacket::encode)
+                    .consumerMainThread(SyncTornadoesPacket::handle)
+                    .add();
+            CHANNEL.messageBuilder(SyncHurricaneStatePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                    .decoder(SyncHurricaneStatePacket::decode)
+                    .encoder(SyncHurricaneStatePacket::encode)
+                    .consumerMainThread(SyncHurricaneStatePacket::handle)
+                    .add();
+        }
 
         // -----------------------------------------------------------------
         // Handshake / server-bound packets
