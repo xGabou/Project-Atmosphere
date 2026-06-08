@@ -95,6 +95,8 @@ public class TelemetryDebugClientCommand {
                                                         .append(data.getCloudTypeId())
                                                         .append(" profileDensity=")
                                                         .append(String.format(java.util.Locale.ROOT, "%.2f", data.getDensityMultiplier()))
+                                                        .append(" baseTop=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.1f/%.1f", data.getBaseY(), data.getTopY()))
                                                         .append(" center=")
                                                         .append(String.format(java.util.Locale.ROOT, "%.1f %.1f %.1f", data.getCenter().x(), data.getCenter().y(), data.getCenter().z()));
                                             }
@@ -116,7 +118,11 @@ public class TelemetryDebugClientCommand {
                                                         .append(" tower=")
                                                         .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getTowerStrength()))
                                                         .append(" anvil=")
-                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getAnvilStrength()));
+                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getAnvilStrength()))
+                                                        .append(" vertical=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getVerticalThickness()))
+                                                        .append(" squash=")
+                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getHeightSquash()));
                                             }
 
                                             ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);

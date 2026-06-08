@@ -30,7 +30,7 @@ public final class CloudRenderProfile {
      */
     public static CloudRenderProfile createDefault() {
         return new CloudRenderProfile(
-                32,
+                64,
                 512.0F,
                 1.0F,
                 false

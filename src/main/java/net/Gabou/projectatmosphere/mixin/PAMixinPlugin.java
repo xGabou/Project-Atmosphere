@@ -112,6 +112,10 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.contains("compat.rainbows") && !isRainbowsLoaded()) {
             return false;
         }
+        if ((mixinClassName.endsWith("WeatherStateMixin") || mixinClassName.endsWith("ServerLevelWeatherCycleMixin"))
+                && isSimpleCloudsLoaded()) {
+            return false;
+        }
         return true;
     }
 

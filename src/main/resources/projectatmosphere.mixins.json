@@ -11,6 +11,9 @@
     "CloudRegionTickEventMixin",
     "InfoMixin",
     "SeasonHooksMixin",
+    "ServerLevelWeatherCycleMixin",
+    "WeatherCommandMixin",
+    "WeatherStateMixin",
     "SimpleCloudsCloudManagerMixin",
     "ServerLevelSnowStormMixin"
   ],

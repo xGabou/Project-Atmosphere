@@ -69,6 +69,12 @@ float hash1(float p) {
     return fract(p);
 }
 
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
 float noise3(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
@@ -142,18 +148,8 @@ float sampleCloudField(vec3 samplePos) {
         return 0.0;
     }
 
-    float horizontalDistance = length(samplePos.xz - CloudCenter.xz);
-    float normalizedHorizontal = horizontalDistance / max(CloudRadius, 0.001);
-    if (normalizedHorizontal >= 1.0) {
-        return 0.0;
-    }
-
     float lifecycleFactor = saturate(CloudGrowth * (1.0 - CloudDecay));
     float effectiveDensity = saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier * lifecycleFactor);
-
-    float edgeSoftness = max(saturate(CloudEdgeSoftness), 0.001);
-    float horizontalFade = 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, normalizedHorizontal);
-    float edgeFactor = smoothstep(0.55, 1.0, normalizedHorizontal);
 
     vec3 motion = (CloudCenter - CloudPreviousCenter) * (0.35 + CloudPartialTick * 0.15);
     vec3 baseNoisePos = samplePos + motion * 0.2;
@@ -164,6 +160,9 @@ float sampleCloudField(vec3 samplePos) {
         return 0.0;
     }
 
+    float horizontalDistance = length(samplePos.xz - CloudCenter.xz);
+    float rawHorizontal = horizontalDistance / max(CloudRadius, 0.001);
+
     float topWarp = fbm(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1), 2) - 0.5;
     float baseWarp = fbm(baseNoisePos * vec3(0.014, 0.0, 0.014) + vec3(3.4, CloudWorldTime * -0.0008, 27.5), 2) - 0.5;
     float warpedVertical = shapedVertical + topWarp * 0.16 * smoothstep(0.45, 1.0, shapedVertical) - baseWarp * 0.08 * (1.0 - smoothstep(0.0, 0.35, shapedVertical));
@@ -171,6 +170,32 @@ float sampleCloudField(vec3 samplePos) {
     float topSoftness = max(CloudTopSoftness, 0.01);
     float verticalFade = smoothstep(0.0, baseSoftness, warpedVertical) * (1.0 - smoothstep(1.0 - topSoftness, 1.0, warpedVertical));
     float interiorFade = 1.0;
+
+    float layerBias = saturate((CloudHeightSquash - 1.20) * 0.36);
+    float puffyRadius = mix(0.18, 1.00, smoothstep(0.04, 0.46, warpedVertical))
+        * mix(1.0, 0.22, smoothstep(0.58, 1.0, warpedVertical));
+    float layerRadius = mix(0.88, 1.06, smoothstep(0.04, 0.34, warpedVertical))
+        * mix(1.0, 0.96, smoothstep(0.88, 1.0, warpedVertical));
+    float towerRadius = mix(0.30, 0.68, smoothstep(0.04, 0.38, warpedVertical))
+        * mix(1.0, 0.58, smoothstep(0.78, 1.0, warpedVertical));
+    float anvilRadius = CloudAnvilStrength
+        * smoothstep(0.56, 0.88, warpedVertical)
+        * (1.0 - smoothstep(0.94, 1.0, warpedVertical))
+        * 0.48;
+    float effectiveRadiusFactor = mix(puffyRadius, layerRadius, layerBias);
+    effectiveRadiusFactor = mix(effectiveRadiusFactor, towerRadius, saturate(CloudTowerStrength));
+    effectiveRadiusFactor = clamp(effectiveRadiusFactor + anvilRadius, 0.12, 1.08);
+
+    float normalizedHorizontal = rawHorizontal / effectiveRadiusFactor;
+    if (normalizedHorizontal >= 1.0) {
+        return 0.0;
+    }
+
+    float edgeSoftness = max(saturate(CloudEdgeSoftness), 0.001);
+    float horizontalFade = 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, normalizedHorizontal);
+    float edgeFactor = smoothstep(0.55, 1.0, normalizedHorizontal);
+    float silhouettePower = mix(2.35, 0.95, layerBias);
+    float silhouetteFade = pow(1.0 - smoothstep(0.36, 1.0, normalizedHorizontal), silhouettePower);
 
     float noiseScale = max(CloudNoiseScale, 0.001);
     float detailNoiseScale = max(CloudDetailNoiseScale, 0.001);
@@ -189,7 +214,7 @@ float sampleCloudField(vec3 samplePos) {
     float precipitationCore = 1.0 + CloudPrecipitationCoreStrength * centerWeight * (1.0 - smoothstep(0.28, 0.72, warpedVertical)) * 0.35;
     float baseProfile = mix(1.0, 0.94, saturate(CloudBaseDarkness) * (1.0 - smoothstep(0.0, 0.42, warpedVertical)));
 
-    return saturate(effectiveDensity * horizontalFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve * towerBoost * anvilBoost * precipitationCore * baseProfile);
+    return saturate(effectiveDensity * horizontalFade * silhouetteFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve * towerBoost * anvilBoost * precipitationCore * baseProfile);
 }
 
 vec3 computeSampleLighting(vec3 samplePos, float density, vec3 rayDir) {
@@ -253,9 +278,10 @@ void main() {
     float interval = maxRay - tNear;
     int steps = int(clamp(float(RaymarchSteps), 1.0, float(MAX_RAYMARCH_STEPS)));
     float stepSize = interval / float(steps);
-    float jitter = hash1(screenUv.x * OutSize.x + screenUv.y * OutSize.y + CloudWorldTime * 0.013);
 
-    float t = tNear + stepSize * (0.2 + jitter * 0.8);
+    // Jitter stable par pixel pour casser les plans de sampling sans scintillement temporel.
+    float jitter = hash12(gl_FragCoord.xy);
+    float t = tNear + jitter * stepSize;
     float transmittance = 1.0;
     vec3 accum = vec3(0.0);
 
@@ -268,7 +294,7 @@ void main() {
         float density = sampleCloudField(samplePos);
         if (density > 0.0005) {
             float softenedDensity = pow(density, 1.18);
-            float alpha = 1.0 - exp(-softenedDensity * stepSize * 5.4);
+            float alpha = 1.0 - exp(-softenedDensity * stepSize * 3.2);
             vec3 cloudTint = computeSampleLighting(samplePos, density, rayDir);
             accum += cloudTint * alpha * transmittance;
             transmittance *= (1.0 - alpha);
