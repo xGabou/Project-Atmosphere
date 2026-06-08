@@ -108,7 +108,7 @@ public final class CloudDensityProvider {
         float verticalFade = smoothstep(0.0F, 0.15F, normalizedVertical)
                 * (1.0F - smoothstep(0.85F, 1.0F, normalizedVertical));
 
-        float interiorFade = 1.0F - smoothstep(0.38F, 0.92F, normalizedHorizontal);
+        float interiorFade = 1.0F;
 
         float density = getEffectiveDensity(snapshot)
                 * getEffectiveCoverage(snapshot)

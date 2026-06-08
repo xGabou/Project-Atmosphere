@@ -139,17 +139,28 @@ float sampleCloudField(vec3 samplePos) {
 
     float edgeSoftness = max(saturate(CloudEdgeSoftness), 0.001);
     float horizontalFade = 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, normalizedHorizontal);
-    float verticalFade = smoothstep(0.0, 0.15, vertical) * (1.0 - smoothstep(0.85, 1.0, vertical));
-    float interiorFade = 1.0;
+    float edgeFactor = smoothstep(0.55, 1.0, normalizedHorizontal);
 
     vec3 motion = (CloudCenter - CloudPreviousCenter) * (0.35 + CloudPartialTick * 0.15);
-    vec3 noisePos = samplePos * vec3(0.045, 0.075, 0.045) + vec3(0.0, CloudWorldTime * 0.0025, 0.0) + motion * 0.2;
-    float noise = fbm(noisePos, 3);
-    float noiseShape = mix(0.58, 1.08, noise);
-    float edgeFactor = smoothstep(0.55, 1.0, normalizedHorizontal);
-    float edgeErosion = mix(1.0, noiseShape, edgeFactor);
+    vec3 baseNoisePos = samplePos + motion * 0.2;
 
-    return saturate(effectiveDensity * horizontalFade * verticalFade * interiorFade * edgeErosion);
+    float topWarp = fbm(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1), 2) - 0.5;
+    float baseWarp = fbm(baseNoisePos * vec3(0.014, 0.0, 0.014) + vec3(3.4, CloudWorldTime * -0.0008, 27.5), 2) - 0.5;
+    float warpedVertical = vertical + topWarp * 0.16 * smoothstep(0.45, 1.0, vertical) - baseWarp * 0.08 * (1.0 - smoothstep(0.0, 0.35, vertical));
+    float verticalFade = smoothstep(0.0, 0.16, warpedVertical) * (1.0 - smoothstep(0.78, 1.0, warpedVertical));
+    float interiorFade = 1.0;
+
+    float lobeNoise = fbm(baseNoisePos * vec3(0.020, 0.035, 0.020) + vec3(0.0, CloudWorldTime * 0.0015, 0.0), 3);
+    float layerNoise = fbm(baseNoisePos * vec3(0.052, 0.105, 0.052) + vec3(12.0, CloudWorldTime * 0.0025, 8.0), 3);
+    float detailNoise = fbm(baseNoisePos * vec3(0.118, 0.150, 0.118) + vec3(31.0, CloudWorldTime * -0.0030, 6.0), 2);
+
+    float lobeShape = mix(0.74, 1.18, lobeNoise);
+    float layeredShape = mix(0.82, 1.10, layerNoise);
+    float edgeCarve = mix(1.0, smoothstep(0.24, 0.86, detailNoise), edgeFactor);
+    float centerWeight = 1.0 - smoothstep(0.0, 0.58, normalizedHorizontal);
+    float corePreserve = mix(edgeCarve, max(edgeCarve, 0.86), centerWeight);
+
+    return saturate(effectiveDensity * horizontalFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve);
 }
 
 vec3 computeSampleLighting(vec3 samplePos, float density, vec3 rayDir) {
