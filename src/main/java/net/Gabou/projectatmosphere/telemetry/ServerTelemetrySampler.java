@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
@@ -75,7 +76,8 @@ public final class ServerTelemetrySampler {
         float humidity = ForecastOrchestrator.getCurrentHumidity(level, pos, gameTime);
         float pressure = ForecastOrchestrator.getCurrentPressure(level, pos, gameTime);
         WindVector wind = ForecastOrchestrator.getWind(regionKey, gameTime);
-        boolean isRaining = level.isRainingAt(pos);
+        boolean isThundering = WeatherCloudQueries.isThunderingAt(level, pos);
+        boolean isRaining = WeatherCloudQueries.isRainingAt(level, pos);
         boolean temperatureOutOfRange = temperature < -60f || temperature > 60f;
 
         PlayerExperienceSample sample = new PlayerExperienceSample(
@@ -91,8 +93,8 @@ public final class ServerTelemetrySampler {
                 pressure,
                 wind.baseSpeed(),
                 wind.angleRadians(),
-                level.isRaining(),
-                level.isThundering(),
+                isRaining,
+                isThundering,
                 isRaining ? "RAINING" : "CLEAR",
                 temperatureOutOfRange,
                 false,

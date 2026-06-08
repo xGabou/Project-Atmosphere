@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Simple in-game configuration screen for Project Atmosphere.
+ * Ecran de configuration interne de Project Atmosphere.
  */
 public class AtmoConfigScreen extends Screen {
     private final Screen parent;
@@ -456,7 +456,7 @@ public class AtmoConfigScreen extends Screen {
             AbstractWidget w = configWidgets.get(i);
             int y = widgetBaseY.get(i) - scrollOffset;
             w.setY(y);
-            // Require full containment within viewport to avoid spillover outside the panel
+            // Le widget doit rester entierement dans la zone visible pour eviter les debordements.
             boolean inView = (y >= contentTop) && ((y + w.getHeight()) <= contentBottom);
             w.visible = inView;
             w.active = inView;
@@ -506,7 +506,7 @@ public class AtmoConfigScreen extends Screen {
         tornadoRenderQuality = Mth.clamp(parseDouble(tornadoRenderQualityBox, tornadoRenderQuality), 0.25d, 1.0d);
         tornadoRenderDownsample = Mth.clamp(parseDouble(tornadoRenderDownsampleBox, tornadoRenderDownsample), 1.0d, 4.0d);
         hurricaneDestructionStrength = Mth.clamp(parseDouble(hurricaneDestructionStrengthBox, hurricaneDestructionStrength), 0.0d, 3.0d);
-        // Buttons already toggled booleans; nothing to parse.
+        // Les boutons ont deja bascule les booleens; aucun parsing requis.
         fogHumidityStartPercent = parseDouble(fogHumidityStartBox, fogHumidityStartPercent);
         fogHumidityFullPercent = parseDouble(fogHumidityFullBox, fogHumidityFullPercent);
         fogWetBiomeBaseStrength = parseDouble(fogWetBiomeStrengthBox, fogWetBiomeBaseStrength);

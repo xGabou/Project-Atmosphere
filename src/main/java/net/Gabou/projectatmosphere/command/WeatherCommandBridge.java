@@ -8,6 +8,7 @@ import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -24,7 +25,7 @@ import java.util.Objects;
 public final class WeatherCommandBridge {
 
     private static final float WEATHER_REGION_RADIUS = 64.0F;
-    private static final float WEATHER_REGION_BASE_Y_OFFSET = 80.0F;
+    private static final float WEATHER_REGION_VERTICAL_PADDING = 8.0F;
 
     private WeatherCommandBridge() {
     }
@@ -107,7 +108,8 @@ public final class WeatherCommandBridge {
                 .findFirst()
                 .orElse(null);
 
-        Vec3 center = new Vec3(sourcePos.getX(), sourcePos.getY() + WEATHER_REGION_BASE_Y_OFFSET, sourcePos.getZ());
+        float spawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
+        Vec3 center = new Vec3(sourcePos.getX(), spawnHeight, sourcePos.getZ());
         String cloudTypeId = kind.nativeCloudTypeId(durationTicks);
         float density = kind.density;
         float coverage = kind.coverage;
@@ -118,18 +120,22 @@ public final class WeatherCommandBridge {
                     level,
                     center,
                     WEATHER_REGION_RADIUS,
-                    (float) center.y() - 8.0F,
-                    (float) center.y() + 8.0F,
+                    (float) center.y() - WEATHER_REGION_VERTICAL_PADDING,
+                    (float) center.y() + WEATHER_REGION_VERTICAL_PADDING,
                     density,
                     coverage,
                     edgeSoftness,
-                    regionKey
+                    regionKey,
+                    cloudTypeId
             );
         } else {
             state.setPreviousCenter(state.getCenter());
             state.setCenter(center);
             state.setRadius(WEATHER_REGION_RADIUS);
-            state.setVerticalBounds((float) center.y() - 8.0F, (float) center.y() + 8.0F);
+            state.setVerticalBounds(
+                    (float) center.y() - WEATHER_REGION_VERTICAL_PADDING,
+                    (float) center.y() + WEATHER_REGION_VERTICAL_PADDING
+            );
             state.setDensity(density);
             state.setCoverage(coverage);
             state.setEdgeSoftness(edgeSoftness);

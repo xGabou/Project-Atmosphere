@@ -247,13 +247,14 @@ public class DebugAtmoCommand {
         ServerLevel level = source.getLevel();
         BlockPos pos = BlockPos.containing(source.getPosition());
         RegionInstanceKey sourceRegionKey = RegionInstanceKey.from(pos);
+        float spawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
 
         CloudRegionState state = CloudRegionManager.getInstance().createCloudRegion(
                 level,
-                new Vec3(pos.getX(), pos.getY() + 80.0D, pos.getZ()),
+                new Vec3(pos.getX(), spawnHeight, pos.getZ()),
                 64.0F,
-                pos.getY() + 72.0F,
-                pos.getY() + 88.0F,
+                spawnHeight - 8.0F,
+                spawnHeight + 8.0F,
                 0.65F,
                 0.75F,
                 0.35F,
@@ -415,12 +416,13 @@ public class DebugAtmoCommand {
         String cloudTypeId = resolveNativeCloudTypeId(cloudId);
         float density = cloudId != null && cloudId.contains("thunder") ? 0.85F : 0.65F;
         float coverage = cloudId != null && cloudId.contains("snow") ? 0.85F : 0.75F;
+        float spawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
         return CloudRegionManager.getInstance().createCloudRegion(
                 level,
-                new Vec3(pos.getX(), pos.getY() + 80.0D, pos.getZ()),
+                new Vec3(pos.getX(), spawnHeight, pos.getZ()),
                 64.0F,
-                pos.getY() + 72.0F,
-                pos.getY() + 88.0F,
+                spawnHeight - 8.0F,
+                spawnHeight + 8.0F,
                 density,
                 coverage,
                 0.35F,

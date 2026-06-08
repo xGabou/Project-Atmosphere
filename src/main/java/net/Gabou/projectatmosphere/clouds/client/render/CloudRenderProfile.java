@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+
 /**
  * Définit les paramètres de qualité du futur rendu live des nuages.
  * Cette classe ne fait aucun rendu et ne lit jamais le backend.
@@ -29,8 +31,9 @@ public final class CloudRenderProfile {
      * @return profil de rendu par défaut
      */
     public static CloudRenderProfile createDefault() {
+        AtmoCommonConfig.CloudRaymarchQuality quality = AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get();
         return new CloudRenderProfile(
-                64,
+                quality.getRaymarchSteps(),
                 512.0F,
                 1.0F,
                 false

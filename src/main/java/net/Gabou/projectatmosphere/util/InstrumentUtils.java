@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.util;
 
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
+import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -96,9 +97,10 @@ public class InstrumentUtils {
             return;
         }
         String msg;
-        if (level.isThundering()) {
+        BlockPos pos = player.blockPosition();
+        if (WeatherCloudQueries.isThunderingAt(level, pos)) {
             msg = "Storm detected!";
-        } else if (level.isRaining()) {
+        } else if (WeatherCloudQueries.isRainingAt(level, pos)) {
             msg = "Rain detected.";
         } else {
             msg = "Skies clear.";
@@ -147,9 +149,10 @@ public class InstrumentUtils {
 
         private static void displayStorm(Level level, Player player) {
             String msg;
-            if (level.isThundering()) {
+            BlockPos pos = player.blockPosition();
+            if (WeatherCloudQueries.isThunderingAt(level, pos)) {
                 msg = "Storm detected!";
-            } else if (level.isRaining()) {
+            } else if (WeatherCloudQueries.isRainingAt(level, pos)) {
                 msg = "Rain detected.";
             } else {
                 msg = "Skies clear.";

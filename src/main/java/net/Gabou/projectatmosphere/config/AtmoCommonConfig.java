@@ -13,7 +13,40 @@ public class AtmoCommonConfig {
         }
     }
 
+    public enum CloudRaymarchQuality {
+        LOW(16),
+        MEDIUM(32),
+        HIGH(64);
+
+        private final int raymarchSteps;
+
+        CloudRaymarchQuality(int raymarchSteps) {
+            this.raymarchSteps = raymarchSteps;
+        }
+
+        /**
+         * Retourne le nombre d'etapes de raymarch associe a cette qualite.
+         *
+         * @return nombre d'etapes shader
+         */
+        public int getRaymarchSteps() {
+            return raymarchSteps;
+        }
+
+        /**
+         * Retourne la qualite suivante pour les boutons cyclables.
+         *
+         * @return prochaine qualite
+         */
+        public CloudRaymarchQuality next() {
+            CloudRaymarchQuality[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
     public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
+    public static final ForgeConfigSpec.EnumValue<CloudRaymarchQuality> CLOUD_RAYMARCH_QUALITY;
+    public static final ForgeConfigSpec.IntValue NATIVE_CLOUD_SPAWN_HEIGHT;
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
     public static final ForgeConfigSpec.EnumValue<CloudMode> CLOUD_MODE;
@@ -139,6 +172,15 @@ public class AtmoCommonConfig {
         CLOUD_RENDER_DISTANCE = builder
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
+        CLOUD_RAYMARCH_QUALITY = builder
+                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes, MEDIUM=32 etapes, HIGH=64 etapes")
+                .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
+        builder.pop();
+
+        builder.push("clouds");
+        NATIVE_CLOUD_SPAWN_HEIGHT = builder
+                .comment("Hauteur Y fixe utilisee par le spawn natif des nuages Project Atmosphere")
+                .defineInRange("nativeCloudSpawnHeight", 256, -2048, 4096);
         builder.pop();
 
         builder.push("display");

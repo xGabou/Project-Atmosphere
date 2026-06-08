@@ -19,20 +19,24 @@ import net.minecraftforge.fml.config.ModConfig;
  */
 public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
     private static final int PANEL_WIDTH = 320;
-    private static final int PANEL_HEIGHT = 244;
+    private static final int PANEL_HEIGHT = 354;
     private static final int ROW_HEIGHT = 20;
     private static final int ROW_GAP = 10;
     private static final int PANEL_PADDING = 14;
 
     private final Screen parent;
     private AtmoCommonConfig.CloudMode cloudMode;
+    private AtmoCommonConfig.CloudRaymarchQuality cloudRaymarchQuality;
     private boolean fogEnabled;
     private boolean eventsEnabled;
+    private int nativeCloudSpawnHeight;
     private double forecastDeviationMultiplier;
 
     private Button cloudModeButton;
+    private Button cloudQualityButton;
     private Button fogButton;
     private Button eventsButton;
+    private EditBox nativeCloudSpawnHeightBox;
     private EditBox forecastDeviationBox;
 
     public ProjectAtmosphereQuickOptionsScreen(Screen parent) {
@@ -43,8 +47,10 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
     @Override
     protected void init() {
         this.cloudMode = AtmoCommonConfig.CLOUD_MODE.get();
+        this.cloudRaymarchQuality = AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get();
         this.fogEnabled = AtmoCommonConfig.FOG_ENABLED.get();
         this.eventsEnabled = AtmoCommonConfig.EVENTS_ENABLED.get();
+        this.nativeCloudSpawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
         this.forecastDeviationMultiplier = AtmoCommonConfig.FORECAST_DEVIATION_MULTIPLIER.get();
 
         int panelWidth = this.getPanelWidth();
@@ -58,29 +64,39 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
             button.setMessage(this.cloudModeLabel());
         }).bounds(left, top, rowWidth, ROW_HEIGHT).build());
 
+        this.cloudQualityButton = this.addRenderableWidget(Button.builder(this.cloudQualityLabel(), button -> {
+            this.cloudRaymarchQuality = this.cloudRaymarchQuality.next();
+            button.setMessage(this.cloudQualityLabel());
+        }).bounds(left, top + 30, rowWidth, ROW_HEIGHT).build());
+
         this.fogButton = this.addRenderableWidget(Button.builder(this.toggleLabel("Fog", this.fogEnabled), button -> {
             this.fogEnabled = !this.fogEnabled;
             button.setMessage(this.toggleLabel("Fog", this.fogEnabled));
-        }).bounds(left, top + 30, rowWidth, ROW_HEIGHT).build());
+        }).bounds(left, top + 60, rowWidth, ROW_HEIGHT).build());
 
         this.eventsButton = this.addRenderableWidget(Button.builder(this.toggleLabel("Events", this.eventsEnabled), button -> {
             this.eventsEnabled = !this.eventsEnabled;
             button.setMessage(this.toggleLabel("Events", this.eventsEnabled));
-        }).bounds(left, top + 60, rowWidth, ROW_HEIGHT).build());
+        }).bounds(left, top + 90, rowWidth, ROW_HEIGHT).build());
 
-        this.forecastDeviationBox = new EditBox(this.font, left, top + 104, rowWidth, ROW_HEIGHT, Component.literal("Forecast deviation"));
+        this.nativeCloudSpawnHeightBox = new EditBox(this.font, left, top + 132, rowWidth, ROW_HEIGHT, Component.literal("Native cloud height"));
+        this.nativeCloudSpawnHeightBox.setValue(Integer.toString(this.nativeCloudSpawnHeight));
+        this.nativeCloudSpawnHeightBox.setMaxLength(8);
+        this.addRenderableWidget(this.nativeCloudSpawnHeightBox);
+
+        this.forecastDeviationBox = new EditBox(this.font, left, top + 180, rowWidth, ROW_HEIGHT, Component.literal("Forecast deviation"));
         this.forecastDeviationBox.setValue(Double.toString(this.forecastDeviationMultiplier));
         this.forecastDeviationBox.setMaxLength(12);
         this.addRenderableWidget(this.forecastDeviationBox);
 
         this.addRenderableWidget(Button.builder(Component.literal("Shader"), button ->
                 Minecraft.getInstance().setScreen(new CloudShaderEditorScreen(this)))
-                .bounds(left, top + 142, halfWidth, ROW_HEIGHT)
+                .bounds(left, top + 226, halfWidth, ROW_HEIGHT)
                 .build());
 
         this.addRenderableWidget(Button.builder(Component.literal("Advanced"), button ->
                 Minecraft.getInstance().setScreen(new AtmoConfigScreen(this)))
-                .bounds(left + halfWidth + 8, top + 142, halfWidth, ROW_HEIGHT)
+                .bounds(left + halfWidth + 8, top + 226, halfWidth, ROW_HEIGHT)
                 .build());
 
         this.addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> this.saveAndClose())
@@ -101,8 +117,10 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
         guiGraphics.fill(left, top, left + panelWidth, top + PANEL_HEIGHT, 0xD0101218);
         guiGraphics.drawCenteredString(this.font, "Project Atmosphere", this.width / 2, top + 10, 0xFFE5F2FF);
         guiGraphics.drawCenteredString(this.font, "Basic cloud and weather controls", this.width / 2, top + 22, 0xFF9FB7C8);
-        guiGraphics.drawString(this.font, "Forecast deviation", left + PANEL_PADDING, top + 132, 0xFFE5F2FF, false);
-        guiGraphics.drawString(this.font, "Forecast swing multiplier", left + PANEL_PADDING, top + 178, 0xFF9FB7C8, false);
+        guiGraphics.drawString(this.font, "Native cloud height", left + PANEL_PADDING, top + 164, 0xFFE5F2FF, false);
+        guiGraphics.drawString(this.font, "Default: 256", left + PANEL_PADDING, top + 204, 0xFF9FB7C8, false);
+        guiGraphics.drawString(this.font, "Forecast deviation", left + PANEL_PADDING, top + 216, 0xFFE5F2FF, false);
+        guiGraphics.drawString(this.font, "Forecast swing multiplier", left + PANEL_PADDING, top + 254, 0xFF9FB7C8, false);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
@@ -119,6 +137,10 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
 
     private Component cloudModeLabel() {
         return Component.literal("Cloud mode: " + this.cloudMode.name());
+    }
+
+    private Component cloudQualityLabel() {
+        return Component.literal("Cloud quality: " + this.cloudRaymarchQuality.name() + " (" + this.cloudRaymarchQuality.getRaymarchSteps() + " steps)");
     }
 
     private Component toggleLabel(String label, boolean value) {
@@ -138,9 +160,12 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
     }
 
     private void saveAndClose() {
+        this.nativeCloudSpawnHeight = Mth.clamp(this.parseInt(this.nativeCloudSpawnHeightBox, this.nativeCloudSpawnHeight), -2048, 4096);
         this.forecastDeviationMultiplier = Mth.clamp(this.parseDouble(this.forecastDeviationBox, this.forecastDeviationMultiplier), 0.0D, 3.0D);
 
         AtmoCommonConfig.CLOUD_MODE.set(this.cloudMode);
+        AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(this.cloudRaymarchQuality);
+        AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.set(this.nativeCloudSpawnHeight);
         AtmoCommonConfig.FOG_ENABLED.set(this.fogEnabled);
         AtmoCommonConfig.EVENTS_ENABLED.set(this.eventsEnabled);
         AtmoCommonConfig.FORECAST_DEVIATION_MULTIPLIER.set(this.forecastDeviationMultiplier);
@@ -151,6 +176,14 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
         }
 
         Minecraft.getInstance().setScreen(this.parent);
+    }
+
+    private int parseInt(EditBox box, int fallback) {
+        try {
+            return Integer.parseInt(box.getValue());
+        } catch (NumberFormatException exception) {
+            return fallback;
+        }
     }
 
     private double parseDouble(EditBox box, double fallback) {
