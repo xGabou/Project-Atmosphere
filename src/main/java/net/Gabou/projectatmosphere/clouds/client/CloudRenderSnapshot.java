@@ -41,6 +41,7 @@ public final class CloudRenderSnapshot {
     private final float towerStrength;
     private final float anvilStrength;
     private final float precipitationCoreStrength;
+    private final int cloudSeed;
     private final int debugColorOrTint;
 
     public CloudRenderSnapshot(
@@ -81,6 +82,7 @@ public final class CloudRenderSnapshot {
             float towerStrength,
             float anvilStrength,
             float precipitationCoreStrength,
+            int cloudSeed,
             int debugColorOrTint
     ) {
         this.enabled = enabled;
@@ -120,6 +122,7 @@ public final class CloudRenderSnapshot {
         this.towerStrength = towerStrength;
         this.anvilStrength = anvilStrength;
         this.precipitationCoreStrength = precipitationCoreStrength;
+        this.cloudSeed = cloudSeed;
         this.debugColorOrTint = debugColorOrTint;
     }
 
@@ -269,6 +272,10 @@ public final class CloudRenderSnapshot {
 
     public float getPrecipitationCoreStrength() {
         return precipitationCoreStrength;
+    }
+
+    public int getCloudSeed() {
+        return cloudSeed;
     }
 
     public int getDebugColorOrTint() {

@@ -1,9 +1,9 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
@@ -30,7 +30,8 @@ public final class CloudUniformUploader {
     public static void apply(
             @NotNull ShaderInstance shader,
             @NotNull CloudRenderFrameContext frameContext,
-            @NotNull CloudRenderSnapshot snapshot
+            @NotNull CloudRenderSnapshot snapshot,
+            @NotNull RenderTarget outputTarget
     ) {
         shader.safeGetUniform("ModelViewMat").set(frameContext.getModelViewMatrix());
         shader.safeGetUniform("ProjMat").set(frameContext.getProjectionMatrix());
@@ -115,17 +116,10 @@ public final class CloudUniformUploader {
         shader.safeGetUniform("FogEnd").set(maxDistance);
         shader.safeGetUniform("MaxDistance").set(maxDistance);
 
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.getWindow() != null) {
-            shader.safeGetUniform("OutSize").set(
-                    (float) minecraft.getWindow().getWidth(),
-                    (float) minecraft.getWindow().getHeight()
-            );
-        } else {
-            shader.safeGetUniform("OutSize").set(1.0F, 1.0F);
-        }
+        shader.safeGetUniform("OutSize").set((float) outputTarget.width, (float) outputTarget.height);
 
         shader.safeGetUniform("AnimationTime").set((frameContext.getWorldTime() + frameContext.getPartialTick()) * 0.05F);
         shader.safeGetUniform("RaymarchSteps").set(Math.max(1, frameContext.getRenderProfile().getRaymarchSteps()));
+        shader.safeGetUniform("CloudSeed").set(snapshot.getCloudSeed());
     }
 }

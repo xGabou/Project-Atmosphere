@@ -78,6 +78,7 @@ public final class CloudRenderSnapshotBuilder {
                 renderData.getTowerStrength(),
                 renderData.getAnvilStrength(),
                 renderData.getPrecipitationCoreStrength(),
+                renderData.getCloudSeed(),
                 renderData.getDebugColorOrTint()
         );
     }

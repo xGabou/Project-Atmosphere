@@ -35,7 +35,7 @@ public final class CloudRenderProfile {
         return new CloudRenderProfile(
                 quality.getRaymarchSteps(),
                 512.0F,
-                1.0F,
+                quality.getResolutionScale(),
                 false
         );
     }

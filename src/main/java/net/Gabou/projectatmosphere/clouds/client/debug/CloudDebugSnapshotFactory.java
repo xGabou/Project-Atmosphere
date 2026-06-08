@@ -33,6 +33,7 @@ public final class CloudDebugSnapshotFactory {
     private static final float DEBUG_PRECIPITATION_CORE_STRENGTH = 0.0F;
 
     private static final int DEBUG_COLOR = 0xFFFF5555;
+    private static final int DEBUG_CLOUD_SEED = 1337;
 
     private CloudDebugSnapshotFactory() {
     }
@@ -108,6 +109,7 @@ public final class CloudDebugSnapshotFactory {
                 DEBUG_TOWER_STRENGTH,
                 DEBUG_ANVIL_STRENGTH,
                 DEBUG_PRECIPITATION_CORE_STRENGTH,
+                DEBUG_CLOUD_SEED,
                 DEBUG_COLOR
         );
     }
@@ -162,6 +164,7 @@ public final class CloudDebugSnapshotFactory {
                 base.getTowerStrength(),
                 base.getAnvilStrength(),
                 base.getPrecipitationCoreStrength(),
+                base.getCloudSeed(),
                 debugColorOrTint
         );
     }

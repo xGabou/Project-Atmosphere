@@ -19,8 +19,10 @@ import java.io.IOException;
 public final class CloudShaders {
 
     private static final ResourceLocation SHADER_ID = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_volume");
+    private static final ResourceLocation COMPOSITE_SHADER_ID = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_composite");
 
     private static ShaderInstance cloudShader;
+    private static ShaderInstance compositeShader;
 
     private CloudShaders() {
 
@@ -35,6 +37,7 @@ public final class CloudShaders {
     @SubscribeEvent
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> cloudShader = loaded);
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), COMPOSITE_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> compositeShader = loaded);
     }
 
     /**
@@ -44,6 +47,10 @@ public final class CloudShaders {
      */
     public static ShaderInstance getShader() {
         return cloudShader;
+    }
+
+    public static ShaderInstance getCompositeShader() {
+        return compositeShader;
     }
 
     /**

@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * État backend d'une région de nuage contrôlée par Project Atmosphere.
@@ -57,6 +58,7 @@ public final class CloudRegionState {
     private static final String TAG_CLOUD_TYPE_ID = "CloudTypeId";
     private static final String TAG_PREVIOUS_CLOUD_TYPE_ID = "PreviousCloudTypeId";
     private static final String TAG_CLOUD_TYPE_TICKS = "CloudTypeTicks";
+    private static final String TAG_CLOUD_SEED = "CloudSeed";
 
     private static final float DEFAULT_RADIUS = 64.0F;
     private static final float DEFAULT_BASE_Y = 128.0F;
@@ -124,6 +126,7 @@ public final class CloudRegionState {
 
     // Durée passée dans le type courant.
     private int cloudTypeTicks;
+    private int cloudSeed;
 
 
 
@@ -160,6 +163,7 @@ public final class CloudRegionState {
         this.cloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.previousCloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.cloudTypeTicks = 0;
+        this.cloudSeed = createRandomCloudSeed();
 
         this.active = true;
     }
@@ -362,6 +366,14 @@ public final class CloudRegionState {
         this.cloudTypeTicks++;
     }
 
+    public int getCloudSeed() {
+        return cloudSeed;
+    }
+
+    public void setCloudSeed(int cloudSeed) {
+        this.cloudSeed = cloudSeed;
+    }
+
     /**
      * Change le type courant du nuage en conservant l'ancien type.
      *
@@ -425,6 +437,7 @@ public final class CloudRegionState {
         tag.putString(TAG_CLOUD_TYPE_ID, cloudTypeId);
         tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, previousCloudTypeId);
         tag.putInt(TAG_CLOUD_TYPE_TICKS, cloudTypeTicks);
+        tag.putInt(TAG_CLOUD_SEED, cloudSeed);
 
         if (sourceRegionKey != null) {
             tag.put(TAG_SOURCE_REGION, saveRegionKey(sourceRegionKey));
@@ -499,6 +512,7 @@ public final class CloudRegionState {
                 ? tag.getString(TAG_PREVIOUS_CLOUD_TYPE_ID)
                 : cloudTypeId;
         int cloudTypeTicks = tag.contains(TAG_CLOUD_TYPE_TICKS) ? tag.getInt(TAG_CLOUD_TYPE_TICKS) : 0;
+        int cloudSeed = tag.contains(TAG_CLOUD_SEED) ? tag.getInt(TAG_CLOUD_SEED) : deriveCloudSeed(regionId);
 
         RegionInstanceKey sourceRegionKey = null;
         if (tag.contains(TAG_SOURCE_REGION, Tag.TAG_COMPOUND)) {
@@ -528,6 +542,7 @@ public final class CloudRegionState {
         state.setCloudTypeId(cloudTypeId);
         state.setPreviousCloudTypeId(previousCloudTypeId);
         state.setCloudTypeTicks(cloudTypeTicks);
+        state.setCloudSeed(cloudSeed);
 
         if (tag.contains(TAG_CURRENT_REGION, Tag.TAG_COMPOUND)) {
             state.setCurrentRegionKey(loadRegionKey(tag.getCompound(TAG_CURRENT_REGION)));
@@ -570,5 +585,17 @@ public final class CloudRegionState {
 
     private static String normalizeCloudTypeId(String cloudTypeId) {
         return CloudTypeRegistry.getOrDefault(cloudTypeId).getId();
+    }
+
+    private static int createRandomCloudSeed() {
+        return ThreadLocalRandom.current().nextInt();
+    }
+
+    private static int deriveCloudSeed(UUID regionId) {
+        long mixed = regionId.getMostSignificantBits() ^ Long.rotateLeft(regionId.getLeastSignificantBits(), 21);
+        mixed ^= mixed >>> 33;
+        mixed *= 0xff51afd7ed558ccdL;
+        mixed ^= mixed >>> 33;
+        return (int) mixed;
     }
 }

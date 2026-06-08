@@ -10,7 +10,6 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.client.render.shader.CloudShaders;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
@@ -33,24 +32,20 @@ public final class CloudRaymarchRenderer {
      * @param frameContext contexte de frame courant
      * @param snapshot snapshot live valide
      */
-    public static void renderSnapshot(
+    public static boolean renderSnapshot(
             @NotNull CloudRenderFrameContext frameContext,
-            @NotNull CloudRenderSnapshot snapshot
+            @NotNull CloudRenderSnapshot snapshot,
+            @NotNull RenderTarget outputTarget,
+            int sceneDepthTextureId
     ) {
         ShaderInstance shader = CloudShaders.getShader();
         if (shader == null || !snapshot.isEnabled() || !CloudDensityProvider.hasVisibleDensity(snapshot)) {
-            return;
+            return false;
         }
 
         ensureFullscreenQuad();
         if (fullscreenQuad == null) {
-            return;
-        }
-
-        Minecraft minecraft = Minecraft.getInstance();
-        RenderTarget mainTarget = minecraft.getMainRenderTarget();
-        if (mainTarget == null) {
-            return;
+            return false;
         }
 
         RenderSystem.enableBlend();
@@ -60,8 +55,8 @@ public final class CloudRaymarchRenderer {
         RenderSystem.depthMask(false);
         RenderSystem.setShader(() -> shader);
 
-        shader.setSampler("DepthSampler", mainTarget.getDepthTextureId());
-        CloudUniformUploader.apply(shader, frameContext, snapshot);
+        shader.setSampler("DepthSampler", sceneDepthTextureId);
+        CloudUniformUploader.apply(shader, frameContext, snapshot, outputTarget);
         shader.apply();
 
         fullscreenQuad.bind();
@@ -73,6 +68,41 @@ public final class CloudRaymarchRenderer {
         RenderSystem.enableDepthTest();
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
+        return true;
+    }
+
+    public static boolean compositeTarget(@NotNull RenderTarget sourceTarget, @NotNull RenderTarget destinationTarget) {
+        ShaderInstance shader = CloudShaders.getCompositeShader();
+        if (shader == null) {
+            return false;
+        }
+
+        ensureFullscreenQuad();
+        if (fullscreenQuad == null) {
+            return false;
+        }
+
+        destinationTarget.bindWrite(true);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
+        RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(false);
+        RenderSystem.setShader(() -> shader);
+
+        shader.setSampler("CloudColorSampler", sourceTarget.getColorTextureId());
+        shader.apply();
+
+        fullscreenQuad.bind();
+        fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
+        VertexBuffer.unbind();
+        shader.clear();
+
+        RenderSystem.depthMask(true);
+        RenderSystem.enableDepthTest();
+        RenderSystem.enableCull();
+        RenderSystem.disableBlend();
+        return true;
     }
 
     private static void ensureFullscreenQuad() {

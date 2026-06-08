@@ -1,10 +1,15 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import net.minecraft.client.Minecraft;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
+import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Point d'entrée du futur rendu live des nuages.
@@ -22,9 +27,51 @@ public final class CloudRenderer {
      * @param frameContext contexte de rendu de la frame courante
      */
     public static void render(@NotNull CloudRenderFrameContext frameContext) {
-        CloudRenderTargetManager.prepareTargets();
-        for (CloudRenderSnapshot snapshot : CloudRenderController.getRenderableLiveSnapshots()) {
-            renderSnapshot(frameContext, snapshot);
+        Minecraft minecraft = Minecraft.getInstance();
+        RenderTarget mainTarget = minecraft.getMainRenderTarget();
+        if (mainTarget == null) {
+            return;
+        }
+
+        CloudRenderTargetManager.prepareTargets(frameContext.getRenderProfile());
+        RenderTarget cloudTarget = CloudRenderTargetManager.getCloudColorTarget();
+        if (cloudTarget == null) {
+            return;
+        }
+
+        boolean downscaled = cloudTarget != mainTarget;
+        if (downscaled) {
+            cloudTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            cloudTarget.clear(Minecraft.ON_OSX);
+        }
+
+        List<CloudRenderSnapshot> sourceSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots();
+        List<CloudRenderSnapshot> renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots();
+        CloudRenderDiagnostics.beginFrame(
+                frameContext,
+                mainTarget,
+                cloudTarget,
+                sourceSnapshots.size(),
+                renderableSnapshots.size(),
+                downscaled
+        );
+
+        try {
+            cloudTarget.bindWrite(true);
+            int sceneDepthTextureId = mainTarget.getDepthTextureId();
+            for (CloudRenderSnapshot snapshot : renderableSnapshots) {
+                if (renderSnapshot(frameContext, snapshot, cloudTarget, sceneDepthTextureId)) {
+                    CloudRenderDiagnostics.recordRendered(snapshot);
+                } else {
+                    CloudRenderDiagnostics.recordSubmitSkipped();
+                }
+            }
+
+            if (downscaled) {
+                CloudRenderDiagnostics.recordCompositeSubmitted(CloudRaymarchRenderer.compositeTarget(cloudTarget, mainTarget));
+            }
+        } finally {
+            CloudRenderDiagnostics.finishFrame();
         }
     }
 
@@ -34,13 +81,15 @@ public final class CloudRenderer {
      * @param frameContext contexte de rendu de la frame courante
      * @param snapshot snapshot live valide
      */
-    private static void renderSnapshot(
+    private static boolean renderSnapshot(
             @NotNull CloudRenderFrameContext frameContext,
-            @Nullable CloudRenderSnapshot snapshot
+            @Nullable CloudRenderSnapshot snapshot,
+            @NotNull RenderTarget cloudTarget,
+            int sceneDepthTextureId
     ) {
         if (snapshot == null) {
-            return;
+            return false;
         }
-        CloudRaymarchRenderer.renderSnapshot(frameContext, snapshot);
+        return CloudRaymarchRenderer.renderSnapshot(frameContext, snapshot, cloudTarget, sceneDepthTextureId);
     }
 }

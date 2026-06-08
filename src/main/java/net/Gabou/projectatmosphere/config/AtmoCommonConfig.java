@@ -14,14 +14,16 @@ public class AtmoCommonConfig {
     }
 
     public enum CloudRaymarchQuality {
-        LOW(16),
-        MEDIUM(32),
-        HIGH(64);
+        LOW(16, 0.50F),
+        MEDIUM(32, 0.75F),
+        HIGH(64, 1.00F);
 
         private final int raymarchSteps;
+        private final float resolutionScale;
 
-        CloudRaymarchQuality(int raymarchSteps) {
+        CloudRaymarchQuality(int raymarchSteps, float resolutionScale) {
             this.raymarchSteps = raymarchSteps;
+            this.resolutionScale = resolutionScale;
         }
 
         /**
@@ -33,6 +35,10 @@ public class AtmoCommonConfig {
             return raymarchSteps;
         }
 
+        public float getResolutionScale() {
+            return resolutionScale;
+        }
+
         /**
          * Retourne la qualite suivante pour les boutons cyclables.
          *
@@ -40,6 +46,17 @@ public class AtmoCommonConfig {
          */
         public CloudRaymarchQuality next() {
             CloudRaymarchQuality[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
+    public enum CloudDiagnosticsOverlayMode {
+        OFF,
+        BASIC,
+        FULL;
+
+        public CloudDiagnosticsOverlayMode next() {
+            CloudDiagnosticsOverlayMode[] values = values();
             return values[(ordinal() + 1) % values.length];
         }
     }
@@ -86,6 +103,7 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
 
     public static final ForgeConfigSpec.BooleanValue DEBUG_MODE;
+    public static final ForgeConfigSpec.EnumValue<CloudDiagnosticsOverlayMode> CLOUD_DIAGNOSTICS_OVERLAY;
 
 
 
@@ -173,7 +191,7 @@ public class AtmoCommonConfig {
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
         CLOUD_RAYMARCH_QUALITY = builder
-                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes, MEDIUM=32 etapes, HIGH=64 etapes")
+                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes a 50%, MEDIUM=32 etapes a 75%, HIGH=64 etapes a 100%")
                 .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
         builder.pop();
 
@@ -542,6 +560,9 @@ public class AtmoCommonConfig {
         DEBUG_MODE = builder
                 .comment("Enable debug mode for verbose logging and diagnostics")
                 .define("debugMode", false);
+        CLOUD_DIAGNOSTICS_OVERLAY = builder
+                .comment("Cloud render diagnostics overlay mode. F3+O cycles this in-game.")
+                .defineEnum("cloudDiagnosticsOverlay", CloudDiagnosticsOverlayMode.OFF);
         builder.pop();
 
         COMMON_SPEC = builder.build();

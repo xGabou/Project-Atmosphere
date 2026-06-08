@@ -45,6 +45,7 @@ public final class CloudRegionRenderData {
     private final float towerStrength;
     private final float anvilStrength;
     private final float precipitationCoreStrength;
+    private final int cloudSeed;
 
     public CloudRegionRenderData(
             UUID regionId,
@@ -80,7 +81,8 @@ public final class CloudRegionRenderData {
             float heightSquash,
             float towerStrength,
             float anvilStrength,
-            float precipitationCoreStrength
+            float precipitationCoreStrength,
+            int cloudSeed
     ) {
         this.regionId = regionId;
         this.dimensionId = dimensionId;
@@ -116,6 +118,7 @@ public final class CloudRegionRenderData {
         this.towerStrength = towerStrength;
         this.anvilStrength = anvilStrength;
         this.precipitationCoreStrength = precipitationCoreStrength;
+        this.cloudSeed = cloudSeed;
     }
 
     public UUID getRegionId() {
@@ -254,6 +257,10 @@ public final class CloudRegionRenderData {
         return precipitationCoreStrength;
     }
 
+    public int getCloudSeed() {
+        return cloudSeed;
+    }
+
     /**
      * Écrit cette donnée transportable dans un buffer réseau.
      *
@@ -300,6 +307,7 @@ public final class CloudRegionRenderData {
         buffer.writeFloat(towerStrength);
         buffer.writeFloat(anvilStrength);
         buffer.writeFloat(precipitationCoreStrength);
+        buffer.writeInt(cloudSeed);
     }
 
     /**
@@ -343,6 +351,7 @@ public final class CloudRegionRenderData {
         float towerStrength = buffer.readFloat();
         float anvilStrength = buffer.readFloat();
         float precipitationCoreStrength = buffer.readFloat();
+        int cloudSeed = buffer.readInt();
 
         return new CloudRegionRenderData(
                 regionId,
@@ -378,7 +387,8 @@ public final class CloudRegionRenderData {
                 heightSquash,
                 towerStrength,
                 anvilStrength,
-                precipitationCoreStrength
+                precipitationCoreStrength,
+                cloudSeed
         );
     }
 }

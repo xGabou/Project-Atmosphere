@@ -63,6 +63,7 @@
     { "name": "CloudTowerStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudAnvilStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudPrecipitationCoreStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudSeed", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 32 ] }
   ]
 }

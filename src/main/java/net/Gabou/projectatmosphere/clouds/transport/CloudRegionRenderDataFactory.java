@@ -106,7 +106,8 @@ public final class CloudRegionRenderDataFactory {
                 profile.getHeightSquash(),
                 profile.getTowerStrength(),
                 profile.getAnvilStrength(),
-                profile.getPrecipitationCoreStrength()
+                profile.getPrecipitationCoreStrength(),
+                state.getCloudSeed()
         );
     }
 }

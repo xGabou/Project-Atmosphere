@@ -1,7 +1,10 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Gère les futures cibles de rendu des nuages Project Atmosphere.
@@ -11,6 +14,7 @@ public final class CloudRenderTargetManager {
 
     private static RenderTarget cloudColorTarget;
     private static RenderTarget cloudShadowTarget;
+    private static boolean ownsCloudColorTarget;
 
     private CloudRenderTargetManager() {
 
@@ -20,16 +24,20 @@ public final class CloudRenderTargetManager {
      * Prépare les render targets pour la taille actuelle de la fenêtre.
      */
     public static void prepareTargets() {
+        prepareTargets(CloudRenderProfile.createDefault());
+    }
+
+    public static void prepareTargets(CloudRenderProfile profile) {
         Minecraft minecraft = Minecraft.getInstance();
 
-        if (minecraft.getWindow() == null) {
+        if (minecraft.getMainRenderTarget() == null) {
             return;
         }
 
-        int width = minecraft.getWindow().getWidth();
-        int height = minecraft.getWindow().getHeight();
+        RenderTarget mainTarget = minecraft.getMainRenderTarget();
+        float resolutionScale = profile != null ? profile.getResolutionScale() : 1.0F;
 
-        ensureTargets(width, height);
+        ensureTargets(mainTarget, resolutionScale);
     }
 
     /**
@@ -38,16 +46,13 @@ public final class CloudRenderTargetManager {
     public static void clearTargets() {
         RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
 
-        if (cloudColorTarget != null && cloudColorTarget != mainTarget) {
+        if (cloudColorTarget != null && ownsCloudColorTarget) {
             cloudColorTarget.destroyBuffers();
-        }
-
-        if (cloudShadowTarget != null && cloudShadowTarget != mainTarget) {
-            cloudShadowTarget.destroyBuffers();
         }
 
         cloudColorTarget = null;
         cloudShadowTarget = null;
+        ownsCloudColorTarget = false;
     }
 
     /**
@@ -74,22 +79,40 @@ public final class CloudRenderTargetManager {
      * @param width largeur cible
      * @param height hauteur cible
      */
-    private static void ensureTargets(int width, int height) {
-        if (width <= 0 || height <= 0) {
+    private static void ensureTargets(RenderTarget mainTarget, float resolutionScale) {
+        if (mainTarget == null || mainTarget.width <= 0 || mainTarget.height <= 0) {
             return;
         }
 
-        if (cloudColorTarget == null || cloudColorTarget.width != width || cloudColorTarget.height != height) {
-            RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
-            if (cloudColorTarget != null && cloudColorTarget != mainTarget) {
-                cloudColorTarget.destroyBuffers();
-            }
-
+        float scale = Mth.clamp(resolutionScale, 0.10F, 1.0F);
+        if (scale >= 0.999F) {
+            destroyCloudColorTargetIfOwned(mainTarget);
             cloudColorTarget = mainTarget;
+            ownsCloudColorTarget = false;
+        } else {
+            int width = Math.max(1, Mth.ceil(mainTarget.width * scale));
+            int height = Math.max(1, Mth.ceil(mainTarget.height * scale));
+            if (cloudColorTarget == null
+                    || cloudColorTarget == mainTarget
+                    || cloudColorTarget.width != width
+                    || cloudColorTarget.height != height) {
+                destroyCloudColorTargetIfOwned(mainTarget);
+                cloudColorTarget = new TextureTarget(width, height, false, Minecraft.ON_OSX);
+                cloudColorTarget.setFilterMode(GL11.GL_LINEAR);
+                cloudColorTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+                ownsCloudColorTarget = true;
+            }
         }
 
-        if (cloudShadowTarget == null) {
-            cloudShadowTarget = Minecraft.getInstance().getMainRenderTarget();
+        if (cloudShadowTarget == null || cloudShadowTarget != mainTarget) {
+            cloudShadowTarget = mainTarget;
+        }
+    }
+
+    private static void destroyCloudColorTargetIfOwned(RenderTarget mainTarget) {
+        if (cloudColorTarget != null && ownsCloudColorTarget) {
+            cloudColorTarget.destroyBuffers();
+            ownsCloudColorTarget = false;
         }
     }
 }
