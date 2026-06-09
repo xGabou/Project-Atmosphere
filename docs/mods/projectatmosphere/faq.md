@@ -16,13 +16,21 @@ Not officially. The `0.8.0.0` changelog says it is temporarily incompatible.
 There is integration code, but the latest official note says the module is still work in progress and should always be disabled.
 
 ## How do I inspect current weather data?
-Use the `/pa` commands. The most useful support commands are:
-- `/pa temperature forecast`
-- `/pa humidity get`
-- `/pa pressure get`
-- `/pa windSpeed get`
+Use the `/pa` commands. Start here:
+- `/pa help`
+- `/pa status`
+- `/pa forecast current`
+- `/pa forecast week`
+- `/pa temperature current`
+- `/pa humidity current`
+- `/pa pressure current`
+- `/pa wind current`
+- `/pa fog info`
+
+Legacy command paths still exist for compatibility, but they are listed here only as fallback:
 - `/pa weatherdebug forecast`
 - `/pa weatherdebug fog`
+- `/pa windSpeed get`
 
 ## How do I force fog for testing?
 In the current source tree, use `/pa fog spawn [strength] [seconds]` and `/pa fog clear`.

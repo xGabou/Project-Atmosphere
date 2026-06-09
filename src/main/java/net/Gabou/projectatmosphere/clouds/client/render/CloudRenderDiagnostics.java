@@ -17,6 +17,9 @@ public final class CloudRenderDiagnostics {
 
     private static volatile FrameStats lastStats = FrameStats.empty();
     private static long lastLoggedWorldTime = Long.MIN_VALUE;
+    private static long lastDepthProbeWorldTime = Long.MIN_VALUE;
+    private static long lastStateSnapshotWorldTime = Long.MIN_VALUE;
+    private static String lastStateSnapshotSignature = "";
 
     private static boolean frameOpen;
     private static long worldTime;
@@ -74,7 +77,7 @@ public final class CloudRenderDiagnostics {
         renderableSnapshots = Math.max(0, renderableSnapshotCount);
         renderedSnapshots = 0;
         submitSkippedSnapshots = 0;
-        compositeSubmitted = !usesDownscaledTarget;
+        compositeSubmitted = false;
         lastCloudTypeId = "";
         lastCloudSeed = 0;
         lastCloudRadius = 0.0F;
@@ -214,6 +217,41 @@ public final class CloudRenderDiagnostics {
 
     public static @NotNull FrameStats getLastStats() {
         return lastStats;
+    }
+
+    public static boolean shouldLogDepthProbe(long worldTime) {
+        if (!isDebugEnabled()) {
+            return false;
+        }
+
+        if (worldTime == lastDepthProbeWorldTime || worldTime % LOG_INTERVAL_TICKS != 0L) {
+            return false;
+        }
+
+        lastDepthProbeWorldTime = worldTime;
+        return true;
+    }
+
+    public static @NotNull String getCurrentQualityName() {
+        return resolveQualityName();
+    }
+
+    public static boolean shouldLogStateSnapshot(long worldTime, @NotNull String signature) {
+        if (!isDebugEnabled()) {
+            return false;
+        }
+
+        if (signature.equals(lastStateSnapshotSignature) && worldTime == lastStateSnapshotWorldTime) {
+            return false;
+        }
+
+        if (signature.equals(lastStateSnapshotSignature) && worldTime % LOG_INTERVAL_TICKS != 0L) {
+            return false;
+        }
+
+        lastStateSnapshotWorldTime = worldTime;
+        lastStateSnapshotSignature = signature;
+        return true;
     }
 
     private static void maybeLog(@NotNull FrameStats stats) {

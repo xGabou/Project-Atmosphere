@@ -26,6 +26,7 @@ public final class CloudRegionManager {
     private final CloudRegionMotionController motionController = new CloudRegionMotionController();
     private final CloudRegionLifecycleController lifecycleController = new CloudRegionLifecycleController();
     private final CloudRegionEvolutionController evolutionController = new CloudRegionEvolutionController();
+    private final CloudRegionMergeController mergeController = new CloudRegionMergeController();
 
     private CloudRegionManager() {
 
@@ -192,9 +193,10 @@ public final class CloudRegionManager {
             Vec3 center = state.getCenter();
             lines.add(String.format(
                     Locale.ROOT,
-                    "%s active=%s type=%s typeTicks=%d center=%.1f %.1f %.1f radius=%.1f age=%d/%d density=%.2f coverage=%.2f growth=%.2f decay=%.2f",
+                    "%s active=%s clusters=%d type=%s typeTicks=%d center=%.1f %.1f %.1f radius=%.1f age=%d/%d density=%.2f coverage=%.2f growth=%.2f decay=%.2f",
                     state.getRegionId(),
                     state.isActive(),
+                    state.getClusterCount(),
                     state.getCloudTypeId(),
                     state.getCloudTypeTicks(),
                     center.x(),
@@ -222,15 +224,28 @@ public final class CloudRegionManager {
     public void tickCloudRegions(@NotNull ServerLevel level) {
         boolean changed = false;
 
-        for (CloudRegionState state : CloudRegionStateStore.getActiveRegions(level)) {
+        Collection<CloudRegionState> activeRegions = CloudRegionStateStore.getActiveRegions(level);
+        for (CloudRegionState state : activeRegions) {
             if (state == null) {
                 continue;
             }
 
             changed |= motionController.tick(level, state);
+        }
+
+        changed |= mergeController.tick(level, activeRegions);
+
+        activeRegions = CloudRegionStateStore.getActiveRegions(level);
+        for (CloudRegionState state : activeRegions) {
+            if (state == null) {
+                continue;
+            }
+
             changed |= lifecycleController.tick(level, state);
             changed |= evolutionController.tick(level, state);
         }
+
+        changed |= CloudRegionStateStore.removeInactiveRegions(level) > 0;
 
         if (changed) {
             CloudRegionStateStore.markDirty(level);

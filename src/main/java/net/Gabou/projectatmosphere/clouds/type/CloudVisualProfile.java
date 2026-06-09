@@ -178,8 +178,41 @@ public final class CloudVisualProfile {
         return precipitationCoreStrength;
     }
 
+    public static CloudVisualProfile blend(CloudVisualProfile from, CloudVisualProfile to, float mix) {
+        CloudVisualProfile left = from != null ? from : to;
+        CloudVisualProfile right = to != null ? to : from;
+        if (left == null && right == null) {
+            return new CloudVisualProfile(1.0F, 0.0F, 0.2F, 0.2F, 0.0F, 0.02F, 0.12F, 0.12F, 1.0F, 1.0F, 1.0F, 0.0F, 0.0F, 0.0F);
+        }
+        if (left == right) {
+            return left;
+        }
+
+        float t = clamp01(mix);
+        return new CloudVisualProfile(
+                lerp(left.verticalThickness, right.verticalThickness, t),
+                lerp(left.edgeErosionStrength, right.edgeErosionStrength, t),
+                lerp(left.topSoftness, right.topSoftness, t),
+                lerp(left.baseSoftness, right.baseSoftness, t),
+                lerp(left.baseDarkness, right.baseDarkness, t),
+                lerp(left.noiseScale, right.noiseScale, t),
+                lerp(left.detailNoiseScale, right.detailNoiseScale, t),
+                lerp(left.erosionNoiseScale, right.erosionNoiseScale, t),
+                lerp(left.densityMultiplier, right.densityMultiplier, t),
+                lerp(left.coverageMultiplier, right.coverageMultiplier, t),
+                lerp(left.heightSquash, right.heightSquash, t),
+                lerp(left.towerStrength, right.towerStrength, t),
+                lerp(left.anvilStrength, right.anvilStrength, t),
+                lerp(left.precipitationCoreStrength, right.precipitationCoreStrength, t)
+        );
+    }
+
     private static float clamp01(float value) {
         return clamp(value, 0.0F, 1.0F);
+    }
+
+    private static float lerp(float from, float to, float mix) {
+        return from + ((to - from) * mix);
     }
 
     private static float clamp(float value, float min, float max) {

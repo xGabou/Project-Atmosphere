@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.clouds;
 
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
-import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
@@ -84,7 +83,7 @@ public final class WeatherCloudQueries {
 
     private static Collection<?> getRegions(Level level) {
         if (level instanceof ServerLevel serverLevel) {
-            return CloudRegionStateStore.getActiveRegions(serverLevel);
+            return CloudRegionStateStore.createRenderDataForActiveRegions(serverLevel);
         }
         return ClientCloudRegionDataCache.getCurrentRegions();
     }
@@ -203,28 +202,6 @@ public final class WeatherCloudQueries {
     }
 
     private static @Nullable RegionWeatherInputs readInputs(Object region, String dimensionId) {
-        if (region instanceof CloudRegionState state) {
-            if (!state.isActive() || !state.getDimension().location().toString().equals(dimensionId)) {
-                return null;
-            }
-            String cloudTypeId = CloudTypeRegistry.getOrDefault(state.getCloudTypeId()).getId();
-            return new RegionWeatherInputs(
-                    state.getRegionId(),
-                    state.getCenter(),
-                    state.getRadius(),
-                    state.getBaseY(),
-                    state.getTopY(),
-                    state.getDensity(),
-                    state.getCoverage(),
-                    state.getEdgeSoftness(),
-                    cloudTypeId,
-                    getDensityMultiplier(cloudTypeId),
-                    getCoverageMultiplier(cloudTypeId),
-                    getPrecipitationCoreStrength(cloudTypeId),
-                    state.getGrowth(),
-                    state.getDecay()
-            );
-        }
         if (region instanceof CloudRegionRenderData data) {
             if (!data.isActive() || !data.getDimensionId().equals(dimensionId)) {
                 return null;

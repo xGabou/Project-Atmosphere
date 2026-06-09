@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.simulation;
 
+import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
@@ -19,22 +20,29 @@ final class CloudRegionMotionController {
      * @return true si la région a été modifiée
      */
     boolean tick(@NotNull ServerLevel level, @NotNull CloudRegionState state) {
-        if (!state.isActive()) {
+        if (!state.isActive() || state.isEmpty()) {
             return false;
         }
 
-        Vec3 velocity = state.getVelocity();
+        boolean changed = false;
+        for (CloudClusterState cluster : state.getClusters()) {
+            if (cluster == null || !cluster.isActive()) {
+                continue;
+            }
 
-        if (velocity == null || velocity.equals(Vec3.ZERO)) {
-            return false;
+            Vec3 velocity = cluster.getVelocity();
+            if (velocity == null || velocity.equals(Vec3.ZERO)) {
+                continue;
+            }
+
+            Vec3 currentCenter = cluster.getCenter();
+            Vec3 nextCenter = currentCenter.add(velocity);
+
+            cluster.setPreviousCenter(currentCenter);
+            cluster.setCenter(nextCenter);
+            changed = true;
         }
 
-        Vec3 currentCenter = state.getCenter();
-        Vec3 nextCenter = currentCenter.add(velocity);
-
-        state.setPreviousCenter(currentCenter);
-        state.setCenter(nextCenter);
-
-        return true;
+        return changed;
     }
 }

@@ -30,36 +30,33 @@ public class TelemetryDebugClientCommand {
 
         dispatcher.register(
                 LiteralArgumentBuilder.<CommandSourceStack>literal("pa")
-                        .then(Commands.literal("debug")
-                                .then(TornadoRenderDebugClientCommand.build())
-                                .then(Commands.literal("export")
-                                        .executes(ctx -> {
-                                            if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
-                                                ctx.getSource().sendFailure(Component.literal("Telemetry export is disabled in the config."));
-                                                return 0;
-                                            }
-                                            ctx.getSource().sendSuccess(() -> Component.literal("Preparing telemetry archive..."), false);
-                                            TelemetryExportService.get().exportAsync(ctx.getSource());
-                                            return 1;
-                                        })
-                                )
-                                .then(Commands.literal("open")
-                                        .executes(ctx -> {
-                                            if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
-                                                ctx.getSource().sendFailure(Component.literal("Telemetry export is disabled in the config."));
-                                                return 0;
-                                            }
-                                            TelemetryExportService.get().openTelemetryFolder(ctx.getSource());
-                                            return 1;
-                                        })
-                                )
+                        .then(Commands.literal("system")
+                                .then(Commands.literal("telemetry")
+                                        .then(Commands.literal("export")
+                                                .executes(ctx -> {
+                                                    if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+                                                        ctx.getSource().sendFailure(Component.literal("Telemetry export is disabled in the config."));
+                                                        return 0;
+                                                    }
+                                                    ctx.getSource().sendSuccess(() -> Component.literal("Preparing telemetry archive..."), false);
+                                                    TelemetryExportService.get().exportAsync(ctx.getSource());
+                                                    return 1;
+                                                }))
+                                        .then(Commands.literal("open")
+                                                .executes(ctx -> {
+                                                    if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+                                                        ctx.getSource().sendFailure(Component.literal("Telemetry export is disabled in the config."));
+                                                        return 0;
+                                                    }
+                                                    TelemetryExportService.get().openTelemetryFolder(ctx.getSource());
+                                                    return 1;
+                                                })))
                                 .then(Commands.literal("cloudDebug")
                                         .executes(ctx -> {
                                             if (FMLEnvironment.production) {
                                                 ctx.getSource().sendFailure(Component.literal("This command is only available in a development environment."));
                                                 return 0;
-                                            }
-                                            else {
+                                            } else {
                                                 CloudDebugRenderHook.changeCloudDebugRenderHook();
                                                 if (CloudDebugRenderHook.isCloudDebugRenderEnabled() && Minecraft.getInstance().player != null) {
                                                     CloudDebugStateInitializer.initialize(Minecraft.getInstance().player.position());
@@ -67,9 +64,7 @@ public class TelemetryDebugClientCommand {
                                                 ctx.getSource().sendSuccess(() -> Component.literal("Toggled cloud debug render."), false);
                                                 return 1;
                                             }
-
-                                        })
-                                )
+                                        }))
                                 .then(Commands.literal("cloudStatus")
                                         .executes(ctx -> {
                                             int cachedRegions = ClientCloudRegionDataCache.getCurrentRegions().size();
@@ -127,9 +122,8 @@ public class TelemetryDebugClientCommand {
 
                                             ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);
                                             return 1;
-                                        })
-                                )
-
+                                        }))
+                                .then(TornadoRenderDebugClientCommand.build())
                         )
         );
     }

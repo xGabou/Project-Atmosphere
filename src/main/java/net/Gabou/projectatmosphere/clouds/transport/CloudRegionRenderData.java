@@ -12,6 +12,7 @@ import java.util.UUID;
 public final class CloudRegionRenderData {
 
     private final UUID regionId;
+    private final UUID clusterId;
     private final String dimensionId;
     private final Vec3 center;
     private final Vec3 previousCenter;
@@ -46,9 +47,11 @@ public final class CloudRegionRenderData {
     private final float anvilStrength;
     private final float precipitationCoreStrength;
     private final int cloudSeed;
+    private final float mergePressure;
 
     public CloudRegionRenderData(
             UUID regionId,
+            UUID clusterId,
             String dimensionId,
             Vec3 center,
             Vec3 previousCenter,
@@ -82,9 +85,11 @@ public final class CloudRegionRenderData {
             float towerStrength,
             float anvilStrength,
             float precipitationCoreStrength,
-            int cloudSeed
+            int cloudSeed,
+            float mergePressure
     ) {
         this.regionId = regionId;
+        this.clusterId = clusterId;
         this.dimensionId = dimensionId;
         this.center = center;
         this.previousCenter = previousCenter;
@@ -119,10 +124,15 @@ public final class CloudRegionRenderData {
         this.anvilStrength = anvilStrength;
         this.precipitationCoreStrength = precipitationCoreStrength;
         this.cloudSeed = cloudSeed;
+        this.mergePressure = mergePressure;
     }
 
     public UUID getRegionId() {
         return regionId;
+    }
+
+    public UUID getClusterId() {
+        return clusterId;
     }
 
     public String getDimensionId() {
@@ -261,6 +271,10 @@ public final class CloudRegionRenderData {
         return cloudSeed;
     }
 
+    public float getMergePressure() {
+        return mergePressure;
+    }
+
     /**
      * Écrit cette donnée transportable dans un buffer réseau.
      *
@@ -268,6 +282,7 @@ public final class CloudRegionRenderData {
      */
     public void encode(FriendlyByteBuf buffer) {
         buffer.writeUUID(regionId);
+        buffer.writeUUID(clusterId);
         buffer.writeUtf(dimensionId);
         buffer.writeDouble(center.x());
         buffer.writeDouble(center.y());
@@ -308,6 +323,7 @@ public final class CloudRegionRenderData {
         buffer.writeFloat(anvilStrength);
         buffer.writeFloat(precipitationCoreStrength);
         buffer.writeInt(cloudSeed);
+        buffer.writeFloat(mergePressure);
     }
 
     /**
@@ -318,6 +334,7 @@ public final class CloudRegionRenderData {
      */
     public static CloudRegionRenderData decode(FriendlyByteBuf buffer) {
         UUID regionId = buffer.readUUID();
+        UUID clusterId = buffer.readUUID();
         String dimensionId = buffer.readUtf();
         Vec3 center = new Vec3(buffer.readDouble(), buffer.readDouble(), buffer.readDouble());
         Vec3 previousCenter = new Vec3(buffer.readDouble(), buffer.readDouble(), buffer.readDouble());
@@ -352,9 +369,11 @@ public final class CloudRegionRenderData {
         float anvilStrength = buffer.readFloat();
         float precipitationCoreStrength = buffer.readFloat();
         int cloudSeed = buffer.readInt();
+        float mergePressure = buffer.readFloat();
 
         return new CloudRegionRenderData(
                 regionId,
+                clusterId,
                 dimensionId,
                 center,
                 previousCenter,
@@ -388,7 +407,8 @@ public final class CloudRegionRenderData {
                 towerStrength,
                 anvilStrength,
                 precipitationCoreStrength,
-                cloudSeed
+                cloudSeed,
+                mergePressure
         );
     }
 }

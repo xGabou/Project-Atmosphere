@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.type;
 
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -12,8 +12,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public final class CloudTypeRegistry {
 
-    public static final String DEFAULT_CLOUD_TYPE_ID = "cumulus_humilis";
-
+    public static final String DEFAULT_CLOUD_TYPE_ID = "vapor_cluster";
     private static final String[] RAIN_CLOUD_IDS = {
             "stratus_nebulosus",
             "stratocumulus",
@@ -40,13 +39,24 @@ public final class CloudTypeRegistry {
     static {
         register(new CloudTypeDefinition(
                 DEFAULT_CLOUD_TYPE_ID,
+                "Vapor cluster",
+                CloudFamily.VAPOR,
+                new CloudVisualProfile(0.28F, 0.18F, 0.24F, 0.20F, 0.10F, 0.030F, 0.100F, 0.115F, 0.42F, 0.50F, 1.10F, 0.00F, 0.00F, 0.00F),
+                fairWeather(0.28F, 0.82F),
+                new CloudEvolutionRules(List.of(
+                        new CloudEvolutionTarget("cumulus_humilis", minutes(2), 0.34F, 0.10F, 1.15F, 0.02F, 0.12F, 0.16F, 0.06F, 0.05F, 0.10F)
+                ))
+        ));
+
+        register(new CloudTypeDefinition(
+                "cumulus_humilis",
                 "Cumulus humilis",
                 CloudFamily.CUMULUS,
                 new CloudVisualProfile(1.12F, 0.46F, 0.22F, 0.20F, 0.22F, 0.022F, 0.118F, 0.145F, 0.86F, 0.88F, 0.82F, 0.18F, 0.00F, 0.00F),
                 fairWeather(0.35F, 0.95F),
                 new CloudEvolutionRules(List.of(
-                        // Valeurs de test: progression lente mais observable pendant les sessions dev.
-                        new CloudEvolutionTarget("cumulus_mediocris", 20 * 90, 0.48F, 0.20F, 1.05F, 0.05F, 0.08F)
+                        new CloudEvolutionTarget("cumulus_mediocris", minutes(5), 0.50F, 0.20F, 1.05F, 0.05F, 4.0F, 34.0F, 0.22F, 0.28F, 0.10F, 0.08F, 0.08F),
+                        new CloudEvolutionTarget("stratocumulus", minutes(5), 0.58F, 0.16F, 1.10F, 0.00F, -18.0F, 8.0F, 0.16F, 0.22F, 0.06F, 0.08F, 0.07F)
                 ))
         ));
 
@@ -57,7 +67,8 @@ public final class CloudTypeRegistry {
                 new CloudVisualProfile(1.34F, 0.50F, 0.24F, 0.18F, 0.30F, 0.019F, 0.120F, 0.150F, 1.00F, 0.98F, 0.72F, 0.36F, 0.00F, 0.00F),
                 fairWeather(0.45F, 1.00F),
                 new CloudEvolutionRules(List.of(
-                        new CloudEvolutionTarget("cumulus_congestus", 20 * 120, 0.58F, 0.35F, 1.00F, 0.12F, 0.07F)
+                        new CloudEvolutionTarget("cumulus_congestus", minutes(8), 0.60F, 0.38F, 1.00F, 0.14F, 6.0F, 32.0F, 0.32F, 0.40F, 0.14F, 0.10F, 0.05F),
+                        new CloudEvolutionTarget("nimbostratus", minutes(8), 0.70F, 0.24F, 1.04F, 0.06F, -14.0F, 10.0F, 0.24F, 0.30F, 0.08F, 0.08F, 0.05F)
                 ))
         ));
 
@@ -68,7 +79,7 @@ public final class CloudTypeRegistry {
                 new CloudVisualProfile(1.72F, 0.56F, 0.30F, 0.15F, 0.42F, 0.016F, 0.124F, 0.162F, 1.16F, 1.05F, 0.54F, 0.72F, 0.06F, 0.08F),
                 fairWeather(0.58F, 1.00F),
                 new CloudEvolutionRules(List.of(
-                        new CloudEvolutionTarget("cumulonimbus_calvus", 20 * 150, 0.68F, 0.55F, 0.96F, 0.24F, 0.06F)
+                        new CloudEvolutionTarget("cumulonimbus_calvus", minutes(12), 0.72F, 0.58F, 0.96F, 0.28F, 8.0F, 28.0F, 0.44F, 0.56F, 0.18F, 0.14F, 0.03F)
                 ))
         ));
 
@@ -79,7 +90,7 @@ public final class CloudTypeRegistry {
                 new CloudVisualProfile(2.22F, 0.62F, 0.34F, 0.13F, 0.60F, 0.013F, 0.130F, 0.172F, 1.34F, 1.14F, 0.42F, 0.92F, 0.30F, 0.26F),
                 stormReady(),
                 new CloudEvolutionRules(List.of(
-                        new CloudEvolutionTarget("cumulonimbus_capillatus", 20 * 180, 0.74F, 0.68F, 0.94F, 0.36F, 0.05F)
+                        new CloudEvolutionTarget("cumulonimbus_capillatus", minutes(18), 0.78F, 0.72F, 0.92F, 0.42F, 0.0F, 22.0F, 0.58F, 0.72F, 0.30F, 0.20F, 0.00F)
                 ))
         ));
 
@@ -133,12 +144,6 @@ public final class CloudTypeRegistry {
 
     }
 
-    /**
-     * Retourne un type par identifiant.
-     *
-     * @param id identifiant du type
-     * @return définition trouvée
-     */
     public static Optional<CloudTypeDefinition> get(String id) {
         if (id == null || id.isBlank()) {
             return Optional.empty();
@@ -146,21 +151,10 @@ public final class CloudTypeRegistry {
         return Optional.ofNullable(TYPES.get(id));
     }
 
-    /**
-     * Retourne un type ou le type par défaut si l'identifiant est invalide.
-     *
-     * @param id identifiant demandé
-     * @return définition sûre
-     */
     public static CloudTypeDefinition getOrDefault(String id) {
         return get(id).orElse(TYPES.get(DEFAULT_CLOUD_TYPE_ID));
     }
 
-    /**
-     * Retourne toutes les définitions enregistrées.
-     *
-     * @return définitions immuables
-     */
     public static Map<String, CloudTypeDefinition> getAll() {
         return Map.copyOf(TYPES);
     }
@@ -218,5 +212,9 @@ public final class CloudTypeRegistry {
 
     private static CloudSpawnConditions stormReady() {
         return new CloudSpawnConditions(0.66F, 1.00F, 4.0F, 42.0F, 0.78F, 0.99F, 0.22F, 0.45F, 0.18F);
+    }
+
+    private static int minutes(int minutes) {
+        return 20 * 60 * Math.max(1, minutes);
     }
 }

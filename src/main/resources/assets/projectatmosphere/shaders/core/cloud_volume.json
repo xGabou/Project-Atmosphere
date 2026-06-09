@@ -34,6 +34,7 @@
     { "name": "AnimationTime", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "MaxDistance", "type": "float", "count": 1, "values": [ 512.0 ] },
     { "name": "OutSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+    { "name": "WriteDepth", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "CloudCenter", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
     { "name": "CloudPreviousCenter", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
     { "name": "CloudVelocity", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },

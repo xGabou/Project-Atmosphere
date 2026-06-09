@@ -11,7 +11,9 @@
     "UV0"
   ],
   "samplers": [
-    { "name": "CloudColorSampler" }
+    { "name": "CloudColorSampler" },
+    { "name": "CloudDepthSampler" },
+    { "name": "SceneDepthSampler" }
   ],
   "uniforms": []
 }

@@ -122,7 +122,14 @@ public final class CloudShaderSourceManager {
      */
     public static CompletableFuture<Void> reloadClientResources() {
         Minecraft minecraft = Minecraft.getInstance();
-        return minecraft.reloadResourcePacks();
+        ProjectAtmosphere.LOGGER.info("[CloudState] resourceReload.request source={}", RESOURCE_PATH);
+        return minecraft.reloadResourcePacks().whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+                ProjectAtmosphere.LOGGER.warn("[CloudState] resourceReload.failed source={}", RESOURCE_PATH, throwable);
+            } else {
+                ProjectAtmosphere.LOGGER.info("[CloudState] resourceReload.complete source={}", RESOURCE_PATH);
+            }
+        });
     }
 
     private static List<Path> resolveEditableTargets() {

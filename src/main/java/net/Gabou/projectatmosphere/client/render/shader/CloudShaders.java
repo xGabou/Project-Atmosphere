@@ -36,8 +36,19 @@ public final class CloudShaders {
      */
     @SubscribeEvent
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
-        event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> cloudShader = loaded);
-        event.registerShader(new ShaderInstance(event.getResourceProvider(), COMPOSITE_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> compositeShader = loaded);
+        ProjectAtmosphere.LOGGER.info(
+                "[CloudState] shaderReload.begin cloud={} composite={}",
+                SHADER_ID,
+                COMPOSITE_SHADER_ID
+        );
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> {
+            cloudShader = loaded;
+            ProjectAtmosphere.LOGGER.info("[CloudState] shaderReload.ready cloud={}", SHADER_ID);
+        });
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), COMPOSITE_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> {
+            compositeShader = loaded;
+            ProjectAtmosphere.LOGGER.info("[CloudState] shaderReload.ready composite={}", COMPOSITE_SHADER_ID);
+        });
     }
 
     /**

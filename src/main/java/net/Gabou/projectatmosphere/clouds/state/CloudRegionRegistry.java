@@ -56,8 +56,14 @@ final class CloudRegionRegistry {
         ArrayList<CloudRegionRenderData> renderDataList = new ArrayList<>();
 
         for (CloudRegionState state : regionsById.values()) {
-            if (state != null && state.isActive()) {
-                renderDataList.add(CloudRegionRenderDataFactory.create(state));
+            if (state == null || !state.isActive()) {
+                continue;
+            }
+
+            for (CloudClusterState cluster : state.getClusters()) {
+                if (cluster != null && cluster.isActive()) {
+                    renderDataList.add(CloudRegionRenderDataFactory.createForCluster(state, cluster));
+                }
             }
         }
 

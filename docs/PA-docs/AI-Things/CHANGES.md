@@ -1,5 +1,10 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+## Unreleased - Project Atmosphere command tree refactor
+- Split the `/pa` command surface into feature-first groups for forecast, temperature, humidity, pressure, wind, fog, cloud, tornado, hurricane, system, help, status, and debug.
+- Kept the legacy `/pa weatherdebug`, `/pa spawnTornado`, `/pa spawnHurricane`, and `/pa windSpeed` paths alive as compatibility aliases while routing them through the new handlers.
+- Standardized command naming and help output so new docs surface the current command tree first and legacy aliases stay at the bottom.
+
 ## Unreleased - AMD and Intel Simple Clouds compatibility
 - Moved Simple Clouds tornado cloud-carving metadata from the `CloudStorms` SSBO to uniform arrays capped at 16 tornadoes, avoiding an extra SSBO dependency for the tornado path on strict AMD and Intel OpenGL drivers.
 - Disabled Project Atmosphere's Simple Clouds storm SSBO allocation on GPUs exposing 16 or fewer shader storage buffer bindings, falling back to uniform tornado cloud carving and disabling hurricane cloud shaping instead of crashing.

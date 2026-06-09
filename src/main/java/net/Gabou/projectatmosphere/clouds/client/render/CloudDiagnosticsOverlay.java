@@ -20,6 +20,7 @@ import net.minecraftforge.fml.config.ModConfig;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT)
@@ -31,6 +32,12 @@ public final class CloudDiagnosticsOverlay {
     private static final int Y = 6;
     private static final int LINE_HEIGHT = 10;
     private static final int PADDING = 4;
+    private static final long REFRESH_INTERVAL_NS = 100_000_000L;
+    private static final int GUI_PACKED_LIGHT = 0xF000F0;
+
+    private static List<String> cachedLines = Collections.emptyList();
+    private static int cachedWidth;
+    private static long lastCacheRefreshNs;
 
     private CloudDiagnosticsOverlay() {
     }
@@ -47,25 +54,55 @@ public final class CloudDiagnosticsOverlay {
             return;
         }
 
-        CloudRenderDiagnostics.FrameStats stats = CloudRenderDiagnostics.getLastStats();
-        List<String> lines = buildLines(stats, mode);
+        Font font = minecraft.font;
+        List<String> lines = getCachedLines(font, mode);
         if (lines.isEmpty()) {
             return;
         }
 
         GuiGraphics guiGraphics = event.getGuiGraphics();
-        Font font = minecraft.font;
+        int height = lines.size() * LINE_HEIGHT + PADDING * 2;
+        guiGraphics.fill(X - PADDING, Y - PADDING, X + cachedWidth + PADDING, Y + height - PADDING, BACKGROUND_COLOR);
+        drawLinesBatched(guiGraphics, font, lines);
+    }
+
+    private static List<String> getCachedLines(Font font, AtmoCommonConfig.CloudDiagnosticsOverlayMode mode) {
+        long nowNs = System.nanoTime();
+        if (nowNs - lastCacheRefreshNs < REFRESH_INTERVAL_NS && !cachedLines.isEmpty()) {
+            return cachedLines;
+        }
+
+        CloudRenderDiagnostics.FrameStats stats = CloudRenderDiagnostics.getLastStats();
+        List<String> lines = buildLines(stats, mode);
         int width = 0;
         for (String line : lines) {
             width = Math.max(width, font.width(line));
         }
 
-        int height = lines.size() * LINE_HEIGHT + PADDING * 2;
-        guiGraphics.fill(X - PADDING, Y - PADDING, X + width + PADDING, Y + height - PADDING, BACKGROUND_COLOR);
+        cachedLines = lines;
+        cachedWidth = width;
+        lastCacheRefreshNs = nowNs;
+        return cachedLines;
+    }
+
+    private static void drawLinesBatched(GuiGraphics guiGraphics, Font font, List<String> lines) {
+        var pose = guiGraphics.pose().last().pose();
         for (int i = 0; i < lines.size(); i++) {
             int color = i == 0 ? TEXT_COLOR : MUTED_TEXT_COLOR;
-            guiGraphics.drawString(font, lines.get(i), X, Y + i * LINE_HEIGHT, color, false);
+            font.drawInBatch(
+                    lines.get(i),
+                    X,
+                    Y + i * LINE_HEIGHT,
+                    color,
+                    false,
+                    pose,
+                    guiGraphics.bufferSource(),
+                    Font.DisplayMode.NORMAL,
+                    0,
+                    GUI_PACKED_LIGHT
+            );
         }
+        guiGraphics.flush();
     }
 
     @SubscribeEvent
@@ -87,10 +124,17 @@ public final class CloudDiagnosticsOverlay {
         AtmoCommonConfig.CloudDiagnosticsOverlayMode next = getMode().next();
         AtmoCommonConfig.CLOUD_DIAGNOSTICS_OVERLAY.set(next);
         saveCommonConfigForMod(ProjectAtmosphere.MODID);
+        invalidateCache();
 
         if (minecraft.player != null) {
             minecraft.player.displayClientMessage(Component.literal("PA cloud overlay: " + next.name()), true);
         }
+    }
+
+    private static void invalidateCache() {
+        cachedLines = Collections.emptyList();
+        cachedWidth = 0;
+        lastCacheRefreshNs = 0L;
     }
 
     private static List<String> buildLines(
@@ -98,73 +142,84 @@ public final class CloudDiagnosticsOverlay {
             AtmoCommonConfig.CloudDiagnosticsOverlayMode mode
     ) {
         List<String> lines = new ArrayList<>();
-        lines.add("PA Overlay [" + mode.name() + "]");
+        lines.add("PA [" + mode.name() + "]");
 
         if (showRenderSection()) {
-            lines.add("Render: " + stats.qualityName() + " / " + stats.raymarchSteps() + " steps / " + percent(stats.resolutionScale()));
-            lines.add("Target: " + stats.targetWidth() + "x" + stats.targetHeight()
-                    + " of " + stats.mainWidth() + "x" + stats.mainHeight()
-                    + " / downscaled=" + yesNo(stats.downscaled()));
-            lines.add("Clouds: " + stats.renderedSnapshots()
-                    + " rendered / " + stats.renderableSnapshots()
-                    + " renderable / " + stats.sourceSnapshots() + " synced");
-
             if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
-                lines.add("Work: " + formatFloat(stats.pixelStepMegas()) + "M px-steps");
-                lines.add("Timing CPU: frame " + formatFloat(stats.frameCpuMs())
-                        + "ms / ray " + formatFloat(stats.raymarchCpuMs())
-                        + "ms / comp " + formatFloat(stats.compositeCpuMs()) + "ms");
-                lines.add("Timing GPU: ray " + formatTiming(
+                lines.add("Render " + stats.qualityName()
+                        + " " + stats.raymarchSteps() + "s "
+                        + percent(stats.resolutionScale())
+                        + " | " + stats.targetWidth() + "x" + stats.targetHeight()
+                        + "/" + stats.mainWidth() + "x" + stats.mainHeight()
+                        + " | ds=" + yesNo(stats.downscaled()));
+                lines.add("Clouds " + stats.renderedSnapshots()
+                        + "/" + stats.renderableSnapshots()
+                        + "/" + stats.sourceSnapshots()
+                        + " | skip " + stats.totalSkippedSnapshots()
+                        + "/" + stats.filteredSkippedSnapshots()
+                        + "/" + stats.submitSkippedSnapshots()
+                        + " | comp=" + yesNo(stats.compositeSubmitted()));
+                lines.add("Work " + formatFloat(stats.pixelStepMegas()) + "M"
+                        + " | CPU " + formatFloat(stats.frameCpuMs())
+                        + "/" + formatFloat(stats.raymarchCpuMs())
+                        + "/" + formatFloat(stats.compositeCpuMs()) + "ms");
+                lines.add("GPU ray " + formatTiming(
                         stats.raymarchGpuMs(),
                         stats.gpuTimingSupported(),
                         stats.raymarchGpuTimingValid(),
                         stats.raymarchGpuAgeFrames(),
                         stats.raymarchGpuPendingQueries()
-                ) + " / comp " + formatTiming(
+                ) + " | comp " + formatTiming(
                         stats.compositeGpuMs(),
                         stats.gpuTimingSupported(),
                         stats.compositeGpuTimingValid(),
                         stats.compositeGpuAgeFrames(),
                         stats.compositeGpuPendingQueries()
                 ));
-                lines.add("Skipped: " + stats.totalSkippedSnapshots()
-                        + " total / " + stats.filteredSkippedSnapshots()
-                        + " filtered / " + stats.submitSkippedSnapshots() + " submit");
-                lines.add("Composite: " + yesNo(stats.compositeSubmitted()));
-                lines.add("Last cloud: " + stats.describeLastCloud());
-                lines.add("World time: " + stats.worldTime());
+                lines.add("Last " + stats.describeLastCloud() + " | t=" + stats.worldTime());
+            } else {
+                lines.add("Render: " + stats.qualityName() + " / " + stats.raymarchSteps() + " steps / " + percent(stats.resolutionScale()));
+                lines.add("Target: " + stats.targetWidth() + "x" + stats.targetHeight()
+                        + " of " + stats.mainWidth() + "x" + stats.mainHeight()
+                        + " / downscaled=" + yesNo(stats.downscaled()));
+                lines.add("Clouds: " + stats.renderedSnapshots()
+                        + " rendered / " + stats.renderableSnapshots()
+                        + " renderable / " + stats.sourceSnapshots() + " synced");
             }
         }
 
         if (showWeatherSection()) {
             ClientLocalizedWeatherState.Diagnostics weather = ClientLocalizedWeatherState.getDiagnostics();
             CloudWeatherSample sample = weather.sample();
-            lines.add("Weather: rain " + formatFloat(weather.targetRainLevel()) + " -> " + formatFloat(weather.smoothedRainLevel())
-                    + " / thunder " + formatFloat(weather.targetThunderLevel()) + " -> " + formatFloat(weather.smoothedThunderLevel()));
-
             if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
                 BlockPos pos = weather.samplePos();
-                lines.add("Weather src: " + sample.describeSource()
-                        + " / column=" + yesNo(sample.inPrecipitationColumn())
-                        + " / snow=" + yesNo(sample.snowing()));
-                lines.add("Weather pos: " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
-                        + " / cover=" + formatFloat(sample.cloudCoverStrength()));
+                lines.add("Weather r " + formatFloat(weather.targetRainLevel()) + ">" + formatFloat(weather.smoothedRainLevel())
+                        + " t " + formatFloat(weather.targetThunderLevel()) + ">" + formatFloat(weather.smoothedThunderLevel())
+                        + " | " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
+                        + " | c=" + formatFloat(sample.cloudCoverStrength()));
+                lines.add("Src " + abbreviate(sample.describeSource(), 34)
+                        + " | col=" + yesNo(sample.inPrecipitationColumn())
+                        + " snow=" + yesNo(sample.snowing()));
+            } else {
+                lines.add("Weather: rain " + formatFloat(weather.targetRainLevel()) + " -> " + formatFloat(weather.smoothedRainLevel())
+                        + " / thunder " + formatFloat(weather.targetThunderLevel()) + " -> " + formatFloat(weather.smoothedThunderLevel()));
             }
         }
 
         if (showWorldEffectsSection()) {
             AtmosphereWorldEffectsDiagnostics.FrameStats effects = AtmosphereWorldEffectsDiagnostics.getLastStats();
-            lines.add("Effects: enabled=" + yesNo(effects.enabled())
-                    + " / samples " + effects.rainySamples() + "/" + effects.samples()
-                    + " / lastRain=" + formatFloat(effects.lastRainIntensity()));
-
             if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
-                lines.add("Effects blocks: fire " + effects.firesRemoved()
-                        + " / campfire " + effects.campfiresDoused()
-                        + " / cauldron " + effects.cauldronsFilled());
-                lines.add("Effects hooks: events " + effects.eventHooks()
-                        + " / custom " + effects.customHooks()
-                        + " / skyBlocked " + effects.skyBlockedSamples());
+                lines.add("Effects " + yesNo(effects.enabled())
+                        + " | samples " + effects.rainySamples() + "/" + effects.samples()
+                        + " | rain=" + formatFloat(effects.lastRainIntensity())
+                        + " | hooks " + effects.eventHooks() + "/" + effects.customHooks() + "/" + effects.skyBlockedSamples());
+                lines.add("Blocks f/c/ca " + effects.firesRemoved()
+                        + "/" + effects.campfiresDoused()
+                        + "/" + effects.cauldronsFilled());
+            } else {
+                lines.add("Effects: enabled=" + yesNo(effects.enabled())
+                        + " / samples " + effects.rainySamples() + "/" + effects.samples()
+                        + " / lastRain=" + formatFloat(effects.lastRainIntensity()));
             }
         }
 
@@ -220,6 +275,14 @@ public final class CloudDiagnosticsOverlay {
             return "n/a";
         }
         return formatFloat(value) + "ms a" + ageFrames + " p" + pendingQueries;
+    }
+
+    private static String abbreviate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value == null ? "" : value;
+        }
+
+        return value.substring(0, Math.max(0, maxLength - 1)) + "~";
     }
 
     private static void saveCommonConfigForMod(String modId) {

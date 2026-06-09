@@ -30,5 +30,5 @@ No special jar ordering is required once the correct files are present in the `m
 ## Basic verification
 1. Start the game or server and confirm it reaches the main menu/world load without dependency errors.
 2. Check that no startup error mentions missing `simpleclouds`, `gaboulibs`, or a missing season provider.
-3. In an Overworld test world, run `/pa temperature forecast`.
+3. In an Overworld test world, run `/pa temperature current`.
 4. If you want to test current-source fog commands, run `/pa fog spawn`.

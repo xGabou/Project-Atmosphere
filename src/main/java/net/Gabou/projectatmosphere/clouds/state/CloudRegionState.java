@@ -4,21 +4,26 @@ import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * État backend d'une région de nuage contrôlée par Project Atmosphere.
- * Cette classe représente où le nuage existe et ses limites de simulation de base.
- * Elle ne fait aucun rendu et ne lit aucun état client.
+ * Region container for one or more cloud clusters.
  */
 public final class CloudRegionState {
 
@@ -31,105 +36,38 @@ public final class CloudRegionState {
     private static final String TAG_BASE_Y = "BaseY";
     private static final String TAG_TOP_Y = "TopY";
     private static final String TAG_ACTIVE = "Active";
-
-    private static final String TAG_SOURCE_REGION = "SourceRegion";
-    private static final String TAG_CURRENT_REGION = "CurrentRegion";
-
-    private static final String TAG_REGION_X = "RegionX";
-    private static final String TAG_REGION_Z = "RegionZ";
-    private static final String TAG_REGION_SIZE = "RegionSize";
-
     private static final String TAG_DENSITY = "Density";
     private static final String TAG_COVERAGE = "Coverage";
     private static final String TAG_EDGE_SOFTNESS = "EdgeSoftness";
-
     private static final String TAG_PREVIOUS_CENTER_X = "PreviousCenterX";
     private static final String TAG_PREVIOUS_CENTER_Y = "PreviousCenterY";
     private static final String TAG_PREVIOUS_CENTER_Z = "PreviousCenterZ";
-
     private static final String TAG_VELOCITY_X = "VelocityX";
     private static final String TAG_VELOCITY_Y = "VelocityY";
     private static final String TAG_VELOCITY_Z = "VelocityZ";
-
     private static final String TAG_AGE_TICKS = "AgeTicks";
     private static final String TAG_LIFETIME_TICKS = "LifetimeTicks";
     private static final String TAG_GROWTH = "Growth";
     private static final String TAG_DECAY = "Decay";
+    private static final String TAG_MERGE_PRESSURE = "MergePressure";
     private static final String TAG_CLOUD_TYPE_ID = "CloudTypeId";
     private static final String TAG_PREVIOUS_CLOUD_TYPE_ID = "PreviousCloudTypeId";
     private static final String TAG_CLOUD_TYPE_TICKS = "CloudTypeTicks";
     private static final String TAG_CLOUD_SEED = "CloudSeed";
+    private static final String TAG_SOURCE_REGION = "SourceRegion";
+    private static final String TAG_CURRENT_REGION = "CurrentRegion";
+    private static final String TAG_REGION_X = "RegionX";
+    private static final String TAG_REGION_Z = "RegionZ";
+    private static final String TAG_REGION_SIZE = "RegionSize";
+    private static final String TAG_CLUSTERS = "Clusters";
 
-    private static final float DEFAULT_RADIUS = 64.0F;
-    private static final float DEFAULT_BASE_Y = 128.0F;
-    private static final float DEFAULT_TOP_Y = 144.0F;
-    private static final float DEFAULT_DENSITY = 0.65F;
-    private static final float DEFAULT_COVERAGE = 0.75F;
-    private static final float DEFAULT_EDGE_SOFTNESS = 0.35F;
-    private static final int DEFAULT_LIFETIME_TICKS = 20 * 60 * 10;
-
-    // Identité stable de cette région de nuage.
     private final UUID regionId;
-
-    // Dimension Minecraft dans laquelle le nuage existe.
     private final ResourceKey<Level> dimension;
+    private final List<CloudClusterState> clusters = new ArrayList<>();
+    private final Map<UUID, Float> interactionStrengths = new LinkedHashMap<>();
 
-    // Région météo PA qui a créé ou influence ce nuage.
-    // Peut être null si le nuage a été créé sans source météo connue.
-    private final RegionInstanceKey sourceRegionKey;
-
-    // Centre actuel du nuage en coordonnées monde.
-    private Vec3 center;
-
-    // Rayon horizontal du nuage.
-    private float radius;
-
-    // Limite verticale basse du volume du nuage.
-    private float baseY;
-
-    // Limite verticale haute du volume du nuage.
-    private float topY;
-
-    // Indique si le nuage est encore actif et peut être rendu.
-    private boolean active;
-
-    // Région météo actuelle du nuage. Utile plus tard si le nuage se déplace.
+    private RegionInstanceKey sourceRegionKey;
     private RegionInstanceKey currentRegionKey;
-
-    private float density;
-    private float coverage;
-    private float edgeSoftness;
-
-    // Centre précédent du nuage. Sert plus tard à l'interpolation client.
-    private Vec3 previousCenter;
-
-    // Vitesse actuelle du nuage en blocs par tick.
-    private Vec3 velocity;
-
-    // Âge actuel du nuage en ticks.
-    private int ageTicks;
-
-    // Durée de vie prévue du nuage en ticks.
-    private int lifetimeTicks;
-
-    // Facteur de croissance du nuage entre 0 et 1.
-    private float growth;
-
-    // Facteur de disparition du nuage entre 0 et 1.
-    private float decay;
-
-    // Identifiant du type de nuage courant. La définition complète reste dans CloudTypeRegistry.
-    private String cloudTypeId;
-
-    // Identifiant du type précédent, utile pour les transitions futures.
-    private String previousCloudTypeId;
-
-    // Durée passée dans le type courant.
-    private int cloudTypeTicks;
-    private int cloudSeed;
-
-
-
 
     public CloudRegionState(
             UUID regionId,
@@ -147,25 +85,17 @@ public final class CloudRegionState {
         this.dimension = Objects.requireNonNull(dimension, "dimension");
         this.sourceRegionKey = sourceRegionKey;
         this.currentRegionKey = sourceRegionKey;
-
-        setCenter(center);
-        setRadius(radius);
-        setVerticalBounds(baseY, topY);
-        setDensity(density);
-        setCoverage(coverage);
-        setEdgeSoftness(edgeSoftness);
-        this.previousCenter = center;
-        this.velocity = Vec3.ZERO;
-        this.ageTicks = 0;
-        this.lifetimeTicks = DEFAULT_LIFETIME_TICKS;
-        this.growth = 1.0F;
-        this.decay = 0.0F;
-        this.cloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
-        this.previousCloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
-        this.cloudTypeTicks = 0;
-        this.cloudSeed = createRandomCloudSeed();
-
-        this.active = true;
+        this.clusters.add(new CloudClusterState(
+                UUID.randomUUID(),
+                dimension,
+                center,
+                radius,
+                baseY,
+                topY,
+                density,
+                coverage,
+                edgeSoftness
+        ));
     }
 
     public CloudRegionState(
@@ -184,9 +114,9 @@ public final class CloudRegionState {
                 radius,
                 baseY,
                 topY,
-                DEFAULT_DENSITY,
-                DEFAULT_COVERAGE,
-                DEFAULT_EDGE_SOFTNESS,
+                0.65F,
+                0.75F,
+                0.35F,
                 sourceRegionKey
         );
     }
@@ -203,191 +133,8 @@ public final class CloudRegionState {
         return sourceRegionKey;
     }
 
-    public Vec3 getCenter() {
-        return center;
-    }
-
-    public void setCenter(Vec3 center) {
-        this.center = Objects.requireNonNull(center, "center");
-    }
-
-    public float getRadius() {
-        return radius;
-    }
-
-    public void setRadius(float radius) {
-        if (radius <= 0.0F) {
-            throw new IllegalArgumentException("radius must be greater than 0");
-        }
-
-        this.radius = radius;
-    }
-
-    public float getBaseY() {
-        return baseY;
-    }
-
-    public float getTopY() {
-        return topY;
-    }
-
-    public float getDensity() {
-        return density;
-    }
-
-    public void setDensity(float density) {
-        this.density = clamp01(density);
-    }
-
-    public float getCoverage() {
-        return coverage;
-    }
-
-    public void setCoverage(float coverage) {
-        this.coverage = clamp01(coverage);
-    }
-
-    public float getEdgeSoftness() {
-        return edgeSoftness;
-    }
-
-    public void setEdgeSoftness(float edgeSoftness) {
-        this.edgeSoftness = clamp01(edgeSoftness);
-    }
-
-    private static float clamp01(float value) {
-        if (value < 0.0F) {
-            return 0.0F;
-        }
-
-        if (value > 1.0F) {
-            return 1.0F;
-        }
-
-        return value;
-    }
-
-    /**
-     * Met à jour les limites verticales du nuage en gardant un état valide.
-     *
-     * @param baseY limite basse du volume
-     * @param topY limite haute du volume
-     */
-    public void setVerticalBounds(float baseY, float topY) {
-        if (topY <= baseY) {
-            throw new IllegalArgumentException("topY must be greater than baseY");
-        }
-
-        this.baseY = baseY;
-        this.topY = topY;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
-    }
-
-    public Vec3 getPreviousCenter() {
-        return previousCenter;
-    }
-
-    public void setPreviousCenter(Vec3 previousCenter) {
-        this.previousCenter = Objects.requireNonNull(previousCenter, "previousCenter");
-    }
-
-    public Vec3 getVelocity() {
-        return velocity;
-    }
-
-    public void setVelocity(Vec3 velocity) {
-        this.velocity = Objects.requireNonNull(velocity, "velocity");
-    }
-
-    public int getAgeTicks() {
-        return ageTicks;
-    }
-
-    public void setAgeTicks(int ageTicks) {
-        this.ageTicks = Math.max(0, ageTicks);
-    }
-
-    public int getLifetimeTicks() {
-        return lifetimeTicks;
-    }
-
-    public void setLifetimeTicks(int lifetimeTicks) {
-        this.lifetimeTicks = Math.max(1, lifetimeTicks);
-    }
-
-    public float getGrowth() {
-        return growth;
-    }
-
-    public void setGrowth(float growth) {
-        this.growth = clamp01(growth);
-    }
-
-    public float getDecay() {
-        return decay;
-    }
-
-    public void setDecay(float decay) {
-        this.decay = clamp01(decay);
-    }
-
-    public String getCloudTypeId() {
-        return cloudTypeId;
-    }
-
-    public void setCloudTypeId(String cloudTypeId) {
-        this.cloudTypeId = normalizeCloudTypeId(cloudTypeId);
-    }
-
-    public String getPreviousCloudTypeId() {
-        return previousCloudTypeId;
-    }
-
-    public void setPreviousCloudTypeId(String previousCloudTypeId) {
-        this.previousCloudTypeId = normalizeCloudTypeId(previousCloudTypeId);
-    }
-
-    public int getCloudTypeTicks() {
-        return cloudTypeTicks;
-    }
-
-    public void setCloudTypeTicks(int cloudTypeTicks) {
-        this.cloudTypeTicks = Math.max(0, cloudTypeTicks);
-    }
-
-    public void incrementCloudTypeTicks() {
-        this.cloudTypeTicks++;
-    }
-
-    public int getCloudSeed() {
-        return cloudSeed;
-    }
-
-    public void setCloudSeed(int cloudSeed) {
-        this.cloudSeed = cloudSeed;
-    }
-
-    /**
-     * Change le type courant du nuage en conservant l'ancien type.
-     *
-     * @param newCloudTypeId nouvel identifiant de type
-     */
-    public void changeCloudType(String newCloudTypeId) {
-        String normalizedTypeId = normalizeCloudTypeId(newCloudTypeId);
-        if (normalizedTypeId.equals(cloudTypeId)) {
-            return;
-        }
-
-        previousCloudTypeId = cloudTypeId;
-        cloudTypeId = normalizedTypeId;
-        cloudTypeTicks = 0;
+    public void setSourceRegionKey(@Nullable RegionInstanceKey sourceRegionKey) {
+        this.sourceRegionKey = sourceRegionKey;
     }
 
     public @Nullable RegionInstanceKey getCurrentRegionKey() {
@@ -398,64 +145,308 @@ public final class CloudRegionState {
         this.currentRegionKey = currentRegionKey;
     }
 
-    /**
-     * Sauvegarde cet état de nuage dans un tag NBT.
-     *
-     * @return état de nuage sérialisé
-     */
+    public @NotNull List<CloudClusterState> getClusters() {
+        return List.copyOf(clusters);
+    }
+
+    public int getClusterCount() {
+        return clusters.size();
+    }
+
+    public boolean isEmpty() {
+        return clusters.isEmpty();
+    }
+
+    public void addCluster(@NotNull CloudClusterState cluster) {
+        Objects.requireNonNull(cluster, "cluster");
+        if (!dimension.equals(cluster.getDimension())) {
+            throw new IllegalArgumentException("cluster dimension must match region dimension");
+        }
+        clusters.add(cluster);
+    }
+
+    public void addClusters(@NotNull Collection<CloudClusterState> newClusters) {
+        for (CloudClusterState cluster : newClusters) {
+            if (cluster != null) {
+                addCluster(cluster);
+            }
+        }
+    }
+
+    public boolean removeCluster(@NotNull UUID clusterId) {
+        for (int i = 0; i < clusters.size(); i++) {
+            if (clusters.get(i).getClusterId().equals(clusterId)) {
+                clusters.remove(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean removeCluster(@NotNull CloudClusterState cluster) {
+        return clusters.remove(cluster);
+    }
+
+    public void clearClusters() {
+        clusters.clear();
+    }
+
+    public void clearInteractions() {
+        interactionStrengths.clear();
+    }
+
+    public void linkInteraction(@NotNull UUID otherRegionId, float strength) {
+        interactionStrengths.put(otherRegionId, clamp01(strength));
+    }
+
+    public float getInteractionStrength(@NotNull UUID otherRegionId) {
+        return interactionStrengths.getOrDefault(otherRegionId, 0.0F);
+    }
+
+    public float getStrongestInteractionStrength() {
+        float strongest = 0.0F;
+        for (float strength : interactionStrengths.values()) {
+            strongest = Math.max(strongest, strength);
+        }
+        return strongest;
+    }
+
+    public @NotNull Map<UUID, Float> getInteractionStrengths() {
+        return Collections.unmodifiableMap(interactionStrengths);
+    }
+
+    public boolean isActive() {
+        for (CloudClusterState cluster : clusters) {
+            if (cluster != null && cluster.isActive()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void setActive(boolean active) {
+        for (CloudClusterState cluster : clusters) {
+            if (cluster != null) {
+                cluster.setActive(active);
+            }
+        }
+    }
+
+    public Vec3 getCenter() {
+        return aggregateCenter();
+    }
+
+    public void setCenter(Vec3 center) {
+        requirePrimaryCluster().setCenter(center);
+    }
+
+    public Vec3 getPreviousCenter() {
+        return aggregatePreviousCenter();
+    }
+
+    public void setPreviousCenter(Vec3 previousCenter) {
+        requirePrimaryCluster().setPreviousCenter(previousCenter);
+    }
+
+    public Vec3 getVelocity() {
+        return aggregateVelocity();
+    }
+
+    public void setVelocity(Vec3 velocity) {
+        requirePrimaryCluster().setVelocity(velocity);
+    }
+
+    public float getRadius() {
+        return aggregateRadius();
+    }
+
+    public void setRadius(float radius) {
+        requirePrimaryCluster().setRadius(radius);
+    }
+
+    public float getBaseY() {
+        float lowest = Float.POSITIVE_INFINITY;
+        for (CloudClusterState cluster : clusters) {
+            if (cluster != null) {
+                lowest = Math.min(lowest, cluster.getBaseY());
+            }
+        }
+        return lowest == Float.POSITIVE_INFINITY ? 0.0F : lowest;
+    }
+
+    public float getTopY() {
+        float highest = Float.NEGATIVE_INFINITY;
+        for (CloudClusterState cluster : clusters) {
+            if (cluster != null) {
+                highest = Math.max(highest, cluster.getTopY());
+            }
+        }
+        return highest == Float.NEGATIVE_INFINITY ? 0.0F : highest;
+    }
+
+    public void setVerticalBounds(float baseY, float topY) {
+        requirePrimaryCluster().setVerticalBounds(baseY, topY);
+    }
+
+    public float getDensity() {
+        return aggregateScalar(CloudClusterState::getDensity);
+    }
+
+    public void setDensity(float density) {
+        requirePrimaryCluster().setDensity(density);
+    }
+
+    public float getCoverage() {
+        return aggregateScalar(CloudClusterState::getCoverage);
+    }
+
+    public void setCoverage(float coverage) {
+        requirePrimaryCluster().setCoverage(coverage);
+    }
+
+    public float getEdgeSoftness() {
+        return aggregateScalar(CloudClusterState::getEdgeSoftness);
+    }
+
+    public void setEdgeSoftness(float edgeSoftness) {
+        requirePrimaryCluster().setEdgeSoftness(edgeSoftness);
+    }
+
+    public int getAgeTicks() {
+        return getPrimaryCluster().map(CloudClusterState::getAgeTicks).orElse(0);
+    }
+
+    public void setAgeTicks(int ageTicks) {
+        requirePrimaryCluster().setAgeTicks(ageTicks);
+    }
+
+    public int getLifetimeTicks() {
+        return getPrimaryCluster().map(CloudClusterState::getLifetimeTicks).orElse(1);
+    }
+
+    public void setLifetimeTicks(int lifetimeTicks) {
+        requirePrimaryCluster().setLifetimeTicks(lifetimeTicks);
+    }
+
+    public float getGrowth() {
+        return getPrimaryCluster().map(CloudClusterState::getGrowth).orElse(0.0F);
+    }
+
+    public void setGrowth(float growth) {
+        requirePrimaryCluster().setGrowth(growth);
+    }
+
+    public float getDecay() {
+        return getPrimaryCluster().map(CloudClusterState::getDecay).orElse(0.0F);
+    }
+
+    public void setDecay(float decay) {
+        requirePrimaryCluster().setDecay(decay);
+    }
+
+    public float getMergePressure() {
+        return getPrimaryCluster().map(CloudClusterState::getMergePressure).orElse(0.0F);
+    }
+
+    public void setMergePressure(float mergePressure) {
+        requirePrimaryCluster().setMergePressure(mergePressure);
+    }
+
+    public String getCloudTypeId() {
+        return getPrimaryCluster().map(CloudClusterState::getCloudTypeId).orElse(CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID);
+    }
+
+    public void setCloudTypeId(String cloudTypeId) {
+        requirePrimaryCluster().setCloudTypeId(cloudTypeId);
+    }
+
+    public String getPreviousCloudTypeId() {
+        return getPrimaryCluster().map(CloudClusterState::getPreviousCloudTypeId).orElse(CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID);
+    }
+
+    public void setPreviousCloudTypeId(String previousCloudTypeId) {
+        requirePrimaryCluster().setPreviousCloudTypeId(previousCloudTypeId);
+    }
+
+    public int getCloudTypeTicks() {
+        return getPrimaryCluster().map(CloudClusterState::getCloudTypeTicks).orElse(0);
+    }
+
+    public void setCloudTypeTicks(int cloudTypeTicks) {
+        requirePrimaryCluster().setCloudTypeTicks(cloudTypeTicks);
+    }
+
+    public void incrementCloudTypeTicks() {
+        requirePrimaryCluster().incrementCloudTypeTicks();
+    }
+
+    public float getTransitionBlend() {
+        return getPrimaryCluster().map(CloudClusterState::getTransitionBlend).orElse(0.0F);
+    }
+
+    public int getCloudSeed() {
+        return getPrimaryCluster().map(CloudClusterState::getCloudSeed).orElse(0);
+    }
+
+    public void setCloudSeed(int cloudSeed) {
+        requirePrimaryCluster().setCloudSeed(cloudSeed);
+    }
+
+    public void changeCloudType(String newCloudTypeId) {
+        requirePrimaryCluster().changeCloudType(newCloudTypeId);
+    }
+
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
 
         tag.putUUID(TAG_REGION_ID, regionId);
         tag.putString(TAG_DIMENSION, dimension.location().toString());
-
-        tag.putDouble(TAG_CENTER_X, center.x());
-        tag.putDouble(TAG_CENTER_Y, center.y());
-        tag.putDouble(TAG_CENTER_Z, center.z());
-
-        tag.putFloat(TAG_RADIUS, radius);
-        tag.putFloat(TAG_BASE_Y, baseY);
-        tag.putFloat(TAG_TOP_Y, topY);
-        tag.putBoolean(TAG_ACTIVE, active);
-
-        tag.putFloat(TAG_DENSITY, density);
-        tag.putFloat(TAG_COVERAGE, coverage);
-        tag.putFloat(TAG_EDGE_SOFTNESS, edgeSoftness);
-
-        tag.putDouble(TAG_PREVIOUS_CENTER_X, previousCenter.x());
-        tag.putDouble(TAG_PREVIOUS_CENTER_Y, previousCenter.y());
-        tag.putDouble(TAG_PREVIOUS_CENTER_Z, previousCenter.z());
-
-        tag.putDouble(TAG_VELOCITY_X, velocity.x());
-        tag.putDouble(TAG_VELOCITY_Y, velocity.y());
-        tag.putDouble(TAG_VELOCITY_Z, velocity.z());
-
-        tag.putInt(TAG_AGE_TICKS, ageTicks);
-        tag.putInt(TAG_LIFETIME_TICKS, lifetimeTicks);
-        tag.putFloat(TAG_GROWTH, growth);
-        tag.putFloat(TAG_DECAY, decay);
-        tag.putString(TAG_CLOUD_TYPE_ID, cloudTypeId);
-        tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, previousCloudTypeId);
-        tag.putInt(TAG_CLOUD_TYPE_TICKS, cloudTypeTicks);
-        tag.putInt(TAG_CLOUD_SEED, cloudSeed);
-
         if (sourceRegionKey != null) {
             tag.put(TAG_SOURCE_REGION, saveRegionKey(sourceRegionKey));
         }
-
         if (currentRegionKey != null) {
             tag.put(TAG_CURRENT_REGION, saveRegionKey(currentRegionKey));
         }
 
+        CloudClusterState legacyView = getPrimaryCluster().orElse(null);
+        if (legacyView != null) {
+            tag.putDouble(TAG_CENTER_X, legacyView.getCenter().x());
+            tag.putDouble(TAG_CENTER_Y, legacyView.getCenter().y());
+            tag.putDouble(TAG_CENTER_Z, legacyView.getCenter().z());
+            tag.putFloat(TAG_RADIUS, legacyView.getRadius());
+            tag.putFloat(TAG_BASE_Y, legacyView.getBaseY());
+            tag.putFloat(TAG_TOP_Y, legacyView.getTopY());
+            tag.putBoolean(TAG_ACTIVE, legacyView.isActive());
+            tag.putFloat(TAG_DENSITY, legacyView.getDensity());
+            tag.putFloat(TAG_COVERAGE, legacyView.getCoverage());
+            tag.putFloat(TAG_EDGE_SOFTNESS, legacyView.getEdgeSoftness());
+            tag.putString(TAG_CLOUD_TYPE_ID, legacyView.getCloudTypeId());
+            tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, legacyView.getPreviousCloudTypeId());
+            tag.putInt(TAG_CLOUD_TYPE_TICKS, legacyView.getCloudTypeTicks());
+            tag.putFloat(TAG_GROWTH, legacyView.getGrowth());
+            tag.putFloat(TAG_DECAY, legacyView.getDecay());
+            tag.putFloat(TAG_MERGE_PRESSURE, legacyView.getMergePressure());
+            tag.putInt(TAG_AGE_TICKS, legacyView.getAgeTicks());
+            tag.putInt(TAG_LIFETIME_TICKS, legacyView.getLifetimeTicks());
+            tag.putInt(TAG_CLOUD_SEED, legacyView.getCloudSeed());
+            tag.putDouble(TAG_PREVIOUS_CENTER_X, legacyView.getPreviousCenter().x());
+            tag.putDouble(TAG_PREVIOUS_CENTER_Y, legacyView.getPreviousCenter().y());
+            tag.putDouble(TAG_PREVIOUS_CENTER_Z, legacyView.getPreviousCenter().z());
+            tag.putDouble(TAG_VELOCITY_X, legacyView.getVelocity().x());
+            tag.putDouble(TAG_VELOCITY_Y, legacyView.getVelocity().y());
+            tag.putDouble(TAG_VELOCITY_Z, legacyView.getVelocity().z());
+        }
+
+        ListTag clusterTags = new ListTag();
+        for (CloudClusterState cluster : clusters) {
+            if (cluster != null) {
+                clusterTags.add(cluster.save());
+            }
+        }
+        tag.put(TAG_CLUSTERS, clusterTags);
         return tag;
     }
 
-    /**
-     * Charge un état de nuage depuis un tag NBT.
-     *
-     * @param tag état de nuage sérialisé
-     * @return état de nuage chargé
-     */
     public static CloudRegionState load(CompoundTag tag) {
         UUID regionId = tag.hasUUID(TAG_REGION_ID) ? tag.getUUID(TAG_REGION_ID) : UUID.randomUUID();
 
@@ -465,59 +456,38 @@ public final class CloudRegionState {
         ResourceLocation dimensionLocation = new ResourceLocation(dimensionId);
         ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, dimensionLocation);
 
+        RegionInstanceKey sourceRegionKey = null;
+        if (tag.contains(TAG_SOURCE_REGION, Tag.TAG_COMPOUND)) {
+            sourceRegionKey = loadRegionKey(tag.getCompound(TAG_SOURCE_REGION));
+        }
+
+        RegionInstanceKey currentRegionKey = null;
+        if (tag.contains(TAG_CURRENT_REGION, Tag.TAG_COMPOUND)) {
+            currentRegionKey = loadRegionKey(tag.getCompound(TAG_CURRENT_REGION));
+        } else {
+            currentRegionKey = sourceRegionKey;
+        }
+
         Vec3 center = new Vec3(
                 tag.getDouble(TAG_CENTER_X),
                 tag.getDouble(TAG_CENTER_Y),
                 tag.getDouble(TAG_CENTER_Z)
         );
 
-        float radius = tag.contains(TAG_RADIUS) ? tag.getFloat(TAG_RADIUS) : DEFAULT_RADIUS;
+        float radius = tag.contains(TAG_RADIUS) ? tag.getFloat(TAG_RADIUS) : 64.0F;
         if (radius <= 0.0F) {
-            radius = DEFAULT_RADIUS;
+            radius = 64.0F;
         }
 
-        float baseY = tag.contains(TAG_BASE_Y) ? tag.getFloat(TAG_BASE_Y) : DEFAULT_BASE_Y;
-        float topY = tag.contains(TAG_TOP_Y) ? tag.getFloat(TAG_TOP_Y) : DEFAULT_TOP_Y;
+        float baseY = tag.contains(TAG_BASE_Y) ? tag.getFloat(TAG_BASE_Y) : 128.0F;
+        float topY = tag.contains(TAG_TOP_Y) ? tag.getFloat(TAG_TOP_Y) : 144.0F;
         if (topY <= baseY) {
-            topY = baseY + (DEFAULT_TOP_Y - DEFAULT_BASE_Y);
+            topY = baseY + 16.0F;
         }
 
-        float density = tag.contains(TAG_DENSITY) ? tag.getFloat(TAG_DENSITY) : DEFAULT_DENSITY;
-        float coverage = tag.contains(TAG_COVERAGE) ? tag.getFloat(TAG_COVERAGE) : DEFAULT_COVERAGE;
-        float edgeSoftness = tag.contains(TAG_EDGE_SOFTNESS) ? tag.getFloat(TAG_EDGE_SOFTNESS) : DEFAULT_EDGE_SOFTNESS;
-
-        Vec3 previousCenter = tag.contains(TAG_PREVIOUS_CENTER_X)
-                ? new Vec3(
-                tag.getDouble(TAG_PREVIOUS_CENTER_X),
-                tag.getDouble(TAG_PREVIOUS_CENTER_Y),
-                tag.getDouble(TAG_PREVIOUS_CENTER_Z)
-        )
-                : center;
-
-        Vec3 velocity = tag.contains(TAG_VELOCITY_X)
-                ? new Vec3(
-                tag.getDouble(TAG_VELOCITY_X),
-                tag.getDouble(TAG_VELOCITY_Y),
-                tag.getDouble(TAG_VELOCITY_Z)
-        )
-                : Vec3.ZERO;
-        int ageTicks = tag.contains(TAG_AGE_TICKS) ? tag.getInt(TAG_AGE_TICKS) : 0;
-        int lifetimeTicks = tag.contains(TAG_LIFETIME_TICKS) ? tag.getInt(TAG_LIFETIME_TICKS) : DEFAULT_LIFETIME_TICKS;
-        float growth = tag.contains(TAG_GROWTH) ? tag.getFloat(TAG_GROWTH) : 1.0F;
-        float decay = tag.contains(TAG_DECAY) ? tag.getFloat(TAG_DECAY) : 0.0F;
-        String cloudTypeId = tag.contains(TAG_CLOUD_TYPE_ID, Tag.TAG_STRING)
-                ? tag.getString(TAG_CLOUD_TYPE_ID)
-                : CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
-        String previousCloudTypeId = tag.contains(TAG_PREVIOUS_CLOUD_TYPE_ID, Tag.TAG_STRING)
-                ? tag.getString(TAG_PREVIOUS_CLOUD_TYPE_ID)
-                : cloudTypeId;
-        int cloudTypeTicks = tag.contains(TAG_CLOUD_TYPE_TICKS) ? tag.getInt(TAG_CLOUD_TYPE_TICKS) : 0;
-        int cloudSeed = tag.contains(TAG_CLOUD_SEED) ? tag.getInt(TAG_CLOUD_SEED) : deriveCloudSeed(regionId);
-
-        RegionInstanceKey sourceRegionKey = null;
-        if (tag.contains(TAG_SOURCE_REGION, Tag.TAG_COMPOUND)) {
-            sourceRegionKey = loadRegionKey(tag.getCompound(TAG_SOURCE_REGION));
-        }
+        float density = tag.contains(TAG_DENSITY) ? tag.getFloat(TAG_DENSITY) : 0.65F;
+        float coverage = tag.contains(TAG_COVERAGE) ? tag.getFloat(TAG_COVERAGE) : 0.75F;
+        float edgeSoftness = tag.contains(TAG_EDGE_SOFTNESS) ? tag.getFloat(TAG_EDGE_SOFTNESS) : 0.35F;
 
         CloudRegionState state = new CloudRegionState(
                 regionId,
@@ -531,71 +501,211 @@ public final class CloudRegionState {
                 edgeSoftness,
                 sourceRegionKey
         );
+        state.setCurrentRegionKey(currentRegionKey);
 
-        state.setActive(!tag.contains(TAG_ACTIVE) || tag.getBoolean(TAG_ACTIVE));
-        state.setPreviousCenter(previousCenter);
-        state.setVelocity(velocity);
-        state.setAgeTicks(ageTicks);
-        state.setLifetimeTicks(lifetimeTicks);
-        state.setGrowth(growth);
-        state.setDecay(decay);
-        state.setCloudTypeId(cloudTypeId);
-        state.setPreviousCloudTypeId(previousCloudTypeId);
-        state.setCloudTypeTicks(cloudTypeTicks);
-        state.setCloudSeed(cloudSeed);
+        state.getClusters().stream().findFirst().ifPresent(cluster -> {
+            if (tag.contains(TAG_PREVIOUS_CENTER_X)) {
+                cluster.setPreviousCenter(new Vec3(
+                        tag.getDouble(TAG_PREVIOUS_CENTER_X),
+                        tag.getDouble(TAG_PREVIOUS_CENTER_Y),
+                        tag.getDouble(TAG_PREVIOUS_CENTER_Z)
+                ));
+            }
+            if (tag.contains(TAG_VELOCITY_X)) {
+                cluster.setVelocity(new Vec3(
+                        tag.getDouble(TAG_VELOCITY_X),
+                        tag.getDouble(TAG_VELOCITY_Y),
+                        tag.getDouble(TAG_VELOCITY_Z)
+                ));
+            }
+            if (tag.contains(TAG_AGE_TICKS)) {
+                cluster.setAgeTicks(tag.getInt(TAG_AGE_TICKS));
+            }
+            if (tag.contains(TAG_LIFETIME_TICKS)) {
+                cluster.setLifetimeTicks(tag.getInt(TAG_LIFETIME_TICKS));
+            }
+            if (tag.contains(TAG_GROWTH)) {
+                cluster.setGrowth(tag.getFloat(TAG_GROWTH));
+            }
+            if (tag.contains(TAG_DECAY)) {
+                cluster.setDecay(tag.getFloat(TAG_DECAY));
+            }
+            if (tag.contains(TAG_MERGE_PRESSURE)) {
+                cluster.setMergePressure(tag.getFloat(TAG_MERGE_PRESSURE));
+            }
+            if (tag.contains(TAG_CLOUD_TYPE_ID, Tag.TAG_STRING)) {
+                cluster.setCloudTypeId(tag.getString(TAG_CLOUD_TYPE_ID));
+            }
+            if (tag.contains(TAG_PREVIOUS_CLOUD_TYPE_ID, Tag.TAG_STRING)) {
+                cluster.setPreviousCloudTypeId(tag.getString(TAG_PREVIOUS_CLOUD_TYPE_ID));
+            }
+            if (tag.contains(TAG_CLOUD_TYPE_TICKS)) {
+                cluster.setCloudTypeTicks(tag.getInt(TAG_CLOUD_TYPE_TICKS));
+            }
+            if (tag.contains(TAG_CLOUD_SEED)) {
+                cluster.setCloudSeed(tag.getInt(TAG_CLOUD_SEED));
+            }
+        });
 
-        if (tag.contains(TAG_CURRENT_REGION, Tag.TAG_COMPOUND)) {
-            state.setCurrentRegionKey(loadRegionKey(tag.getCompound(TAG_CURRENT_REGION)));
-        } else {
-            state.setCurrentRegionKey(sourceRegionKey);
+        if (tag.contains(TAG_CLUSTERS, Tag.TAG_LIST)) {
+            state.clearClusters();
+            ListTag clustersTag = tag.getList(TAG_CLUSTERS, Tag.TAG_COMPOUND);
+            for (int i = 0; i < clustersTag.size(); i++) {
+                state.addCluster(CloudClusterState.load(clustersTag.getCompound(i)));
+            }
+        }
+
+        if (state.isEmpty()) {
+            state.addCluster(new CloudClusterState(
+                    UUID.randomUUID(),
+                    dimension,
+                    center,
+                    radius,
+                    baseY,
+                    topY,
+                    density,
+                    coverage,
+                    edgeSoftness
+            ));
         }
 
         return state;
     }
 
-    /**
-     * Sauvegarde une clé de région météo dans un tag NBT.
-     *
-     * @param key clé de région météo
-     * @return clé de région météo sérialisée
-     */
+    public void mergeRegionFrom(@NotNull CloudRegionState other) {
+        if (other == this) {
+            return;
+        }
+
+        addClusters(other.clusters);
+        if (sourceRegionKey == null) {
+            sourceRegionKey = other.sourceRegionKey;
+        }
+        if (currentRegionKey == null) {
+            currentRegionKey = other.currentRegionKey;
+        }
+    }
+
+    private @NotNull CloudClusterState requirePrimaryCluster() {
+        CloudClusterState cluster = selectPrimaryCluster();
+        if (cluster == null) {
+            throw new IllegalStateException("cloud region has no clusters");
+        }
+        return cluster;
+    }
+
+    private @Nullable CloudClusterState selectPrimaryCluster() {
+        CloudClusterState best = null;
+        float bestWeight = -1.0F;
+        for (CloudClusterState cluster : clusters) {
+            if (cluster == null) {
+                continue;
+            }
+            float weight = cluster.getFootprint();
+            if (best == null || weight > bestWeight || (weight == bestWeight && cluster.getClusterId().compareTo(best.getClusterId()) < 0)) {
+                best = cluster;
+                bestWeight = weight;
+            }
+        }
+        return best;
+    }
+
+    private java.util.Optional<CloudClusterState> getPrimaryCluster() {
+        return java.util.Optional.ofNullable(selectPrimaryCluster());
+    }
+
+    private float aggregateScalar(java.util.function.ToDoubleFunction<CloudClusterState> extractor) {
+        double weighted = 0.0D;
+        double weightSum = 0.0D;
+        for (CloudClusterState cluster : clusters) {
+            if (cluster == null) {
+                continue;
+            }
+            double weight = cluster.getFootprint();
+            weighted += extractor.applyAsDouble(cluster) * weight;
+            weightSum += weight;
+        }
+        if (weightSum <= 0.0D) {
+            return 0.0F;
+        }
+        return (float) (weighted / weightSum);
+    }
+
+    private Vec3 aggregateCenter() {
+        return aggregateVec(CloudClusterState::getCenter);
+    }
+
+    private Vec3 aggregatePreviousCenter() {
+        return aggregateVec(CloudClusterState::getPreviousCenter);
+    }
+
+    private Vec3 aggregateVelocity() {
+        return aggregateVec(CloudClusterState::getVelocity);
+    }
+
+    private Vec3 aggregateVec(java.util.function.Function<CloudClusterState, Vec3> extractor) {
+        double weightedX = 0.0D;
+        double weightedY = 0.0D;
+        double weightedZ = 0.0D;
+        double weightSum = 0.0D;
+
+        for (CloudClusterState cluster : clusters) {
+            if (cluster == null) {
+                continue;
+            }
+            float weight = cluster.getFootprint();
+            Vec3 vec = extractor.apply(cluster);
+            weightedX += vec.x() * weight;
+            weightedY += vec.y() * weight;
+            weightedZ += vec.z() * weight;
+            weightSum += weight;
+        }
+
+        if (weightSum <= 0.0D) {
+            return Vec3.ZERO;
+        }
+
+        return new Vec3(weightedX / weightSum, weightedY / weightSum, weightedZ / weightSum);
+    }
+
+    private float aggregateRadius() {
+        Vec3 center = aggregateCenter();
+        float radius = 0.0F;
+        for (CloudClusterState cluster : clusters) {
+            if (cluster == null) {
+                continue;
+            }
+            double dx = cluster.getCenter().x() - center.x();
+            double dz = cluster.getCenter().z() - center.z();
+            float horizontalDistance = (float) Math.sqrt((dx * dx) + (dz * dz));
+            radius = Math.max(radius, horizontalDistance + cluster.getRadius());
+        }
+        return radius;
+    }
+
+    private static float clamp01(float value) {
+        if (value < 0.0F) {
+            return 0.0F;
+        }
+        if (value > 1.0F) {
+            return 1.0F;
+        }
+        return value;
+    }
+
     private static CompoundTag saveRegionKey(RegionInstanceKey key) {
         CompoundTag tag = new CompoundTag();
-
         tag.putInt(TAG_REGION_X, key.regionX());
         tag.putInt(TAG_REGION_Z, key.regionZ());
         tag.putInt(TAG_REGION_SIZE, key.regionSize());
-
         return tag;
     }
 
-    /**
-     * Charge une clé de région météo depuis un tag NBT.
-     *
-     * @param tag clé de région météo sérialisée
-     * @return clé de région météo chargée
-     */
     private static RegionInstanceKey loadRegionKey(CompoundTag tag) {
         return new RegionInstanceKey(
                 tag.getInt(TAG_REGION_X),
                 tag.getInt(TAG_REGION_Z),
                 tag.getInt(TAG_REGION_SIZE)
         );
-    }
-
-    private static String normalizeCloudTypeId(String cloudTypeId) {
-        return CloudTypeRegistry.getOrDefault(cloudTypeId).getId();
-    }
-
-    private static int createRandomCloudSeed() {
-        return ThreadLocalRandom.current().nextInt();
-    }
-
-    private static int deriveCloudSeed(UUID regionId) {
-        long mixed = regionId.getMostSignificantBits() ^ Long.rotateLeft(regionId.getLeastSignificantBits(), 21);
-        mixed ^= mixed >>> 33;
-        mixed *= 0xff51afd7ed558ccdL;
-        mixed ^= mixed >>> 33;
-        return (int) mixed;
     }
 }

@@ -1,9 +1,11 @@
 package net.Gabou.projectatmosphere.clouds.transport;
 
+import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.clouds.type.CloudVisualProfile;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -28,11 +30,13 @@ public final class CloudRegionRenderDataFactory {
      * @return donnée de rendu de nuage transportable
      */
     public static @NotNull CloudRegionRenderData createDebug(@NotNull CloudRegionState state) {
-        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(state.getCloudTypeId());
+        CloudClusterState cluster = selectRenderableCluster(state);
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cluster.getCloudTypeId());
         CloudVisualProfile profile = definition.getVisualProfile();
 
         return createWithProfile(
-                state,
+            state,
+                cluster,
                 DEFAULT_DENSITY,
                 DEFAULT_COVERAGE,
                 DEFAULT_EDGE_SOFTNESS,
@@ -49,14 +53,45 @@ public final class CloudRegionRenderDataFactory {
      * @return donnée de rendu de nuage transportable
      */
     public static @NotNull CloudRegionRenderData create(@NotNull CloudRegionState state) {
-        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(state.getCloudTypeId());
-        CloudVisualProfile profile = definition.getVisualProfile();
+        CloudClusterState cluster = selectRenderableCluster(state);
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cluster.getCloudTypeId());
+        CloudTypeDefinition previousDefinition = CloudTypeRegistry.getOrDefault(cluster.getPreviousCloudTypeId());
+        CloudVisualProfile profile = CloudVisualProfile.blend(
+                previousDefinition.getVisualProfile(),
+                definition.getVisualProfile(),
+                Mth.clamp(cluster.getTransitionBlend() + (cluster.getMergePressure() * 0.35F), 0.0F, 1.0F)
+        );
 
         return createWithProfile(
                 state,
-                state.getDensity(),
-                state.getCoverage(),
-                state.getEdgeSoftness(),
+                cluster,
+                cluster.getDensity(),
+                cluster.getCoverage(),
+                cluster.getEdgeSoftness(),
+                0xFFFFFFFF,
+                definition,
+                profile
+        );
+    }
+
+    public static @NotNull CloudRegionRenderData createForCluster(
+            @NotNull CloudRegionState region,
+            @NotNull CloudClusterState cluster
+    ) {
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cluster.getCloudTypeId());
+        CloudTypeDefinition previousDefinition = CloudTypeRegistry.getOrDefault(cluster.getPreviousCloudTypeId());
+        CloudVisualProfile profile = CloudVisualProfile.blend(
+                previousDefinition.getVisualProfile(),
+                definition.getVisualProfile(),
+                Mth.clamp(cluster.getTransitionBlend() + (cluster.getMergePressure() * 0.35F), 0.0F, 1.0F)
+        );
+
+        return createWithProfile(
+                region,
+                cluster,
+                cluster.getDensity(),
+                cluster.getCoverage(),
+                cluster.getEdgeSoftness(),
                 0xFFFFFFFF,
                 definition,
                 profile
@@ -65,6 +100,7 @@ public final class CloudRegionRenderDataFactory {
 
     private static @NotNull CloudRegionRenderData createWithProfile(
             @NotNull CloudRegionState state,
+            @NotNull CloudClusterState cluster,
             float density,
             float coverage,
             float edgeSoftness,
@@ -72,18 +108,28 @@ public final class CloudRegionRenderDataFactory {
             @NotNull CloudTypeDefinition definition,
             @NotNull CloudVisualProfile profile
     ) {
+        float mergePressure = cluster.getMergePressure();
+        float mergeScale = 1.0F + (mergePressure * 0.08F);
+        float finalDensity = clamp01(density * (1.0F - (mergePressure * 0.05F)));
+        float finalCoverage = clamp01(coverage * (1.0F + (mergePressure * 0.07F)));
+        float finalEdgeSoftness = clamp01(edgeSoftness + (mergePressure * 0.16F));
+        float finalRadius = Math.max(1.0F, cluster.getRadius() * mergeScale);
+        float finalBaseY = cluster.getBaseY() - (mergePressure * 2.5F);
+        float finalTopY = cluster.getTopY() + (mergePressure * 6.5F);
+
         return new CloudRegionRenderData(
                 state.getRegionId(),
+                cluster.getClusterId(),
                 state.getDimension().location().toString(),
-                state.getCenter(),
-                state.getPreviousCenter(),
-                state.getVelocity(),
-                state.getRadius(),
-                state.getBaseY(),
-                state.getTopY(),
-                density,
-                coverage,
-                edgeSoftness,
+                cluster.getCenter(),
+                cluster.getPreviousCenter(),
+                cluster.getVelocity(),
+                finalRadius,
+                finalBaseY,
+                finalTopY,
+                finalDensity,
+                finalCoverage,
+                finalEdgeSoftness,
                 state.isActive(),
                 debugColorOrTint,
                 state.getAgeTicks(),
@@ -107,7 +153,54 @@ public final class CloudRegionRenderDataFactory {
                 profile.getTowerStrength(),
                 profile.getAnvilStrength(),
                 profile.getPrecipitationCoreStrength(),
-                state.getCloudSeed()
+                cluster.getCloudSeed(),
+                mergePressure
         );
+    }
+
+    private static @NotNull CloudClusterState selectRenderableCluster(@NotNull CloudRegionState state) {
+        CloudClusterState dominant = null;
+        for (CloudClusterState cluster : state.getClusters()) {
+            if (cluster == null || !cluster.isActive()) {
+                continue;
+            }
+            if (dominant == null
+                    || cluster.getFootprint() > dominant.getFootprint()
+                    || (cluster.getFootprint() == dominant.getFootprint() && cluster.getClusterId().compareTo(dominant.getClusterId()) < 0)) {
+                dominant = cluster;
+            }
+        }
+
+        if (dominant != null) {
+            return dominant;
+        }
+
+        CloudClusterState fallback = new CloudClusterState(
+                java.util.UUID.randomUUID(),
+                state.getDimension(),
+                state.getCenter(),
+                Math.max(1.0F, state.getRadius()),
+                Math.max(0.0F, state.getBaseY()),
+                Math.max(state.getBaseY() + 1.0F, state.getTopY())
+        );
+        fallback.setDensity(Math.max(DEFAULT_DENSITY, state.getDensity()));
+        fallback.setCoverage(Math.max(DEFAULT_COVERAGE, state.getCoverage()));
+        fallback.setEdgeSoftness(Math.max(DEFAULT_EDGE_SOFTNESS, state.getEdgeSoftness()));
+        fallback.setCloudTypeId(state.getCloudTypeId());
+        fallback.setPreviousCloudTypeId(state.getPreviousCloudTypeId());
+        fallback.setCloudTypeTicks(state.getCloudTypeTicks());
+        fallback.setCloudSeed(state.getCloudSeed());
+        fallback.setMergePressure(state.getMergePressure());
+        return fallback;
+    }
+
+    private static float clamp01(float value) {
+        if (value < 0.0F) {
+            return 0.0F;
+        }
+        if (value > 1.0F) {
+            return 1.0F;
+        }
+        return value;
     }
 }

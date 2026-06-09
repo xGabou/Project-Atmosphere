@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.client.render.shader.CloudShaders;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
@@ -49,13 +50,17 @@ public final class CloudRaymarchRenderer {
             return false;
         }
 
+        Minecraft minecraft = Minecraft.getInstance();
+        boolean writeDepth = outputTarget != minecraft.getMainRenderTarget();
+
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
         RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
+        RenderSystem.depthMask(writeDepth);
         RenderSystem.setShader(() -> shader);
 
+        shader.safeGetUniform("WriteDepth").set(writeDepth ? 1 : 0);
         shader.setSampler("DepthSampler", sceneDepthTextureId);
         CloudUniformUploader.apply(shader, frameContext, snapshot, outputTarget);
         shader.apply();
@@ -74,7 +79,7 @@ public final class CloudRaymarchRenderer {
         return true;
     }
 
-    public static boolean compositeTarget(@NotNull RenderTarget sourceTarget, @NotNull RenderTarget destinationTarget) {
+    public static boolean compositeTarget(@NotNull RenderTarget sourceTarget, @NotNull RenderTarget destinationTarget, int sceneDepthTextureId) {
         ShaderInstance shader = CloudShaders.getCompositeShader();
         if (shader == null) {
             return false;
@@ -94,6 +99,8 @@ public final class CloudRaymarchRenderer {
         RenderSystem.setShader(() -> shader);
 
         shader.setSampler("CloudColorSampler", sourceTarget.getColorTextureId());
+        shader.setSampler("CloudDepthSampler", sourceTarget.getDepthTextureId());
+        shader.setSampler("SceneDepthSampler", sceneDepthTextureId);
         shader.apply();
 
         fullscreenQuad.bind();

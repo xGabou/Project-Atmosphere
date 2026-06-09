@@ -17,7 +17,20 @@ The official `0.8.0.0` changelog marks PA x TFC as temporarily incompatible. If 
 ## Commands do not work
 
 ### Use the `/pa` root
-Current server commands are registered under `/pa`. If older docs mention `/weatherdebug`, use `/pa weatherdebug` instead.
+Current server commands are registered under `/pa`. Start with `/pa help`, then use the feature groups:
+
+- `/pa forecast`
+- `/pa temperature`
+- `/pa humidity`
+- `/pa pressure`
+- `/pa wind`
+- `/pa fog`
+- `/pa cloud`
+- `/pa tornado`
+- `/pa hurricane`
+- `/pa system`
+
+Legacy paths like `/pa weatherdebug` still work for now, but they are only compatibility aliases.
 
 ### Wrong dimension
 Many forecast and debug commands only work in the Overworld.
@@ -36,8 +49,8 @@ Custom biome temperature overrides live in `config/projectatmosphere/biome_temps
 ### Dynamic Trees integration
 Latest official notes say the Dynamic Trees module is still work in progress and should remain disabled.
 
-## Known command issue
-`/pa weatherdebug snowstorm` is currently mis-registered in the source tree: the handler expects an `intensity` argument that the command does not expose. Treat that command as broken until fixed.
+## Legacy command notes
+Old command paths are still available for compatibility. Prefer the new `/pa` tree in new docs and support answers.
 
 ## When to check known issues
 Check `data/mcp/mods/projectatmosphere/known-issues.json` when:

@@ -22,6 +22,7 @@ uniform vec4 FogColor;
 uniform float AnimationTime;
 uniform float MaxDistance;
 uniform vec2 OutSize;
+uniform int WriteDepth;
 uniform vec3 CloudCenter;
 uniform vec3 CloudPreviousCenter;
 uniform vec3 CloudVelocity;
@@ -151,7 +152,7 @@ bool intersectAabb(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax, out float tNear, out 
     return tFar > max(tNear, 0.0);
 }
 
-float sampleCloudField(vec3 samplePos) {
+float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float heightRange = max(CloudTopY - CloudBaseY, 0.001);
     float vertical = (samplePos.y - CloudBaseY) / heightRange;
     if (vertical < 0.0 || vertical > 1.0) {
@@ -162,7 +163,6 @@ float sampleCloudField(vec3 samplePos) {
     float effectiveDensity = saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier * lifecycleFactor);
 
     vec3 motion = (CloudCenter - CloudPreviousCenter) * (0.35 + CloudPartialTick * 0.15);
-    vec3 seedOffset = seedOffset3();
     vec3 baseNoisePos = samplePos + motion * 0.2 + seedOffset;
     float visualThickness = max(CloudVerticalThickness, 0.05);
     float heightSquash = max(CloudHeightSquash, 0.10);
@@ -173,20 +173,25 @@ float sampleCloudField(vec3 samplePos) {
 
     vec2 localHorizontal = samplePos.xz - CloudCenter.xz;
     float horizontalDistance = length(localHorizontal);
+    float radiusInv = 1.0 / max(CloudRadius, 0.001);
+    float baseHorizontal = horizontalDistance * radiusInv;
+    if (baseHorizontal >= 1.24) {
+        return 0.0;
+    }
+
     float edgeAngle = atan(localHorizontal.y, localHorizontal.x);
-    float seedValue = float(CloudSeed);
     float lobeCount = mix(4.0, 9.0, hash1(seedValue + 131.0));
     float lobePhase = hash1(seedValue + 149.0) * 6.2831853;
     float lobeWave = sin(edgeAngle * lobeCount + lobePhase);
-    float silhouetteNoise = fbm(vec3(
+    float silhouetteNoise = noise3(vec3(
         localHorizontal * 0.015 + seedOffset.xz * 0.021,
         shapedVertical * 2.0 + seedOffset.y * 0.017
-    ), 2) - 0.5;
-    float seededRadiusWarp = 1.0 + (lobeWave * 0.055 + silhouetteNoise * 0.16) * smoothstep(0.12, 1.0, horizontalDistance / max(CloudRadius, 0.001));
+    )) * 0.5;
+    float seededRadiusWarp = 1.0 + (lobeWave * 0.055 + silhouetteNoise * 0.16) * smoothstep(0.12, 1.0, baseHorizontal);
     float rawHorizontal = horizontalDistance / max(CloudRadius * clamp(seededRadiusWarp, 0.78, 1.20), 0.001);
 
-    float topWarp = fbm(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1) + seedOffset * 0.011, 2) - 0.5;
-    float baseWarp = fbm(baseNoisePos * vec3(0.014, 0.0, 0.014) + vec3(3.4, CloudWorldTime * -0.0008, 27.5) + seedOffset * 0.009, 2) - 0.5;
+    float topWarp = noise3(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1) + seedOffset * 0.011) * 0.5;
+    float baseWarp = noise3(baseNoisePos * vec3(0.014, 0.0, 0.014) + vec3(3.4, CloudWorldTime * -0.0008, 27.5) + seedOffset * 0.009) * 0.5;
     float warpedVertical = shapedVertical + topWarp * 0.16 * smoothstep(0.45, 1.0, shapedVertical) - baseWarp * 0.08 * (1.0 - smoothstep(0.0, 0.35, shapedVertical));
     float baseSoftness = max(CloudBaseSoftness, 0.01);
     float topSoftness = max(CloudTopSoftness, 0.01);
@@ -222,9 +227,9 @@ float sampleCloudField(vec3 samplePos) {
     float noiseScale = max(CloudNoiseScale, 0.001);
     float detailNoiseScale = max(CloudDetailNoiseScale, 0.001);
     float erosionNoiseScale = max(CloudErosionNoiseScale, 0.001);
-    float lobeNoise = fbm(baseNoisePos * vec3(noiseScale, noiseScale * 1.75, noiseScale) + vec3(0.0, CloudWorldTime * 0.0015, 0.0) + seedOffset * 0.017, 3);
-    float layerNoise = fbm(baseNoisePos * vec3(detailNoiseScale * 0.50, detailNoiseScale, detailNoiseScale * 0.50) + vec3(12.0, CloudWorldTime * 0.0025, 8.0) + seedOffset * 0.013, 3);
-    float detailNoise = fbm(baseNoisePos * vec3(erosionNoiseScale, erosionNoiseScale * 1.25, erosionNoiseScale) + vec3(31.0, CloudWorldTime * -0.0030, 6.0) + seedOffset * 0.019, 2);
+    float lobeNoise = fbm(baseNoisePos * vec3(noiseScale, noiseScale * 1.75, noiseScale) + vec3(0.0, CloudWorldTime * 0.0015, 0.0) + seedOffset * 0.017, 2);
+    float layerNoise = noise3(baseNoisePos * vec3(detailNoiseScale * 0.50, detailNoiseScale, detailNoiseScale * 0.50) + vec3(12.0, CloudWorldTime * 0.0025, 8.0) + seedOffset * 0.013) * 0.5 + 0.5;
+    float detailNoise = noise3(baseNoisePos * vec3(erosionNoiseScale, erosionNoiseScale * 1.25, erosionNoiseScale) + vec3(31.0, CloudWorldTime * -0.0030, 6.0) + seedOffset * 0.019) * 0.5 + 0.5;
 
     float seedLobeBias = mix(-0.08, 0.08, hash1(seedValue + 197.0));
     float lobeShape = mix(0.74 + seedLobeBias, 1.18 + seedLobeBias, lobeNoise);
@@ -290,7 +295,7 @@ void main() {
     float sceneDistance = MaxDistance;
     if (sceneDepth < 1.0) {
         vec3 sceneWorld = reconstructWorld(screenUv, sceneDepth);
-        sceneDistance = length(sceneWorld - rayOrigin);
+        sceneDistance = max(0.0, length(sceneWorld - rayOrigin) - 0.35);
     }
 
     float maxRay = min(min(tFar, MaxDistance), sceneDistance);
@@ -307,6 +312,8 @@ void main() {
     float t = tNear + jitter * stepSize;
     float transmittance = 1.0;
     vec3 accum = vec3(0.0);
+    vec3 seedOffset = seedOffset3();
+    float seedValue = float(CloudSeed);
 
     for (int step = 0; step < MAX_RAYMARCH_STEPS; step++) {
         if (step >= steps || transmittance < 0.02) {
@@ -314,7 +321,7 @@ void main() {
         }
 
         vec3 samplePos = rayOrigin + rayDir * t;
-        float density = sampleCloudField(samplePos);
+        float density = sampleCloudField(samplePos, seedOffset, seedValue);
         if (density > 0.0005) {
             float softenedDensity = pow(density, 1.18);
             float alpha = 1.0 - exp(-softenedDensity * stepSize * 3.2);
@@ -335,5 +342,6 @@ void main() {
     float fogFactor = smoothstep(FogStart, FogEnd, min(t, MaxDistance));
     color = mix(color, FogColor.rgb, fogFactor * 0.35);
 
+    gl_FragDepth = WriteDepth != 0 ? sceneDepth : gl_FragCoord.z;
     fragColor = vec4(color, clamp(rawAlpha * 0.92, 0.0, 1.0));
 }

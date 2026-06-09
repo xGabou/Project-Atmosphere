@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.simulation;
 
+import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import org.jetbrains.annotations.NotNull;
@@ -21,17 +22,29 @@ final class CloudRegionTypeGeometry {
      * @param cloudTypeId identifiant de type demandé
      */
     static void apply(@NotNull CloudRegionState state, String cloudTypeId) {
-        Shape shape = resolveShape(cloudTypeId);
-        double centerY = state.getCenter().y();
+        CloudClusterState cluster = state.getClusters().stream()
+                .filter(CloudClusterState::isActive)
+                .reduce((first, second) -> first.getFootprint() >= second.getFootprint() ? first : second)
+                .orElse(null);
+        if (cluster == null) {
+            return;
+        }
 
-        state.setRadius(shape.radius);
-        state.setVerticalBounds(
+        apply(cluster, cloudTypeId);
+    }
+
+    static void apply(@NotNull CloudClusterState cluster, String cloudTypeId) {
+        Shape shape = resolveShape(cloudTypeId);
+        double centerY = cluster.getCenter().y();
+
+        cluster.setRadius(shape.radius);
+        cluster.setVerticalBounds(
                 (float) centerY - shape.baseOffset,
                 (float) centerY + shape.topOffset
         );
-        state.setDensity(shape.density);
-        state.setCoverage(shape.coverage);
-        state.setEdgeSoftness(shape.edgeSoftness);
+        cluster.setDensity(shape.density);
+        cluster.setCoverage(shape.coverage);
+        cluster.setEdgeSoftness(shape.edgeSoftness);
     }
 
     private static Shape resolveShape(String cloudTypeId) {

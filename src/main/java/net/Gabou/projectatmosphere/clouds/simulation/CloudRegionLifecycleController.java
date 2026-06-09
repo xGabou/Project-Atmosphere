@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.simulation;
 
+import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.NotNull;
@@ -21,26 +22,38 @@ final class CloudRegionLifecycleController {
      * @return true si la région a été modifiée
      */
     boolean tick(@NotNull ServerLevel level, @NotNull CloudRegionState state) {
-        if (!state.isActive()) {
+        if (!state.isActive() || state.isEmpty()) {
             return false;
         }
 
-        int nextAge = state.getAgeTicks() + 1;
-        int lifetime = Math.max(1, state.getLifetimeTicks());
+        boolean changed = false;
+        for (CloudClusterState cluster : state.getClusters()) {
+            if (cluster == null || !cluster.isActive()) {
+                continue;
+            }
 
-        state.setAgeTicks(nextAge);
+            int nextAge = cluster.getAgeTicks() + 1;
+            int lifetime = Math.max(1, cluster.getLifetimeTicks());
 
-        float growth = computeGrowth(nextAge);
-        float decay = computeDecay(nextAge, lifetime);
+            cluster.setAgeTicks(nextAge);
 
-        state.setGrowth(growth);
-        state.setDecay(decay);
+            float growth = computeGrowth(nextAge);
+            float decay = computeDecay(nextAge, lifetime);
 
-        if (nextAge >= lifetime) {
-            state.setActive(false);
+            cluster.setGrowth(growth);
+            cluster.setDecay(decay);
+
+            if (nextAge >= lifetime) {
+                cluster.setActive(false);
+            }
+            changed = true;
         }
 
-        return true;
+        state.getClusters().stream()
+                .filter(cluster -> cluster != null && !cluster.isActive())
+                .forEach(cluster -> state.removeCluster(cluster));
+
+        return changed;
     }
 
     /**
