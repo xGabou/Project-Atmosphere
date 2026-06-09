@@ -25,6 +25,7 @@
     "MixinSandstormDebugBlocker",
     "MultiRegionCloudMeshGeneratorMixin",
     "client.DefaultPipelineTornadoMixin",
+    "client.ClientLevelWeatherMixin",
     "client.InstanceableMeshDiagnosticsMixin",
     "client.DhSupportPipelineDiagnosticsMixin",
     "client.OptionsScreenMixin",

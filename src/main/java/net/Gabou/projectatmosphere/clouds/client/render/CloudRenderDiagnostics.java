@@ -36,6 +36,18 @@ public final class CloudRenderDiagnostics {
     private static String lastCloudTypeId = "";
     private static int lastCloudSeed;
     private static float lastCloudRadius;
+    private static long frameCpuStartNs;
+    private static long raymarchCpuNs;
+    private static long compositeCpuNs;
+    private static float raymarchGpuMs;
+    private static float compositeGpuMs;
+    private static boolean gpuTimingSupported;
+    private static boolean raymarchGpuTimingValid;
+    private static boolean compositeGpuTimingValid;
+    private static int raymarchGpuAgeFrames;
+    private static int compositeGpuAgeFrames;
+    private static int raymarchGpuPendingQueries;
+    private static int compositeGpuPendingQueries;
 
     private CloudRenderDiagnostics() {
     }
@@ -66,6 +78,18 @@ public final class CloudRenderDiagnostics {
         lastCloudTypeId = "";
         lastCloudSeed = 0;
         lastCloudRadius = 0.0F;
+        frameCpuStartNs = System.nanoTime();
+        raymarchCpuNs = 0L;
+        compositeCpuNs = 0L;
+        raymarchGpuMs = 0.0F;
+        compositeGpuMs = 0.0F;
+        gpuTimingSupported = true;
+        raymarchGpuTimingValid = false;
+        compositeGpuTimingValid = false;
+        raymarchGpuAgeFrames = -1;
+        compositeGpuAgeFrames = -1;
+        raymarchGpuPendingQueries = 0;
+        compositeGpuPendingQueries = 0;
     }
 
     public static void recordRendered(@NotNull CloudRenderSnapshot snapshot) {
@@ -95,12 +119,59 @@ public final class CloudRenderDiagnostics {
         compositeSubmitted = submitted;
     }
 
+    public static long nowNs() {
+        return System.nanoTime();
+    }
+
+    public static void recordRaymarchCpuTime(long startNs) {
+        if (!frameOpen || startNs <= 0L) {
+            return;
+        }
+
+        raymarchCpuNs += Math.max(0L, System.nanoTime() - startNs);
+    }
+
+    public static void recordCompositeCpuTime(long startNs) {
+        if (!frameOpen || startNs <= 0L) {
+            return;
+        }
+
+        compositeCpuNs += Math.max(0L, System.nanoTime() - startNs);
+    }
+
+    public static void recordGpuTimings(
+            float raymarchMilliseconds,
+            float compositeMilliseconds,
+            boolean supported,
+            boolean raymarchValid,
+            boolean compositeValid,
+            int raymarchAgeFrames,
+            int compositeAgeFrames,
+            int raymarchPending,
+            int compositePending
+    ) {
+        if (!frameOpen) {
+            return;
+        }
+
+        raymarchGpuMs = Math.max(0.0F, raymarchMilliseconds);
+        compositeGpuMs = Math.max(0.0F, compositeMilliseconds);
+        gpuTimingSupported = supported;
+        raymarchGpuTimingValid = raymarchValid;
+        compositeGpuTimingValid = compositeValid;
+        raymarchGpuAgeFrames = raymarchAgeFrames;
+        compositeGpuAgeFrames = compositeAgeFrames;
+        raymarchGpuPendingQueries = Math.max(0, raymarchPending);
+        compositeGpuPendingQueries = Math.max(0, compositePending);
+    }
+
     public static void finishFrame() {
         if (!frameOpen) {
             return;
         }
 
         frameOpen = false;
+        long frameCpuNs = frameCpuStartNs <= 0L ? 0L : Math.max(0L, System.nanoTime() - frameCpuStartNs);
         int filteredSkipped = Math.max(0, sourceSnapshots - renderableSnapshots);
         int totalSkipped = filteredSkipped + submitSkippedSnapshots;
         FrameStats stats = new FrameStats(
@@ -122,7 +193,20 @@ public final class CloudRenderDiagnostics {
                 compositeSubmitted,
                 lastCloudTypeId,
                 lastCloudSeed,
-                lastCloudRadius
+                lastCloudRadius,
+                nsToMs(frameCpuNs),
+                nsToMs(raymarchCpuNs),
+                nsToMs(compositeCpuNs),
+                raymarchGpuMs,
+                compositeGpuMs,
+                gpuTimingSupported,
+                raymarchGpuTimingValid,
+                compositeGpuTimingValid,
+                raymarchGpuAgeFrames,
+                compositeGpuAgeFrames,
+                raymarchGpuPendingQueries,
+                compositeGpuPendingQueries,
+                estimatePixelStepsMillions()
         );
         lastStats = stats;
         maybeLog(stats);
@@ -143,7 +227,7 @@ public final class CloudRenderDiagnostics {
 
         lastLoggedWorldTime = stats.worldTime();
         ProjectAtmosphere.LOGGER.info(
-                "[CloudRender] quality={} steps={} scale={} main={}x{} target={}x{} downscaled={} snapshots={}/{} rendered={} skipped={} filtered={} submitSkipped={} composite={} lastCloud={}",
+                "[CloudRender] quality={} steps={} scale={} main={}x{} target={}x{} downscaled={} snapshots={}/{} rendered={} skipped={} filtered={} submitSkipped={} composite={} workMPxSteps={} cpuMs={} rayCpuMs={} compositeCpuMs={} rayGpuMs={} compositeGpuMs={} gpuTimer={} rayAge={} rayPending={} compAge={} compPending={} lastCloud={}",
                 stats.qualityName(),
                 stats.raymarchSteps(),
                 formatFloat(stats.resolutionScale()),
@@ -159,6 +243,17 @@ public final class CloudRenderDiagnostics {
                 stats.filteredSkippedSnapshots(),
                 stats.submitSkippedSnapshots(),
                 stats.compositeSubmitted(),
+                formatFloat(stats.pixelStepMegas()),
+                formatFloat(stats.frameCpuMs()),
+                formatFloat(stats.raymarchCpuMs()),
+                formatFloat(stats.compositeCpuMs()),
+                formatFloat(stats.raymarchGpuMs()),
+                formatFloat(stats.compositeGpuMs()),
+                stats.gpuTimingSupported(),
+                stats.raymarchGpuAgeFrames(),
+                stats.raymarchGpuPendingQueries(),
+                stats.compositeGpuAgeFrames(),
+                stats.compositeGpuPendingQueries(),
                 stats.describeLastCloud()
         );
     }
@@ -183,6 +278,14 @@ public final class CloudRenderDiagnostics {
         return String.format(java.util.Locale.ROOT, "%.2f", value);
     }
 
+    private static float nsToMs(long value) {
+        return (float) (value / 1_000_000.0D);
+    }
+
+    private static float estimatePixelStepsMillions() {
+        return targetWidth * (float) targetHeight * (float) raymarchSteps / 1_000_000.0F;
+    }
+
     public record FrameStats(
             long worldTime,
             @NotNull String qualityName,
@@ -202,7 +305,20 @@ public final class CloudRenderDiagnostics {
             boolean compositeSubmitted,
             @Nullable String lastCloudTypeId,
             int lastCloudSeed,
-            float lastCloudRadius
+            float lastCloudRadius,
+            float frameCpuMs,
+            float raymarchCpuMs,
+            float compositeCpuMs,
+            float raymarchGpuMs,
+            float compositeGpuMs,
+            boolean gpuTimingSupported,
+            boolean raymarchGpuTimingValid,
+            boolean compositeGpuTimingValid,
+            int raymarchGpuAgeFrames,
+            int compositeGpuAgeFrames,
+            int raymarchGpuPendingQueries,
+            int compositeGpuPendingQueries,
+            float pixelStepMegas
     ) {
         private static FrameStats empty() {
             return new FrameStats(
@@ -223,6 +339,19 @@ public final class CloudRenderDiagnostics {
                     0,
                     false,
                     "",
+                    0,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    true,
+                    false,
+                    false,
+                    -1,
+                    -1,
+                    0,
                     0,
                     0.0F
             );

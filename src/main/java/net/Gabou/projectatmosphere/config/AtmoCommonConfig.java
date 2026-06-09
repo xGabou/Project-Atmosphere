@@ -104,6 +104,9 @@ public class AtmoCommonConfig {
 
     public static final ForgeConfigSpec.BooleanValue DEBUG_MODE;
     public static final ForgeConfigSpec.EnumValue<CloudDiagnosticsOverlayMode> CLOUD_DIAGNOSTICS_OVERLAY;
+    public static final ForgeConfigSpec.BooleanValue CLOUD_DIAGNOSTICS_SHOW_RENDER;
+    public static final ForgeConfigSpec.BooleanValue CLOUD_DIAGNOSTICS_SHOW_WEATHER;
+    public static final ForgeConfigSpec.BooleanValue CLOUD_DIAGNOSTICS_SHOW_WORLD_EFFECTS;
 
 
 
@@ -563,6 +566,15 @@ public class AtmoCommonConfig {
         CLOUD_DIAGNOSTICS_OVERLAY = builder
                 .comment("Cloud render diagnostics overlay mode. F3+O cycles this in-game.")
                 .defineEnum("cloudDiagnosticsOverlay", CloudDiagnosticsOverlayMode.OFF);
+        CLOUD_DIAGNOSTICS_SHOW_RENDER = builder
+                .comment("Show cloud render diagnostics in the Project Atmosphere overlay.")
+                .define("cloudDiagnosticsShowRender", true);
+        CLOUD_DIAGNOSTICS_SHOW_WEATHER = builder
+                .comment("Show localized weather diagnostics in the Project Atmosphere overlay.")
+                .define("cloudDiagnosticsShowWeather", true);
+        CLOUD_DIAGNOSTICS_SHOW_WORLD_EFFECTS = builder
+                .comment("Show world effect diagnostics in the Project Atmosphere overlay.")
+                .define("cloudDiagnosticsShowWorldEffects", true);
         builder.pop();
 
         COMMON_SPEC = builder.build();

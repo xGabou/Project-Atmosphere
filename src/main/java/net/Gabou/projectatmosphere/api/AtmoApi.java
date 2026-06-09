@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.api;
 
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsManager;
+import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
+import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.ForecastType;
@@ -92,6 +94,10 @@ public class AtmoApi {
         float windSpeed = wind == null ? 0f : wind.baseSpeed();
         float windAngle = wind == null ? 0f : wind.angleRadians();
 
+        CloudWeatherSample cloudWeather = WeatherCloudQueries.sampleAt(level, pos, true);
+        rainIntensity = Math.max(rainIntensity, cloudWeather.rainStrength());
+        cloudCover = Math.max(cloudCover, cloudWeather.cloudCoverStrength());
+
         float stormFactor;
         if (state != null) {
             float rain = Math.min(1f, state.getRainIntensity());
@@ -106,8 +112,8 @@ public class AtmoApi {
         } else {
             stormFactor = 0f;
         }
-        boolean storming = rainIntensity >= 0.6f || stormFactor >= 0.7f;
-        boolean snowing = rainIntensity > 0f && temperature <= 0f;
+        boolean storming = rainIntensity >= 0.6f || stormFactor >= 0.7f || cloudWeather.hasThunder();
+        boolean snowing = rainIntensity > 0f && (temperature <= 0f || cloudWeather.snowing());
 
         return new WeatherSnapshot(cloudCover, rainIntensity, temperature, windSpeed, windAngle, storming, snowing);
     }

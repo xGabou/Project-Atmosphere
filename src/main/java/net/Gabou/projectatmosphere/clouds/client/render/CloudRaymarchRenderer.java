@@ -36,7 +36,8 @@ public final class CloudRaymarchRenderer {
             @NotNull CloudRenderFrameContext frameContext,
             @NotNull CloudRenderSnapshot snapshot,
             @NotNull RenderTarget outputTarget,
-            int sceneDepthTextureId
+            int sceneDepthTextureId,
+            @NotNull CloudGpuTimer gpuTimer
     ) {
         ShaderInstance shader = CloudShaders.getShader();
         if (shader == null || !snapshot.isEnabled() || !CloudDensityProvider.hasVisibleDensity(snapshot)) {
@@ -59,9 +60,11 @@ public final class CloudRaymarchRenderer {
         CloudUniformUploader.apply(shader, frameContext, snapshot, outputTarget);
         shader.apply();
 
+        gpuTimer.begin();
         fullscreenQuad.bind();
         fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
         VertexBuffer.unbind();
+        gpuTimer.end();
         shader.clear();
 
         RenderSystem.depthMask(true);

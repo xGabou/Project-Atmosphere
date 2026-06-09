@@ -1,10 +1,14 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
+import net.Gabou.projectatmosphere.clouds.client.ClientLocalizedWeatherState;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsDiagnostics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
@@ -94,22 +98,74 @@ public final class CloudDiagnosticsOverlay {
             AtmoCommonConfig.CloudDiagnosticsOverlayMode mode
     ) {
         List<String> lines = new ArrayList<>();
-        lines.add("PA Clouds [" + mode.name() + "]");
-        lines.add("Quality: " + stats.qualityName() + " / " + stats.raymarchSteps() + " steps / " + percent(stats.resolutionScale()));
-        lines.add("Target: " + stats.targetWidth() + "x" + stats.targetHeight()
-                + " of " + stats.mainWidth() + "x" + stats.mainHeight()
-                + " / downscaled=" + yesNo(stats.downscaled()));
-        lines.add("Clouds: " + stats.renderedSnapshots()
-                + " rendered / " + stats.renderableSnapshots()
-                + " renderable / " + stats.sourceSnapshots() + " synced");
+        lines.add("PA Overlay [" + mode.name() + "]");
 
-        if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
-            lines.add("Skipped: " + stats.totalSkippedSnapshots()
-                    + " total / " + stats.filteredSkippedSnapshots()
-                    + " filtered / " + stats.submitSkippedSnapshots() + " submit");
-            lines.add("Composite: " + yesNo(stats.compositeSubmitted()));
-            lines.add("Last: " + stats.describeLastCloud());
-            lines.add("World time: " + stats.worldTime());
+        if (showRenderSection()) {
+            lines.add("Render: " + stats.qualityName() + " / " + stats.raymarchSteps() + " steps / " + percent(stats.resolutionScale()));
+            lines.add("Target: " + stats.targetWidth() + "x" + stats.targetHeight()
+                    + " of " + stats.mainWidth() + "x" + stats.mainHeight()
+                    + " / downscaled=" + yesNo(stats.downscaled()));
+            lines.add("Clouds: " + stats.renderedSnapshots()
+                    + " rendered / " + stats.renderableSnapshots()
+                    + " renderable / " + stats.sourceSnapshots() + " synced");
+
+            if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
+                lines.add("Work: " + formatFloat(stats.pixelStepMegas()) + "M px-steps");
+                lines.add("Timing CPU: frame " + formatFloat(stats.frameCpuMs())
+                        + "ms / ray " + formatFloat(stats.raymarchCpuMs())
+                        + "ms / comp " + formatFloat(stats.compositeCpuMs()) + "ms");
+                lines.add("Timing GPU: ray " + formatTiming(
+                        stats.raymarchGpuMs(),
+                        stats.gpuTimingSupported(),
+                        stats.raymarchGpuTimingValid(),
+                        stats.raymarchGpuAgeFrames(),
+                        stats.raymarchGpuPendingQueries()
+                ) + " / comp " + formatTiming(
+                        stats.compositeGpuMs(),
+                        stats.gpuTimingSupported(),
+                        stats.compositeGpuTimingValid(),
+                        stats.compositeGpuAgeFrames(),
+                        stats.compositeGpuPendingQueries()
+                ));
+                lines.add("Skipped: " + stats.totalSkippedSnapshots()
+                        + " total / " + stats.filteredSkippedSnapshots()
+                        + " filtered / " + stats.submitSkippedSnapshots() + " submit");
+                lines.add("Composite: " + yesNo(stats.compositeSubmitted()));
+                lines.add("Last cloud: " + stats.describeLastCloud());
+                lines.add("World time: " + stats.worldTime());
+            }
+        }
+
+        if (showWeatherSection()) {
+            ClientLocalizedWeatherState.Diagnostics weather = ClientLocalizedWeatherState.getDiagnostics();
+            CloudWeatherSample sample = weather.sample();
+            lines.add("Weather: rain " + formatFloat(weather.targetRainLevel()) + " -> " + formatFloat(weather.smoothedRainLevel())
+                    + " / thunder " + formatFloat(weather.targetThunderLevel()) + " -> " + formatFloat(weather.smoothedThunderLevel()));
+
+            if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
+                BlockPos pos = weather.samplePos();
+                lines.add("Weather src: " + sample.describeSource()
+                        + " / column=" + yesNo(sample.inPrecipitationColumn())
+                        + " / snow=" + yesNo(sample.snowing()));
+                lines.add("Weather pos: " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
+                        + " / cover=" + formatFloat(sample.cloudCoverStrength()));
+            }
+        }
+
+        if (showWorldEffectsSection()) {
+            AtmosphereWorldEffectsDiagnostics.FrameStats effects = AtmosphereWorldEffectsDiagnostics.getLastStats();
+            lines.add("Effects: enabled=" + yesNo(effects.enabled())
+                    + " / samples " + effects.rainySamples() + "/" + effects.samples()
+                    + " / lastRain=" + formatFloat(effects.lastRainIntensity()));
+
+            if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
+                lines.add("Effects blocks: fire " + effects.firesRemoved()
+                        + " / campfire " + effects.campfiresDoused()
+                        + " / cauldron " + effects.cauldronsFilled());
+                lines.add("Effects hooks: events " + effects.eventHooks()
+                        + " / custom " + effects.customHooks()
+                        + " / skyBlocked " + effects.skyBlockedSamples());
+            }
         }
 
         return lines;
@@ -123,12 +179,47 @@ public final class CloudDiagnosticsOverlay {
         }
     }
 
+    private static boolean showRenderSection() {
+        try {
+            return AtmoCommonConfig.CLOUD_DIAGNOSTICS_SHOW_RENDER.get();
+        } catch (IllegalStateException exception) {
+            return true;
+        }
+    }
+
+    private static boolean showWeatherSection() {
+        try {
+            return AtmoCommonConfig.CLOUD_DIAGNOSTICS_SHOW_WEATHER.get();
+        } catch (IllegalStateException exception) {
+            return true;
+        }
+    }
+
+    private static boolean showWorldEffectsSection() {
+        try {
+            return AtmoCommonConfig.CLOUD_DIAGNOSTICS_SHOW_WORLD_EFFECTS.get();
+        } catch (IllegalStateException exception) {
+            return true;
+        }
+    }
+
     private static String percent(float value) {
         return Math.round(value * 100.0F) + "%";
     }
 
     private static String yesNo(boolean value) {
         return value ? "yes" : "no";
+    }
+
+    private static String formatFloat(float value) {
+        return String.format(java.util.Locale.ROOT, "%.2f", value);
+    }
+
+    private static String formatTiming(float value, boolean supported, boolean valid, int ageFrames, int pendingQueries) {
+        if (!supported || !valid) {
+            return "n/a";
+        }
+        return formatFloat(value) + "ms a" + ageFrames + " p" + pendingQueries;
     }
 
     private static void saveCommonConfigForMod(String modId) {

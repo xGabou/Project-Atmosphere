@@ -16,6 +16,8 @@ import java.util.List;
  * Cette classe ne gère pas le rendu debug et ne lit jamais debugSnapshot.
  */
 public final class CloudRenderer {
+    private static final CloudGpuTimer RAYMARCH_GPU_TIMER = new CloudGpuTimer();
+    private static final CloudGpuTimer COMPOSITE_GPU_TIMER = new CloudGpuTimer();
 
     private CloudRenderer() {
 
@@ -60,16 +62,37 @@ public final class CloudRenderer {
             cloudTarget.bindWrite(true);
             int sceneDepthTextureId = mainTarget.getDepthTextureId();
             for (CloudRenderSnapshot snapshot : renderableSnapshots) {
-                if (renderSnapshot(frameContext, snapshot, cloudTarget, sceneDepthTextureId)) {
+                long raymarchCpuStart = CloudRenderDiagnostics.nowNs();
+                if (renderSnapshot(frameContext, snapshot, cloudTarget, sceneDepthTextureId, RAYMARCH_GPU_TIMER)) {
+                    CloudRenderDiagnostics.recordRaymarchCpuTime(raymarchCpuStart);
                     CloudRenderDiagnostics.recordRendered(snapshot);
                 } else {
+                    CloudRenderDiagnostics.recordRaymarchCpuTime(raymarchCpuStart);
                     CloudRenderDiagnostics.recordSubmitSkipped();
                 }
             }
 
             if (downscaled) {
+                long compositeCpuStart = CloudRenderDiagnostics.nowNs();
+                COMPOSITE_GPU_TIMER.begin();
                 CloudRenderDiagnostics.recordCompositeSubmitted(CloudRaymarchRenderer.compositeTarget(cloudTarget, mainTarget));
+                COMPOSITE_GPU_TIMER.end();
+                CloudRenderDiagnostics.recordCompositeCpuTime(compositeCpuStart);
+            } else {
+                COMPOSITE_GPU_TIMER.poll();
             }
+            RAYMARCH_GPU_TIMER.poll();
+            CloudRenderDiagnostics.recordGpuTimings(
+                    RAYMARCH_GPU_TIMER.getLastMilliseconds(),
+                    downscaled ? COMPOSITE_GPU_TIMER.getLastMilliseconds() : 0.0F,
+                    RAYMARCH_GPU_TIMER.isSupported() && COMPOSITE_GPU_TIMER.isSupported(),
+                    RAYMARCH_GPU_TIMER.hasResult(),
+                    downscaled && COMPOSITE_GPU_TIMER.hasResult(),
+                    RAYMARCH_GPU_TIMER.getLastResultAgeFrames(),
+                    downscaled ? COMPOSITE_GPU_TIMER.getLastResultAgeFrames() : -1,
+                    RAYMARCH_GPU_TIMER.getPendingQueries(),
+                    downscaled ? COMPOSITE_GPU_TIMER.getPendingQueries() : 0
+            );
         } finally {
             CloudRenderDiagnostics.finishFrame();
         }
@@ -85,11 +108,12 @@ public final class CloudRenderer {
             @NotNull CloudRenderFrameContext frameContext,
             @Nullable CloudRenderSnapshot snapshot,
             @NotNull RenderTarget cloudTarget,
-            int sceneDepthTextureId
+            int sceneDepthTextureId,
+            @NotNull CloudGpuTimer gpuTimer
     ) {
         if (snapshot == null) {
             return false;
         }
-        return CloudRaymarchRenderer.renderSnapshot(frameContext, snapshot, cloudTarget, sceneDepthTextureId);
+        return CloudRaymarchRenderer.renderSnapshot(frameContext, snapshot, cloudTarget, sceneDepthTextureId, gpuTimer);
     }
 }
