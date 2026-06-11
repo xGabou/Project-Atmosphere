@@ -91,6 +91,33 @@ public final class CloudUniformUploader {
         shader.safeGetUniform("CloudTowerStrength").set(snapshot.getTowerStrength());
         shader.safeGetUniform("CloudAnvilStrength").set(snapshot.getAnvilStrength());
         shader.safeGetUniform("CloudPrecipitationCoreStrength").set(snapshot.getPrecipitationCoreStrength());
+        shader.safeGetUniform("CloudMaterialDarkness").set(snapshot.getMaterialProfile().getDarkness());
+        shader.safeGetUniform("CloudMaterialPrecipitationTint").set(snapshot.getMaterialProfile().getPrecipitationTint());
+        shader.safeGetUniform("CloudMaterialOpacityBias").set(snapshot.getMaterialProfile().getOpacityBias());
+        shader.safeGetUniform("CloudMaterialUndersideDarkness").set(snapshot.getMaterialProfile().getUndersideDarkness());
+        shader.safeGetUniform("CloudMaterialEdgeErosion").set(snapshot.getMaterialProfile().getEdgeErosion());
+        shader.safeGetUniform("CloudStormCoreDarkening").set(snapshot.getMaterialProfile().getStormCoreDarkening());
+        shader.safeGetUniform("CloudMaterialShadowContribution").set(snapshot.getMaterialProfile().getShadowContribution());
+        shader.safeGetUniform("CloudMaterialLightningResponse").set(snapshot.getMaterialProfile().getLightningResponse());
+        shader.safeGetUniform("CloudShapeLobeCounts").set(
+                (float) snapshot.getShapeProfile().getLobeCountMin(),
+                (float) snapshot.getShapeProfile().getLobeCountMax()
+        );
+        shader.safeGetUniform("CloudShapeLobeStrength").set(snapshot.getShapeProfile().getLobeStrength());
+        shader.safeGetUniform("CloudShapeVerticalTilt").set(snapshot.getShapeProfile().getVerticalTilt());
+        shader.safeGetUniform("CloudShapeWindShearStrength").set(snapshot.getShapeProfile().getWindShearStrength());
+        shader.safeGetUniform("CloudShapeCellSplitStrength").set(snapshot.getShapeProfile().getCellSplitStrength());
+        shader.safeGetUniform("CloudShapeTowerNarrowing").set(snapshot.getShapeProfile().getTowerNarrowing());
+        shader.safeGetUniform("CloudShapeAnvilSpread").set(snapshot.getShapeProfile().getAnvilSpread());
+        shader.safeGetUniform("CloudShapeBaseFlattening").set(snapshot.getShapeProfile().getBaseFlattening());
+        shader.safeGetUniform("CloudShapeEdgeRaggedness").set(snapshot.getShapeProfile().getEdgeRaggedness());
+        shader.safeGetUniform("CloudShapeStormWallStrength").set(snapshot.getShapeProfile().getStormWallStrength());
+        shader.safeGetUniform("CloudStormVisualTier").set(snapshot.getStormVisualTier().ordinal());
+        shader.safeGetUniform("CloudStormVisualDarkness").set(snapshot.getStormVisualTier().getDarkness());
+        shader.safeGetUniform("CloudPrecipitationTier").set(snapshot.getPrecipitationTier().ordinal());
+        shader.safeGetUniform("CloudPrecipitationIntensity").set(snapshot.getPrecipitationTier().getRepresentativeIntensity());
+        shader.safeGetUniform("CloudShadowContribution").set(snapshot.getShadowContribution());
+        shader.safeGetUniform("CloudLightningInfluence").set(snapshot.getLightningInfluence());
 
         float[] cloudColor = CloudLightingBridge.resolveCloudColor(snapshot, frameContext);
         shader.safeGetUniform("CloudColor").set(cloudColor[0], cloudColor[1], cloudColor[2], cloudColor[3]);

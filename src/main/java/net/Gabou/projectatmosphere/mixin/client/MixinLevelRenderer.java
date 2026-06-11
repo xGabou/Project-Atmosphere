@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
+import net.Gabou.projectatmosphere.clouds.client.render.CustomPrecipitationRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
@@ -38,7 +39,9 @@ public class MixinLevelRenderer {
 
     @Inject(method = "renderSnowAndRain", at = @At("HEAD"), cancellable = true)
     public void projectatmosphere$customRainHook_renderSnowAndRain(LightTexture texture, float partialTick, double camX, double camY, double camZ, CallbackInfo ci) {
-        // Hook intentionally left non-cancelling until PA ships a replacement rain renderer.
+        if (CustomPrecipitationRenderer.renderSnowAndRain(this.level, texture, partialTick, camX, camY, camZ)) {
+            ci.cancel();
+        }
     }
 
     @ModifyConstant(method = "tickRain", constant = @Constant(floatValue = 0.2F, ordinal = 0))

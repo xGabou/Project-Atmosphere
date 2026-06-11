@@ -1,5 +1,9 @@
 package net.Gabou.projectatmosphere.clouds.transport;
 
+import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
+import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
+import net.Gabou.projectatmosphere.modules.weather.StormVisualTier;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 
@@ -48,6 +52,12 @@ public final class CloudRegionRenderData {
     private final float precipitationCoreStrength;
     private final int cloudSeed;
     private final float mergePressure;
+    private final CloudMaterialProfile materialProfile;
+    private final CloudShapeProfile shapeProfile;
+    private final StormVisualTier stormVisualTier;
+    private final PrecipitationTier precipitationTier;
+    private final float shadowContribution;
+    private final float lightningInfluence;
 
     public CloudRegionRenderData(
             UUID regionId,
@@ -86,7 +96,13 @@ public final class CloudRegionRenderData {
             float anvilStrength,
             float precipitationCoreStrength,
             int cloudSeed,
-            float mergePressure
+            float mergePressure,
+            CloudMaterialProfile materialProfile,
+            CloudShapeProfile shapeProfile,
+            StormVisualTier stormVisualTier,
+            PrecipitationTier precipitationTier,
+            float shadowContribution,
+            float lightningInfluence
     ) {
         this.regionId = regionId;
         this.clusterId = clusterId;
@@ -125,6 +141,12 @@ public final class CloudRegionRenderData {
         this.precipitationCoreStrength = precipitationCoreStrength;
         this.cloudSeed = cloudSeed;
         this.mergePressure = mergePressure;
+        this.materialProfile = materialProfile == null ? CloudMaterialProfile.DEFAULT : materialProfile;
+        this.shapeProfile = shapeProfile == null ? CloudShapeProfile.DEFAULT : shapeProfile;
+        this.stormVisualTier = stormVisualTier == null ? StormVisualTier.CLEAR : stormVisualTier;
+        this.precipitationTier = precipitationTier == null ? PrecipitationTier.NONE : precipitationTier;
+        this.shadowContribution = clamp01(shadowContribution);
+        this.lightningInfluence = clamp01(lightningInfluence);
     }
 
     public UUID getRegionId() {
@@ -275,6 +297,30 @@ public final class CloudRegionRenderData {
         return mergePressure;
     }
 
+    public CloudMaterialProfile getMaterialProfile() {
+        return materialProfile;
+    }
+
+    public CloudShapeProfile getShapeProfile() {
+        return shapeProfile;
+    }
+
+    public StormVisualTier getStormVisualTier() {
+        return stormVisualTier;
+    }
+
+    public PrecipitationTier getPrecipitationTier() {
+        return precipitationTier;
+    }
+
+    public float getShadowContribution() {
+        return shadowContribution;
+    }
+
+    public float getLightningInfluence() {
+        return lightningInfluence;
+    }
+
     /**
      * Écrit cette donnée transportable dans un buffer réseau.
      *
@@ -324,6 +370,12 @@ public final class CloudRegionRenderData {
         buffer.writeFloat(precipitationCoreStrength);
         buffer.writeInt(cloudSeed);
         buffer.writeFloat(mergePressure);
+        encodeMaterialProfile(buffer, materialProfile);
+        encodeShapeProfile(buffer, shapeProfile);
+        buffer.writeEnum(stormVisualTier);
+        buffer.writeEnum(precipitationTier);
+        buffer.writeFloat(shadowContribution);
+        buffer.writeFloat(lightningInfluence);
     }
 
     /**
@@ -370,6 +422,12 @@ public final class CloudRegionRenderData {
         float precipitationCoreStrength = buffer.readFloat();
         int cloudSeed = buffer.readInt();
         float mergePressure = buffer.readFloat();
+        CloudMaterialProfile materialProfile = decodeMaterialProfile(buffer);
+        CloudShapeProfile shapeProfile = decodeShapeProfile(buffer);
+        StormVisualTier stormVisualTier = buffer.readEnum(StormVisualTier.class);
+        PrecipitationTier precipitationTier = buffer.readEnum(PrecipitationTier.class);
+        float shadowContribution = buffer.readFloat();
+        float lightningInfluence = buffer.readFloat();
 
         return new CloudRegionRenderData(
                 regionId,
@@ -408,7 +466,91 @@ public final class CloudRegionRenderData {
                 anvilStrength,
                 precipitationCoreStrength,
                 cloudSeed,
-                mergePressure
+                mergePressure,
+                materialProfile,
+                shapeProfile,
+                stormVisualTier,
+                precipitationTier,
+                shadowContribution,
+                lightningInfluence
         );
+    }
+
+    private static void encodeMaterialProfile(FriendlyByteBuf buffer, CloudMaterialProfile profile) {
+        CloudMaterialProfile safeProfile = profile == null ? CloudMaterialProfile.DEFAULT : profile;
+        buffer.writeUtf(safeProfile.getMaterialId());
+        buffer.writeUtf(safeProfile.getTextureId());
+        buffer.writeFloat(safeProfile.getDarkness());
+        buffer.writeFloat(safeProfile.getPrecipitationTint());
+        buffer.writeFloat(safeProfile.getOpacityBias());
+        buffer.writeFloat(safeProfile.getUndersideDarkness());
+        buffer.writeFloat(safeProfile.getEdgeErosion());
+        buffer.writeFloat(safeProfile.getStormCoreDarkening());
+        buffer.writeFloat(safeProfile.getShadowContribution());
+        buffer.writeFloat(safeProfile.getLightningResponse());
+    }
+
+    private static CloudMaterialProfile decodeMaterialProfile(FriendlyByteBuf buffer) {
+        return new CloudMaterialProfile(
+                buffer.readUtf(),
+                buffer.readUtf(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat()
+        );
+    }
+
+    private static void encodeShapeProfile(FriendlyByteBuf buffer, CloudShapeProfile profile) {
+        CloudShapeProfile safeProfile = profile == null ? CloudShapeProfile.DEFAULT : profile;
+        buffer.writeUtf(safeProfile.getShapeId());
+        buffer.writeFloat(safeProfile.getBaseRadius());
+        buffer.writeFloat(safeProfile.getBaseOffset());
+        buffer.writeFloat(safeProfile.getTopOffset());
+        buffer.writeVarInt(safeProfile.getLobeCountMin());
+        buffer.writeVarInt(safeProfile.getLobeCountMax());
+        buffer.writeFloat(safeProfile.getLobeStrength());
+        buffer.writeFloat(safeProfile.getVerticalTilt());
+        buffer.writeFloat(safeProfile.getWindShearStrength());
+        buffer.writeFloat(safeProfile.getCellSplitStrength());
+        buffer.writeFloat(safeProfile.getTowerNarrowing());
+        buffer.writeFloat(safeProfile.getAnvilSpread());
+        buffer.writeFloat(safeProfile.getBaseFlattening());
+        buffer.writeFloat(safeProfile.getEdgeRaggedness());
+        buffer.writeFloat(safeProfile.getStormWallStrength());
+    }
+
+    private static CloudShapeProfile decodeShapeProfile(FriendlyByteBuf buffer) {
+        return new CloudShapeProfile(
+                buffer.readUtf(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readVarInt(),
+                buffer.readVarInt(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat(),
+                buffer.readFloat()
+        );
+    }
+
+    private static float clamp01(float value) {
+        if (value < 0.0F) {
+            return 0.0F;
+        }
+        if (value > 1.0F) {
+            return 1.0F;
+        }
+        return value;
     }
 }

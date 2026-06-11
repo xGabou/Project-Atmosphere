@@ -2,7 +2,10 @@ package net.Gabou.projectatmosphere.clouds.simulation;
 
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
+import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.clouds.type.CloudVisualProfile;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -34,42 +37,28 @@ final class CloudRegionTypeGeometry {
     }
 
     static void apply(@NotNull CloudClusterState cluster, String cloudTypeId) {
-        Shape shape = resolveShape(cloudTypeId);
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
+        CloudShapeProfile shape = definition.getShapeProfile();
+        CloudVisualProfile visual = definition.getVisualProfile();
         double centerY = cluster.getCenter().y();
 
-        cluster.setRadius(shape.radius);
+        cluster.setRadius(shape.getBaseRadius());
         cluster.setVerticalBounds(
-                (float) centerY - shape.baseOffset,
-                (float) centerY + shape.topOffset
+                (float) centerY - shape.getBaseOffset(),
+                (float) centerY + shape.getTopOffset()
         );
-        cluster.setDensity(shape.density);
-        cluster.setCoverage(shape.coverage);
-        cluster.setEdgeSoftness(shape.edgeSoftness);
+        cluster.setDensity(clamp01(0.48F + visual.getDensityMultiplier() * 0.26F + visual.getPrecipitationCoreStrength() * 0.18F));
+        cluster.setCoverage(clamp01(0.56F + visual.getCoverageMultiplier() * 0.24F + shape.getBaseFlattening() * 0.14F));
+        cluster.setEdgeSoftness(clamp01(0.24F + visual.getEdgeErosionStrength() * 0.28F + shape.getEdgeRaggedness() * 0.12F));
     }
 
-    private static Shape resolveShape(String cloudTypeId) {
-        String normalizedType = CloudTypeRegistry.getOrDefault(cloudTypeId).getId();
-
-        return switch (normalizedType) {
-            case "cumulus_mediocris" -> new Shape(58.0F, 18.0F, 32.0F, 0.70F, 0.78F, 0.34F);
-            case "cumulus_congestus" -> new Shape(72.0F, 22.0F, 62.0F, 0.76F, 0.82F, 0.32F);
-            case "cumulonimbus_calvus" -> new Shape(94.0F, 32.0F, 112.0F, 0.84F, 0.88F, 0.30F);
-            case "cumulonimbus_capillatus" -> new Shape(118.0F, 36.0F, 142.0F, 0.88F, 0.92F, 0.28F);
-            case "stratus_nebulosus" -> new Shape(128.0F, 8.0F, 14.0F, 0.50F, 0.92F, 0.52F);
-            case "stratocumulus" -> new Shape(106.0F, 10.0F, 24.0F, 0.62F, 0.86F, 0.44F);
-            case "nimbostratus" -> new Shape(150.0F, 12.0F, 30.0F, 0.82F, 0.96F, 0.48F);
-            case "cirrus" -> new Shape(122.0F, 5.0F, 12.0F, 0.34F, 0.58F, 0.64F);
-            default -> new Shape(48.0F, 10.0F, 24.0F, 0.62F, 0.72F, 0.38F);
-        };
-    }
-
-    private record Shape(
-            float radius,
-            float baseOffset,
-            float topOffset,
-            float density,
-            float coverage,
-            float edgeSoftness
-    ) {
+    private static float clamp01(float value) {
+        if (value < 0.0F) {
+            return 0.0F;
+        }
+        if (value > 1.0F) {
+            return 1.0F;
+        }
+        return value;
     }
 }

@@ -64,13 +64,37 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
                 || mixinClassName.contains("CloudMeshGenerator")
                 || mixinClassName.contains("MultiRegionCloudMeshGenerator")
                 || mixinClassName.contains("DefaultPipelineTornado")
-                || mixinClassName.contains("DefaultPipelineHurricane")
                 || mixinClassName.contains("ShaderSupportPipelineTornado")
-                || mixinClassName.contains("ShaderSupportPipelineHurricane")
                 || mixinClassName.contains("DhSupportPipeline")
                 || mixinClassName.contains("InstanceableMesh")
                 || mixinClassName.contains("InfoMixin")
                 || mixinClassName.contains("BindingManager");
+    }
+
+    private boolean isHurricaneRenderPipelineMixin(String mixinClassName) {
+        return mixinClassName.contains("DefaultPipelineHurricane")
+                || mixinClassName.contains("ShaderSupportPipelineHurricane");
+    }
+
+    private boolean isNativeCloudModuleMixin(String mixinClassName) {
+        return mixinClassName.endsWith("client.MixinLevelRenderer")
+                || mixinClassName.endsWith("client.MixinGameRenderer")
+                || mixinClassName.endsWith("client.MixinMinecraftLevelLifecycle");
+    }
+
+    private boolean isCloudWeatherOwnershipMixin(String mixinClassName) {
+        return mixinClassName.endsWith("ThrownTridentWeatherMixin")
+                || mixinClassName.endsWith("WeatherCommandMixin")
+                || mixinClassName.endsWith("WeatherStateMixin")
+                || mixinClassName.endsWith("ServerLevelWeatherCycleMixin")
+                || mixinClassName.endsWith("BiomeFreezingMixin")
+                || mixinClassName.endsWith("client.ClientLevelWeatherMixin");
+    }
+
+    private boolean isCloudModuleMixin(String mixinClassName) {
+        return isSimpleCloudsMixin(mixinClassName)
+                || isNativeCloudModuleMixin(mixinClassName)
+                || isCloudWeatherOwnershipMixin(mixinClassName);
     }
 
     private boolean isClassPresent(String className) {
@@ -98,7 +122,14 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
         if (!FMLEnvironment.dist.isClient() && mixinClassName.contains(".client.")) {
             return false;
         }
-        if (isSimpleCloudsMixin(mixinClassName) && !isSimpleCloudsLoaded()) {
+        boolean simpleCloudsLoaded = isSimpleCloudsLoaded();
+        if (isHurricaneRenderPipelineMixin(mixinClassName)) {
+            return simpleCloudsLoaded;
+        }
+        if (isCloudModuleMixin(mixinClassName) && simpleCloudsLoaded) {
+            return false;
+        }
+        if (isSimpleCloudsMixin(mixinClassName) && !simpleCloudsLoaded) {
             return false;
         }
         if (mixinClassName.endsWith("OverwriteDesertSound") && !isSandStormLoaded()) {
@@ -111,9 +142,6 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
             return false;
         }
         if (mixinClassName.contains("compat.rainbows") && !isRainbowsLoaded()) {
-            return false;
-        }
-        if (mixinClassName.endsWith("ServerLevelWeatherCycleMixin") && isSimpleCloudsLoaded()) {
             return false;
         }
         return true;

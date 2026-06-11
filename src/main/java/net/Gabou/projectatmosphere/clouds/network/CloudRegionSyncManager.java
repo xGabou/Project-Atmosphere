@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.network;
 
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.minecraft.server.level.ServerLevel;
@@ -25,7 +26,7 @@ public final class CloudRegionSyncManager {
      * @param level niveau serveur
      */
     public static void syncPlayers(ServerLevel level) {
-        if (level == null) {
+        if (level == null || AtmosphereCloudServices.isSimpleCloudsLoaded()) {
             return;
         }
         if (level.getGameTime() % 20L != 0L) {
@@ -43,7 +44,7 @@ public final class CloudRegionSyncManager {
      * @param player joueur cible
      */
     public static void syncPlayer(ServerPlayer player) {
-        if (player == null) {
+        if (player == null || AtmosphereCloudServices.isSimpleCloudsLoaded()) {
             return;
         }
 

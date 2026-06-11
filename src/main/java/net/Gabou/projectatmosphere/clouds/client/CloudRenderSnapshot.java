@@ -1,5 +1,9 @@
 package net.Gabou.projectatmosphere.clouds.client;
 
+import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
+import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
+import net.Gabou.projectatmosphere.modules.weather.StormVisualTier;
 import net.minecraft.world.phys.Vec3;
 
 public final class CloudRenderSnapshot {
@@ -43,6 +47,12 @@ public final class CloudRenderSnapshot {
     private final float precipitationCoreStrength;
     private final int cloudSeed;
     private final int debugColorOrTint;
+    private final CloudMaterialProfile materialProfile;
+    private final CloudShapeProfile shapeProfile;
+    private final StormVisualTier stormVisualTier;
+    private final PrecipitationTier precipitationTier;
+    private final float shadowContribution;
+    private final float lightningInfluence;
 
     public CloudRenderSnapshot(
             boolean enabled,
@@ -83,7 +93,13 @@ public final class CloudRenderSnapshot {
             float anvilStrength,
             float precipitationCoreStrength,
             int cloudSeed,
-            int debugColorOrTint
+            int debugColorOrTint,
+            CloudMaterialProfile materialProfile,
+            CloudShapeProfile shapeProfile,
+            StormVisualTier stormVisualTier,
+            PrecipitationTier precipitationTier,
+            float shadowContribution,
+            float lightningInfluence
     ) {
         this.enabled = enabled;
         this.dimension = dimension;
@@ -124,6 +140,12 @@ public final class CloudRenderSnapshot {
         this.precipitationCoreStrength = precipitationCoreStrength;
         this.cloudSeed = cloudSeed;
         this.debugColorOrTint = debugColorOrTint;
+        this.materialProfile = materialProfile == null ? CloudMaterialProfile.DEFAULT : materialProfile;
+        this.shapeProfile = shapeProfile == null ? CloudShapeProfile.DEFAULT : shapeProfile;
+        this.stormVisualTier = stormVisualTier == null ? StormVisualTier.CLEAR : stormVisualTier;
+        this.precipitationTier = precipitationTier == null ? PrecipitationTier.NONE : precipitationTier;
+        this.shadowContribution = clamp01(shadowContribution);
+        this.lightningInfluence = clamp01(lightningInfluence);
     }
 
     public boolean isEnabled() {
@@ -280,5 +302,47 @@ public final class CloudRenderSnapshot {
 
     public int getDebugColorOrTint() {
         return debugColorOrTint;
+    }
+
+    public CloudMaterialProfile getMaterialProfile() {
+        return materialProfile;
+    }
+
+    public CloudShapeProfile getShapeProfile() {
+        return shapeProfile;
+    }
+
+    public StormVisualTier getStormVisualTier() {
+        return stormVisualTier;
+    }
+
+    public PrecipitationTier getPrecipitationTier() {
+        return precipitationTier;
+    }
+
+    public float getShadowContribution() {
+        return shadowContribution;
+    }
+
+    public float getLightningInfluence() {
+        return lightningInfluence;
+    }
+
+    public float getMaterialDarkness() {
+        return materialProfile.getDarkness();
+    }
+
+    public float getStormCoreDarkening() {
+        return materialProfile.getStormCoreDarkening();
+    }
+
+    private static float clamp01(float value) {
+        if (value < 0.0F) {
+            return 0.0F;
+        }
+        if (value > 1.0F) {
+            return 1.0F;
+        }
+        return value;
     }
 }

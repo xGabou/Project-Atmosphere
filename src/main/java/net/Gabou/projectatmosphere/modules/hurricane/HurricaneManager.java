@@ -310,7 +310,7 @@ public class HurricaneManager {
             float cooling = 0.0F;
 
             for (HurricaneInstance hurricane : hurricanes) {
-                float forcingRadius = hurricane.getStormExtentRadius();
+                float forcingRadius = hurricane.getVisualStormExtentRadius();
                 double distance = state.distanceTo(hurricane.position.x, hurricane.position.z);
                 if (distance > forcingRadius) {
                     continue;
@@ -319,7 +319,7 @@ public class HurricaneManager {
                 float influence = 1.0F - (float) (distance / forcingRadius);
                 influence = Mth.clamp(influence, 0.0F, 1.0F);
                 float eyeRadius = hurricane.getVisualEyeRadius();
-                float coreRadius = hurricane.getCoreRadius();
+                float coreRadius = hurricane.getVisualCoreRadius();
                 boolean eyewallZone = distance >= eyeRadius * 1.3F && distance <= coreRadius * 0.9F;
                 float stormWeight = influence * (eyewallZone ? 1.0F : 0.78F);
                 cloudCeil = Math.max(cloudCeil, Mth.clamp(0.72F + stormWeight * 0.28F, 0.0F, 1.0F));
@@ -363,7 +363,7 @@ public class HurricaneManager {
         }
 
         for (HurricaneInstance hurricane : hurricanes) {
-            float activityRadius = hurricane.getStormExtentRadius() + 512.0F;
+            float activityRadius = hurricane.getVisualStormExtentRadius() + 512.0F;
             if (!projectatmosphere$isPlayerNear(level, hurricane, activityRadius)) {
                 continue;
             }
@@ -373,7 +373,7 @@ public class HurricaneManager {
             }
 
             float minRadius = hurricane.getVisualEyeRadius() * 1.3F;
-            float maxRadius = hurricane.getCoreRadius() * 0.9F;
+            float maxRadius = hurricane.getVisualCoreRadius() * 0.9F;
             if (maxRadius <= minRadius) {
                 maxRadius = minRadius + 16.0F;
             }

@@ -23,6 +23,7 @@ public class HurricaneInstance {
     private static final float CLOUD_LAYER_DESCENT = 620.0F;
     private static final float GROUND_CLEARANCE = 48.0F;
     private static final float OUTER_SHELL_SCALE = 0.25F;
+    private static final float MIN_FORMING_VISUAL_SCALE = 0.16F;
     private static final int WIND_FIELD_INTERVAL_TICKS = 2;
     private static final int DESTRUCTION_INTERVAL_TICKS = 8;
 
@@ -158,14 +159,42 @@ public class HurricaneInstance {
         return Math.max(coreRadius * 2.75F, cycloneDriven + this.category.ordinal() * 120.0F);
     }
 
+    public float getVisualGrowth(float partialTick) {
+        return switch (this.phase) {
+            case FORMING -> {
+                float progress = ((float)this.phaseTicks + partialTick) / Math.max(1.0F, (float)this.formationTicks);
+                progress = Mth.clamp(progress, 0.0F, 1.0F);
+                progress = progress * progress * (3.0F - 2.0F * progress);
+                yield Mth.lerp(progress, MIN_FORMING_VISUAL_SCALE, 1.0F);
+            }
+            case ACTIVE -> 1.0F;
+            case DISSIPATING -> {
+                float reference = Math.max(this.targetDestructiveStrength, 0.10F);
+                yield Mth.clamp(this.destructiveStrength / reference, 0.0F, 1.0F);
+            }
+            case DISSIPATED -> 0.0F;
+        };
+    }
+
+    public float getVisualCoreRadius() {
+        float growth = this.getVisualGrowth(0.0F);
+        return Math.max(this.getCoreRadius() * growth, 80.0F);
+    }
+
+    public float getVisualStormExtentRadius() {
+        float growth = this.getVisualGrowth(0.0F);
+        float coreRadius = this.getVisualCoreRadius();
+        return Math.max(coreRadius * 2.20F, this.getStormExtentRadius() * growth);
+    }
+
     public float getVisualEyeRadius() {
-        float coreRadius = this.getCoreRadius();
+        float coreRadius = this.getVisualCoreRadius();
         float ratio = 0.17F + this.category.ordinal() * 0.011F;
-        return coreRadius * ratio;
+        return Math.max(coreRadius * ratio, 18.0F);
     }
 
     public float getVisualEdgeFade() {
-        return Math.max(this.getStormExtentRadius() * 0.055F, 64.0F);
+        return Math.max(this.getVisualStormExtentRadius() * 0.055F, 24.0F);
     }
 
     public int getBandCount() {
@@ -173,7 +202,7 @@ public class HurricaneInstance {
     }
 
     public float getBandWidth() {
-        return Math.max(this.getCoreRadius() * 0.075F, 32.0F);
+        return Math.max(this.getVisualCoreRadius() * 0.075F, 18.0F);
     }
 
     public float getSpiralTightness() {
@@ -186,11 +215,11 @@ public class HurricaneInstance {
     }
 
     public float getTransitionStart() {
-        return Math.max(this.getVisualEyeRadius() + this.getBandWidth() * 0.72F, this.getCoreRadius() * 0.28F);
+        return Math.max(this.getVisualEyeRadius() + this.getBandWidth() * 0.72F, this.getVisualCoreRadius() * 0.28F);
     }
 
     public float getTransitionEnd() {
-        return Math.max(this.getTransitionStart() + this.getBandWidth() * 6.0F, this.getStormExtentRadius() * 0.58F);
+        return Math.max(this.getTransitionStart() + this.getBandWidth() * 6.0F, this.getVisualStormExtentRadius() * 0.58F);
     }
 
     public float getRotationPhase() {
@@ -203,14 +232,14 @@ public class HurricaneInstance {
 
     public HurricaneRenderDescriptor getRenderDescriptor(float partialTick) {
         return HurricaneRenderDescriptor.create(
-                Math.max(this.radius, 1.0F),
+                Math.max(this.radius * this.getVisualGrowth(partialTick), 1.0F),
                 this.getRenderIntensity(partialTick),
                 this.category
         );
     }
 
     public float getRenderIntensity(float partialTick) {
-        return Mth.clamp(this.destructiveStrength, 0.0F, 1.0F);
+        return Mth.clamp(this.destructiveStrength * this.getVisualGrowth(partialTick), 0.0F, 1.0F);
     }
 
     public float getVisualSpin(float partialTick) {
@@ -227,8 +256,8 @@ public class HurricaneInstance {
                 this.position.x,
                 this.position.z,
                 this.getAnchorY(),
-                this.getCoreRadius(),
-                this.getStormExtentRadius(),
+                this.getVisualCoreRadius(),
+                this.getVisualStormExtentRadius(),
                 this.getVisualEyeRadius(),
                 this.getVisualEdgeFade(),
                 this.getBandCount(),

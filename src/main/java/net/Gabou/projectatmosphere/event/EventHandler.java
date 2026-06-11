@@ -55,7 +55,10 @@ public class EventHandler {
             return;
         }
 
-        CloudRegionManager.getInstance().tickCloudRegions(serverLevel);
+        boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
+        if (!simpleCloudsLoaded) {
+            CloudRegionManager.getInstance().tickCloudRegions(serverLevel);
+        }
 
         if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
 
@@ -79,7 +82,9 @@ public class EventHandler {
         }
 
         AtmosphereStatusSyncManager.syncPlayers(serverLevel);
-        CloudRegionSyncManager.syncPlayers(serverLevel);
+        if (!simpleCloudsLoaded) {
+            CloudRegionSyncManager.syncPlayers(serverLevel);
+        }
         if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
             hasDisplayedMessage = true;
             serverLevel.players().forEach(player -> {player.sendSystemMessage(Component.literal(ForecastGenerator.message) );});
@@ -104,7 +109,9 @@ public class EventHandler {
         ServerLevel level = player.serverLevel();
         if (level.dimension().equals(event.getTo())) {
             AtmosphereStatusSyncManager.syncPlayer(player);
-            CloudRegionSyncManager.syncPlayer(player);
+            if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+                CloudRegionSyncManager.syncPlayer(player);
+            }
 
         }
     }

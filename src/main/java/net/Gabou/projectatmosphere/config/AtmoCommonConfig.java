@@ -79,6 +79,12 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.EnumValue<CloudMode> CLOUD_MODE;
     public static final ForgeConfigSpec.EnumValue<DimensionFilterMode> CLOUD_DIMENSION_FILTER_MODE;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> CLOUD_DIMENSION_IDS;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_CUSTOM_PRECIPITATION_RENDERING;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_SHADOW_MAP;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_LIGHTNING_VISUALS;
+    public static final ForgeConfigSpec.BooleanValue SHADER_SAFE_MODE;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_DISTANT_HORIZONS_ADAPTER;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_VOXY_ADAPTER;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADO_DESTRUCTION;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
@@ -214,6 +220,24 @@ public class AtmoCommonConfig {
         NATIVE_CLOUD_SPAWN_HEIGHT = builder
                 .comment("Hauteur Y fixe utilisee par le spawn natif des nuages Project Atmosphere")
                 .defineInRange("nativeCloudSpawnHeight", 256, -2048, 4096);
+        ENABLE_CUSTOM_PRECIPITATION_RENDERING = builder
+                .comment("Enable Project Atmosphere custom rain and snow rendering hooks. Vanilla precipitation remains the fallback.")
+                .define("enableCustomPrecipitationRendering", true);
+        ENABLE_CLOUD_SHADOW_MAP = builder
+                .comment("Enable Project Atmosphere cloud shadow map publication for render, terrain, fog, rainbow, and mod API consumers.")
+                .define("enableCloudShadowMap", true);
+        ENABLE_CLOUD_LIGHTNING_VISUALS = builder
+                .comment("Enable render-only cloud lightning visuals. Gameplay lightning bolts remain controlled separately.")
+                .define("enableCloudLightningVisuals", true);
+        SHADER_SAFE_MODE = builder
+                .comment("Prefer conservative cloud rendering paths intended to avoid shader-pack conflicts.")
+                .define("shaderSafeMode", false);
+        ENABLE_DISTANT_HORIZONS_ADAPTER = builder
+                .comment("Enable the Project Atmosphere Distant Horizons render adapter when DH is loaded.")
+                .define("enableDistantHorizonsAdapter", true);
+        ENABLE_VOXY_ADAPTER = builder
+                .comment("Reserve the Project Atmosphere Voxy adapter toggle. No implementation is loaded unless a compatible Voxy port is present.")
+                .define("enableVoxyAdapter", false);
         builder.pop();
 
         builder.push("display");

@@ -1,7 +1,11 @@
 package net.Gabou.projectatmosphere.clouds.client.debug;
 
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
+import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
+import net.Gabou.projectatmosphere.modules.weather.StormVisualTier;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -110,7 +114,13 @@ public final class CloudDebugSnapshotFactory {
                 DEBUG_ANVIL_STRENGTH,
                 DEBUG_PRECIPITATION_CORE_STRENGTH,
                 DEBUG_CLOUD_SEED,
-                DEBUG_COLOR
+                DEBUG_COLOR,
+                CloudMaterialProfile.DEFAULT,
+                CloudShapeProfile.DEFAULT,
+                StormVisualTier.CLOUDY,
+                PrecipitationTier.NONE,
+                0.45F,
+                0.0F
         );
     }
 
@@ -165,7 +175,13 @@ public final class CloudDebugSnapshotFactory {
                 base.getAnvilStrength(),
                 base.getPrecipitationCoreStrength(),
                 base.getCloudSeed(),
-                debugColorOrTint
+                debugColorOrTint,
+                base.getMaterialProfile(),
+                base.getShapeProfile(),
+                base.getStormVisualTier(),
+                base.getPrecipitationTier(),
+                base.getShadowContribution(),
+                base.getLightningInfluence()
         );
     }
 }

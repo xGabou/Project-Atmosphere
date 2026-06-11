@@ -34,6 +34,7 @@ public final class CloudTypeRegistry {
             THUNDER_CLOUD_IDS[1]
     );
 
+    private static final Map<String, CloudTypeDefinition> BUILT_IN_TYPES = new LinkedHashMap<>();
     private static final Map<String, CloudTypeDefinition> TYPES = new LinkedHashMap<>();
 
     static {
@@ -159,6 +160,20 @@ public final class CloudTypeRegistry {
         return Map.copyOf(TYPES);
     }
 
+    public static synchronized void replaceDataPackDefinitions(Map<String, CloudTypeDefinition> dataPackDefinitions) {
+        TYPES.clear();
+        TYPES.putAll(BUILT_IN_TYPES);
+        if (dataPackDefinitions == null || dataPackDefinitions.isEmpty()) {
+            return;
+        }
+
+        for (CloudTypeDefinition definition : dataPackDefinitions.values()) {
+            if (definition != null && definition.getId() != null && !definition.getId().isBlank()) {
+                TYPES.put(definition.getId(), definition);
+            }
+        }
+    }
+
     public static String getClearWeatherCloudId() {
         return DEFAULT_CLOUD_TYPE_ID;
     }
@@ -195,6 +210,7 @@ public final class CloudTypeRegistry {
     }
 
     private static void register(CloudTypeDefinition definition) {
+        BUILT_IN_TYPES.put(definition.getId(), definition);
         TYPES.put(definition.getId(), definition);
     }
 

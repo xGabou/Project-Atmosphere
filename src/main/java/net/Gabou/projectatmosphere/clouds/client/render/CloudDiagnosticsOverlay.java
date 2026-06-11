@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.clouds.client.render;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
+import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
+import net.Gabou.projectatmosphere.clouds.api.CloudShadowSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.ClientLocalizedWeatherState;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsDiagnostics;
@@ -11,20 +13,18 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ConfigTracker;
 import net.minecraftforge.fml.config.ModConfig;
 import org.lwjgl.glfw.GLFW;
+import net.minecraft.util.FormattedCharSequence;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-@Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT)
 public final class CloudDiagnosticsOverlay {
     private static final int BACKGROUND_COLOR = 0xA0101010;
     private static final int TEXT_COLOR = 0xFFE6F2FF;
@@ -36,7 +36,8 @@ public final class CloudDiagnosticsOverlay {
     private static final long REFRESH_INTERVAL_NS = 100_000_000L;
     private static final int GUI_PACKED_LIGHT = 0xF000F0;
 
-    private static List<String> cachedLines = Collections.emptyList();
+    private static List<String> cachedRawLines = Collections.emptyList();
+    private static List<FormattedCharSequence> cachedVisualLines = Collections.emptyList();
     private static int cachedWidth;
     private static long lastCacheRefreshNs;
 
@@ -52,40 +53,79 @@ public final class CloudDiagnosticsOverlay {
 
         Minecraft minecraft = Minecraft.getInstance();
         Font font = minecraft.font;
-        List<String> lines = getCachedLines(font, mode);
+
+        List<FormattedCharSequence> lines = getCachedVisualLines(font, mode);
         if (lines.isEmpty()) {
             return;
         }
 
         GuiGraphics guiGraphics = event.getGuiGraphics();
         int height = lines.size() * LINE_HEIGHT + PADDING * 2;
-        guiGraphics.fill(X - PADDING, Y - PADDING, X + cachedWidth + PADDING, Y + height - PADDING, BACKGROUND_COLOR);
+
+        guiGraphics.fill(
+                X - PADDING,
+                Y - PADDING,
+                X + cachedWidth + PADDING,
+                Y + height - PADDING,
+                BACKGROUND_COLOR
+        );
+
         drawLinesBatched(guiGraphics, font, lines);
     }
 
-    private static List<String> getCachedLines(Font font, AtmoCommonConfig.CloudDiagnosticsOverlayMode mode) {
+    /**
+     * Builds and caches the overlay text as precomputed visual lines.
+     *
+     * @param font The Minecraft font renderer used to measure the text width.
+     * @param mode The current diagnostics overlay mode.
+     * @return The cached visual lines ready for batched rendering.
+     */
+    private static List<FormattedCharSequence> getCachedVisualLines(
+            Font font,
+            AtmoCommonConfig.CloudDiagnosticsOverlayMode mode
+    ) {
         long nowNs = System.nanoTime();
-        if (nowNs - lastCacheRefreshNs < REFRESH_INTERVAL_NS && !cachedLines.isEmpty()) {
-            return cachedLines;
+
+        if (nowNs - lastCacheRefreshNs < REFRESH_INTERVAL_NS && !cachedVisualLines.isEmpty()) {
+            return cachedVisualLines;
         }
 
         CloudRenderDiagnostics.FrameStats stats = CloudRenderDiagnostics.getLastStats();
-        List<String> lines = buildLines(stats, mode);
+        List<String> rawLines = buildLines(stats, mode);
+
+        List<FormattedCharSequence> visualLines = new ArrayList<>(rawLines.size());
         int width = 0;
-        for (String line : lines) {
+
+        for (String line : rawLines) {
             width = Math.max(width, font.width(line));
+            visualLines.add(FormattedCharSequence.forward(line, net.minecraft.network.chat.Style.EMPTY));
         }
 
-        cachedLines = lines;
+        cachedRawLines = rawLines;
+        cachedVisualLines = visualLines;
         cachedWidth = width;
         lastCacheRefreshNs = nowNs;
-        return cachedLines;
+
+        return cachedVisualLines;
     }
 
-    private static void drawLinesBatched(GuiGraphics guiGraphics, Font font, List<String> lines) {
+    /**
+     * Draws all cached overlay lines in one font batch.
+     *
+     * @param guiGraphics The current GUI graphics context.
+     * @param font The Minecraft font renderer.
+     * @param lines The cached visual lines to draw.
+     */
+    private static void drawLinesBatched(
+            GuiGraphics guiGraphics,
+            Font font,
+            List<FormattedCharSequence> lines
+    ) {
         var pose = guiGraphics.pose().last().pose();
+
         for (int i = 0; i < lines.size(); i++) {
             int color = i == 0 ? TEXT_COLOR : MUTED_TEXT_COLOR;
+
             font.drawInBatch(
                     lines.get(i),
                     X,
@@ -99,6 +139,7 @@ public final class CloudDiagnosticsOverlay {
                     GUI_PACKED_LIGHT
             );
         }
+
         guiGraphics.flush();
     }
 
@@ -128,8 +169,12 @@ public final class CloudDiagnosticsOverlay {
         }
     }
 
+    /**
+     * Clears all cached overlay text and measurements.
+     */
     private static void invalidateCache() {
-        cachedLines = Collections.emptyList();
+        cachedRawLines = Collections.emptyList();
+        cachedVisualLines = Collections.emptyList();
         cachedWidth = 0;
         lastCacheRefreshNs = 0L;
     }
@@ -174,6 +219,11 @@ public final class CloudDiagnosticsOverlay {
                         stats.compositeGpuPendingQueries()
                 ));
                 lines.add("Last " + stats.describeLastCloud() + " | t=" + stats.worldTime());
+                CloudShadowSnapshot shadow = CloudShadowMapAccess.getCurrentSnapshot();
+                lines.add("Shadow " + yesNo(shadow.isValid())
+                        + " | tex=" + shadow.getTextureId()
+                        + " | grid=" + shadow.getResolutionX() + "x" + shadow.getResolutionZ()
+                        + " | frame=" + shadow.getValidityFrame());
             } else {
                 lines.add("Render: " + stats.qualityName() + " / " + stats.raymarchSteps() + " steps / " + percent(stats.resolutionScale()));
                 lines.add("Target: " + stats.targetWidth() + "x" + stats.targetHeight()
@@ -200,6 +250,11 @@ public final class CloudDiagnosticsOverlay {
                 lines.add("Src " + abbreviate(sample.describeSource(), 34)
                         + " | col=" + yesNo(sample.inPrecipitationColumn())
                         + " snow=" + yesNo(sample.snowing()));
+                PrecipitationVisualState precip = CustomPrecipitationRenderer.getLastState();
+                lines.add("Precip " + precip.rainTier().name()
+                        + "/" + precip.snowTier().name()
+                        + " | fog=" + formatFloat(precip.fogBoost())
+                        + " | splash=" + formatFloat(precip.splashIntensity()));
             } else {
                 lines.add("Weather: rain " + formatFloat(weather.targetRainLevel()) + " -> " + formatFloat(weather.smoothedRainLevel())
                         + " / thunder " + formatFloat(weather.targetThunderLevel()) + " -> " + formatFloat(weather.smoothedThunderLevel()));

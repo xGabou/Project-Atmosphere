@@ -8,6 +8,8 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateUpdater;
+import net.Gabou.projectatmosphere.client.render.pipeline.AtmospherePipelineAdapter;
+import net.Gabou.projectatmosphere.client.render.pipeline.AtmospherePipelineAdapters;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
@@ -42,11 +44,13 @@ public final class CloudRenderer {
 
     public static void onClientLevelChanged() {
         CloudRenderStateUpdater.clearCurrentSnapshots();
+        CloudShadowRenderer.clear();
         CloudRenderTargetManager.onLevelChanged();
     }
 
     public static void shutdown() {
         CloudRenderStateUpdater.clearCurrentSnapshots();
+        CloudShadowRenderer.clear();
         CloudRenderTargetManager.shutdown();
     }
 
@@ -88,8 +92,12 @@ public final class CloudRenderer {
 
         String screenName = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
         RenderTarget shadowTarget = CloudRenderTargetManager.getCloudShadowTarget();
+        CloudShadowRenderer.update(frameContext, renderableSnapshots, shadowTarget);
+        AtmospherePipelineAdapter pipelineAdapter = AtmospherePipelineAdapters.select();
         int shadowDepthTextureId = shadowTarget != null ? shadowTarget.getDepthTextureId() : -1;
         String stateSignature = screenName
+                + "|"
+                + pipelineAdapter.id()
                 + "|"
                 + frameContext.getRenderProfile().getRaymarchSteps()
                 + "|"
@@ -110,9 +118,10 @@ public final class CloudRenderer {
                 + downscaled;
         if (CloudRenderDiagnostics.shouldLogStateSnapshot(frameContext.getWorldTime(), stateSignature)) {
             ProjectAtmosphere.LOGGER.info(
-                    "[CloudState] stage=AFTER_PARTICLES screen={} worldTime={} quality={} steps={} scale={} main={}x{} mainColor={} mainDepth={} cloud={}x{} cloudColor={} cloudDepth={} shadowDepth={} intermediate={} downscaled={}",
+                    "[CloudState] stage=AFTER_PARTICLES screen={} worldTime={} adapter={} quality={} steps={} scale={} main={}x{} mainColor={} mainDepth={} cloud={}x{} cloudColor={} cloudDepth={} shadowDepth={} intermediate={} downscaled={}",
                     screenName,
                     frameContext.getWorldTime(),
+                    pipelineAdapter.id(),
                     CloudRenderDiagnostics.getCurrentQualityName(),
                     frameContext.getRenderProfile().getRaymarchSteps(),
                     formatProbeFloat(frameContext.getRenderProfile().getResolutionScale()),

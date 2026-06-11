@@ -37,6 +37,7 @@ public final class CloudRenderDiagnostics {
     private static int submitSkippedSnapshots;
     private static boolean compositeSubmitted;
     private static String lastCloudTypeId = "";
+    private static String lastCloudShapeId = "";
     private static int lastCloudSeed;
     private static float lastCloudRadius;
     private static long frameCpuStartNs;
@@ -79,6 +80,7 @@ public final class CloudRenderDiagnostics {
         submitSkippedSnapshots = 0;
         compositeSubmitted = false;
         lastCloudTypeId = "";
+        lastCloudShapeId = "";
         lastCloudSeed = 0;
         lastCloudRadius = 0.0F;
         frameCpuStartNs = System.nanoTime();
@@ -102,6 +104,7 @@ public final class CloudRenderDiagnostics {
 
         renderedSnapshots++;
         lastCloudTypeId = snapshot.getCloudTypeId();
+        lastCloudShapeId = snapshot.getShapeProfile().getShapeId();
         lastCloudSeed = snapshot.getCloudSeed();
         lastCloudRadius = snapshot.getRegionRadius();
     }
@@ -195,6 +198,7 @@ public final class CloudRenderDiagnostics {
                 totalSkipped,
                 compositeSubmitted,
                 lastCloudTypeId,
+                lastCloudShapeId,
                 lastCloudSeed,
                 lastCloudRadius,
                 nsToMs(frameCpuNs),
@@ -342,6 +346,7 @@ public final class CloudRenderDiagnostics {
             int totalSkippedSnapshots,
             boolean compositeSubmitted,
             @Nullable String lastCloudTypeId,
+            @Nullable String lastCloudShapeId,
             int lastCloudSeed,
             float lastCloudRadius,
             float frameCpuMs,
@@ -377,6 +382,7 @@ public final class CloudRenderDiagnostics {
                     0,
                     false,
                     "",
+                    "",
                     0,
                     0.0F,
                     0.0F,
@@ -400,7 +406,8 @@ public final class CloudRenderDiagnostics {
                 return "none";
             }
 
-            return lastCloudTypeId + "/seed=" + lastCloudSeed + "/radius=" + formatFloat(lastCloudRadius);
+            String shape = lastCloudShapeId == null || lastCloudShapeId.isBlank() ? "shape=unknown" : "shape=" + lastCloudShapeId;
+            return lastCloudTypeId + "/" + shape + "/seed=" + lastCloudSeed + "/radius=" + formatFloat(lastCloudRadius);
         }
     }
 }

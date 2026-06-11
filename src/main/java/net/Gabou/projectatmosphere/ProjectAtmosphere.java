@@ -4,6 +4,7 @@ package net.Gabou.projectatmosphere;
 import net.Gabou.projectatmosphere.auth.ClientLauncherGuards;
 import net.Gabou.projectatmosphere.auth.ServerAuth;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDataReloadListener;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -11,7 +12,6 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.locale.Language;
@@ -81,6 +81,7 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
         MinecraftForge.EVENT_BUS.register(BiomeChangeManager.class);
         MinecraftForge.EVENT_BUS.register(EventHandler.class);
+        MinecraftForge.EVENT_BUS.addListener(CloudTypeDataReloadListener::onAddReloadListeners);
 
         MinecraftForge.EVENT_BUS.addListener((TickEvent.ServerTickEvent event)-> {
             if (event.phase == TickEvent.Phase.END) {
@@ -154,9 +155,6 @@ public class ProjectAtmosphere {
         if(ProjectAtmosphere.DEBUG_MODE)
             LOGGER.info("Setting up Project Atmosphere (Common)");
         initModules();
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            TornadoProbabilityManager.init();
-        }
         event.enqueueWork(() -> {
 
             configureOptionalCloudHooks();
@@ -167,17 +165,8 @@ public class ProjectAtmosphere {
     }
 
     private void configureOptionalCloudHooks() {
-        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            return;
-        }
-
-        try {
-            Class<?> apiClass = Class.forName("dev.nonamecrackers2.simpleclouds.api.SimpleCloudsAPI");
-            Object api = apiClass.getMethod("getApi").invoke(null);
-            Object hooks = api.getClass().getMethod("getHooks").invoke(api);
-            hooks.getClass().getMethod("setExternalWeatherControl", boolean.class).invoke(hooks, true);
-        } catch (ReflectiveOperationException | LinkageError exception) {
-            LOGGER.warn("[Atmosphere] Failed to configure Simple Clouds hooks.", exception);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            LOGGER.info("[Atmosphere] Simple Clouds owns cloud hooks; PA cloud hooks disabled.");
         }
     }
 

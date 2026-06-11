@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.modules.snowstorm;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
+import net.Gabou.projectatmosphere.modules.weather.SnowTier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -39,6 +40,15 @@ public class SnowstormManager {
                 .orElse(0);
     }
 
+    public static SnowTier getSnowTier(ChunkPos pos) {
+        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(), pos.getMinBlockZ(), 16);
+        return affectedRegions.stream()
+                .filter(storm -> storm.getCloudRegion().intersects(region))
+                .map(SnowStorm::getTier)
+                .max(java.util.Comparator.comparingInt(Enum::ordinal))
+                .orElse(SnowTier.NONE);
+    }
+
 
     public static boolean isSnowStormAt(ChunkPos pos){
         SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(),pos.getMinBlockZ(),16);
@@ -50,7 +60,7 @@ public class SnowstormManager {
             for (ServerPlayer player : level.players()) {
                 BlockPos pos = player.blockPosition();
                 if (snow.getCloudRegion().intersects(new SpawnRegion(pos.getX(), pos.getY(), 5)))
-                    applyEffects(player, snow.getIntensity());
+                    applyEffects(player, snow);
 
             }
         }
@@ -60,10 +70,19 @@ public class SnowstormManager {
 
 
 
-    private static void applyEffects(ServerPlayer player, int forecast) {
-        player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, false, false));
+    private static void applyEffects(ServerPlayer player, SnowStorm snowstorm) {
+        SnowTier tier = snowstorm.getTier();
+        if (tier == SnowTier.NONE) {
+            return;
+        }
+
+        int amplifier = tier == SnowTier.BLIZZARD ? 1 : 0;
+        int duration = tier == SnowTier.SNOWY_DAY ? 20 : 40;
+        if (tier != SnowTier.SNOWY_DAY) {
+            player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, duration, amplifier, false, false));
+        }
         triggerTemperatureEffect(player);
-        player.displayClientMessage(Component.literal("Snow forecast: " + forecast + " blocks"), true);
+        player.displayClientMessage(Component.literal("Snow tier: " + tier.name() + " (" + snowstorm.getIntensity() + ")"), true);
     }
 
     private static final String[] TEMPERATURE_MODS = {

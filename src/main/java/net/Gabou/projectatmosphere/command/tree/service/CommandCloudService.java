@@ -3,10 +3,16 @@ package net.Gabou.projectatmosphere.command.tree.service;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -15,10 +21,34 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public final class CommandCloudService {
+    private static final Map<String, String> NATIVE_CLOUD_ALIASES = Map.ofEntries(
+            Map.entry("cumulus", "cumulus_humilis"),
+            Map.entry("small_cumulus", "cumulus_humilis"),
+            Map.entry("stratus", "stratus_nebulosus"),
+            Map.entry("heavy_stratus", "stratus_nebulosus"),
+            Map.entry("overcast", "nimbostratus"),
+            Map.entry("dense_stratocumulus", "stratocumulus"),
+            Map.entry("thicker_stratocumulus", "stratocumulus"),
+            Map.entry("cumulonimbus", "cumulonimbus_calvus"),
+            Map.entry("simpleclouds:cumulonimbus", "cumulonimbus_calvus"),
+            Map.entry("severe_cumulonimbus", "cumulonimbus_capillatus"),
+            Map.entry("custom_cumulonimbus", "cumulonimbus_calvus"),
+            Map.entry("dark_wall", "cumulonimbus_capillatus"),
+            Map.entry("cookie", "cumulonimbus_calvus"),
+            Map.entry("tsegrus", "cumulonimbus_calvus"),
+            Map.entry("dense_tsegrus", "cumulonimbus_capillatus"),
+            Map.entry("stronger_stratus", "nimbostratus"),
+            Map.entry("severe_nimbostratus", "nimbostratus")
+    );
+
     private CommandCloudService() {
     }
 
@@ -43,12 +73,12 @@ public final class CommandCloudService {
                         (float) Math.toRadians(sample.directionDeg())
                 );
 
-        if (!PaCommandSupport.requireSimpleClouds(source)) {
-            return 0;
-        }
-
-        CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
-        if (region != null) {
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
+            if (region == null) {
+                source.sendFailure(Component.literal("Failed to create Simple Clouds cloud '" + cloudId + "'."));
+                return 0;
+            }
             CloudRegionSyncManager.syncPlayer(player);
             PaCommandMessages.success(
                     source,
@@ -62,16 +92,38 @@ public final class CommandCloudService {
             return 1;
         }
 
-        source.sendFailure(Component.literal("Failed to create Simple Clouds cloud '" + cloudId + "'."));
-        return 0;
+        CloudRegionState state = spawnNativeCloud(level, pos, cloudId);
+        if (state == null) {
+            source.sendFailure(Component.literal("Failed to create native PA cloud '" + cloudId + "'."));
+            return 0;
+        }
+
+        CloudRegionSyncManager.syncPlayer(player);
+        PaCommandMessages.success(
+                source,
+                true,
+                "Cloud spawned",
+                "Requested: " + cloudId,
+                "Resolved: " + state.getCloudTypeId(),
+                "Region: " + regionKey,
+                "Wind: " + PaCommandSupport.formatWind(wind),
+                "Result: native PA region created"
+        );
+        return 1;
     }
 
     public static int spawnRain(CommandSourceStack source, int intensity) {
-        return spawnCloud(source, CloudLibrary.getRandomRainCloud(intensity, true));
+        String cloudId = AtmosphereCloudServices.isSimpleCloudsLoaded()
+                ? CloudLibrary.getRandomRainCloud(intensity, true)
+                : CloudTypeRegistry.getRandomRainCloud(intensity);
+        return spawnCloud(source, cloudId);
     }
 
     public static int spawnThunder(CommandSourceStack source, int intensity) {
-        return spawnCloud(source, CloudLibrary.getRandomThunderCloud(intensity));
+        String cloudId = AtmosphereCloudServices.isSimpleCloudsLoaded()
+                ? CloudLibrary.getRandomThunderCloud(intensity)
+                : CloudTypeRegistry.getRandomThunderCloud(intensity);
+        return spawnCloud(source, cloudId);
     }
 
     public static int spawnSnowstorm(CommandSourceStack source, boolean overwrite) {
@@ -90,7 +142,10 @@ public final class CommandCloudService {
             return 0;
         }
 
-        return spawnCloud(source, CloudLibrary.getSnowstormCloudId());
+        String cloudId = AtmosphereCloudServices.isSimpleCloudsLoaded()
+                ? CloudLibrary.getSnowstormCloudId()
+                : "nimbostratus";
+        return spawnCloud(source, cloudId);
     }
 
     public static int sendCloudCount(CommandSourceStack source) {
@@ -163,6 +218,81 @@ public final class CommandCloudService {
         CloudRegionSyncManager.syncPlayer(player);
         PaCommandMessages.success(source, false, "Cloud sync sent");
         return 1;
+    }
+
+    public static boolean spawnWeatherCloudAtSource(CommandSourceStack source, String cloudId) {
+        ServerLevel level = source.getLevel();
+        BlockPos pos = BlockPos.containing(source.getPosition());
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        net.Gabou.projectatmosphere.modules.core.WindVector wind =
+                net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(1.0F, 0.0F);
+
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
+            if (region == null) {
+                return false;
+            }
+        } else if (spawnNativeCloud(level, pos, cloudId) == null) {
+            return false;
+        }
+
+        ServerPlayer player = source.getPlayer();
+        if (player != null) {
+            CloudRegionSyncManager.syncPlayer(player);
+        }
+        return true;
+    }
+
+    public static String resolveNativeCloudTypeId(String requestedId) {
+        if (requestedId == null || requestedId.isBlank()) {
+            return CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
+        }
+
+        String normalized = requestedId.trim().toLowerCase(Locale.ROOT);
+        String alias = NATIVE_CLOUD_ALIASES.get(normalized);
+        if (alias != null) {
+            return alias;
+        }
+
+        String path = normalized;
+        int separator = normalized.indexOf(':');
+        if (separator >= 0 && separator + 1 < normalized.length()) {
+            path = normalized.substring(separator + 1);
+            alias = NATIVE_CLOUD_ALIASES.get(path);
+            if (alias != null) {
+                return alias;
+            }
+        }
+
+        return CloudTypeRegistry.getOrDefault(path).getId();
+    }
+
+    private static CloudRegionState spawnNativeCloud(ServerLevel level, BlockPos pos, String cloudId) {
+        if (!level.dimension().equals(Level.OVERWORLD)) {
+            return null;
+        }
+
+        String cloudTypeId = resolveNativeCloudTypeId(cloudId);
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
+        float spawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
+        float radius = Math.max(24.0F, definition.getShapeProfile().getBaseRadius());
+        float thickness = Math.max(8.0F, definition.getShapeProfile().getTopOffset());
+        float density = Math.min(1.0F, Math.max(0.18F, 0.55F * definition.getVisualProfile().getDensityMultiplier()));
+        float coverage = Math.min(1.0F, Math.max(0.20F, 0.70F * definition.getVisualProfile().getCoverageMultiplier()));
+        float edgeSoftness = Math.min(0.85F, Math.max(0.08F, definition.getVisualProfile().getTopSoftness()));
+
+        return CloudRegionManager.getInstance().createCloudRegion(
+                level,
+                new Vec3(pos.getX(), spawnHeight, pos.getZ()),
+                radius,
+                spawnHeight - (thickness * 0.35F),
+                spawnHeight + (thickness * 0.65F),
+                density,
+                coverage,
+                edgeSoftness,
+                RegionInstanceKey.from(pos),
+                cloudTypeId
+        );
     }
 
 }

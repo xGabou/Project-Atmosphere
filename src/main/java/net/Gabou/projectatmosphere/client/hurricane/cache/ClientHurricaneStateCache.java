@@ -19,6 +19,7 @@ import java.util.UUID;
 
 public final class ClientHurricaneStateCache {
     private static final int DEFAULT_BLEND_TICKS = 10;
+    private static final int STALE_GRACE_TICKS = 60;
     private static final Map<UUID, Entry> ENTRIES = new LinkedHashMap<>();
     private static final Map<UUID, CloudRegion> RESERVATION_REGIONS = new LinkedHashMap<>();
     private static long cachedSemanticTick = Long.MIN_VALUE;
@@ -47,6 +48,16 @@ public final class ClientHurricaneStateCache {
             }
             nextReservations.put(snapshot.id(), getReservationRegion(snapshot));
         }
+        for (Map.Entry<UUID, Entry> existing : ENTRIES.entrySet()) {
+            if (next.containsKey(existing.getKey())) {
+                continue;
+            }
+            Entry entry = existing.getValue();
+            if (clientTick - entry.clientUpdateTick <= STALE_GRACE_TICKS) {
+                next.put(existing.getKey(), entry);
+                nextReservations.put(existing.getKey(), getReservationRegion(entry.current));
+            }
+        }
 
         ENTRIES.clear();
         ENTRIES.putAll(next);
@@ -62,6 +73,12 @@ public final class ClientHurricaneStateCache {
         }
         if (level == null) {
             clear();
+            return;
+        }
+        boolean removed = ENTRIES.entrySet().removeIf(entry -> level.getGameTime() - entry.getValue().clientUpdateTick > STALE_GRACE_TICKS);
+        if (removed) {
+            RESERVATION_REGIONS.keySet().retainAll(ENTRIES.keySet());
+            invalidateSemanticSnapshotCache();
         }
     }
 
@@ -103,9 +120,14 @@ public final class ClientHurricaneStateCache {
     private static List<HurricaneRenderSnapshot> buildInterpolatedSnapshots(long clientTick, float partialTick) {
         List<HurricaneRenderSnapshot> snapshots = new ArrayList<>(ENTRIES.size());
         for (Entry entry : ENTRIES.values()) {
-            float blend = Mth.clamp(((float)(clientTick - entry.clientUpdateTick) + partialTick) / (float)DEFAULT_BLEND_TICKS, 0.0F, 1.0F);
+            float elapsed = (float)(clientTick - entry.clientUpdateTick) + partialTick;
+            float blend = Mth.clamp(elapsed / (float)DEFAULT_BLEND_TICKS, 0.0F, 1.0F);
             HurricaneRenderSnapshot start = entry.previous;
             HurricaneRenderSnapshot end = entry.current;
+            float rotationSpeed = Mth.lerp(blend, start.rotationSpeed(), end.rotationSpeed());
+            float extrapolatedTicks = Math.max(0.0F, elapsed - DEFAULT_BLEND_TICKS);
+            float rotationPhase = Mth.lerp(blend, start.rotationPhase(), end.rotationPhase()) + rotationSpeed * extrapolatedTicks;
+            int ageTicks = Mth.floor(Mth.lerp(blend, start.ageTicks(), end.ageTicks()) + extrapolatedTicks);
 
             snapshots.add(new HurricaneRenderSnapshot(
                     end.id(),
@@ -119,13 +141,13 @@ public final class ClientHurricaneStateCache {
                     end.bandCount(),
                     Mth.lerp(blend, start.bandWidth(), end.bandWidth()),
                     Mth.lerp(blend, start.spiralTightness(), end.spiralTightness()),
-                    Mth.lerp(blend, start.rotationPhase(), end.rotationPhase()) + Mth.lerp(blend, start.rotationSpeed(), end.rotationSpeed()) * partialTick,
-                    Mth.lerp(blend, start.rotationSpeed(), end.rotationSpeed()),
+                    rotationPhase,
+                    rotationSpeed,
                     Mth.lerp(blend, start.transitionStart(), end.transitionStart()),
                     Mth.lerp(blend, start.transitionEnd(), end.transitionEnd()),
                     Mth.lerp(blend, start.normalizedIntensity(), end.normalizedIntensity()),
                     end.cloudTypeId(),
-                    Mth.floor(Mth.lerp(blend, start.ageTicks(), end.ageTicks()) + partialTick)
+                    ageTicks
             ));
         }
         return snapshots;

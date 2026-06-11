@@ -1,16 +1,14 @@
 package net.Gabou.projectatmosphere.command;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.command.tree.service.CommandCloudService;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
-import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 
 public final class WeatherCommandBridge {
 
@@ -35,33 +33,21 @@ public final class WeatherCommandBridge {
             source.sendFailure(Component.literal("Weather clouds can only be spawned in the Overworld."));
             return 0;
         }
-        if (!net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport.requireSimpleClouds(source)) {
-            return 0;
-        }
-
-        BlockPos sourcePos = BlockPos.containing(source.getPosition());
-        RegionInstanceKey regionKey = RegionInstanceKey.from(sourcePos);
         String cloudId = switch (kind) {
-            case CLEAR -> CloudLibrary.getCloudIdFromSeverity(1);
-            case RAIN -> CloudLibrary.getRandomRainCloud(1, false);
-            case THUNDER -> CloudLibrary.getRandomThunderCloud(1);
+            case CLEAR -> AtmosphereCloudServices.isSimpleCloudsLoaded()
+                    ? CloudLibrary.getCloudIdFromSeverity(1)
+                    : CloudTypeRegistry.getClearWeatherCloudId();
+            case RAIN -> AtmosphereCloudServices.isSimpleCloudsLoaded()
+                    ? CloudLibrary.getRandomRainCloud(1, false)
+                    : CloudTypeRegistry.getRandomRainCloud(1);
+            case THUNDER -> AtmosphereCloudServices.isSimpleCloudsLoaded()
+                    ? CloudLibrary.getRandomThunderCloud(1)
+                    : CloudTypeRegistry.getRandomThunderCloud(1);
         };
 
-        CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(
-                cloudId,
-                regionKey,
-                level,
-                null,
-                net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(1.0F, 0.0F)
-        );
-        if (region == null) {
+        if (!CommandCloudService.spawnWeatherCloudAtSource(source, cloudId)) {
             source.sendFailure(Component.literal("Failed to spawn weather cloud."));
             return 0;
-        }
-
-        ServerPlayer player = source.getPlayer();
-        if (player != null) {
-            CloudRegionSyncManager.syncPlayer(player);
         }
 
         source.sendSuccess(() -> Component.literal("Spawned " + kind.messageName + " cloud in your region."), true);

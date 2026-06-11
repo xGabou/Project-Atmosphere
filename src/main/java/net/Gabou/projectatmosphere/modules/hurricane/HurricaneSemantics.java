@@ -73,7 +73,7 @@ public final class HurricaneSemantics {
     }
 
     public static boolean intersectsReservation(HurricaneInstance hurricane, double worldX, double worldZ, double extraRadius) {
-        return intersectsReservation(hurricane.position.x, hurricane.position.z, hurricane.getStormExtentRadius(), worldX, worldZ, extraRadius);
+        return intersectsReservation(hurricane.position.x, hurricane.position.z, hurricane.getVisualStormExtentRadius(), worldX, worldZ, extraRadius);
     }
 
     public static boolean intersectsReservation(HurricaneRenderSnapshot hurricane, double worldX, double worldZ, double extraRadius) {
@@ -106,7 +106,7 @@ public final class HurricaneSemantics {
                 0.0F,
                 (float)(hurricane.position.x / (double)SimpleCloudsConstants.CLOUD_SCALE),
                 (float)(hurricane.position.z / (double)SimpleCloudsConstants.CLOUD_SCALE),
-                (hurricane.getStormExtentRadius() + SimpleCloudsConstants.MIN_SPAWN_DIST_BETWEEN_REGIONS) / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                (hurricane.getVisualStormExtentRadius() + SimpleCloudsConstants.MIN_SPAWN_DIST_BETWEEN_REGIONS) / (float)SimpleCloudsConstants.CLOUD_SCALE,
                 0.0F,
                 1.0F,
                 Integer.MAX_VALUE,
@@ -144,7 +144,7 @@ public final class HurricaneSemantics {
 
     public static void updateReservationRegion(CloudRegion region, HurricaneInstance hurricane) {
         region.moveToWorldPos((float)hurricane.position.x, (float)hurricane.position.z);
-        region.setWorldRadius(hurricane.getStormExtentRadius() + SimpleCloudsConstants.MIN_SPAWN_DIST_BETWEEN_REGIONS);
+        region.setWorldRadius(hurricane.getVisualStormExtentRadius() + SimpleCloudsConstants.MIN_SPAWN_DIST_BETWEEN_REGIONS);
         region.setStretchFactor(1.0F);
         region.setRotation(0.0F);
     }
@@ -181,8 +181,8 @@ public final class HurricaneSemantics {
                 hurricane.position.x,
                 hurricane.position.z,
                 hurricane.getAnchorY(),
-                hurricane.getCoreRadius(),
-                hurricane.getStormExtentRadius(),
+                hurricane.getVisualCoreRadius(),
+                hurricane.getVisualStormExtentRadius(),
                 hurricane.getVisualEyeRadius(),
                 hurricane.getVisualEdgeFade(),
                 hurricane.getBandCount(),

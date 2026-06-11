@@ -37,24 +37,12 @@ public final class AtmosphereCloudServices {
     }
 
     private static AtmosphereCloudService createService() {
-        if (!isSimpleCloudsLoaded()) {
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds absent; using native PA cloud service.");
-            return new NativeAtmosphereCloudService();
+        if (isSimpleCloudsLoaded()) {
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; PA cloud module is disabled.");
+            return new DisabledAtmosphereCloudService();
         }
 
-        try {
-            Class<?> serviceClass = Class.forName(
-                    "net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsAtmosphereCloudService"
-            );
-            Object instance = serviceClass.getDeclaredConstructor().newInstance();
-            if (instance instanceof AtmosphereCloudService cloudService) {
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; enabling compat cloud service.");
-                return cloudService;
-            }
-        } catch (ReflectiveOperationException | LinkageError exception) {
-            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Simple Clouds compat failed to load; using native cloud service.", exception);
-        }
-
+        ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds absent; using native PA cloud service.");
         return new NativeAtmosphereCloudService();
     }
 }

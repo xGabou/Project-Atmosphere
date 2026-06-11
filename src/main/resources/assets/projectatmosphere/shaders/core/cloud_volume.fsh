@@ -52,6 +52,16 @@ uniform float CloudHeightSquash;
 uniform float CloudTowerStrength;
 uniform float CloudAnvilStrength;
 uniform float CloudPrecipitationCoreStrength;
+uniform vec2 CloudShapeLobeCounts;
+uniform float CloudShapeLobeStrength;
+uniform float CloudShapeVerticalTilt;
+uniform float CloudShapeWindShearStrength;
+uniform float CloudShapeCellSplitStrength;
+uniform float CloudShapeTowerNarrowing;
+uniform float CloudShapeAnvilSpread;
+uniform float CloudShapeBaseFlattening;
+uniform float CloudShapeEdgeRaggedness;
+uniform float CloudShapeStormWallStrength;
 uniform int CloudSeed;
 uniform int RaymarchSteps;
 
@@ -62,6 +72,11 @@ const int MAX_RAYMARCH_STEPS = 64;
 
 float saturate(float value) {
     return clamp(value, 0.0, 1.0);
+}
+
+vec2 safeNormalize2(vec2 value, vec2 fallback) {
+    float lenSq = dot(value, value);
+    return lenSq > 0.000001 ? value * inversesqrt(lenSq) : fallback;
 }
 
 float hash1(float p) {
@@ -172,6 +187,11 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     }
 
     vec2 localHorizontal = samplePos.xz - CloudCenter.xz;
+    vec2 shearDirection = safeNormalize2(abs(CloudVelocity.x) + abs(CloudVelocity.z) > 0.001
+        ? CloudVelocity.xz
+        : vec2(hash1(seedValue + 211.0) - 0.5, hash1(seedValue + 223.0) - 0.5), vec2(1.0, 0.0));
+    float shearLift = (shapedVertical - 0.35) * CloudShapeWindShearStrength + shapedVertical * CloudShapeVerticalTilt;
+    localHorizontal -= shearDirection * CloudRadius * shearLift * 0.24;
     float horizontalDistance = length(localHorizontal);
     float radiusInv = 1.0 / max(CloudRadius, 0.001);
     float baseHorizontal = horizontalDistance * radiusInv;
@@ -180,14 +200,16 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     }
 
     float edgeAngle = atan(localHorizontal.y, localHorizontal.x);
-    float lobeCount = mix(4.0, 9.0, hash1(seedValue + 131.0));
+    float minLobes = max(1.0, CloudShapeLobeCounts.x);
+    float maxLobes = max(minLobes, CloudShapeLobeCounts.y);
+    float lobeCount = mix(minLobes, maxLobes, hash1(seedValue + 131.0));
     float lobePhase = hash1(seedValue + 149.0) * 6.2831853;
     float lobeWave = sin(edgeAngle * lobeCount + lobePhase);
     float silhouetteNoise = noise3(vec3(
         localHorizontal * 0.015 + seedOffset.xz * 0.021,
         shapedVertical * 2.0 + seedOffset.y * 0.017
-    )) * 0.5;
-    float seededRadiusWarp = 1.0 + (lobeWave * 0.055 + silhouetteNoise * 0.16) * smoothstep(0.12, 1.0, baseHorizontal);
+    )) * mix(0.30, 0.72, saturate(CloudShapeEdgeRaggedness));
+    float seededRadiusWarp = 1.0 + (lobeWave * 0.12 * CloudShapeLobeStrength + silhouetteNoise * 0.18) * smoothstep(0.12, 1.0, baseHorizontal);
     float rawHorizontal = horizontalDistance / max(CloudRadius * clamp(seededRadiusWarp, 0.78, 1.20), 0.001);
 
     float topWarp = noise3(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1) + seedOffset * 0.011) * 0.5;
@@ -198,17 +220,17 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float verticalFade = smoothstep(0.0, baseSoftness, warpedVertical) * (1.0 - smoothstep(1.0 - topSoftness, 1.0, warpedVertical));
     float interiorFade = 1.0;
 
-    float layerBias = saturate((CloudHeightSquash - 1.20) * 0.36);
+    float layerBias = saturate((CloudHeightSquash - 1.20) * 0.36 + CloudShapeBaseFlattening * 0.55);
     float puffyRadius = mix(0.18, 1.00, smoothstep(0.04, 0.46, warpedVertical))
         * mix(1.0, 0.22, smoothstep(0.58, 1.0, warpedVertical));
     float layerRadius = mix(0.88, 1.06, smoothstep(0.04, 0.34, warpedVertical))
         * mix(1.0, 0.96, smoothstep(0.88, 1.0, warpedVertical));
     float towerRadius = mix(0.30, 0.68, smoothstep(0.04, 0.38, warpedVertical))
-        * mix(1.0, 0.58, smoothstep(0.78, 1.0, warpedVertical));
+        * mix(1.0, mix(0.68, 0.34, CloudShapeTowerNarrowing), smoothstep(0.78, 1.0, warpedVertical));
     float anvilRadius = CloudAnvilStrength
         * smoothstep(0.56, 0.88, warpedVertical)
         * (1.0 - smoothstep(0.94, 1.0, warpedVertical))
-        * 0.48;
+        * mix(0.48, 0.88, CloudShapeAnvilSpread);
     float effectiveRadiusFactor = mix(puffyRadius, layerRadius, layerBias);
     effectiveRadiusFactor = mix(effectiveRadiusFactor, towerRadius, saturate(CloudTowerStrength));
     effectiveRadiusFactor = clamp(effectiveRadiusFactor + anvilRadius, 0.12, 1.08);
@@ -223,6 +245,9 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float edgeFactor = smoothstep(0.55, 1.0, normalizedHorizontal);
     float silhouettePower = mix(2.35, 0.95, layerBias);
     float silhouetteFade = pow(1.0 - smoothstep(0.36, 1.0, normalizedHorizontal), silhouettePower);
+    vec2 splitDirection = safeNormalize2(vec2(hash1(seedValue + 307.0) - 0.5, hash1(seedValue + 331.0) - 0.5), vec2(0.0, 1.0));
+    float splitLine = abs(dot(safeNormalize2(localHorizontal + splitDirection * 0.001, splitDirection), splitDirection));
+    float splitCarve = mix(1.0, smoothstep(0.08, 0.42, splitLine), CloudShapeCellSplitStrength * edgeFactor);
 
     float noiseScale = max(CloudNoiseScale, 0.001);
     float detailNoiseScale = max(CloudDetailNoiseScale, 0.001);
@@ -234,15 +259,16 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float seedLobeBias = mix(-0.08, 0.08, hash1(seedValue + 197.0));
     float lobeShape = mix(0.74 + seedLobeBias, 1.18 + seedLobeBias, lobeNoise);
     float layeredShape = mix(0.82, 1.10, layerNoise);
-    float edgeCarve = mix(1.0, smoothstep(0.24, 0.86, detailNoise), edgeFactor * saturate(CloudEdgeErosionStrength));
+    float edgeCarve = mix(1.0, smoothstep(0.24, 0.86, detailNoise), edgeFactor * saturate(CloudEdgeErosionStrength + CloudShapeEdgeRaggedness * 0.55));
     float centerWeight = 1.0 - smoothstep(0.0, 0.58, normalizedHorizontal);
     float corePreserve = mix(edgeCarve, max(edgeCarve, 0.86), centerWeight);
     float towerBoost = 1.0 + CloudTowerStrength * centerWeight * smoothstep(0.22, 0.86, warpedVertical) * 0.42;
     float anvilBoost = 1.0 + CloudAnvilStrength * smoothstep(0.58, 1.0, warpedVertical) * smoothstep(0.20, 0.92, normalizedHorizontal) * 0.34;
     float precipitationCore = 1.0 + CloudPrecipitationCoreStrength * centerWeight * (1.0 - smoothstep(0.28, 0.72, warpedVertical)) * 0.35;
+    float stormWall = 1.0 + CloudShapeStormWallStrength * smoothstep(0.48, 0.88, normalizedHorizontal) * (1.0 - smoothstep(0.90, 1.0, normalizedHorizontal)) * 0.48;
     float baseProfile = mix(1.0, 0.94, saturate(CloudBaseDarkness) * (1.0 - smoothstep(0.0, 0.42, warpedVertical)));
 
-    return saturate(effectiveDensity * horizontalFade * silhouetteFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve * towerBoost * anvilBoost * precipitationCore * baseProfile);
+    return saturate(effectiveDensity * horizontalFade * silhouetteFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve * splitCarve * towerBoost * anvilBoost * precipitationCore * stormWall * baseProfile);
 }
 
 vec3 computeSampleLighting(vec3 samplePos, float density, vec3 rayDir) {

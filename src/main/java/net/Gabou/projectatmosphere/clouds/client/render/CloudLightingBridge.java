@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
+import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkySample;
@@ -68,17 +69,25 @@ public final class CloudLightingBridge {
         float rainIntensity = skySample.rainIntensity();
         float sunsetStrength = resolveSunsetStrength(frameContext);
         float nightFactor = skySample.nightFactor();
+        float localShadow = CloudShadowMapAccess.sampleShadowAt(snapshot.getRegionCenter().x(), snapshot.getRegionCenter().z());
+        float materialDarkness = Math.max(snapshot.getMaterialProfile().getDarkness(), snapshot.getStormVisualTier().getDarkness());
+        float precipitationTint = snapshot.getMaterialProfile().getPrecipitationTint() * snapshot.getPrecipitationTier().getRepresentativeIntensity();
+        float lightningBoost = snapshot.getLightningInfluence() * snapshot.getMaterialProfile().getLightningResponse() * 0.28F;
 
         float brightness = 0.18F + daylightFactor * 0.66F + atmosphericClarity * 0.08F;
         brightness *= 1.0F - rainIntensity * 0.12F;
         brightness *= 0.92F + lifecycleFactor * 0.08F;
         brightness *= 1.0F - sunsetStrength * 0.26F;
+        brightness *= 1.0F - materialDarkness * 0.34F;
+        brightness *= 1.0F - localShadow * 0.24F;
+        brightness += lightningBoost;
 
         Vector3f resolvedColor = new Vector3f(red, green, blue).mul(brightness);
         Vector3f skyTint = sampleSkyTint(frameContext);
         Vector3f dayAmbient = mix(DAY_AMBIENT, skyTint, clamp01(0.20F + daylightFactor * 0.35F));
         resolvedColor = mix(resolvedColor, dayAmbient, clamp01(0.18F + daylightFactor * 0.22F));
         resolvedColor = mix(resolvedColor, NIGHT_AMBIENT, clamp01(nightFactor * 0.55F));
+        resolvedColor = mix(resolvedColor, new Vector3f(0.42F, 0.46F, 0.50F), clamp01(precipitationTint * 0.22F));
 
         return resolvedColor;
     }
@@ -172,7 +181,10 @@ public final class CloudLightingBridge {
     public static float resolveLightAbsorption(@NotNull CloudRenderSnapshot snapshot, @NotNull CloudRenderFrameContext frameContext) {
         SunPhase phase = resolveSunPhase(frameContext);
         float visibleDensity = CloudDensityProvider.getEffectiveDensity(snapshot) * CloudDensityProvider.getEffectiveCoverage(snapshot);
-        return Mth.clamp(1.20F + visibleDensity * 1.55F + phase.window * 1.20F, 1.20F, 4.00F);
+        float materialAbsorption = snapshot.getMaterialProfile().getDarkness() * 0.85F
+                + snapshot.getMaterialProfile().getStormCoreDarkening() * 0.75F
+                + snapshot.getPrecipitationTier().getRepresentativeIntensity() * 0.42F;
+        return Mth.clamp(1.20F + visibleDensity * 1.55F + phase.window * 1.20F + materialAbsorption, 1.20F, 4.00F);
     }
 
     /**

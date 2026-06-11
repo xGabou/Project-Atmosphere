@@ -64,6 +64,16 @@
     { "name": "CloudTowerStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudAnvilStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudPrecipitationCoreStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudShapeLobeCounts", "type": "float", "count": 2, "values": [ 4.0, 9.0 ] },
+    { "name": "CloudShapeLobeStrength", "type": "float", "count": 1, "values": [ 0.50 ] },
+    { "name": "CloudShapeVerticalTilt", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudShapeWindShearStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudShapeCellSplitStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudShapeTowerNarrowing", "type": "float", "count": 1, "values": [ 0.20 ] },
+    { "name": "CloudShapeAnvilSpread", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudShapeBaseFlattening", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudShapeEdgeRaggedness", "type": "float", "count": 1, "values": [ 0.32 ] },
+    { "name": "CloudShapeStormWallStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudSeed", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 32 ] }
   ]

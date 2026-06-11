@@ -4,7 +4,9 @@ import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudVisualProfile;
+import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 
@@ -33,6 +35,7 @@ public final class CloudRegionRenderDataFactory {
         CloudClusterState cluster = selectRenderableCluster(state);
         CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cluster.getCloudTypeId());
         CloudVisualProfile profile = definition.getVisualProfile();
+        CloudShapeProfile shapeProfile = definition.getShapeProfile();
 
         return createWithProfile(
             state,
@@ -42,7 +45,8 @@ public final class CloudRegionRenderDataFactory {
                 DEFAULT_EDGE_SOFTNESS,
                 DEFAULT_DEBUG_COLOR,
                 definition,
-                profile
+                profile,
+                shapeProfile
         );
     }
 
@@ -61,6 +65,11 @@ public final class CloudRegionRenderDataFactory {
                 definition.getVisualProfile(),
                 Mth.clamp(cluster.getTransitionBlend() + (cluster.getMergePressure() * 0.35F), 0.0F, 1.0F)
         );
+        CloudShapeProfile shapeProfile = CloudShapeProfile.blend(
+                previousDefinition.getShapeProfile(),
+                definition.getShapeProfile(),
+                Mth.clamp(cluster.getTransitionBlend() + (cluster.getMergePressure() * 0.35F), 0.0F, 1.0F)
+        );
 
         return createWithProfile(
                 state,
@@ -70,7 +79,8 @@ public final class CloudRegionRenderDataFactory {
                 cluster.getEdgeSoftness(),
                 0xFFFFFFFF,
                 definition,
-                profile
+                profile,
+                shapeProfile
         );
     }
 
@@ -85,6 +95,11 @@ public final class CloudRegionRenderDataFactory {
                 definition.getVisualProfile(),
                 Mth.clamp(cluster.getTransitionBlend() + (cluster.getMergePressure() * 0.35F), 0.0F, 1.0F)
         );
+        CloudShapeProfile shapeProfile = CloudShapeProfile.blend(
+                previousDefinition.getShapeProfile(),
+                definition.getShapeProfile(),
+                Mth.clamp(cluster.getTransitionBlend() + (cluster.getMergePressure() * 0.35F), 0.0F, 1.0F)
+        );
 
         return createWithProfile(
                 region,
@@ -94,7 +109,8 @@ public final class CloudRegionRenderDataFactory {
                 cluster.getEdgeSoftness(),
                 0xFFFFFFFF,
                 definition,
-                profile
+                profile,
+                shapeProfile
         );
     }
 
@@ -106,7 +122,8 @@ public final class CloudRegionRenderDataFactory {
             float edgeSoftness,
             int debugColorOrTint,
             @NotNull CloudTypeDefinition definition,
-            @NotNull CloudVisualProfile profile
+            @NotNull CloudVisualProfile profile,
+            @NotNull CloudShapeProfile shapeProfile
     ) {
         float mergePressure = cluster.getMergePressure();
         float mergeScale = 1.0F + (mergePressure * 0.08F);
@@ -116,6 +133,16 @@ public final class CloudRegionRenderDataFactory {
         float finalRadius = Math.max(1.0F, cluster.getRadius() * mergeScale);
         float finalBaseY = cluster.getBaseY() - (mergePressure * 2.5F);
         float finalTopY = cluster.getTopY() + (mergePressure * 6.5F);
+        PrecipitationTier precipitationTier = resolvePrecipitationTier(definition, profile, finalDensity, finalCoverage);
+        float stormDarkening = Math.max(definition.getStormVisualTier().getDarkness(), definition.getMaterialProfile().getStormCoreDarkening());
+        float shadowContribution = clamp01(
+                definition.getMaterialProfile().getShadowContribution()
+                        * (0.55F + finalDensity * 0.30F + finalCoverage * 0.25F)
+                        + stormDarkening * 0.20F
+        );
+        float lightningInfluence = CloudTypeRegistry.isThunderCloud(definition.getId())
+                ? Math.max(0.35F, definition.getMaterialProfile().getLightningResponse() * 0.45F)
+                : 0.0F;
 
         return new CloudRegionRenderData(
                 state.getRegionId(),
@@ -154,7 +181,13 @@ public final class CloudRegionRenderDataFactory {
                 profile.getAnvilStrength(),
                 profile.getPrecipitationCoreStrength(),
                 cluster.getCloudSeed(),
-                mergePressure
+                mergePressure,
+                definition.getMaterialProfile().withVisualDefaults(profile),
+                shapeProfile,
+                definition.getStormVisualTier(),
+                precipitationTier,
+                shadowContribution,
+                lightningInfluence
         );
     }
 
@@ -202,5 +235,22 @@ public final class CloudRegionRenderDataFactory {
             return 1.0F;
         }
         return value;
+    }
+
+    private static PrecipitationTier resolvePrecipitationTier(
+            @NotNull CloudTypeDefinition definition,
+            @NotNull CloudVisualProfile profile,
+            float density,
+            float coverage
+    ) {
+        if (!CloudTypeRegistry.isPrecipitatingCloud(definition.getId())) {
+            return PrecipitationTier.NONE;
+        }
+
+        float rainIntensity = density * 0.35F
+                + coverage * 0.30F
+                + profile.getPrecipitationCoreStrength() * 0.45F
+                + definition.getStormVisualTier().getDarkness() * 0.25F;
+        return PrecipitationTier.fromRainIntensity(rainIntensity);
     }
 }
