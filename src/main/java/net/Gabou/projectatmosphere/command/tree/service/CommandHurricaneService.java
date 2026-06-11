@@ -88,7 +88,8 @@ public final class CommandHurricaneService {
     }
 
     public static int clearHurricanes(CommandSourceStack source) {
-        HurricaneManager.clearHurricanes();
+        ServerLevel level = source.getLevel();
+        HurricaneManager.clearHurricanes(level);
         PaCommandMessages.success(source, true, "All hurricanes cleared");
         return 1;
     }

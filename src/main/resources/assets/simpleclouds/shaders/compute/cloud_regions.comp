@@ -254,7 +254,7 @@ void main()
         }
     }
 
-    if (TotalCloudHurricanes > 0)
+    if (TotalCloudHurricanes < 0)
     {
         for (int i = 0; i < TotalCloudHurricanes; i++)
         {

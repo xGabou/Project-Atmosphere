@@ -16,6 +16,7 @@ import net.Gabou.projectatmosphere.client.render.shader.HurricaneShaders;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneCloudVolume;
 import net.Gabou.projectatmosphere.client.render.mesh.VolumeBoxMesh;
+import net.Gabou.projectatmosphere.tools.debug.HurricaneRenderDiagnostics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -53,48 +54,75 @@ public final class SimpleCloudsHurricaneRenderer {
         if (this.preparedLevel == level
                 && this.preparedGameTime == level.getGameTime()
                 && Float.compare(this.preparedPartialTick, partialTick) == 0) {
+            HurricaneRenderDiagnostics.markPrepareCacheHit();
             return;
         }
 
         this.ensureInitialized();
+        List<ClientHurricaneStateCache.RenderableHurricane> renderables = ClientHurricaneStateCache.getRenderableHurricanes(partialTick);
         this.preparedLevel = level;
         this.preparedGameTime = level.getGameTime();
         this.preparedPartialTick = partialTick;
         this.preparedHurricanes.clear();
+        if (renderables.isEmpty()) {
+            HurricaneRenderDiagnostics.clear();
+            return;
+        }
+        HurricaneRenderDiagnostics.beginFrame(level.getGameTime(), renderables.size(), Math.min(renderables.size(), MAX_STORMS));
+        long prepareStartNs = HurricaneRenderDiagnostics.nowNs();
 
-        for (ClientHurricaneStateCache.RenderableHurricane hurricane : ClientHurricaneStateCache.getRenderableHurricanes(partialTick)) {
+        for (ClientHurricaneStateCache.RenderableHurricane hurricane : renderables) {
             if (this.preparedHurricanes.size() >= MAX_STORMS) {
                 break;
             }
             this.preparedHurricanes.add(HurricaneCloudVolume.from(hurricane, partialTick));
         }
+        HurricaneRenderDiagnostics.recordPrepareCpuTime(prepareStartNs);
     }
 
     public void renderOpaque(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
                              float partialTick, float cloudR, float cloudG, float cloudB) {
         if (this.preparedHurricanes.isEmpty() || !HurricaneShaders.isOpaqueReady()) {
+            if (!HurricaneShaders.isTransparencyReady()) {
+                HurricaneRenderDiagnostics.finishFrame();
+            }
             return;
         }
 
+        long scratchStartNs = HurricaneRenderDiagnostics.nowNs();
         this.ensureScratchTargets(renderer);
+        HurricaneRenderDiagnostics.recordScratchCpuTime(scratchStartNs);
         StormUniforms uniforms = StormUniforms.from(this.preparedHurricanes);
 
+        long passStartNs = HurricaneRenderDiagnostics.nowNs();
         this.runOpaqueEyeMaskPass(renderer, stack, projMat, uniforms, this.opaqueScratchTarget,
                 renderer.getCloudTarget().getColorTextureId(), renderer.getCloudTarget().getDepthTextureId(), false);
         this.runOpaqueEyeMaskPass(renderer, stack, projMat, uniforms, renderer.getCloudTarget(),
                 this.opaqueScratchTarget.getColorTextureId(), this.opaqueScratchTarget.getDepthTextureId(), true);
+        HurricaneRenderDiagnostics.recordOpaqueMaskCpuTime(passStartNs);
+
+        passStartNs = HurricaneRenderDiagnostics.nowNs();
         this.runOpaqueVolumePass(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB);
+        HurricaneRenderDiagnostics.recordOpaqueVolumeCpuTime(passStartNs);
+
+        if (!HurricaneShaders.isTransparencyReady()) {
+            HurricaneRenderDiagnostics.finishFrame();
+        }
     }
 
     public void renderTransparency(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat,
                                    float partialTick, float cloudR, float cloudG, float cloudB) {
         if (this.preparedHurricanes.isEmpty() || !HurricaneShaders.isTransparencyReady()) {
+            HurricaneRenderDiagnostics.finishFrame();
             return;
         }
 
+        long scratchStartNs = HurricaneRenderDiagnostics.nowNs();
         this.ensureScratchTargets(renderer);
+        HurricaneRenderDiagnostics.recordScratchCpuTime(scratchStartNs);
         StormUniforms uniforms = StormUniforms.from(this.preparedHurricanes);
 
+        long passStartNs = HurricaneRenderDiagnostics.nowNs();
         this.runTransparencyMaskPass(renderer, stack, projMat, uniforms, this.transparencyScratchTarget,
                 renderer.getCloudTransparencyTarget().getColorTextureId(),
                 renderer.getCloudTransparencyTarget().getRevealageTextureId(),
@@ -105,7 +133,12 @@ public final class SimpleCloudsHurricaneRenderer {
                 this.transparencyScratchTarget.getRevealageTextureId(),
                 this.transparencyScratchTarget.getDepthTextureId(),
                 true);
+        HurricaneRenderDiagnostics.recordTransparencyMaskCpuTime(passStartNs);
+
+        passStartNs = HurricaneRenderDiagnostics.nowNs();
         this.runTransparencyVolumePass(renderer, stack, projMat, partialTick, cloudR, cloudG, cloudB);
+        HurricaneRenderDiagnostics.recordTransparencyVolumeCpuTime(passStartNs);
+        HurricaneRenderDiagnostics.finishFrame();
     }
 
     public void close() {
@@ -126,6 +159,7 @@ public final class SimpleCloudsHurricaneRenderer {
             this.transparencyScratchTarget.destroyBuffers();
             this.transparencyScratchTarget = null;
         }
+        HurricaneRenderDiagnostics.clear();
         this.initialized = false;
     }
 

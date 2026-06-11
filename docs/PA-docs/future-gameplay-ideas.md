@@ -14,6 +14,11 @@ This file is a parking lot for gameplay ideas that are intentionally out of scop
 - Cloud merging that can create larger composite formations without visible seams.
 - Cloud dissipation and re-seeding when environmental conditions decay.
 
+## Rain Presentation Ideas
+
+- Full custom rain rendering that can replace vanilla rain visuals when PA owns localized weather.
+- Custom rain sound replacement or layered rain sound mixing using PA-local rain intensity.
+
 ## Survival / World Ideas
 
 - Soil saturation and mud after prolonged rain.

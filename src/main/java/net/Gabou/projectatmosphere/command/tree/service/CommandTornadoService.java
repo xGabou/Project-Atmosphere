@@ -4,7 +4,6 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
-import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
@@ -57,8 +56,12 @@ public final class CommandTornadoService {
         WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
         WindVector wind = WindVector.fromBase(sample.speedMps(), (float) Math.toRadians(sample.directionDeg()));
 
-        if (noCloud || !AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+        if (noCloud) {
             return spawnStandaloneTornado(source, level, tornadoPos, wind);
+        }
+
+        if (!PaCommandSupport.requireSimpleClouds(source)) {
+            return 0;
         }
 
         CloudRegion existing = findCumulonimbus(level, tornadoPos);

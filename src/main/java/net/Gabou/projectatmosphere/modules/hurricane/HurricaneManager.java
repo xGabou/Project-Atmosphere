@@ -4,6 +4,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
@@ -54,7 +55,7 @@ public class HurricaneManager {
         HurricaneInstance hurricane = HurricaneInstance.createDebug(pos, radius, wind, category);
         hurricane.refreshAnchorY(level);
         DEBUG_HURRICANES.add(hurricane);
-        RESERVATION_REGIONS.put(hurricane.id, HurricaneSemantics.createReservationRegion(hurricane));
+        projectatmosphere$syncManagedRegion(level, hurricane);
         dirty = true;
         syncToDimension(level);
     }
@@ -64,7 +65,7 @@ public class HurricaneManager {
 
         projectatmosphere$tickDebugHurricanes(level);
         projectatmosphere$syncCycloneHurricanes(level, gameTime);
-        projectatmosphere$syncReservationRegions();
+        projectatmosphere$syncReservationRegions(level);
 
         List<HurricaneInstance> active = projectatmosphere$getAllHurricanes();
         if (!active.isEmpty() && gameTime % ATMOSPHERE_INTERVAL_TICKS == 0L) {
@@ -89,7 +90,11 @@ public class HurricaneManager {
     }
 
     public static void clearHurricanes() {
-        resetRuntimeState();
+        resetRuntimeState(null);
+    }
+
+    public static void clearHurricanes(ServerLevel level) {
+        resetRuntimeState(level);
     }
 
     public static List<CompoundTag> savePersistentHurricanes() {
@@ -103,12 +108,12 @@ public class HurricaneManager {
     }
 
     public static void loadPersistentHurricanes(ServerLevel level, List<CompoundTag> tags) {
-        resetRuntimeState();
+        resetRuntimeState(level);
 
         for (CompoundTag tag : tags) {
             HurricaneInstance hurricane = HurricaneInstance.fromPersistentTag(tag);
             hurricane.refreshAnchorY(level);
-            registerLoadedHurricane(hurricane);
+            registerLoadedHurricane(level, hurricane);
         }
         dirty = true;
     }
@@ -147,6 +152,11 @@ public class HurricaneManager {
     }
 
     private static void resetRuntimeState() {
+        resetRuntimeState(null);
+    }
+
+    private static void resetRuntimeState(ServerLevel level) {
+        projectatmosphere$removeManagedRegions(level);
         LINKED_HURRICANES.clear();
         DEBUG_HURRICANES.clear();
         FORMATION_TRACKERS.clear();
@@ -155,13 +165,13 @@ public class HurricaneManager {
         dirty = true;
     }
 
-    private static void registerLoadedHurricane(HurricaneInstance hurricane) {
+    private static void registerLoadedHurricane(ServerLevel level, HurricaneInstance hurricane) {
         if (hurricane.isDebugSpawn() || hurricane.getCycloneId() == null) {
             DEBUG_HURRICANES.add(hurricane);
         } else {
             LINKED_HURRICANES.put(hurricane.getCycloneId(), hurricane);
         }
-        RESERVATION_REGIONS.put(hurricane.id, HurricaneSemantics.createReservationRegion(hurricane));
+        projectatmosphere$syncManagedRegion(level, hurricane);
     }
 
     private static SyncHurricaneStatePacket createSyncPacket() {
@@ -188,7 +198,7 @@ public class HurricaneManager {
         if (!dead.isEmpty()) {
             for (HurricaneInstance hurricane : dead) {
                 DEBUG_HURRICANES.remove(hurricane);
-                RESERVATION_REGIONS.remove(hurricane.id);
+                projectatmosphere$removeManagedRegion(level, hurricane.id);
             }
             dirty = true;
         }
@@ -238,7 +248,7 @@ public class HurricaneManager {
                             environment.intensificationStrength()
                     );
                     LINKED_HURRICANES.put(snapshot.id(), created);
-                    RESERVATION_REGIONS.put(created.id, HurricaneSemantics.createReservationRegion(created));
+                    projectatmosphere$syncManagedRegion(level, created);
                     dirty = true;
                 }
                 continue;
@@ -263,7 +273,7 @@ public class HurricaneManager {
 
             if (hurricane.isDead()) {
                 LINKED_HURRICANES.remove(snapshot.id());
-                RESERVATION_REGIONS.remove(hurricane.id);
+                projectatmosphere$removeManagedRegion(level, hurricane.id);
                 dirty = true;
             }
         }
@@ -278,7 +288,7 @@ public class HurricaneManager {
             HurricaneInstance hurricane = entry.getValue();
             hurricane.tick(level);
             if (hurricane.isDead()) {
-                RESERVATION_REGIONS.remove(hurricane.id);
+                projectatmosphere$removeManagedRegion(level, hurricane.id);
                 iterator.remove();
                 dirty = true;
             }
@@ -386,14 +396,87 @@ public class HurricaneManager {
         }
     }
 
-    private static void projectatmosphere$syncReservationRegions() {
+    private static void projectatmosphere$syncReservationRegions(ServerLevel level) {
         List<HurricaneInstance> hurricanes = projectatmosphere$getAllHurricanes();
         Set<UUID> activeIds = hurricanes.stream().map(hurricane -> hurricane.id).collect(Collectors.toSet());
-        RESERVATION_REGIONS.entrySet().removeIf(entry -> !activeIds.contains(entry.getKey()));
+        for (Map.Entry<UUID, CloudRegion> entry : new ArrayList<>(RESERVATION_REGIONS.entrySet())) {
+            if (activeIds.contains(entry.getKey())) {
+                continue;
+            }
+            projectatmosphere$removeManagedRegion(level, entry.getKey());
+        }
 
         for (HurricaneInstance hurricane : hurricanes) {
-            CloudRegion region = RESERVATION_REGIONS.computeIfAbsent(hurricane.id, ignored -> HurricaneSemantics.createReservationRegion(hurricane));
-            HurricaneSemantics.updateReservationRegion(region, hurricane);
+            projectatmosphere$syncManagedRegion(level, hurricane);
+        }
+    }
+
+    private static void projectatmosphere$syncManagedRegion(ServerLevel level, HurricaneInstance hurricane) {
+        CloudRegion region = RESERVATION_REGIONS.get(hurricane.id);
+        if (region == null) {
+            region = HurricaneSemantics.createReservationRegion(hurricane);
+            if (region == null) {
+                return;
+            }
+            RESERVATION_REGIONS.put(hurricane.id, region);
+            projectatmosphere$addManagedRegion(level, hurricane, region);
+        }
+        HurricaneSemantics.updateReservationRegion(region, hurricane);
+        projectatmosphere$addManagedRegion(level, hurricane, region);
+    }
+
+    private static void projectatmosphere$addManagedRegion(ServerLevel level, HurricaneInstance hurricane, CloudRegion region) {
+        if (level == null || region == null || !AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
+        CloudManager<?> cloudManager = CloudManager.get(level);
+        if (cloudManager == null) {
+            return;
+        }
+        CloudGenerator generator = cloudManager.getCloudGenerator();
+        if (generator.addCloud(region, CloudGenerator.Order.USE_WEIGHT)) {
+            return;
+        }
+        if (generator.getClouds().contains(region)) {
+            return;
+        }
+
+        double padding = SimpleCloudsConstants.MIN_SPAWN_DIST_BETWEEN_REGIONS;
+        generator.removeClouds(candidate ->
+                HurricaneSemantics.intersectsReservation(hurricane, candidate.getWorldX(), candidate.getWorldZ(), candidate.getWorldRadius() + padding)
+        );
+        generator.addCloud(region, CloudGenerator.Order.USE_WEIGHT);
+    }
+
+    private static void projectatmosphere$removeManagedRegion(ServerLevel level, UUID hurricaneId) {
+        CloudRegion region = RESERVATION_REGIONS.remove(hurricaneId);
+        if (region == null) {
+            return;
+        }
+        if (level == null || !AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
+        CloudManager<?> cloudManager = CloudManager.get(level);
+        if (cloudManager == null) {
+            return;
+        }
+        cloudManager.getCloudGenerator().removeClouds(candidate -> candidate == region);
+    }
+
+    private static void projectatmosphere$removeManagedRegions(ServerLevel level) {
+        if (RESERVATION_REGIONS.isEmpty()) {
+            return;
+        }
+
+        if (level != null && AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            CloudManager<?> cloudManager = CloudManager.get(level);
+            if (cloudManager != null) {
+                for (CloudRegion region : new ArrayList<>(RESERVATION_REGIONS.values())) {
+                    if (region != null) {
+                        cloudManager.getCloudGenerator().removeClouds(candidate -> candidate == region);
+                    }
+                }
+            }
         }
     }
 

@@ -20,8 +20,9 @@ public class HurricaneInstance {
 
     private static final float DEFAULT_ANCHOR_Y = 180.0F;
     private static final float MIN_WORLD_ANCHOR_Y = 128.0F;
-    private static final float CLOUD_LAYER_DESCENT = 360.0F;
-    private static final float GROUND_CLEARANCE = 96.0F;
+    private static final float CLOUD_LAYER_DESCENT = 620.0F;
+    private static final float GROUND_CLEARANCE = 48.0F;
+    private static final float OUTER_SHELL_SCALE = 0.25F;
     private static final int WIND_FIELD_INTERVAL_TICKS = 2;
     private static final int DESTRUCTION_INTERVAL_TICKS = 8;
 
@@ -87,11 +88,9 @@ public class HurricaneInstance {
         }
 
         float cloudHeight = manager.getCloudHeight();
-        this.anchorY = Mth.clamp(
-                cloudHeight - CLOUD_LAYER_DESCENT,
-                level.getSeaLevel() + GROUND_CLEARANCE,
-                cloudHeight - 64.0F
-        );
+        float minAnchor = level.getSeaLevel() + GROUND_CLEARANCE;
+        float maxAnchor = Math.max(minAnchor, cloudHeight - 180.0F);
+        this.anchorY = Mth.clamp(cloudHeight - CLOUD_LAYER_DESCENT, minAnchor, maxAnchor);
     }
 
     public void updateFromCyclone(ServerLevel level, CycloneSnapshot snapshot, WindVector ambientWind,
@@ -155,8 +154,8 @@ public class HurricaneInstance {
 
     public float getStormExtentRadius() {
         float coreRadius = this.getCoreRadius();
-        float cycloneDriven = Math.max(4200.0F, this.cycloneRadius * 18.0F);
-        return Math.max(coreRadius * 14.0F, cycloneDriven + this.category.ordinal() * 520.0F);
+        float cycloneDriven = Math.max(3600.0F, this.cycloneRadius * 12.0F) * OUTER_SHELL_SCALE;
+        return Math.max(coreRadius * 2.75F, cycloneDriven + this.category.ordinal() * 120.0F);
     }
 
     public float getVisualEyeRadius() {
@@ -166,7 +165,7 @@ public class HurricaneInstance {
     }
 
     public float getVisualEdgeFade() {
-        return Math.max(this.getStormExtentRadius() * 0.09F, 160.0F);
+        return Math.max(this.getStormExtentRadius() * 0.055F, 64.0F);
     }
 
     public int getBandCount() {
@@ -174,7 +173,7 @@ public class HurricaneInstance {
     }
 
     public float getBandWidth() {
-        return Math.max(this.getCoreRadius() * 0.145F, 52.0F);
+        return Math.max(this.getCoreRadius() * 0.075F, 32.0F);
     }
 
     public float getSpiralTightness() {
@@ -187,11 +186,11 @@ public class HurricaneInstance {
     }
 
     public float getTransitionStart() {
-        return Math.max(this.getVisualEyeRadius() + this.getBandWidth() * 0.78F, this.getCoreRadius() * 0.30F);
+        return Math.max(this.getVisualEyeRadius() + this.getBandWidth() * 0.72F, this.getCoreRadius() * 0.28F);
     }
 
     public float getTransitionEnd() {
-        return Math.max(this.getTransitionStart() + this.getBandWidth() * 18.0F, this.getStormExtentRadius() * 0.72F);
+        return Math.max(this.getTransitionStart() + this.getBandWidth() * 6.0F, this.getStormExtentRadius() * 0.58F);
     }
 
     public float getRotationPhase() {

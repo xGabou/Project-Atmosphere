@@ -13,6 +13,16 @@ public class AtmoCommonConfig {
         }
     }
 
+    public enum DimensionFilterMode {
+        WHITELIST,
+        BLACKLIST;
+
+        public DimensionFilterMode next() {
+            DimensionFilterMode[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
     public enum CloudRaymarchQuality {
         LOW(16, 0.50F),
         MEDIUM(32, 0.75F),
@@ -67,6 +77,8 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
     public static final ForgeConfigSpec.EnumValue<CloudMode> CLOUD_MODE;
+    public static final ForgeConfigSpec.EnumValue<DimensionFilterMode> CLOUD_DIMENSION_FILTER_MODE;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> CLOUD_DIMENSION_IDS;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADO_DESTRUCTION;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
@@ -211,6 +223,14 @@ public class AtmoCommonConfig {
         CLOUD_MODE = builder
                 .comment("Select how Project Atmosphere cloud rendering should behave")
                 .defineEnum("cloudMode", CloudMode.FULL);
+        CLOUD_DIMENSION_FILTER_MODE = builder
+                .comment("Controls whether cloudDimensionIds is used as an allow-list or deny-list for PA cloud/weather ownership")
+                .defineEnum("cloudDimensionFilterMode", DimensionFilterMode.WHITELIST);
+        CLOUD_DIMENSION_IDS = builder
+                .comment("Dimension ids used by cloudDimensionFilterMode. Default allows PA clouds/weather only in the Overworld.")
+                .defineListAllowEmpty("cloudDimensionIds",
+                        List.of("minecraft:overworld"),
+                        value -> value instanceof String);
         builder.pop();
 
         builder.push("forecast");

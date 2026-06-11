@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
 import net.Gabou.projectatmosphere.clouds.client.ClientLocalizedWeatherState;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsDiagnostics;
+import net.Gabou.projectatmosphere.tools.debug.HurricaneRenderDiagnostics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -50,10 +51,6 @@ public final class CloudDiagnosticsOverlay {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.options.renderDebug) {
-            return;
-        }
-
         Font font = minecraft.font;
         List<String> lines = getCachedLines(font, mode);
         if (lines.isEmpty()) {
@@ -186,7 +183,10 @@ public final class CloudDiagnosticsOverlay {
                         + " rendered / " + stats.renderableSnapshots()
                         + " renderable / " + stats.sourceSnapshots() + " synced");
             }
+
         }
+
+        lines.add(buildHurricaneLine(mode));
 
         if (showWeatherSection()) {
             ClientLocalizedWeatherState.Diagnostics weather = ClientLocalizedWeatherState.getDiagnostics();
@@ -224,6 +224,12 @@ public final class CloudDiagnosticsOverlay {
         }
 
         return lines;
+    }
+
+    private static String buildHurricaneLine(AtmoCommonConfig.CloudDiagnosticsOverlayMode mode) {
+        HurricaneRenderDiagnostics.FrameStats stats = HurricaneRenderDiagnostics.getLastStats();
+        boolean detailed = mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL;
+        return "Hurricane " + (stats == null ? "idle" : stats.describe(detailed));
     }
 
     private static AtmoCommonConfig.CloudDiagnosticsOverlayMode getMode() {

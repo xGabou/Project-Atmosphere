@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
+import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateUpdater;
@@ -8,7 +9,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.joml.Matrix4f;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 /**
  * Hook de rendu live des nuages Project Atmosphere.
@@ -39,7 +39,7 @@ public final class CloudRenderHook {
             return;
         }
 
-        if (AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.VANILLA) {
+        if (!AtmosphereCloudPolicy.shouldRenderPaClouds(level)) {
             CloudRenderStateUpdater.clearCurrentSnapshots();
             return;
         }

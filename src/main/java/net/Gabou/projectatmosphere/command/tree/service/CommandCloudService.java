@@ -3,14 +3,10 @@ package net.Gabou.projectatmosphere.command.tree.service;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
-import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
-import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
-import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -19,9 +15,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.fml.loading.FMLEnvironment;
 
 import java.util.List;
 
@@ -50,28 +43,12 @@ public final class CommandCloudService {
                         (float) Math.toRadians(sample.directionDeg())
                 );
 
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
-            if (region != null) {
-                CloudRegionSyncManager.syncPlayer(player);
-                PaCommandMessages.success(
-                        source,
-                        true,
-                        "Cloud spawned",
-                        "Cloud: " + cloudId,
-                        "Region: " + regionKey,
-                        "Wind: " + PaCommandSupport.formatWind(wind),
-                        "Result: Simple Clouds region created"
-                );
-                return 1;
-            }
-
-            source.sendFailure(Component.literal("Failed to create Simple Clouds cloud '" + cloudId + "'."));
+        if (!PaCommandSupport.requireSimpleClouds(source)) {
             return 0;
         }
 
-        CloudRegionState state = spawnNativeCloud(level, pos, cloudId);
-        if (state != null) {
+        CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
+        if (region != null) {
             CloudRegionSyncManager.syncPlayer(player);
             PaCommandMessages.success(
                     source,
@@ -80,12 +57,12 @@ public final class CommandCloudService {
                     "Cloud: " + cloudId,
                     "Region: " + regionKey,
                     "Wind: " + PaCommandSupport.formatWind(wind),
-                    "Result: native backend region created"
+                    "Result: Simple Clouds region created"
             );
             return 1;
         }
 
-        source.sendFailure(Component.literal("Failed to create native cloud region '" + cloudId + "'."));
+        source.sendFailure(Component.literal("Failed to create Simple Clouds cloud '" + cloudId + "'."));
         return 0;
     }
 
@@ -188,41 +165,4 @@ public final class CommandCloudService {
         return 1;
     }
 
-    private static CloudRegionState spawnNativeCloud(ServerLevel level, BlockPos pos, String cloudId) {
-        if (!level.dimension().equals(Level.OVERWORLD)) {
-            return null;
-        }
-        String cloudTypeId = resolveNativeCloudTypeId(cloudId);
-        float density = cloudId != null && cloudId.contains("thunder") ? 0.85F : 0.65F;
-        float coverage = cloudId != null && cloudId.contains("snow") ? 0.85F : 0.75F;
-        float spawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
-        return CloudRegionManager.getInstance().createCloudRegion(
-                level,
-                new Vec3(pos.getX(), spawnHeight, pos.getZ()),
-                64.0F,
-                spawnHeight - 8.0F,
-                spawnHeight + 8.0F,
-                density,
-                coverage,
-                0.35F,
-                RegionInstanceKey.from(pos),
-                cloudTypeId
-        );
-    }
-
-    private static String resolveNativeCloudTypeId(String cloudId) {
-        if (CloudTypeRegistry.get(cloudId).isPresent()) {
-            return cloudId;
-        }
-        if (cloudId != null && cloudId.contains("thunder")) {
-            return "cumulonimbus_calvus";
-        }
-        if (cloudId != null && cloudId.contains("rain")) {
-            return "nimbostratus";
-        }
-        if (cloudId != null && cloudId.contains("snow")) {
-            return "nimbostratus";
-        }
-        return CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
-    }
 }

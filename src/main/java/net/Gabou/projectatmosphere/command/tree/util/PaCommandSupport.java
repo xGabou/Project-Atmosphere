@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.command.tree.util;
 
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -29,6 +30,14 @@ public final class PaCommandSupport {
             source.sendFailure(Component.literal(message));
             return null;
         }
+    }
+
+    public static boolean requireSimpleClouds(CommandSourceStack source) {
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            source.sendFailure(Component.literal("Simple Clouds isn't loaded. Please relaunch the game with Simple Clouds installed."));
+            return false;
+        }
+        return true;
     }
 
     public static BlockPos sourceBlockPos(CommandSourceStack source) {

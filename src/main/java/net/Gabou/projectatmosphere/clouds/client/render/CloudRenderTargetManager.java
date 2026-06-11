@@ -45,6 +45,30 @@ public final class CloudRenderTargetManager {
     }
 
     /**
+     * Explicit resize entrypoint called by the client renderer lifecycle.
+     */
+    public static void onResize(int width, int height) {
+        if (cloudColorTarget == null) {
+            return;
+        }
+        prepareTargets();
+    }
+
+    /**
+     * Clears GPU-owned targets when the client world changes.
+     */
+    public static void onLevelChanged() {
+        clearTargets();
+    }
+
+    /**
+     * Releases GPU-owned targets during renderer shutdown.
+     */
+    public static void shutdown() {
+        clearTargets();
+    }
+
+    /**
      * Supprime les render targets quand elles ne sont plus nécessaires.
      */
     public static void clearTargets() {

@@ -49,7 +49,7 @@ public class HurricaneCommand {
         root.then(Commands.literal("clearhurricanes")
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
-                    HurricaneManager.clearHurricanes();
+                    HurricaneManager.clearHurricanes(ctx.getSource().getLevel());
                     ctx.getSource().sendSuccess(() -> Component.literal("All hurricanes cleared."), true);
                     return 1;
                 }));

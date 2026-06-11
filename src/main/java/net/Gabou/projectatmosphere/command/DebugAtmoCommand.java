@@ -379,33 +379,20 @@ public class DebugAtmoCommand {
                         (float) Math.toRadians(sample.directionDeg())
                 );
 
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            var region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
-            if (region != null) {
-                source.sendSuccess(
-                        () -> Component.literal("Created SimpleClouds cloud '" + cloudId + "' at your position."),
-                        true
-                );
-                return 1;
-            }
-
-            source.sendFailure(Component.literal("Failed to create SimpleClouds cloud '" + cloudId + "'."));
+        if (!net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport.requireSimpleClouds(source)) {
             return 0;
         }
 
-        CloudRegionState state = spawnNativeCloud(level, pos, cloudId);
-        if (state != null) {
-            if (source.getPlayer() != null) {
-                CloudRegionSyncManager.syncPlayer(source.getPlayer());
-            }
+        var region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
+        if (region != null) {
             source.sendSuccess(
-                    () -> Component.literal("Created PA cloud region '" + cloudId + "' at your position."),
+                    () -> Component.literal("Created SimpleClouds cloud '" + cloudId + "' at your position."),
                     true
             );
             return 1;
         }
 
-        source.sendFailure(Component.literal("Failed to create PA cloud region '" + cloudId + "'."));
+        source.sendFailure(Component.literal("Failed to create SimpleClouds cloud '" + cloudId + "'."));
         return 0;
     }
 

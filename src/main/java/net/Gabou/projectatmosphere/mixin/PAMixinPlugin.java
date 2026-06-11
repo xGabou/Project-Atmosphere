@@ -69,6 +69,7 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
                 || mixinClassName.contains("ShaderSupportPipelineHurricane")
                 || mixinClassName.contains("DhSupportPipeline")
                 || mixinClassName.contains("InstanceableMesh")
+                || mixinClassName.contains("InfoMixin")
                 || mixinClassName.contains("BindingManager");
     }
 

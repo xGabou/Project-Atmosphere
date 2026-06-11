@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
+import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateUpdater;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
@@ -33,6 +34,20 @@ public final class CloudRenderer {
 
     private CloudRenderer() {
 
+    }
+
+    public static void onMainWindowResize(int width, int height) {
+        CloudRenderTargetManager.onResize(width, height);
+    }
+
+    public static void onClientLevelChanged() {
+        CloudRenderStateUpdater.clearCurrentSnapshots();
+        CloudRenderTargetManager.onLevelChanged();
+    }
+
+    public static void shutdown() {
+        CloudRenderStateUpdater.clearCurrentSnapshots();
+        CloudRenderTargetManager.shutdown();
     }
 
     /**

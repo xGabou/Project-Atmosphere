@@ -62,6 +62,9 @@ public class AtmosphereManager {
 
     public static void onServerStopping(ServerLevel world) {
         ForecastOrchestrator.onServerStop(world);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            HurricaneManager.clearHurricanes(world);
+        }
         resetRuntimeState();
         AtmosphereCloudServices.get().onServerStopping(world);
 
@@ -114,7 +117,7 @@ public class AtmosphereManager {
             AtmosphereCloudServices.get().clearForRegeneration(world);
             if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
                 TornadoManager.clearTornadoes();
-                HurricaneManager.clearHurricanes();
+                HurricaneManager.clearHurricanes(world);
             }
             ForecastOrchestrator.clearAndRegenerate(world);
         });

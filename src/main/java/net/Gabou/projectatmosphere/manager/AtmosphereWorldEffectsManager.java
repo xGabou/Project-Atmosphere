@@ -168,7 +168,9 @@ public final class AtmosphereWorldEffectsManager {
 
         float intensity = Mth.clamp(snapshot.rainIntensity(), 0f, 1f);
         float fireChance = AtmoCommonConfig.FIRE_EXTINGUISH_BASE_CHANCE.get().floatValue() * intensity;
-        float cauldronChance = AtmoCommonConfig.CAULDRON_FILL_BASE_CHANCE.get().floatValue() * intensity;
+        float cauldronChance = LocalizedPrecipitationBlockUpdater.shouldUseVanillaCompatibility(level)
+                ? 0.0F
+                : AtmoCommonConfig.CAULDRON_FILL_BASE_CHANCE.get().floatValue() * intensity;
         if (fireChance <= 0f && cauldronChance <= 0f && EFFECTS.isEmpty()) {
             return EffectCounters.NONE;
         }

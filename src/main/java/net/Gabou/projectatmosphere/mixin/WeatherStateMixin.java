@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.mixin;
 
 import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
+import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,7 +14,8 @@ public abstract class WeatherStateMixin {
 
     @Inject(method = "isRainingAt", at = @At("HEAD"), cancellable = true)
     private void projectatmosphere$isRainingAt(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        if (WeatherCloudQueries.isRainingAt((Level) (Object) this, pos)) {
+        Level level = (Level) (Object) this;
+        if (AtmosphereCloudPolicy.shouldOwnWeather(level) && WeatherCloudQueries.isRainingAt(level, pos)) {
             cir.setReturnValue(true);
         }
     }

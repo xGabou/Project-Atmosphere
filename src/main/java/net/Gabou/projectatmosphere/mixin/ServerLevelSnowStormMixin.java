@@ -12,7 +12,6 @@ public abstract class ServerLevelSnowStormMixin implements ISnowStormLevel {
 
     @Override
     public boolean sereneseasonsplus$isSnowStormAt(ChunkPos pos) {
-        ((ServerLevel) (Object)  this).isRainingAt(pos.getWorldPosition());
         return SnowstormManager.isSnowStormAt(pos);
     }
 

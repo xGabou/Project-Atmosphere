@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.mixin;
 
 import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.temperature.util.LocalBiomeTemperatureResolver;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -89,12 +91,12 @@ public class BiomeFreezingMixin {
 
     private static Float resolveTemperature(LevelReader level, BlockPos pos) {
         if (level instanceof ServerLevel serverLevel) {
-            ResourceLocation biomeId = serverLevel.getBiome(pos).unwrapKey().map(key -> key.location()).orElse(null);
-            if (biomeId == null) {
+            ForecastRegion forecast = ForecastOrchestrator.getRegionForecast(serverLevel, pos);
+            if (forecast == null) {
                 return null;
             }
             RegionInstanceKey key = RegionInstanceKey.from(pos);
-            return ForecastOrchestrator.getCurrentTemperature(key, serverLevel.getGameTime());
+            return (float) LocalBiomeTemperatureResolver.getLocalBiomeTemperature(serverLevel, pos, key, forecast);
         }
         if (level instanceof Level clientLevel
                 && "net.minecraft.client.multiplayer.ClientLevel".equals(level.getClass().getName())) {
