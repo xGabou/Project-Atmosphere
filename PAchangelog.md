@@ -1,52 +1,12 @@
-# Project Atmosphere 0.8.0.0
+# Project Atmosphere v0.9.0.1-a Changelog
 
-Project Atmosphere `0.8.0.0` continues the large internal refactor of the forecast and runtime systems, focusing on simulation stability, improved diagnostics, and better atmosphere state correctness.
+## Added
+SSP min version 5.1.2
 
-This update stabilizes the new region-first runtime architecture while introducing deeper telemetry tools and improved safeguards for live atmospheric evolution.
+## Changed
+- Added the local biome temperature to the weather sampler's region data, so that it can be used for more accurate temperature-based effects. This is used by SSP v5.1.2 to provide more natural temperature variation for player-level atmospheric effects based on the local environment, such as biome and elevation.
+## Fixed
+- Fixed a crash because of bad versioning with SSP v0.5.1.1. (It was supposed to be 5.1.1, but I accidentally named it 0.5.1.1)
 
-> **Note:**  
-> This update is **temporarily incompatible with PA x TFC**.  
-> A compatibility update is already planned and will restore support soon.
+## Removed
 
----
-
-## Changes
-
-### Forecast and Runtime
-- Continued the transition to a **region-first forecast runtime architecture**.
-- Reduced reliance on legacy biome-key runtime systems.
-- Forecast baselines have been stabilized as part of the ongoing refactor.
-
-### Atmosphere Simulation
-- Added **humidity budget instrumentation**, including ocean and wind integration.
-- Completed the **cloud-water coupling system** for humidity simulation.
-- Added **pressure restore toward forecast targets** with soft deviation guards and anomaly reporting.
-- Added **temperature restore toward forecast targets** with soft deviation guards and anomaly reporting.
-- Reworked **cyclone and cloud ownership logic** so cyclone-driven storm visuals are no longer immediately overwritten by cloud sampling.
-
-### Telemetry and Debugging
-- Added new telemetry exports for **atmosphere coupling**, including target vs live values for:
-    - Temperature
-    - Pressure
-    - Humidity
-- Added **humidity budget diagnostics** and improved tracking of cloud-water interactions.
-- Added anomaly markers to help diagnose **pressure and temperature drift** during runtime.
-
-### Compatibility
-- **Dynamic Trees compatibility remains optional**, allowing the mod to load normally even if Dynamic Trees is not installed.(This module is a work in progress you should always disable it)
-
-### Fixes
-- Fixed a **telemetry export crash on JDK 17** caused by Gson reflective access to `java.time.Instant`.  
-  Explicit serialization for `Instant` is now used.
-
----
-
-## Notes
-- This release contains **no client or HUD changes**.
-- Build verified successfully on **JDK 17**.
-
----
-
-## Ongoing Work
-- Forecast generation is now in a stable state.
-- Current tuning work focuses on **live runtime evolution**, particularly temperature and humidity oscillations observed in some active regions.

@@ -37,7 +37,7 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "sereneseasonsplus"
 mandatory = false
-versionRange = "[5.1.1,)"
+versionRange = "[5.1.2,)"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
@@ -56,7 +56,7 @@ side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "simpleclouds"
-mandatory = false
+mandatory = true
 versionRange = "[0.7.3,)"
 ordering = "AFTER"
 side = "BOTH"

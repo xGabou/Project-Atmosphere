@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.modules.temperature.util;
 
 import javax.annotation.Nullable;
+
+import net.Gabou.projectatmosphere.api.Celsius;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
@@ -105,26 +107,26 @@ public final class LocalBiomeTemperatureResolver {
      * @param pos the world position to evaluate
      * @param regionKey the enclosing region key
      * @param forecast the existing region forecast; if null, the current forecast is resolved on demand
-     * @return true when the local biome is cold and wet enough for snow accumulation
+     * @return when the local biome is cold and wet enough for snow accumulation
      */
-    public static boolean canAccumulateSnow(ServerLevel level,
+    public static Celsius canAccumulateSnow(ServerLevel level,
                                             BlockPos pos,
                                             RegionInstanceKey regionKey,
                                             @Nullable ForecastRegion forecast) {
         ForecastRegion resolvedForecast = resolveForecast(level, pos, forecast);
         if (resolvedForecast == null) {
-            return false;
+            return new Celsius(false, -1);
         }
 
-        long sampleTick = getBucketSampleTick(getTimeBucket(level.getDayTime()));
-        Vec3 localPos = RegionAdapters.toRegionLocal(pos, regionKey);
-        float humidity = resolvedForecast.sampleHumidity(localPos, sampleTick);
-        float storm = resolvedForecast.sampleStorm(sampleTick);
+//        long sampleTick = getBucketSampleTick(getTimeBucket(level.getDayTime()));
+//        Vec3 localPos = RegionAdapters.toRegionLocal(pos, regionKey);
+//        float humidity = resolvedForecast.sampleHumidity(localPos, sampleTick);
+//        float storm = resolvedForecast.sampleStorm(sampleTick);
         double localTemperature = getLocalBiomeTemperature(level, pos, regionKey, resolvedForecast);
 
-        return localTemperature <= FREEZING_SNOW_THRESHOLD_C
-                && humidity >= 50.0D
-                && storm >= 0.30D;
+        return new Celsius(localTemperature <= FREEZING_SNOW_THRESHOLD_C, localTemperature);
+                /*&& humidity >= 50.0D
+                && storm >= 0.30D*/
     }
 
     /**
@@ -360,7 +362,7 @@ public final class LocalBiomeTemperatureResolver {
      * <p>Sampling the bucket midpoint keeps the cached result stable across all calls
      * that land inside the same 3000-tick window.</p>
      *
-     * @param gameTime the current world time
+     * @param timeBucket the current world time
      * @return the midpoint tick used to sample the forecast
      */
     private static long getBucketSampleTick(long timeBucket) {

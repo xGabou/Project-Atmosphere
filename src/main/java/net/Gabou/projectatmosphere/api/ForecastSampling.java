@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.api;
 
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.temperature.util.LocalBiomeTemperatureResolver;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -17,6 +18,15 @@ public final class ForecastSampling {
     // Temperature
     // ---------------------------------------------------------------------
 
+    public static Celsius isColdEnoughForSnow(ServerLevel level, BlockPos pos) {
+        return LocalBiomeTemperatureResolver.canAccumulateSnow(
+                level,
+                pos,
+                RegionInstanceKey.from(pos),
+                ForecastOrchestrator.getRegionForecast(level, pos)
+        );
+
+    }
     public static float getTemperatureC(ServerLevel level, BlockPos pos) {
         return ForecastOrchestrator.getCurrentTemperature(level, pos, level.getGameTime());
     }
