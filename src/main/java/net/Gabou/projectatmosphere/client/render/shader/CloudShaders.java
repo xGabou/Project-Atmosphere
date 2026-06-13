@@ -20,9 +20,11 @@ public final class CloudShaders {
 
     private static final ResourceLocation SHADER_ID = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_volume");
     private static final ResourceLocation COMPOSITE_SHADER_ID = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_composite");
+    private static final ResourceLocation TERRAIN_SHADOW_SHADER_ID = ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_terrain_shadow");
 
     private static ShaderInstance cloudShader;
     private static ShaderInstance compositeShader;
+    private static ShaderInstance terrainShadowShader;
 
     private CloudShaders() {
 
@@ -49,6 +51,10 @@ public final class CloudShaders {
             compositeShader = loaded;
             ProjectAtmosphere.LOGGER.info("[CloudState] shaderReload.ready composite={}", COMPOSITE_SHADER_ID);
         });
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), TERRAIN_SHADOW_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> {
+            terrainShadowShader = loaded;
+            ProjectAtmosphere.LOGGER.info("[CloudState] shaderReload.ready terrainShadow={}", TERRAIN_SHADOW_SHADER_ID);
+        });
     }
 
     /**
@@ -62,6 +68,10 @@ public final class CloudShaders {
 
     public static ShaderInstance getCompositeShader() {
         return compositeShader;
+    }
+
+    public static ShaderInstance getTerrainShadowShader() {
+        return terrainShadowShader;
     }
 
     /**

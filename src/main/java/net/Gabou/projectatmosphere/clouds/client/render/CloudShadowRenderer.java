@@ -11,7 +11,10 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 public final class CloudShadowRenderer {
@@ -47,6 +50,10 @@ public final class CloudShadowRenderer {
                 float worldX = Mth.lerp(x / (float) (resolution - 1), bounds.minX(), bounds.maxX());
                 values[z * resolution + x] = sampleCloudOcclusion(snapshots, worldX, worldZ);
             }
+        }
+
+        if (shadowTarget != null) {
+            uploadShadowTexture(shadowTarget, values, resolution, resolution);
         }
 
         Matrix4f worldToShadow = new Matrix4f()
@@ -138,6 +145,26 @@ public final class CloudShadowRenderer {
         } catch (IllegalStateException exception) {
             return true;
         }
+    }
+
+    private static void uploadShadowTexture(@NotNull RenderTarget shadowTarget, float[] values, int width, int height) {
+        if (shadowTarget.getColorTextureId() < 0 || values == null || values.length < width * height) {
+            return;
+        }
+
+        ByteBuffer pixels = BufferUtils.createByteBuffer(width * height * 4);
+        for (int i = 0; i < width * height; i++) {
+            int shadow = Mth.clamp(Math.round(values[i] * 255.0F), 0, 255);
+            pixels.put((byte) shadow);
+            pixels.put((byte) shadow);
+            pixels.put((byte) shadow);
+            pixels.put((byte) 255);
+        }
+        pixels.flip();
+
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, shadowTarget.getColorTextureId());
+        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
     }
 
     private static float smoothstep(float edge0, float edge1, float value) {

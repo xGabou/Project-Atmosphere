@@ -14,11 +14,15 @@ import java.util.Locale;
  * Cette classe ne fait pas de rendu et ne lit jamais le backend.
  */
 public final class CloudRenderTargetManager {
+    private static final int SHADOW_TARGET_SIZE = 64;
 
     private static RenderTarget cloudColorTarget;
     private static RenderTarget cloudShadowTarget;
+    private static final RenderTarget[] cloudHistoryTargets = new RenderTarget[2];
+    private static int cloudHistoryReadIndex;
     private static boolean ownsCloudColorTarget;
     private static boolean cloudColorTargetHasDepth;
+    private static boolean cloudHistoryValid;
 
     private CloudRenderTargetManager() {
 
@@ -88,10 +92,16 @@ public final class CloudRenderTargetManager {
             }
         }
 
+        destroyHistoryTargets();
+        if (cloudShadowTarget != null) {
+            cloudShadowTarget.destroyBuffers();
+        }
         cloudColorTarget = null;
         cloudShadowTarget = null;
         ownsCloudColorTarget = false;
         cloudColorTargetHasDepth = false;
+        cloudHistoryReadIndex = 0;
+        cloudHistoryValid = false;
     }
 
     /**
@@ -110,6 +120,29 @@ public final class CloudRenderTargetManager {
      */
     public static RenderTarget getCloudShadowTarget() {
         return cloudShadowTarget;
+    }
+
+    public static RenderTarget getCloudHistoryReadTarget() {
+        return cloudHistoryTargets[cloudHistoryReadIndex];
+    }
+
+    public static RenderTarget getCloudHistoryWriteTarget() {
+        return cloudHistoryTargets[1 - cloudHistoryReadIndex];
+    }
+
+    public static boolean isCloudHistoryValid() {
+        return cloudHistoryValid
+                && cloudHistoryTargets[0] != null
+                && cloudHistoryTargets[1] != null;
+    }
+
+    public static void invalidateCloudHistory() {
+        cloudHistoryValid = false;
+    }
+
+    public static void swapCloudHistoryTargets() {
+        cloudHistoryReadIndex = 1 - cloudHistoryReadIndex;
+        cloudHistoryValid = true;
     }
 
     /**
@@ -169,9 +202,52 @@ public final class CloudRenderTargetManager {
             logGlError("cloud-target-create");
         }
 
-        if (cloudShadowTarget == null || cloudShadowTarget != mainTarget) {
-            cloudShadowTarget = mainTarget;
+        ensureHistoryTargets(width, height);
+
+        if (cloudShadowTarget == null || cloudShadowTarget.width != SHADOW_TARGET_SIZE || cloudShadowTarget.height != SHADOW_TARGET_SIZE) {
+            if (cloudShadowTarget != null) {
+                cloudShadowTarget.destroyBuffers();
+            }
+            cloudShadowTarget = new TextureTarget(SHADOW_TARGET_SIZE, SHADOW_TARGET_SIZE, false, Minecraft.ON_OSX);
+            cloudShadowTarget.setFilterMode(GL11.GL_LINEAR);
+            cloudShadowTarget.resize(SHADOW_TARGET_SIZE, SHADOW_TARGET_SIZE, Minecraft.ON_OSX);
+            cloudShadowTarget.setClearColor(1.0F, 1.0F, 1.0F, 1.0F);
+            cloudShadowTarget.clear(Minecraft.ON_OSX);
         }
+    }
+
+    private static void ensureHistoryTargets(int width, int height) {
+        boolean recreate = false;
+        for (RenderTarget target : cloudHistoryTargets) {
+            if (target == null || target.width != width || target.height != height) {
+                recreate = true;
+                break;
+            }
+        }
+
+        if (!recreate) {
+            return;
+        }
+
+        destroyHistoryTargets();
+        for (int i = 0; i < cloudHistoryTargets.length; i++) {
+            RenderTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
+            target.setFilterMode(GL11.GL_LINEAR);
+            target.resize(width, height, Minecraft.ON_OSX);
+            target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            target.clear(Minecraft.ON_OSX);
+            cloudHistoryTargets[i] = target;
+        }
+        cloudHistoryReadIndex = 0;
+        cloudHistoryValid = false;
+        ProjectAtmosphere.LOGGER.info(
+                "[CloudState] cloudHistory.create size={}x{} readColor={} writeColor={}",
+                width,
+                height,
+                cloudHistoryTargets[0].getColorTextureId(),
+                cloudHistoryTargets[1].getColorTextureId()
+        );
+        logGlError("cloud-history-create");
     }
 
     private static void destroyCloudColorTargetIfOwned() {
@@ -179,6 +255,17 @@ public final class CloudRenderTargetManager {
             cloudColorTarget.destroyBuffers();
             ownsCloudColorTarget = false;
         }
+    }
+
+    private static void destroyHistoryTargets() {
+        for (int i = 0; i < cloudHistoryTargets.length; i++) {
+            RenderTarget target = cloudHistoryTargets[i];
+            if (target != null) {
+                target.destroyBuffers();
+                cloudHistoryTargets[i] = null;
+            }
+        }
+        cloudHistoryValid = false;
     }
 
     private static void logGlError(String context) {

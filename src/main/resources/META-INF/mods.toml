@@ -37,7 +37,7 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "sereneseasonsplus"
 mandatory = false
-versionRange = "*"
+versionRange = "[5.1.1,)"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
@@ -57,14 +57,21 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "simpleclouds"
 mandatory = false
-versionRange = "*"
+versionRange = "[0.7.3,)"
 ordering = "AFTER"
 side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "gaboulibs"
 mandatory = true
-versionRange = "*"
+versionRange = "[1.7.2,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "distanthorizons"
+mandatory = false
+versionRange = "[3.0.1-b,)"
 ordering = "AFTER"
 side = "BOTH"
 

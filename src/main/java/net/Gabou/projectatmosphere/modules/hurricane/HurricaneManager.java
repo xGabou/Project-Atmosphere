@@ -5,6 +5,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
@@ -23,6 +24,7 @@ import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -51,7 +53,14 @@ public class HurricaneManager {
     private HurricaneManager() {
     }
 
+    public static boolean isFeatureEnabled() {
+        return AtmoCommonConfig.ENABLE_HURRICANES.get();
+    }
+
     public static void spawnServer(ServerLevel level, Vec3 pos, float radius, WindVector wind, HurricaneCategory category) {
+        if (!isFeatureEnabled()) {
+            return;
+        }
         HurricaneInstance hurricane = HurricaneInstance.createDebug(pos, radius, wind, category);
         hurricane.refreshAnchorY(level);
         DEBUG_HURRICANES.add(hurricane);
@@ -61,6 +70,10 @@ public class HurricaneManager {
     }
 
     public static void tick(ServerLevel level) {
+        if (!isFeatureEnabled()) {
+            projectatmosphere$disableAndFlush(level);
+            return;
+        }
         long gameTime = level.getGameTime();
 
         projectatmosphere$tickDebugHurricanes(level);
@@ -82,6 +95,9 @@ public class HurricaneManager {
     }
 
     public static List<HurricaneInstance> getActiveHurricanes() {
+        if (!isFeatureEnabled()) {
+            return List.of();
+        }
         return List.copyOf(projectatmosphere$getAllHurricanes());
     }
 
@@ -98,6 +114,9 @@ public class HurricaneManager {
     }
 
     public static List<CompoundTag> savePersistentHurricanes() {
+        if (!isFeatureEnabled()) {
+            return List.of();
+        }
         List<CompoundTag> tags = new ArrayList<>();
         for (HurricaneInstance hurricane : projectatmosphere$getAllHurricanes()) {
             if (!hurricane.isDead()) {
@@ -109,6 +128,9 @@ public class HurricaneManager {
 
     public static void loadPersistentHurricanes(ServerLevel level, List<CompoundTag> tags) {
         resetRuntimeState(level);
+        if (!isFeatureEnabled()) {
+            return;
+        }
 
         for (CompoundTag tag : tags) {
             HurricaneInstance hurricane = HurricaneInstance.fromPersistentTag(tag);
@@ -132,6 +154,9 @@ public class HurricaneManager {
     }
 
     public static CloudRegion getReservationRegionAt(double worldX, double worldZ) {
+        if (!isFeatureEnabled()) {
+            return null;
+        }
         for (HurricaneInstance hurricane : projectatmosphere$getAllHurricanes()) {
             if (HurricaneSemantics.intersectsReservation(hurricane, worldX, worldZ, 0.0D)) {
                 CloudRegion region = RESERVATION_REGIONS.get(hurricane.id);
@@ -149,6 +174,16 @@ public class HurricaneManager {
 
     private static void syncToDimension(ServerLevel level) {
         NetworkHandler.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension), createSyncPacket());
+    }
+
+    private static void projectatmosphere$disableAndFlush(@Nullable ServerLevel level) {
+        if (LINKED_HURRICANES.isEmpty() && DEBUG_HURRICANES.isEmpty() && RESERVATION_REGIONS.isEmpty()) {
+            return;
+        }
+        resetRuntimeState(level);
+        if (level != null) {
+            syncToDimension(level);
+        }
     }
 
     private static void resetRuntimeState() {

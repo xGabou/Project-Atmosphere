@@ -5,12 +5,9 @@ import dev.nonamecrackers2.simpleclouds.client.renderer.WorldEffects;
 import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.modules.fog.FogHeuristics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.ViewportEvent;
@@ -35,41 +32,16 @@ public final class SimpleCloudsWhiteoutFogHandler {
         SimpleCloudsRenderer renderer = SimpleCloudsRenderer.getOptionalInstance().orElse(null);
         float partialTick = (float) event.getPartialTick();
         Vec3 cameraPos = event.getCamera().getPosition();
-        FogHeuristics.FogProfile dynamicFog = AtmosphereFogState.sample(level, cameraPos, partialTick);
         float cloudWhiteout = renderer == null ? 0.0F : computeCloudWhiteout(level, renderer, cameraPos);
         float whiteout = cloudWhiteout;
-        float dynamicStrength = dynamicFog.strength();
 
-        if (whiteout <= 0.0F && dynamicStrength <= 0.0F) {
+        if (whiteout <= 0.0F) {
             return;
         }
 
-        float baseNear = event.getNearPlaneDistance();
         float baseFar = event.getFarPlaneDistance();
-        float nearPlane = baseNear;
-        float farPlane = baseFar;
-
-        if (dynamicStrength > 0.0F && Level.OVERWORLD.equals(level.dimension())) {
-            float fogInfluence = Mth.clamp(
-                    dynamicStrength * 0.55F
-                            + dynamicStrength * dynamicStrength * 0.85F
-                            + dynamicFog.wetBiomeFactor() * 0.20F
-                            + dynamicFog.rainFactor() * 0.12F,
-                    0.0F,
-                    1.0F
-            );
-            float configuredNear = AtmoCommonConfig.FOG_NEAR_DISTANCE.get().floatValue();
-            float configuredFar = AtmoCommonConfig.FOG_FAR_DISTANCE.get().floatValue();
-            nearPlane = Math.min(nearPlane, Mth.lerp(fogInfluence, baseNear, configuredNear));
-            farPlane = Math.min(farPlane, Math.max(2.0F, Mth.lerp(fogInfluence, baseFar, configuredFar)));
-        }
-        if (whiteout > 0.0F) {
-            nearPlane = 0.0F;
-            farPlane = Math.min(farPlane, Math.max(0.35F, Mth.lerp(whiteout, baseFar, 0.85F)));
-        }
-
-        event.setNearPlaneDistance(nearPlane);
-        event.setFarPlaneDistance(farPlane);
+        event.setNearPlaneDistance(0.0F);
+        event.setFarPlaneDistance(Math.min(baseFar, Math.max(0.35F, Mth.lerp(whiteout, baseFar, 0.85F))));
         event.setCanceled(true);
     }
 
@@ -83,44 +55,21 @@ public final class SimpleCloudsWhiteoutFogHandler {
         SimpleCloudsRenderer renderer = SimpleCloudsRenderer.getOptionalInstance().orElse(null);
         float partialTick = (float) event.getPartialTick();
         Vec3 cameraPos = event.getCamera().getPosition();
-        FogHeuristics.FogProfile dynamicFog = AtmosphereFogState.sample(level, cameraPos, partialTick);
         float cloudWhiteout = renderer == null ? 0.0F : computeCloudWhiteout(level, renderer, cameraPos);
         float whiteout = cloudWhiteout;
-        float dynamicStrength = dynamicFog.strength();
 
-        if (whiteout <= 0.0F && dynamicStrength <= 0.0F) {
+        if (whiteout <= 0.0F) {
             return;
         }
 
-        if (dynamicStrength > 0.0F && Level.OVERWORLD.equals(level.dimension())) {
-            float fogInfluence = Mth.clamp(
-                    dynamicStrength * 0.55F
-                            + dynamicStrength * dynamicStrength * 0.85F
-                            + dynamicFog.wetBiomeFactor() * 0.20F
-                            + dynamicFog.rainFactor() * 0.12F,
-                    0.0F,
-                    1.0F
-            );
-            float colorBlend = AtmoCommonConfig.FOG_COLOR_BLEND.get().floatValue()
-                    * Mth.clamp(dynamicStrength * 0.45F + fogInfluence * 0.70F, 0.0F, 1.0F);
-            float dampRed = Mth.clamp(event.getRed() * (0.88F - dynamicFog.wetBiomeFactor() * 0.06F), 0.0F, 1.0F);
-            float dampGreen = Mth.clamp(event.getGreen() * (0.90F + dynamicFog.wetBiomeFactor() * 0.05F), 0.0F, 1.0F);
-            float dampBlue = Mth.clamp(event.getBlue() * (0.95F + dynamicFog.rainFactor() * 0.05F), 0.0F, 1.0F);
-            event.setRed(Mth.lerp(colorBlend, event.getRed(), dampRed));
-            event.setGreen(Mth.lerp(colorBlend, event.getGreen(), dampGreen));
-            event.setBlue(Mth.lerp(colorBlend, event.getBlue(), dampBlue));
-        }
-
-        if (whiteout > 0.0F) {
-            float[] cloudColor = renderer == null ? null : renderer.getCloudColor(partialTick);
-            float dustyRed = cloudColor == null ? 0.30F : Mth.clamp(cloudColor[0] * 0.62F + 0.10F, 0.0F, 1.0F);
-            float dustyGreen = cloudColor == null ? 0.25F : Mth.clamp(cloudColor[1] * 0.55F + 0.08F, 0.0F, 1.0F);
-            float dustyBlue = cloudColor == null ? 0.20F : Mth.clamp(cloudColor[2] * 0.45F + 0.06F, 0.0F, 1.0F);
-            float dustyBlend = Mth.clamp(whiteout * 1.18F, 0.0F, 1.0F);
-            event.setRed(Mth.lerp(dustyBlend, event.getRed(), dustyRed));
-            event.setGreen(Mth.lerp(dustyBlend, event.getGreen(), dustyGreen));
-            event.setBlue(Mth.lerp(dustyBlend, event.getBlue(), dustyBlue));
-        }
+        float[] cloudColor = renderer == null ? null : renderer.getCloudColor(partialTick);
+        float dustyRed = cloudColor == null ? 0.30F : Mth.clamp(cloudColor[0] * 0.62F + 0.10F, 0.0F, 1.0F);
+        float dustyGreen = cloudColor == null ? 0.25F : Mth.clamp(cloudColor[1] * 0.55F + 0.08F, 0.0F, 1.0F);
+        float dustyBlue = cloudColor == null ? 0.20F : Mth.clamp(cloudColor[2] * 0.45F + 0.06F, 0.0F, 1.0F);
+        float dustyBlend = Mth.clamp(whiteout * 1.18F, 0.0F, 1.0F);
+        event.setRed(Mth.lerp(dustyBlend, event.getRed(), dustyRed));
+        event.setGreen(Mth.lerp(dustyBlend, event.getGreen(), dustyGreen));
+        event.setBlue(Mth.lerp(dustyBlend, event.getBlue(), dustyBlue));
     }
 
     private static float computeCloudWhiteout(ClientLevel level, SimpleCloudsRenderer renderer, Vec3 cameraPos) {

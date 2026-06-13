@@ -242,7 +242,7 @@ public final class CloudRegionManager {
             }
 
             changed |= lifecycleController.tick(level, state);
-            changed |= evolutionController.tick(level, state);
+            changed |= evolutionController.tick(level, state, activeRegions);
         }
 
         changed |= CloudRegionStateStore.removeInactiveRegions(level) > 0;

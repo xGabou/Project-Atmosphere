@@ -52,6 +52,11 @@ public class TornadoRoarLoop extends AbstractTickableSoundInstance {
         this.pitch = 0.99f + 0.02f * Mth.sin((mc.level.getGameTime() % 100000) * 0.025f);
     }
 
+    @Override
+    public boolean canStartSilent() {
+        return true;
+    }
+
     public void setBaseVolume(float v) {
         this.baseVolume = Mth.clamp(v, 0.0f, 1.0f);
     }

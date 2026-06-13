@@ -75,6 +75,9 @@
     { "name": "CloudShapeEdgeRaggedness", "type": "float", "count": 1, "values": [ 0.32 ] },
     { "name": "CloudShapeStormWallStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudSeed", "type": "int", "count": 1, "values": [ 0 ] },
-    { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 32 ] }
+    { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 32 ] },
+    { "name": "RayJitterFrame", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "RayJitterStrength", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "RayJitterTemporalStrength", "type": "float", "count": 1, "values": [ 0.25 ] }
   ]
 }

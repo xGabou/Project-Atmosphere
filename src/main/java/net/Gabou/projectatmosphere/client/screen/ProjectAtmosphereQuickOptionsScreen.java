@@ -179,7 +179,7 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
 
     private Component cloudQualityLabel() {
         int scalePercent = Math.round(this.cloudRaymarchQuality.getResolutionScale() * 100.0F);
-        return Component.literal("Cloud quality: " + this.cloudRaymarchQuality.name() + " (" + this.cloudRaymarchQuality.getRaymarchSteps() + " steps, " + scalePercent + "%)");
+        return Component.literal("Cloud quality: " + this.cloudRaymarchQuality.getDisplayName() + " (" + this.cloudRaymarchQuality.getRaymarchSteps() + " steps, " + scalePercent + "%)");
     }
 
     private Component cloudOverlayLabel() {

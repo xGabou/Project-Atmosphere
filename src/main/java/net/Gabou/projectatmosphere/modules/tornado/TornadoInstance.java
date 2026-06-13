@@ -23,8 +23,8 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -50,8 +50,8 @@ public class TornadoInstance {
     private static final int MINIMUM_PERSISTENCE_TICKS = 20 * 120;
     private static final int MINIMUM_ACTIVE_TICKS = 20 * 120;
     private static final int MAXIMUM_ACTIVE_TICKS = 20 * 600;
-    private static final int MINIMUM_FORMATION_TICKS = 20 * 6;
-    private static final int MAXIMUM_FORMATION_TICKS = 20 * 20;
+    private static final int MINIMUM_FORMATION_TICKS = 20 * 18;
+    private static final int MAXIMUM_FORMATION_TICKS = 20 * 60;
     private static final int MINIMUM_DISSIPATION_TICKS = 20 * 8;
     private static final int MAXIMUM_DISSIPATION_TICKS = 20 * 40;
     private static final int FLOW_FIELD_INTERVAL_TICKS = 1;
@@ -70,6 +70,7 @@ public class TornadoInstance {
     private static final int CAPTURE_FULL_TICKS = 24;
     private static final int CAPTURE_ASCENT_TICKS = 90;
     private static final int CAPTURE_RELEASE_TICKS = 220;
+    private static final int EJECTION_IGNORE_TICKS = 20 * 5;
     private static final float BASE_SUCTION_FORCE = 0.13F;
     private static final float BASE_TANGENTIAL_FORCE = 0.11F;
     private static final float BASE_LIFT_FORCE = 0.12F;
@@ -90,7 +91,6 @@ public class TornadoInstance {
     private static final int TREE_CLUSTER_VISIT_LIMIT = 512;
     private static final float MAX_DEBRIS_ENTITY_SPAWN_CHANCE = 0.46F;
     private static final int BASE_MAX_DEBRIS_ENTITY_SPAWNS = 8;
-    private static final int ENTITY_DAMAGE_INTERVAL_TICKS = 8;
     private static final float MOVEMENT_ROUTE_LEASH_RADIUS = 150.0F;
     private static final double MOVEMENT_ROUTE_REACHED_DISTANCE_SQR = 36.0D;
     private static final float MOVEMENT_HEADING_BLEND = 0.010F;
@@ -147,7 +147,11 @@ public class TornadoInstance {
     private float clientPreviousRenderRadius;
     private float clientRenderRadius;
     private float clientTargetRadius;
+    private float clientPreviousRenderFormationProgress;
+    private float clientRenderFormationProgress;
+    private float clientTargetFormationProgress;
     private final Map<Integer, CapturedEntityState> capturedEntities = new HashMap<>();
+    private final Map<Integer, Integer> ejectedEntityIgnoreUntil = new HashMap<>();
     private int debugEligibleEntityCount;
     private int debugCapturedEntityCount;
     private int debugForceSampleCount;
@@ -233,6 +237,9 @@ public class TornadoInstance {
         this.clientPreviousRenderRadius = this.radius;
         this.clientRenderRadius = this.radius;
         this.clientTargetRadius = this.radius;
+        this.clientPreviousRenderFormationProgress = 0.0F;
+        this.clientRenderFormationProgress = 0.0F;
+        this.clientTargetFormationProgress = 0.0F;
     }
 
     public UUID getId() {
@@ -278,15 +285,38 @@ public class TornadoInstance {
     }
 
     public float getRenderBottomY(float partialTick) {
-        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderBottomY, this.clientRenderBottomY);
+        float blend = Mth.clamp(partialTick, 0.0F, 1.0F);
+        float bottom = Mth.lerp(blend, this.clientPreviousRenderBottomY, this.clientRenderBottomY);
+        float height = Mth.lerp(blend, this.clientPreviousRenderHeight, this.clientRenderHeight);
+        float formation = Mth.lerp(blend, this.clientPreviousRenderFormationProgress, this.clientRenderFormationProgress);
+        return bottom + height * (1.0F - formation);
     }
 
     public float getRenderHeight(float partialTick) {
-        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderHeight, this.clientRenderHeight);
+        float blend = Mth.clamp(partialTick, 0.0F, 1.0F);
+        float height = Mth.lerp(blend, this.clientPreviousRenderHeight, this.clientRenderHeight);
+        float formation = Mth.lerp(blend, this.clientPreviousRenderFormationProgress, this.clientRenderFormationProgress);
+        return height * formation;
     }
 
     public float getRenderRadius(float partialTick) {
         return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderRadius, this.clientRenderRadius);
+    }
+
+    public float getFormationProgress(float partialTick) {
+        return Mth.lerp(Mth.clamp(partialTick, 0.0F, 1.0F), this.clientPreviousRenderFormationProgress, this.clientRenderFormationProgress);
+    }
+
+    private float computeFormationProgress(float partialTick) {
+        float blend = Mth.clamp(partialTick, 0.0F, 1.0F);
+        return switch (this.phase) {
+            case FORMING -> {
+                float progress = Mth.clamp((this.phaseTicks + blend) / Math.max(1.0F, (float) this.formationTicks), 0.0F, 1.0F);
+                yield progress * progress * (3.0F - 2.0F * progress);
+            }
+            case ACTIVE, DISSIPATING -> 1.0F;
+            case DISSIPATED -> 0.0F;
+        };
     }
 
     public TornadoLevel getLevel() {
@@ -350,11 +380,6 @@ public class TornadoInstance {
         }
 
         this.detachedTicks++;
-        if (this.detachedTicks >= CLOUD_DETACH_GRACE_TICKS
-                && this.ageTicks >= MINIMUM_PERSISTENCE_TICKS
-                && this.phase != StormLifecyclePhase.DISSIPATING) {
-            this.markDissipating();
-        }
     }
 
     public int getDetachedTicks() {
@@ -425,12 +450,14 @@ public class TornadoInstance {
         this.clientPreviousRenderBottomY = this.clientRenderBottomY;
         this.clientPreviousRenderHeight = this.clientRenderHeight;
         this.clientPreviousRenderRadius = this.clientRenderRadius;
+        this.clientPreviousRenderFormationProgress = this.clientRenderFormationProgress;
 
         Vec3 predictedTarget = this.clientTargetPosition.add(this.clientTargetVelocity.scale(CLIENT_EXTRAPOLATION_TICKS));
         this.clientRenderPosition = this.clientRenderPosition.lerp(predictedTarget, CLIENT_POSITION_INTERPOLATION);
         this.clientRenderBottomY = Mth.lerp(CLIENT_SHAPE_INTERPOLATION, this.clientRenderBottomY, this.clientTargetBottomY);
         this.clientRenderHeight = Mth.lerp(CLIENT_SHAPE_INTERPOLATION, this.clientRenderHeight, this.clientTargetHeight);
         this.clientRenderRadius = Mth.lerp(CLIENT_SHAPE_INTERPOLATION, this.clientRenderRadius, this.clientTargetRadius);
+        this.clientRenderFormationProgress = Mth.lerp(CLIENT_SHAPE_INTERPOLATION, this.clientRenderFormationProgress, this.clientTargetFormationProgress);
         this.clientTargetVelocity = this.clientTargetVelocity.scale(CLIENT_VELOCITY_DAMPING);
     }
 
@@ -447,6 +474,7 @@ public class TornadoInstance {
                 this.normalizedIntensity,
                 this.stormLevel,
                 this.recentDebrisScore,
+                this.computeFormationProgress(0.0F),
                 this.phase
         );
     }
@@ -574,6 +602,7 @@ public class TornadoInstance {
         this.cloudRegion = region;
         this.anchorX = (float) this.position.x;
         this.anchorZ = (float) this.position.z;
+        float formationProgress = Mth.clamp(snapshot.formationProgress(), 0.0F, 1.0F);
         if (snapToTarget) {
             this.clientPreviousRenderPosition = this.position;
             this.clientRenderPosition = this.position;
@@ -588,6 +617,9 @@ public class TornadoInstance {
             this.clientPreviousRenderRadius = this.radius;
             this.clientRenderRadius = this.radius;
             this.clientTargetRadius = this.radius;
+            this.clientPreviousRenderFormationProgress = formationProgress;
+            this.clientRenderFormationProgress = formationProgress;
+            this.clientTargetFormationProgress = formationProgress;
             return;
         }
 
@@ -597,6 +629,7 @@ public class TornadoInstance {
         this.clientTargetBottomY = this.visualBottomY;
         this.clientTargetHeight = this.visualHeight;
         this.clientTargetRadius = this.radius;
+        this.clientTargetFormationProgress = formationProgress;
     }
 
     public boolean synchronizeWithDescriptor() {
@@ -970,6 +1003,9 @@ public class TornadoInstance {
                     }
 
                     if (AtmosphereUtils.isGlass(state)) {
+                        if (!AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get()) {
+                            continue;
+                        }
                         if (glassDestroyed >= maxGlassBreaks) {
                             continue;
                         }
@@ -1375,6 +1411,11 @@ public class TornadoInstance {
     }
 
     private void applyTornadoForces(ServerLevel level, Entity entity, Vec3 anchor) {
+        if (this.isEjectionIgnored(entity)) {
+            this.capturedEntities.remove(entity.getId());
+            return;
+        }
+
         CapturedEntityState captured = this.capturedEntities.get(entity.getId());
         double outerInfluenceRadius = captured != null
                 ? this.getOuterInfluenceRadius() * CAPTURE_HYSTERESIS_FACTOR
@@ -1417,6 +1458,10 @@ public class TornadoInstance {
         if (captured == null && shouldCapture) {
             captured = this.createCaptureState(entity, captureRadius, horizontalDistance);
             this.capturedEntities.put(entity.getId(), captured);
+        }
+        if (captured != null && entity.getY() + entity.getBbHeight() >= topY) {
+            this.releaseCapturedEntityAtTop(entity, captured, anchor, tangential, tornadoForce);
+            return;
         }
 
         Vec3 translationAssist = this.motion.scale(0.10D + tornadoForce * 0.10D);
@@ -1486,7 +1531,7 @@ public class TornadoInstance {
                 : new Vec3(current.x * 0.82D, Math.max(current.y * 0.35D, -0.02D), current.z * 0.82D);
         entity.setDeltaMovement(damped.add(add));
 
-        if (captured != null && (entity.getY() > topY + ENTITY_RELEASE_HEIGHT_PADDING || captured.captureTicks > CAPTURE_RELEASE_TICKS)) {
+        if (captured != null && captured.captureTicks > CAPTURE_RELEASE_TICKS) {
             this.capturedEntities.remove(entity.getId());
             entity.setDeltaMovement(entity.getDeltaMovement().add(tangential.scale(0.18D + tornadoForce * 0.08D)).add(0.0D, 0.20D, 0.0D));
         }
@@ -1496,7 +1541,36 @@ public class TornadoInstance {
         if (entity instanceof ServerPlayer serverPlayer) {
             serverPlayer.connection.send(new ClientboundSetEntityMotionPacket(serverPlayer));
         }
-        this.applyEntityDamage(entity, captured, approachFactor, coreFactor, liftWindow);
+    }
+
+    private void releaseCapturedEntityAtTop(Entity entity,
+                                            CapturedEntityState captured,
+                                            Vec3 anchor,
+                                            Vec3 tangential,
+                                            float tornadoForce) {
+        this.capturedEntities.remove(entity.getId());
+        if (entity instanceof ItemEntity || entity instanceof FallingBlockEntity) {
+            entity.discard();
+            return;
+        }
+
+        Vec3 horizontal = new Vec3(entity.getX() - anchor.x, 0.0D, entity.getZ() - anchor.z);
+        Vec3 outward = horizontal.lengthSqr() > 1.0E-4D
+                ? horizontal.normalize()
+                : new Vec3(Math.cos(captured.orbitAngle), 0.0D, Math.sin(captured.orbitAngle));
+        Vec3 ejection = outward.scale(2.15D + tornadoForce * 1.10D)
+                .add(tangential.scale(1.00D + tornadoForce * 0.45D))
+                .add(this.motion.scale(1.20D))
+                .add(0.0D, 0.75D + tornadoForce * 0.35D, 0.0D);
+        this.ejectedEntityIgnoreUntil.put(entity.getId(), this.ageTicks + EJECTION_IGNORE_TICKS);
+
+        entity.setDeltaMovement(ejection);
+        entity.hasImpulse = true;
+        entity.hurtMarked = true;
+        entity.fallDistance = 0.0F;
+        if (entity instanceof ServerPlayer serverPlayer) {
+            serverPlayer.connection.send(new ClientboundSetEntityMotionPacket(serverPlayer));
+        }
     }
 
     private CapturedEntityState createCaptureState(Entity entity, double captureRadius, double dist) {
@@ -1513,33 +1587,16 @@ public class TornadoInstance {
         );
     }
 
-    private void applyEntityDamage(Entity entity,
-                                   @Nullable CapturedEntityState captured,
-                                   float approachFactor,
-                                   float coreFactor,
-                                   float liftWindow) {
-        if (!(entity instanceof LivingEntity living)) {
-            return;
+    private boolean isEjectionIgnored(Entity entity) {
+        Integer ignoreUntil = this.ejectedEntityIgnoreUntil.get(entity.getId());
+        if (ignoreUntil == null) {
+            return false;
         }
-        if (living instanceof Player player && (player.isCreative() || player.isSpectator())) {
-            return;
+        if (ignoreUntil <= this.ageTicks) {
+            this.ejectedEntityIgnoreUntil.remove(entity.getId());
+            return false;
         }
-        if (this.ageTicks % ENTITY_DAMAGE_INTERVAL_TICKS != Math.floorMod(entity.getId(), ENTITY_DAMAGE_INTERVAL_TICKS)) {
-            return;
-        }
-        if (captured == null && coreFactor < 0.28F && approachFactor < 0.48F) {
-            return;
-        }
-
-        float stormFactor = StormSeverityScale.toNormalized(this.stormLevel);
-        float intensityFactor = 0.48F + this.normalizedIntensity * 0.96F + stormFactor * 0.42F;
-        float pressureFactor = captured != null ? 1.35F : 0.82F;
-        float zoneFactor = 0.34F + coreFactor * 0.92F + approachFactor * 0.38F + (1.0F - liftWindow) * 0.12F;
-        float damage = (float) (this.getDamageMultiplier() * 0.08D) * intensityFactor * pressureFactor * zoneFactor;
-        damage = Mth.clamp(damage, captured != null ? 1.5F : 0.75F, 9.0F);
-        if (damage > 0.0F) {
-            living.hurt(living.damageSources().generic(), damage);
-        }
+        return true;
     }
 
     private float getRotationDirection(Entity entity) {
@@ -1572,6 +1629,7 @@ public class TornadoInstance {
     }
 
     private void pruneCapturedEntities(ServerLevel level) {
+        this.ejectedEntityIgnoreUntil.entrySet().removeIf(entry -> entry.getValue() <= this.ageTicks);
         Iterator<Map.Entry<Integer, CapturedEntityState>> iterator = this.capturedEntities.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<Integer, CapturedEntityState> entry = iterator.next();

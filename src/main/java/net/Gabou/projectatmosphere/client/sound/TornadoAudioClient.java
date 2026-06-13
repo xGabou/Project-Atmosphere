@@ -16,7 +16,7 @@ public final class TornadoAudioClient {
     public static void ensure(TornadoInstance tornado, float baseVol, float maxDist) {
         var sm = Minecraft.getInstance().getSoundManager();
         TornadoRoarLoop loop = ACTIVE.get(tornado);
-        if (loop == null) {
+        if (loop == null || !sm.isActive(loop)) {
             loop = new TornadoRoarLoop(tornado, baseVol, maxDist);
             ACTIVE.put(tornado, loop);
             sm.play(loop);

@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.client.fog;
 
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -68,7 +71,13 @@ public final class FogBiomeClassifier {
 
     private static boolean isLocallyRaining(Level level, BlockPos pos) {
         try {
-            return CloudManager.get(level).isRainingAt(pos);
+            if(AtmosphereCloudServices.isSimpleCloudsLoaded()){
+                return SimpleCloudsCompat.isRainningAt(level,pos);
+            }
+            else {
+                return WeatherCloudQueries.isRainingAt(level,pos);
+            }
+
         } catch (Exception ignored) {
             return level.isRainingAt(pos);
         }

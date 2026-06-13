@@ -310,7 +310,7 @@ public final class CloudRenderDiagnostics {
 
     private static String resolveQualityName() {
         try {
-            return AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get().name();
+            return AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get().getDisplayName();
         } catch (IllegalStateException exception) {
             return "UNKNOWN";
         }

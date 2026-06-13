@@ -24,29 +24,75 @@ public class AtmoCommonConfig {
     }
 
     public enum CloudRaymarchQuality {
-        LOW(16, 0.50F),
-        MEDIUM(32, 0.75F),
-        HIGH(64, 1.00F);
+        LOW("LOW", 16, 0.50F, 0.82F, 1.05F, 0.72F, 0.60F, 0.16F),
+        LOW_24("LOW 24", 24, 0.50F, 0.78F, 0.98F, 0.66F, 0.56F, 0.14F),
+        MEDIUM("MEDIUM", 32, 0.75F, 0.70F, 0.85F, 0.55F, 0.85F, 0.30F),
+        HIGH("HIGH", 64, 1.00F, 0.55F, 0.45F, 0.30F, 0.70F, 0.55F);
 
+        private final String displayName;
         private final int raymarchSteps;
         private final float resolutionScale;
+        private final float temporalHistoryWeight;
+        private final float compositeBlurRadius;
+        private final float compositeBlurStrength;
+        private final float rayJitterStrength;
+        private final float rayJitterTemporalStrength;
 
-        CloudRaymarchQuality(int raymarchSteps, float resolutionScale) {
+        CloudRaymarchQuality(
+                String displayName,
+                int raymarchSteps,
+                float resolutionScale,
+                float temporalHistoryWeight,
+                float compositeBlurRadius,
+                float compositeBlurStrength,
+                float rayJitterStrength,
+                float rayJitterTemporalStrength
+        ) {
+            this.displayName = displayName;
             this.raymarchSteps = raymarchSteps;
             this.resolutionScale = resolutionScale;
+            this.temporalHistoryWeight = temporalHistoryWeight;
+            this.compositeBlurRadius = compositeBlurRadius;
+            this.compositeBlurStrength = compositeBlurStrength;
+            this.rayJitterStrength = rayJitterStrength;
+            this.rayJitterTemporalStrength = rayJitterTemporalStrength;
         }
 
         /**
-         * Retourne le nombre d'etapes de raymarch associe a cette qualite.
+         * Returns the user-facing label for this quality preset.
          *
-         * @return nombre d'etapes shader
+         * @return display name
          */
+        public String getDisplayName() {
+            return displayName;
+        }
+
         public int getRaymarchSteps() {
             return raymarchSteps;
         }
 
         public float getResolutionScale() {
             return resolutionScale;
+        }
+
+        public float getTemporalHistoryWeight() {
+            return temporalHistoryWeight;
+        }
+
+        public float getCompositeBlurRadius() {
+            return compositeBlurRadius;
+        }
+
+        public float getCompositeBlurStrength() {
+            return compositeBlurStrength;
+        }
+
+        public float getRayJitterStrength() {
+            return rayJitterStrength;
+        }
+
+        public float getRayJitterTemporalStrength() {
+            return rayJitterTemporalStrength;
         }
 
         /**
@@ -82,10 +128,14 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_CUSTOM_PRECIPITATION_RENDERING;
     public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_SHADOW_MAP;
     public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_LIGHTNING_VISUALS;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_MOVEMENT;
+    public static final ForgeConfigSpec.BooleanValue FREEZE_CLOUD_MOVEMENT;
+    public static final ForgeConfigSpec.DoubleValue CLOUD_WIND_DRIFT_SCALE;
     public static final ForgeConfigSpec.BooleanValue SHADER_SAFE_MODE;
     public static final ForgeConfigSpec.BooleanValue ENABLE_DISTANT_HORIZONS_ADAPTER;
     public static final ForgeConfigSpec.BooleanValue ENABLE_VOXY_ADAPTER;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_HURRICANES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADO_DESTRUCTION;
     public static final ForgeConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
     public static final ForgeConfigSpec.BooleanValue EVENTS_ENABLED;
@@ -212,7 +262,7 @@ public class AtmoCommonConfig {
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
         CLOUD_RAYMARCH_QUALITY = builder
-                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes a 50%, MEDIUM=32 etapes a 75%, HIGH=64 etapes a 100%")
+                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes a 50%, LOW 24=24 etapes a 50%, MEDIUM=32 etapes a 75%, HIGH=64 etapes a 100%")
                 .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
         builder.pop();
 
@@ -229,6 +279,15 @@ public class AtmoCommonConfig {
         ENABLE_CLOUD_LIGHTNING_VISUALS = builder
                 .comment("Enable render-only cloud lightning visuals. Gameplay lightning bolts remain controlled separately.")
                 .define("enableCloudLightningVisuals", true);
+        ENABLE_CLOUD_MOVEMENT = builder
+                .comment("Enable native Project Atmosphere cloud drift from regional wind.")
+                .define("enableCloudMovement", true);
+        FREEZE_CLOUD_MOVEMENT = builder
+                .comment("Freeze native Project Atmosphere cloud movement for debugging and screenshots.")
+                .define("freezeCloudMovement", false);
+        CLOUD_WIND_DRIFT_SCALE = builder
+                .comment("Blocks-per-tick drift multiplier applied to wind speed in m/s for native PA clouds.")
+                .defineInRange("cloudWindDriftScale", 0.035d, 0.0d, 1.0d);
         SHADER_SAFE_MODE = builder
                 .comment("Prefer conservative cloud rendering paths intended to avoid shader-pack conflicts.")
                 .define("shaderSafeMode", false);
@@ -272,6 +331,9 @@ public class AtmoCommonConfig {
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);
+        ENABLE_HURRICANES = builder
+                .comment("Enable hurricane spawning, ticking, syncing, and commands")
+                .define("enableHurricanes", false);
         ENABLE_TORNADO_DESTRUCTION = builder
                 .comment("Enable tornado block destruction and terrain scouring")
                 .define("enableTornadoDestruction", true);

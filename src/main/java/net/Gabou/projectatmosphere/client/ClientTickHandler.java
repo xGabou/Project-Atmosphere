@@ -6,12 +6,14 @@ import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.TornadoClientEffects;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
+import net.Gabou.projectatmosphere.client.sound.WeatherAudioClient;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
@@ -34,9 +36,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-
 @OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
 public class ClientTickHandler {
 
@@ -44,83 +43,51 @@ public class ClientTickHandler {
 
     private static int tickCounter = 0;
     private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
-    private static final Set<Integer> culledRegionIds = new HashSet<>();
-    private static final double CLOUD_RENDER_DISTANCE = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
-
-    private static int getRegionId(CloudRegion region) {
-        return System.identityHashCode(region);
-    }
-
-    public static boolean isRegionCulled(CloudRegion region) {
-        return culledRegionIds.contains(getRegionId(region));
-    }
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+        boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
+        if (simpleCloudsLoaded) {
             ClientHurricaneStateCache.tick(mc.level);
         }
         if (mc.level == null) {
-            if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            if (simpleCloudsLoaded) {
                 TornadoManager.clearClientTornadoes();
             }
+            TornadoAudioClient.stopAll();
+            WeatherAudioClient.stopAll();
+            prevTornadoes.clear();
             return;
         }
         if (mc.isPaused()) return;
 
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+        if (simpleCloudsLoaded) {
             TornadoManager.tick(mc.level);
+            syncTornadoAudio(new HashSet<>(TornadoManager.getClientTornadoes()));
         }
         if (!ClientSyncLock.isReady()) return;
 
         AtmosphereClientState.tick(mc);
         AtmosphereFogState.tick(mc);
+        WeatherAudioClient.tick(mc);
 
         SkyEffectState.beginFrame();
         tickCounter++;
         AtmosphereSkyEffectController.tick(mc);
 
-        if (mc.player != null) {
-            CloudManager<?> manager = CloudManager.get(mc.level);
-            List<CloudRegion> regions = manager.getClouds();
-            double playerX = mc.player.getX();
-            double playerZ = mc.player.getZ();
-            Set<Integer> nextCulled = new HashSet<>();
-            for (CloudRegion region : regions) {
-                double dx = region.getWorldX() - playerX;
-                double dz = region.getWorldZ() - playerZ;
-                double distSq = dx * dx + dz * dz;
-                if (distSq > CLOUD_RENDER_DISTANCE * CLOUD_RENDER_DISTANCE) {
-                    nextCulled.add(getRegionId(region));
-                }
-            }
-            culledRegionIds.clear();
-            culledRegionIds.addAll(nextCulled);
-        }
-
-        if (mc.level != null && AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+        if (mc.level != null && simpleCloudsLoaded) {
             Set<TornadoInstance> current = new HashSet<>(TornadoManager.getClientTornadoes());
             for (TornadoInstance tornado : current) {
-                float baseVol = 0.35f + 0.45f * 0.75f;
-                TornadoAudioClient.ensure(tornado, baseVol, 140f);
                 TornadoClientEffects.tickTornadoDust(tornado, mc.level, tickCounter);
             }
-            for (TornadoInstance t : prevTornadoes) {
-                if (!current.contains(t)) {
-                    TornadoAudioClient.stop(t);
-                }
-            }
-            prevTornadoes.clear();
-            prevTornadoes.addAll(current);
         }
 
         if (tickCounter % 40 == 0) {
             if (mc.player != null) {
-                if (mc.level != null) {
-                    CloudManager<?> manager = CloudManager.get(mc.level);
-                    SimpleCloudsRenderDiagnostics.logPlayerSample(manager, mc.player.getX(), mc.player.getZ());
+                if (mc.level != null && simpleCloudsLoaded) {
+                    SimpleCloudsCompat.logDiagnostic(mc.player.getX(),mc.player.getZ(),mc.level);
                 }
 
                 // snapshot
@@ -177,6 +144,20 @@ public class ClientTickHandler {
     public static SeasonStage getCurrentSeason(ClientLevel level, BlockPos pos) {
         return SeasonTimeHelper.stage(level);
     }
+
+    private static void syncTornadoAudio(Set<TornadoInstance> current) {
+        for (TornadoInstance tornado : current) {
+            TornadoAudioClient.ensure(tornado, 0.85f, 384.0f);
+        }
+        for (TornadoInstance tornado : prevTornadoes) {
+            if (!current.contains(tornado)) {
+                TornadoAudioClient.stop(tornado);
+            }
+        }
+        prevTornadoes.clear();
+        prevTornadoes.addAll(current);
+    }
+
     public record WindSpawnData(BlockPos pos,
                                 double x, double y, double z,
                                 double vx, double vy, double vz) {}

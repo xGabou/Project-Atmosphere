@@ -11,17 +11,32 @@ public final class CloudRenderProfile {
     private final int raymarchSteps;
     private final float maxRenderDistance;
     private final float resolutionScale;
+    private final float temporalHistoryWeight;
+    private final float compositeBlurRadius;
+    private final float compositeBlurStrength;
+    private final float rayJitterStrength;
+    private final float rayJitterTemporalStrength;
     private final boolean shadowsEnabled;
 
     private CloudRenderProfile(
             int raymarchSteps,
             float maxRenderDistance,
             float resolutionScale,
+            float temporalHistoryWeight,
+            float compositeBlurRadius,
+            float compositeBlurStrength,
+            float rayJitterStrength,
+            float rayJitterTemporalStrength,
             boolean shadowsEnabled
     ) {
         this.raymarchSteps = raymarchSteps;
         this.maxRenderDistance = maxRenderDistance;
         this.resolutionScale = resolutionScale;
+        this.temporalHistoryWeight = temporalHistoryWeight;
+        this.compositeBlurRadius = compositeBlurRadius;
+        this.compositeBlurStrength = compositeBlurStrength;
+        this.rayJitterStrength = rayJitterStrength;
+        this.rayJitterTemporalStrength = rayJitterTemporalStrength;
         this.shadowsEnabled = shadowsEnabled;
     }
 
@@ -36,6 +51,11 @@ public final class CloudRenderProfile {
                 quality.getRaymarchSteps(),
                 512.0F,
                 quality.getResolutionScale(),
+                quality.getTemporalHistoryWeight(),
+                quality.getCompositeBlurRadius(),
+                quality.getCompositeBlurStrength(),
+                quality.getRayJitterStrength(),
+                quality.getRayJitterTemporalStrength(),
                 false
         );
     }
@@ -50,6 +70,26 @@ public final class CloudRenderProfile {
 
     public float getResolutionScale() {
         return resolutionScale;
+    }
+
+    public float getTemporalHistoryWeight() {
+        return temporalHistoryWeight;
+    }
+
+    public float getCompositeBlurRadius() {
+        return compositeBlurRadius;
+    }
+
+    public float getCompositeBlurStrength() {
+        return compositeBlurStrength;
+    }
+
+    public float getRayJitterStrength() {
+        return rayJitterStrength;
+    }
+
+    public float getRayJitterTemporalStrength() {
+        return rayJitterTemporalStrength;
     }
 
     public boolean isShadowsEnabled() {

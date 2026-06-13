@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -30,7 +31,11 @@ public final class TornadoStorageManager {
         RuntimeStormData data = RuntimeStormData.get(level);
         COOLDOWNS.clear();
         COOLDOWNS.putAll(data.cooldowns);
-        TornadoManager.loadPersistentTornadoes(level, data.tornadoes);
+        if (AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            TornadoManager.loadPersistentTornadoes(level, data.tornadoes);
+        } else {
+            TornadoManager.clearTornadoes();
+        }
         HurricaneManager.loadPersistentHurricanes(level, data.hurricanes);
     }
 
@@ -42,7 +47,9 @@ public final class TornadoStorageManager {
         data.cooldowns.clear();
         data.cooldowns.putAll(COOLDOWNS);
         data.tornadoes.clear();
-        data.tornadoes.addAll(TornadoManager.savePersistentTornadoes());
+        if (AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            data.tornadoes.addAll(TornadoManager.savePersistentTornadoes());
+        }
         data.hurricanes.clear();
         data.hurricanes.addAll(HurricaneManager.savePersistentHurricanes());
         data.setDirty();

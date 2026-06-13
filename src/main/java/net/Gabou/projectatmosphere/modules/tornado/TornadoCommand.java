@@ -6,6 +6,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.util.DelayedTaskScheduler;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -33,6 +34,10 @@ public class TornadoCommand {
         LiteralArgumentBuilder<CommandSourceStack> noCloudsBaseCommand = Commands.literal("spawnTornadoNoClouds")
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
+                    if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+                        ctx.getSource().sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+                        return 0;
+                    }
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     ServerLevel level = player.serverLevel();
                     if (!level.dimension().equals(Level.OVERWORLD)) {
@@ -65,6 +70,10 @@ public class TornadoCommand {
         LiteralArgumentBuilder<CommandSourceStack> baseCommand = Commands.literal("spawnTornado")
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
+                    if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+                        ctx.getSource().sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+                        return 0;
+                    }
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     ServerLevel level = player.serverLevel();
                     if (!level.dimension().equals(Level.OVERWORLD)) {
@@ -158,6 +167,10 @@ public class TornadoCommand {
     }
 
     private static int projectatmosphere$removeNearestTornado(CommandSourceStack source, double maxDistance) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerPlayer player = source.getPlayerOrException();
         ServerLevel level = player.serverLevel();
         if (!level.dimension().equals(Level.OVERWORLD)) {
@@ -182,6 +195,10 @@ public class TornadoCommand {
     }
 
     private static int projectatmosphere$clearAllTornadoes(CommandSourceStack source) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         TornadoManager.clearTornadoes();
         source.sendSuccess(() -> Component.literal("All tornadoes cleared."), true);
         return 1;
@@ -192,6 +209,10 @@ public class TornadoCommand {
                                                      Vec3 tornadoPos,
                                                      net.Gabou.projectatmosphere.modules.core.WindVector wind,
                                                      int remainingPolls) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+            return;
+        }
         if (remainingPolls <= 0) {
             source.sendFailure(Component.literal("No SimpleClouds cumulonimbus became available for this tornado."));
             return;

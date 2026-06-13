@@ -6,6 +6,9 @@ import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitialize
 import net.Gabou.projectatmosphere.clouds.client.render.CloudDiagnosticsOverlay;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.client.ClientTickHandler;
+import net.Gabou.projectatmosphere.client.fog.AtmosphereFogRenderHandler;
+import net.Gabou.projectatmosphere.client.fog.SimpleCloudsWhiteoutFogHandler;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.auroras.AuroraCompatController;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
@@ -25,11 +28,14 @@ public class ClientOnlyRegistrar {
 
     public static void registerClient(IEventBus modEventBus, FMLJavaModLoadingContext context) {
         boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
+        MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
+        MinecraftForge.EVENT_BUS.register(AtmosphereFogRenderHandler.class);
         if (!simpleCloudsLoaded) {
             MinecraftForge.EVENT_BUS.register(CloudDebugRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudDiagnosticsOverlay.class);
             MinecraftForge.EVENT_BUS.register(CloudRenderHook.class);
         } else {
+            MinecraftForge.EVENT_BUS.register(SimpleCloudsWhiteoutFogHandler.class);
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; PA cloud client hooks disabled.");
         }
 

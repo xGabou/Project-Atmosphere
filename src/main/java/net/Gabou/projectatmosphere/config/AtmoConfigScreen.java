@@ -25,6 +25,7 @@ public class AtmoConfigScreen extends Screen {
     private boolean forceSharedExecutor;
     private boolean displayUnitsImperial;
     private boolean enableTornadoes;
+    private boolean enableHurricanes;
     private boolean enableTornadoDestruction;
     private boolean enableStormDebris;
     private boolean fogEnabled;
@@ -158,6 +159,7 @@ public class AtmoConfigScreen extends Screen {
         this.stormBoostMultiplier = AtmoCommonConfig.STORM_SEVERITY_BOOSTER.get();
         this.displayUnitsImperial = AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.get();
         this.enableTornadoes = AtmoCommonConfig.ENABLE_TORNADOES.get();
+        this.enableHurricanes = AtmoCommonConfig.ENABLE_HURRICANES.get();
         this.enableTornadoDestruction = AtmoCommonConfig.ENABLE_TORNADO_DESTRUCTION.get();
         this.enableStormDebris = AtmoCommonConfig.ENABLE_STORM_DEBRIS.get();
         this.fogEnabled = AtmoCommonConfig.FOG_ENABLED.get();
@@ -256,6 +258,11 @@ public class AtmoConfigScreen extends Screen {
         addConfigWidget(Button.builder(toggleLabel("Tornadoes", enableTornadoes), b -> {
             enableTornadoes = !enableTornadoes;
             b.setMessage(toggleLabel("Tornadoes", enableTornadoes));
+        }).bounds(center - 100, y, 200, 20).build(), y);
+        y += 32;
+        addConfigWidget(Button.builder(toggleLabel("Hurricanes", enableHurricanes), b -> {
+            enableHurricanes = !enableHurricanes;
+            b.setMessage(toggleLabel("Hurricanes", enableHurricanes));
         }).bounds(center - 100, y, 200, 20).build(), y);
         y += 32;
         addConfigWidget(Button.builder(toggleLabel("Tornado Destruction", enableTornadoDestruction), b -> {
@@ -525,6 +532,7 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.FORCE_SHARED_EXECUTOR.set(forceSharedExecutor);
         AtmoCommonConfig.DISPLAY_UNITS_IMPERIAL.set(displayUnitsImperial);
         AtmoCommonConfig.ENABLE_TORNADOES.set(enableTornadoes);
+        AtmoCommonConfig.ENABLE_HURRICANES.set(enableHurricanes);
         AtmoCommonConfig.ENABLE_TORNADO_DESTRUCTION.set(enableTornadoDestruction);
         AtmoCommonConfig.ENABLE_STORM_DEBRIS.set(enableStormDebris);
         AtmoCommonConfig.FOG_ENABLED.set(fogEnabled);

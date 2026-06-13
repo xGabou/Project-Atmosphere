@@ -39,18 +39,21 @@ public final class CloudRenderer {
     }
 
     public static void onMainWindowResize(int width, int height) {
+        CloudRaymarchRenderer.resetTemporalState();
         CloudRenderTargetManager.onResize(width, height);
     }
 
     public static void onClientLevelChanged() {
         CloudRenderStateUpdater.clearCurrentSnapshots();
         CloudShadowRenderer.clear();
+        CloudRaymarchRenderer.resetTemporalState();
         CloudRenderTargetManager.onLevelChanged();
     }
 
     public static void shutdown() {
         CloudRenderStateUpdater.clearCurrentSnapshots();
         CloudShadowRenderer.clear();
+        CloudRaymarchRenderer.resetTemporalState();
         CloudRenderTargetManager.shutdown();
     }
 
@@ -93,6 +96,7 @@ public final class CloudRenderer {
         String screenName = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
         RenderTarget shadowTarget = CloudRenderTargetManager.getCloudShadowTarget();
         CloudShadowRenderer.update(frameContext, renderableSnapshots, shadowTarget);
+        CloudTerrainShadowRenderer.render(frameContext, mainTarget, shadowTarget);
         AtmospherePipelineAdapter pipelineAdapter = AtmospherePipelineAdapters.select();
         int shadowDepthTextureId = shadowTarget != null ? shadowTarget.getDepthTextureId() : -1;
         String stateSignature = screenName
@@ -164,8 +168,16 @@ public final class CloudRenderer {
             if (usesIntermediateTarget) {
                 long compositeCpuStart = CloudRenderDiagnostics.nowNs();
                 COMPOSITE_GPU_TIMER.begin();
+                CloudRenderTargetManager.invalidateCloudHistory();
                 CloudRenderDiagnostics.recordCompositeSubmitted(
-                        CloudRaymarchRenderer.compositeTarget(cloudTarget, mainTarget, sceneDepthTextureId)
+                        CloudRaymarchRenderer.compositeTarget(
+                                cloudTarget,
+                                cloudTarget,
+                                mainTarget,
+                                sceneDepthTextureId,
+                                frameContext.getRenderProfile().getCompositeBlurRadius(),
+                                frameContext.getRenderProfile().getCompositeBlurStrength()
+                        )
                 );
                 COMPOSITE_GPU_TIMER.end();
                 CloudRenderDiagnostics.recordCompositeCpuTime(compositeCpuStart);

@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.client.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -34,6 +35,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector4f;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL43;
 import org.lwjgl.system.MemoryStack;
 
@@ -469,6 +471,9 @@ public final class SimpleCloudsTornadoRenderer {
         }
         RenderSystem.disableCull();
         RenderSystem.setShader(() -> shader);
+        applyLinearClampFiltering(this.downsampleTarget.getColorTextureId());
+        applyLinearClampFiltering(this.downsampleTarget.getDepthTextureId());
+        applyLinearClampFiltering(sceneDepthTextureId);
         shader.setSampler("TornadoColorSampler", this.downsampleTarget.getColorTextureId());
         shader.setSampler("TornadoDepthSampler", this.downsampleTarget.getDepthTextureId());
         shader.setSampler("SceneDepthSampler", sceneDepthTextureId);
@@ -479,6 +484,18 @@ public final class SimpleCloudsTornadoRenderer {
         this.fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
         VertexBuffer.unbind();
         shader.clear();
+    }
+
+    private static void applyLinearClampFiltering(int textureId) {
+        if (textureId <= 0) {
+            return;
+        }
+
+        RenderSystem.bindTexture(textureId);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
     }
 
     private void setProxyCullState(Vec3 cameraPos, PreparedTornado tornado) {
@@ -1055,30 +1072,27 @@ public final class SimpleCloudsTornadoRenderer {
             float terrainSurfaceY = terrainSurface.surfaceY();
             float centerX = (float) renderPos.x / scale;
             float centerZ = (float) renderPos.z / scale;
-            float bottomWorld;
-            if (terrainSurface.fallbackUsed()) {
-                bottomWorld = renderBottomY - GROUND_VISUAL_SINK_WORLD;
-            } else {
-                bottomWorld = terrainSurfaceY - GROUND_VISUAL_SINK_WORLD;
-            }
+            float bottomWorld = Math.max(
+                    terrainSurfaceY - GROUND_VISUAL_SINK_WORLD,
+                    renderBottomY - GROUND_VISUAL_SINK_WORLD
+            );
+            float formationProgress = tornado.getFormationProgress(partialTick);
             float topWorld = Math.max(
                     renderBottomY + tornado.getRenderHeight(partialTick),
                     cloudHeight + CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD
             );
             float bottomY = (bottomWorld - cloudHeight) / scale;
-            float height = Math.max((topWorld - bottomWorld) / scale, MIN_VISUAL_WORLD_HEIGHT / scale);
+            float height = Math.max(
+                    (topWorld - bottomWorld) / scale,
+                    (MIN_VISUAL_WORLD_HEIGHT / scale) * Math.max(formationProgress, 0.05F)
+            );
             float width = Math.max(renderRadius * 2.0F, MIN_VISUAL_WORLD_WIDTH) / scale;
             float stormSize = Math.max(MIN_VISUAL_WORLD_STORM_SIZE / scale, Math.max(width * 3.75F, height * 0.30F));
             float boundsRadiusCloud = Math.max(width * 4.25F, stormSize * 0.50F);
             float boundsRadiusWorld = boundsRadiusCloud * scale;
             float wallcloudRadiusWorld = stormSize * scale * 0.35F;
             float intensity = Mth.clamp(tornado.getNormalizedIntensity(), 0.0F, 1.0F);
-            float touchdownProgress = switch (tornado.getPhase()) {
-                case FORMING -> Mth.clamp(intensity * 1.35F, 0.0F, 0.92F);
-                case ACTIVE -> Mth.clamp(0.72F + intensity * 0.35F, 0.0F, 1.0F);
-                case DISSIPATING -> Mth.clamp(intensity * 1.10F, 0.0F, 1.0F);
-                default -> 0.0F;
-            };
+            float touchdownProgress = formationProgress;
             float seed = (Math.abs(tornado.getId().hashCode()) % 10000) / 10000.0F;
             float shape = 8.0F + seed * 10.0F;
             return new PreparedTornado(

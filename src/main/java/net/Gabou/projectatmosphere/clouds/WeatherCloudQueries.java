@@ -88,6 +88,46 @@ public final class WeatherCloudQueries {
         return ClientCloudRegionDataCache.getCurrentRegions();
     }
 
+    public static @Nullable CloudRegionRenderData getCloudRegionAt(Level level, BlockPos pos) {
+        String dimensionId = level.dimension().location().toString();
+        Collection<CloudRegionRenderData> regions =
+                level instanceof ServerLevel server
+                        ? CloudRegionStateStore.createRenderDataForActiveRegions(server)
+                        : ClientCloudRegionDataCache.getCurrentRegions();
+
+        CloudRegionRenderData best = null;
+        float bestScore = -1.0F;
+
+        double px = pos.getX() + 0.5D;
+        double py = pos.getY() + 0.5D;
+        double pz = pos.getZ() + 0.5D;
+
+        for (CloudRegionRenderData region : regions) {
+            if (!region.isActive() || !dimensionId.equals(region.getDimensionId())) {
+                continue;
+            }
+
+            double dx = px - region.getCenter().x();
+            double dz = pz - region.getCenter().z();
+            if (dx * dx + dz * dz > (double) region.getRadius() * region.getRadius()) {
+                continue;
+            }
+
+            if (py < region.getBaseY() || py > region.getTopY()) {
+                continue;
+            }
+
+            float score = region.getDensity() * region.getCoverage();
+            if (score > bestScore) {
+                bestScore = score;
+                best = region;
+            }
+        }
+
+        return best;
+    }
+
+
     private static float sampleGlobalRainLevel(Level level) {
         if (level == null) {
             return 0.0F;

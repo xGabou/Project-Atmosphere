@@ -213,7 +213,11 @@ public class ForecastOrchestrator {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 sendLoginStage(player, "Seeding local weather systems", 0.28F, "player_login_seed_weather");
                 if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-                    net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
+                    if (!net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.ensureReady(level)) {
+                        ProjectAtmosphere.LOGGER.warn("[Atmosphere] Simple Clouds is loaded but its cloud generator is not ready during player login; skipping initial cloud seeding.");
+                    } else {
+                        net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
+                    }
                 }
             }
 

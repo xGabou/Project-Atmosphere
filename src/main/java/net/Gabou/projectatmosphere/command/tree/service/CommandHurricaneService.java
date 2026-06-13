@@ -29,6 +29,10 @@ public final class CommandHurricaneService {
     }
 
     public static int spawnHurricane(CommandSourceStack source, int categoryId) {
+        if (!HurricaneManager.isFeatureEnabled()) {
+            source.sendFailure(Component.literal("Hurricanes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerPlayer player = PaCommandSupport.requirePlayer(source, "Hurricane spawning is only available to players.");
         if (player == null) {
             return 0;
@@ -67,6 +71,10 @@ public final class CommandHurricaneService {
     }
 
     public static int removeHurricane(CommandSourceStack source, double maxDistance) {
+        if (!HurricaneManager.isFeatureEnabled()) {
+            source.sendFailure(Component.literal("Hurricanes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerPlayer player = PaCommandSupport.requirePlayer(source, "Hurricane removal is only available to players.");
         if (player == null) {
             return 0;
@@ -88,6 +96,10 @@ public final class CommandHurricaneService {
     }
 
     public static int clearHurricanes(CommandSourceStack source) {
+        if (!HurricaneManager.isFeatureEnabled()) {
+            source.sendFailure(Component.literal("Hurricanes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerLevel level = source.getLevel();
         HurricaneManager.clearHurricanes(level);
         PaCommandMessages.success(source, true, "All hurricanes cleared");
@@ -95,6 +107,10 @@ public final class CommandHurricaneService {
     }
 
     public static int sendHurricaneList(CommandSourceStack source) {
+        if (!HurricaneManager.isFeatureEnabled()) {
+            source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: Hurricane list\nResult: hurricanes disabled in config"), false);
+            return 1;
+        }
         List<HurricaneInstance> hurricanes = HurricaneManager.getActiveHurricanes();
         if (hurricanes.isEmpty()) {
             source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: Hurricane list\nResult: no active hurricanes"), false);
@@ -117,6 +133,10 @@ public final class CommandHurricaneService {
     }
 
     public static int sendHurricaneInfo(CommandSourceStack source) {
+        if (!HurricaneManager.isFeatureEnabled()) {
+            source.sendFailure(Component.literal("Hurricanes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerPlayer player = source.getPlayer();
         HurricaneInstance hurricane = player == null
                 ? HurricaneManager.getActiveHurricanes().stream().findFirst().orElse(null)

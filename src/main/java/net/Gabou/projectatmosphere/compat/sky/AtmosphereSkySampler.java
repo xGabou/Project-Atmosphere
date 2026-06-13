@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.compat.sky;
 
 import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
+import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
+import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
+import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.client.fog.FogBiomeClassifier;
 import net.Gabou.projectatmosphere.compat.temperature.ClientTemperatureResolver;
 import net.minecraft.client.Minecraft;
@@ -27,6 +30,9 @@ public final class AtmosphereSkySampler {
         float humidityPercent = snapshot.humidityPercent();
         float rainIntensity = snapshot.rainIntensity();
         float cloudCover = snapshot.cloudCover();
+        CloudWeatherSample cloudWeather = WeatherCloudQueries.sampleAt(level, pos, false);
+        rainIntensity = Math.max(rainIntensity, cloudWeather.rainStrength());
+        cloudCover = Math.max(cloudCover, cloudWeather.cloudCoverStrength());
         float recentRainFactor = snapshot.recentRainFactor();
         float clearingTrend = snapshot.clearingTrend();
         float wetBiomeFactor = FogBiomeClassifier.computeWetBiomeFactor(level, pos);
@@ -39,11 +45,12 @@ public final class AtmosphereSkySampler {
         float sunVisibility = 0.0F;
         float atmosphericClarity = 0.0F;
         if (canSeeSky) {
-            float sunOcclusion = Mth.clamp(1.0F - cloudCover * 0.82F - rainIntensity * 0.95F, 0.0F, 1.0F);
+            float cloudShadow = CloudShadowMapAccess.sampleShadowAt(pos.getX() + 0.5D, pos.getZ() + 0.5D);
+            float sunOcclusion = Mth.clamp(1.0F - cloudCover * 0.82F - rainIntensity * 0.95F - cloudShadow * 0.70F, 0.0F, 1.0F);
             sunVisibility = daylightFactor * sunOcclusion;
 
             float humidityHaze = SkyConditionMath.remapClamped(humidityPercent, 74.0F, 100.0F);
-            atmosphericClarity = Mth.clamp(1.0F - cloudCover * 0.75F - rainIntensity * 0.95F - humidityHaze * 0.25F, 0.0F, 1.0F);
+            atmosphericClarity = Mth.clamp(1.0F - cloudCover * 0.75F - rainIntensity * 0.95F - humidityHaze * 0.25F - cloudShadow * 0.45F, 0.0F, 1.0F);
         }
 
         float cloudBreakup = SkyConditionMath.peakedFactor(cloudCover, 0.32F, 0.34F);

@@ -19,6 +19,16 @@ public class ModSounds {
 
     public static final RegistryObject<SoundEvent> TORNADO_ROAR = registerSound("tornado_roar");
 
+    public static final RegistryObject<SoundEvent> RAIN_LIGHT = registerSound("rain.light");
+    public static final RegistryObject<SoundEvent> RAIN_MEDIUM = registerSound("rain.medium");
+    public static final RegistryObject<SoundEvent> RAIN_HEAVY = registerSound("rain.heavy");
+
+    public static final RegistryObject<SoundEvent> THUNDER_IN_CLOUDS = registerSound("thunder.in_clouds");
+    public static final RegistryObject<SoundEvent> THUNDER_HIT_DISTANT = registerSound("thunder.hit_distant");
+    public static final RegistryObject<SoundEvent> THUNDER_HIT_SEMI_DISTANT = registerSound("thunder.hit_semi_distant");
+    public static final RegistryObject<SoundEvent> THUNDER_RUMBLING_CLOSE = registerSound("thunder.rumbling_close");
+    public static final RegistryObject<SoundEvent> THUNDER_RUMBLING_DISTANT = registerSound("thunder.rumbling_distant");
+
     public static void register(IEventBus eventBus) {
         SOUND_EVENTS.register(eventBus);
     }

@@ -4,6 +4,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.noise.NoiseSettings;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -95,6 +96,9 @@ public final class SimpleCloudsRenderDiagnostics {
                     stats.totalElements
             );
         }
+    }
+    public static void logPlayerSample(Level level, double x, double z) {
+        logPlayerSample(CloudManager.get(level), x, z);
     }
 
     public static void logPlayerSample(CloudManager<?> manager, double playerX, double playerZ) {

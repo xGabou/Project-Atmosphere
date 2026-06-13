@@ -41,11 +41,15 @@ final class CloudRegionTypeGeometry {
         CloudShapeProfile shape = definition.getShapeProfile();
         CloudVisualProfile visual = definition.getVisualProfile();
         double centerY = cluster.getCenter().y();
+        float existingRadius = Math.max(1.0F, cluster.getRadius());
+        float targetRadius = Math.max(shape.getBaseRadius(), existingRadius * (1.0F + cluster.getMergePressure() * 0.18F));
+        float targetBaseY = (float) centerY - shape.getBaseOffset();
+        float targetTopY = (float) centerY + shape.getTopOffset() + cluster.getMergePressure() * 12.0F;
 
-        cluster.setRadius(shape.getBaseRadius());
+        cluster.setRadius(targetRadius);
         cluster.setVerticalBounds(
-                (float) centerY - shape.getBaseOffset(),
-                (float) centerY + shape.getTopOffset()
+                Math.min(cluster.getBaseY(), targetBaseY),
+                Math.max(cluster.getTopY(), targetTopY)
         );
         cluster.setDensity(clamp01(0.48F + visual.getDensityMultiplier() * 0.26F + visual.getPrecipitationCoreStrength() * 0.18F));
         cluster.setCoverage(clamp01(0.56F + visual.getCoverageMultiplier() * 0.24F + shape.getBaseFlattening() * 0.14F));

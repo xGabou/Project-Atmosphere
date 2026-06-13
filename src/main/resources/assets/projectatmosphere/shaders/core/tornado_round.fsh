@@ -101,6 +101,12 @@ float hash1(float p) {
     return fract(p);
 }
 
+float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
 float onoise(vec3 pos) {
     vec3 x = pos * 2.0;
     vec3 p = floor(x);
@@ -711,7 +717,10 @@ void main() {
     float maxSteps = mix(14.0, 28.0, detailQuality);
     int steps = int(clamp(interval / stepSpacing, minSteps, maxSteps));
     float stepSize = interval / float(max(steps, 1));
-    float jitter = hash1(screenUv.x * OutSize.x + screenUv.y * OutSize.y + 17.13);
+    // Decale le depart du rayon par pixel sans creer de diagonales x+y visibles.
+    vec2 pixel = floor(gl_FragCoord.xy);
+    float stormSeed = dot(getStormPos(0).xz, vec2(0.071, 0.113));
+    float jitter = hash12(pixel + vec2(stormSeed, stormSeed * 1.37));
     float t = tNear + stepSize * (0.20 + jitter * 0.80);
     float previousT = tNear;
 

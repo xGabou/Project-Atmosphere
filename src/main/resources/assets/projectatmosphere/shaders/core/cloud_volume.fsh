@@ -64,6 +64,9 @@ uniform float CloudShapeEdgeRaggedness;
 uniform float CloudShapeStormWallStrength;
 uniform int CloudSeed;
 uniform int RaymarchSteps;
+uniform float RayJitterFrame;
+uniform float RayJitterStrength;
+uniform float RayJitterTemporalStrength;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -90,6 +93,10 @@ float hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
     p3 += dot(p3, p3.yzx + 33.33);
     return fract((p3.x + p3.y) * p3.z);
+}
+
+float interleavedGradientNoise(vec2 p) {
+    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
 
 float noise3(vec3 p) {
@@ -154,6 +161,15 @@ vec3 getWorldRay(vec2 uv) {
     vec4 view = InverseProjMat * clip;
     view /= view.w;
     return normalize((InverseModelViewMat * vec4(normalize(view.xyz), 0.0)).xyz);
+}
+
+float projectDepth(vec3 worldPos) {
+    vec4 clip = ProjMat * ModelViewMat * vec4(worldPos, 1.0);
+    if (abs(clip.w) <= 0.000001) {
+        return 1.0;
+    }
+    float ndcDepth = clip.z / clip.w;
+    return clamp(ndcDepth * 0.5 + 0.5, 0.0, 1.0);
 }
 
 bool intersectAabb(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax, out float tNear, out float tFar) {
@@ -333,13 +349,22 @@ void main() {
     int steps = int(clamp(float(RaymarchSteps), 1.0, float(MAX_RAYMARCH_STEPS)));
     float stepSize = interval / float(steps);
 
-    // Jitter stable par pixel pour casser les plans de sampling sans scintillement temporel.
-    float jitter = hash12(gl_FragCoord.xy);
-    float t = tNear + jitter * stepSize;
+    vec2 pixel = floor(gl_FragCoord.xy);
+    float seed = mod(abs(float(CloudSeed)), 4096.0);
+    float frameGroup = mod(floor(RayJitterFrame * 0.25), 8.0);
+    vec2 cycleOffset = vec2(hash1(frameGroup * 19.17 + seed), hash1(frameGroup * 43.31 + seed)) * 11.0;
+    float stableJitter = hash12(pixel + seed * vec2(0.071, 0.113));
+    float gradientJitter = interleavedGradientNoise(pixel + seed * 0.37);
+    float temporalJitter = hash12(pixel + cycleOffset + seed * vec2(0.017, 0.029));
+    float baseJitter = mix(stableJitter, gradientJitter, 0.28);
+    float jitter = mix(baseJitter, temporalJitter, clamp(RayJitterTemporalStrength, 0.0, 1.0));
+    float t = tNear + jitter * stepSize * clamp(RayJitterStrength, 0.0, 1.0);
     float transmittance = 1.0;
     vec3 accum = vec3(0.0);
     vec3 seedOffset = seedOffset3();
     float seedValue = float(CloudSeed);
+    float firstCloudDepth = sceneDepth;
+    bool firstCloudDepthSet = false;
 
     for (int step = 0; step < MAX_RAYMARCH_STEPS; step++) {
         if (step >= steps || transmittance < 0.02) {
@@ -349,8 +374,13 @@ void main() {
         vec3 samplePos = rayOrigin + rayDir * t;
         float density = sampleCloudField(samplePos, seedOffset, seedValue);
         if (density > 0.0005) {
+            if (!firstCloudDepthSet && density > 0.018) {
+                firstCloudDepth = projectDepth(samplePos);
+                firstCloudDepthSet = true;
+            }
             float softenedDensity = pow(density, 1.18);
-            float alpha = 1.0 - exp(-softenedDensity * stepSize * 3.2);
+            float extinction = mix(3.0, 5.6, saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier));
+            float alpha = 1.0 - exp(-softenedDensity * stepSize * extinction);
             vec3 cloudTint = computeSampleLighting(samplePos, density, rayDir);
             accum += cloudTint * alpha * transmittance;
             transmittance *= (1.0 - alpha);
@@ -368,6 +398,7 @@ void main() {
     float fogFactor = smoothstep(FogStart, FogEnd, min(t, MaxDistance));
     color = mix(color, FogColor.rgb, fogFactor * 0.35);
 
-    gl_FragDepth = WriteDepth != 0 ? sceneDepth : gl_FragCoord.z;
-    fragColor = vec4(color, clamp(rawAlpha * 0.92, 0.0, 1.0));
+    float opacityBoost = mix(0.92, 1.18, saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier));
+    gl_FragDepth = WriteDepth != 0 && firstCloudDepthSet ? firstCloudDepth : sceneDepth;
+    fragColor = vec4(color, clamp(rawAlpha * opacityBoost, 0.0, 1.0));
 }

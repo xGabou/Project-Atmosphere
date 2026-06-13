@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
@@ -45,8 +46,8 @@ public final class CommandStatusService {
                 "Wind: " + PaCommandSupport.formatWind(wind),
                 "Weather phase: " + phase,
                 "Simple Clouds: " + (simpleClouds ? "loaded" : "disabled"),
-                "Tornadoes: " + tornadoes,
-                "Hurricanes: " + hurricanes,
+                "Tornadoes: " + tornadoes + " (" + (AtmoCommonConfig.ENABLE_TORNADOES.get() ? "enabled" : "disabled") + ")",
+                "Hurricanes: " + hurricanes + " (" + (AtmoCommonConfig.ENABLE_HURRICANES.get() ? "enabled" : "disabled") + ")",
                 "Debug mode: " + ProjectAtmosphere.DEBUG_MODE
         );
         return 1;

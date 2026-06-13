@@ -36,6 +36,10 @@ void main() {
         if (tornadoDepth >= 1.0) {
             discard;
         }
+        float sceneDepth = texture(SceneDepthSampler, texCoord).r;
+        if (sceneDepth < 1.0 && tornadoDepth > sceneDepth + 0.0005) {
+            discard;
+        }
         gl_FragDepth = tornadoDepth;
     }
 

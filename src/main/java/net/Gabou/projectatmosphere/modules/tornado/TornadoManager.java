@@ -50,6 +50,10 @@ public class TornadoManager {
 
     @OnlyIn(Dist.CLIENT)
     public static void spawnClient(UUID id, Vec3 pos, float radius, WindVector wind, float bottomY, float height) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            clearClientTornadoes();
+            return;
+        }
         applyClientSnapshot(new TornadoSnapshot(
                 id,
                 new Vec3(pos.x, bottomY, pos.z),
@@ -61,6 +65,7 @@ public class TornadoManager {
                 wind.gustSpeed(),
                 Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F),
                 StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F)),
+                0.0F,
                 0.0F,
                 net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase.FORMING
         ));
@@ -128,10 +133,16 @@ public class TornadoManager {
     }
 
     public static List<TornadoInstance> getActiveTornadoes() {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            return List.of();
+        }
         return SERVER_TORNADOES;
     }
 
     public static List<TornadoInstance> getClientTornadoes() {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            return List.of();
+        }
         return CLIENT_TORNADOES;
     }
 
@@ -160,10 +171,17 @@ public class TornadoManager {
     }
 
     public static void syncToPlayer(ServerPlayer player) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTornadoesPacket(List.of()));
+            return;
+        }
         NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), createSyncPacket());
     }
 
     public static List<CompoundTag> savePersistentTornadoes() {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            return List.of();
+        }
         List<CompoundTag> tags = new ArrayList<>(SERVER_TORNADOES.size());
         for (TornadoInstance tornado : SERVER_TORNADOES) {
             if (!tornado.isDead()) {
@@ -174,6 +192,10 @@ public class TornadoManager {
     }
 
     public static void loadPersistentTornadoes(ServerLevel level, List<CompoundTag> tags) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            clearTornadoes();
+            return;
+        }
         for (TornadoInstance tornado : new ArrayList<>(SERVER_TORNADOES)) {
             removeAttachedDescriptor(tornado);
         }
@@ -197,6 +219,19 @@ public class TornadoManager {
 
     public static void tick(Level level) {
         if (level == null) {
+            return;
+        }
+
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            if (level.isClientSide) {
+                if (!CLIENT_TORNADOES.isEmpty()) {
+                    clearClientTornadoes();
+                }
+            } else {
+                if (!SERVER_TORNADOES.isEmpty()) {
+                    clearTornadoes();
+                }
+            }
             return;
         }
 
@@ -241,6 +276,10 @@ public class TornadoManager {
 
     @OnlyIn(Dist.CLIENT)
     public static void applyClientSnapshots(List<TornadoSnapshot> snapshots) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            clearClientTornadoes();
+            return;
+        }
         List<TornadoInstance> next = new ArrayList<>(snapshots.size());
         for (TornadoSnapshot snapshot : snapshots) {
             next.add(createOrUpdateClientTornado(snapshot));

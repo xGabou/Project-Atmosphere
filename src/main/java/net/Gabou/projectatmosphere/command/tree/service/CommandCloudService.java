@@ -1,14 +1,14 @@
 package net.Gabou.projectatmosphere.command.tree.service;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.clouds.simulation.CloudGroupSpawner;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
-import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
-import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
@@ -22,7 +22,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.config.ConfigTracker;
+import net.minecraftforge.fml.config.ModConfig;
 
 import java.util.List;
 import java.util.Locale;
@@ -220,6 +221,36 @@ public final class CommandCloudService {
         return 1;
     }
 
+    public static int setCloudMovementFrozen(CommandSourceStack source, boolean frozen) {
+        AtmoCommonConfig.FREEZE_CLOUD_MOVEMENT.set(frozen);
+        try {
+            saveCommonConfigForMod(ProjectAtmosphere.MODID);
+        } catch (Exception exception) {
+            ProjectAtmosphere.LOGGER.warn("Failed to save cloud movement freeze setting", exception);
+        }
+
+        PaCommandMessages.success(
+                source,
+                true,
+                "Cloud movement " + (frozen ? "frozen" : "unfrozen"),
+                "Native PA cloud drift is now " + (frozen ? "paused" : "active")
+        );
+        return 1;
+    }
+
+    private static void saveCommonConfigForMod(String modId) {
+        var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
+        if (set == null) {
+            return;
+        }
+        for (ModConfig config : set) {
+            if (config.getModId().equals(modId)) {
+                config.save();
+                return;
+            }
+        }
+    }
+
     public static boolean spawnWeatherCloudAtSource(CommandSourceStack source, String cloudId) {
         ServerLevel level = source.getLevel();
         BlockPos pos = BlockPos.containing(source.getPosition());
@@ -273,26 +304,7 @@ public final class CommandCloudService {
         }
 
         String cloudTypeId = resolveNativeCloudTypeId(cloudId);
-        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
-        float spawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
-        float radius = Math.max(24.0F, definition.getShapeProfile().getBaseRadius());
-        float thickness = Math.max(8.0F, definition.getShapeProfile().getTopOffset());
-        float density = Math.min(1.0F, Math.max(0.18F, 0.55F * definition.getVisualProfile().getDensityMultiplier()));
-        float coverage = Math.min(1.0F, Math.max(0.20F, 0.70F * definition.getVisualProfile().getCoverageMultiplier()));
-        float edgeSoftness = Math.min(0.85F, Math.max(0.08F, definition.getVisualProfile().getTopSoftness()));
-
-        return CloudRegionManager.getInstance().createCloudRegion(
-                level,
-                new Vec3(pos.getX(), spawnHeight, pos.getZ()),
-                radius,
-                spawnHeight - (thickness * 0.35F),
-                spawnHeight + (thickness * 0.65F),
-                density,
-                coverage,
-                edgeSoftness,
-                RegionInstanceKey.from(pos),
-                cloudTypeId
-        );
+        return CloudGroupSpawner.spawnRequestedCloud(level, pos, cloudTypeId);
     }
 
 }

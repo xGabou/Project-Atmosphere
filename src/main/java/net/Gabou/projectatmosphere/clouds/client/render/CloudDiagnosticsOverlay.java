@@ -13,53 +13,74 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.config.ConfigTracker;
 import net.minecraftforge.fml.config.ModConfig;
 import org.lwjgl.glfw.GLFW;
-import net.minecraft.util.FormattedCharSequence;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 public final class CloudDiagnosticsOverlay {
     private static final int BACKGROUND_COLOR = 0xA0101010;
     private static final int TEXT_COLOR = 0xFFE6F2FF;
     private static final int MUTED_TEXT_COLOR = 0xFFB8C6D0;
+
     private static final int X = 6;
     private static final int Y = 6;
     private static final int LINE_HEIGHT = 10;
     private static final int PADDING = 4;
-    private static final long REFRESH_INTERVAL_NS = 100_000_000L;
-    private static final int GUI_PACKED_LIGHT = 0xF000F0;
 
-    private static List<String> cachedRawLines = Collections.emptyList();
+    private static final long REFRESH_INTERVAL_NS = 250_000_000L;
+
+    private static final int MAX_COMPACT_LINES = 5;
+    private static final int MAX_FULL_LINES = 8;
+
     private static List<FormattedCharSequence> cachedVisualLines = Collections.emptyList();
     private static int cachedWidth;
     private static long lastCacheRefreshNs;
+    private static AtmoCommonConfig.CloudDiagnosticsOverlayMode cachedMode;
+
+    private static int callsThisSecond = 0;
+    private static long lastPrint = 0L;
+
 
     private CloudDiagnosticsOverlay() {
     }
 
     @SubscribeEvent
     public static void onRenderOverlay(RenderGuiOverlayEvent.Post event) {
-        AtmoCommonConfig.CloudDiagnosticsOverlayMode mode = getMode();
-        if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.OFF) {
+        if (!event.getOverlay().id().toString().equals("minecraft:debug_text")) {
             return;
         }
 
         Minecraft minecraft = Minecraft.getInstance();
-        Font font = minecraft.font;
 
+        if (minecraft.options.hideGui) {
+            return;
+        }
+
+        AtmoCommonConfig.CloudDiagnosticsOverlayMode mode = getMode();
+
+        if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.OFF) {
+            return;
+        }
+
+        Font font = minecraft.font;
         List<FormattedCharSequence> lines = getCachedVisualLines(font, mode);
+
         if (lines.isEmpty()) {
             return;
         }
 
         GuiGraphics guiGraphics = event.getGuiGraphics();
+
         int height = lines.size() * LINE_HEIGHT + PADDING * 2;
 
         guiGraphics.fill(
@@ -70,15 +91,15 @@ public final class CloudDiagnosticsOverlay {
                 BACKGROUND_COLOR
         );
 
-        drawLinesBatched(guiGraphics, font, lines);
+        drawLines(guiGraphics, font, lines);
     }
 
     /**
-     * Builds and caches the overlay text as precomputed visual lines.
+     * Gets the cached diagnostic overlay lines.
      *
-     * @param font The Minecraft font renderer used to measure the text width.
+     * @param font The Minecraft font renderer used for text measurements.
      * @param mode The current diagnostics overlay mode.
-     * @return The cached visual lines ready for batched rendering.
+     * @return The cached formatted lines ready to render.
      */
     private static List<FormattedCharSequence> getCachedVisualLines(
             Font font,
@@ -86,61 +107,48 @@ public final class CloudDiagnosticsOverlay {
     ) {
         long nowNs = System.nanoTime();
 
-        if (nowNs - lastCacheRefreshNs < REFRESH_INTERVAL_NS && !cachedVisualLines.isEmpty()) {
+        if (
+                cachedMode == mode
+                        && nowNs - lastCacheRefreshNs < REFRESH_INTERVAL_NS
+                        && !cachedVisualLines.isEmpty()
+        ) {
             return cachedVisualLines;
         }
 
-        CloudRenderDiagnostics.FrameStats stats = CloudRenderDiagnostics.getLastStats();
-        List<String> rawLines = buildLines(stats, mode);
-
+        List<String> rawLines = buildLines(mode);
         List<FormattedCharSequence> visualLines = new ArrayList<>(rawLines.size());
+
         int width = 0;
 
         for (String line : rawLines) {
             width = Math.max(width, font.width(line));
-            visualLines.add(FormattedCharSequence.forward(line, net.minecraft.network.chat.Style.EMPTY));
+            visualLines.add(FormattedCharSequence.forward(line, Style.EMPTY));
         }
 
-        cachedRawLines = rawLines;
         cachedVisualLines = visualLines;
         cachedWidth = width;
+        cachedMode = mode;
         lastCacheRefreshNs = nowNs;
 
         return cachedVisualLines;
     }
 
     /**
-     * Draws all cached overlay lines in one font batch.
+     * Draws the cached diagnostic lines without forcing an immediate GUI flush.
      *
      * @param guiGraphics The current GUI graphics context.
      * @param font The Minecraft font renderer.
-     * @param lines The cached visual lines to draw.
+     * @param lines The cached formatted lines to draw.
      */
-    private static void drawLinesBatched(
+    private static void drawLines(
             GuiGraphics guiGraphics,
             Font font,
             List<FormattedCharSequence> lines
     ) {
-        var pose = guiGraphics.pose().last().pose();
-
         for (int i = 0; i < lines.size(); i++) {
             int color = i == 0 ? TEXT_COLOR : MUTED_TEXT_COLOR;
-
-            font.drawInBatch(
-                    lines.get(i),
-                    X,
-                    Y + i * LINE_HEIGHT,
-                    color,
-                    false,
-                    pose,
-                    guiGraphics.bufferSource(),
-                    Font.DisplayMode.NORMAL,
-                    0,
-                    GUI_PACKED_LIGHT
-            );
+            guiGraphics.drawString(font, lines.get(i), X, Y + i * LINE_HEIGHT, color, false);
         }
-
-        guiGraphics.flush();
     }
 
     @SubscribeEvent
@@ -150,16 +158,19 @@ public final class CloudDiagnosticsOverlay {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
+
         if (minecraft.getWindow() == null) {
             return;
         }
 
         long window = minecraft.getWindow().getWindow();
+
         if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_F3) != GLFW.GLFW_PRESS) {
             return;
         }
 
         AtmoCommonConfig.CloudDiagnosticsOverlayMode next = getMode().next();
+
         AtmoCommonConfig.CLOUD_DIAGNOSTICS_OVERLAY.set(next);
         saveCommonConfigForMod(ProjectAtmosphere.MODID);
         invalidateCache();
@@ -170,30 +181,53 @@ public final class CloudDiagnosticsOverlay {
     }
 
     /**
-     * Clears all cached overlay text and measurements.
+     * Clears all cached overlay lines and measurements.
      */
     private static void invalidateCache() {
-        cachedRawLines = Collections.emptyList();
         cachedVisualLines = Collections.emptyList();
         cachedWidth = 0;
         lastCacheRefreshNs = 0L;
+        cachedMode = null;
     }
 
-    private static List<String> buildLines(
-            CloudRenderDiagnostics.FrameStats stats,
-            AtmoCommonConfig.CloudDiagnosticsOverlayMode mode
-    ) {
+    /**
+     * Builds a lightweight diagnostic overlay.
+     *
+     * @param mode The current diagnostics overlay mode.
+     * @return A capped list of raw diagnostic lines.
+     */
+    private static List<String> buildLines(AtmoCommonConfig.CloudDiagnosticsOverlayMode mode) {
         List<String> lines = new ArrayList<>();
+        boolean full = mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL;
+        int maxLines = full ? MAX_FULL_LINES : MAX_COMPACT_LINES;
+
         lines.add("PA [" + mode.name() + "]");
 
-        if (showRenderSection()) {
-            if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
+        CloudRenderDiagnostics.FrameStats stats = CloudRenderDiagnostics.getLastStats();
+
+        if (stats == null) {
+            lines.add("Cloud renderer: waiting for stats");
+            appendHurricaneLine(lines, mode, maxLines);
+            return lines;
+        }
+
+        if (showRenderSection() && lines.size() < maxLines) {
+            if (full) {
                 lines.add("Render " + stats.qualityName()
                         + " " + stats.raymarchSteps() + "s "
                         + percent(stats.resolutionScale())
                         + " | " + stats.targetWidth() + "x" + stats.targetHeight()
                         + "/" + stats.mainWidth() + "x" + stats.mainHeight()
                         + " | ds=" + yesNo(stats.downscaled()));
+            } else {
+                lines.add("Render: " + stats.qualityName()
+                        + " / " + stats.raymarchSteps()
+                        + " steps / " + percent(stats.resolutionScale()));
+            }
+        }
+
+        if (showRenderSection() && lines.size() < maxLines) {
+            if (full) {
                 lines.add("Clouds " + stats.renderedSnapshots()
                         + "/" + stats.renderableSnapshots()
                         + "/" + stats.sourceSnapshots()
@@ -201,92 +235,161 @@ public final class CloudDiagnosticsOverlay {
                         + "/" + stats.filteredSkippedSnapshots()
                         + "/" + stats.submitSkippedSnapshots()
                         + " | comp=" + yesNo(stats.compositeSubmitted()));
-                lines.add("Work " + formatFloat(stats.pixelStepMegas()) + "M"
-                        + " | CPU " + formatFloat(stats.frameCpuMs())
-                        + "/" + formatFloat(stats.raymarchCpuMs())
-                        + "/" + formatFloat(stats.compositeCpuMs()) + "ms");
-                lines.add("GPU ray " + formatTiming(
-                        stats.raymarchGpuMs(),
-                        stats.gpuTimingSupported(),
-                        stats.raymarchGpuTimingValid(),
-                        stats.raymarchGpuAgeFrames(),
-                        stats.raymarchGpuPendingQueries()
-                ) + " | comp " + formatTiming(
-                        stats.compositeGpuMs(),
-                        stats.gpuTimingSupported(),
-                        stats.compositeGpuTimingValid(),
-                        stats.compositeGpuAgeFrames(),
-                        stats.compositeGpuPendingQueries()
-                ));
-                lines.add("Last " + stats.describeLastCloud() + " | t=" + stats.worldTime());
-                CloudShadowSnapshot shadow = CloudShadowMapAccess.getCurrentSnapshot();
+            } else {
+                lines.add("Clouds: " + stats.renderedSnapshots()
+                        + " rendered / " + stats.renderableSnapshots()
+                        + " renderable / " + stats.sourceSnapshots()
+                        + " synced");
+            }
+        }
+
+        if (showRenderSection() && full && lines.size() < maxLines) {
+            lines.add("CPU " + formatFloat(stats.frameCpuMs())
+                    + "/" + formatFloat(stats.raymarchCpuMs())
+                    + "/" + formatFloat(stats.compositeCpuMs())
+                    + "ms | work=" + formatFloat(stats.pixelStepMegas()) + "M");
+        }
+
+        if (showRenderSection() && full && lines.size() < maxLines) {
+            lines.add("GPU ray " + formatTiming(
+                    stats.raymarchGpuMs(),
+                    stats.gpuTimingSupported(),
+                    stats.raymarchGpuTimingValid(),
+                    stats.raymarchGpuAgeFrames(),
+                    stats.raymarchGpuPendingQueries()
+            ) + " | comp " + formatTiming(
+                    stats.compositeGpuMs(),
+                    stats.gpuTimingSupported(),
+                    stats.compositeGpuTimingValid(),
+                    stats.compositeGpuAgeFrames(),
+                    stats.compositeGpuPendingQueries()
+            ));
+        }
+
+        if (showRenderSection() && full && lines.size() < maxLines) {
+            CloudShadowSnapshot shadow = CloudShadowMapAccess.getCurrentSnapshot();
+
+            if (shadow != null) {
                 lines.add("Shadow " + yesNo(shadow.isValid())
                         + " | tex=" + shadow.getTextureId()
                         + " | grid=" + shadow.getResolutionX() + "x" + shadow.getResolutionZ()
                         + " | frame=" + shadow.getValidityFrame());
-            } else {
-                lines.add("Render: " + stats.qualityName() + " / " + stats.raymarchSteps() + " steps / " + percent(stats.resolutionScale()));
-                lines.add("Target: " + stats.targetWidth() + "x" + stats.targetHeight()
-                        + " of " + stats.mainWidth() + "x" + stats.mainHeight()
-                        + " / downscaled=" + yesNo(stats.downscaled()));
-                lines.add("Clouds: " + stats.renderedSnapshots()
-                        + " rendered / " + stats.renderableSnapshots()
-                        + " renderable / " + stats.sourceSnapshots() + " synced");
             }
-
         }
 
-        lines.add(buildHurricaneLine(mode));
+        appendHurricaneLine(lines, mode, maxLines);
 
-        if (showWeatherSection()) {
+        if (showWeatherSection() && lines.size() < maxLines) {
             ClientLocalizedWeatherState.Diagnostics weather = ClientLocalizedWeatherState.getDiagnostics();
-            CloudWeatherSample sample = weather.sample();
-            if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
-                BlockPos pos = weather.samplePos();
-                lines.add("Weather r " + formatFloat(weather.targetRainLevel()) + ">" + formatFloat(weather.smoothedRainLevel())
-                        + " t " + formatFloat(weather.targetThunderLevel()) + ">" + formatFloat(weather.smoothedThunderLevel())
-                        + " | " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
-                        + " | c=" + formatFloat(sample.cloudCoverStrength()));
-                lines.add("Src " + abbreviate(sample.describeSource(), 34)
-                        + " | col=" + yesNo(sample.inPrecipitationColumn())
-                        + " snow=" + yesNo(sample.snowing()));
-                PrecipitationVisualState precip = CustomPrecipitationRenderer.getLastState();
+
+            if (weather != null) {
+                if (full) {
+                    CloudWeatherSample sample = weather.sample();
+                    BlockPos pos = weather.samplePos();
+
+                    lines.add("Weather r " + formatFloat(weather.targetRainLevel())
+                            + ">" + formatFloat(weather.smoothedRainLevel())
+                            + " t " + formatFloat(weather.targetThunderLevel())
+                            + ">" + formatFloat(weather.smoothedThunderLevel())
+                            + " | " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
+                            + " | c=" + formatFloat(sample.cloudCoverStrength()));
+                } else {
+                    lines.add("Weather: rain " + formatFloat(weather.targetRainLevel())
+                            + " > " + formatFloat(weather.smoothedRainLevel())
+                            + " / thunder " + formatFloat(weather.targetThunderLevel())
+                            + " > " + formatFloat(weather.smoothedThunderLevel()));
+                }
+            }
+        }
+
+        if (showWeatherSection() && full && lines.size() < maxLines) {
+            ClientLocalizedWeatherState.Diagnostics weather = ClientLocalizedWeatherState.getDiagnostics();
+
+            if (weather != null) {
+                CloudWeatherSample sample = weather.sample();
+
+                if (sample != null) {
+                    lines.add("Src " + abbreviate(sample.describeSource(), 34)
+                            + " | col=" + yesNo(sample.inPrecipitationColumn())
+                            + " snow=" + yesNo(sample.snowing()));
+                }
+            }
+        }
+
+        if (showWeatherSection() && full && lines.size() < maxLines) {
+            PrecipitationVisualState precip = CustomPrecipitationRenderer.getLastState();
+
+            if (precip != null) {
                 lines.add("Precip " + precip.rainTier().name()
                         + "/" + precip.snowTier().name()
                         + " | fog=" + formatFloat(precip.fogBoost())
                         + " | splash=" + formatFloat(precip.splashIntensity()));
-            } else {
-                lines.add("Weather: rain " + formatFloat(weather.targetRainLevel()) + " -> " + formatFloat(weather.smoothedRainLevel())
-                        + " / thunder " + formatFloat(weather.targetThunderLevel()) + " -> " + formatFloat(weather.smoothedThunderLevel()));
             }
         }
 
-        if (showWorldEffectsSection()) {
+        if (showWorldEffectsSection() && lines.size() < maxLines) {
             AtmosphereWorldEffectsDiagnostics.FrameStats effects = AtmosphereWorldEffectsDiagnostics.getLastStats();
-            if (mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL) {
-                lines.add("Effects " + yesNo(effects.enabled())
-                        + " | samples " + effects.rainySamples() + "/" + effects.samples()
-                        + " | rain=" + formatFloat(effects.lastRainIntensity())
-                        + " | hooks " + effects.eventHooks() + "/" + effects.customHooks() + "/" + effects.skyBlockedSamples());
-                lines.add("Blocks f/c/ca " + effects.firesRemoved()
-                        + "/" + effects.campfiresDoused()
-                        + "/" + effects.cauldronsFilled());
-            } else {
-                lines.add("Effects: enabled=" + yesNo(effects.enabled())
-                        + " / samples " + effects.rainySamples() + "/" + effects.samples()
-                        + " / lastRain=" + formatFloat(effects.lastRainIntensity()));
+
+            if (effects != null) {
+                if (full) {
+                    lines.add("Effects " + yesNo(effects.enabled())
+                            + " | samples " + effects.rainySamples()
+                            + "/" + effects.samples()
+                            + " | rain=" + formatFloat(effects.lastRainIntensity()));
+                } else {
+                    lines.add("Effects: " + yesNo(effects.enabled())
+                            + " / samples " + effects.rainySamples()
+                            + "/" + effects.samples()
+                            + " / rain=" + formatFloat(effects.lastRainIntensity()));
+                }
             }
         }
 
-        return lines;
+        return limitLines(lines, maxLines);
     }
 
-    private static String buildHurricaneLine(AtmoCommonConfig.CloudDiagnosticsOverlayMode mode) {
+    /**
+     * Adds the hurricane diagnostic line when there is enough overlay space.
+     *
+     * @param lines The current mutable line list.
+     * @param mode The current diagnostics overlay mode.
+     * @param maxLines The maximum number of lines allowed.
+     */
+    private static void appendHurricaneLine(
+            List<String> lines,
+            AtmoCommonConfig.CloudDiagnosticsOverlayMode mode,
+            int maxLines
+    ) {
+        if (lines.size() >= maxLines) {
+            return;
+        }
+
         HurricaneRenderDiagnostics.FrameStats stats = HurricaneRenderDiagnostics.getLastStats();
         boolean detailed = mode == AtmoCommonConfig.CloudDiagnosticsOverlayMode.FULL;
-        return "Hurricane " + (stats == null ? "idle" : stats.describe(detailed));
+
+        lines.add("Hurricane " + (stats == null ? "idle" : stats.describe(detailed)));
     }
 
+    /**
+     * Limits the amount of rendered text to keep the debug overlay cheap.
+     *
+     * @param lines The original diagnostic lines.
+     * @param maxLines The maximum number of lines to keep.
+     * @return The capped diagnostic line list.
+     */
+    private static List<String> limitLines(List<String> lines, int maxLines) {
+        if (lines.size() <= maxLines) {
+            return lines;
+        }
+
+        return new ArrayList<>(lines.subList(0, maxLines));
+    }
+
+    /**
+     * Gets the current diagnostics overlay mode.
+     *
+     * @return The active overlay mode, or OFF if the config is unavailable.
+     */
     private static AtmoCommonConfig.CloudDiagnosticsOverlayMode getMode() {
         try {
             return AtmoCommonConfig.CLOUD_DIAGNOSTICS_OVERLAY.get();
@@ -295,6 +398,11 @@ public final class CloudDiagnosticsOverlay {
         }
     }
 
+    /**
+     * Checks if render diagnostics should be shown.
+     *
+     * @return True when render diagnostics are enabled.
+     */
     private static boolean showRenderSection() {
         try {
             return AtmoCommonConfig.CLOUD_DIAGNOSTICS_SHOW_RENDER.get();
@@ -303,6 +411,11 @@ public final class CloudDiagnosticsOverlay {
         }
     }
 
+    /**
+     * Checks if weather diagnostics should be shown.
+     *
+     * @return True when weather diagnostics are enabled.
+     */
     private static boolean showWeatherSection() {
         try {
             return AtmoCommonConfig.CLOUD_DIAGNOSTICS_SHOW_WEATHER.get();
@@ -311,6 +424,11 @@ public final class CloudDiagnosticsOverlay {
         }
     }
 
+    /**
+     * Checks if world effect diagnostics should be shown.
+     *
+     * @return True when world effect diagnostics are enabled.
+     */
     private static boolean showWorldEffectsSection() {
         try {
             return AtmoCommonConfig.CLOUD_DIAGNOSTICS_SHOW_WORLD_EFFECTS.get();
@@ -319,25 +437,67 @@ public final class CloudDiagnosticsOverlay {
         }
     }
 
+    /**
+     * Formats a float as a percentage.
+     *
+     * @param value The value to format.
+     * @return The formatted percentage.
+     */
     private static String percent(float value) {
         return Math.round(value * 100.0F) + "%";
     }
 
+    /**
+     * Converts a boolean into a compact yes or no value.
+     *
+     * @param value The boolean value.
+     * @return yes when true, otherwise no.
+     */
     private static String yesNo(boolean value) {
         return value ? "yes" : "no";
     }
 
+    /**
+     * Formats a float with two decimals.
+     *
+     * @param value The value to format.
+     * @return The formatted float.
+     */
     private static String formatFloat(float value) {
-        return String.format(java.util.Locale.ROOT, "%.2f", value);
+        return String.format(Locale.ROOT, "%.2f", value);
     }
 
-    private static String formatTiming(float value, boolean supported, boolean valid, int ageFrames, int pendingQueries) {
+    /**
+     * Formats a GPU timing value.
+     *
+     * @param value The timing value in milliseconds.
+     * @param supported Whether GPU timings are supported.
+     * @param valid Whether the timing value is valid.
+     * @param ageFrames The query age in frames.
+     * @param pendingQueries The amount of pending GPU timing queries.
+     * @return The formatted timing string.
+     */
+    private static String formatTiming(
+            float value,
+            boolean supported,
+            boolean valid,
+            int ageFrames,
+            int pendingQueries
+    ) {
         if (!supported || !valid) {
             return "n/a";
         }
+
         return formatFloat(value) + "ms a" + ageFrames + " p" + pendingQueries;
     }
 
+    /**
+     * Abbreviates a string to a maximum length.
+     *
+     * @param value The string to abbreviate.
+     * @param maxLength The maximum allowed length.
+     * @return The abbreviated string.
+     */
     private static String abbreviate(String value, int maxLength) {
         if (value == null || value.length() <= maxLength) {
             return value == null ? "" : value;
@@ -346,9 +506,15 @@ public final class CloudDiagnosticsOverlay {
         return value.substring(0, Math.max(0, maxLength - 1)) + "~";
     }
 
+    /**
+     * Saves the common config for the requested mod id.
+     *
+     * @param modId The target mod id.
+     */
     private static void saveCommonConfigForMod(String modId) {
         try {
             var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
+
             if (set == null) {
                 return;
             }

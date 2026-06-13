@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
@@ -39,6 +40,10 @@ public final class CommandTornadoService {
     }
 
     public static int spawnTornado(CommandSourceStack source, boolean noCloud) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerPlayer player = PaCommandSupport.requirePlayer(source, "Tornado spawning is only available to players.");
         if (player == null) {
             return 0;
@@ -122,6 +127,10 @@ public final class CommandTornadoService {
     }
 
     public static int removeTornado(CommandSourceStack source, double maxDistance) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerPlayer player = PaCommandSupport.requirePlayer(source, "Tornado removal is only available to players.");
         if (player == null) {
             return 0;
@@ -155,12 +164,20 @@ public final class CommandTornadoService {
     }
 
     public static int clearTornadoes(CommandSourceStack source) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         TornadoManager.clearTornadoes();
         PaCommandMessages.success(source, true, "All tornadoes cleared");
         return 1;
     }
 
     public static int sendTornadoList(CommandSourceStack source) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: Tornado list\nResult: tornadoes disabled in config"), false);
+            return 1;
+        }
         List<TornadoInstance> tornadoes = TornadoManager.getActiveTornadoes();
         if (tornadoes.isEmpty()) {
             source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: Tornado list\nResult: no active tornadoes"), false);
@@ -183,6 +200,10 @@ public final class CommandTornadoService {
     }
 
     public static int sendTornadoInfo(CommandSourceStack source) {
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
+            source.sendFailure(Component.literal("Tornadoes are disabled in Project Atmosphere config."));
+            return 0;
+        }
         ServerPlayer player = source.getPlayer();
         TornadoInstance tornado = player == null
                 ? TornadoManager.getActiveTornadoes().stream().findFirst().orElse(null)

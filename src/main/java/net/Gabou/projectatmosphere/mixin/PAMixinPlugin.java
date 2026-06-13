@@ -123,13 +123,16 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
             return false;
         }
         boolean simpleCloudsLoaded = isSimpleCloudsLoaded();
+        if (isSimpleCloudsMixin(mixinClassName) && !simpleCloudsLoaded) {
+            return false;
+        }
+        if (isSimpleCloudsMixin(mixinClassName)) {
+            return true;
+        }
         if (isHurricaneRenderPipelineMixin(mixinClassName)) {
             return simpleCloudsLoaded;
         }
-        if (isCloudModuleMixin(mixinClassName) && simpleCloudsLoaded) {
-            return false;
-        }
-        if (isSimpleCloudsMixin(mixinClassName) && !simpleCloudsLoaded) {
+        if ((isNativeCloudModuleMixin(mixinClassName) || isCloudWeatherOwnershipMixin(mixinClassName)) && simpleCloudsLoaded) {
             return false;
         }
         if (mixinClassName.endsWith("OverwriteDesertSound") && !isSandStormLoaded()) {

@@ -57,6 +57,13 @@ public final class PaCloudCommand {
                 .then(Commands.literal("sync")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> CommandCloudService.syncClouds(ctx.getSource())))
+                .then(Commands.literal("freeze")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> CommandCloudService.setCloudMovementFrozen(
+                                        ctx.getSource(),
+                                        BoolArgumentType.getBool(ctx, "enabled")
+                                ))))
                 .then(Commands.literal("help")
                         .executes(ctx -> {
                             net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages.success(
@@ -71,6 +78,7 @@ public final class PaCloudCommand {
                                     "/pa cloud count",
                                     "/pa cloud clear",
                                     "/pa cloud clear inactive",
+                                    "/pa cloud freeze <true|false>",
                                     "/pa cloud sync"
                             );
                             return 1;

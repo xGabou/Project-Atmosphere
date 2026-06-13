@@ -18,6 +18,7 @@ public record TornadoSnapshot(
         float normalizedIntensity,
         int stormLevel,
         float recentDebrisScore,
+        float formationProgress,
         StormLifecyclePhase phase
 ) {
     // ---------------------------------------------------------------------
@@ -37,6 +38,7 @@ public record TornadoSnapshot(
         buf.writeFloat(this.normalizedIntensity);
         buf.writeVarInt(this.stormLevel);
         buf.writeFloat(this.recentDebrisScore);
+        buf.writeFloat(this.formationProgress);
         buf.writeEnum(this.phase);
     }
 
@@ -52,7 +54,8 @@ public record TornadoSnapshot(
         float normalizedIntensity = buf.readFloat();
         int stormLevel = buf.readVarInt();
         float recentDebrisScore = buf.readFloat();
+        float formationProgress = buf.readFloat();
         StormLifecyclePhase phase = buf.readEnum(StormLifecyclePhase.class);
-        return new TornadoSnapshot(id, position, radius, bottomY, height, windSpeed, windAngle, windGust, normalizedIntensity, stormLevel, recentDebrisScore, phase);
+        return new TornadoSnapshot(id, position, radius, bottomY, height, windSpeed, windAngle, windGust, normalizedIntensity, stormLevel, recentDebrisScore, formationProgress, phase);
     }
 }

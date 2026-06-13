@@ -12,14 +12,17 @@ import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.modules.weather.WeatherSampler;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.BiasedToBottomInt;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec2;
 import org.joml.Vector2i;
 
@@ -59,8 +62,58 @@ public class SimpleCloudsCompat {
 
     public static void init(ServerLevel level) {
         cloudManager = (ServerCloudManager) CloudManager.get(level);
+        if (cloudManager == null) {
+            generator = null;
+            spawnConfig = null;
+            isInit = false;
+            return;
+        }
+
         generator = cloudManager.getCloudGenerator();
+        if (generator == null) {
+            spawnConfig = null;
+            isInit = false;
+            return;
+        }
+
         spawnConfig = generator.getSpawnConfig().get();
+        isInit = spawnConfig != null;
+    }
+
+    public static boolean ensureReady(ServerLevel level) {
+        if (level == null) {
+            return false;
+        }
+        if (cloudManager != null && generator != null && spawnConfig != null) {
+            isInit = true;
+            return true;
+        }
+
+        init(level);
+        if (generator != null && spawnConfig != null) {
+            return true;
+        }
+
+        if (cloudManager == null) {
+            cloudManager = (ServerCloudManager) CloudManager.get(level);
+        }
+        if (cloudManager == null) {
+            return false;
+        }
+
+        if (generator == null) {
+            generator = cloudManager.getCloudGenerator();
+        }
+        if (generator == null) {
+            isInit = false;
+            return false;
+        }
+
+        if (spawnConfig == null && generator.getSpawnConfig() != null) {
+            spawnConfig = generator.getSpawnConfig().get();
+        }
+        isInit = generator != null && spawnConfig != null;
+        return isInit;
     }
 
     private static boolean isInit = false;
@@ -200,7 +253,7 @@ public class SimpleCloudsCompat {
     // ---------------------------------------------------------------------
     private static CloudRegion spawnCloud(String cloudId, BlockPos anchor, @Nullable ResourceLocation biomeId, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
 
-        if (!isInit) {
+        if (!ensureReady(level)) {
             ProjectAtmosphere.LOGGER.warn("[Atmosphere] SimpleClouds is not ready yet, cannot spawn cloud: {}", cloudId);
             return null;
         }
@@ -310,6 +363,11 @@ public class SimpleCloudsCompat {
     }
 
     public static void doInitialGenWithWeather(int x, int z, ServerLevel level) {
+        if (!ensureReady(level)) {
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Skipping Simple Clouds initial generation because the generator is not ready yet.");
+            return;
+        }
+
         List<SpawnRegion> regions = generator.getSpawnRegions();
         SpawnRegion region = regions.stream()
                 .filter(r -> r.includesPoint(x, z))
@@ -385,10 +443,22 @@ public class SimpleCloudsCompat {
         }
     }
 
+    public static void logDiagnostic(double x, double z, Level level) {
+        SimpleCloudsRenderDiagnostics.logPlayerSample(level, x, z);
+    }
+
+    public static boolean isRainningAt(Level level,BlockPos pos) {
+        return CloudManager.get(level).isRainingAt(pos);
+    }
+
     // ---------------------------------------------------------------------
     // Misc helpers
     // ---------------------------------------------------------------------
     public static double getCloudScale() {
         return SimpleCloudsConstants.CLOUD_SCALE;
+    }
+
+    public static boolean isCloudAtPos(ClientLevel level, BlockPos pos) {
+        return CloudManager.get(level).getCloudGenerator().getCloudAtWorldPosition(pos.getX() + 0.5F, pos.getZ() + 0.5F) !=null;
     }
 }

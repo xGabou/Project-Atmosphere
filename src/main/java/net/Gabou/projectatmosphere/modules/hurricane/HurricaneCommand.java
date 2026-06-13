@@ -20,6 +20,10 @@ public class HurricaneCommand {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("category", IntegerArgumentType.integer(1, 5))
                         .executes(ctx -> {
+                            if (!HurricaneManager.isFeatureEnabled()) {
+                                ctx.getSource().sendFailure(Component.literal("Hurricanes are disabled in Project Atmosphere config."));
+                                return 0;
+                            }
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                             ServerLevel level = player.serverLevel();
                             if (!level.dimension().equals(Level.OVERWORLD)) {
@@ -49,6 +53,10 @@ public class HurricaneCommand {
         root.then(Commands.literal("clearhurricanes")
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
+                    if (!HurricaneManager.isFeatureEnabled()) {
+                        ctx.getSource().sendFailure(Component.literal("Hurricanes are disabled in Project Atmosphere config."));
+                        return 0;
+                    }
                     HurricaneManager.clearHurricanes(ctx.getSource().getLevel());
                     ctx.getSource().sendSuccess(() -> Component.literal("All hurricanes cleared."), true);
                     return 1;
@@ -56,6 +64,10 @@ public class HurricaneCommand {
         root.then(Commands.literal("removehurricane")
                 .requires(source -> source.hasPermission(2))
                 .executes(ctx -> {
+                    if (!HurricaneManager.isFeatureEnabled()) {
+                        ctx.getSource().sendFailure(Component.literal("Hurricanes are disabled in Project Atmosphere config."));
+                        return 0;
+                    }
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     Vec3 playerPos = player.position();
                     HurricaneInstance hurricane = HurricaneManager.getActiveHurricanes().stream()

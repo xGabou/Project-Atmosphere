@@ -147,6 +147,9 @@ public final class CloudUniformUploader {
 
         shader.safeGetUniform("AnimationTime").set((frameContext.getWorldTime() + frameContext.getPartialTick()) * 0.05F);
         shader.safeGetUniform("RaymarchSteps").set(Math.max(1, frameContext.getRenderProfile().getRaymarchSteps()));
+        shader.safeGetUniform("RayJitterFrame").set((float) (frameContext.getWorldTime() & 1023L) + frameContext.getPartialTick());
+        shader.safeGetUniform("RayJitterStrength").set(frameContext.getRenderProfile().getRayJitterStrength());
+        shader.safeGetUniform("RayJitterTemporalStrength").set(frameContext.getRenderProfile().getRayJitterTemporalStrength());
         shader.safeGetUniform("CloudSeed").set(snapshot.getCloudSeed());
     }
 }

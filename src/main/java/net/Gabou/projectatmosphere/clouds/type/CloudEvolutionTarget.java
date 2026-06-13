@@ -122,6 +122,9 @@ public final class CloudEvolutionTarget {
             float lift,
             float mergePressure
     ) {
+        if (cloudTypeTicks < minAgeTicks) {
+            return false;
+        }
         return satisfiedCount(cloudTypeTicks, humidity, instability, pressure, stormChance, temperature, density, coverage, lift, mergePressure)
                 >= activeThresholdCount();
     }
@@ -145,6 +148,9 @@ public final class CloudEvolutionTarget {
         if (activeThresholds <= 0) {
             return false;
         }
+        if (cloudTypeTicks < Math.round(minAgeTicks * 0.85F)) {
+            return false;
+        }
 
         int satisfiedThresholds = satisfiedCount(
                 cloudTypeTicks,
@@ -161,9 +167,12 @@ public final class CloudEvolutionTarget {
         if (satisfiedThresholds <= 0 || satisfiedThresholds >= activeThresholds) {
             return false;
         }
+        if (satisfiedThresholds < activeThresholds - 1) {
+            return false;
+        }
 
         float progress = (float) satisfiedThresholds / (float) activeThresholds;
-        float earlyChance = clamp01(chancePerCheck * progress * progress);
+        float earlyChance = clamp01(chancePerCheck * 0.10F * progress * progress);
         return ThreadLocalRandom.current().nextFloat() < earlyChance;
     }
 
