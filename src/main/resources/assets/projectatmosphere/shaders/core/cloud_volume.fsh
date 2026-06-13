@@ -99,7 +99,7 @@ float interleavedGradientNoise(vec2 p) {
     return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
 
-float noise3(vec3 p) {
+float paCloudNoise3(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -131,7 +131,7 @@ float fbm(vec3 p, int octaves) {
         if (i >= octaves) {
             break;
         }
-        value += noise3(p * frequency) * amplitude;
+        value += paCloudNoise3(p * frequency) * amplitude;
         frequency *= 2.0;
         amplitude *= 0.5;
     }
@@ -221,15 +221,15 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float lobeCount = mix(minLobes, maxLobes, hash1(seedValue + 131.0));
     float lobePhase = hash1(seedValue + 149.0) * 6.2831853;
     float lobeWave = sin(edgeAngle * lobeCount + lobePhase);
-    float silhouetteNoise = noise3(vec3(
+    float silhouetteNoise = paCloudNoise3(vec3(
         localHorizontal * 0.015 + seedOffset.xz * 0.021,
         shapedVertical * 2.0 + seedOffset.y * 0.017
     )) * mix(0.30, 0.72, saturate(CloudShapeEdgeRaggedness));
     float seededRadiusWarp = 1.0 + (lobeWave * 0.12 * CloudShapeLobeStrength + silhouetteNoise * 0.18) * smoothstep(0.12, 1.0, baseHorizontal);
     float rawHorizontal = horizontalDistance / max(CloudRadius * clamp(seededRadiusWarp, 0.78, 1.20), 0.001);
 
-    float topWarp = noise3(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1) + seedOffset * 0.011) * 0.5;
-    float baseWarp = noise3(baseNoisePos * vec3(0.014, 0.0, 0.014) + vec3(3.4, CloudWorldTime * -0.0008, 27.5) + seedOffset * 0.009) * 0.5;
+    float topWarp = paCloudNoise3(baseNoisePos * vec3(0.018, 0.0, 0.018) + vec3(19.7, CloudWorldTime * 0.0012, 4.1) + seedOffset * 0.011) * 0.5;
+    float baseWarp = paCloudNoise3(baseNoisePos * vec3(0.014, 0.0, 0.014) + vec3(3.4, CloudWorldTime * -0.0008, 27.5) + seedOffset * 0.009) * 0.5;
     float warpedVertical = shapedVertical + topWarp * 0.16 * smoothstep(0.45, 1.0, shapedVertical) - baseWarp * 0.08 * (1.0 - smoothstep(0.0, 0.35, shapedVertical));
     float baseSoftness = max(CloudBaseSoftness, 0.01);
     float topSoftness = max(CloudTopSoftness, 0.01);
@@ -269,8 +269,8 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float detailNoiseScale = max(CloudDetailNoiseScale, 0.001);
     float erosionNoiseScale = max(CloudErosionNoiseScale, 0.001);
     float lobeNoise = fbm(baseNoisePos * vec3(noiseScale, noiseScale * 1.75, noiseScale) + vec3(0.0, CloudWorldTime * 0.0015, 0.0) + seedOffset * 0.017, 2);
-    float layerNoise = noise3(baseNoisePos * vec3(detailNoiseScale * 0.50, detailNoiseScale, detailNoiseScale * 0.50) + vec3(12.0, CloudWorldTime * 0.0025, 8.0) + seedOffset * 0.013) * 0.5 + 0.5;
-    float detailNoise = noise3(baseNoisePos * vec3(erosionNoiseScale, erosionNoiseScale * 1.25, erosionNoiseScale) + vec3(31.0, CloudWorldTime * -0.0030, 6.0) + seedOffset * 0.019) * 0.5 + 0.5;
+    float layerNoise = paCloudNoise3(baseNoisePos * vec3(detailNoiseScale * 0.50, detailNoiseScale, detailNoiseScale * 0.50) + vec3(12.0, CloudWorldTime * 0.0025, 8.0) + seedOffset * 0.013) * 0.5 + 0.5;
+    float detailNoise = paCloudNoise3(baseNoisePos * vec3(erosionNoiseScale, erosionNoiseScale * 1.25, erosionNoiseScale) + vec3(31.0, CloudWorldTime * -0.0030, 6.0) + seedOffset * 0.019) * 0.5 + 0.5;
 
     float seedLobeBias = mix(-0.08, 0.08, hash1(seedValue + 197.0));
     float lobeShape = mix(0.74 + seedLobeBias, 1.18 + seedLobeBias, lobeNoise);
