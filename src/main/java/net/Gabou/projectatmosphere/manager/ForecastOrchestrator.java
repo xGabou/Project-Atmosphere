@@ -5,16 +5,19 @@ import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.client.loading.IntegratedForecastLoadingBridge;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateSavedData;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler;
 import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
+import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
 import net.Gabou.projectatmosphere.modules.weather.ServerWeatherStateResolver;
+import net.Gabou.projectatmosphere.modules.weathercell.WeatherCellManager;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.region.RegionOrchestratorBootstrap;
@@ -112,6 +115,7 @@ public class ForecastOrchestrator {
                         "server_start_initialize_systems"
                 );
                 initializeDynamicSystems(level);
+                AtmosphericStateSavedData.restore(level);
                 return true;
             } catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
@@ -168,6 +172,7 @@ public class ForecastOrchestrator {
                 "server_start_initialize_systems"
         );
         initializeDynamicSystems(level);
+        AtmosphericStateSavedData.restore(level);
         return true;
     }
 
@@ -176,6 +181,7 @@ public class ForecastOrchestrator {
      * Called when the server stops
      */
     public static void onServerStop(ServerLevel level) {
+        AtmosphericStateSavedData.snapshot(level);
         ForecastDataStorage.saveAll(level);
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
             TornadoStorageManager.save(level);
@@ -304,49 +310,14 @@ public class ForecastOrchestrator {
     }
 
     /**
-     * Regenerates forecasts on season change without wiping cloud entities or player centers.
+     * Legacy entry point for season changes. Seasons now drift live atmosphere
+     * toward seasonal targets instead of rebuilding immutable forecast data.
      */
     public static void regenerateForSeason(ServerLevel level) {
         if (level == null) {
             return;
         }
-        REGENERATING = true;
-        try {
-            ForecastGenerator.clearForecasts();
-            clearActiveRegions();
-            List<BlockPos> centers = new ArrayList<>();
-            if (!ForecastDataStorage.playerData.isEmpty()) {
-                centers.addAll(ForecastDataStorage.playerData.values());
-            } else {
-                centers.add(level.getSharedSpawnPos());
-            }
-
-            Set<BlockPos> uniqueCenters = new HashSet<>();
-            for (BlockPos center : centers) {
-                boolean tooClose = false;
-                for (BlockPos existingCenter : uniqueCenters) {
-                    if (existingCenter.distManhattan(center) < MIN_DISTANCE_BETWEEN_CENTERS) {
-                        tooClose = true;
-                        break;
-                    }
-                }
-                if (!tooClose) {
-                    uniqueCenters.add(center);
-                }
-            }
-
-            for (BlockPos center : uniqueCenters) {
-                ForecastGenerator.generateForecastForRegion(center, level);
-            }
-            WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
-            initializeDynamicSystems(level);
-        } finally {
-            REGENERATING = false;
-            Runnable r;
-            while ((r = POST_REGEN_QUEUE.poll()) != null) {
-                try { r.run(); } catch (Throwable ignored) { }
-            }
-        }
+        SeasonalAtmosphericDrift.onSeasonChanged(level);
     }
 
     /**
@@ -604,7 +575,9 @@ public class ForecastOrchestrator {
         if (sandStormLoaded)
             SandStormManager.tickSandstormScheduler(level);
 
+        SeasonalAtmosphericDrift.tick(level);
         AtmosphericUpdateScheduler.tick(level);
+        WeatherCellManager.tick(level);
         Set<RegionInstanceKey> activeRegions = getActiveRegions(level);
         OceanBasinManager.update(level, activeRegions);
         CycloneManager.update(level);

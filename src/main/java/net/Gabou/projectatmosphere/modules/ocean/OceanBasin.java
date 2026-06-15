@@ -4,6 +4,9 @@ import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
@@ -181,5 +184,114 @@ public final class OceanBasin {
             }
         }
         return false;
+    }
+
+    CompoundTag savePersistentState() {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("Id", id);
+        tag.putFloat("BaseSurfaceTemperature", baseSurfaceTemperature);
+        tag.putFloat("BaseHumidity", baseHumidity);
+        tag.putFloat("BasePressure", basePressure);
+        tag.putFloat("SurfaceTemperature", surfaceTemperature);
+        tag.putFloat("DeepTemperature", deepTemperature);
+        tag.putFloat("HumidityReservoir", humidityReservoir);
+        tag.putFloat("ThermalMemory", thermalMemory);
+        tag.putFloat("MultiDayAnomaly", multiDayAnomaly);
+        tag.putFloat("PressureOffset", pressureOffset);
+        tag.put("WindBias", saveWind(windBias));
+
+        ListTag cells = new ListTag();
+        for (RegionInstanceKey key : oceanCells) {
+            cells.add(saveRegionKey(key));
+        }
+        tag.put("OceanCells", cells);
+
+        ListTag weights = new ListTag();
+        for (Map.Entry<RegionInstanceKey, Float> entry : influenceWeights.entrySet()) {
+            CompoundTag weightTag = saveRegionKey(entry.getKey());
+            weightTag.putFloat("Weight", entry.getValue());
+            weights.add(weightTag);
+        }
+        tag.put("InfluenceWeights", weights);
+        return tag;
+    }
+
+    static OceanBasin loadPersistentState(CompoundTag tag) {
+        if (tag == null || !tag.contains("Id", Tag.TAG_INT)) {
+            return null;
+        }
+        Set<RegionInstanceKey> cells = ConcurrentHashMap.newKeySet();
+        ListTag cellTags = tag.getList("OceanCells", Tag.TAG_COMPOUND);
+        for (int i = 0; i < cellTags.size(); i++) {
+            RegionInstanceKey key = loadRegionKey(cellTags.getCompound(i));
+            if (key != null) {
+                cells.add(key);
+            }
+        }
+
+        Map<RegionInstanceKey, Float> weights = new ConcurrentHashMap<>();
+        ListTag weightTags = tag.getList("InfluenceWeights", Tag.TAG_COMPOUND);
+        for (int i = 0; i < weightTags.size(); i++) {
+            CompoundTag weightTag = weightTags.getCompound(i);
+            RegionInstanceKey key = loadRegionKey(weightTag);
+            if (key != null) {
+                weights.put(key, weightTag.getFloat("Weight"));
+            }
+        }
+
+        OceanBasin basin = new OceanBasin(
+                tag.getInt("Id"),
+                cells,
+                weights,
+                tag.getFloat("BaseSurfaceTemperature"),
+                tag.getFloat("BaseHumidity"),
+                tag.getFloat("BasePressure"),
+                tag.getFloat("DeepTemperature"),
+                loadWind(tag.getCompound("WindBias"))
+        );
+        basin.setSurfaceTemperature(tag.getFloat("SurfaceTemperature"));
+        basin.setHumidityReservoir(tag.getFloat("HumidityReservoir"));
+        basin.setThermalMemory(tag.getFloat("ThermalMemory"));
+        basin.setMultiDayAnomaly(tag.getFloat("MultiDayAnomaly"));
+        basin.setPressureOffset(tag.getFloat("PressureOffset"));
+        return basin;
+    }
+
+    private static CompoundTag saveRegionKey(RegionInstanceKey key) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("RegionX", key.regionX());
+        tag.putInt("RegionZ", key.regionZ());
+        tag.putInt("RegionSize", key.regionSize());
+        return tag;
+    }
+
+    private static RegionInstanceKey loadRegionKey(CompoundTag tag) {
+        if (tag == null || !tag.contains("RegionX", Tag.TAG_INT) || !tag.contains("RegionZ", Tag.TAG_INT)) {
+            return null;
+        }
+        int size = tag.contains("RegionSize", Tag.TAG_INT) ? tag.getInt("RegionSize") : RegionInstanceKey.DEFAULT_REGION_SIZE;
+        return new RegionInstanceKey(tag.getInt("RegionX"), tag.getInt("RegionZ"), size);
+    }
+
+    private static CompoundTag saveWind(WindVector wind) {
+        CompoundTag tag = new CompoundTag();
+        WindVector safeWind = Objects.requireNonNullElse(wind, WindVector.fromBase(0f, 0f));
+        tag.putFloat("BaseSpeed", safeWind.baseSpeed());
+        tag.putFloat("AngleRadians", safeWind.angleRadians());
+        tag.putFloat("GustSpeed", safeWind.gustSpeed());
+        return tag;
+    }
+
+    private static WindVector loadWind(CompoundTag tag) {
+        if (tag == null || tag.isEmpty()) {
+            return WindVector.fromBase(0f, 0f);
+        }
+        float baseSpeed = tag.getFloat("BaseSpeed");
+        float angle = tag.getFloat("AngleRadians");
+        float gustSpeed = tag.getFloat("GustSpeed");
+        if (!Float.isFinite(baseSpeed) || !Float.isFinite(angle) || !Float.isFinite(gustSpeed)) {
+            return WindVector.fromBase(0f, 0f);
+        }
+        return new WindVector(Math.max(0f, baseSpeed), angle, Math.max(0f, gustSpeed));
     }
 }

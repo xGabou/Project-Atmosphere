@@ -72,6 +72,7 @@ public final class CloudTypeDataReloadListener extends SimpleJsonResourceReloadL
         CloudTypeDefinition base = CloudTypeRegistry.getOrDefault(id);
         String displayName = stringValue(root, "displayName", stringValue(root, "display_name", base.getDisplayName()));
         CloudFamily family = enumValue(root, "family", CloudFamily.class, base.getFamily());
+        CloudMorphologyFamily morphologyFamily = parseMorphologyFamily(root, id, family, base);
         CloudVisualProfile visual = parseVisual(objectValue(root, "visual"), base.getVisualProfile());
         CloudMaterialProfile material = parseMaterial(objectValue(root, "material"), base.getMaterialProfile()).withVisualDefaults(visual);
         CloudShapeProfile shape = parseShape(objectValue(root, "shape"), CloudShapeProfile.defaultFor(id, family, visual), id);
@@ -84,6 +85,7 @@ public final class CloudTypeDataReloadListener extends SimpleJsonResourceReloadL
                 id,
                 displayName,
                 family,
+                morphologyFamily,
                 visual,
                 material,
                 shape,
@@ -91,6 +93,21 @@ public final class CloudTypeDataReloadListener extends SimpleJsonResourceReloadL
                 spawn,
                 evolution
         );
+    }
+
+    private static CloudMorphologyFamily parseMorphologyFamily(
+            JsonObject root,
+            String id,
+            CloudFamily family,
+            CloudTypeDefinition base
+    ) {
+        String value = stringValue(root, "morphologyFamily",
+                stringValue(root, "morphology_family",
+                        stringValue(root, "morphology", "")));
+        CloudMorphologyFamily fallback = base == null
+                ? CloudMorphologyFamily.defaultFor(id, family)
+                : base.getMorphologyFamily();
+        return CloudMorphologyFamily.byId(value, fallback);
     }
 
     private static CloudVisualProfile parseVisual(JsonObject object, CloudVisualProfile base) {

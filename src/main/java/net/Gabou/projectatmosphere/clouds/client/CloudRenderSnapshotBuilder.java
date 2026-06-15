@@ -63,6 +63,7 @@ public final class CloudRenderSnapshotBuilder {
                 renderData.getDecay(),
                 renderData.getCloudTypeId(),
                 renderData.getPreviousCloudTypeId(),
+                renderData.getMorphologyFamily(),
                 renderData.getCloudTypeTicks(),
                 renderData.getVerticalThickness(),
                 renderData.getEdgeErosionStrength(),

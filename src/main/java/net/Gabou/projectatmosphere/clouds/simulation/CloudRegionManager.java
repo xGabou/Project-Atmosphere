@@ -27,6 +27,7 @@ public final class CloudRegionManager {
     private final CloudRegionLifecycleController lifecycleController = new CloudRegionLifecycleController();
     private final CloudRegionEvolutionController evolutionController = new CloudRegionEvolutionController();
     private final CloudRegionMergeController mergeController = new CloudRegionMergeController();
+    private final CloudRegionAtmosphereFeedbackController atmosphereFeedbackController = new CloudRegionAtmosphereFeedbackController();
 
     private CloudRegionManager() {
 
@@ -193,11 +194,12 @@ public final class CloudRegionManager {
             Vec3 center = state.getCenter();
             lines.add(String.format(
                     Locale.ROOT,
-                    "%s active=%s clusters=%d type=%s typeTicks=%d center=%.1f %.1f %.1f radius=%.1f age=%d/%d density=%.2f coverage=%.2f growth=%.2f decay=%.2f",
+                    "%s active=%s clusters=%d type=%s morphology=%s typeTicks=%d center=%.1f %.1f %.1f radius=%.1f age=%d/%d density=%.2f coverage=%.2f growth=%.2f decay=%.2f",
                     state.getRegionId(),
                     state.isActive(),
                     state.getClusterCount(),
                     state.getCloudTypeId(),
+                    state.getMorphologyFamily(),
                     state.getCloudTypeTicks(),
                     center.x(),
                     center.y(),
@@ -246,6 +248,7 @@ public final class CloudRegionManager {
         }
 
         changed |= CloudRegionStateStore.removeInactiveRegions(level) > 0;
+        atmosphereFeedbackController.tick(level, CloudRegionStateStore.getActiveRegions(level));
 
         if (changed) {
             CloudRegionStateStore.markDirty(level);

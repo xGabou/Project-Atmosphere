@@ -11,6 +11,9 @@ import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -65,6 +68,40 @@ public final class AtmosphericUpdateScheduler {
     private AtmosphericUpdateScheduler() {
     }
 
+    public static CompoundTag savePersistentState() {
+        CompoundTag tag = new CompoundTag();
+        tag.putLong("LastActiveTick", lastActiveTick);
+        tag.putLong("LastPassiveTick", lastPassiveTick);
+        ListTag queue = new ListTag();
+        for (RegionInstanceKey key : PASSIVE_QUEUE) {
+            if (key != null) {
+                queue.add(saveRegionKey(key));
+            }
+        }
+        tag.put("PassiveQueue", queue);
+        return tag;
+    }
+
+    public static void loadPersistentState(CompoundTag tag) {
+        ACTIVE_IN_FLIGHT.set(false);
+        PASSIVE_IN_FLIGHT.set(false);
+        PASSIVE_QUEUE.clear();
+        if (tag == null || tag.isEmpty()) {
+            lastActiveTick = -ACTIVE_INTERVAL_TICKS;
+            lastPassiveTick = 0L;
+            return;
+        }
+        lastActiveTick = tag.getLong("LastActiveTick");
+        lastPassiveTick = tag.getLong("LastPassiveTick");
+        ListTag queue = tag.getList("PassiveQueue", Tag.TAG_COMPOUND);
+        for (int i = 0; i < queue.size(); i++) {
+            RegionInstanceKey key = loadRegionKey(queue.getCompound(i));
+            if (key != null) {
+                PASSIVE_QUEUE.addLast(key);
+            }
+        }
+    }
+
     public static void tick(ServerLevel level) {
         long now = level.getGameTime();
         if (now - lastActiveTick >= ACTIVE_INTERVAL_TICKS) {
@@ -92,7 +129,7 @@ public final class AtmosphericUpdateScheduler {
             return;
         }
         float daylight = baseDaylightCurve(dayTime);
-        float seasonal = seasonalTilt(dayTime);
+        float seasonal = SeasonalAtmosphericDrift.sunlightMultiplier();
         String dimensionId = level.dimension().location().toString();
         AsyncAtmosphereService.runWithCallback(
                 PoolType.WEATHER,
@@ -187,7 +224,7 @@ public final class AtmosphericUpdateScheduler {
             return;
         }
         float daylight = baseDaylightCurve(dayTime);
-        float seasonal = seasonalTilt(dayTime);
+        float seasonal = SeasonalAtmosphericDrift.sunlightMultiplier();
         String dimensionId = level.dimension().location().toString();
         AsyncAtmosphereService.runWithCallback(
                 PoolType.WEATHER,
@@ -532,14 +569,24 @@ public final class AtmosphericUpdateScheduler {
         return daylight * daylight;
     }
 
-    private static float seasonalTilt(long dayTime) {
-        long day = dayTime / 24000L;
-        float seasonProgress = (day % 96L) / 96f;
-        return 0.7f + 0.3f * Mth.cos(seasonProgress * (float) (Math.PI * 2));
-    }
-
     private static float clampDelta(float value, float min, float max) {
         return Mth.clamp(value, min, max);
+    }
+
+    private static CompoundTag saveRegionKey(RegionInstanceKey key) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("RegionX", key.regionX());
+        tag.putInt("RegionZ", key.regionZ());
+        tag.putInt("RegionSize", key.regionSize());
+        return tag;
+    }
+
+    private static RegionInstanceKey loadRegionKey(CompoundTag tag) {
+        if (tag == null || !tag.contains("RegionX", Tag.TAG_INT) || !tag.contains("RegionZ", Tag.TAG_INT)) {
+            return null;
+        }
+        int size = tag.contains("RegionSize", Tag.TAG_INT) ? tag.getInt("RegionSize") : RegionInstanceKey.DEFAULT_REGION_SIZE;
+        return new RegionInstanceKey(tag.getInt("RegionX"), tag.getInt("RegionZ"), size);
     }
 
     record StateView(

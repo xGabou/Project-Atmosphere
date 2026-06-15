@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.state;
 
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.registries.Registries;
@@ -52,6 +53,7 @@ public final class CloudRegionState {
     private static final String TAG_MERGE_PRESSURE = "MergePressure";
     private static final String TAG_CLOUD_TYPE_ID = "CloudTypeId";
     private static final String TAG_PREVIOUS_CLOUD_TYPE_ID = "PreviousCloudTypeId";
+    private static final String TAG_MORPHOLOGY_FAMILY = "MorphologyFamily";
     private static final String TAG_CLOUD_TYPE_TICKS = "CloudTypeTicks";
     private static final String TAG_CLOUD_SEED = "CloudSeed";
     private static final String TAG_SOURCE_REGION = "SourceRegion";
@@ -368,6 +370,16 @@ public final class CloudRegionState {
         requirePrimaryCluster().setPreviousCloudTypeId(previousCloudTypeId);
     }
 
+    public CloudMorphologyFamily getMorphologyFamily() {
+        return getPrimaryCluster()
+                .map(CloudClusterState::getMorphologyFamily)
+                .orElse(CloudTypeRegistry.getOrDefault(getCloudTypeId()).getMorphologyFamily());
+    }
+
+    public void setMorphologyFamily(CloudMorphologyFamily morphologyFamily) {
+        requirePrimaryCluster().setMorphologyFamily(morphologyFamily);
+    }
+
     public int getCloudTypeTicks() {
         return getPrimaryCluster().map(CloudClusterState::getCloudTypeTicks).orElse(0);
     }
@@ -422,6 +434,7 @@ public final class CloudRegionState {
             tag.putFloat(TAG_EDGE_SOFTNESS, legacyView.getEdgeSoftness());
             tag.putString(TAG_CLOUD_TYPE_ID, legacyView.getCloudTypeId());
             tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, legacyView.getPreviousCloudTypeId());
+            tag.putString(TAG_MORPHOLOGY_FAMILY, legacyView.getMorphologyFamily().name());
             tag.putInt(TAG_CLOUD_TYPE_TICKS, legacyView.getCloudTypeTicks());
             tag.putFloat(TAG_GROWTH, legacyView.getGrowth());
             tag.putFloat(TAG_DECAY, legacyView.getDecay());
@@ -538,6 +551,12 @@ public final class CloudRegionState {
             }
             if (tag.contains(TAG_PREVIOUS_CLOUD_TYPE_ID, Tag.TAG_STRING)) {
                 cluster.setPreviousCloudTypeId(tag.getString(TAG_PREVIOUS_CLOUD_TYPE_ID));
+            }
+            if (tag.contains(TAG_MORPHOLOGY_FAMILY, Tag.TAG_STRING)) {
+                cluster.setMorphologyFamily(CloudMorphologyFamily.byId(
+                        tag.getString(TAG_MORPHOLOGY_FAMILY),
+                        CloudTypeRegistry.getOrDefault(cluster.getCloudTypeId()).getMorphologyFamily()
+                ));
             }
             if (tag.contains(TAG_CLOUD_TYPE_TICKS)) {
                 cluster.setCloudTypeTicks(tag.getInt(TAG_CLOUD_TYPE_TICKS));

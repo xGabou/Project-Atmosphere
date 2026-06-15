@@ -165,6 +165,7 @@ public final class CloudRegionRenderDataFactory {
                 state.getDecay(),
                 definition.getId(),
                 state.getPreviousCloudTypeId(),
+                cluster.getMorphologyFamily(),
                 state.getCloudTypeTicks(),
                 profile.getVerticalThickness(),
                 profile.getEdgeErosionStrength(),

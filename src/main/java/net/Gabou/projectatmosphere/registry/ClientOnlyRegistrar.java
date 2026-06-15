@@ -1,10 +1,12 @@
 package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudDiagnosticsOverlay;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogRenderHandler;
@@ -28,6 +30,8 @@ public class ClientOnlyRegistrar {
 
     public static void registerClient(IEventBus modEventBus, FMLJavaModLoadingContext context) {
         boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
+        CloudRegionPacketDispatcher.setClientSink(ClientCloudRegionDataCache::setCurrentRegions);
+        CloudRegionPacketDispatcher.setClientSupplier(ClientCloudRegionDataCache::getCurrentRegions);
         MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
         MinecraftForge.EVENT_BUS.register(AtmosphereFogRenderHandler.class);
         if (!simpleCloudsLoaded) {

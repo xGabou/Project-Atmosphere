@@ -8,6 +8,10 @@ import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Range;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.FloatTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
@@ -21,6 +25,23 @@ import java.util.concurrent.ConcurrentHashMap;
  * Values are expressed in intuitive units (랍C, % humidity, hPa, m/s).
  */
 public class RegionAtmosphereState {
+    private static final String TAG_TEMPERATURE = "Temperature";
+    private static final String TAG_HUMIDITY = "Humidity";
+    private static final String TAG_PRESSURE = "Pressure";
+    private static final String TAG_WIND = "Wind";
+    private static final String TAG_WIND_BASE_SPEED = "BaseSpeed";
+    private static final String TAG_WIND_ANGLE = "AngleRadians";
+    private static final String TAG_WIND_GUST_SPEED = "GustSpeed";
+    private static final String TAG_CLOUD_COVER = "CloudCover";
+    private static final String TAG_CLOUD_WATER = "CloudWater";
+    private static final String TAG_CYCLONE_CLOUD_FLOOR = "CycloneCloudFloor";
+    private static final String TAG_CYCLONE_RAIN_FLOOR = "CycloneRainFloor";
+    private static final String TAG_SUNLIGHT = "Sunlight";
+    private static final String TAG_RAIN_INTENSITY = "RainIntensity";
+    private static final String TAG_DAILY_TEMPERATURE = "DailyTemperature";
+    private static final String TAG_DAILY_HUMIDITY = "DailyHumidity";
+    private static final String TAG_DAILY_PRESSURE = "DailyPressure";
+
     private static final int DAILY_SLOTS = 240;
     private static final float MIN_TEMPERATURE_C = -273.15f;
     private static final float MAX_REASONABLE_TEMPERATURE_C = 70f;
@@ -277,6 +298,65 @@ public class RegionAtmosphereState {
         return dailyPressureProfile.clone();
     }
 
+    public CompoundTag saveMutableState() {
+        CompoundTag tag = new CompoundTag();
+        tag.putFloat(TAG_TEMPERATURE, temperature);
+        tag.putFloat(TAG_HUMIDITY, humidity);
+        tag.putFloat(TAG_PRESSURE, pressure);
+        tag.putFloat(TAG_CLOUD_COVER, cloudCover);
+        tag.putFloat(TAG_CLOUD_WATER, cloudWater);
+        tag.putFloat(TAG_CYCLONE_CLOUD_FLOOR, cycloneCloudFloor);
+        tag.putFloat(TAG_CYCLONE_RAIN_FLOOR, cycloneRainFloor);
+        tag.putFloat(TAG_SUNLIGHT, sunlight);
+        tag.putFloat(TAG_RAIN_INTENSITY, rainIntensity);
+        if (wind != null) {
+            tag.put(TAG_WIND, saveWind(wind));
+        }
+        tag.put(TAG_DAILY_TEMPERATURE, saveFloatArray(dailyTemperatureProfile));
+        tag.put(TAG_DAILY_HUMIDITY, saveFloatArray(dailyHumidityProfile));
+        tag.put(TAG_DAILY_PRESSURE, saveFloatArray(dailyPressureProfile));
+        return tag;
+    }
+
+    public void applyMutableState(CompoundTag tag) {
+        if (tag == null || tag.isEmpty()) {
+            return;
+        }
+        if (tag.contains(TAG_TEMPERATURE, Tag.TAG_FLOAT)) {
+            setTemperature(tag.getFloat(TAG_TEMPERATURE));
+        }
+        if (tag.contains(TAG_HUMIDITY, Tag.TAG_FLOAT)) {
+            setHumidity(tag.getFloat(TAG_HUMIDITY));
+        }
+        if (tag.contains(TAG_PRESSURE, Tag.TAG_FLOAT)) {
+            setPressure(tag.getFloat(TAG_PRESSURE));
+        }
+        if (tag.contains(TAG_CLOUD_COVER, Tag.TAG_FLOAT)) {
+            setCloudCover(tag.getFloat(TAG_CLOUD_COVER));
+        }
+        if (tag.contains(TAG_CLOUD_WATER, Tag.TAG_FLOAT)) {
+            setCloudWater(tag.getFloat(TAG_CLOUD_WATER));
+        }
+        if (tag.contains(TAG_CYCLONE_CLOUD_FLOOR, Tag.TAG_FLOAT)) {
+            cycloneCloudFloor = Mth.clamp(tag.getFloat(TAG_CYCLONE_CLOUD_FLOOR), 0f, 1f);
+        }
+        if (tag.contains(TAG_CYCLONE_RAIN_FLOOR, Tag.TAG_FLOAT)) {
+            cycloneRainFloor = Mth.clamp(tag.getFloat(TAG_CYCLONE_RAIN_FLOOR), 0f, 1f);
+        }
+        if (tag.contains(TAG_SUNLIGHT, Tag.TAG_FLOAT)) {
+            setSunlight(tag.getFloat(TAG_SUNLIGHT));
+        }
+        if (tag.contains(TAG_RAIN_INTENSITY, Tag.TAG_FLOAT)) {
+            setRainIntensity(tag.getFloat(TAG_RAIN_INTENSITY));
+        }
+        if (tag.contains(TAG_WIND, Tag.TAG_COMPOUND)) {
+            wind = loadWind(tag.getCompound(TAG_WIND));
+        }
+        restoreFloatArray(tag, TAG_DAILY_TEMPERATURE, dailyTemperatureProfile);
+        restoreFloatArray(tag, TAG_DAILY_HUMIDITY, dailyHumidityProfile);
+        restoreFloatArray(tag, TAG_DAILY_PRESSURE, dailyPressureProfile);
+    }
+
     public float getTargetTemperature(long dayTime) {
         if (forecastTemperatureProfile.length == 0) {
             return temperature;
@@ -462,6 +542,46 @@ public class RegionAtmosphereState {
             max += 2f;
         }
         return new float[]{min, max};
+    }
+
+    private static CompoundTag saveWind(WindVector wind) {
+        CompoundTag tag = new CompoundTag();
+        tag.putFloat(TAG_WIND_BASE_SPEED, wind.baseSpeed());
+        tag.putFloat(TAG_WIND_ANGLE, wind.angleRadians());
+        tag.putFloat(TAG_WIND_GUST_SPEED, wind.gustSpeed());
+        return tag;
+    }
+
+    private static WindVector loadWind(CompoundTag tag) {
+        float baseSpeed = tag.getFloat(TAG_WIND_BASE_SPEED);
+        float angle = tag.getFloat(TAG_WIND_ANGLE);
+        float gustSpeed = tag.getFloat(TAG_WIND_GUST_SPEED);
+        if (!Float.isFinite(baseSpeed) || !Float.isFinite(angle) || !Float.isFinite(gustSpeed)) {
+            return WindVector.fromBase(1f, 0f);
+        }
+        return new WindVector(Math.max(0f, baseSpeed), angle, Math.max(0f, gustSpeed));
+    }
+
+    private static ListTag saveFloatArray(float[] values) {
+        ListTag list = new ListTag();
+        if (values == null) {
+            return list;
+        }
+        for (float value : values) {
+            list.add(FloatTag.valueOf(value));
+        }
+        return list;
+    }
+
+    private static void restoreFloatArray(CompoundTag tag, String key, float[] target) {
+        if (target == null || !tag.contains(key, Tag.TAG_LIST)) {
+            return;
+        }
+        ListTag list = tag.getList(key, Tag.TAG_FLOAT);
+        int count = Math.min(target.length, list.size());
+        for (int i = 0; i < count; i++) {
+            target[i] = list.getFloat(i);
+        }
     }
 
     private float clampTemperature(float value) {

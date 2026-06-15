@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.transport;
 
 import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
 import net.Gabou.projectatmosphere.modules.weather.StormVisualTier;
@@ -35,6 +36,7 @@ public final class CloudRegionRenderData {
     private final float decay;
     private final String cloudTypeId;
     private final String previousCloudTypeId;
+    private final CloudMorphologyFamily morphologyFamily;
     private final int cloudTypeTicks;
     private final float verticalThickness;
     private final float edgeErosionStrength;
@@ -80,6 +82,7 @@ public final class CloudRegionRenderData {
             float decay,
             String cloudTypeId,
             String previousCloudTypeId,
+            CloudMorphologyFamily morphologyFamily,
             int cloudTypeTicks,
             float verticalThickness,
             float edgeErosionStrength,
@@ -124,6 +127,7 @@ public final class CloudRegionRenderData {
         this.decay = decay;
         this.cloudTypeId = cloudTypeId;
         this.previousCloudTypeId = previousCloudTypeId;
+        this.morphologyFamily = morphologyFamily == null ? CloudMorphologyFamily.PUFF : morphologyFamily;
         this.cloudTypeTicks = cloudTypeTicks;
         this.verticalThickness = verticalThickness;
         this.edgeErosionStrength = edgeErosionStrength;
@@ -227,6 +231,10 @@ public final class CloudRegionRenderData {
 
     public String getPreviousCloudTypeId() {
         return previousCloudTypeId;
+    }
+
+    public CloudMorphologyFamily getMorphologyFamily() {
+        return morphologyFamily;
     }
 
     public int getCloudTypeTicks() {
@@ -353,6 +361,7 @@ public final class CloudRegionRenderData {
         buffer.writeFloat(decay);
         buffer.writeUtf(cloudTypeId);
         buffer.writeUtf(previousCloudTypeId);
+        buffer.writeEnum(morphologyFamily);
         buffer.writeVarInt(cloudTypeTicks);
         buffer.writeFloat(verticalThickness);
         buffer.writeFloat(edgeErosionStrength);
@@ -405,6 +414,7 @@ public final class CloudRegionRenderData {
         float decay = buffer.readFloat();
         String cloudTypeId = buffer.readUtf();
         String previousCloudTypeId = buffer.readUtf();
+        CloudMorphologyFamily morphologyFamily = buffer.readEnum(CloudMorphologyFamily.class);
         int cloudTypeTicks = buffer.readVarInt();
         float verticalThickness = buffer.readFloat();
         float edgeErosionStrength = buffer.readFloat();
@@ -450,6 +460,7 @@ public final class CloudRegionRenderData {
                 decay,
                 cloudTypeId,
                 previousCloudTypeId,
+                morphologyFamily,
                 cloudTypeTicks,
                 verticalThickness,
                 edgeErosionStrength,

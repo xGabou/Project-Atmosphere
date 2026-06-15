@@ -9,9 +9,11 @@ import net.Gabou.projectatmosphere.command.tree.ProjectAtmosphereCommands;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphereStatusSyncManager;
+import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.modules.weathercell.WeatherCellManager;
 import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
@@ -128,7 +130,7 @@ public class AtmosphereManager {
 
     public static void onSeasonChange(ServerLevel world) {
         recordSeasonStage(world);
-        AsyncAtmosphereService.runWeather(() -> ForecastOrchestrator.regenerateForSeason(world));
+        ForecastOrchestrator.regenerateForSeason(world);
     }
 
 
@@ -177,6 +179,8 @@ public class AtmosphereManager {
     private static void resetRuntimeState() {
         playerReadyMap.clear();
         lastSeasonStage.clear();
+        SeasonalAtmosphericDrift.reset();
+        WeatherCellManager.resetRuntimeState();
         isInitialGenerationDone = false;
         count = 0;
     }

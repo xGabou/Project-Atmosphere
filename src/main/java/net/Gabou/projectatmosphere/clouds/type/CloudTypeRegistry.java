@@ -42,7 +42,8 @@ public final class CloudTypeRegistry {
                 DEFAULT_CLOUD_TYPE_ID,
                 "Vapor cluster",
                 CloudFamily.VAPOR,
-                new CloudVisualProfile(0.28F, 0.18F, 0.24F, 0.20F, 0.10F, 0.030F, 0.100F, 0.115F, 0.42F, 0.50F, 1.10F, 0.00F, 0.00F, 0.00F),
+                CloudMorphologyFamily.PUFF,
+                new CloudVisualProfile(0.34F, 0.34F, 0.28F, 0.24F, 0.08F, 0.034F, 0.110F, 0.128F, 0.36F, 0.44F, 1.28F, 0.00F, 0.00F, 0.00F),
                 fairWeather(0.28F, 0.82F),
                 new CloudEvolutionRules(List.of(
                         new CloudEvolutionTarget("cumulus_humilis", minutes(4), 0.34F, 0.10F, 1018.0F, 0.02F, 0.12F, 0.16F, 0.06F, 0.05F, 0.003F)
@@ -53,7 +54,8 @@ public final class CloudTypeRegistry {
                 "cumulus_humilis",
                 "Cumulus humilis",
                 CloudFamily.CUMULUS,
-                new CloudVisualProfile(1.12F, 0.46F, 0.22F, 0.20F, 0.22F, 0.022F, 0.118F, 0.145F, 0.86F, 0.88F, 0.82F, 0.18F, 0.00F, 0.00F),
+                CloudMorphologyFamily.PUFF,
+                new CloudVisualProfile(1.00F, 0.54F, 0.20F, 0.16F, 0.18F, 0.022F, 0.126F, 0.156F, 0.82F, 0.82F, 0.74F, 0.12F, 0.00F, 0.00F),
                 fairWeather(0.35F, 0.95F),
                 new CloudEvolutionRules(List.of(
                         new CloudEvolutionTarget("cumulus_mediocris", minutes(10), 0.50F, 0.20F, 1015.0F, 0.05F, 4.0F, 34.0F, 0.22F, 0.28F, 0.10F, 0.08F, 0.002F),
@@ -65,7 +67,8 @@ public final class CloudTypeRegistry {
                 "cumulus_mediocris",
                 "Cumulus mediocris",
                 CloudFamily.CUMULUS,
-                new CloudVisualProfile(1.34F, 0.50F, 0.24F, 0.18F, 0.30F, 0.019F, 0.120F, 0.150F, 1.00F, 0.98F, 0.72F, 0.36F, 0.00F, 0.00F),
+                CloudMorphologyFamily.PUFF,
+                new CloudVisualProfile(1.48F, 0.54F, 0.24F, 0.16F, 0.28F, 0.018F, 0.126F, 0.156F, 1.00F, 0.96F, 0.62F, 0.42F, 0.00F, 0.00F),
                 fairWeather(0.45F, 1.00F),
                 new CloudEvolutionRules(List.of(
                         new CloudEvolutionTarget("cumulus_congestus", minutes(16), 0.60F, 0.38F, 1011.0F, 0.14F, 6.0F, 32.0F, 0.32F, 0.40F, 0.14F, 0.10F, 0.001F),
@@ -77,7 +80,8 @@ public final class CloudTypeRegistry {
                 "cumulus_congestus",
                 "Cumulus congestus",
                 CloudFamily.CUMULUS,
-                new CloudVisualProfile(1.72F, 0.56F, 0.30F, 0.15F, 0.42F, 0.016F, 0.124F, 0.162F, 1.16F, 1.05F, 0.54F, 0.72F, 0.06F, 0.08F),
+                CloudMorphologyFamily.TOWER,
+                new CloudVisualProfile(2.05F, 0.60F, 0.28F, 0.13F, 0.42F, 0.015F, 0.128F, 0.168F, 1.18F, 1.02F, 0.42F, 0.84F, 0.03F, 0.10F),
                 fairWeather(0.58F, 1.00F),
                 new CloudEvolutionRules(List.of(
                         new CloudEvolutionTarget("cumulonimbus_calvus", minutes(24), 0.72F, 0.58F, 1007.0F, 0.28F, 8.0F, 28.0F, 0.44F, 0.56F, 0.18F, 0.14F, 0.0005F)
@@ -88,7 +92,8 @@ public final class CloudTypeRegistry {
                 "cumulonimbus_calvus",
                 "Cumulonimbus calvus",
                 CloudFamily.CUMULONIMBUS,
-                new CloudVisualProfile(2.22F, 0.62F, 0.34F, 0.13F, 0.60F, 0.013F, 0.130F, 0.172F, 1.34F, 1.14F, 0.42F, 0.92F, 0.30F, 0.26F),
+                CloudMorphologyFamily.STORM_ANVIL,
+                new CloudVisualProfile(2.58F, 0.66F, 0.34F, 0.12F, 0.64F, 0.012F, 0.132F, 0.176F, 1.38F, 1.16F, 0.34F, 1.00F, 0.22F, 0.30F),
                 stormReady(),
                 new CloudEvolutionRules(List.of(
                         new CloudEvolutionTarget("cumulonimbus_capillatus", minutes(32), 0.78F, 0.72F, 1004.0F, 0.42F, 0.0F, 22.0F, 0.58F, 0.72F, 0.30F, 0.20F, 0.0002F)
@@ -99,7 +104,8 @@ public final class CloudTypeRegistry {
                 "cumulonimbus_capillatus",
                 "Cumulonimbus capillatus",
                 CloudFamily.CUMULONIMBUS,
-                new CloudVisualProfile(2.55F, 0.66F, 0.42F, 0.12F, 0.70F, 0.012F, 0.136F, 0.178F, 1.44F, 1.20F, 0.36F, 0.96F, 0.72F, 0.42F),
+                CloudMorphologyFamily.STORM_ANVIL,
+                new CloudVisualProfile(2.78F, 0.70F, 0.46F, 0.12F, 0.74F, 0.011F, 0.140F, 0.184F, 1.48F, 1.22F, 0.30F, 1.00F, 0.88F, 0.48F),
                 stormReady(),
                 new CloudEvolutionRules(List.of())
         ));
@@ -108,7 +114,8 @@ public final class CloudTypeRegistry {
                 "stratus_nebulosus",
                 "Stratus nebulosus",
                 CloudFamily.STRATUS,
-                new CloudVisualProfile(0.36F, 0.20F, 0.42F, 0.38F, 0.40F, 0.009F, 0.050F, 0.065F, 0.72F, 1.12F, 3.10F, 0.00F, 0.00F, 0.00F),
+                CloudMorphologyFamily.SHEET,
+                new CloudVisualProfile(0.24F, 0.14F, 0.50F, 0.46F, 0.42F, 0.008F, 0.044F, 0.058F, 0.72F, 1.20F, 3.70F, 0.00F, 0.00F, 0.00F),
                 new CloudSpawnConditions(0.62F, 1.00F, -20.0F, 24.0F, 0.92F, 1.08F, 0.00F, 0.00F, 0.00F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -117,7 +124,8 @@ public final class CloudTypeRegistry {
                 "stratocumulus",
                 "Stratocumulus",
                 CloudFamily.STRATOCUMULUS,
-                new CloudVisualProfile(0.58F, 0.36F, 0.32F, 0.26F, 0.36F, 0.014F, 0.082F, 0.112F, 0.82F, 1.08F, 2.20F, 0.08F, 0.00F, 0.00F),
+                CloudMorphologyFamily.CELLULAR_SHEET,
+                new CloudVisualProfile(0.62F, 0.50F, 0.34F, 0.24F, 0.36F, 0.014F, 0.092F, 0.128F, 0.82F, 0.96F, 2.35F, 0.04F, 0.00F, 0.00F),
                 new CloudSpawnConditions(0.48F, 1.00F, -15.0F, 30.0F, 0.90F, 1.10F, 0.00F, 0.00F, 0.00F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -126,7 +134,8 @@ public final class CloudTypeRegistry {
                 "nimbostratus",
                 "Nimbostratus",
                 CloudFamily.NIMBOSTRATUS,
-                new CloudVisualProfile(0.46F, 0.18F, 0.46F, 0.34F, 0.78F, 0.010F, 0.058F, 0.072F, 1.10F, 1.22F, 2.80F, 0.00F, 0.00F, 0.48F),
+                CloudMorphologyFamily.SHEET,
+                new CloudVisualProfile(0.34F, 0.16F, 0.52F, 0.40F, 0.82F, 0.009F, 0.054F, 0.070F, 1.12F, 1.28F, 3.20F, 0.00F, 0.00F, 0.54F),
                 new CloudSpawnConditions(0.72F, 1.00F, -10.0F, 22.0F, 0.80F, 1.00F, 0.15F, 0.10F, 0.05F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -135,7 +144,8 @@ public final class CloudTypeRegistry {
                 "cirrus",
                 "Cirrus",
                 CloudFamily.CIRRUS,
-                new CloudVisualProfile(0.20F, 0.58F, 0.52F, 0.46F, 0.10F, 0.006F, 0.052F, 0.105F, 0.34F, 0.52F, 4.00F, 0.00F, 0.22F, 0.00F),
+                CloudMorphologyFamily.FILAMENT,
+                new CloudVisualProfile(0.12F, 0.72F, 0.60F, 0.54F, 0.06F, 0.005F, 0.050F, 0.112F, 0.26F, 0.38F, 4.00F, 0.00F, 0.08F, 0.00F),
                 new CloudSpawnConditions(0.15F, 0.75F, -60.0F, 0.0F, 0.80F, 1.15F, 0.00F, 0.00F, 0.00F),
                 new CloudEvolutionRules(List.of())
         ));

@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.client.debug;
 
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
@@ -98,6 +99,7 @@ public final class CloudDebugSnapshotFactory {
                 0.0F,
                 CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID,
                 CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID,
+                CloudMorphologyFamily.DEBUG,
                 0,
                 DEBUG_VERTICAL_THICKNESS,
                 DEBUG_EDGE_EROSION_STRENGTH,
@@ -159,6 +161,7 @@ public final class CloudDebugSnapshotFactory {
                 base.getDecay(),
                 base.getCloudTypeId(),
                 base.getPreviousCloudTypeId(),
+                base.getMorphologyFamily(),
                 base.getCloudTypeTicks(),
                 base.getVerticalThickness(),
                 base.getEdgeErosionStrength(),

@@ -6,6 +6,9 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -42,6 +45,40 @@ public final class CycloneManager {
             return List.of();
         }
         return List.copyOf(ACTIVE_SNAPSHOTS.values());
+    }
+
+    public static CompoundTag savePersistentState() {
+        CompoundTag tag = new CompoundTag();
+        tag.putLong("LastSpawnTick", lastSpawnTick);
+        tag.putLong("LastMidnightTick", lastMidnightTick);
+        ListTag cyclones = new ListTag();
+        for (Cyclone cyclone : ACTIVE_CYCLONES) {
+            if (cyclone != null) {
+                cyclones.add(cyclone.save());
+            }
+        }
+        tag.put("Cyclones", cyclones);
+        return tag;
+    }
+
+    public static void loadPersistentState(ServerLevel level, CompoundTag tag) {
+        ACTIVE_CYCLONES.clear();
+        ACTIVE_SNAPSHOTS.clear();
+        if (tag == null || tag.isEmpty()) {
+            lastSpawnTick = level == null ? -COOLDOWN_TICKS : level.getDayTime();
+            lastMidnightTick = -1L;
+            return;
+        }
+        lastSpawnTick = tag.getLong("LastSpawnTick");
+        lastMidnightTick = tag.getLong("LastMidnightTick");
+        ListTag cyclones = tag.getList("Cyclones", Tag.TAG_COMPOUND);
+        for (int i = 0; i < cyclones.size(); i++) {
+            Cyclone cyclone = Cyclone.load(cyclones.getCompound(i));
+            if (cyclone != null) {
+                ACTIVE_CYCLONES.add(cyclone);
+                ACTIVE_SNAPSHOTS.put(cyclone.id, cyclone.snapshot());
+            }
+        }
     }
 
     public static void update(ServerLevel level) {
@@ -130,11 +167,13 @@ public final class CycloneManager {
         long lifetime = 24000L + random.nextInt(24000);
 
         Cyclone cyclone = new Cyclone(
+                UUID.randomUUID(),
                 new Vec2(state.getPosition().getX(), state.getPosition().getZ()),
                 radius,
                 intensity,
                 pressureDrop,
-                lifetime
+                lifetime,
+                0
         );
         ACTIVE_CYCLONES.add(cyclone);
         ACTIVE_SNAPSHOTS.put(cyclone.id, cyclone.snapshot());
@@ -177,20 +216,50 @@ public final class CycloneManager {
 
 
     private static final class Cyclone {
-        private final UUID id = UUID.randomUUID();
+        private final UUID id;
         private Vec2 center;
         private float radius;
         private float intensity;
         private final float corePressureDrop;
         private long lifetimeTicks;
-        private int counter = 0;
+        private int counter;
 
-        private Cyclone(Vec2 center, float radius, float intensity, float corePressureDrop, long lifetimeTicks) {
+        private Cyclone(UUID id, Vec2 center, float radius, float intensity, float corePressureDrop, long lifetimeTicks, int counter) {
+            this.id = id == null ? UUID.randomUUID() : id;
             this.center = center;
             this.radius = radius;
             this.intensity = intensity;
             this.corePressureDrop = corePressureDrop;
             this.lifetimeTicks = lifetimeTicks;
+            this.counter = counter;
+        }
+
+        private CompoundTag save() {
+            CompoundTag tag = new CompoundTag();
+            tag.putUUID("Id", id);
+            tag.putFloat("CenterX", center.x);
+            tag.putFloat("CenterZ", center.y);
+            tag.putFloat("Radius", radius);
+            tag.putFloat("Intensity", intensity);
+            tag.putFloat("CorePressureDrop", corePressureDrop);
+            tag.putLong("LifetimeTicks", lifetimeTicks);
+            tag.putInt("Counter", counter);
+            return tag;
+        }
+
+        private static Cyclone load(CompoundTag tag) {
+            if (tag == null || !tag.hasUUID("Id")) {
+                return null;
+            }
+            return new Cyclone(
+                    tag.getUUID("Id"),
+                    new Vec2(tag.getFloat("CenterX"), tag.getFloat("CenterZ")),
+                    tag.getFloat("Radius"),
+                    tag.getFloat("Intensity"),
+                    tag.getFloat("CorePressureDrop"),
+                    tag.getLong("LifetimeTicks"),
+                    tag.getInt("Counter")
+            );
         }
 
         private CycloneImpactApplier.CycloneStep tick(List<RegionAtmosphereState> snapshot, long gameTime) {

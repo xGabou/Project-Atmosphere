@@ -10,6 +10,9 @@ import net.Gabou.projectatmosphere.modules.ocean.influence.BasinPressureMemoryIn
 import net.Gabou.projectatmosphere.modules.ocean.influence.BasinThermalMemoryInfluence;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 
@@ -34,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class OceanBasinManager {
     private static final Map<Integer, OceanBasin> BASINS = new ConcurrentHashMap<>();
     private static final AtomicInteger NEXT_ID = new AtomicInteger();
+    private static final AtomicInteger DETECTION_VERSION = new AtomicInteger();
     private static volatile CompletableFuture<Void> detectionTask = CompletableFuture.completedFuture(null);
     private static final AtomicBoolean READY = new AtomicBoolean(false);
 
@@ -45,9 +49,13 @@ public final class OceanBasinManager {
         BASINS.clear();
         NEXT_ID.set(0);
         detectionTask.cancel(true);
+        int version = DETECTION_VERSION.incrementAndGet();
         long sampleTime = level.getGameTime();
         detectionTask = CompletableFuture.supplyAsync(() -> detectBasins(sampleTime), AsyncAtmosphereService.getWeatherExecutor())
                 .thenAccept(basins -> {
+                    if (version != DETECTION_VERSION.get()) {
+                        return;
+                    }
                     BASINS.clear();
                     for (OceanBasin basin : basins) {
                         BASINS.put(basin.getId(), basin);
@@ -61,6 +69,43 @@ public final class OceanBasinManager {
                     READY.set(false);
                     return null;
                 });
+    }
+
+    public static CompoundTag savePersistentState() {
+        CompoundTag tag = new CompoundTag();
+        tag.putBoolean("Ready", READY.get());
+        tag.putInt("NextId", NEXT_ID.get());
+        ListTag basins = new ListTag();
+        for (OceanBasin basin : BASINS.values()) {
+            if (basin != null) {
+                basins.add(basin.savePersistentState());
+            }
+        }
+        tag.put("Basins", basins);
+        return tag;
+    }
+
+    public static void loadPersistentState(CompoundTag tag) {
+        if (tag == null || tag.isEmpty() || !tag.contains("Basins", Tag.TAG_LIST)) {
+            return;
+        }
+
+        DETECTION_VERSION.incrementAndGet();
+        detectionTask.cancel(true);
+        BASINS.clear();
+        int maxId = -1;
+        ListTag basins = tag.getList("Basins", Tag.TAG_COMPOUND);
+        for (int i = 0; i < basins.size(); i++) {
+            OceanBasin basin = OceanBasin.loadPersistentState(basins.getCompound(i));
+            if (basin == null) {
+                continue;
+            }
+            attachInfluences(basin);
+            BASINS.put(basin.getId(), basin);
+            maxId = Math.max(maxId, basin.getId());
+        }
+        NEXT_ID.set(Math.max(tag.getInt("NextId"), maxId + 1));
+        READY.set(tag.getBoolean("Ready") || !BASINS.isEmpty());
     }
 
     public static void update(ServerLevel level, Set<RegionInstanceKey> activeRegions) {
@@ -184,9 +229,13 @@ public final class OceanBasinManager {
             windBias = new WindVector(speed, angle, Math.max(speed, gust));
         }
         OceanBasin basin = new OceanBasin(NEXT_ID.getAndIncrement(), basinCells, influenceWeights, baseTemp, baseHumidity, basePressure, deepTemp, windBias);
+        attachInfluences(basin);
+        return basin;
+    }
+
+    private static void attachInfluences(OceanBasin basin) {
         basin.addOceanInfluence(new BasinThermalMemoryInfluence());
         basin.addOceanInfluence(new BasinPressureMemoryInfluence());
         basin.addAtmosphereInfluence(new AtmosphereFluxInfluence());
-        return basin;
     }
 }

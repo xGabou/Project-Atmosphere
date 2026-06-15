@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.state;
 
 import net.Gabou.projectatmosphere.clouds.type.CloudFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -45,6 +46,7 @@ public final class CloudClusterState {
     private static final String TAG_MERGE_PRESSURE = "MergePressure";
     private static final String TAG_CLOUD_TYPE_ID = "CloudTypeId";
     private static final String TAG_PREVIOUS_CLOUD_TYPE_ID = "PreviousCloudTypeId";
+    private static final String TAG_MORPHOLOGY_FAMILY = "MorphologyFamily";
     private static final String TAG_CLOUD_TYPE_TICKS = "CloudTypeTicks";
     private static final String TAG_CLOUD_SEED = "CloudSeed";
 
@@ -76,6 +78,7 @@ public final class CloudClusterState {
     private float mergePressure;
     private String cloudTypeId;
     private String previousCloudTypeId;
+    private CloudMorphologyFamily morphologyFamily;
     private int cloudTypeTicks;
     private int cloudSeed;
 
@@ -108,6 +111,7 @@ public final class CloudClusterState {
         this.mergePressure = 0.0F;
         this.cloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.previousCloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
+        this.morphologyFamily = CloudTypeRegistry.getOrDefault(CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID).getMorphologyFamily();
         this.cloudTypeTicks = 0;
         this.cloudSeed = createRandomCloudSeed();
         this.active = true;
@@ -144,6 +148,10 @@ public final class CloudClusterState {
 
     public CloudFamily getCloudFamily() {
         return CloudTypeRegistry.getOrDefault(cloudTypeId).getFamily();
+    }
+
+    public CloudMorphologyFamily getMorphologyFamily() {
+        return morphologyFamily;
     }
 
     public Vec3 getCenter() {
@@ -281,6 +289,7 @@ public final class CloudClusterState {
 
     public void setCloudTypeId(String cloudTypeId) {
         this.cloudTypeId = normalizeCloudTypeId(cloudTypeId);
+        this.morphologyFamily = CloudTypeRegistry.getOrDefault(this.cloudTypeId).getMorphologyFamily();
     }
 
     public String getPreviousCloudTypeId() {
@@ -289,6 +298,12 @@ public final class CloudClusterState {
 
     public void setPreviousCloudTypeId(String previousCloudTypeId) {
         this.previousCloudTypeId = normalizeCloudTypeId(previousCloudTypeId);
+    }
+
+    public void setMorphologyFamily(CloudMorphologyFamily morphologyFamily) {
+        this.morphologyFamily = morphologyFamily == null
+                ? CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily()
+                : morphologyFamily;
     }
 
     public int getCloudTypeTicks() {
@@ -331,6 +346,7 @@ public final class CloudClusterState {
 
         previousCloudTypeId = cloudTypeId;
         cloudTypeId = normalizedTypeId;
+        morphologyFamily = CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily();
         cloudTypeTicks = 0;
     }
 
@@ -361,6 +377,7 @@ public final class CloudClusterState {
         if (otherWeight > thisWeight && !cloudTypeId.equals(other.cloudTypeId)) {
             previousCloudTypeId = cloudTypeId;
             cloudTypeId = normalizeCloudTypeId(other.cloudTypeId);
+            morphologyFamily = other.morphologyFamily;
             cloudTypeTicks = Math.max(cloudTypeTicks, other.cloudTypeTicks);
         } else {
             cloudTypeTicks = Math.max(cloudTypeTicks, other.cloudTypeTicks);
@@ -397,6 +414,7 @@ public final class CloudClusterState {
         tag.putFloat(TAG_MERGE_PRESSURE, mergePressure);
         tag.putString(TAG_CLOUD_TYPE_ID, cloudTypeId);
         tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, previousCloudTypeId);
+        tag.putString(TAG_MORPHOLOGY_FAMILY, morphologyFamily.name());
         tag.putInt(TAG_CLOUD_TYPE_TICKS, cloudTypeTicks);
         tag.putInt(TAG_CLOUD_SEED, cloudSeed);
 
@@ -460,6 +478,9 @@ public final class CloudClusterState {
         String previousCloudTypeId = tag.contains(TAG_PREVIOUS_CLOUD_TYPE_ID, Tag.TAG_STRING)
                 ? tag.getString(TAG_PREVIOUS_CLOUD_TYPE_ID)
                 : cloudTypeId;
+        CloudMorphologyFamily morphologyFamily = tag.contains(TAG_MORPHOLOGY_FAMILY, Tag.TAG_STRING)
+                ? CloudMorphologyFamily.byId(tag.getString(TAG_MORPHOLOGY_FAMILY), CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily())
+                : CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily();
         int cloudTypeTicks = tag.contains(TAG_CLOUD_TYPE_TICKS) ? tag.getInt(TAG_CLOUD_TYPE_TICKS) : 0;
         int cloudSeed = tag.contains(TAG_CLOUD_SEED) ? tag.getInt(TAG_CLOUD_SEED) : deriveCloudSeed(clusterId);
 
@@ -485,6 +506,7 @@ public final class CloudClusterState {
         state.setMergePressure(mergePressure);
         state.setCloudTypeId(cloudTypeId);
         state.setPreviousCloudTypeId(previousCloudTypeId);
+        state.setMorphologyFamily(morphologyFamily);
         state.setCloudTypeTicks(cloudTypeTicks);
         state.setCloudSeed(cloudSeed);
 

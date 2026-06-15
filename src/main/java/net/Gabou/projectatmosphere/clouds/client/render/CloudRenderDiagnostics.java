@@ -37,6 +37,7 @@ public final class CloudRenderDiagnostics {
     private static int submitSkippedSnapshots;
     private static boolean compositeSubmitted;
     private static String lastCloudTypeId = "";
+    private static String lastCloudMorphologyFamily = "";
     private static String lastCloudShapeId = "";
     private static int lastCloudSeed;
     private static float lastCloudRadius;
@@ -80,6 +81,7 @@ public final class CloudRenderDiagnostics {
         submitSkippedSnapshots = 0;
         compositeSubmitted = false;
         lastCloudTypeId = "";
+        lastCloudMorphologyFamily = "";
         lastCloudShapeId = "";
         lastCloudSeed = 0;
         lastCloudRadius = 0.0F;
@@ -104,6 +106,7 @@ public final class CloudRenderDiagnostics {
 
         renderedSnapshots++;
         lastCloudTypeId = snapshot.getCloudTypeId();
+        lastCloudMorphologyFamily = snapshot.getMorphologyFamily().name();
         lastCloudShapeId = snapshot.getShapeProfile().getShapeId();
         lastCloudSeed = snapshot.getCloudSeed();
         lastCloudRadius = snapshot.getRegionRadius();
@@ -198,6 +201,7 @@ public final class CloudRenderDiagnostics {
                 totalSkipped,
                 compositeSubmitted,
                 lastCloudTypeId,
+                lastCloudMorphologyFamily,
                 lastCloudShapeId,
                 lastCloudSeed,
                 lastCloudRadius,
@@ -346,6 +350,7 @@ public final class CloudRenderDiagnostics {
             int totalSkippedSnapshots,
             boolean compositeSubmitted,
             @Nullable String lastCloudTypeId,
+            @Nullable String lastCloudMorphologyFamily,
             @Nullable String lastCloudShapeId,
             int lastCloudSeed,
             float lastCloudRadius,
@@ -383,6 +388,7 @@ public final class CloudRenderDiagnostics {
                     false,
                     "",
                     "",
+                    "",
                     0,
                     0.0F,
                     0.0F,
@@ -407,7 +413,8 @@ public final class CloudRenderDiagnostics {
             }
 
             String shape = lastCloudShapeId == null || lastCloudShapeId.isBlank() ? "shape=unknown" : "shape=" + lastCloudShapeId;
-            return lastCloudTypeId + "/" + shape + "/seed=" + lastCloudSeed + "/radius=" + formatFloat(lastCloudRadius);
+            String morphology = lastCloudMorphologyFamily == null || lastCloudMorphologyFamily.isBlank() ? "morphology=unknown" : "morphology=" + lastCloudMorphologyFamily;
+            return lastCloudTypeId + "/" + morphology + "/" + shape + "/seed=" + lastCloudSeed + "/radius=" + formatFloat(lastCloudRadius);
         }
     }
 }

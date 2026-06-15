@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.clouds;
 
-import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
@@ -85,7 +85,7 @@ public final class WeatherCloudQueries {
         if (level instanceof ServerLevel serverLevel) {
             return CloudRegionStateStore.createRenderDataForActiveRegions(serverLevel);
         }
-        return ClientCloudRegionDataCache.getCurrentRegions();
+        return CloudRegionPacketDispatcher.getClientRegions();
     }
 
     public static @Nullable CloudRegionRenderData getCloudRegionAt(Level level, BlockPos pos) {
@@ -93,7 +93,7 @@ public final class WeatherCloudQueries {
         Collection<CloudRegionRenderData> regions =
                 level instanceof ServerLevel server
                         ? CloudRegionStateStore.createRenderDataForActiveRegions(server)
-                        : ClientCloudRegionDataCache.getCurrentRegions();
+                        : CloudRegionPacketDispatcher.getClientRegions();
 
         CloudRegionRenderData best = null;
         float bestScore = -1.0F;

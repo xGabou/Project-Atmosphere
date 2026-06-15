@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.network;
 
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
-import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
@@ -69,7 +68,7 @@ public final class SyncCloudRegionsPacket {
         NetworkEvent.Context context = contextSupplier.get();
 
         context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                ClientCloudRegionDataCache.setCurrentRegions(packet.regions)
+                CloudRegionPacketDispatcher.handleClientRegions(packet.regions)
         ));
 
         context.setPacketHandled(true);

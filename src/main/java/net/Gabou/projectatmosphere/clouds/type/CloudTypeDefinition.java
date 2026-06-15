@@ -12,6 +12,7 @@ public final class CloudTypeDefinition {
     private final String id;
     private final String displayName;
     private final CloudFamily family;
+    private final CloudMorphologyFamily morphologyFamily;
     private final CloudVisualProfile visualProfile;
     private final CloudMaterialProfile materialProfile;
     private final CloudShapeProfile shapeProfile;
@@ -31,6 +32,30 @@ public final class CloudTypeDefinition {
                 id,
                 displayName,
                 family,
+                CloudMorphologyFamily.defaultFor(id, family),
+                visualProfile,
+                CloudMaterialProfile.DEFAULT.withVisualDefaults(visualProfile),
+                CloudShapeProfile.defaultFor(id, family, visualProfile),
+                resolveDefaultVisualTier(family, visualProfile),
+                spawnConditions,
+                evolutionRules
+        );
+    }
+
+    public CloudTypeDefinition(
+            String id,
+            String displayName,
+            CloudFamily family,
+            CloudMorphologyFamily morphologyFamily,
+            CloudVisualProfile visualProfile,
+            CloudSpawnConditions spawnConditions,
+            CloudEvolutionRules evolutionRules
+    ) {
+        this(
+                id,
+                displayName,
+                family,
+                morphologyFamily,
                 visualProfile,
                 CloudMaterialProfile.DEFAULT.withVisualDefaults(visualProfile),
                 CloudShapeProfile.defaultFor(id, family, visualProfile),
@@ -51,9 +76,36 @@ public final class CloudTypeDefinition {
             CloudSpawnConditions spawnConditions,
             CloudEvolutionRules evolutionRules
     ) {
+        this(
+                id,
+                displayName,
+                family,
+                CloudMorphologyFamily.defaultFor(id, family),
+                visualProfile,
+                materialProfile,
+                shapeProfile,
+                stormVisualTier,
+                spawnConditions,
+                evolutionRules
+        );
+    }
+
+    public CloudTypeDefinition(
+            String id,
+            String displayName,
+            CloudFamily family,
+            CloudMorphologyFamily morphologyFamily,
+            CloudVisualProfile visualProfile,
+            CloudMaterialProfile materialProfile,
+            CloudShapeProfile shapeProfile,
+            StormVisualTier stormVisualTier,
+            CloudSpawnConditions spawnConditions,
+            CloudEvolutionRules evolutionRules
+    ) {
         this.id = Objects.requireNonNull(id, "id");
         this.displayName = Objects.requireNonNull(displayName, "displayName");
         this.family = Objects.requireNonNull(family, "family");
+        this.morphologyFamily = Objects.requireNonNull(morphologyFamily, "morphologyFamily");
         this.visualProfile = Objects.requireNonNull(visualProfile, "visualProfile");
         this.materialProfile = Objects.requireNonNull(materialProfile, "materialProfile");
         this.shapeProfile = Objects.requireNonNull(shapeProfile, "shapeProfile");
@@ -72,6 +124,10 @@ public final class CloudTypeDefinition {
 
     public CloudFamily getFamily() {
         return family;
+    }
+
+    public CloudMorphologyFamily getMorphologyFamily() {
+        return morphologyFamily;
     }
 
     public CloudVisualProfile getVisualProfile() {
