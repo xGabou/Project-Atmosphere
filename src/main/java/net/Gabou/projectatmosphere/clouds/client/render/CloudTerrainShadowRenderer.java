@@ -27,7 +27,20 @@ public final class CloudTerrainShadowRenderer {
     private CloudTerrainShadowRenderer() {
     }
 
-    public static boolean render(@NotNull CloudRenderFrameContext frameContext, @NotNull RenderTarget mainTarget, @Nullable RenderTarget shadowTarget) {
+    public static boolean render(
+            @NotNull CloudRenderFrameContext frameContext,
+            @NotNull RenderTarget mainTarget,
+            @Nullable RenderTarget shadowTarget
+    ) {
+        return render(frameContext, mainTarget, shadowTarget, resolveShadowStrength());
+    }
+
+    public static boolean render(
+            @NotNull CloudRenderFrameContext frameContext,
+            @NotNull RenderTarget mainTarget,
+            @Nullable RenderTarget shadowTarget,
+            float shadowStrength
+    ) {
         if (!isEnabled() || shadowTarget == null || shadowTarget.getColorTextureId() <= 0) {
             return false;
         }
@@ -62,7 +75,7 @@ public final class CloudTerrainShadowRenderer {
         shader.safeGetUniform("InverseProjMat").set(frameContext.getInverseProjectionMatrix());
         shader.safeGetUniform("InverseModelViewMat").set(frameContext.getInverseModelViewMatrix());
         shader.safeGetUniform("ShadowBounds").set(snapshot.getMinX(), snapshot.getMinZ(), snapshot.getMaxX(), snapshot.getMaxZ());
-        shader.safeGetUniform("ShadowStrength").set(resolveShadowStrength());
+        shader.safeGetUniform("ShadowStrength").set(Mth.clamp(shadowStrength, 0.0F, 0.72F));
         shader.apply();
 
         fullscreenQuad.bind();
@@ -86,7 +99,7 @@ public final class CloudTerrainShadowRenderer {
     }
 
     private static float resolveShadowStrength() {
-        return Mth.clamp(0.52F, 0.0F, 1.0F);
+        return Mth.clamp(0.52F, 0.0F, 0.72F);
     }
 
     private static void applyLinearFiltering(int textureId) {

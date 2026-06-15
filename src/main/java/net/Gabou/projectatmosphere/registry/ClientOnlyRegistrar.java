@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudDiagnosticsOverlay;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.render.FallbackDarkeningPass;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
@@ -38,6 +39,7 @@ public class ClientOnlyRegistrar {
             MinecraftForge.EVENT_BUS.register(CloudDebugRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudDiagnosticsOverlay.class);
             MinecraftForge.EVENT_BUS.register(CloudRenderHook.class);
+            MinecraftForge.EVENT_BUS.register(FallbackDarkeningPass.class);
         } else {
             MinecraftForge.EVENT_BUS.register(SimpleCloudsWhiteoutFogHandler.class);
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; PA cloud client hooks disabled.");

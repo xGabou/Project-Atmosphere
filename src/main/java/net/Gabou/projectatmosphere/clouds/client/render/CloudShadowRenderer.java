@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
@@ -13,9 +14,12 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL21;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Locale;
 
 public final class CloudShadowRenderer {
     private static final int DEFAULT_GRID_RESOLUTION = 64;
@@ -52,15 +56,13 @@ public final class CloudShadowRenderer {
             }
         }
 
-        if (shadowTarget != null) {
-            uploadShadowTexture(shadowTarget, values, resolution, resolution);
-        }
+        boolean uploaded = shadowTarget != null && uploadShadowTexture(shadowTarget, values, resolution, resolution);
 
         Matrix4f worldToShadow = new Matrix4f()
                 .identity()
                 .translate(-bounds.minX(), 0.0F, -bounds.minZ())
                 .scale(1.0F / Math.max(1.0F, bounds.maxX() - bounds.minX()), 1.0F, 1.0F / Math.max(1.0F, bounds.maxZ() - bounds.minZ()));
-        int textureId = shadowTarget == null ? -1 : shadowTarget.getColorTextureId();
+        int textureId = uploaded ? shadowTarget.getColorTextureId() : -1;
         CloudShadowMapAccess.publishSnapshot(new CloudShadowSnapshot(
                 true,
                 textureId,
@@ -147,9 +149,21 @@ public final class CloudShadowRenderer {
         }
     }
 
-    private static void uploadShadowTexture(@NotNull RenderTarget shadowTarget, float[] values, int width, int height) {
-        if (shadowTarget.getColorTextureId() < 0 || values == null || values.length < width * height) {
-            return;
+    private static boolean uploadShadowTexture(@NotNull RenderTarget shadowTarget, float[] values, int width, int height) {
+        int textureId = shadowTarget.getColorTextureId();
+        if (textureId < 0 || width <= 0 || height <= 0 || values == null || values.length < width * height) {
+            return false;
+        }
+        if (shadowTarget.width < width || shadowTarget.height < height) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "[CloudShadow] upload.skip reason=targetTooSmall target={}x{} upload={}x{} texture={}",
+                    shadowTarget.width,
+                    shadowTarget.height,
+                    width,
+                    height,
+                    textureId
+            );
+            return false;
         }
 
         ByteBuffer pixels = BufferUtils.createByteBuffer(width * height * 4);
@@ -162,9 +176,53 @@ public final class CloudShadowRenderer {
         }
         pixels.flip();
 
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, shadowTarget.getColorTextureId());
-        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        int previousUnpackAlignment = GL11.glGetInteger(GL11.GL_UNPACK_ALIGNMENT);
+        int previousUnpackBuffer = GL11.glGetInteger(GL21.GL_PIXEL_UNPACK_BUFFER_BINDING);
+        try {
+            // Other renderers may leave a PBO bound; CPU ByteBuffer uploads require unpack buffer 0.
+            GL15.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+            GL11.glTexImage2D(
+                    GL11.GL_TEXTURE_2D,
+                    0,
+                    GL11.GL_RGBA8,
+                    width,
+                    height,
+                    0,
+                    GL11.GL_RGBA,
+                    GL11.GL_UNSIGNED_BYTE,
+                    pixels
+            );
+            return logGlError("shadow-upload", false);
+        } catch (RuntimeException exception) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "[CloudShadow] upload.failed texture={} size={}x{} message={}",
+                    textureId,
+                    width,
+                    height,
+                    exception.getMessage()
+            );
+            return false;
+        } finally {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, previousTexture);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, previousUnpackAlignment);
+            GL15.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, previousUnpackBuffer);
+        }
+    }
+
+    private static boolean logGlError(String context, boolean defaultValue) {
+        int error = GL11.glGetError();
+        if (error == GL11.GL_NO_ERROR) {
+            return true;
+        }
+        ProjectAtmosphere.LOGGER.warn(
+                "[CloudShadow] glError context={} code=0x{}",
+                context,
+                String.format(Locale.ROOT, "%04X", error)
+        );
+        return defaultValue;
     }
 
     private static float smoothstep(float edge0, float edge1, float value) {

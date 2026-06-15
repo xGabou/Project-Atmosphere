@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
 import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
+import net.Gabou.projectatmosphere.clouds.client.lighting.CloudLightingManager;
 import net.Gabou.projectatmosphere.client.fog.FogBiomeClassifier;
 import net.Gabou.projectatmosphere.compat.temperature.ClientTemperatureResolver;
 import net.minecraft.client.Minecraft;
@@ -45,7 +46,9 @@ public final class AtmosphereSkySampler {
         float sunVisibility = 0.0F;
         float atmosphericClarity = 0.0F;
         if (canSeeSky) {
-            float cloudShadow = CloudShadowMapAccess.sampleShadowAt(pos.getX() + 0.5D, pos.getZ() + 0.5D);
+            float mapShadow = CloudShadowMapAccess.sampleShadowAt(pos.getX() + 0.5D, pos.getZ() + 0.5D);
+            float managedShadow = CloudLightingManager.getPlayerShadowIntensity();
+            float cloudShadow = Math.max(mapShadow, managedShadow * 0.82F);
             float sunOcclusion = Mth.clamp(1.0F - cloudCover * 0.82F - rainIntensity * 0.95F - cloudShadow * 0.70F, 0.0F, 1.0F);
             sunVisibility = daylightFactor * sunOcclusion;
 

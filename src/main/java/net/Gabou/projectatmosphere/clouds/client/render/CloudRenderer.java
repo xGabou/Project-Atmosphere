@@ -84,19 +84,21 @@ public final class CloudRenderer {
 
         List<CloudRenderSnapshot> sourceSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots();
         List<CloudRenderSnapshot> renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots();
+        List<CloudRenderLodPlan> renderPlans = CloudRenderLodManager.createPlans(frameContext, renderableSnapshots);
         CloudRenderDiagnostics.beginFrame(
                 frameContext,
                 mainTarget,
                 cloudTarget,
                 sourceSnapshots.size(),
-                renderableSnapshots.size(),
+                renderPlans.size(),
                 downscaled
         );
 
         String screenName = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
         RenderTarget shadowTarget = CloudRenderTargetManager.getCloudShadowTarget();
         CloudShadowRenderer.update(frameContext, renderableSnapshots, shadowTarget);
-        CloudTerrainShadowRenderer.render(frameContext, mainTarget, shadowTarget);
+        FallbackDarkeningPass.updateFrame(frameContext, minecraft.level);
+        FallbackDarkeningPass.applyTerrainDarkening(frameContext, mainTarget, shadowTarget);
         AtmospherePipelineAdapter pipelineAdapter = AtmospherePipelineAdapters.select();
         int shadowDepthTextureId = shadowTarget != null ? shadowTarget.getDepthTextureId() : -1;
         String stateSignature = screenName
@@ -148,11 +150,12 @@ public final class CloudRenderer {
             float[] preSceneDepths = depthProbeEnabled ? captureSceneDepths(mainTarget) : null;
             cloudTarget.bindWrite(true);
             int sceneDepthTextureId = mainTarget.getDepthTextureId();
-            for (CloudRenderSnapshot snapshot : renderableSnapshots) {
+            for (CloudRenderLodPlan plan : renderPlans) {
                 long raymarchCpuStart = CloudRenderDiagnostics.nowNs();
-                if (renderSnapshot(frameContext, snapshot, cloudTarget, sceneDepthTextureId, RAYMARCH_GPU_TIMER)) {
+                CloudRenderFrameContext lodFrameContext = frameContext.withRenderProfile(plan.renderProfile());
+                if (renderSnapshot(lodFrameContext, plan.snapshot(), cloudTarget, sceneDepthTextureId, RAYMARCH_GPU_TIMER)) {
                     CloudRenderDiagnostics.recordRaymarchCpuTime(raymarchCpuStart);
-                    CloudRenderDiagnostics.recordRendered(snapshot);
+                    CloudRenderDiagnostics.recordRendered(plan.snapshot());
                 } else {
                     CloudRenderDiagnostics.recordRaymarchCpuTime(raymarchCpuStart);
                     CloudRenderDiagnostics.recordSubmitSkipped();

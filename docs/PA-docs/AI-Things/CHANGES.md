@@ -1,6 +1,13 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
+## Unreleased - Phase 6A cloud lighting and fallback darkening (0.9.0.1-alpha)
+- Added `CloudLightingEvaluation` for shared cloud darkness, storm darkness, shadow intensity, and fallback darkening candidate selection from `CloudVisualState`.
+- Added `CloudLightingManager` with smoothed read-only player lighting accessors for future shader and Distant Horizons integration.
+- Implemented `FallbackDarkeningPass` using conservative fog darkening for all pipelines and optional terrain overlay via existing `CloudTerrainShadowRenderer` when shader-safe paths are not active.
+- Added `ClientShaderPipelineHelper` to respect `shaderSafeMode` and external shaderpack detection without modifying Iris or Oculus.
+- Extended `CloudVisualStateManager` with `getFallbackDarkeningCandidates` and wired fallback darkening through `CloudRenderer`, `CloudRenderHook`, and `AtmosphereSkySampler`.
+
 ## Unreleased - Verification telemetry command (0.9.0.1-alpha)
 - Added read-only `/pa debug verify` and `/pa debug verify snapshot` commands that audit forecast, atmosphere, wind, season, weather cells, clouds, morphology, evolution, and persistence state through the telemetry verification package.
 - Introduced `VerificationCollector`, `VerificationReport`, `VerificationFormatter`, and `VerificationStatus` under `telemetry.verification` for structured runtime inspection without modifying gameplay systems.

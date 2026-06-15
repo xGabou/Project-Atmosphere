@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateUpdater;
+import net.Gabou.projectatmosphere.clouds.client.lighting.CloudLightingManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -36,11 +37,13 @@ public final class CloudRenderHook {
 
         if (level == null) {
             CloudRenderStateUpdater.clearCurrentSnapshots();
+            CloudLightingManager.clear();
             return;
         }
 
         if (!AtmosphereCloudPolicy.shouldRenderPaClouds(level)) {
             CloudRenderStateUpdater.clearCurrentSnapshots();
+            CloudLightingManager.clear();
             return;
         }
 

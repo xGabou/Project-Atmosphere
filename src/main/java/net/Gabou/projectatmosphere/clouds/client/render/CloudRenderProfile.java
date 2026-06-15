@@ -49,7 +49,7 @@ public final class CloudRenderProfile {
         AtmoCommonConfig.CloudRaymarchQuality quality = AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get();
         return new CloudRenderProfile(
                 quality.getRaymarchSteps(),
-                512.0F,
+                Math.max(100.0F, AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get().floatValue()),
                 quality.getResolutionScale(),
                 quality.getTemporalHistoryWeight(),
                 quality.getCompositeBlurRadius(),
@@ -57,6 +57,20 @@ public final class CloudRenderProfile {
                 quality.getRayJitterStrength(),
                 quality.getRayJitterTemporalStrength(),
                 false
+        );
+    }
+
+    public CloudRenderProfile withLod(int raymarchSteps, float maxRenderDistance) {
+        return new CloudRenderProfile(
+                Math.max(1, Math.min(raymarchSteps, this.raymarchSteps)),
+                Math.max(100.0F, maxRenderDistance),
+                this.resolutionScale,
+                this.temporalHistoryWeight,
+                this.compositeBlurRadius,
+                this.compositeBlurStrength,
+                this.rayJitterStrength,
+                this.rayJitterTemporalStrength,
+                this.shadowsEnabled
         );
     }
 

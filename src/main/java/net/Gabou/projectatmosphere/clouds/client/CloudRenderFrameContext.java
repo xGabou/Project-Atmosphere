@@ -84,4 +84,17 @@ public final class CloudRenderFrameContext {
     public @NotNull CloudRenderProfile getRenderProfile() {
         return renderProfile;
     }
+
+    public @NotNull CloudRenderFrameContext withRenderProfile(@NotNull CloudRenderProfile renderProfile) {
+        return new CloudRenderFrameContext(
+                this.level,
+                this.poseStack,
+                this.cameraPosition,
+                this.modelViewMatrix,
+                this.projectionMatrix,
+                renderProfile,
+                this.worldTime,
+                this.partialTick
+        );
+    }
 }
