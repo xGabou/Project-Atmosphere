@@ -16,6 +16,10 @@ public final class PaDebugCommand {
                         .executes(ctx -> CommandDebugService.setDebugMode(ctx.getSource(), true)))
                 .then(Commands.literal("off")
                         .executes(ctx -> CommandDebugService.setDebugMode(ctx.getSource(), false)))
+                .then(Commands.literal("verify")
+                        .executes(ctx -> CommandDebugService.runVerification(ctx.getSource(), false))
+                        .then(Commands.literal("snapshot")
+                                .executes(ctx -> CommandDebugService.runVerification(ctx.getSource(), true))))
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> CommandDebugService.setDebugMode(ctx.getSource(), BoolArgumentType.getBool(ctx, "value"))));
     }

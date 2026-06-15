@@ -1,5 +1,10 @@
 # Project Atmosphere — Developer Change Log
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
+
+## Unreleased - Verification telemetry command (0.9.0.1-alpha)
+- Added read-only `/pa debug verify` and `/pa debug verify snapshot` commands that audit forecast, atmosphere, wind, season, weather cells, clouds, morphology, evolution, and persistence state through the telemetry verification package.
+- Introduced `VerificationCollector`, `VerificationReport`, `VerificationFormatter`, and `VerificationStatus` under `telemetry.verification` for structured runtime inspection without modifying gameplay systems.
+
 ## Unreleased - Project Atmosphere command tree refactor
 - Split the `/pa` command surface into feature-first groups for forecast, temperature, humidity, pressure, wind, fog, cloud, tornado, hurricane, system, help, status, and debug.
 - Kept the legacy `/pa weatherdebug`, `/pa spawnTornado`, `/pa spawnHurricane`, and `/pa windSpeed` paths alive as compatibility aliases while routing them through the new handlers.
