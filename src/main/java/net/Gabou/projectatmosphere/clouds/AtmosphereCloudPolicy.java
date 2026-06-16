@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds;
 
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendResolver;
+import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -14,12 +16,12 @@ public final class AtmosphereCloudPolicy {
     }
 
     public static boolean shouldRenderPaClouds(@Nullable Level level) {
-        return AtmoCommonConfig.CLOUD_MODE.get() != AtmoCommonConfig.CloudMode.VANILLA
-                && canUsePaInDimension(level);
+        return CloudBackendResolver.resolve(level) == CloudVisualBackend.PA_NATIVE;
     }
 
     public static boolean shouldSuppressVanillaClouds(@Nullable Level level) {
-        return AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.FULL
+        return CloudBackendResolver.resolve(level) != CloudVisualBackend.DISABLED
+                && AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.FULL
                 && canUsePaInDimension(level);
     }
 

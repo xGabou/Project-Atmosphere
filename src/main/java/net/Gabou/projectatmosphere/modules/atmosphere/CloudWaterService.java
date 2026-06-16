@@ -21,19 +21,20 @@ public final class CloudWaterService {
         float clampedCloudCover = Mth.clamp(cloudCover, 0f, 1f);
         float clampedRain = Mth.clamp(rainIntensity, 0f, 1f);
 
-        float supersaturation = Math.max(0f, clampedHumidity - Math.max(clampedTarget, 0.55f));
-        float condensation = supersaturation * (0.04f + clampedCloudCover * 0.06f);
+        float supersaturation = Math.max(0f, clampedHumidity - Math.max(clampedTarget, 0.62f));
+        float condensation = supersaturation * (0.018f + clampedCloudCover * 0.032f);
         condensation = Math.min(condensation, clampedHumidity);
 
-        float reEvaporation = Math.max(0f, 0.2f - clampedCloudCover) * clampedCloudWater * 0.02f;
-        float precipitationDraw = clampedRain * Math.min(clampedCloudWater, 0.015f + clampedRain * 0.02f);
+        float reEvaporation = Math.max(0f, 0.28f - clampedCloudCover) * clampedCloudWater * 0.012f;
+        float precipitationDraw = clampedRain * Math.min(clampedCloudWater, 0.025f + clampedRain * 0.045f);
+        float excessWaterDrain = Math.max(0f, clampedCloudWater - 1.0f) * (0.035f + clampedRain * 0.055f);
 
         return new CloudWaterExchange(
                 -condensation + reEvaporation,
-                condensation - reEvaporation - precipitationDraw,
+                condensation - reEvaporation - precipitationDraw - excessWaterDrain,
                 condensation,
                 reEvaporation,
-                precipitationDraw
+                precipitationDraw + excessWaterDrain
         );
     }
 }

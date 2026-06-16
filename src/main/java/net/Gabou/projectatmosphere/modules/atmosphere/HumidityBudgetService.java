@@ -36,8 +36,10 @@ public final class HumidityBudgetService {
                 * moistureActivity
                 * responseScale;
 
+        float effectiveOceanFlux = resolveOceanFlux(oceanFlux, dominantBiomeId, currentHumidity, targetHumidity, updateScale, responseScale);
+
         float rainExchange = clampedRain
-                * (0.005f + profile.evaporationStrength() * 0.5f)
+                * (0.0025f + profile.evaporationStrength() * 0.22f)
                 * responseScale;
 
         float forecastRestore = humidityError
@@ -51,11 +53,41 @@ public final class HumidityBudgetService {
         return new HumidityBudget(
                 solarDrying,
                 biomeEvaporation,
-                oceanFlux,
+                effectiveOceanFlux,
                 rainExchange,
                 windTransport,
                 forecastRestore,
                 precipitationSink
         );
+    }
+
+    private static float resolveOceanFlux(
+            float oceanFlux,
+            String dominantBiomeId,
+            float currentHumidity,
+            float targetHumidity,
+            float updateScale,
+            float responseScale
+    ) {
+        if (Math.abs(oceanFlux) > 0.000001f || !isWaterBiome(dominantBiomeId)) {
+            return oceanFlux;
+        }
+
+        float waterTarget = Math.max(targetHumidity, 0.78f);
+        float deficit = Math.max(0f, waterTarget - currentHumidity);
+        return Mth.clamp(deficit * 0.004f * updateScale * responseScale, 0f, 0.0025f);
+    }
+
+    private static boolean isWaterBiome(String biomeId) {
+        if (biomeId == null || biomeId.isBlank()) {
+            return false;
+        }
+        String lower = biomeId.toLowerCase();
+        return lower.contains("ocean")
+                || lower.contains("river")
+                || lower.contains("beach")
+                || lower.contains("shore")
+                || lower.contains("mangrove")
+                || lower.contains("swamp");
     }
 }

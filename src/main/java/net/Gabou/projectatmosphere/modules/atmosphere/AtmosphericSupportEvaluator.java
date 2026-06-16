@@ -13,11 +13,11 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class AtmosphericSupportEvaluator {
     public static final float WEATHER_RAIN_THRESHOLD = 0.18F;
-    public static final float WEATHER_THUNDER_THRESHOLD = 0.42F;
-    public static final float WEATHER_SEVERE_THRESHOLD = 0.70F;
+    public static final float WEATHER_THUNDER_THRESHOLD = 0.56F;
+    public static final float WEATHER_SEVERE_THRESHOLD = 0.82F;
     public static final float WEATHER_THUNDER_WEAKEN_THRESHOLD = (WEATHER_RAIN_THRESHOLD + WEATHER_THUNDER_THRESHOLD) * 0.5F;
     public static final float WEATHER_SUPERCELL_WEAKEN_THRESHOLD = (WEATHER_THUNDER_THRESHOLD + WEATHER_SEVERE_THRESHOLD) * 0.5F;
-    public static final float RAIN_CELL_FORMATION_THRESHOLD = 0.58F;
+    public static final float RAIN_CELL_FORMATION_THRESHOLD = 0.68F;
 
     private AtmosphericSupportEvaluator() {
     }
@@ -39,19 +39,19 @@ public final class AtmosphericSupportEvaluator {
         float humidityTransport = WindVector.estimateHumidityTransport(key);
 
         float cloudBirthHumiditySupport = ramp(humidity, 0.50F, 0.84F);
-        float stormHumiditySupport = ramp(humidity, 0.64F, 1.00F);
-        float rainFormationHumiditySupport = ramp(humidity, 0.68F, 1.00F);
+        float stormHumiditySupport = ramp(humidity, 0.72F, 1.08F);
+        float rainFormationHumiditySupport = ramp(humidity, 0.74F, 1.05F);
         float cloudBirthWaterSupport = ramp(cloudWater, 0.04F, 0.34F);
-        float rainFormationWaterSupport = ramp(cloudWater, 0.10F, 0.38F);
-        float stormWaterSupport = ramp(cloudWater, 0.06F, 0.34F);
-        float cloudBirthPressureSupport = Mth.clamp((1018.0F - pressure) / 30.0F, 0.0F, 1.0F);
-        float rainFormationPressureSupport = Mth.clamp((1017.0F - pressure) / 28.0F, 0.0F, 1.0F);
-        float stormPressureSupport = Mth.clamp((1018.0F - pressure) / 30.0F, 0.0F, 1.0F);
-        float lowPressureSupport = Mth.clamp((1013.25F - pressure) / 45.0F, 0.0F, 1.0F);
+        float rainFormationWaterSupport = ramp(cloudWater, 0.18F, 0.72F);
+        float stormWaterSupport = ramp(cloudWater, 0.22F, 0.86F);
+        float cloudBirthPressureSupport = Mth.clamp((1016.0F - pressure) / 36.0F, 0.0F, 1.0F);
+        float rainFormationPressureSupport = Mth.clamp((1012.0F - pressure) / 38.0F, 0.0F, 1.0F);
+        float stormPressureSupport = Mth.clamp((1008.0F - pressure) / 42.0F, 0.0F, 1.0F);
+        float lowPressureSupport = Mth.clamp((1008.0F - pressure) / 45.0F, 0.0F, 1.0F);
         float temperatureCloudSupport = Mth.clamp((temperature + 8.0F) / 30.0F, 0.0F, 1.0F);
         float windTransportSupport = Mth.clamp(Math.max(0.0F, humidityTransport) / 0.035F, 0.0F, 1.0F);
-        float rainFormationRainSupport = ramp(rainIntensity, 0.04F, 0.49F);
-        float rainSupport = Mth.clamp(rainIntensity / 0.55F, 0.0F, 1.0F);
+        float rainFormationRainSupport = ramp(rainIntensity, 0.08F, 0.58F);
+        float rainSupport = Mth.clamp(rainIntensity / 0.68F, 0.0F, 1.0F);
         float cloudCoverSupport = ramp(cloudCover, 0.35F, 0.85F);
         float weatherCloudSupport = Mth.clamp(cloudCover, 0.0F, 1.0F);
         float windStrengthSupport = Mth.clamp(windStrength / 18.0F, 0.0F, 1.0F);
@@ -59,33 +59,33 @@ public final class AtmosphericSupportEvaluator {
         float highPressurePenalty = Mth.clamp((pressure - 1022.0F) / 24.0F, 0.0F, 1.0F);
 
         float rainCellSustain = Mth.clamp(
-                stormHumiditySupport * 0.34F
-                        + stormWaterSupport * 0.32F
-                        + stormPressureSupport * 0.18F
+                stormHumiditySupport * 0.32F
+                        + stormWaterSupport * 0.30F
+                        + stormPressureSupport * 0.14F
                         + convergence * 0.08F
-                        + rainSupport * 0.08F,
+                        + rainSupport * 0.06F,
                 0.0F,
                 1.0F
         );
 
         float thunderstormSupport = Mth.clamp(
-                stormHumiditySupport * 0.24F
+                stormHumiditySupport * 0.25F
                         + stormWaterSupport * 0.24F
-                        + rainSupport * 0.14F
-                        + weatherCloudSupport * 0.10F
-                        + lowPressureSupport * 0.12F
+                        + rainSupport * 0.10F
+                        + weatherCloudSupport * 0.07F
+                        + lowPressureSupport * 0.10F
                         + convergence * 0.10F
-                        + windStrengthSupport * 0.06F,
+                        + windStrengthSupport * 0.04F,
                 0.0F,
                 1.0F
         );
 
         float supercellSupport = Mth.clamp(
-                thunderstormSupport * 0.58F
-                        + stormPressureSupport * 0.12F
+                thunderstormSupport * 0.52F
+                        + stormPressureSupport * 0.10F
                         + convergence * 0.12F
                         + gustSupport * 0.10F
-                        + windStrengthSupport * 0.08F,
+                        + windStrengthSupport * 0.06F,
                 0.0F,
                 1.0F
         );
@@ -269,7 +269,7 @@ public final class AtmosphericSupportEvaluator {
             float saturationPenalty = Mth.clamp((coverage - 0.45F) / 0.35F, 0.0F, 1.0F);
             float instability = rainFormationHumiditySupport * 0.28F
                     + rainFormationWaterSupport * 0.28F
-                    + rainFormationPressureSupport * 0.18F
+                    + rainFormationPressureSupport * 0.14F
                     + windConvergence * 0.14F
                     + cloudCoverSupport * 0.08F
                     + rainFormationRainSupport * 0.04F;

@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterShadersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 
 import java.io.IOException;
@@ -32,6 +33,13 @@ public final class HurricaneShaders {
 
     @SubscribeEvent
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
+        if (!ModList.get().isLoaded("simpleclouds")) {
+            opaqueShader = null;
+            opaqueMaskShader = null;
+            transparencyShader = null;
+            transparencyMaskShader = null;
+            return;
+        }
         event.registerShader(new ShaderInstance(event.getResourceProvider(), OPAQUE_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> opaqueShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), OPAQUE_MASK_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> opaqueMaskShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), TRANSPARENCY_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> transparencyShader = loaded);

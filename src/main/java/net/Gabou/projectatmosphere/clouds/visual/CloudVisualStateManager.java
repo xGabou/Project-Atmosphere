@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.visual;
 
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendResolver;
+import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
@@ -135,6 +137,9 @@ public final class CloudVisualStateManager {
     }
 
     private static Collection<CloudRegionRenderData> getRenderData(Level level) {
+        if (CloudBackendResolver.resolve(level) != CloudVisualBackend.PA_NATIVE) {
+            return List.of();
+        }
         if (level instanceof ServerLevel serverLevel) {
             return CloudRegionStateStore.createRenderDataForActiveRegions(serverLevel);
         }

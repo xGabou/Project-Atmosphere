@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -25,7 +26,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CycloneManager {
     private static final List<Cyclone> ACTIVE_CYCLONES = new CopyOnWriteArrayList<>();
     private static final Map<UUID, CycloneSnapshot> ACTIVE_SNAPSHOTS = new ConcurrentHashMap<>();
-    private static final long COOLDOWN_TICKS = 24000L * 2;
+    private static final long COOLDOWN_TICKS = 24000L * 4;
+    private static final int MAX_ACTIVE_CYCLONES = 4;
+    private static final float MIN_SEED_DISTANCE_BLOCKS = 900f;
+    private static final float SEED_SUPPORT_THRESHOLD = 0.52f;
+    private static final float ORGANIZED_SUPPORT_THRESHOLD = 0.62f;
+    private static final float SEVERE_SUPPORT_THRESHOLD = 0.70f;
     private static long lastSpawnTick = -COOLDOWN_TICKS;
     private static long lastMidnightTick = -1L;
 
@@ -45,6 +51,186 @@ public final class CycloneManager {
             return List.of();
         }
         return List.copyOf(ACTIVE_SNAPSHOTS.values());
+    }
+
+    public static int maxActiveCyclones() {
+        return MAX_ACTIVE_CYCLONES;
+    }
+
+    public static long spawnCooldownRemainingTicks(long dayTime) {
+        return Math.max(0L, COOLDOWN_TICKS - (dayTime - lastSpawnTick));
+    }
+
+    public static float minSeedDistanceBlocks() {
+        return MIN_SEED_DISTANCE_BLOCKS;
+    }
+
+    public static SeedSpawnCheck evaluateSeedSpawn(RegionAtmosphereState state, long gameTime, long dayTime) {
+        CycloneSupport support = evaluateCycloneSupport(state, gameTime);
+        List<String> blockers = new ArrayList<>();
+        if (state == null) {
+            blockers.add("no live region state");
+            return new SeedSpawnCheck(false, support, blockers);
+        }
+        AtmosphericSupportEvaluator.Support atmospheric = AtmosphericSupportEvaluator.evaluate(state.getRegionId(), state);
+        if (atmospheric.humidity() < 0.70f) {
+            blockers.add("humidity too low");
+        }
+        if (atmospheric.cloudWater() < 0.25f) {
+            blockers.add("cloud water too low");
+        }
+        if (support.pressureAnomalyHpa() < 8f) {
+            blockers.add("pressure anomaly too weak");
+        }
+        if (support.seedSupport() < SEED_SUPPORT_THRESHOLD) {
+            blockers.add("support score too low");
+        }
+        if (support.convergenceSupport() < 0.18f
+                && atmospheric.stormPressureSupport() < 0.22f
+                && support.oceanMoistureBonus() < 0.12f) {
+            blockers.add("no organizing source");
+        }
+        if (ACTIVE_CYCLONES.size() >= MAX_ACTIVE_CYCLONES) {
+            blockers.add("regional cyclone cap reached");
+        }
+        if (spawnCooldownRemainingTicks(dayTime) > 0L) {
+            blockers.add("cooldown active");
+        }
+        if (isTooCloseToActiveCyclone(state)) {
+            blockers.add("too close to another cyclone");
+        }
+        return new SeedSpawnCheck(blockers.isEmpty() && support.seedEligible(), support, blockers);
+    }
+
+    public static CycloneSnapshot nearestCyclone(BlockPos pos) {
+        if (pos == null || ACTIVE_SNAPSHOTS.isEmpty()) {
+            return null;
+        }
+        CycloneSnapshot nearest = null;
+        double best = Double.MAX_VALUE;
+        for (CycloneSnapshot snapshot : ACTIVE_SNAPSHOTS.values()) {
+            double dx = pos.getX() - snapshot.centerX();
+            double dz = pos.getZ() - snapshot.centerZ();
+            double distance = Math.sqrt(dx * dx + dz * dz);
+            if (distance < best) {
+                best = distance;
+                nearest = snapshot;
+            }
+        }
+        return nearest;
+    }
+
+    public static double distanceTo(CycloneSnapshot snapshot, BlockPos pos) {
+        if (snapshot == null || pos == null) {
+            return Double.NaN;
+        }
+        double dx = pos.getX() - snapshot.centerX();
+        double dz = pos.getZ() - snapshot.centerZ();
+        return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    public static float estimatePressureDelta(RegionAtmosphereState state, long gameTime) {
+        if (state == null || state.getPosition() == null || ACTIVE_SNAPSHOTS.isEmpty()) {
+            return 0f;
+        }
+        return estimatePressureDelta(state.getPosition(), state.getPressure(), state.getTargetPressure(gameTime));
+    }
+
+    public static float estimatePressureDelta(BlockPos position, float currentPressure, float targetPressure) {
+        if (position == null || ACTIVE_SNAPSHOTS.isEmpty()) {
+            return 0f;
+        }
+        float total = 0f;
+        for (CycloneSnapshot cyclone : ACTIVE_SNAPSHOTS.values()) {
+            double dx = position.getX() - cyclone.centerX();
+            double dz = position.getZ() - cyclone.centerZ();
+            double distance = Math.sqrt(dx * dx + dz * dz);
+            float influence = (float) (1d - (distance / Math.max(1f, cyclone.radius())));
+            if (influence <= 0f) {
+                continue;
+            }
+            float scaledInfluence = influence * cyclone.intensity();
+            float currentDrop = Math.max(0.0f, targetPressure - currentPressure);
+            float allowedDrop = Mth.lerp(scaledInfluence, 12.0f, 38.0f);
+            float remainingDrop = Math.max(0.0f, allowedDrop - currentDrop);
+            float pressurePulse = Math.min(8f, cyclone.corePressureDrop()) * scaledInfluence * 0.045f;
+            total -= Math.min(remainingDrop, pressurePulse);
+        }
+        return total;
+    }
+
+    public static CycloneSupport evaluateCycloneSupport(RegionAtmosphereState state, long gameTime) {
+        if (state == null || state.getRegionId() == null) {
+            return CycloneSupport.empty();
+        }
+        AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(state.getRegionId(), state);
+        float targetPressure = state.getTargetPressure(gameTime);
+        float deficitToTarget = Math.max(0f, targetPressure - state.getPressure());
+        float deficitToNormal = Math.max(0f, 1013.25f - state.getPressure());
+        float pressureAnomaly = Math.max(deficitToTarget, deficitToNormal);
+        float pressureScore = ramp(pressureAnomaly, 6f, 18f);
+        float humidityScore = ramp(support.humidity(), 0.70f, 0.88f);
+        float cloudWaterScore = ramp(support.cloudWater(), 0.25f, 0.65f);
+        float convergenceScore = Mth.clamp(
+                support.windConvergence() * 0.72f
+                        + support.windStrengthSupport() * 0.18f
+                        + Math.max(0f, support.humidityTransport()) * 3.0f,
+                0f,
+                1f
+        );
+        float oceanFlux = OceanBasinManager.estimateHumidityFlux(state.getRegionId(), state.getHumidity());
+        float oceanPressureDelta = OceanBasinManager.estimatePressureDelta(state.getRegionId(), state.getPressure());
+        float oceanMoistureBonus = Mth.clamp(
+                Math.max(0f, oceanFlux) * 80f + Math.max(0f, -oceanPressureDelta) * 45f,
+                0f,
+                1f
+        );
+
+        float seedSupport = Mth.clamp(
+                humidityScore * 0.22f
+                        + cloudWaterScore * 0.22f
+                        + pressureScore * 0.26f
+                        + support.stormPressureSupport() * 0.14f
+                        + convergenceScore * 0.12f
+                        + oceanMoistureBonus * 0.04f,
+                0f,
+                1f
+        );
+        float intensificationSupport = Mth.clamp(
+                humidityScore * 0.20f
+                        + cloudWaterScore * 0.22f
+                        + pressureScore * 0.16f
+                        + convergenceScore * 0.14f
+                        + support.rainSupport() * 0.08f
+                        + support.thunderstormSupport() * 0.16f
+                        + oceanMoistureBonus * 0.04f,
+                0f,
+                1f
+        );
+        float severeSupport = Mth.clamp(
+                support.thunderstormSupport() * 0.42f
+                        + support.supercellSupport() * 0.34f
+                        + pressureScore * 0.10f
+                        + convergenceScore * 0.14f,
+                0f,
+                1f
+        );
+        boolean seedEligible = support.humidity() >= 0.70f
+                && support.cloudWater() >= 0.25f
+                && pressureAnomaly >= 8f
+                && seedSupport >= SEED_SUPPORT_THRESHOLD
+                && (convergenceScore >= 0.18f || support.stormPressureSupport() >= 0.22f || oceanMoistureBonus >= 0.12f);
+        return new CycloneSupport(
+                seedEligible,
+                seedSupport,
+                intensificationSupport,
+                severeSupport,
+                pressureAnomaly,
+                convergenceScore,
+                oceanMoistureBonus,
+                support.thunderstormSupport(),
+                support.supercellSupport()
+        );
     }
 
     public static CompoundTag savePersistentState() {
@@ -114,7 +300,7 @@ public final class CycloneManager {
     }
 
     public static void onMidnight(ServerLevel level) {
-        if (ACTIVE_CYCLONES.size() >= 4) {
+        if (ACTIVE_CYCLONES.size() >= MAX_ACTIVE_CYCLONES) {
             return;
         }
         long now = level.getDayTime();
@@ -122,7 +308,7 @@ public final class CycloneManager {
             return;
         }
         // Precompute nearby region candidates
-        List<RegionAtmosphereState> candidates = findNearbyStates(level);
+        List<RegionAtmosphereState> candidates = findCycloneSupportStates(level);
 
         if (candidates.isEmpty()) {
             return; // no valid region nearby → skip all
@@ -136,18 +322,18 @@ public final class CycloneManager {
 
     private static void spawnInitialCyclones(ServerLevel level) {
         RandomSource random = level.random;
-        int count = 3 + random.nextInt(6);
 
         // Precompute nearby region candidates
-        List<RegionAtmosphereState> candidates = findNearbyStates(level);
+        List<RegionAtmosphereState> candidates = findCycloneSupportStates(level);
 
         if (candidates.isEmpty()) {
             return; // no valid region nearby → skip all
         }
 
-        for (int i = 0; i < count; i++) {
-            spawnCyclone(level, candidates);
+        if (random.nextFloat() > 0.35F) {
+            return;
         }
+        spawnCyclone(level, candidates);
     }
 
 
@@ -158,12 +344,12 @@ public final class CycloneManager {
             return;
         }
 
-        // Pick one candidate directly
-        RegionAtmosphereState state = candidates.get(random.nextInt(candidates.size()));
+        RegionAtmosphereState state = candidates.get(Math.min(random.nextInt(Math.min(3, candidates.size())), candidates.size() - 1));
+        CycloneSupport support = evaluateCycloneSupport(state, level.getGameTime());
 
-        float radius = 180f + random.nextFloat() * 140f;
-        float intensity = 0.4f + random.nextFloat() * 0.4f;
-        float pressureDrop = 5f + random.nextFloat() * 10f;
+        float radius = Mth.lerp(support.seedSupport(), 220f, 520f) + random.nextFloat() * 80f;
+        float intensity = Mth.clamp(0.16f + support.seedSupport() * 0.26f + random.nextFloat() * 0.05f, 0.16f, 0.48f);
+        float pressureDrop = Mth.clamp(3.0f + support.seedSupport() * 7.0f + support.intensificationSupport() * 4.0f, 3.0f, 14.0f);
         long lifetime = 24000L + random.nextInt(24000);
 
         Cyclone cyclone = new Cyclone(
@@ -192,6 +378,34 @@ public final class CycloneManager {
                 .toList();
     }
 
+    private static List<RegionAtmosphereState> findCycloneSupportStates(ServerLevel level) {
+        long gameTime = level.getGameTime();
+        return findNearbyStates(level).stream()
+                .filter(state -> {
+                    CycloneSupport support = evaluateCycloneSupport(state, gameTime);
+                    return support.seedEligible() && !isTooCloseToActiveCyclone(state);
+                })
+                .sorted((a, b) -> Float.compare(
+                        evaluateCycloneSupport(b, gameTime).seedSupport(),
+                        evaluateCycloneSupport(a, gameTime).seedSupport()
+                ))
+                .toList();
+    }
+
+    private static boolean isTooCloseToActiveCyclone(RegionAtmosphereState state) {
+        if (state == null || state.getPosition() == null || ACTIVE_SNAPSHOTS.isEmpty()) {
+            return false;
+        }
+        for (CycloneSnapshot cyclone : ACTIVE_SNAPSHOTS.values()) {
+            double dx = state.getPosition().getX() - cyclone.centerX();
+            double dz = state.getPosition().getZ() - cyclone.centerZ();
+            if (Math.sqrt(dx * dx + dz * dz) < MIN_SEED_DISTANCE_BLOCKS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static List<BlockPos> collectPlayerPositions(ServerLevel level) {
         return level.players().stream()
                 .map(ServerPlayer::blockPosition)
@@ -213,6 +427,42 @@ public final class CycloneManager {
         return false;
     }
 
+    private static float ramp(float value, float startsAt, float fullAt) {
+        if (fullAt <= startsAt) {
+            return value >= fullAt ? 1f : 0f;
+        }
+        return Mth.clamp((value - startsAt) / (fullAt - startsAt), 0f, 1f);
+    }
+
+    public record CycloneSupport(
+            boolean seedEligible,
+            float seedSupport,
+            float intensificationSupport,
+            float severeSupport,
+            float pressureAnomalyHpa,
+            float convergenceSupport,
+            float oceanMoistureBonus,
+            float thunderstormSupport,
+            float supercellSupport
+    ) {
+        static CycloneSupport empty() {
+            return new CycloneSupport(false, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
+        }
+    }
+
+    public record SeedSpawnCheck(
+            boolean canSpawn,
+            CycloneSupport support,
+            List<String> blockedReasons
+    ) {
+        public String blockedReasonSummary() {
+            if (blockedReasons == null || blockedReasons.isEmpty()) {
+                return "none";
+            }
+            return String.join(", ", blockedReasons);
+        }
+    }
+
 
 
     private static final class Cyclone {
@@ -223,6 +473,8 @@ public final class CycloneManager {
         private final float corePressureDrop;
         private long lifetimeTicks;
         private int counter;
+        private float lastMoveX;
+        private float lastMoveZ;
 
         private Cyclone(UUID id, Vec2 center, float radius, float intensity, float corePressureDrop, long lifetimeTicks, int counter) {
             this.id = id == null ? UUID.randomUUID() : id;
@@ -265,24 +517,46 @@ public final class CycloneManager {
         private CycloneImpactApplier.CycloneStep tick(List<RegionAtmosphereState> snapshot, long gameTime) {
             List<CycloneImpactApplier.CycloneDelta> deltas = List.of();
             if (counter++ % 20 == 0) {
-                deltas = applyEffects(snapshot);
+                deltas = applyEffects(snapshot, gameTime);
             }
-            drift(snapshot, gameTime);
+            RegionAtmosphereState nearest = findNearest(snapshot, center.x, center.y);
+            adjustIntensity(nearest, gameTime);
+            drift(nearest, gameTime);
             lifetimeTicks--;
-            intensity *= 0.9995f;
             if (lifetimeTicks <= 0 || intensity < 0.05f) {
                 return new CycloneImpactApplier.CycloneStep(true, deltas);
             }
-            radius = Mth.clamp(radius + (intensity - 0.5f) * 0.8f, 120f, 420f);
+            radius = Mth.clamp(radius + (intensity - 0.38f) * 1.2f, 140f, 620f);
             return new CycloneImpactApplier.CycloneStep(false, deltas);
         }
 
-        private List<CycloneImpactApplier.CycloneDelta> applyEffects(List<RegionAtmosphereState> states) {
+        private void adjustIntensity(RegionAtmosphereState nearest, long gameTime) {
+            CycloneSupport support = evaluateCycloneSupport(nearest, gameTime);
+            float organization = support.intensificationSupport();
+            float severe = support.severeSupport();
+            float seed = support.seedSupport();
+            float tendency = -0.00035f;
+            if (seed >= SEED_SUPPORT_THRESHOLD) {
+                tendency += (seed - SEED_SUPPORT_THRESHOLD) * 0.0012f;
+            }
+            if (organization >= ORGANIZED_SUPPORT_THRESHOLD) {
+                tendency += (organization - ORGANIZED_SUPPORT_THRESHOLD) * 0.0022f;
+            }
+            if (severe >= SEVERE_SUPPORT_THRESHOLD) {
+                tendency += (severe - SEVERE_SUPPORT_THRESHOLD) * 0.0028f;
+            }
+            if (!support.seedEligible() && organization < 0.40f) {
+                tendency -= 0.00045f;
+            }
+            intensity = Mth.clamp(intensity + tendency, 0.03f, 1.15f);
+        }
+
+        private List<CycloneImpactApplier.CycloneDelta> applyEffects(List<RegionAtmosphereState> states, long gameTime) {
             List<CycloneImpactApplier.CycloneDelta> deltas = new ArrayList<>();
             if (states.isEmpty()) {
                 return deltas;
             }
-            float maxPressureDrop = Math.min(12f, corePressureDrop);
+            float maxPressureDrop = Math.min(8f, corePressureDrop);
             for (RegionAtmosphereState state : states) {
                 double dx = state.getPosition().getX() - center.x;
                 double dz = state.getPosition().getZ() - center.y;
@@ -292,9 +566,14 @@ public final class CycloneManager {
                     influence = 0f;
                 }
                 float scaledInfluence = influence * intensity;
-                float pressureDelta = Mth.clamp(-maxPressureDrop * scaledInfluence, -20f, 0f);
-                float humidityDelta = Mth.clamp(scaledInfluence, 0f, 0.6f);
-                float temperatureDelta = Mth.clamp(-scaledInfluence * 2f, -8f, 0f);
+                float targetPressure = state.getTargetPressure(gameTime);
+                float currentDrop = Math.max(0.0f, targetPressure - state.getPressure());
+                float allowedDrop = Mth.lerp(scaledInfluence, 12.0f, 38.0f);
+                float remainingDrop = Math.max(0.0f, allowedDrop - currentDrop);
+                float pressurePulse = maxPressureDrop * scaledInfluence * 0.045f;
+                float pressureDelta = -Math.min(remainingDrop, pressurePulse);
+                float humidityDelta = Mth.clamp(scaledInfluence * 0.018f, 0f, 0.018f);
+                float temperatureDelta = Mth.clamp(-scaledInfluence * 0.16f, -0.18f, 0f);
                 float rainCeil = Mth.clamp(scaledInfluence, 0f, 1f);
                 float cloudCeil = Mth.clamp(state.getCloudCover() + scaledInfluence * 0.25f, 0f, 1f);
                 deltas.add(new CycloneImpactApplier.CycloneDelta(state.getKey(), temperatureDelta, humidityDelta, pressureDelta, rainCeil, cloudCeil));
@@ -302,8 +581,7 @@ public final class CycloneManager {
             return deltas;
         }
 
-        private void drift(List<RegionAtmosphereState> states, long gameTime) {
-            RegionAtmosphereState nearest = findNearest(states, center.x, center.y);
+        private void drift(RegionAtmosphereState nearest, long gameTime) {
             if (nearest == null) {
                 return;
             }
@@ -312,6 +590,8 @@ public final class CycloneManager {
             float angle = wind.angleRadians();
             float dx = (float) Math.sin(angle) * speed;
             float dz = (float) Math.cos(angle) * speed;
+            lastMoveX = dx;
+            lastMoveZ = dz;
             center = center.add(new Vec2(dx, dz));
         }
 
@@ -336,7 +616,10 @@ public final class CycloneManager {
                     this.radius,
                     this.intensity,
                     this.corePressureDrop,
-                    this.lifetimeTicks
+                    this.lifetimeTicks,
+                    this.counter,
+                    this.lastMoveX,
+                    this.lastMoveZ
             );
         }
     }

@@ -23,7 +23,8 @@ final class CycloneImpactApplier {
             state.applyCycloneVisualFloor(delta.cloudCeil(), delta.rainCeil());
             state.setRainIntensity(Math.min(1f, Math.max(state.getRainIntensity(), delta.rainCeil())));
             state.setCloudCover(Math.min(1f, Math.max(state.getCloudCover(), delta.cloudCeil())));
-            state.setCloudWater(Math.max(state.getCloudWater(), delta.cloudCeil() * 0.35f + delta.rainCeil() * 0.65f));
+            float cycloneWaterFloor = Math.min(1.05f, delta.cloudCeil() * 0.26f + delta.rainCeil() * 0.46f);
+            state.setCloudWater(Math.max(state.getCloudWater(), cycloneWaterFloor));
         }
     }
 

@@ -28,6 +28,7 @@ public final class CloudRegionRenderData {
     private final float density;
     private final float coverage;
     private final float edgeSoftness;
+    private final long simulationTick;
     private final boolean active;
     private final int debugColorOrTint;
     private final int ageTicks;
@@ -74,6 +75,7 @@ public final class CloudRegionRenderData {
             float density,
             float coverage,
             float edgeSoftness,
+            long simulationTick,
             boolean active,
             int debugColorOrTint,
             int ageTicks,
@@ -119,6 +121,7 @@ public final class CloudRegionRenderData {
         this.density = density;
         this.coverage = coverage;
         this.edgeSoftness = edgeSoftness;
+        this.simulationTick = Math.max(0L, simulationTick);
         this.active = active;
         this.debugColorOrTint = debugColorOrTint;
         this.ageTicks = ageTicks;
@@ -199,6 +202,10 @@ public final class CloudRegionRenderData {
 
     public float getEdgeSoftness() {
         return edgeSoftness;
+    }
+
+    public long getSimulationTick() {
+        return simulationTick;
     }
 
     public boolean isActive() {
@@ -353,6 +360,7 @@ public final class CloudRegionRenderData {
         buffer.writeFloat(density);
         buffer.writeFloat(coverage);
         buffer.writeFloat(edgeSoftness);
+        buffer.writeLong(simulationTick);
         buffer.writeBoolean(active);
         buffer.writeInt(debugColorOrTint);
         buffer.writeVarInt(ageTicks);
@@ -406,6 +414,7 @@ public final class CloudRegionRenderData {
         float density = buffer.readFloat();
         float coverage = buffer.readFloat();
         float edgeSoftness = buffer.readFloat();
+        long simulationTick = buffer.readLong();
         boolean active = buffer.readBoolean();
         int debugColorOrTint = buffer.readInt();
         int ageTicks = buffer.readVarInt();
@@ -452,6 +461,7 @@ public final class CloudRegionRenderData {
                 density,
                 coverage,
                 edgeSoftness,
+                simulationTick,
                 active,
                 debugColorOrTint,
                 ageTicks,

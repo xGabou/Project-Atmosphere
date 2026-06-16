@@ -112,6 +112,7 @@ public final class CloudUniformUploader {
         shader.safeGetUniform("CloudShapeBaseFlattening").set(snapshot.getShapeProfile().getBaseFlattening());
         shader.safeGetUniform("CloudShapeEdgeRaggedness").set(snapshot.getShapeProfile().getEdgeRaggedness());
         shader.safeGetUniform("CloudShapeStormWallStrength").set(snapshot.getShapeProfile().getStormWallStrength());
+        shader.safeGetUniform("CloudMorphologyFamily").set(snapshot.getMorphologyFamily().ordinal());
         shader.safeGetUniform("CloudStormVisualTier").set(snapshot.getStormVisualTier().ordinal());
         shader.safeGetUniform("CloudStormVisualDarkness").set(snapshot.getStormVisualTier().getDarkness());
         shader.safeGetUniform("CloudPrecipitationTier").set(snapshot.getPrecipitationTier().ordinal());

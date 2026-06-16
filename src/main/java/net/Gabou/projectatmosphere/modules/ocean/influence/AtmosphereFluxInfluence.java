@@ -12,6 +12,7 @@ import net.minecraft.util.Mth;
  */
 public final class AtmosphereFluxInfluence implements AtmosVolumeInfluence {
     public static final float DEFAULT_HUMIDITY_COUPLING = 0.004f;
+    public static final float DEFAULT_PRESSURE_COUPLING = 0.0025f;
     private final float humidityCoupling;
     private final float temperatureCoupling;
     private final float pressureCoupling;
@@ -25,7 +26,7 @@ public final class AtmosphereFluxInfluence implements AtmosVolumeInfluence {
     }
 
     public AtmosphereFluxInfluence() {
-        this(DEFAULT_HUMIDITY_COUPLING, 0.003f, 0.0025f, 0.002f);
+        this(DEFAULT_HUMIDITY_COUPLING, 0.003f, DEFAULT_PRESSURE_COUPLING, 0.002f);
     }
 
     public static float computeHumidityDelta(float humidityTarget, float currentHumidity, float weight, boolean oceanCell) {
@@ -34,6 +35,10 @@ public final class AtmosphereFluxInfluence implements AtmosVolumeInfluence {
             humidityDelta *= 1.8f;
         }
         return humidityDelta;
+    }
+
+    public static float computePressureDelta(float targetPressure, float currentPressure, float weight) {
+        return (targetPressure - currentPressure) * DEFAULT_PRESSURE_COUPLING * weight;
     }
 
     @Override

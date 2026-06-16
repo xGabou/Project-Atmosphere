@@ -154,6 +154,37 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
         return estimateHumidityTransport(key, state, states, neighborsMap);
     }
 
+    public static float estimatePressureTransport(RegionInstanceKey key) {
+        if (key == null) {
+            return 0f;
+        }
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+        if (state == null) {
+            return 0f;
+        }
+        float strength = state.getWindStrength();
+        if (strength <= 0.01f) {
+            return 0f;
+        }
+        Map<RegionInstanceKey, RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
+        Map<RegionInstanceKey, List<RegionInstanceKey>> neighborsMap = AtmosphericStateRegistry.getNeighborsAsMap();
+        List<RegionInstanceKey> neighbors = neighborsMap.getOrDefault(key, List.of());
+        if (neighbors.isEmpty()) {
+            return 0f;
+        }
+        float pressureFactor = Mth.clamp(0.05f * strength, 0f, MAX_WIND_MIX_FACTOR);
+        float total = 0f;
+        for (RegionInstanceKey neighborKey : neighbors) {
+            RegionAtmosphereState neighbor = states.get(neighborKey);
+            if (neighbor == null) {
+                continue;
+            }
+            float pressureDelta = (neighbor.getPressure() - state.getPressure()) * pressureFactor;
+            total += Mth.clamp(pressureDelta, -MAX_PRESSURE_MIX_DELTA, MAX_PRESSURE_MIX_DELTA);
+        }
+        return Mth.clamp(total, -MAX_PRESSURE_MIX_DELTA, MAX_PRESSURE_MIX_DELTA);
+    }
+
     public static float estimateHumidityTransport(RegionInstanceKey key,
                                                   RegionAtmosphereState state,
                                                   Map<RegionInstanceKey, RegionAtmosphereState> states,

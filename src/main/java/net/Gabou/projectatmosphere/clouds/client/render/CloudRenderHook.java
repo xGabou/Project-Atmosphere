@@ -54,7 +54,7 @@ public final class CloudRenderHook {
                 new Matrix4f(event.getPoseStack().last().pose()),
                 new Matrix4f(event.getProjectionMatrix()),
                 CloudRenderProfile.createDefault(),
-                level.getDayTime(),
+                level.getGameTime(),
                 event.getPartialTick()
         );
 

@@ -2,6 +2,9 @@ package net.Gabou.projectatmosphere.clouds.service;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendBridgeSnapshot;
+
+import java.util.List;
 
 /**
  * Service d'intégration des systèmes de nuages utilisables par Project Atmosphere.
@@ -108,6 +111,17 @@ public interface AtmosphereCloudService {
      */
     default boolean hasSevereCloudNearby(ServerLevel level, BlockPos pos, int minimumSeverity) {
         return false;
+    }
+
+    /**
+     * Mirrors neutral PA cloud snapshots into this service when it owns the active visual backend.
+     *
+     * @param level niveau serveur
+     * @param snapshots instantanÃ©s backend-neutres Ã  convertir
+     * @return nombre de nuages effectivement crÃ©Ã©s
+     */
+    default int mirrorPaNativeClouds(ServerLevel level, List<CloudBackendBridgeSnapshot> snapshots) {
+        return 0;
     }
 
     /**

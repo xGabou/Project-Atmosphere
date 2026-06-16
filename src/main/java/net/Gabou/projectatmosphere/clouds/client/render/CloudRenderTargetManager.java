@@ -14,10 +14,7 @@ import java.util.Locale;
  * Cette classe ne fait pas de rendu et ne lit jamais le backend.
  */
 public final class CloudRenderTargetManager {
-    private static final int SHADOW_TARGET_SIZE = 64;
-
     private static RenderTarget cloudColorTarget;
-    private static RenderTarget cloudShadowTarget;
     private static final RenderTarget[] cloudHistoryTargets = new RenderTarget[2];
     private static int cloudHistoryReadIndex;
     private static boolean ownsCloudColorTarget;
@@ -93,11 +90,7 @@ public final class CloudRenderTargetManager {
         }
 
         destroyHistoryTargets();
-        if (cloudShadowTarget != null) {
-            cloudShadowTarget.destroyBuffers();
-        }
         cloudColorTarget = null;
-        cloudShadowTarget = null;
         ownsCloudColorTarget = false;
         cloudColorTargetHasDepth = false;
         cloudHistoryReadIndex = 0;
@@ -119,7 +112,7 @@ public final class CloudRenderTargetManager {
      * @return render target shadow, ou null si elle n'existe pas
      */
     public static RenderTarget getCloudShadowTarget() {
-        return cloudShadowTarget;
+        return null;
     }
 
     public static RenderTarget getCloudHistoryReadTarget() {
@@ -203,17 +196,6 @@ public final class CloudRenderTargetManager {
         }
 
         ensureHistoryTargets(width, height);
-
-        if (cloudShadowTarget == null || cloudShadowTarget.width != SHADOW_TARGET_SIZE || cloudShadowTarget.height != SHADOW_TARGET_SIZE) {
-            if (cloudShadowTarget != null) {
-                cloudShadowTarget.destroyBuffers();
-            }
-            cloudShadowTarget = new TextureTarget(SHADOW_TARGET_SIZE, SHADOW_TARGET_SIZE, false, Minecraft.ON_OSX);
-            cloudShadowTarget.setFilterMode(GL11.GL_LINEAR);
-            cloudShadowTarget.resize(SHADOW_TARGET_SIZE, SHADOW_TARGET_SIZE, Minecraft.ON_OSX);
-            cloudShadowTarget.setClearColor(1.0F, 1.0F, 1.0F, 1.0F);
-            cloudShadowTarget.clear(Minecraft.ON_OSX);
-        }
     }
 
     private static void ensureHistoryTargets(int width, int height) {

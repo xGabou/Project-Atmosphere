@@ -34,11 +34,22 @@ public final class CloudRenderSnapshotBuilder {
     ) {
         Vec3 previousCenter = renderData.getPreviousCenter();
         Vec3 currentCenter = renderData.getCenter();
+        Vec3 velocity = renderData.getVelocity();
+        long simulationTick = renderData.getSimulationTick();
 
-        Vec3 interpolatedCenter = previousCenter.lerp(
-                currentCenter,
-                partialTick
-        );
+        Vec3 snapshotPreviousCenter;
+        Vec3 interpolatedCenter;
+        if (simulationTick > 0L && velocity != null && velocity.lengthSqr() > 0.0000001D) {
+            double elapsedTicks = Math.max(0.0D, Math.min(24.0D, (double) (worldTime - simulationTick) + partialTick));
+            interpolatedCenter = currentCenter.add(velocity.scale(elapsedTicks));
+            snapshotPreviousCenter = currentCenter.add(velocity.scale(Math.max(0.0D, elapsedTicks - 1.0D)));
+        } else {
+            interpolatedCenter = previousCenter.lerp(
+                    currentCenter,
+                    partialTick
+            );
+            snapshotPreviousCenter = previousCenter;
+        }
 
         return new CloudRenderSnapshot(
                 renderData.isActive(),
@@ -47,7 +58,7 @@ public final class CloudRenderSnapshotBuilder {
                 partialTick,
                 cameraPosition,
                 interpolatedCenter,
-                previousCenter,
+                snapshotPreviousCenter,
                 renderData.getVelocity(),
                 renderData.getRadius(),
                 renderData.getBaseY(),

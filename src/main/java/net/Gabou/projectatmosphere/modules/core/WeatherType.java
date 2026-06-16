@@ -18,7 +18,6 @@ public enum WeatherType {
     private static final Map<ResourceLocation, WeatherType> CLOUD_MAP = new HashMap<>();
 
     static {
-        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "balls"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "cookie"), THUNDERSTORM);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "cumulus_noise"), NONE);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "custom_cumulonimbus"), THUNDERSTORM);
@@ -58,7 +57,6 @@ public enum WeatherType {
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "stratus"), RAIN);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "cumulus_congestus"), RAIN);
         CLOUD_MAP.put(new ResourceLocation("simpleclouds", "cumulus_mediocris"), RAIN);
-        CLOUD_MAP.put(new ResourceLocation("simpleclouds", "stratocumulus_opacus"), NONE);
     }
 
     public static WeatherType getWeatherType(ResourceLocation id) {

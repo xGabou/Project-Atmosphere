@@ -1,5 +1,8 @@
 package net.Gabou.projectatmosphere.telemetry.verification;
 
+import net.Gabou.projectatmosphere.clouds.backend.CloudMigrationDirection;
+import net.Gabou.projectatmosphere.clouds.backend.CloudMigrationStatus;
+import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.modules.weathercell.WeatherCellType;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
@@ -19,6 +22,7 @@ public final class VerificationReport {
     private final SeasonSection season;
     private final WeatherCellSection weatherCells;
     private final CloudSection clouds;
+    private final CloudBackendSection cloudBackend;
     private final MorphologySection morphology;
     private final EvolutionSection evolution;
     private final PersistenceSection persistence;
@@ -33,6 +37,7 @@ public final class VerificationReport {
             SeasonSection season,
             WeatherCellSection weatherCells,
             CloudSection clouds,
+            CloudBackendSection cloudBackend,
             MorphologySection morphology,
             EvolutionSection evolution,
             PersistenceSection persistence,
@@ -46,6 +51,7 @@ public final class VerificationReport {
         this.season = season;
         this.weatherCells = weatherCells;
         this.clouds = clouds;
+        this.cloudBackend = cloudBackend;
         this.morphology = morphology;
         this.evolution = evolution;
         this.persistence = persistence;
@@ -82,6 +88,10 @@ public final class VerificationReport {
 
     public CloudSection clouds() {
         return clouds;
+    }
+
+    public CloudBackendSection cloudBackend() {
+        return cloudBackend;
     }
 
     public MorphologySection morphology() {
@@ -129,8 +139,52 @@ public final class VerificationReport {
             float windDirectionDeg,
             Float sunlight,
             Float forecastTemperatureC,
+            Float baseForecastTemperatureC,
+            Float effectiveForecastTemperatureC,
+            Float deltaToBaseForecastC,
+            Float deltaToEffectiveForecastC,
+            Float schedulerTemperatureDeltaC,
+            Float baseRelaxTemperatureDeltaC,
+            Float seasonalDriftTemperatureDeltaC,
             Float forecastHumidity,
-            Float forecastPressureHpa
+            Float forecastPressureHpa,
+            Float pressureTargetHpa,
+            Float forecastPressureCurrentSampleHpa,
+            Float liveStateRawPressureTargetHpa,
+            Float effectivePressureTargetHpa,
+            String pressureTargetSource,
+            Integer pressureTargetDayIndex,
+            Integer currentForecastDayIndex,
+            Boolean pressureTargetUsesCurrentForecastDay,
+            Boolean day0PressureTargetProfileActive,
+            Boolean stalePressureTargetDetected,
+            Float stalePressureTargetCorrectionDelta,
+            String pressureAnomalyClassification,
+            Float normalPressureReferenceHpa,
+            Float pressureDeltaToForecastHpa,
+            Float pressureDeltaToNormalHpa,
+            Float schedulerPressureDelta,
+            Float forecastRecoveryPressureDelta,
+            Float pressureGuardDelta,
+            Float baseRelaxPressureDelta,
+            Float rainPressureDelta,
+            Float windPressureMixDelta,
+            Float oceanFlux,
+            Float oceanPressureInfluence,
+            Float cyclonePressureInfluence,
+            Float stormPressureSupport,
+            Float thunderstormSupport,
+            Float seasonPressureOffsetHpa,
+            Float seasonTemperatureOffsetC,
+            Boolean pressureRecoveryEligible,
+            Boolean cycloneSeedEligible,
+            Float cycloneSeedSupport,
+            Float cycloneIntensificationSupport,
+            Float cycloneSevereSupport,
+            Boolean unsupportedLowRecoveryActive,
+            Float unsupportedLowRecoveryDelta,
+            Float unsupportedLowRecoveryCapPerDay,
+            Float supportResistance
     ) {
     }
 
@@ -154,6 +208,8 @@ public final class VerificationReport {
             SeasonStage stage,
             float progress,
             float temperatureOffset,
+            float driftTemperatureOffset,
+            float driftPressureOffset,
             boolean driftInitialized,
             boolean driftPersistencePresent
     ) {
@@ -185,6 +241,19 @@ public final class VerificationReport {
             int activeRegionCount,
             int activeClusterCount,
             NearestCloud nearest
+    ) {
+    }
+
+    public record CloudBackendSection(
+            CloudVisualBackend currentVisualBackend,
+            CloudVisualBackend lastVisualBackend,
+            boolean simpleCloudsLoaded,
+            int paNativeCloudsStored,
+            int paNativeCloudsRendered,
+            int bridgeSnapshotsStored,
+            CloudMigrationDirection lastMigrationDirection,
+            CloudMigrationStatus migrationStatus,
+            boolean duplicateVisualCloudRisk
     ) {
     }
 
@@ -220,7 +289,38 @@ public final class VerificationReport {
             float coverage,
             int cloudTypeTicks,
             String previousCloudTypeId,
-            float transitionBlend
+            float transitionBlend,
+            float rawRadius,
+            float renderedRadius,
+            float targetRadius,
+            String radiusCap,
+            float radiusDelta,
+            float growthRate,
+            String growthBlockedReason,
+            float rawCoverage,
+            float renderedCoverage,
+            float targetCoverage,
+            float rawDensity,
+            float renderedDensity,
+            float targetDensity,
+            float evolutionSupport,
+            float growthSupport,
+            String growthPhase,
+            String migrationSource,
+            String bridgeSnapshotId,
+            String cloudWorldPosition,
+            String previousCloudPosition,
+            String cloudVelocity,
+            float cloudDriftSpeed,
+            float cloudWindCoupling,
+            String cloudMotionSource,
+            long lastMotionTick,
+            long lastGrowthTick,
+            long lastRenderSnapshotTick,
+            int shapeSeed,
+            boolean morphologyNoiseStable,
+            String renderBounds,
+            String lodTier
     ) {
     }
 

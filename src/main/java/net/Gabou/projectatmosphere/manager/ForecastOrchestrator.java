@@ -219,11 +219,7 @@ public class ForecastOrchestrator {
                 ForecastDataStorage.playerData.put(uuid, playerPos);
                 sendLoginStage(player, "Seeding local weather systems", 0.28F, "player_login_seed_weather");
                 if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-                    if (!net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.ensureReady(level)) {
-                        ProjectAtmosphere.LOGGER.warn("[Atmosphere] Simple Clouds is loaded but its cloud generator is not ready during player login; skipping initial cloud seeding.");
-                    } else {
-                        net.Gabou.projectatmosphere.compat.SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
-                    }
+                    ProjectAtmosphere.LOGGER.debug("[Atmosphere] Simple Clouds owns fresh-world cloud generation; skipping PA initial Simple Clouds seeding.");
                 }
             }
 
@@ -356,7 +352,8 @@ public class ForecastOrchestrator {
         if (region == null) {
             return 0f;
         }
-        return region.sampleTemperature(getRegionOrchestrator(level).toRegionLocal(pos), tick);
+        return region.sampleTemperature(getRegionOrchestrator(level).toRegionLocal(pos), tick)
+                + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
     /**
@@ -391,7 +388,8 @@ public class ForecastOrchestrator {
         }
         ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
         if (region != null) {
-            return region.sampleTemperature(new Vec3(regionKey.regionSize() / 2.0, 0.0, regionKey.regionSize() / 2.0), tick);
+            return region.sampleTemperature(new Vec3(regionKey.regionSize() / 2.0, 0.0, regionKey.regionSize() / 2.0), tick)
+                    + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
         }
         return 0f;
     }

@@ -62,6 +62,7 @@ uniform float CloudShapeAnvilSpread;
 uniform float CloudShapeBaseFlattening;
 uniform float CloudShapeEdgeRaggedness;
 uniform float CloudShapeStormWallStrength;
+uniform int CloudMorphologyFamily;
 uniform int CloudSeed;
 uniform int RaymarchSteps;
 uniform float RayJitterFrame;
@@ -72,6 +73,13 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 const int MAX_RAYMARCH_STEPS = 64;
+const int MORPHOLOGY_PUFF = 0;
+const int MORPHOLOGY_TOWER = 1;
+const int MORPHOLOGY_STORM_ANVIL = 2;
+const int MORPHOLOGY_SHEET = 3;
+const int MORPHOLOGY_CELLULAR_SHEET = 4;
+const int MORPHOLOGY_FILAMENT = 5;
+const int MORPHOLOGY_SPIRAL_STORM = 6;
 
 float saturate(float value) {
     return clamp(value, 0.0, 1.0);
@@ -137,6 +145,128 @@ float fbm(vec3 p, int octaves) {
     }
 
     return value * 0.5 + 0.5;
+}
+
+vec2 rotate2(vec2 value, float angle) {
+    float s = sin(angle);
+    float c = cos(angle);
+    return vec2(value.x * c - value.y * s, value.x * s + value.y * c);
+}
+
+float ellipsoidField(vec3 p, vec3 center, vec3 radius) {
+    vec3 q = (p - center) / max(radius, vec3(0.001));
+    float d = length(q);
+    return 1.0 - smoothstep(0.62, 1.0, d);
+}
+
+float puffStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    float field = ellipsoidField(localVolume, vec3(0.0, 0.42, 0.0), vec3(0.48, 0.28, 0.48)) * 0.72;
+    for (int i = 0; i < 6; i++) {
+        float fi = float(i);
+        float angle = fi * 2.399963 + hash1(seedValue + fi * 17.0) * 1.10;
+        float ring = mix(0.10, 0.44, hash1(seedValue + fi * 23.0));
+        float y = mix(0.24, 0.66, hash1(seedValue + fi * 31.0));
+        vec3 center = vec3(cos(angle) * ring, y, sin(angle) * ring);
+        float radiusJitter = mix(0.82, 1.18, hash1(seedValue + fi * 47.0));
+        vec3 radius = vec3(0.28, 0.20, 0.28) * radiusJitter;
+        field = max(field, ellipsoidField(localVolume, center, radius));
+    }
+    float edgeNoise = fbm(localVolume * vec3(6.0, 3.0, 6.0) + seedOffset * 0.011, 2);
+    return saturate(field * mix(0.72, 1.14, edgeNoise));
+}
+
+float towerStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    float field = 0.0;
+    for (int i = 0; i < 7; i++) {
+        float tier = float(i) / 6.0;
+        float angle = tier * 5.40 + hash1(seedValue + float(i) * 29.0) * 1.35;
+        float ring = mix(0.02, 0.18, hash1(seedValue + float(i) * 37.0)) * mix(0.58, 1.12, tier);
+        float y = mix(0.12, 0.88, tier);
+        float shoulder = smoothstep(0.12, 0.62, tier) * (1.0 - smoothstep(0.88, 1.0, tier));
+        float horizontalRadius = mix(0.20, 0.40, shoulder) * mix(0.86, 1.14, hash1(seedValue + float(i) * 43.0));
+        vec3 center = vec3(cos(angle) * ring, y, sin(angle) * ring);
+        vec3 radius = vec3(horizontalRadius, mix(0.13, 0.20, shoulder), horizontalRadius);
+        field = max(field, ellipsoidField(localVolume, center, radius));
+    }
+    float sideTurbulence = fbm(localVolume * vec3(7.5, 4.5, 7.5) + seedOffset * 0.013, 2);
+    return saturate(field * mix(0.68, 1.18, sideTurbulence));
+}
+
+float stormAnvilStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    float tower = towerStructuralField(localVolume, seedOffset, seedValue) * 0.86;
+    float upper = smoothstep(0.52, 0.74, localVolume.y) * (1.0 - smoothstep(0.96, 1.0, localVolume.y));
+    vec2 anvilLocal = rotate2(localVolume.xz, hash1(seedValue + 541.0) * 1.2 - 0.6);
+    float anvil = ellipsoidField(vec3(anvilLocal.x, localVolume.y, anvilLocal.y), vec3(0.16, 0.76, 0.0), vec3(0.92 + CloudShapeAnvilSpread * 0.36, 0.15, 0.48));
+    float wall = smoothstep(0.22, 0.70, length(localVolume.xz)) * (1.0 - smoothstep(0.82, 1.08, length(localVolume.xz)));
+    float ragged = fbm(localVolume * vec3(5.0, 2.0, 5.0) + seedOffset * 0.017, 2);
+    return saturate(max(tower, anvil * upper) * mix(0.74, 1.18, ragged) + wall * CloudShapeStormWallStrength * 0.18);
+}
+
+float sheetStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    vec2 sheetLocal = rotate2(localVolume.xz, hash1(seedValue + 607.0) * 3.14159);
+    sheetLocal.x *= 0.70;
+    sheetLocal.y *= 1.18;
+    float horizontal = 1.0 - smoothstep(0.60, 1.04, length(sheetLocal));
+    float vertical = 1.0 - smoothstep(0.16, 0.48, abs(localVolume.y - 0.46));
+    float ragged = fbm(vec3(sheetLocal * 4.0, localVolume.y * 1.8) + seedOffset * 0.009, 2);
+    return saturate(horizontal * vertical * mix(0.72, 1.12, ragged));
+}
+
+float cellularSheetStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    float sheet = sheetStructuralField(localVolume, seedOffset, seedValue);
+    vec2 cellLocal = rotate2(localVolume.xz, hash1(seedValue + 719.0) * 2.4);
+    float cellsA = fbm(vec3(cellLocal * 7.2, localVolume.y * 2.0) + seedOffset * 0.015, 2);
+    float cellsB = paCloudNoise3(vec3(cellLocal * 13.0, localVolume.y * 3.0) + seedOffset * 0.021) * 0.5 + 0.5;
+    float occupancy = smoothstep(0.34, 0.72, mix(cellsA, cellsB, 0.38));
+    return saturate(sheet * mix(0.04, 1.10, occupancy));
+}
+
+float filamentStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    vec2 filamentLocal = rotate2(localVolume.xz, hash1(seedValue + 823.0) * 6.2831853);
+    float trailA = 1.0 - smoothstep(0.05, 0.24, abs(filamentLocal.y + sin(filamentLocal.x * 8.0 + seedValue * 0.013) * 0.045));
+    float trailB = 1.0 - smoothstep(0.04, 0.18, abs(filamentLocal.y - 0.20 + sin(filamentLocal.x * 6.0 + 1.7) * 0.035));
+    float alongFade = 1.0 - smoothstep(0.76, 1.20, abs(filamentLocal.x));
+    float vertical = 1.0 - smoothstep(0.10, 0.36, abs(localVolume.y - 0.52));
+    float wispy = fbm(vec3(filamentLocal * vec2(7.0, 18.0), localVolume.y * 2.0) + seedOffset * 0.012, 2);
+    return saturate(max(trailA, trailB * 0.72) * alongFade * vertical * mix(0.54, 1.20, wispy));
+}
+
+float spiralStormStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    vec2 spiralLocal = localVolume.xz;
+    float radius = length(spiralLocal);
+    float angle = atan(spiralLocal.y, spiralLocal.x);
+    float phase = hash1(seedValue + 929.0) * 6.2831853;
+    float bandSignal = 0.5 + 0.5 * cos(angle * 3.2 - radius * 12.0 + phase);
+    float secondary = 0.5 + 0.5 * cos(angle * 5.4 - radius * 18.0 - phase * 0.7);
+    float bands = smoothstep(0.54, 0.88, mix(bandSignal, secondary, 0.32));
+    float envelope = (1.0 - smoothstep(0.92, 1.12, radius)) * smoothstep(0.10, 0.26, radius);
+    float eye = smoothstep(0.14, 0.26, radius);
+    float core = 1.0 - smoothstep(0.28, 0.58, radius);
+    float vertical = 1.0 - smoothstep(0.24, 0.56, abs(localVolume.y - 0.48));
+    float ragged = fbm(localVolume * vec3(4.5, 2.0, 4.5) + seedOffset * 0.016, 2);
+    return saturate(max(core * eye * 0.82, bands * envelope) * vertical * mix(0.70, 1.16, ragged));
+}
+
+float morphologyStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    if (CloudMorphologyFamily == MORPHOLOGY_TOWER) {
+        return towerStructuralField(localVolume, seedOffset, seedValue);
+    }
+    if (CloudMorphologyFamily == MORPHOLOGY_STORM_ANVIL) {
+        return stormAnvilStructuralField(localVolume, seedOffset, seedValue);
+    }
+    if (CloudMorphologyFamily == MORPHOLOGY_SHEET) {
+        return sheetStructuralField(localVolume, seedOffset, seedValue);
+    }
+    if (CloudMorphologyFamily == MORPHOLOGY_CELLULAR_SHEET) {
+        return cellularSheetStructuralField(localVolume, seedOffset, seedValue);
+    }
+    if (CloudMorphologyFamily == MORPHOLOGY_FILAMENT) {
+        return filamentStructuralField(localVolume, seedOffset, seedValue);
+    }
+    if (CloudMorphologyFamily == MORPHOLOGY_SPIRAL_STORM) {
+        return spiralStormStructuralField(localVolume, seedOffset, seedValue);
+    }
+    return puffStructuralField(localVolume, seedOffset, seedValue);
 }
 
 vec3 seedOffset3() {
@@ -252,12 +382,12 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     effectiveRadiusFactor = clamp(effectiveRadiusFactor + anvilRadius, 0.12, 1.08);
 
     float normalizedHorizontal = rawHorizontal / effectiveRadiusFactor;
-    if (normalizedHorizontal >= 1.0) {
+    if (normalizedHorizontal >= 1.16) {
         return 0.0;
     }
 
     float edgeSoftness = max(saturate(CloudEdgeSoftness), 0.001);
-    float horizontalFade = 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, normalizedHorizontal);
+    float horizontalFade = 1.0 - smoothstep(1.0 - edgeSoftness, 1.10, normalizedHorizontal);
     float edgeFactor = smoothstep(0.55, 1.0, normalizedHorizontal);
     float silhouettePower = mix(2.35, 0.95, layerBias);
     float silhouetteFade = pow(1.0 - smoothstep(0.36, 1.0, normalizedHorizontal), silhouettePower);
@@ -271,12 +401,19 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float lobeNoise = fbm(baseNoisePos * vec3(noiseScale, noiseScale * 1.75, noiseScale) + vec3(0.0, CloudWorldTime * 0.0015, 0.0) + seedOffset * 0.017, 2);
     float layerNoise = paCloudNoise3(baseNoisePos * vec3(detailNoiseScale * 0.50, detailNoiseScale, detailNoiseScale * 0.50) + vec3(12.0, CloudWorldTime * 0.0025, 8.0) + seedOffset * 0.013) * 0.5 + 0.5;
     float detailNoise = paCloudNoise3(baseNoisePos * vec3(erosionNoiseScale, erosionNoiseScale * 1.25, erosionNoiseScale) + vec3(31.0, CloudWorldTime * -0.0030, 6.0) + seedOffset * 0.019) * 0.5 + 0.5;
+    vec3 localVolume = vec3(localHorizontal.x * radiusInv, warpedVertical, localHorizontal.y * radiusInv);
+    float morphologyField = morphologyStructuralField(localVolume, seedOffset, seedValue);
 
     float seedLobeBias = mix(-0.08, 0.08, hash1(seedValue + 197.0));
     float lobeShape = mix(0.74 + seedLobeBias, 1.18 + seedLobeBias, lobeNoise);
     float layeredShape = mix(0.82, 1.10, layerNoise);
-    float edgeCarve = mix(1.0, smoothstep(0.24, 0.86, detailNoise), edgeFactor * saturate(CloudEdgeErosionStrength + CloudShapeEdgeRaggedness * 0.55));
     float centerWeight = 1.0 - smoothstep(0.0, 0.58, normalizedHorizontal);
+    float structuralStrength = mix(0.42, 0.86, saturate(CloudShapeLobeStrength + CloudShapeEdgeRaggedness * 0.35));
+    float qualityFactor = smoothstep(12.0, 44.0, float(RaymarchSteps));
+    float preservedCore = max(morphologyField, centerWeight * mix(0.58, 0.78, CloudPrecipitationCoreStrength));
+    float morphologyMask = mix(1.0, preservedCore, structuralStrength * mix(0.54, 1.0, qualityFactor));
+    float edgeBreakup = smoothstep(0.20, 0.86, detailNoise + silhouetteNoise * 0.20);
+    float edgeCarve = mix(1.0, edgeBreakup, edgeFactor * saturate(CloudEdgeErosionStrength + CloudShapeEdgeRaggedness * 0.78));
     float corePreserve = mix(edgeCarve, max(edgeCarve, 0.86), centerWeight);
     float towerBoost = 1.0 + CloudTowerStrength * centerWeight * smoothstep(0.22, 0.86, warpedVertical) * 0.42;
     float anvilBoost = 1.0 + CloudAnvilStrength * smoothstep(0.58, 1.0, warpedVertical) * smoothstep(0.20, 0.92, normalizedHorizontal) * 0.34;
@@ -284,7 +421,7 @@ float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
     float stormWall = 1.0 + CloudShapeStormWallStrength * smoothstep(0.48, 0.88, normalizedHorizontal) * (1.0 - smoothstep(0.90, 1.0, normalizedHorizontal)) * 0.48;
     float baseProfile = mix(1.0, 0.94, saturate(CloudBaseDarkness) * (1.0 - smoothstep(0.0, 0.42, warpedVertical)));
 
-    return saturate(effectiveDensity * horizontalFade * silhouetteFade * verticalFade * interiorFade * lobeShape * layeredShape * corePreserve * splitCarve * towerBoost * anvilBoost * precipitationCore * stormWall * baseProfile);
+    return saturate(effectiveDensity * horizontalFade * silhouetteFade * verticalFade * interiorFade * morphologyMask * lobeShape * layeredShape * corePreserve * splitCarve * towerBoost * anvilBoost * precipitationCore * stormWall * baseProfile);
 }
 
 vec3 computeSampleLighting(vec3 samplePos, float density, vec3 rayDir) {

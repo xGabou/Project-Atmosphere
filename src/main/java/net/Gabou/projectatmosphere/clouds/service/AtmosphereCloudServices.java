@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.service;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsAtmosphereCloudService;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraftforge.fml.ModList;
 
 /**
@@ -37,9 +39,13 @@ public final class AtmosphereCloudServices {
     }
 
     private static AtmosphereCloudService createService() {
-        if (isSimpleCloudsLoaded()) {
-            ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; PA cloud module is disabled.");
+        if (AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.VANILLA) {
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud rendering disabled by config; using disabled cloud service.");
             return new DisabledAtmosphereCloudService();
+        }
+        if (isSimpleCloudsLoaded()) {
+            ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; using Simple Clouds cloud service.");
+            return new SimpleCloudsAtmosphereCloudService();
         }
 
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds absent; using native PA cloud service.");

@@ -8,6 +8,7 @@ import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudVisualProfile;
 import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -40,10 +41,12 @@ public final class CloudRegionRenderDataFactory {
         return createWithProfile(
             state,
                 cluster,
+                RenderMetrics.forRegion(state),
                 DEFAULT_DENSITY,
                 DEFAULT_COVERAGE,
                 DEFAULT_EDGE_SOFTNESS,
                 DEFAULT_DEBUG_COLOR,
+                0L,
                 definition,
                 profile,
                 shapeProfile
@@ -57,6 +60,10 @@ public final class CloudRegionRenderDataFactory {
      * @return donnée de rendu de nuage transportable
      */
     public static @NotNull CloudRegionRenderData create(@NotNull CloudRegionState state) {
+        return create(state, 0L);
+    }
+
+    public static @NotNull CloudRegionRenderData create(@NotNull CloudRegionState state, long simulationTick) {
         CloudClusterState cluster = selectRenderableCluster(state);
         CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cluster.getCloudTypeId());
         CloudTypeDefinition previousDefinition = CloudTypeRegistry.getOrDefault(cluster.getPreviousCloudTypeId());
@@ -74,10 +81,12 @@ public final class CloudRegionRenderDataFactory {
         return createWithProfile(
                 state,
                 cluster,
-                cluster.getDensity(),
-                cluster.getCoverage(),
-                cluster.getEdgeSoftness(),
+                RenderMetrics.forRegion(state),
+                state.getDensity(),
+                state.getCoverage(),
+                state.getEdgeSoftness(),
                 0xFFFFFFFF,
+                simulationTick,
                 definition,
                 profile,
                 shapeProfile
@@ -104,10 +113,12 @@ public final class CloudRegionRenderDataFactory {
         return createWithProfile(
                 region,
                 cluster,
+                RenderMetrics.forCluster(cluster),
                 cluster.getDensity(),
                 cluster.getCoverage(),
                 cluster.getEdgeSoftness(),
                 0xFFFFFFFF,
+                0L,
                 definition,
                 profile,
                 shapeProfile
@@ -117,10 +128,12 @@ public final class CloudRegionRenderDataFactory {
     private static @NotNull CloudRegionRenderData createWithProfile(
             @NotNull CloudRegionState state,
             @NotNull CloudClusterState cluster,
+            @NotNull RenderMetrics metrics,
             float density,
             float coverage,
             float edgeSoftness,
             int debugColorOrTint,
+            long simulationTick,
             @NotNull CloudTypeDefinition definition,
             @NotNull CloudVisualProfile profile,
             @NotNull CloudShapeProfile shapeProfile
@@ -130,9 +143,9 @@ public final class CloudRegionRenderDataFactory {
         float finalDensity = clamp01(density * (1.0F - (mergePressure * 0.05F)));
         float finalCoverage = clamp01(coverage * (1.0F + (mergePressure * 0.07F)));
         float finalEdgeSoftness = clamp01(edgeSoftness + (mergePressure * 0.16F));
-        float finalRadius = Math.max(1.0F, cluster.getRadius() * mergeScale);
-        float finalBaseY = cluster.getBaseY() - (mergePressure * 2.5F);
-        float finalTopY = cluster.getTopY() + (mergePressure * 6.5F);
+        float finalRadius = Math.max(1.0F, metrics.radius() * mergeScale);
+        float finalBaseY = metrics.baseY() - (mergePressure * 2.5F);
+        float finalTopY = Math.max(finalBaseY + 1.0F, metrics.topY() + (mergePressure * 6.5F));
         PrecipitationTier precipitationTier = resolvePrecipitationTier(definition, profile, finalDensity, finalCoverage);
         float stormDarkening = Math.max(definition.getStormVisualTier().getDarkness(), definition.getMaterialProfile().getStormCoreDarkening());
         float shadowContribution = clamp01(
@@ -148,25 +161,26 @@ public final class CloudRegionRenderDataFactory {
                 state.getRegionId(),
                 cluster.getClusterId(),
                 state.getDimension().location().toString(),
-                cluster.getCenter(),
-                cluster.getPreviousCenter(),
-                cluster.getVelocity(),
+                metrics.center(),
+                metrics.previousCenter(),
+                metrics.velocity(),
                 finalRadius,
                 finalBaseY,
                 finalTopY,
                 finalDensity,
                 finalCoverage,
                 finalEdgeSoftness,
+                simulationTick,
                 state.isActive(),
                 debugColorOrTint,
-                state.getAgeTicks(),
-                state.getLifetimeTicks(),
-                state.getGrowth(),
-                state.getDecay(),
+                cluster.getAgeTicks(),
+                cluster.getLifetimeTicks(),
+                cluster.getGrowth(),
+                cluster.getDecay(),
                 definition.getId(),
-                state.getPreviousCloudTypeId(),
+                cluster.getPreviousCloudTypeId(),
                 cluster.getMorphologyFamily(),
-                state.getCloudTypeTicks(),
+                cluster.getCloudTypeTicks(),
                 profile.getVerticalThickness(),
                 profile.getEdgeErosionStrength(),
                 profile.getTopSoftness(),
@@ -190,6 +204,39 @@ public final class CloudRegionRenderDataFactory {
                 shadowContribution,
                 lightningInfluence
         );
+    }
+
+    private record RenderMetrics(
+            @NotNull Vec3 center,
+            @NotNull Vec3 previousCenter,
+            @NotNull Vec3 velocity,
+            float radius,
+            float baseY,
+            float topY
+    ) {
+        private static @NotNull RenderMetrics forRegion(@NotNull CloudRegionState state) {
+            float baseY = state.getBaseY();
+            float topY = Math.max(baseY + 1.0F, state.getTopY());
+            return new RenderMetrics(
+                    state.getCenter(),
+                    state.getPreviousCenter(),
+                    state.getVelocity(),
+                    Math.max(1.0F, state.getRadius()),
+                    baseY,
+                    topY
+            );
+        }
+
+        private static @NotNull RenderMetrics forCluster(@NotNull CloudClusterState cluster) {
+            return new RenderMetrics(
+                    cluster.getCenter(),
+                    cluster.getPreviousCenter(),
+                    cluster.getVelocity(),
+                    Math.max(1.0F, cluster.getRadius()),
+                    cluster.getBaseY(),
+                    Math.max(cluster.getBaseY() + 1.0F, cluster.getTopY())
+            );
+        }
     }
 
     private static @NotNull CloudClusterState selectRenderableCluster(@NotNull CloudRegionState state) {

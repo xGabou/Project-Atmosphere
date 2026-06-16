@@ -1,17 +1,28 @@
 package net.Gabou.projectatmosphere.telemetry.verification;
 
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendStatus;
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
+import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderDataFactory;
 import net.Gabou.projectatmosphere.clouds.type.CloudFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericSupportEvaluator;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler;
+import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.region.FileRegionPersistence;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
@@ -28,6 +39,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -56,6 +68,7 @@ public final class VerificationCollector {
         VerificationReport.SeasonSection season = collectSeason(level, issues);
         VerificationReport.WeatherCellSection weatherCells = collectWeatherCells(level, pos, issues);
         VerificationReport.CloudSection clouds = collectClouds(level, pos, issues);
+        VerificationReport.CloudBackendSection cloudBackend = collectCloudBackend(level, issues);
         VerificationReport.MorphologySection morphology = collectMorphology(level, clouds.activeRegionCount(), issues);
         VerificationReport.EvolutionSection evolution = collectEvolution(level, pos, issues);
         VerificationReport.PersistenceSection persistence = collectPersistence(level, issues);
@@ -69,6 +82,7 @@ public final class VerificationCollector {
                 season,
                 weatherCells,
                 clouds,
+                cloudBackend,
                 morphology,
                 evolution,
                 persistence,
@@ -170,8 +184,118 @@ public final class VerificationCollector {
         }
 
         Float forecastTemp = forecast.missingRegion() ? null : forecast.temperatureC();
+        Float baseForecastTemp = null;
+        Float effectiveForecastTemp = null;
+        Float deltaToBaseForecast = null;
+        Float deltaToEffectiveForecast = null;
+        Float schedulerTemperatureDelta = null;
+        Float baseRelaxTemperatureDelta = null;
+        Float seasonalDriftTemperatureDelta = null;
         Float forecastHumidity = forecast.missingRegion() ? null : forecast.humidity();
         Float forecastPressure = forecast.missingRegion() ? null : forecast.pressureHpa();
+        Float pressureTarget = null;
+        Float forecastPressureCurrentSample = null;
+        Float liveStateRawPressureTarget = null;
+        Float effectivePressureTarget = null;
+        String pressureTargetSource = null;
+        Integer pressureTargetDayIndex = null;
+        Integer currentForecastDayIndex = null;
+        Boolean pressureTargetUsesCurrentForecastDay = null;
+        Boolean day0PressureTargetProfileActive = null;
+        Boolean stalePressureTargetDetected = null;
+        Float stalePressureTargetCorrectionDelta = null;
+        String pressureAnomalyClassification = null;
+        Float normalPressureReference = null;
+        Float pressureDeltaToForecast = null;
+        Float pressureDeltaToNormal = null;
+        Float schedulerPressureDelta = null;
+        Float forecastRecoveryPressureDelta = null;
+        Float pressureGuardDelta = null;
+        Float baseRelaxPressureDelta = null;
+        Float rainPressureDelta = null;
+        Float windPressureMixDelta = null;
+        Float oceanFlux = null;
+        Float oceanPressureInfluence = null;
+        Float cyclonePressureInfluence = null;
+        Float stormPressureSupport = null;
+        Float thunderstormSupport = null;
+        Float seasonPressureOffset = null;
+        Float seasonTemperatureOffset = null;
+        Boolean pressureRecoveryEligible = null;
+        Boolean cycloneSeedEligible = null;
+        Float cycloneSeedSupport = null;
+        Float cycloneIntensificationSupport = null;
+        Float cycloneSevereSupport = null;
+        Boolean unsupportedLowRecoveryActive = null;
+        Float unsupportedLowRecoveryDelta = null;
+        Float unsupportedLowRecoveryCapPerDay = null;
+        Float supportResistance = null;
+
+        if (live != null) {
+            boolean active = AtmosphericStateRegistry.getActiveStates().contains(live.getRegionId());
+            long dayTime = level.getDayTime();
+            AtmosphericUpdateScheduler.PressureDiagnostics pressureDiagnostics =
+                    AtmosphericUpdateScheduler.estimatePressureDiagnostics(live, gameTime, active);
+            AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(live.getRegionId(), live);
+            CycloneManager.CycloneSupport cycloneSupport = CycloneManager.evaluateCycloneSupport(live, gameTime);
+            RegionAtmosphereState.PressureTargetDebug pressureTargetDebug = live.pressureTargetDebug(gameTime);
+            baseForecastTemp = live.getBaseTargetTemperature(dayTime);
+            effectiveForecastTemp = live.getTargetTemperature(dayTime);
+            deltaToBaseForecast = liveTemp - baseForecastTemp;
+            deltaToEffectiveForecast = liveTemp - effectiveForecastTemp;
+            float updateScale = active ? 1.0F : 0.35F;
+            float relaxFactor = active ? 0.0012F : 0.00035F;
+            float driftRate = active ? 0.025F : 0.008F;
+            float driftMaxStep = active ? 0.25F : 0.08F;
+            schedulerTemperatureDelta = (effectiveForecastTemp - liveTemp) * 0.04F * updateScale;
+            baseRelaxTemperatureDelta = (live.getEffectiveBaseTemperature() - liveTemp) * relaxFactor;
+            seasonalDriftTemperatureDelta = Mth.clamp((effectiveForecastTemp - liveTemp) * driftRate, -driftMaxStep, driftMaxStep);
+            pressureTarget = pressureDiagnostics.targetPressure();
+            forecastPressureCurrentSample = pressureTargetDebug.forecastPressureCurrentSample();
+            liveStateRawPressureTarget = pressureTargetDebug.rawTargetPressure();
+            effectivePressureTarget = pressureTargetDebug.effectiveTargetPressure();
+            pressureTargetSource = pressureTargetDebug.source();
+            pressureTargetDayIndex = pressureTargetDebug.targetDayIndex();
+            currentForecastDayIndex = pressureTargetDebug.currentForecastDayIndex();
+            pressureTargetUsesCurrentForecastDay = pressureTargetDebug.targetUsesCurrentForecastDay();
+            day0PressureTargetProfileActive = pressureTargetDebug.day0TargetProfileActive();
+            stalePressureTargetDetected = pressureTargetDebug.staleTargetDetected();
+            stalePressureTargetCorrectionDelta = pressureTargetDebug.staleTargetCorrectionDelta();
+            normalPressureReference = pressureDiagnostics.normalPressureReference();
+            pressureDeltaToForecast = forecastPressure == null ? null : livePressure - forecastPressure;
+            pressureDeltaToNormal = livePressure - pressureDiagnostics.normalPressureReference();
+            schedulerPressureDelta = pressureDiagnostics.schedulerPressureDelta();
+            forecastRecoveryPressureDelta = pressureDiagnostics.forecastRecoveryDelta();
+            pressureGuardDelta = pressureDiagnostics.pressureGuardDelta();
+            baseRelaxPressureDelta = pressureDiagnostics.baseRelaxDelta();
+            rainPressureDelta = pressureDiagnostics.rainPressureDelta();
+            windPressureMixDelta = WindVector.estimatePressureTransport(live.getRegionId());
+            oceanFlux = OceanBasinManager.estimateHumidityFlux(live.getRegionId(), liveHumidity);
+            oceanPressureInfluence = OceanBasinManager.estimatePressureDelta(live.getRegionId(), livePressure);
+            cyclonePressureInfluence = CycloneManager.estimatePressureDelta(live, gameTime);
+            pressureAnomalyClassification = classifyPressureAnomaly(
+                    pressureTargetDebug,
+                    pressureDiagnostics,
+                    windPressureMixDelta,
+                    oceanPressureInfluence,
+                    cyclonePressureInfluence,
+                    support
+            );
+            stormPressureSupport = support.stormPressureSupport();
+            thunderstormSupport = support.thunderstormSupport();
+            seasonPressureOffset = SeasonalAtmosphericDrift.currentPressureOffsetHpa();
+            seasonTemperatureOffset = SeasonalAtmosphericDrift.currentTemperatureOffsetC();
+            pressureRecoveryEligible = pressureDiagnostics.supportResistance() < 0.65F
+                    && livePressure < pressureDiagnostics.normalPressureReference();
+            cycloneSeedEligible = cycloneSupport.seedEligible();
+            cycloneSeedSupport = cycloneSupport.seedSupport();
+            cycloneIntensificationSupport = cycloneSupport.intensificationSupport();
+            cycloneSevereSupport = cycloneSupport.severeSupport();
+            unsupportedLowRecoveryActive = pressureDiagnostics.unsupportedLowRecoveryActive();
+            unsupportedLowRecoveryDelta = pressureDiagnostics.unsupportedLowRecoveryDelta();
+            unsupportedLowRecoveryCapPerDay = pressureDiagnostics.unsupportedLowRecoveryCapPerDay();
+            supportResistance = pressureDiagnostics.supportResistance();
+        }
 
         VerificationStatus status = VerificationStatus.OK;
         if (live == null) {
@@ -194,8 +318,52 @@ public final class VerificationCollector {
                 windDirection,
                 sunlight,
                 forecastTemp,
+                baseForecastTemp,
+                effectiveForecastTemp,
+                deltaToBaseForecast,
+                deltaToEffectiveForecast,
+                schedulerTemperatureDelta,
+                baseRelaxTemperatureDelta,
+                seasonalDriftTemperatureDelta,
                 forecastHumidity,
-                forecastPressure
+                forecastPressure,
+                pressureTarget,
+                forecastPressureCurrentSample,
+                liveStateRawPressureTarget,
+                effectivePressureTarget,
+                pressureTargetSource,
+                pressureTargetDayIndex,
+                currentForecastDayIndex,
+                pressureTargetUsesCurrentForecastDay,
+                day0PressureTargetProfileActive,
+                stalePressureTargetDetected,
+                stalePressureTargetCorrectionDelta,
+                pressureAnomalyClassification,
+                normalPressureReference,
+                pressureDeltaToForecast,
+                pressureDeltaToNormal,
+                schedulerPressureDelta,
+                forecastRecoveryPressureDelta,
+                pressureGuardDelta,
+                baseRelaxPressureDelta,
+                rainPressureDelta,
+                windPressureMixDelta,
+                oceanFlux,
+                oceanPressureInfluence,
+                cyclonePressureInfluence,
+                stormPressureSupport,
+                thunderstormSupport,
+                seasonPressureOffset,
+                seasonTemperatureOffset,
+                pressureRecoveryEligible,
+                cycloneSeedEligible,
+                cycloneSeedSupport,
+                cycloneIntensificationSupport,
+                cycloneSevereSupport,
+                unsupportedLowRecoveryActive,
+                unsupportedLowRecoveryDelta,
+                unsupportedLowRecoveryCapPerDay,
+                supportResistance
         );
     }
 
@@ -263,6 +431,8 @@ public final class VerificationCollector {
                 snapshot.stage(),
                 snapshot.progress(),
                 snapshot.temperatureOffset(),
+                SeasonalAtmosphericDrift.currentTemperatureOffsetC(),
+                SeasonalAtmosphericDrift.currentPressureOffsetHpa(),
                 driftInitialized,
                 driftPersistencePresent
         );
@@ -373,6 +543,27 @@ public final class VerificationCollector {
         );
     }
 
+    private static VerificationReport.CloudBackendSection collectCloudBackend(
+            ServerLevel level,
+            List<String> issues
+    ) {
+        CloudBackendStatus status = CloudBackendMigrationManager.status(level);
+        if (status.duplicateVisualCloudRisk()) {
+            issues.add("Cloud Backend: PA native clouds are marked rendered while Simple Clouds owns the visual backend.");
+        }
+        return new VerificationReport.CloudBackendSection(
+                status.currentBackend(),
+                status.lastBackend(),
+                status.simpleCloudsLoaded(),
+                status.paCloudsStored(),
+                status.paCloudsRendered(),
+                status.bridgeSnapshotsStored(),
+                status.lastMigrationDirection(),
+                status.migrationStatus(),
+                status.duplicateVisualCloudRisk()
+        );
+    }
+
     private static VerificationReport.MorphologySection collectMorphology(
             ServerLevel level,
             int activeRegionCount,
@@ -463,6 +654,25 @@ public final class VerificationCollector {
 
         VerificationReport.NearestEvolvingCloud nearestCloud = null;
         if (nearest != null) {
+            CloudClusterState cluster = selectPrimaryCluster(nearest);
+            CloudRegionRenderData renderData = CloudRegionRenderDataFactory.create(nearest, level.getGameTime());
+            CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(nearest.getCloudTypeId());
+            CloudShapeProfile shape = definition.getShapeProfile();
+            Vec3 center = nearest.getCenter();
+            Vec3 previousCenter = nearest.getPreviousCenter();
+            Vec3 velocity = nearest.getVelocity();
+            RegionInstanceKey regionKey = RegionInstanceKey.from(BlockPos.containing(center));
+            RegionAtmosphereState atmosphere = AtmosphericStateRegistry.getState(regionKey);
+            AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(regionKey, atmosphere);
+            float targetRadius = Math.max(shape.getBaseRadius(), nearest.getRadius());
+            float targetCoverage = renderData.getCoverage();
+            float targetDensity = renderData.getDensity();
+            float driftSpeed = (float) Math.sqrt(velocity.x() * velocity.x() + velocity.z() * velocity.z());
+            float windCoupling = safeCloudWindDriftScale();
+            String radiusCap = resolveRadiusCap(nearest);
+            String growthBlockedReason = resolveGrowthBlockedReason(nearest, radiusCap);
+            String motionSource = resolveCloudMotionSource(velocity);
+            int ageTicks = nearest.getAgeTicks();
             nearestCloud = new VerificationReport.NearestEvolvingCloud(
                     nearest.getCloudTypeId(),
                     nearest.getMorphologyFamily(),
@@ -471,7 +681,38 @@ public final class VerificationCollector {
                     nearest.getCoverage(),
                     nearest.getCloudTypeTicks(),
                     nearest.getPreviousCloudTypeId(),
-                    nearest.getTransitionBlend()
+                    nearest.getTransitionBlend(),
+                    nearest.getRadius(),
+                    renderData.getRadius(),
+                    targetRadius,
+                    radiusCap,
+                    targetRadius - nearest.getRadius(),
+                    nearest.getGrowth() < 1.0F ? 1.0F / 600.0F : 0.0F,
+                    growthBlockedReason,
+                    nearest.getCoverage(),
+                    renderData.getCoverage(),
+                    targetCoverage,
+                    nearest.getDensity(),
+                    renderData.getDensity(),
+                    targetDensity,
+                    support.hasState() ? Math.max(support.thunderstormSupport(), support.rainSupport()) : 0.0F,
+                    support.hasState() ? support.cloudBirthBaseScore() : 0.0F,
+                    nearest.getGrowth() < 1.0F ? "lifecycle growth" : nearest.getDecay() > 0.0F ? "decay" : "mature",
+                    "PA_NATIVE migration/source=" + (nearest.getSourceRegionKey() == null ? "unknown" : nearest.getSourceRegionKey()),
+                    nearest.getRegionId().toString(),
+                    formatVec(center),
+                    formatVec(previousCenter),
+                    formatVec(velocity),
+                    driftSpeed,
+                    windCoupling,
+                    motionSource,
+                    ageTicks,
+                    ageTicks,
+                    level.getGameTime(),
+                    nearest.getCloudSeed(),
+                    true,
+                    formatBounds(renderData),
+                    "server-source; client LOD selected per frame"
             );
         }
 
@@ -481,6 +722,88 @@ public final class VerificationCollector {
         }
 
         return new VerificationReport.EvolutionSection(status, counts, nearestCloud);
+    }
+
+    private static CloudClusterState selectPrimaryCluster(CloudRegionState region) {
+        CloudClusterState best = null;
+        float bestWeight = -1.0F;
+        if (region == null) {
+            return null;
+        }
+        for (CloudClusterState cluster : region.getClusters()) {
+            if (cluster == null || !cluster.isActive()) {
+                continue;
+            }
+            float weight = cluster.getFootprint();
+            if (best == null || weight > bestWeight) {
+                best = cluster;
+                bestWeight = weight;
+            }
+        }
+        return best;
+    }
+
+    private static String resolveRadiusCap(CloudRegionState region) {
+        if (region == null) {
+            return "unknown";
+        }
+        if (region.getRadius() >= 1399.5F) {
+            return "radius capped by migration (Simple Clouds -> PA_NATIVE clamp 1400.00)";
+        }
+        return "not capped by migration; raw radius from cloud type geometry/cluster aggregation";
+    }
+
+    private static String resolveGrowthBlockedReason(CloudRegionState region, String radiusCap) {
+        if (region == null) {
+            return "unknown";
+        }
+        if (radiusCap != null && radiusCap.contains("migration")) {
+            return "raw radius fixed at migration cap; lifecycle growth affects visual alpha only";
+        }
+        if (region.getGrowth() >= 1.0F) {
+            return "growth complete; radius/coverage/density are stable backend geometry values";
+        }
+        return "lifecycle growth active; raw radius is not resized by lifecycle growth";
+    }
+
+    private static String resolveCloudMotionSource(Vec3 velocity) {
+        if (velocity == null || velocity.lengthSqr() <= 0.0000001D) {
+            return "server wind drift inactive or no resolved wind velocity";
+        }
+        return "server regional wind drift; client extrapolates between sync packets";
+    }
+
+    private static float safeCloudWindDriftScale() {
+        try {
+            return AtmoCommonConfig.CLOUD_WIND_DRIFT_SCALE.get().floatValue();
+        } catch (IllegalStateException exception) {
+            return 0.035F;
+        }
+    }
+
+    private static String formatVec(Vec3 vec) {
+        if (vec == null) {
+            return "unknown";
+        }
+        return String.format(Locale.ROOT, "%.2f, %.2f, %.2f", vec.x(), vec.y(), vec.z());
+    }
+
+    private static String formatBounds(CloudRegionRenderData data) {
+        if (data == null) {
+            return "unknown";
+        }
+        Vec3 center = data.getCenter();
+        float radius = data.getRadius();
+        return String.format(
+                Locale.ROOT,
+                "x=%.1f..%.1f y=%.1f..%.1f z=%.1f..%.1f",
+                center.x() - radius,
+                center.x() + radius,
+                data.getBaseY(),
+                data.getTopY(),
+                center.z() - radius,
+                center.z() + radius
+        );
     }
 
     private static VerificationReport.PersistenceSection collectPersistence(
@@ -521,6 +844,41 @@ public final class VerificationCollector {
                 weatherCellStatus,
                 cloudStatus
         );
+    }
+
+    private static String classifyPressureAnomaly(
+            RegionAtmosphereState.PressureTargetDebug target,
+            AtmosphericUpdateScheduler.PressureDiagnostics pressure,
+            Float windPressure,
+            Float oceanPressure,
+            Float cyclonePressure,
+            AtmosphericSupportEvaluator.Support support
+    ) {
+        if (target == null) {
+            return "unknown";
+        }
+        if (target.staleTargetDetected() && pressure != null && pressure.supportResistance() < 0.65F) {
+            return "stale unsupported target";
+        }
+        if (cyclonePressure != null && cyclonePressure < -0.05F) {
+            return "cyclone seed";
+        }
+        if (support != null
+                && (support.rainSupport() >= 0.45F
+                || support.thunderstormSupport() >= 0.35F
+                || support.supercellSupport() >= 0.25F)) {
+            return "rain/storm system";
+        }
+        if (windPressure != null && windPressure < -0.05F) {
+            return "wind-imported gradient";
+        }
+        if (oceanPressure != null && oceanPressure < -0.05F) {
+            return "ocean-influenced low";
+        }
+        if (target.effectiveTargetPressure() < 1008.0F) {
+            return "active forecast anomaly";
+        }
+        return "current forecast";
     }
 
     private static boolean isEmptyForecastData(ForecastRegion region) {

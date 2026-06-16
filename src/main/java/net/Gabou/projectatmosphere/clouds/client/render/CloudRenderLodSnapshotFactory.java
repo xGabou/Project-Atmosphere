@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.client.render;
 
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.minecraft.util.Mth;
 
@@ -67,7 +68,7 @@ final class CloudRenderLodSnapshotFactory {
                 source.getCloudSeed(),
                 source.getDebugColorOrTint(),
                 reduceMaterial(source.getMaterialProfile(), detail, alpha),
-                reduceShape(source.getShapeProfile(), detail, majorStorm),
+                reduceShape(source.getShapeProfile(), detail, source),
                 source.getStormVisualTier(),
                 source.getPrecipitationTier(),
                 source.getShadowContribution(),
@@ -97,12 +98,11 @@ final class CloudRenderLodSnapshotFactory {
         );
     }
 
-    private static CloudShapeProfile reduceShape(CloudShapeProfile source, float detail, boolean majorStorm) {
+    private static CloudShapeProfile reduceShape(CloudShapeProfile source, float detail, CloudRenderSnapshot snapshot) {
         if (source == null) {
             source = CloudShapeProfile.DEFAULT;
         }
-        float preservedStormDetail = majorStorm ? 0.35F : 0.0F;
-        float shapeDetail = Math.max(detail, preservedStormDetail);
+        float shapeDetail = Math.max(detail, morphologyDetailFloor(snapshot));
         int minLobes = Math.max(1, Math.round(source.getLobeCountMin() * Mth.lerp(shapeDetail, 0.28F, 1.0F)));
         int maxLobes = Math.max(minLobes, Math.round(source.getLobeCountMax() * Mth.lerp(shapeDetail, 0.24F, 1.0F)));
         return new CloudShapeProfile(
@@ -122,6 +122,34 @@ final class CloudRenderLodSnapshotFactory {
                 source.getEdgeRaggedness() * Mth.lerp(shapeDetail, 0.22F, 1.0F),
                 source.getStormWallStrength()
         );
+    }
+
+    private static float morphologyDetailFloor(CloudRenderSnapshot snapshot) {
+        if (snapshot == null) {
+            return 0.0F;
+        }
+
+        CloudMorphologyFamily family = snapshot.getMorphologyFamily();
+        if (family == CloudMorphologyFamily.STORM_ANVIL || family == CloudMorphologyFamily.SPIRAL_STORM) {
+            return 0.50F;
+        }
+        if (family == CloudMorphologyFamily.TOWER) {
+            return 0.46F;
+        }
+        if (family == CloudMorphologyFamily.CELLULAR_SHEET || family == CloudMorphologyFamily.FILAMENT) {
+            return 0.36F;
+        }
+        if (family == CloudMorphologyFamily.SHEET) {
+            return 0.28F;
+        }
+        if (family == CloudMorphologyFamily.PUFF || isCumulusType(snapshot.getCloudTypeId())) {
+            return 0.32F;
+        }
+        return CloudRenderLodManager.isMajorStorm(snapshot) ? 0.42F : 0.0F;
+    }
+
+    private static boolean isCumulusType(String cloudTypeId) {
+        return cloudTypeId != null && cloudTypeId.contains("cumulus");
     }
 
     private static float clamp01(float value) {

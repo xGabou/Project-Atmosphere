@@ -97,7 +97,6 @@ public class CloudLibrary {
             "islands",
             "spots",
             "pattern",
-            "balls",
             "cumulus_noise",
             "dense_cumulus",
             "tall_noise"
@@ -178,7 +177,6 @@ public class CloudLibrary {
                  "islands",
                  "spots",
                  "pattern",
-                 "balls",
                  "cumulus_noise",
                  "dense_cumulus",
                  "tall_noise" -> 2;

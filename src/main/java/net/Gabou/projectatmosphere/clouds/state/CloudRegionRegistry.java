@@ -52,7 +52,7 @@ final class CloudRegionRegistry {
         return activeRegions;
     }
 
-    Collection<CloudRegionRenderData> createRenderDataForActiveRegions() {
+    Collection<CloudRegionRenderData> createRenderDataForActiveRegions(long simulationTick) {
         ArrayList<CloudRegionRenderData> renderDataList = new ArrayList<>();
 
         for (CloudRegionState state : regionsById.values()) {
@@ -60,11 +60,7 @@ final class CloudRegionRegistry {
                 continue;
             }
 
-            for (CloudClusterState cluster : state.getClusters()) {
-                if (cluster != null && cluster.isActive()) {
-                    renderDataList.add(CloudRegionRenderDataFactory.createForCluster(state, cluster));
-                }
-            }
+            renderDataList.add(CloudRegionRenderDataFactory.create(state, simulationTick));
         }
 
         return renderDataList;

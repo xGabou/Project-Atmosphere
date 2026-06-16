@@ -9,6 +9,9 @@ public record CycloneSnapshot(
         float radius,
         float intensity,
         float corePressureDrop,
-        long lifetimeTicks
+        long lifetimeTicks,
+        int ageTicks,
+        float movementX,
+        float movementZ
 ) {
 }

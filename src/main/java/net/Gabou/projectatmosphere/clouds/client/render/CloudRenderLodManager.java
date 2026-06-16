@@ -90,6 +90,7 @@ public final class CloudRenderLodManager {
             usedByTier.put(candidate.tier(), used + 1);
         }
 
+        plans.sort(Comparator.comparingDouble(CloudRenderLodPlan::distanceToCamera).reversed());
         return List.copyOf(plans);
     }
 

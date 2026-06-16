@@ -47,10 +47,12 @@ public final class AtmosphericUpdateScheduler {
     private static final float TEMPERATURE_GUARD_EXCESS_FACTOR = 0.15f;
     private static final float TEMPERATURE_GUARD_MAX_DELTA = 3f;
     private static final float PRESSURE_RESTORE = 1.5f;
-    private static final float PRESSURE_TARGET_RESTORE = 0.015f;
-    private static final float PRESSURE_GUARD_THRESHOLD_HPA = 8f;
-    private static final float PRESSURE_GUARD_EXCESS_FACTOR = 0.12f;
-    private static final float PRESSURE_GUARD_MAX_DELTA = 2.5f;
+    private static final float PRESSURE_TARGET_RESTORE = 0.026f;
+    private static final float PRESSURE_GUARD_THRESHOLD_HPA = 6f;
+    private static final float PRESSURE_GUARD_EXCESS_FACTOR = 0.18f;
+    private static final float PRESSURE_GUARD_MAX_DELTA = 3.5f;
+    private static final float UNSUPPORTED_LOW_RECOVERY_HPA_PER_DAY = 2.0f;
+    private static final float UNSUPPORTED_LOW_RECOVERY_RATE = 0.002f;
     private static final float CYCLONE_CLOUD_FLOOR_DECAY_ACTIVE = 0.02f;
     private static final float CYCLONE_RAIN_FLOOR_DECAY_ACTIVE = 0.03f;
     private static final float CYCLONE_CLOUD_FLOOR_DECAY_PASSIVE = 0.008f;
@@ -102,6 +104,55 @@ public final class AtmosphericUpdateScheduler {
         }
     }
 
+    public static PressureDiagnostics estimatePressureDiagnostics(RegionAtmosphereState state, long forecastTime, boolean active) {
+        if (state == null) {
+            return PressureDiagnostics.empty();
+        }
+        UpdateMode mode = active ? UpdateMode.ACTIVE : UpdateMode.PASSIVE;
+        float targetPressure = state.getTargetPressure(forecastTime);
+        float clampedRain = Math.min(1f, state.getRainIntensity());
+        float rainPressureDelta = clampedRain * PRESSURE_RESTORE * mode.scale();
+        float forecastRecoveryDelta = (targetPressure - state.getPressure()) * PRESSURE_TARGET_RESTORE * mode.scale();
+        float pressureDeviation = targetPressure - state.getPressure();
+        float pressureGuardDelta = 0f;
+        float pressureDeviationAbs = Math.abs(pressureDeviation);
+        if (pressureDeviationAbs > PRESSURE_GUARD_THRESHOLD_HPA) {
+            float excess = pressureDeviationAbs - PRESSURE_GUARD_THRESHOLD_HPA;
+            float guardMagnitude = Math.min(PRESSURE_GUARD_MAX_DELTA, excess * PRESSURE_GUARD_EXCESS_FACTOR);
+            pressureGuardDelta = Math.signum(pressureDeviation) * guardMagnitude * mode.scale();
+        }
+        float baseRelaxDelta = (state.getBasePressure() - state.getPressure()) * mode.relaxFactor();
+        UnsupportedLowRecovery unsupportedLowRecovery = estimateUnsupportedLowRecovery(
+                state.getRegionId(),
+                state.getPosition(),
+                state.getHumidity(),
+                state.getCloudWater(),
+                state.getPressure(),
+                state.getRainIntensity(),
+                targetPressure,
+                forecastTime,
+                mode
+        );
+        float schedulerPressureDelta = clampDelta(
+                rainPressureDelta + forecastRecoveryDelta + pressureGuardDelta + unsupportedLowRecovery.delta(),
+                -15f,
+                15f
+        );
+        return new PressureDiagnostics(
+                targetPressure,
+                1013.25f,
+                rainPressureDelta,
+                forecastRecoveryDelta,
+                pressureGuardDelta,
+                baseRelaxDelta,
+                schedulerPressureDelta,
+                unsupportedLowRecovery.active(),
+                unsupportedLowRecovery.delta(),
+                unsupportedLowRecovery.capPerDay(),
+                unsupportedLowRecovery.supportResistance()
+        );
+    }
+
     public static void tick(ServerLevel level) {
         long now = level.getGameTime();
         if (now - lastActiveTick >= ACTIVE_INTERVAL_TICKS) {
@@ -123,7 +174,8 @@ public final class AtmosphericUpdateScheduler {
             return;
         }
         long dayTime = level.getDayTime();
-        List<StateView> snapshot = snapshotStates(activeKeys, dayTime);
+        long forecastTime = level.getGameTime();
+        List<StateView> snapshot = snapshotStates(activeKeys, dayTime, forecastTime);
         if (snapshot.isEmpty()) {
             ACTIVE_IN_FLIGHT.set(false);
             return;
@@ -218,7 +270,8 @@ public final class AtmosphericUpdateScheduler {
             return;
         }
         long dayTime = level.getDayTime();
-        List<StateView> snapshot = snapshotStates(batchKeys, dayTime);
+        long forecastTime = level.getGameTime();
+        List<StateView> snapshot = snapshotStates(batchKeys, dayTime, forecastTime);
         if (snapshot.isEmpty()) {
             PASSIVE_IN_FLIGHT.set(false);
             return;
@@ -263,7 +316,7 @@ public final class AtmosphericUpdateScheduler {
         return batch;
     }
 
-    private static List<StateView> snapshotStates(Collection<RegionInstanceKey> keys, long dayTime) {
+    private static List<StateView> snapshotStates(Collection<RegionInstanceKey> keys, long dayTime, long forecastTime) {
         Map<RegionInstanceKey, RegionAtmosphereState> states = AtmosphericStateRegistry.getStatesAsMap();
         List<StateView> views = new ArrayList<>(keys.size());
         for (RegionInstanceKey key : keys) {
@@ -271,14 +324,17 @@ public final class AtmosphericUpdateScheduler {
             if (state == null || state.getPosition() == null) {
                 continue;
             }
-            views.add(buildStateView(key, state, dayTime));
+            views.add(buildStateView(key, state, dayTime, forecastTime));
         }
         return views;
     }
 
-    private static StateView buildStateView(RegionInstanceKey key, RegionAtmosphereState state, long dayTime) {
+    private static StateView buildStateView(RegionInstanceKey key, RegionAtmosphereState state, long dayTime, long forecastTime) {
         return new StateView(
                 key,
+                state.getPosition(),
+                dayTime,
+                forecastTime,
                 state.getTemperature(),
                 state.getHumidity(),
                 state.getPressure(),
@@ -288,7 +344,7 @@ public final class AtmosphericUpdateScheduler {
                 state.getRainIntensity(),
                 state.getTargetTemperature(dayTime),
                 state.getTargetHumidity(dayTime),
-                state.getTargetPressure(dayTime),
+                state.getTargetPressure(forecastTime),
                 state.getBiomeSunlightMultiplier(),
                 state.getBaselineMinTemperature(),
                 state.getBaselineMaxTemperature(),
@@ -365,9 +421,24 @@ public final class AtmosphericUpdateScheduler {
                     -20f,
                     20f
             );
-            humidityDelta = clampDelta(humidityDelta, -0.35f, 0.35f);
-            float cloudWaterDelta = clampDelta(cloudWaterExchange.cloudWaterDelta(), -0.08f, 0.08f);
-            float pressureDelta = clampDelta(rainPressureDelta + pressureForecastRestore + pressureGuardDelta, -15f, 15f);
+            humidityDelta = clampDelta(humidityDelta, -0.12f, 0.12f);
+            float cloudWaterDelta = clampDelta(cloudWaterExchange.cloudWaterDelta(), -0.035f, 0.030f);
+            UnsupportedLowRecovery unsupportedLowRecovery = estimateUnsupportedLowRecovery(
+                    view.key(),
+                    view.position(),
+                    view.humidity(),
+                    view.cloudWater(),
+                    view.pressure(),
+                    view.rainIntensity(),
+                    view.targetPressure(),
+                    view.forecastTime(),
+                    mode
+            );
+            float pressureDelta = clampDelta(
+                    rainPressureDelta + pressureForecastRestore + pressureGuardDelta + unsupportedLowRecovery.delta(),
+                    -15f,
+                    15f
+            );
 
             float rainFade = RAIN_FADE * mode.rainFadeScale();
 
@@ -385,10 +456,62 @@ public final class AtmosphericUpdateScheduler {
                     humidityBudget,
                     cloudWaterDelta,
                     cloudWaterExchange,
-                    view.dominantBiomeId()
+                    view.dominantBiomeId(),
+                    unsupportedLowRecovery
             ));
         }
         return deltas;
+    }
+
+    private static UnsupportedLowRecovery estimateUnsupportedLowRecovery(RegionInstanceKey key,
+                                                                         BlockPos position,
+                                                                         float humidity,
+                                                                         float cloudWater,
+                                                                         float pressure,
+                                                                         float rainIntensity,
+                                                                         float targetPressure,
+                                                                         long forecastTime,
+                                                                         UpdateMode mode) {
+        float deficitToNormal = Math.max(0f, 1013.25f - pressure);
+        if (deficitToNormal <= 0.05f) {
+            return new UnsupportedLowRecovery(false, 0f, UNSUPPORTED_LOW_RECOVERY_HPA_PER_DAY, 1f);
+        }
+        AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(key, AtmosphericStateRegistry.getState(key));
+        float rainSupport = support.hasState() ? support.rainSupport() : Mth.clamp(rainIntensity / 0.68f, 0f, 1f);
+        float stormPressureSupport = support.hasState() ? support.stormPressureSupport() : Mth.clamp((1008.0f - pressure) / 42.0f, 0f, 1f);
+        float thunderstormSupport = support.hasState() ? support.thunderstormSupport() : 0f;
+        float supercellSupport = support.hasState() ? support.supercellSupport() : 0f;
+        float convergenceSupport = support.hasState() ? support.windConvergence() : 0f;
+        float cloudWaterSupport = ramp(cloudWater, 0.25f, 0.65f);
+        float humiditySupport = ramp(humidity, 0.70f, 0.88f);
+        float oceanPressureInfluence = OceanBasinManager.estimatePressureDelta(key, pressure);
+        float oceanLowPressureSupport = oceanPressureInfluence < 0f ? Mth.clamp(-oceanPressureInfluence * 45f, 0f, 1f) : 0f;
+        float windPressureMix = WindVector.estimatePressureTransport(key);
+        float strongWindImportSupport = windPressureMix < 0f ? Mth.clamp(-windPressureMix / 3f, 0f, 1f) : 0f;
+        float cyclonePressureInfluence = CycloneManager.estimatePressureDelta(position, pressure, targetPressure);
+        float cycloneSupport = cyclonePressureInfluence < 0f ? Mth.clamp(-cyclonePressureInfluence / 0.15f, 0f, 1f) : 0f;
+        CycloneManager.CycloneSupport cycloneSeed = CycloneManager.evaluateCycloneSupport(AtmosphericStateRegistry.getState(key), forecastTime);
+        float cycloneSeedSupport = cycloneSeed.seedEligible() ? cycloneSeed.seedSupport() : 0f;
+
+        float supportResistance = max(
+                rainSupport,
+                stormPressureSupport,
+                thunderstormSupport,
+                supercellSupport,
+                cycloneSupport,
+                cycloneSeedSupport,
+                oceanLowPressureSupport,
+                strongWindImportSupport,
+                cloudWaterSupport,
+                humiditySupport,
+                convergenceSupport
+        );
+        float recoveryFactor = Mth.clamp(1.0f - supportResistance, 0f, 1f);
+        float maxRecoveryThisUpdate = UNSUPPORTED_LOW_RECOVERY_HPA_PER_DAY * (mode.updateTicks() / 24000f);
+        float recovery = deficitToNormal * UNSUPPORTED_LOW_RECOVERY_RATE * recoveryFactor;
+        recovery = Mth.clamp(recovery, 0f, maxRecoveryThisUpdate);
+        boolean active = recovery > 0f && supportResistance < 0.65f;
+        return new UnsupportedLowRecovery(active, active ? recovery : 0f, UNSUPPORTED_LOW_RECOVERY_HPA_PER_DAY, supportResistance);
     }
 
     private static void applyDeltas(List<StateDelta> deltas, long dayTime, String dimensionId, UpdateMode mode) {
@@ -573,6 +696,24 @@ public final class AtmosphericUpdateScheduler {
         return Mth.clamp(value, min, max);
     }
 
+    private static float ramp(float value, float startsAt, float fullAt) {
+        if (fullAt <= startsAt) {
+            return value >= fullAt ? 1f : 0f;
+        }
+        return Mth.clamp((value - startsAt) / (fullAt - startsAt), 0f, 1f);
+    }
+
+    private static float max(float... values) {
+        float max = 0f;
+        if (values == null) {
+            return max;
+        }
+        for (float value : values) {
+            max = Math.max(max, value);
+        }
+        return max;
+    }
+
     private static CompoundTag saveRegionKey(RegionInstanceKey key) {
         CompoundTag tag = new CompoundTag();
         tag.putInt("RegionX", key.regionX());
@@ -591,6 +732,9 @@ public final class AtmosphericUpdateScheduler {
 
     record StateView(
             RegionInstanceKey key,
+            BlockPos position,
+            long dayTime,
+            long forecastTime,
             float temperature,
             float humidity,
             float pressure,
@@ -622,13 +766,40 @@ public final class AtmosphericUpdateScheduler {
             HumidityBudget humidityBudget,
             float cloudWaterDelta,
             CloudWaterExchange cloudWaterExchange,
-            String dominantBiomeId
+            String dominantBiomeId,
+            UnsupportedLowRecovery unsupportedLowRecovery
+    ) {
+    }
+
+    public record PressureDiagnostics(
+            float targetPressure,
+            float normalPressureReference,
+            float rainPressureDelta,
+            float forecastRecoveryDelta,
+            float pressureGuardDelta,
+            float baseRelaxDelta,
+            float schedulerPressureDelta,
+            boolean unsupportedLowRecoveryActive,
+            float unsupportedLowRecoveryDelta,
+            float unsupportedLowRecoveryCapPerDay,
+            float supportResistance
+    ) {
+        static PressureDiagnostics empty() {
+            return new PressureDiagnostics(0f, 1013.25f, 0f, 0f, 0f, 0f, 0f, false, 0f, UNSUPPORTED_LOW_RECOVERY_HPA_PER_DAY, 1f);
+        }
+    }
+
+    public record UnsupportedLowRecovery(
+            boolean active,
+            float delta,
+            float capPerDay,
+            float supportResistance
     ) {
     }
 
     enum UpdateMode {
-        ACTIVE(1f, 0.0005f, 0.6f, 1f, 1f, ACTIVE_INTERVAL_TICKS),
-        PASSIVE(0.35f, 0.0002f, 0.45f, 0.5f, 0.45f, 0f);
+        ACTIVE(1f, 0.0012f, 0.6f, 1f, 0.62f, 2f, ACTIVE_INTERVAL_TICKS),
+        PASSIVE(0.35f, 0.00035f, 0.45f, 0.5f, 0.32f, 0f, PASSIVE_INTERVAL_TICKS);
 
         private final float scale;
         private final float relaxFactor;
@@ -636,15 +807,17 @@ public final class AtmosphericUpdateScheduler {
         private final float rainFadeScale;
         private final float humidityBudgetScale;
         private final float transportAccumulationTicks;
+        private final float updateTicks;
 
         UpdateMode(float scale, float relaxFactor, float blend, float rainFadeScale, float humidityBudgetScale,
-                   float transportAccumulationTicks) {
+                   float transportAccumulationTicks, float updateTicks) {
             this.scale = scale;
             this.relaxFactor = relaxFactor;
             this.blend = blend;
             this.rainFadeScale = rainFadeScale;
             this.humidityBudgetScale = humidityBudgetScale;
             this.transportAccumulationTicks = transportAccumulationTicks;
+            this.updateTicks = updateTicks;
         }
 
         float scale() {
@@ -669,6 +842,10 @@ public final class AtmosphericUpdateScheduler {
 
         float transportAccumulationTicks() {
             return transportAccumulationTicks;
+        }
+
+        float updateTicks() {
+            return updateTicks;
         }
     }
 }

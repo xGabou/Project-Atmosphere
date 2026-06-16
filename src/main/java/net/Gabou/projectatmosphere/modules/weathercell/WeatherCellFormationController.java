@@ -27,8 +27,8 @@ final class WeatherCellFormationController {
     private static final int MAX_NEW_CELLS_PER_ATTEMPT = 2;
     private static final int MAX_NEW_CELLS_PER_PLAYER_ATTEMPT = 1;
     private static final int MAX_ACTIVE_WEATHER_CELLS = 48;
-    private static final int MAX_ACTIVE_CELLS_PER_REGION = 4;
-    private static final int MAX_ACTIVE_CELLS_NEAR_PLAYER = 12;
+    private static final int MAX_ACTIVE_CELLS_PER_REGION = 3;
+    private static final int MAX_ACTIVE_CELLS_NEAR_PLAYER = 8;
     private static final double PLAYER_FORMATION_RADIUS = 1100.0D;
 
     boolean tick(ServerLevel level, WeatherCellSavedData data, Collection<WeatherCellState> activeCells) {
@@ -119,16 +119,16 @@ final class WeatherCellFormationController {
         float coverage = WeatherCellSupport.estimateCellCoverage(state.getPosition(), activeCells);
 
         float score = support.rainCellFormationScore(coverage);
-        if (support.humidity() < 0.72F
-                || support.cloudWater() < 0.12F
-                || coverage >= 0.70F
+        if (support.humidity() < 0.78F
+                || support.cloudWater() < 0.22F
+                || coverage >= 0.58F
                 || score < AtmosphericSupportEvaluator.RAIN_CELL_FORMATION_THRESHOLD) {
             return null;
         }
 
         float pressureAnomaly = 1013.25F - support.pressure();
         float windInfluence = Mth.clamp(support.windConvergence() * 0.65F + Math.max(0.0F, support.humidityTransport()) * 8.0F, 0.0F, 1.0F);
-        float formationChance = Mth.clamp(0.12F + score * 0.45F, 0.12F, 0.52F);
+        float formationChance = Mth.clamp(0.08F + score * 0.28F, 0.08F, 0.32F);
         return new FormationCandidate(
                 key,
                 nearestPlayer.getUUID(),

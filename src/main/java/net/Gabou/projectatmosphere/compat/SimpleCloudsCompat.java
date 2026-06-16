@@ -10,12 +10,13 @@ import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsRollbackDebugger;
+import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsTrackingIdentity;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.modules.weather.WeatherSampler;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -136,6 +137,13 @@ public class SimpleCloudsCompat {
         return spawnCloud(cloudId, key.center(), null, level, dummy, windVector);
     }
 
+    public static CloudRegion spawnCloudAt(String cloudId, BlockPos anchor, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
+        if (anchor == null) {
+            return null;
+        }
+        return spawnCloud(cloudId, anchor, null, level, dummy, windVector);
+    }
+
     public static CloudRegion ensureCloudAtPosition(BlockPos pos, ServerLevel level) {
         if (pos == null || level == null || generator == null || spawnConfig == null) {
             return null;
@@ -179,6 +187,8 @@ public class SimpleCloudsCompat {
             if (nearest == null) {
                 return null;
             }
+            SimpleCloudsTrackingIdentity.Entry removedIdentity = SimpleCloudsTrackingIdentity.resolve(nearest, level);
+            SimpleCloudsRollbackDebugger.markSimpleCloudWrite("ensure_coverage_remove_nearest", removedIdentity.trackingKey(), level);
             generator.removeClouds(existing -> existing == nearest);
             candidate = createLocalCloudCandidate(info, pos, level, wind);
             if (candidate.isEmpty()) {
@@ -188,6 +198,8 @@ public class SimpleCloudsCompat {
 
         CloudRegion cloud = candidate.get();
         if (generator.addCloud(cloud, CloudGenerator.Order.USE_WEIGHT)) {
+            SimpleCloudsTrackingIdentity.Entry identity = SimpleCloudsTrackingIdentity.resolve(cloud, level);
+            SimpleCloudsRollbackDebugger.markSimpleCloudWrite("ensure_coverage_add", identity.trackingKey(), level);
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Forced local cloud coverage for {} at {}", currentRegion, pos);
             return cloud;
         }
@@ -197,8 +209,12 @@ public class SimpleCloudsCompat {
                 .max(Comparator.comparingDouble(existing -> distanceSquared(existing, pos)))
                 .orElse(null);
         if (farthest != null) {
+            SimpleCloudsTrackingIdentity.Entry removedIdentity = SimpleCloudsTrackingIdentity.resolve(farthest, level);
+            SimpleCloudsRollbackDebugger.markSimpleCloudWrite("ensure_coverage_replace_remove", removedIdentity.trackingKey(), level);
             generator.removeClouds(existing -> existing == farthest);
             if (generator.addCloud(cloud, CloudGenerator.Order.USE_WEIGHT)) {
+                SimpleCloudsTrackingIdentity.Entry identity = SimpleCloudsTrackingIdentity.resolve(cloud, level);
+                SimpleCloudsRollbackDebugger.markSimpleCloudWrite("ensure_coverage_replace_add", identity.trackingKey(), level);
                 ProjectAtmosphere.LOGGER.info("[Atmosphere] Replaced distant cloud to force local coverage for {} at {}", currentRegion, pos);
                 return cloud;
             }
@@ -291,6 +307,10 @@ public class SimpleCloudsCompat {
                 r -> ProjectAtmosphere.LOGGER.info("[Atmosphere] Spawned {} at {}, {} near {}", cloudId, x, z, biomeId == null ? anchor : biomeId),
                 () -> ProjectAtmosphere.LOGGER.warn("[Atmosphere] Failed to spawn {} near {}", cloudId, biomeId == null ? anchor : biomeId)
             );
+        region.ifPresent(cloud -> {
+            SimpleCloudsTrackingIdentity.Entry identity = SimpleCloudsTrackingIdentity.resolve(cloud, level);
+            SimpleCloudsRollbackDebugger.markSimpleCloudWrite("spawn_cloud", identity.trackingKey(), level);
+        });
         return  region.orElse(null);
     }
 
@@ -434,8 +454,11 @@ public class SimpleCloudsCompat {
                 int finalSharedRadius = sharedRadius;
                 cloudFormation.ifPresent(cf -> {
                     cf.setRadius(finalSharedRadius);
-                    generator.addCloud(cf, CloudGenerator.Order.USE_WEIGHT);
-                    setIsInit(true);
+                    if (generator.addCloud(cf, CloudGenerator.Order.USE_WEIGHT)) {
+                        SimpleCloudsTrackingIdentity.Entry identity = SimpleCloudsTrackingIdentity.resolve(cf, level);
+                        SimpleCloudsRollbackDebugger.markSimpleCloudWrite("initial_generation_add", identity.trackingKey(), level);
+                        setIsInit(true);
+                    }
                 });
 
                 break;
@@ -458,7 +481,7 @@ public class SimpleCloudsCompat {
         return SimpleCloudsConstants.CLOUD_SCALE;
     }
 
-    public static boolean isCloudAtPos(ClientLevel level, BlockPos pos) {
+    public static boolean isCloudAtPos(Level level, BlockPos pos) {
         return CloudManager.get(level).getCloudGenerator().getCloudAtWorldPosition(pos.getX() + 0.5F, pos.getZ() + 0.5F) !=null;
     }
 }

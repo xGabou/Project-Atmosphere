@@ -59,7 +59,7 @@ public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
                 new ResourceLocation("eclipticseasons", "season"),
                 stage,
                 progress,
-                0.0f
+                SeasonClimateProfile.temperatureOffsetC(stage, progress)
         );
     }
 

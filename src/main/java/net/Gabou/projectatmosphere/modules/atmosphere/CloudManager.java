@@ -8,6 +8,7 @@ import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsTrackingIdentity;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
@@ -18,7 +19,6 @@ import net.Gabou.projectatmosphere.telemetry.TelemetryModels.CloudTickSummary;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PrecipitationDecisionTrace;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
-import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.Gabou.projectatmosphere.modules.weather.WeatherSampler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -44,11 +44,11 @@ import static net.Gabou.projectatmosphere.manager.CloudSpawnSeverityRules.select
  * atmospheric registry by projecting contributions back into the relevant RegionAtmosphereState entries.
  */
 public final class CloudManager {
-    private static final Map<Integer, RegionCloudData> REGION_DATA = new ConcurrentHashMap<>();
-    private static final Map<Integer, Long> CLOUD_BIRTH_TICK = new ConcurrentHashMap<>();
-    private static final Map<Integer, Vector2i> CLOUD_LAST_POS = new ConcurrentHashMap<>();
-    private static final Map<Integer, Long> CLOUD_LAST_SAMPLE_TICK = new ConcurrentHashMap<>();
-    private static final Map<Integer, ResourceLocation> CLOUD_TYPES = new ConcurrentHashMap<>();
+    private static final Map<String, RegionCloudData> REGION_DATA = new ConcurrentHashMap<>();
+    private static final Map<String, Long> CLOUD_BIRTH_TICK = new ConcurrentHashMap<>();
+    private static final Map<String, Vector2i> CLOUD_LAST_POS = new ConcurrentHashMap<>();
+    private static final Map<String, Long> CLOUD_LAST_SAMPLE_TICK = new ConcurrentHashMap<>();
+    private static final Map<String, ResourceLocation> CLOUD_TYPES = new ConcurrentHashMap<>();
     private static final Set<RegionInstanceKey> ACTIVE_REGIONS = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private static final AtomicBoolean REGION_SCAN_IN_FLIGHT = new AtomicBoolean();
@@ -135,7 +135,7 @@ public final class CloudManager {
             return;
         }
 
-        List<RegionDescriptor> descriptors = snapshotRegions(generator);
+        List<RegionDescriptor> descriptors = snapshotRegions(level, generator);
         if (descriptors.isEmpty()) {
             REGION_SCAN_IN_FLIGHT.set(false);
             applyBiomeContributions(Collections.emptyMap());
@@ -161,14 +161,15 @@ public final class CloudManager {
         );
     }
 
-    private static List<RegionDescriptor> snapshotRegions(CloudGenerator generator) {
+    private static List<RegionDescriptor> snapshotRegions(ServerLevel level, CloudGenerator generator) {
         List<CloudRegion> clouds = generator.getClouds();
         List<RegionDescriptor> descriptors = new ArrayList<>(clouds.size());
         for (CloudRegion region : clouds) {
             if (region == null) continue;
-            int id = extractId(region);
+            SimpleCloudsTrackingIdentity.Entry identity = SimpleCloudsTrackingIdentity.resolve(region, level);
             descriptors.add(new RegionDescriptor(
-                    id,
+                    identity.trackingKey(),
+                    identity.sourceId(),
                     region.getCloudTypeId(),
                     region.getWorldX(),
                     region.getWorldZ(),
@@ -239,7 +240,8 @@ public final class CloudManager {
 
         if (weightSum <= 0f) {
             return new RegionSample(
-                    descriptor.id(),
+                    descriptor.trackingKey(),
+                    descriptor.sourceId(),
                     descriptor.cloudType(),
                     descriptor.worldX(),
                     descriptor.worldZ(),
@@ -262,7 +264,8 @@ public final class CloudManager {
         float dewPoint = calculateDewPoint(temperatureAvg, humidityPercent);
 
         return new RegionSample(
-                descriptor.id(),
+                descriptor.trackingKey(),
+                descriptor.sourceId(),
                 descriptor.cloudType(),
                 descriptor.worldX(),
                 descriptor.worldZ(),
@@ -285,25 +288,29 @@ public final class CloudManager {
             return;
         }
 
-        Map<Integer, CloudRegion> regionIndex = indexCloudRegions(generator);
+        Map<String, CloudRegion> regionIndex = indexCloudRegions(level, generator);
         Map<RegionInstanceKey, BiomeContribution> contributions = new HashMap<>();
-        Set<Integer> observed = new HashSet<>();
+        Set<String> observed = new HashSet<>();
+        Map<String, PositionObservation> trackingPositions = new HashMap<>();
+        Map<Integer, PositionObservation> legacyPositions = new HashMap<>();
 
         for (RegionSample sample : samples) {
-            CloudRegion region = regionIndex.get(sample.id());
+            CloudRegion region = regionIndex.get(sample.trackingKey());
             if (region == null) {
                 continue;
             }
-            observed.add(sample.id());
+            warnIfDistantTrackingCollision(trackingPositions, sample.trackingKey(), sample.cloudType(), sample.worldX(), sample.worldZ());
+            warnIfDistantLegacyCollision(legacyPositions, sample.sourceId(), sample.trackingKey(), sample.cloudType(), sample.worldX(), sample.worldZ());
+            observed.add(sample.trackingKey());
 
-            RegionCloudData data = REGION_DATA.computeIfAbsent(sample.id(), ignored -> new RegionCloudData());
-            Vector2i previousPos = CLOUD_LAST_POS.get(sample.id());
-            Long previousTick = CLOUD_LAST_SAMPLE_TICK.get(sample.id());
-            ResourceLocation previousType = CLOUD_TYPES.get(sample.id());
-            if (AtmoCommonConfig.TELEMETRY_ENABLED.get() && !CLOUD_BIRTH_TICK.containsKey(sample.id())) {
-                CLOUD_BIRTH_TICK.put(sample.id(), level.getGameTime());
-                CLOUD_TYPES.put(sample.id(), sample.cloudType());
-                CLOUD_LAST_SAMPLE_TICK.put(sample.id(), level.getGameTime());
+            RegionCloudData data = REGION_DATA.computeIfAbsent(sample.trackingKey(), ignored -> new RegionCloudData());
+            Vector2i previousPos = CLOUD_LAST_POS.get(sample.trackingKey());
+            Long previousTick = CLOUD_LAST_SAMPLE_TICK.get(sample.trackingKey());
+            ResourceLocation previousType = CLOUD_TYPES.get(sample.trackingKey());
+            if (AtmoCommonConfig.TELEMETRY_ENABLED.get() && !CLOUD_BIRTH_TICK.containsKey(sample.trackingKey())) {
+                CLOUD_BIRTH_TICK.put(sample.trackingKey(), level.getGameTime());
+                CLOUD_TYPES.put(sample.trackingKey(), sample.cloudType());
+                CLOUD_LAST_SAMPLE_TICK.put(sample.trackingKey(), level.getGameTime());
                 recordCloudCreated(level, sample);
             }
             if (AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
@@ -311,9 +318,9 @@ public final class CloudManager {
                     recordCloudEvolution(level, sample, previousType);
                 }
                 recordCloudTick(level, sample, data, previousPos, previousTick);
-                CLOUD_TYPES.put(sample.id(), sample.cloudType());
-                CLOUD_LAST_POS.put(sample.id(), new Vector2i((int) sample.worldX(), (int) sample.worldZ()));
-                CLOUD_LAST_SAMPLE_TICK.put(sample.id(), level.getGameTime());
+                CLOUD_TYPES.put(sample.trackingKey(), sample.cloudType());
+                CLOUD_LAST_POS.put(sample.trackingKey(), new Vector2i((int) sample.worldX(), (int) sample.worldZ()));
+                CLOUD_LAST_SAMPLE_TICK.put(sample.trackingKey(), level.getGameTime());
             }
             data.updateFromSample(sample, region);
 
@@ -336,16 +343,17 @@ public final class CloudManager {
         applyBiomeContributions(contributions);
     }
 
-    private static Map<Integer, CloudRegion> indexCloudRegions(CloudGenerator generator) {
-        Map<Integer, CloudRegion> index = new HashMap<>();
+    private static Map<String, CloudRegion> indexCloudRegions(ServerLevel level, CloudGenerator generator) {
+        Map<String, CloudRegion> index = new HashMap<>();
         for (CloudRegion region : generator.getClouds()) {
             if (region == null) continue;
-            index.put(extractId(region), region);
+            SimpleCloudsTrackingIdentity.Entry identity = SimpleCloudsTrackingIdentity.resolve(region, level);
+            index.put(identity.trackingKey(), region);
         }
         return index;
     }
 
-    private static void pruneMissingRegions(Set<Integer> observed) {
+    private static void pruneMissingRegions(Set<String> observed) {
         if (observed.isEmpty()) {
             REGION_DATA.clear();
             CLOUD_BIRTH_TICK.clear();
@@ -589,7 +597,7 @@ public final class CloudManager {
         Vector2i lastPos = new Vector2i((int) sample.worldX(), (int) sample.worldZ());
         String biomeId = sample.footprint().isEmpty() ? "unknown" : sample.footprint().get(0).key().toString();
         TelemetryCollector.get().recordCloudEvent(new CloudCreated(
-                String.valueOf(sample.id()),
+                sample.trackingKey(),
                 sample.cloudType().toString(),
                 "spawn_scan",
                 level.dimension().location().toString(),
@@ -621,12 +629,12 @@ public final class CloudManager {
             }
         }
         Float lifetimeSeconds = null;
-        Long birth = CLOUD_BIRTH_TICK.get(sample.id());
+        Long birth = CLOUD_BIRTH_TICK.get(sample.trackingKey());
         if (birth != null) {
             lifetimeSeconds = (level.getGameTime() - birth) / 20f;
         }
         TelemetryCollector.get().recordCloudEvent(new CloudTickSummary(
-                String.valueOf(sample.id()),
+                sample.trackingKey(),
                 sample.cloudType().toString(),
                 lastPos.x() >> 4,
                 lastPos.y() >> 4,
@@ -657,7 +665,7 @@ public final class CloudManager {
         after.put("pressure", sample.avgPressure());
 
         TelemetryCollector.get().recordCloudEvent(new CloudEvolved(
-                String.valueOf(sample.id()),
+                sample.trackingKey(),
                 previousType.toString(),
                 sample.cloudType().toString(),
                 "type_change",
@@ -666,22 +674,22 @@ public final class CloudManager {
         ));
     }
 
-    private static void recordCloudDeath(ServerLevel level, int id) {
+    private static void recordCloudDeath(ServerLevel level, String trackingKey) {
         if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
             return;
         }
-        long birth = CLOUD_BIRTH_TICK.getOrDefault(id, level.getGameTime());
-        Vector2i pos = CLOUD_LAST_POS.get(id);
+        long birth = CLOUD_BIRTH_TICK.getOrDefault(trackingKey, level.getGameTime());
+        Vector2i pos = CLOUD_LAST_POS.get(trackingKey);
         TelemetryCollector.get().recordCloudEvent(new CloudDied(
-                String.valueOf(id),
+                trackingKey,
                 pos == null ? 0 : pos.x() >> 4,
                 pos == null ? 0 : pos.y() >> 4,
                 (level.getGameTime() - birth) / 20f,
                 "despawn"
         ));
-        CLOUD_BIRTH_TICK.remove(id);
-        CLOUD_LAST_POS.remove(id);
-        CLOUD_TYPES.remove(id);
+        CLOUD_BIRTH_TICK.remove(trackingKey);
+        CLOUD_LAST_POS.remove(trackingKey);
+        CLOUD_TYPES.remove(trackingKey);
     }
 
     private static void recordPrecipitationDecision(ServerLevel level, SpawnCandidate candidate) {
@@ -719,11 +727,65 @@ public final class CloudManager {
         ));
     }
 
-    private static int extractId(CloudRegion region) {
-        if (region instanceof ICloudRegionId accessor) {
-            return accessor.projectatmosphere$getId();
+    private static void warnIfDistantTrackingCollision(
+            Map<String, PositionObservation> observations,
+            String trackingKey,
+            ResourceLocation type,
+            double worldX,
+            double worldZ
+    ) {
+        PositionObservation previous = observations.putIfAbsent(trackingKey, new PositionObservation(worldX, worldZ, trackingKey));
+        if (previous == null) {
+            return;
         }
-        return System.identityHashCode(region);
+        double distance = distance(previous.x(), previous.z(), worldX, worldZ);
+        if (distance >= 1500.0D) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "[Atmosphere] Simple Clouds tracking collision: id={} type={} distance={} positionA=({}, {}) positionB=({}, {})",
+                    trackingKey,
+                    type,
+                    distance,
+                    previous.x(),
+                    previous.z(),
+                    worldX,
+                    worldZ
+            );
+        }
+    }
+
+    private static void warnIfDistantLegacyCollision(
+            Map<Integer, PositionObservation> observations,
+            int sourceId,
+            String trackingKey,
+            ResourceLocation type,
+            double worldX,
+            double worldZ
+    ) {
+        PositionObservation previous = observations.putIfAbsent(sourceId, new PositionObservation(worldX, worldZ, trackingKey));
+        if (previous == null || previous.trackingKey().equals(trackingKey)) {
+            return;
+        }
+        double distance = distance(previous.x(), previous.z(), worldX, worldZ);
+        if (distance >= 1500.0D) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "[Atmosphere] Simple Clouds legacy id collision avoided: sourceId={} type={} distance={} trackingKeyA={} positionA=({}, {}) trackingKeyB={} positionB=({}, {})",
+                    sourceId,
+                    type,
+                    distance,
+                    previous.trackingKey(),
+                    previous.x(),
+                    previous.z(),
+                    trackingKey,
+                    worldX,
+                    worldZ
+            );
+        }
+    }
+
+    private static double distance(double ax, double az, double bx, double bz) {
+        double dx = ax - bx;
+        double dz = az - bz;
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     private static final class RegionCloudData {
@@ -825,11 +887,12 @@ public final class CloudManager {
         }
     }
 
-    private record RegionDescriptor(int id, ResourceLocation cloudType, double worldX, double worldZ, float radius) {
+    private record RegionDescriptor(String trackingKey, int sourceId, ResourceLocation cloudType, double worldX, double worldZ, float radius) {
     }
 
     private record RegionSample(
-            int id,
+            String trackingKey,
+            int sourceId,
             ResourceLocation cloudType,
             double worldX,
             double worldZ,
@@ -850,5 +913,8 @@ public final class CloudManager {
     }
 
     private record SpawnSearchResult(SpawnCandidate candidate) {
+    }
+
+    private record PositionObservation(double x, double z, String trackingKey) {
     }
 }

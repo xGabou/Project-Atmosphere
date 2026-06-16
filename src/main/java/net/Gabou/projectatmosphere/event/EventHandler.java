@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.event;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudService;
@@ -55,14 +57,14 @@ public class EventHandler {
             return;
         }
 
-        boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
-        if (!simpleCloudsLoaded) {
+        AtmosphereCloudService cloudService = AtmosphereCloudServices.get();
+        CloudVisualBackend activeBackend = CloudBackendMigrationManager.tick(serverLevel, cloudService);
+        if (activeBackend == CloudVisualBackend.PA_NATIVE) {
             CloudRegionManager.getInstance().tickCloudRegions(serverLevel);
         }
 
         if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
 
-        AtmosphereCloudService cloudService = AtmosphereCloudServices.get();
         boolean eventsEnabled = AtmoCommonConfig.EVENTS_ENABLED.get();
         if (eventsEnabled) {
             AtmosphereManager.tick(serverLevel);
@@ -82,7 +84,7 @@ public class EventHandler {
         }
 
         AtmosphereStatusSyncManager.syncPlayers(serverLevel);
-        if (!simpleCloudsLoaded) {
+        if (activeBackend == CloudVisualBackend.PA_NATIVE) {
             CloudRegionSyncManager.syncPlayers(serverLevel);
         }
         if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
@@ -109,7 +111,7 @@ public class EventHandler {
         ServerLevel level = player.serverLevel();
         if (level.dimension().equals(event.getTo())) {
             AtmosphereStatusSyncManager.syncPlayer(player);
-            if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            if (CloudBackendMigrationManager.status(level).currentBackend() == CloudVisualBackend.PA_NATIVE) {
                 CloudRegionSyncManager.syncPlayer(player);
             }
 

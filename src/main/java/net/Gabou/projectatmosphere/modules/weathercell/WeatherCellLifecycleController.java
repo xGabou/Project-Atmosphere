@@ -9,6 +9,8 @@ import net.minecraft.util.Mth;
 final class WeatherCellLifecycleController {
     private static final int TICK_STEP = WeatherCellManager.TICK_INTERVAL;
     private static final float EVOLUTION_TRACKING = 0.08F;
+    private static final int RAIN_TO_THUNDER_MIN_AGE_TICKS = 20 * 90;
+    private static final int THUNDER_TO_SUPERCELL_MIN_AGE_TICKS = 20 * 180;
 
     boolean tick(ServerLevel level, WeatherCellState cell) {
         if (level == null || cell == null || !cell.isActive()) {
@@ -90,12 +92,14 @@ final class WeatherCellLifecycleController {
         WeatherCellType current = cell.getType();
         switch (current) {
             case RAIN_CELL -> {
-                if (score >= AtmosphericSupportEvaluator.WEATHER_THUNDER_THRESHOLD) {
+                if (cell.getAgeTicks() >= RAIN_TO_THUNDER_MIN_AGE_TICKS
+                        && score >= AtmosphericSupportEvaluator.WEATHER_THUNDER_THRESHOLD) {
                     cell.setType(WeatherCellType.THUNDERSTORM);
                 }
             }
             case THUNDERSTORM -> {
-                if (severeScore >= AtmosphericSupportEvaluator.WEATHER_SEVERE_THRESHOLD) {
+                if (cell.getAgeTicks() >= THUNDER_TO_SUPERCELL_MIN_AGE_TICKS
+                        && severeScore >= AtmosphericSupportEvaluator.WEATHER_SEVERE_THRESHOLD) {
                     cell.setType(WeatherCellType.SUPERCELL);
                 } else if (score < AtmosphericSupportEvaluator.WEATHER_THUNDER_WEAKEN_THRESHOLD) {
                     cell.setType(WeatherCellType.RAIN_CELL);

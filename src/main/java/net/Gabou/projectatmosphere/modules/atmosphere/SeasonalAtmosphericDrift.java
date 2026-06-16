@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.seasons.SeasonClimateProfile;
 import net.Gabou.projectatmosphere.seasons.SeasonSnapshot;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
@@ -81,6 +82,22 @@ public final class SeasonalAtmosphericDrift {
         return currentModifier.sunlightMultiplier();
     }
 
+    public static synchronized float currentTemperatureOffsetC() {
+        return currentModifier.temperatureOffsetC() + currentSnapshot.temperatureOffset();
+    }
+
+    public static synchronized float currentSnapshotTemperatureOffsetC() {
+        return currentSnapshot.temperatureOffset();
+    }
+
+    public static synchronized float currentPressureOffsetHpa() {
+        return currentModifier.pressureOffsetHpa();
+    }
+
+    public static synchronized boolean isInitialized() {
+        return initialized;
+    }
+
     public static synchronized CompoundTag savePersistentState() {
         CompoundTag tag = new CompoundTag();
         tag.putInt("Version", VERSION);
@@ -145,9 +162,7 @@ public final class SeasonalAtmosphericDrift {
     }
 
     private static void applyToState(RegionAtmosphereState state, SeasonalModifier modifier, long dayTime, boolean active) {
-        float temperatureTarget = state.getTargetTemperature(dayTime)
-                + modifier.temperatureOffsetC()
-                + currentSnapshot.temperatureOffset();
+        float temperatureTarget = state.getTargetTemperature(dayTime);
         float humidityTarget = Mth.clamp(
                 state.getTargetHumidity(dayTime) * modifier.humidityMultiplier() + modifier.humidityOffset(),
                 0f,
@@ -245,12 +260,12 @@ public final class SeasonalAtmosphericDrift {
             float progress = snapshot == null ? 0f : Mth.clamp(snapshot.progress(), 0f, 1f);
             float strength = stage == SeasonStage.NEUTRAL
                     ? 0f
-                    : 0.75f + 0.25f * Mth.sin(progress * (float) Math.PI);
+                    : SeasonClimateProfile.seasonalStrength(progress);
             return switch (stage) {
-                case SPRING -> scale(new SeasonalModifier(stage, 2.0f, 1.05f, 0.03f, -0.2f, 0.36f, 0.04f, 0.95f), strength);
-                case SUMMER -> scale(new SeasonalModifier(stage, 6.0f, 1.08f, 0.04f, -1.2f, 0.42f, 0.08f, 1.08f), strength);
-                case AUTUMN -> scale(new SeasonalModifier(stage, -2.0f, 0.96f, -0.02f, 0.6f, 0.30f, -0.02f, 0.88f), strength);
-                case WINTER -> scale(new SeasonalModifier(stage, -8.0f, 0.82f, -0.06f, 1.5f, 0.22f, -0.06f, 0.72f), strength);
+                case SPRING -> scale(new SeasonalModifier(stage, 0f, 1.05f, 0.03f, -0.2f, 0.36f, 0.04f, 0.95f), strength);
+                case SUMMER -> scale(new SeasonalModifier(stage, 0f, 1.08f, 0.04f, -1.2f, 0.42f, 0.08f, 1.08f), strength);
+                case AUTUMN -> scale(new SeasonalModifier(stage, 0f, 0.96f, -0.02f, 0.6f, 0.30f, -0.02f, 0.88f), strength);
+                case WINTER -> scale(new SeasonalModifier(stage, 0f, 0.82f, -0.06f, 1.5f, 0.22f, -0.06f, 0.72f), strength);
                 case NEUTRAL -> neutral();
             };
         }

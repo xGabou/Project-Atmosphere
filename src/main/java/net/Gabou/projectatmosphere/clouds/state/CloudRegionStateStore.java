@@ -90,7 +90,7 @@ public final class CloudRegionStateStore {
      * @return données de rendu réseau
      */
     public static @NotNull Collection<CloudRegionRenderData> createRenderDataForActiveRegions(@NotNull ServerLevel level) {
-        return CloudRegionBackend.getRegistry(level).createRenderDataForActiveRegions();
+        return CloudRegionBackend.getRegistry(level).createRenderDataForActiveRegions(level.getGameTime());
     }
 
     /**

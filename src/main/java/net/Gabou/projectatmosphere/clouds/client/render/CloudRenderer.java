@@ -95,12 +95,11 @@ public final class CloudRenderer {
         );
 
         String screenName = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
-        RenderTarget shadowTarget = CloudRenderTargetManager.getCloudShadowTarget();
-        CloudShadowRenderer.update(frameContext, renderableSnapshots, shadowTarget);
+        CloudShadowRenderer.update(frameContext, renderableSnapshots);
         FallbackDarkeningPass.updateFrame(frameContext, minecraft.level);
-        FallbackDarkeningPass.applyTerrainDarkening(frameContext, mainTarget, shadowTarget);
+        FallbackDarkeningPass.applyTerrainDarkening(frameContext, mainTarget, null);
         AtmospherePipelineAdapter pipelineAdapter = AtmospherePipelineAdapters.select();
-        int shadowDepthTextureId = shadowTarget != null ? shadowTarget.getDepthTextureId() : -1;
+        int shadowDepthTextureId = -1;
         String stateSignature = screenName
                 + "|"
                 + pipelineAdapter.id()

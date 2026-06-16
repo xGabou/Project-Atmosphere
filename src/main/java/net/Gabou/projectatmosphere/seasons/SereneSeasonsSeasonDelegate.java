@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.seasons;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.util.ICloudRegionId;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fml.ModList;
 import sereneseasons.api.season.SeasonHelper;
@@ -35,9 +36,15 @@ public class SereneSeasonsSeasonDelegate implements SeasonTimeDelegate {
             case AUTUMN -> SeasonStage.AUTUMN;
             case WINTER -> SeasonStage.WINTER;
         };
-        float progress = state.getDay() / (float) state.getSeasonDuration();
+        float progress = seasonProgress(state.getSeasonCycleTicks(), state.getSeasonDuration());
         return new SeasonSnapshot(new net.minecraft.resources.ResourceLocation("sereneseasons", "season"),
-                stage, progress, 0.0f);
+                stage, progress, SeasonClimateProfile.temperatureOffsetC(stage, progress));
+    }
+
+    private static float seasonProgress(int cycleTicks, int seasonDuration) {
+        int safeSeasonDuration = Math.max(1, seasonDuration);
+        int ticksInSeason = Math.floorMod(cycleTicks, safeSeasonDuration);
+        return Mth.clamp(ticksInSeason / (float) safeSeasonDuration, 0f, 1f);
     }
 
     @Override

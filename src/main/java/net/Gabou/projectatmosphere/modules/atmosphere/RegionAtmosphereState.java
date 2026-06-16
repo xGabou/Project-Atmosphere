@@ -61,9 +61,11 @@ public class RegionAtmosphereState {
     private final float[] forecastTemperatureProfile;
     private final float[] forecastHumidityProfile;
     private final float[] forecastPressureProfile;
+    private final float[][] forecastPressureWeek;
     private final float[] dailyTemperatureProfile;
     private final float[] dailyHumidityProfile;
     private final float[] dailyPressureProfile;
+    private final float dayZeroPressureMean;
     private final float baselineMinTemp;
     private final float baselineMaxTemp;
 
@@ -94,9 +96,11 @@ public class RegionAtmosphereState {
         this.forecastTemperatureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getTemperature(), baseTemperature), baseTemperature);
         this.forecastHumidityProfile = initialiseDailyCurveScaled(deriveDailyCurve(forecastRegion.getHumidity(), baseHumidity * 100f), this.humidity, 100f);
         this.forecastPressureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getPressure(), basePressure), basePressure);
+        this.forecastPressureWeek = cloneWeek(forecastRegion.getPressure());
         this.dailyTemperatureProfile = forecastTemperatureProfile.clone();
         this.dailyHumidityProfile = forecastHumidityProfile.clone();
         this.dailyPressureProfile = forecastPressureProfile.clone();
+        this.dayZeroPressureMean = averageCurve(this.forecastPressureProfile, basePressure);
         float[] bounds = computeTemperatureBounds(this.forecastTemperatureProfile, baseTemperature);
         this.baselineMinTemp = bounds[0];
         this.baselineMaxTemp = bounds[1];
@@ -158,6 +162,14 @@ public class RegionAtmosphereState {
 
     public ResourceLocation getDominantBiome() {
         return dominantBiome;
+    }
+
+    public float getBasePressure() {
+        return basePressure;
+    }
+
+    public float getBaseTemperature() {
+        return baseTemperature;
     }
 
     public float getTemperature() {
@@ -358,6 +370,10 @@ public class RegionAtmosphereState {
     }
 
     public float getTargetTemperature(long dayTime) {
+        return getBaseTargetTemperature(dayTime) + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
+    }
+
+    public float getBaseTargetTemperature(long dayTime) {
         if (forecastTemperatureProfile.length == 0) {
             return temperature;
         }
@@ -379,19 +395,71 @@ public class RegionAtmosphereState {
         return clampHumidity(interpolate(forecastHumidityProfile, position));
     }
 
-    public float getTargetPressure(long dayTime) {
+    public float getTargetPressure(long forecastTime) {
+        return pressureTargetDebug(forecastTime).effectiveTargetPressure();
+    }
+
+    public PressureTargetDebug pressureTargetDebug(long forecastTime) {
         if (forecastPressureProfile.length == 0) {
-            return pressure;
+            return new PressureTargetDebug(
+                    0f,
+                    0,
+                    pressure,
+                    pressure,
+                    0f,
+                    pressure,
+                    pressure,
+                    pressure,
+                    "live-pressure-fallback",
+                    0,
+                    0,
+                    false,
+                    false,
+                    false,
+                    0f,
+                    "live pressure fallback"
+            );
         }
-        float position = (float) Math.floorMod(dayTime, 24000L) / 100f;
-        if (position >= forecastPressureProfile.length - 1f) {
-            return Mth.clamp(forecastPressureProfile[forecastPressureProfile.length - 1], MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
-        }
-        return Mth.clamp(interpolate(forecastPressureProfile, position), MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        float position = (float) Math.floorMod(forecastTime, 24000L) / 100f;
+        int lower = (int) Math.floor(Math.min(position, forecastPressureProfile.length - 1f));
+        int upper = Math.min(forecastPressureProfile.length - 1, lower + 1);
+        float interpolation = upper == lower ? 0f : position - lower;
+        float previous = Mth.clamp(forecastPressureProfile[lower], MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        float next = Mth.clamp(forecastPressureProfile[upper], MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        float rawTarget = Mth.clamp(previous + (next - previous) * interpolation, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        boolean hasWeeklyPressure = forecastPressureWeek != null && forecastPressureWeek.length > 0;
+        float currentForecastPressure = hasWeeklyPressure
+                ? sampleWeeklyPressure(forecastPressureWeek, forecastTime, basePressure)
+                : rawTarget;
+        float dailyShapeOffset = rawTarget - dayZeroPressureMean;
+        float effectiveTarget = hasWeeklyPressure
+                ? Mth.clamp(currentForecastPressure + dailyShapeOffset, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA)
+                : rawTarget;
+        int currentForecastDay = currentForecastDayIndex(forecastPressureWeek, forecastTime);
+        float staleCorrectionDelta = effectiveTarget - rawTarget;
+        boolean staleTargetDetected = hasWeeklyPressure && Math.abs(staleCorrectionDelta) > 3.0f;
+        return new PressureTargetDebug(
+                position,
+                lower,
+                previous,
+                next,
+                interpolation,
+                rawTarget,
+                effectiveTarget,
+                currentForecastPressure,
+                hasWeeklyPressure ? "weekly-forecast-plus-day0-diurnal-shape" : "region-daily-pressure-profile",
+                0,
+                currentForecastDay,
+                hasWeeklyPressure,
+                true,
+                staleTargetDetected,
+                staleCorrectionDelta,
+                staleTargetDetected ? "stale unsupported target" : "current forecast"
+        );
     }
 
     public void relaxTowardBase(float factor) {
-        temperature += (baseTemperature - temperature) * factor;
+        temperature += (getEffectiveBaseTemperature() - temperature) * factor;
         humidity += (baseHumidity - humidity) * factor;
         pressure += (basePressure - pressure) * factor;
         humidity = clampHumidity(humidity);
@@ -399,9 +467,13 @@ public class RegionAtmosphereState {
     }
 
     public void relaxTemperatureAndPressureTowardBase(float factor) {
-        temperature += (baseTemperature - temperature) * factor;
+        temperature += (getEffectiveBaseTemperature() - temperature) * factor;
         pressure += (basePressure - pressure) * factor;
         pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+    }
+
+    public float getEffectiveBaseTemperature() {
+        return baseTemperature + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
     public double distanceTo(double x, double z) {
@@ -411,11 +483,11 @@ public class RegionAtmosphereState {
     }
 
     public float getBaselineMinTemperature() {
-        return baselineMinTemp;
+        return baselineMinTemp + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
     public float getBaselineMaxTemperature() {
-        return baselineMaxTemp;
+        return baselineMaxTemp + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
     public float getBaselineTemperatureSpan() {
@@ -425,6 +497,26 @@ public class RegionAtmosphereState {
     public float getSunlightDrivenTemperature(float sunlightFactor) {
         float clamped = Mth.clamp(sunlightFactor, 0f, 1f);
         return Mth.lerp(clamped, baselineMinTemp, baselineMaxTemp);
+    }
+
+    public record PressureTargetDebug(
+            float curvePosition,
+            int lowerIndex,
+            float previousPoint,
+            float nextPoint,
+            float interpolation,
+            float rawTargetPressure,
+            float effectiveTargetPressure,
+            float forecastPressureCurrentSample,
+            String source,
+            int targetDayIndex,
+            int currentForecastDayIndex,
+            boolean targetUsesCurrentForecastDay,
+            boolean day0TargetProfileActive,
+            boolean staleTargetDetected,
+            float staleTargetCorrectionDelta,
+            String anomalyClassification
+    ) {
     }
 
     /**
@@ -496,6 +588,56 @@ public class RegionAtmosphereState {
             arr[hour] = Mth.lerp(phase, dayMin, dayMax);
         }
         return arr;
+    }
+
+    private static float[][] cloneWeek(@Nullable float[][] week) {
+        if (week == null || week.length == 0) {
+            return new float[0][];
+        }
+        float[][] copy = new float[week.length][];
+        for (int i = 0; i < week.length; i++) {
+            copy[i] = week[i] == null ? null : week[i].clone();
+        }
+        return copy;
+    }
+
+    private static float sampleWeeklyPressure(@Nullable float[][] week, long gameTime, float fallback) {
+        if (week == null || week.length == 0) {
+            return fallback;
+        }
+        int day = currentForecastDayIndex(week, gameTime);
+        float[] dayProfile = week[day];
+        if (dayProfile == null || dayProfile.length == 0) {
+            return fallback;
+        }
+        if (dayProfile.length == 1) {
+            return Mth.clamp(dayProfile[0], MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        }
+        float dayFraction = (float) Math.floorMod(gameTime, 24000L) / 24000f;
+        return Mth.clamp(Mth.lerp(dayFraction, dayProfile[0], dayProfile[1]), MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+    }
+
+    private static int currentForecastDayIndex(@Nullable float[][] week, long gameTime) {
+        if (week == null || week.length == 0) {
+            return 0;
+        }
+        long day = Math.floorMod(gameTime / 24000L, week.length);
+        return (int) day;
+    }
+
+    private static float averageCurve(@Nullable float[] curve, float fallback) {
+        if (curve == null || curve.length == 0) {
+            return fallback;
+        }
+        float sum = 0f;
+        int count = 0;
+        for (float value : curve) {
+            if (Float.isFinite(value)) {
+                sum += value;
+                count++;
+            }
+        }
+        return count == 0 ? fallback : sum / count;
     }
 
     private static float[] resampleDailyCurve(float[] source) {

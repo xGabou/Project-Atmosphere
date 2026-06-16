@@ -43,19 +43,8 @@ public final class FallbackDarkeningPass {
             @NotNull RenderTarget mainTarget,
             @Nullable RenderTarget shadowTarget
     ) {
-        if (!isEnabled() || !shouldApplyTerrainOverlay() || shadowTarget == null) {
-            return false;
-        }
-        if (!CloudLightingManager.hasActiveDarkening()
-                || CloudLightingManager.getPlayerShadowIntensity() < TERRAIN_OVERLAY_THRESHOLD) {
-            return false;
-        }
-        return CloudTerrainShadowRenderer.render(
-                frameContext,
-                mainTarget,
-                shadowTarget,
-                resolveTerrainOverlayStrength()
-        );
+        // GPU terrain-shadow texture upload is disabled; CPU shadow data still drives fog/player darkening.
+        return false;
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
