@@ -2,6 +2,8 @@ package net.Gabou.projectatmosphere.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.List;
+
 public final class AtmoCommonConfig {
     public static final ModConfigSpec COMMON_SPEC;
 
@@ -66,6 +68,43 @@ public final class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue FIRE_EXTINGUISH_BASE_CHANCE;
     public static final ModConfigSpec.DoubleValue CAULDRON_FILL_BASE_CHANCE;
 
+    public enum CloudMode {
+        FULL,
+        HYBRID,
+        VANILLA,
+        NATIVE,
+        SIMPLE_CLOUDS
+    }
+
+    public enum DimensionFilterMode {
+        WHITELIST,
+        BLACKLIST
+    }
+
+    public static final ModConfigSpec.EnumValue<CloudMode> CLOUD_MODE;
+    public static final ModConfigSpec.EnumValue<DimensionFilterMode> CLOUD_DIMENSION_FILTER_MODE;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> CLOUD_DIMENSION_IDS;
+    public static final ModConfigSpec.IntValue NATIVE_CLOUD_SPAWN_HEIGHT;
+    public static final ModConfigSpec.BooleanValue ENABLE_CLOUD_MOVEMENT;
+    public static final ModConfigSpec.BooleanValue FREEZE_CLOUD_MOVEMENT;
+    public static final ModConfigSpec.DoubleValue CLOUD_WIND_DRIFT_SCALE;
+    public static final ModConfigSpec.BooleanValue FOG_ENABLED;
+    public static final ModConfigSpec.IntValue FOG_SYNC_INTERVAL_TICKS;
+    public static final ModConfigSpec.DoubleValue FOG_HUMIDITY_START_PERCENT;
+    public static final ModConfigSpec.DoubleValue FOG_HUMIDITY_FULL_PERCENT;
+    public static final ModConfigSpec.DoubleValue FOG_WET_BIOME_BASE_STRENGTH;
+    public static final ModConfigSpec.DoubleValue FOG_RAIN_BOOST;
+    public static final ModConfigSpec.DoubleValue FOG_NEAR_DISTANCE;
+    public static final ModConfigSpec.DoubleValue FOG_FAR_DISTANCE;
+    public static final ModConfigSpec.DoubleValue FOG_COLOR_BLEND;
+    public static final ModConfigSpec.DoubleValue FOG_WET_BIOME_DOWNFALL_MIN;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_IDS;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_KEYWORDS;
+    public static final ModConfigSpec.BooleanValue AUTH_STRICT_OFFLINE_UUID_REJECT;
+    public static final ModConfigSpec.BooleanValue AUTH_KICK_ON_FAILURE;
+    public static final ModConfigSpec.IntValue AUTH_CHALLENGE_TIMEOUT_TICKS;
+    public static final ModConfigSpec.BooleanValue EVENTS_ENABLED;
+
     public static final ModConfigSpec.BooleanValue TELEMETRY_ENABLED;
     public static final ModConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
 
@@ -93,6 +132,9 @@ public final class AtmoCommonConfig {
         STORM_SEVERITY_BOOSTER = builder
                 .comment("Global multiplier for storm severity (affects wind speed and precipitation intensity)")
                 .defineInRange("stormSeverityBooster", 3.2D, 0.5D, 8.0D);
+        EVENTS_ENABLED = builder
+                .comment("Enable storm and weather event spawning/processing")
+                .define("eventsEnabled", true);
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);
@@ -256,6 +298,75 @@ public final class AtmoCommonConfig {
                 .defineInRange("cauldronFillBaseChance", 0.06d, 0d, 1d);
         builder.pop();
 
+        builder.push("clouds");
+        CLOUD_MODE = builder
+                .comment("Select how Project Atmosphere cloud rendering should behave")
+                .defineEnum("cloudMode", CloudMode.FULL);
+        CLOUD_DIMENSION_FILTER_MODE = builder
+                .comment("Controls whether cloudDimensionIds is used as an allow-list or deny-list for PA cloud/weather ownership")
+                .defineEnum("cloudDimensionFilterMode", DimensionFilterMode.WHITELIST);
+        CLOUD_DIMENSION_IDS = builder
+                .comment("Dimension ids used by cloudDimensionFilterMode. Default allows PA clouds/weather only in the Overworld.")
+                .defineListAllowEmpty("cloudDimensionIds",
+                        List.of("minecraft:overworld"),
+                        value -> value instanceof String);
+        NATIVE_CLOUD_SPAWN_HEIGHT = builder
+                .comment("Fixed Y height used by native Project Atmosphere cloud spawning")
+                .defineInRange("nativeCloudSpawnHeight", 256, -2048, 4096);
+        ENABLE_CLOUD_MOVEMENT = builder
+                .comment("Enable native Project Atmosphere cloud drift from regional wind")
+                .define("enableCloudMovement", true);
+        FREEZE_CLOUD_MOVEMENT = builder
+                .comment("Freeze native Project Atmosphere cloud movement for debugging and screenshots")
+                .define("freezeCloudMovement", false);
+        CLOUD_WIND_DRIFT_SCALE = builder
+                .comment("Blocks-per-tick drift multiplier applied to wind speed in m/s for native PA clouds")
+                .defineInRange("cloudWindDriftScale", 0.035d, 0.0d, 1.0d);
+        builder.pop();
+
+        builder.push("fog");
+        FOG_ENABLED = builder
+                .comment("Enable humidity-driven dynamic fog rendering on the client")
+                .define("enabled", true);
+        FOG_SYNC_INTERVAL_TICKS = builder
+                .comment("Ticks between lightweight server->client atmosphere sync updates used by fog and sky-effect compatibility sampling")
+                .defineInRange("syncIntervalTicks", 20, 1, 200);
+        FOG_HUMIDITY_START_PERCENT = builder
+                .comment("Humidity percentage where dynamic fog starts to form")
+                .defineInRange("humidityStartPercent", 72d, 0d, 100d);
+        FOG_HUMIDITY_FULL_PERCENT = builder
+                .comment("Humidity percentage where the humidity contribution reaches full strength")
+                .defineInRange("humidityFullPercent", 96d, 0d, 100d);
+        FOG_WET_BIOME_BASE_STRENGTH = builder
+                .comment("Base fog strength added by moisture-heavy biomes such as swamps or rainforests")
+                .defineInRange("wetBiomeBaseStrength", 0.18d, 0d, 1d);
+        FOG_RAIN_BOOST = builder
+                .comment("Additional fog strength contributed by active rain intensity")
+                .defineInRange("rainBoost", 0.22d, 0d, 1d);
+        FOG_NEAR_DISTANCE = builder
+                .comment("Near fog plane used when dynamic fog is fully saturated")
+                .defineInRange("nearDistance", 0.5d, 0d, 64d);
+        FOG_FAR_DISTANCE = builder
+                .comment("Far fog plane used when dynamic fog is fully saturated")
+                .defineInRange("farDistance", 72d, 4d, 512d);
+        FOG_COLOR_BLEND = builder
+                .comment("Color tint blend applied by dynamic fog")
+                .defineInRange("colorBlend", 0.45d, 0d, 1d);
+        FOG_WET_BIOME_DOWNFALL_MIN = builder
+                .comment("Biome downfall value that starts contributing wet-biome fog weighting")
+                .defineInRange("wetBiomeDownfallMin", 0.75d, 0d, 1d);
+        FOG_WET_BIOME_IDS = builder
+                .comment("Explicit biome ids that should always count as moisture-heavy for fog")
+                .defineListAllowEmpty("wetBiomeIds",
+                        List.of("minecraft:swamp", "minecraft:mangrove_swamp"),
+                        value -> value instanceof String);
+        FOG_WET_BIOME_KEYWORDS = builder
+                .comment("Biome path keywords that should count as moisture-heavy for fog")
+                .defineListAllowEmpty("wetBiomeKeywords",
+                        List.of("swamp", "marsh", "bog", "fen", "rainforest", "jungle", "mangrove", "wetland", "bayou"),
+                        value -> value instanceof String);
+        builder.pop();
+
         builder.push("telemetry");
         TELEMETRY_ENABLED = builder
                 .comment("Enable lightweight telemetry collection for diagnostics")
@@ -263,6 +374,18 @@ public final class AtmoCommonConfig {
         TELEMETRY_RETENTION_DAYS = builder
                 .comment("Number of days to retain exported telemetry archives before pruning")
                 .defineInRange("telemetryRetentionDays", 14, 0, 365);
+        builder.pop();
+
+        builder.push("auth");
+        AUTH_STRICT_OFFLINE_UUID_REJECT = builder
+                .comment("Reject offline UUID v3 identities during the launcher auth check")
+                .define("strictOfflineUuidReject", true);
+        AUTH_KICK_ON_FAILURE = builder
+                .comment("Kick players who fail or timeout the launcher auth challenge")
+                .define("kickOnFailure", true);
+        AUTH_CHALLENGE_TIMEOUT_TICKS = builder
+                .comment("Ticks before a pending launcher auth challenge times out")
+                .defineInRange("challengeTimeoutTicks", 200, 1, Integer.MAX_VALUE);
         builder.pop();
 
         builder.push("debug");

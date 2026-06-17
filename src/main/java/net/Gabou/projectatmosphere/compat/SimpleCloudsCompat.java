@@ -17,9 +17,11 @@ import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.WeatherSampler;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.valueproviders.BiasedToBottomInt;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec2;
 import org.joml.Vector2i;
 
@@ -50,6 +52,10 @@ public class SimpleCloudsCompat {
     public static final int MAX_RADIUS = Math.round(9429F / SCALE);
 
     private static boolean isInit = false;
+
+    public static void configureConstants() {
+        SimpleCloudsConstants.SPAWN_RADIUS = Math.min(ProjectAtmosphere.DEFAULT_RADIUS / 5, 10000);
+    }
 
     public static void init(ServerLevel level) {
         cloudManager = (ServerCloudManager) CloudManager.get(level);
@@ -226,5 +232,20 @@ public class SimpleCloudsCompat {
 
     public static double getCloudScale() {
         return SimpleCloudsConstants.CLOUD_SCALE;
+    }
+
+    public static CloudRegion spawnCloudAt(String cloudId, BlockPos anchor, ServerLevel level, @Nullable CloudRegion dummy, WindVector windVector) {
+        if (anchor == null) {
+            return null;
+        }
+        return spawnCloudInBiome(cloudId, new BiomeInstanceKey(level.getBiome(anchor).unwrapKey().map(key -> key.location()).orElse(null), anchor), level, dummy, windVector);
+    }
+
+    public static boolean isRainningAt(Level level, BlockPos pos) {
+        return CloudManager.get(level).isRainingAt(pos);
+    }
+
+    public static boolean isCloudAtPos(Level level, BlockPos pos) {
+        return CloudManager.get(level).getCloudGenerator().getCloudAtWorldPosition(pos.getX() + 0.5F, pos.getZ() + 0.5F) != null;
     }
 }

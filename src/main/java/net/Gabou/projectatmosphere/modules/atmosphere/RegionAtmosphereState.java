@@ -50,6 +50,9 @@ public class RegionAtmosphereState {
     private float pressure;
     private WindVector wind;
     private float cloudCover;
+    private float cloudWater;
+    private float cycloneCloudFloor;
+    private float cycloneRainFloor;
     private float sunlight;
     private float rainIntensity;
 
@@ -211,6 +214,36 @@ public class RegionAtmosphereState {
 
     public void setCloudCover(float value) {
         this.cloudCover = Mth.clamp(value, 0f, 1f);
+    }
+
+    public float getCloudWater() {
+        return cloudWater;
+    }
+
+    public void setCloudWater(float value) {
+        this.cloudWater = Mth.clamp(value, 0f, 1.2f);
+    }
+
+    public void adjustCloudWater(float delta) {
+        setCloudWater(this.cloudWater + delta);
+    }
+
+    public float getCycloneCloudFloor() {
+        return cycloneCloudFloor;
+    }
+
+    public float getCycloneRainFloor() {
+        return cycloneRainFloor;
+    }
+
+    public void applyCycloneVisualFloor(float cloudFloor, float rainFloor) {
+        cycloneCloudFloor = Math.max(cycloneCloudFloor, Mth.clamp(cloudFloor, 0f, 1f));
+        cycloneRainFloor = Math.max(cycloneRainFloor, Mth.clamp(rainFloor, 0f, 1f));
+    }
+
+    public void decayCycloneVisualFloor(float cloudDecay, float rainDecay) {
+        cycloneCloudFloor = Math.max(0f, cycloneCloudFloor - Math.max(0f, cloudDecay));
+        cycloneRainFloor = Math.max(0f, cycloneRainFloor - Math.max(0f, rainDecay));
     }
 
     public float getBiomeSunlightMultiplier() {

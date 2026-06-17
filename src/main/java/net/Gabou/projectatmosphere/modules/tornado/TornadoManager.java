@@ -18,6 +18,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class TornadoManager {
     private static final List<TornadoInstance> ACTIVE_TORNADOES = new ArrayList<>();
@@ -65,6 +66,27 @@ public class TornadoManager {
     }
     public static void clearTornadoes() {
         ACTIVE_TORNADOES.clear();
+    }
+
+    public static void removeClientTornado(UUID id) {
+        // This legacy TornadoInstance has no stable UUID field; clearing prevents stale client visuals after removal packets.
+        ACTIVE_TORNADOES.clear();
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public static void applyClientSnapshots(List<TornadoSnapshot> snapshots) {
+        ACTIVE_TORNADOES.clear();
+        if (!AtmoCommonConfig.ENABLE_TORNADOES.get() || snapshots == null) {
+            return;
+        }
+        for (TornadoSnapshot snapshot : snapshots) {
+            ACTIVE_TORNADOES.add(new TornadoInstance(
+                    snapshot.position(),
+                    snapshot.radius(),
+                    new WindVector(snapshot.windSpeed(), snapshot.windAngle(), snapshot.windGust()),
+                    null
+            ));
+        }
     }
 
     @OnlyIn(Dist.CLIENT)

@@ -1,0 +1,298 @@
+{
+  "files": 358,
+  "changed": 40,
+  "perFile": [
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\async\\BiomeSampler.java",
+      "removed": [
+        "net.minecraft.server.level.ServerLevel",
+        "net.minecraft.world.level.Level",
+        "net.minecraft.world.level.biome.MultiNoiseBiomeSource",
+        "net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\blocks\\DustLayerBlock.java",
+      "removed": [
+        "net.minecraft.world.level.storage.loot.LootContext"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\blocks\\SandLayerBlock.java",
+      "removed": [
+        "net.minecraft.world.item.Items",
+        "net.minecraft.world.level.storage.loot.parameters.LootContextParams"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\client\\ClientTickHandler.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\client\\HUDOverlayRenderer.java",
+      "removed": [
+        "com.mojang.blaze3d.vertex.PoseStack"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\client\\render\\SimpleCloudsTornadoRenderer.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\client\\screen\\WeatherRadarScreen.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\compat\\ColdSweatCompat.java",
+      "removed": [
+        "com.momosoftworks.coldsweat.common.entity.data.Preference",
+        "net.minecraft.server.level.ServerLevel"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\config\\AtmoCommonConfig.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.ProjectAtmosphere",
+        "net.minecraft.resources.ResourceLocation",
+        "net.minecraft.world.item.Item",
+        "net.minecraftforge.eventbus.api.SubscribeEvent",
+        "net.minecraftforge.fml.common.Mod",
+        "net.minecraftforge.fml.event.config.ModConfigEvent",
+        "net.minecraftforge.registries.ForgeRegistries",
+        "java.util.Set",
+        "java.util.stream.Collectors"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\event\\EventHandler.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.compat.CompatHandler"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\items\\Balai.java",
+      "removed": [
+        "net.minecraft.world.item.Item",
+        "net.minecraft.world.item.ShovelItem"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\items\\Thermometre.java",
+      "removed": [
+        "net.minecraftforge.api.distmarker.Dist",
+        "net.minecraftforge.api.distmarker.OnlyIn"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\manager\\AtmosphereManager.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.compat.CompatHandler"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\manager\\ForecastGenerator.java",
+      "removed": [
+        "com.BreadRes.desertstormwarming.logic.SandstormPhase",
+        "com.BreadRes.desertstormwarming.sounds.SandstormSounds",
+        "net.Gabou.projectatmosphere.event.BiomeChangeManager",
+        "net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState",
+        "net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI",
+        "net.Gabou.projectatmosphere.modules.temperature.spike.SpikeManager",
+        "net.Gabou.projectatmosphere.util.DelayedTaskScheduler",
+        "net.minecraft.client.Minecraft",
+        "net.minecraft.network.chat.Component",
+        "net.minecraft.sounds.SoundEvent",
+        "org.apache.commons.lang3.tuple.Pair",
+        "net.Gabou.projectatmosphere.seasons.SeasonStage",
+        "net.Gabou.projectatmosphere.seasons.SeasonTimeHelper"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\manager\\ForecastOrchestrator.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.modules.core.BiomeForecast"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\mixin\\MixinSandstormDebugBlocker.java",
+      "removed": [
+        "org.spongepowered.asm.mixin.injection.At",
+        "org.spongepowered.asm.mixin.injection.Redirect"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\mixin\\OverwriteDesertSound.java",
+      "removed": [
+        "org.spongepowered.asm.mixin.Unique"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\atmosphere\\CloudManager.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.manager.SimpleCloudSpawner",
+        "net.Gabou.projectatmosphere.modules.core.WindVector"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\atmosphere\\CycloneManager.java",
+      "removed": [
+        "java.util.Collections",
+        "java.util.LinkedHashMap"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\atmosphere\\RegionAtmosphereState.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.modules.region.RegionAdapters"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\hurricane\\HurricaneManager.java",
+      "removed": [
+        "java.util.Collections"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\hurricane\\HurricaneSemantics.java",
+      "removed": [
+        "java.util.List"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\pressure\\PressureGenerator.java",
+      "removed": [
+        "net.minecraft.world.level.Level"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\region\\RegionIdCodec.java",
+      "removed": [
+        "net.minecraft.resources.ResourceKey",
+        "net.minecraft.resources.ResourceLocation",
+        "net.minecraft.world.level.Level"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\sandStorm\\SandStormAPI.java",
+      "removed": [
+        "net.minecraft.world.entity.item.FallingBlockEntity",
+        "net.minecraft.world.level.block.FallingBlock",
+        "net.minecraft.world.level.block.SandBlock",
+        "java.util.Random"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\snowstorm\\SnowstormManager.java",
+      "removed": [
+        "net.minecraft.world.level.biome.Biome",
+        "java.util.Map",
+        "java.util.concurrent.ConcurrentHashMap",
+        "java.util.concurrent.ConcurrentLinkedDeque"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\temperature\\command\\TemperatureCommands.java",
+      "removed": [
+        "com.mojang.brigadier.arguments.IntegerArgumentType"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\temperature\\config\\BiomeTempUserConfig.java",
+      "removed": [
+        "java.util.Locale"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\temperature\\spike\\SpikeManager.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.util.BiomeInstanceKey"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\temperature\\spike\\SpikeStateStorage.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.modules.region.RegionIdCodec",
+        "net.Gabou.projectatmosphere.util.AtmosphereUtils",
+        "net.Gabou.projectatmosphere.util.BiomeInstanceKey",
+        "net.minecraft.core.BlockPos",
+        "net.minecraft.resources.ResourceLocation"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\temperature\\util\\TemperatureUtils.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.util.AtmosphereUtils",
+        "net.Gabou.projectatmosphere.util.BiomeInstanceKey",
+        "net.minecraft.core.BlockPos",
+        "net.minecraft.server.level.ServerLevel",
+        "net.minecraft.world.level.biome.Biome",
+        "net.minecraft.world.level.biome.BiomeManager",
+        "net.minecraft.world.level.biome.Climate"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\tornado\\TornadoDebug.java",
+      "removed": [
+        "net.minecraft.util.Mth"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\modules\\tornado\\TornadoManager.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.manager.ForecastOrchestrator"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\ProjectAtmosphere.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.manager.ForecastGenerator",
+        "net.minecraft.world.level.biome.BiomeSource"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\registry\\ClientOnlyRegistrar.java",
+      "removed": [
+        "net.minecraftforge.common.MinecraftForge",
+        "net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\registry\\ModBlocks.java",
+      "removed": [
+        "net.minecraft.client.resources.model.Material"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\registry\\ModClient.java",
+      "removed": [
+        "net.minecraft.client.particle.SpriteSet"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\registry\\ModItems.java",
+      "removed": [
+        "sfiomn.legendarysurvivaloverhaul.common.items.ThermometerItem"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\tools\\debug\\ShaderSnapshot.java",
+      "removed": [
+        "dev.nonamecrackers2.simpleclouds.client.mesh.generator.SingleRegionCloudMeshGenerator",
+        "dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants"
+      ]
+    },
+    {
+      "file": "G:\\Project-Atmosphere\\src\\main\\java\\net\\Gabou\\projectatmosphere\\util\\TickCounter.java",
+      "removed": [
+        "net.Gabou.projectatmosphere.manager.AtmosphereManager",
+        "net.minecraftforge.event.TickEvent"
+      ]
+    }
+  ]
+}

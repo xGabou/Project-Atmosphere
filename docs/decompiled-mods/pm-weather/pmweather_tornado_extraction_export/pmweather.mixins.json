@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "package": "dev.protomanly.pmweather.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "pmweather.refmap.json",
+  "mixins": [
+    "LevelMixin",
+    "ServerLevelMixin",
+    "SnowLayerBlockMixin",
+    "SpreadingSnowyDirtBlockMixin"
+  ],
+  "client": [
+    "ParticleMixin",
+    "LevelRendererMixin",
+    "PostChainMixin",
+    "ClientLevelMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

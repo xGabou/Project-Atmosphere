@@ -1,39 +1,119 @@
-## Project Atmosphere
+# Project Atmosphere 0.9.1 Alpha
 
-### Changed
-- Reworked wind handling across the mod to remove inconsistencies and ensure all systems use the same wind source and direction convention.
-- Wind particles now sample wind every tick at their own position and smoothly steer toward it, producing real bending instead of straight trajectories.
-- Player wind influence now uses Weather2-style steering applied after input, with a noticeable effect only above 11.1 m/s.
-- Non-player living entities use a separate steering path with optional gust blending and higher drift caps.
-- Wind direction vectors are now consistent across particles, entity forces, and SimpleClouds cloud drift.
-- Cloud regions now apply a stable per-cloud direction bias plus slow wobble and slight speed variance to reduce apparent stacking.
-- Temperature clamping now logs a debug warning with context and stack trace to track runaway sources.
-- Server commands are now registered under the `/pa` root (for example `/pa temperature` and `/pa spawnTornado`).
-- Wind-driven neighbor mixing now clamps its factors and deltas to stop runaway temperature spikes from spreading.
-- Added weather snapshot and world-effects hooks, including rain-driven fire/campfire extinguish, cauldron filling, and dense-cloud sunburn suppression.
-- Region fallback generation now ensures biome keys are present and regenerates any regions that contain only min/max clamp values.
-- Wind steering now ramps near the threshold so low winds no longer slow the player.
-- World effects skip sampling when no rain is present and no custom effects are registered, reducing tick load.
-- Wind drift now applies as a directional add without reducing existing player speed.
-- Player wind now uses intermittent gust impulses (no conveyor steering), with configurable thresholds and caps.
-- Wind particle steering now caches region wind samples per tick to reduce client overhead.
-- Client cloud culling now uses a single pass per tick to avoid quadratic scans.
-- Creative/spectator players are immune to wind gusts, and gust impulses no longer reduce current player speed.
-- Sprinting players now ignore gusts unless winds reach extreme thresholds.
-- Surface wind now comes from the low-wind layer and no longer treats gust headroom as baseline speed.
-- Reduced default wind push scales and player gust caps by ~3x for gentler movement impact.
-- Thermometer now syncs the client day-forecast temperature so it no longer shows the 0.5 fallback.
-- Instrument readouts now use server-side values in multiplayer instead of showing default client fallbacks.
-- Storm sirens now play the severe-storm sound only once per continuous storm event.
+## Atmospheric Continuity Update
 
-### Fixed
-- Fixed a wind particle crash.
-- Fixed wind speed being far too low due to a unit mismatch in the wind equation (hPa vs Pa), which was suppressing the computed wind magnitude.
-- Fixed a 90° wind direction offset caused by inconsistent sin/cos mapping between systems.
-- Fixed wind fallback behavior and cleaned up wind selection usage to reduce edge-case inconsistencies.
-- Wind forces now respect exposure, skipping entities in water or lava, under cover, or colliding horizontally.
+Project Atmosphere 0.9.1 improves weather persistence, seasonal behavior, pressure logic, cyclone formation, cloud simulation, and debug tools.
 
-### Notes
-- Storms have been observed spawning again in testing (cumulus clouds and a wall cloud), so storm generation appears to be working correctly.
-- Please report any unusual wind behavior, particle issues, or storm spawning problems so I can continue monitoring and tuning.
+This update is mostly backend focused, but it builds the foundation for future weather systems.
 
+## Persistent Atmosphere
+
+Weather now survives server restarts instead of resetting to forecast defaults.
+
+Persistent systems include:
+
+* Temperature
+* Humidity
+* Pressure
+* Wind
+* Cloud water
+* Cloud cover
+* Rain intensity
+* Ocean state
+* Cyclone state
+* Seasonal drift
+* WeatherCells
+
+Weather now continues evolving between play sessions.
+
+## Forecasts And Seasons
+
+Forecasts now act as a climate baseline instead of being regenerated during normal season changes.
+
+Forecast regeneration is now limited to missing data, corrupt data recovery, and admin or debug commands.
+
+Season changes now gradually influence the live atmosphere instead of rebuilding it.
+
+Stored forecasts are now season neutral. The current season offset is applied when forecast targets are sampled, so the atmosphere follows the current season instead of stale values.
+
+Season compatibility was also improved through the season delegate system.
+
+## Pressure Lifecycle
+
+Pressure behavior was reworked so stale low pressure does not last forever, while real weather systems can still persist.
+
+Pressure now follows a cleaner lifecycle:
+
+* Forecast pressure remains the dynamic target
+* Active low pressure systems can persist
+* Unsupported stale lows recover slowly
+* Pressure gradients remain meaningful
+* Pressure is no longer forced back to normal
+
+Unsupported low pressure recovery is capped at 2 hPa per Minecraft day and is resisted by rain, storms, cyclones, ocean influence, wind, humidity, cloud water, and convergence.
+
+## Cyclone Seeds
+
+Cyclone formation was reworked so weak low pressure disturbances can form earlier.
+
+The new lifecycle separates weak seed formation, cyclone intensification, and severe storm development.
+
+Cyclone seeds now depend more on low pressure anomaly, humidity, cloud water, convergence, wind organization, and moisture sources.
+
+## WeatherCells And Rain Cells
+
+A new WeatherCell layer was added between the persistent atmosphere and future weather effects.
+
+Only Rain Cells are active for now, but this system is planned to support future thunderstorms, supercells, cyclones, and blizzards.
+
+Rain Cells can now:
+
+* Form from atmospheric support
+* Move with wind
+* Age and decay naturally
+* Increase local rainfall
+* Consume cloud water
+* Persist across restarts
+
+## Clouds
+
+Cloud formation now better accounts for humidity, cloud water, temperature, pressure, and wind convergence.
+
+Cloud water consumption and balancing were improved to reduce runaway humidity and excessive cloud growth.
+
+## Dedicated Server Stability
+
+Several cloud related client and server issues were fixed.
+
+This includes better dedicated server safety, improved client gating for cloud sync, and removal of client cache references from common server code.
+
+## Debug Tools
+
+Debug tools now expose more details about seasonal targets, pressure recovery, cyclone seed eligibility, storm support, ocean influence, wind pressure mixing, and live vs forecast deltas.
+
+New debug commands:
+
+```mcfunction
+/pa debug cyclone
+/pa debug cyclone current
+/pa debug cyclone region
+/pa debug cyclone nearest
+/pa debug cyclone list
+/pa debug pressure
+/pa debug pressure current
+/pa debug pressure region
+```
+
+## Summary
+
+Project Atmosphere now treats forecasts as the climate baseline and the persistent atmosphere as the live evolving weather state.
+
+Season changes no longer rebuild the atmosphere.
+
+Pressure, wind, rain, cloud water, cyclones, ocean influence, and seasonal drift now persist and evolve more naturally over time.
+
+# Update 0.9.1 Alpha will be released to~~morrow~~ night.
+
+I need to head to bed now,
+
+Thanks for your patience.

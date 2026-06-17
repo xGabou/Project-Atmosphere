@@ -40,10 +40,13 @@
   - Forecasting and state managers run asynchronously using safe, background threads.
   - All core systems are chunk-based and independently extensible.
 
-- **🧪 Developer & Debug Tools**
-- `/weatherdebug` to inspect live forecasts, force spikes, test biome data.
-- `/temperature`, `/humidity`, `/pressure` commands for diagnostics.
-- `/spawntornadoes` to manually create a test tornado for shader debugging.
+- **Developer & Debug Tools**
+  - `/pa help`
+  - `/pa status`
+  - `/pa debug on|off`
+  - `/pa forecast`, `/pa temperature`, `/pa humidity`, `/pa pressure`, `/pa wind`
+  - `/pa fog`, `/pa cloud`, `/pa tornado`, `/pa hurricane`, `/pa system`
+  - Legacy commands still work for now, but the new `/pa` tree is the primary interface.
 
 ---
 

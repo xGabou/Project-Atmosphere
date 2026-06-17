@@ -1,0 +1,347 @@
+{
+  "commands": [
+    {
+      "name": "/pa temperature forecast",
+      "syntax": "/pa temperature forecast",
+      "permissionLevel": "player",
+      "description": "Shows the weekly temperature forecast for the player's current biome.",
+      "examples": [
+        "/pa temperature forecast"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa temperature get",
+      "syntax": "/pa temperature get <biome>",
+      "permissionLevel": "player",
+      "description": "Samples the current temperature for a biome id or the current biome aliases supported by the command helper.",
+      "examples": [
+        "/pa temperature get minecraft:plains",
+        "/pa temperature get current"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa temperature dayprofile",
+      "syntax": "/pa temperature dayprofile",
+      "permissionLevel": "player",
+      "description": "Prints the current biome's daily temperature profile array.",
+      "examples": [
+        "/pa temperature dayprofile"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa temperature getseason",
+      "syntax": "/pa temperature getseason",
+      "permissionLevel": "2",
+      "description": "Shows the current season/sub-season as reported by the active season provider.",
+      "examples": [
+        "/pa temperature getseason"
+      ]
+    },
+    {
+      "name": "/pa temperature gettemp",
+      "syntax": "/pa temperature gettemp",
+      "permissionLevel": "2",
+      "description": "Prints raw and converted temperature values for the player's position.",
+      "examples": [
+        "/pa temperature gettemp"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa temperature regenerate",
+      "syntax": "/pa temperature regenerate",
+      "permissionLevel": "2",
+      "description": "Clears/regenerates forecast cache data.",
+      "examples": [
+        "/pa temperature regenerate"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa temperature resetSpikes",
+      "syntax": "/pa temperature resetSpikes",
+      "permissionLevel": "2",
+      "description": "Clears cached temperature spike simulation data.",
+      "examples": [
+        "/pa temperature resetSpikes"
+      ]
+    },
+    {
+      "name": "/pa temperature help",
+      "syntax": "/pa temperature help",
+      "permissionLevel": "player",
+      "description": "Prints built-in help for the temperature command group.",
+      "examples": [
+        "/pa temperature help"
+      ]
+    },
+    {
+      "name": "/pa humidity get",
+      "syntax": "/pa humidity get",
+      "permissionLevel": "player",
+      "description": "Prints the humidity forecast array for the player's current region.",
+      "examples": [
+        "/pa humidity get"
+      ]
+    },
+    {
+      "name": "/pa pressure get",
+      "syntax": "/pa pressure get",
+      "permissionLevel": "player",
+      "description": "Prints the pressure forecast array for the player's current region.",
+      "examples": [
+        "/pa pressure get"
+      ]
+    },
+    {
+      "name": "/pa windSpeed get",
+      "syntax": "/pa windSpeed get",
+      "permissionLevel": "player",
+      "description": "Prints the wind forecast data for the player's current region.",
+      "examples": [
+        "/pa windSpeed get"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa spawncloud",
+      "syntax": "/pa spawncloud",
+      "permissionLevel": "2",
+      "description": "Spawns a cloud for the executing player through the Simple Clouds integration.",
+      "examples": [
+        "/pa spawncloud"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa fog spawn",
+      "syntax": "/pa fog spawn [strength] [seconds]",
+      "permissionLevel": "2",
+      "description": "Applies a client fog debug override to the executing player.",
+      "examples": [
+        "/pa fog spawn",
+        "/pa fog spawn 0.85 30"
+      ],
+      "notes": "Current-source debug command. Overworld only."
+    },
+    {
+      "name": "/pa fog clear",
+      "syntax": "/pa fog clear",
+      "permissionLevel": "2",
+      "description": "Clears the client fog debug override for the executing player.",
+      "examples": [
+        "/pa fog clear"
+      ],
+      "notes": "Current-source debug command. Overworld only."
+    },
+    {
+      "name": "/pa weatherdebug forecast",
+      "syntax": "/pa weatherdebug forecast [biome]",
+      "permissionLevel": "player",
+      "description": "Prints forecast, humidity, pressure, and wind information for the current position or a biome id argument.",
+      "examples": [
+        "/pa weatherdebug forecast",
+        "/pa weatherdebug forecast minecraft:plains"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa weatherdebug fog",
+      "syntax": "/pa weatherdebug fog [pos]",
+      "permissionLevel": "player",
+      "description": "Prints fog heuristic inputs and tunables for the current position or a target block position.",
+      "examples": [
+        "/pa weatherdebug fog",
+        "/pa weatherdebug fog 0 64 0"
+      ],
+      "notes": "Current-source command. Overworld only."
+    },
+    {
+      "name": "/pa weatherdebug cpu",
+      "syntax": "/pa weatherdebug cpu",
+      "permissionLevel": "player",
+      "description": "Shows simple CPU/executor profile information used by the mod.",
+      "examples": [
+        "/pa weatherdebug cpu"
+      ]
+    },
+    {
+      "name": "/pa weatherdebug rain",
+      "syntax": "/pa weatherdebug rain [pos] [noThunder] [intensity]",
+      "permissionLevel": "player",
+      "description": "Spawns a debug rain cloud near the target position.",
+      "examples": [
+        "/pa weatherdebug rain",
+        "/pa weatherdebug rain 0 64 0 true 2"
+      ],
+      "notes": "Overworld only. Intensity range is 1..2."
+    },
+    {
+      "name": "/pa weatherdebug thunder",
+      "syntax": "/pa weatherdebug thunder [pos] [intensity]",
+      "permissionLevel": "player",
+      "description": "Spawns a debug thunder cloud near the target position.",
+      "examples": [
+        "/pa weatherdebug thunder",
+        "/pa weatherdebug thunder 0 64 0 2"
+      ],
+      "notes": "Overworld only. Intensity range is 1..2."
+    },
+    {
+      "name": "/pa weatherdebug snowstorm",
+      "syntax": "/pa weatherdebug snowstorm [pos] [overwrite]",
+      "permissionLevel": "player",
+      "description": "Attempts to spawn a debug snowstorm cloud.",
+      "examples": [
+        "/pa weatherdebug snowstorm",
+        "/pa weatherdebug snowstorm 0 64 0 true"
+      ],
+      "notes": "Currently broken in source: the handler expects an intensity argument that the command tree does not expose."
+    },
+    {
+      "name": "/pa weatherdebug debugmode",
+      "syntax": "/pa weatherdebug debugmode <value>",
+      "permissionLevel": "player",
+      "description": "Toggles the in-memory Project Atmosphere debug mode flag.",
+      "examples": [
+        "/pa weatherdebug debugmode true"
+      ]
+    },
+    {
+      "name": "/pa weatherdebug cloud",
+      "syntax": "/pa weatherdebug cloud <id>",
+      "permissionLevel": "2",
+      "description": "Spawns a specific cloud id at the player's position.",
+      "examples": [
+        "/pa weatherdebug cloud cumulonimbus"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa weatherdebug tornado risk",
+      "syntax": "/pa weatherdebug tornado risk",
+      "permissionLevel": "2",
+      "description": "Prints the computed tornado risk for the player's current region.",
+      "examples": [
+        "/pa weatherdebug tornado risk"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa weatherdebug tornado force",
+      "syntax": "/pa weatherdebug tornado force <intensity>",
+      "permissionLevel": "2",
+      "description": "Forces a tornado spawn with the given intensity.",
+      "examples": [
+        "/pa weatherdebug tornado force 0.8"
+      ],
+      "notes": "Overworld only. Intensity range is 0.0..1.0."
+    },
+    {
+      "name": "/pa weatherdebug tornado cooldown reset",
+      "syntax": "/pa weatherdebug tornado cooldown reset",
+      "permissionLevel": "2",
+      "description": "Clears the tornado cooldown for the player's current region.",
+      "examples": [
+        "/pa weatherdebug tornado cooldown reset"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa spawnTornado",
+      "syntax": "/pa spawnTornado",
+      "permissionLevel": "2",
+      "description": "Attempts to engage a tornado near the player, seeding or reusing a cumulonimbus cloud if needed.",
+      "examples": [
+        "/pa spawnTornado"
+      ],
+      "notes": "Alias: /pa spawntornadoes. Overworld only."
+    },
+    {
+      "name": "/pa cleartornadoes",
+      "syntax": "/pa cleartornadoes",
+      "permissionLevel": "2",
+      "description": "Clears all active tornadoes.",
+      "examples": [
+        "/pa cleartornadoes"
+      ]
+    },
+    {
+      "name": "/pa removetornado",
+      "syntax": "/pa removetornado",
+      "permissionLevel": "2",
+      "description": "Removes a tornado near the executing player.",
+      "examples": [
+        "/pa removetornado"
+      ],
+      "notes": "Overworld only."
+    },
+    {
+      "name": "/pa spawnHurricane",
+      "syntax": "/pa spawnHurricane <category>",
+      "permissionLevel": "2",
+      "description": "Spawns a hurricane near the player in a valid ocean biome.",
+      "examples": [
+        "/pa spawnHurricane 1",
+        "/pa spawnHurricanes 5"
+      ],
+      "notes": "Alias: /pa spawnHurricanes. Overworld only. Category range is 1..5."
+    },
+    {
+      "name": "/pa clearhurricanes",
+      "syntax": "/pa clearhurricanes",
+      "permissionLevel": "2",
+      "description": "Clears all active hurricanes.",
+      "examples": [
+        "/pa clearhurricanes"
+      ]
+    },
+    {
+      "name": "/pa removehurricane",
+      "syntax": "/pa removehurricane",
+      "permissionLevel": "2",
+      "description": "Removes a hurricane near the executing player.",
+      "examples": [
+        "/pa removehurricane"
+      ]
+    },
+    {
+      "name": "/pa debug export",
+      "syntax": "/pa debug export",
+      "permissionLevel": "client-only",
+      "description": "Client debug command that exports telemetry archives when telemetry is enabled.",
+      "examples": [
+        "/pa debug export"
+      ],
+      "notes": "Registered on the client command dispatcher."
+    },
+    {
+      "name": "/pa debug open",
+      "syntax": "/pa debug open",
+      "permissionLevel": "client-only",
+      "description": "Client debug command that opens the telemetry folder when telemetry is enabled.",
+      "examples": [
+        "/pa debug open"
+      ],
+      "notes": "Registered on the client command dispatcher."
+    },
+    {
+      "name": "/dumpcloud",
+      "syntax": "/dumpcloud",
+      "permissionLevel": "client-only",
+      "description": "Client debug command that captures the current cloud render texture.",
+      "examples": [
+        "/dumpcloud"
+      ],
+      "notes": "Registered on the client command dispatcher."
+    }
+  ],
+  "notes": [
+    "Current server commands are rooted under /pa.",
+    "The README still mentions /weatherdebug directly, but the current source registers /pa weatherdebug instead.",
+    "An undocumented /pa weatherdebug <resource_location> path exists in source for cloud violence reporting; it is omitted here because the syntax is unstable and not user-friendly."
+  ]
+}

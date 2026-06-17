@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.hurricane;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
@@ -30,6 +31,15 @@ public class HurricaneManager {
 
     public static List<HurricaneInstance> getActiveHurricanes() {
         return Collections.unmodifiableList(ACTIVE_HURRICANES);
+    }
+
+    public static CloudRegion getReservationRegionAt(double worldX, double worldZ) {
+        for (HurricaneInstance hurricane : ACTIVE_HURRICANES) {
+            if (HurricaneSemantics.intersectsReservation(hurricane, worldX, worldZ, 0.0D)) {
+                return HurricaneSemantics.createReservationRegion(hurricane);
+            }
+        }
+        return null;
     }
 
     public static void clearHurricanes() {

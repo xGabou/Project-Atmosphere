@@ -1,0 +1,40 @@
+@startuml
+package Backend {
+    class CloudRegionState
+    class CloudRegionRegistry
+    class CloudRegionStorage
+    class CloudRegionSavedData
+    class CloudRegionBackend
+    class CloudRegionRenderData
+    class CloudRegionRenderDataFactory
+    class CloudRegionManager
+    class CloudRegionSpawner
+    class CloudRegionMotionController
+    class CloudRegionLifecycleController
+    class CloudRegionSyncManager
+}
+
+class RegionInstanceKey
+class ServerLevel
+class WeatherSnapshot
+class WindVector
+
+CloudRegionState ..> RegionInstanceKey
+CloudRegionRegistry ..> CloudRegionState
+CloudRegionStorage ..> CloudRegionRegistry
+CloudRegionStorage ..> CloudRegionState
+CloudRegionSavedData ..> CloudRegionStorage
+CloudRegionSavedData ..> CloudRegionRegistry
+CloudRegionBackend ..> CloudRegionSavedData
+CloudRegionRenderDataFactory ..> CloudRegionState
+CloudRegionRenderDataFactory ..> CloudRegionRenderData
+
+CloudRegionManager ..> CloudRegionRegistry
+CloudRegionManager ..> CloudRegionMotionController
+CloudRegionManager ..> CloudRegionLifecycleController
+CloudRegionSpawner ..> WeatherSnapshot
+CloudRegionMotionController ..> WindVector
+CloudRegionSyncManager ..> CloudRegionRegistry
+CloudRegionSyncManager ..> CloudRegionRenderData
+ServerLevel ..> CloudRegionSavedData
+@enduml

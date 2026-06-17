@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "half=lower": {
+      "model": "projectatmosphere:block/storm_siren_bottom"
+    },
+    "half=upper": {
+      "model": "projectatmosphere:block/storm_siren_top"
+    }
+  }
+}

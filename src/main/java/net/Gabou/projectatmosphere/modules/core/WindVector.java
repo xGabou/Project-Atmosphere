@@ -135,6 +135,52 @@ public record WindVector(float baseSpeed, float angleRadians, float gustSpeed) {
 
     public record WindSample(float speedMps, float directionDeg) { }
 
+    public static float estimateHumidityTransport(RegionInstanceKey key) {
+        if (key == null) {
+            return 0f;
+        }
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+        if (state == null) {
+            return 0f;
+        }
+        return estimateHumidityTransport(
+                key,
+                state,
+                AtmosphericStateRegistry.getStatesAsMap(),
+                AtmosphericStateRegistry.getNeighborsAsMap()
+        );
+    }
+
+    public static float estimateHumidityTransport(
+            RegionInstanceKey key,
+            RegionAtmosphereState state,
+            Map<RegionInstanceKey, RegionAtmosphereState> states,
+            Map<RegionInstanceKey, List<RegionInstanceKey>> neighborsMap
+    ) {
+        if (key == null || state == null || states == null || neighborsMap == null) {
+            return 0f;
+        }
+        float strength = state.getWindStrength();
+        if (strength <= 0.01f) {
+            return 0f;
+        }
+        List<RegionInstanceKey> neighbors = neighborsMap.getOrDefault(key, List.of());
+        if (neighbors.isEmpty()) {
+            return 0f;
+        }
+        float humidityFactor = Mth.clamp(0.03f * strength, 0f, MAX_WIND_MIX_FACTOR);
+        float total = 0f;
+        for (RegionInstanceKey neighborKey : neighbors) {
+            RegionAtmosphereState neighbor = states.get(neighborKey);
+            if (neighbor == null) {
+                continue;
+            }
+            float humidityDelta = (neighbor.getHumidity() - state.getHumidity()) * humidityFactor;
+            total += Mth.clamp(humidityDelta, -MAX_HUMIDITY_MIX_DELTA, MAX_HUMIDITY_MIX_DELTA);
+        }
+        return Mth.clamp(total, -MAX_HUMIDITY_MIX_DELTA, MAX_HUMIDITY_MIX_DELTA);
+    }
+
     private static final class Delta {
         private float temperature;
         private float humidity;

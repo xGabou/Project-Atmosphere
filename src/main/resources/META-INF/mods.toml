@@ -1,0 +1,79 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_name}"
+authors = "${mod_authors}"
+description = '''${mod_description}'''
+logoFile = "${mod_logo_file}"
+mixinConfigs = "${mod_mixins}"
+displayTest = "IGNORE_ALL_VERSION"
+
+[[dependencies."${mod_id}"]]
+modId = "forge"
+mandatory = true
+versionRange = "${forge_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "sereneseasons"
+mandatory = false
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+
+[[dependencies."${mod_id}"]]
+modId = "sereneseasonsplus"
+mandatory = false
+versionRange = "[5.1.2,)"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "dynamictrees"
+mandatory = false
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "sandstorm"
+mandatory = false
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "simpleclouds"
+mandatory = true
+versionRange = "[0.7.3,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "gaboulibs"
+mandatory = true
+versionRange = "[1.7.2,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "distanthorizons"
+mandatory = false
+versionRange = "[3.0.1-b,)"
+ordering = "AFTER"
+side = "BOTH"
+
+
+

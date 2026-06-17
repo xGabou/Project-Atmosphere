@@ -1,0 +1,30 @@
+{
+  "slug": "projectatmosphere",
+  "name": "Project Atmosphere",
+  "aliases": [
+    "projectatmosphere",
+    "project atmosphere",
+    "pa"
+  ],
+  "latestVersion": "0.8.0.0",
+  "minecraftVersions": [
+    "1.20.1"
+  ],
+  "loaders": [
+    "forge"
+  ],
+  "docs": {
+    "overview": "docs/mods/projectatmosphere/overview.md",
+    "install": "docs/mods/projectatmosphere/install.md",
+    "troubleshooting": "docs/mods/projectatmosphere/troubleshooting.md",
+    "faq": "docs/mods/projectatmosphere/faq.md"
+  },
+  "links": {
+    "source": "https://github.com/xGabou/Project-Atmosphere",
+    "issues": "https://github.com/xGabou/Project-Atmosphere/issues"
+  },
+  "notes": [
+    "Alias list is derived from the mod id, display name, and common in-repo shorthand. Confirm against the global mod catalog if that catalog uses different aliases.",
+    "Latest version is taken from gradle.properties in the current repository."
+  ]
+}

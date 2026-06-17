@@ -85,6 +85,9 @@ public class ModItems {
     public static final DeferredHolder<Item, Item> STORM_SIREN =
             blockUtilities(ModBlocks.STORM_SIREN);
 
+    public static final DeferredHolder<Item, Item> STORM_SHIELD =
+            blockUtilities(ModBlocks.STORM_SHIELD);
+
     // === Utility method ===
     private static DeferredHolder<Item, Item> blockUtilities(DeferredHolder<Block, Block> block) {
         return ITEMS.register(block.getId().getPath(),

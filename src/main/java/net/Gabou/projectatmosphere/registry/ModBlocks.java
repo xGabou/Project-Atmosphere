@@ -88,6 +88,14 @@ public class ModBlocks {
                     .noOcclusion()
             ));
 
+    public static final DeferredHolder<Block, Block> STORM_SHIELD = REGISTRY.register("storm_shield", () ->
+            new StormShieldBlock(BlockBehaviour.Properties
+                    .of()
+                    .strength(3.0f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+            ));
+
     public static void register(IEventBus eventBus) {
         REGISTRY.register(eventBus);
     }

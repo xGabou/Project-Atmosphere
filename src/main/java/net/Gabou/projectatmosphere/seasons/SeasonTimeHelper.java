@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.seasons;
 
+import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -71,6 +73,22 @@ public final class SeasonTimeHelper {
             return DELEGATE.get().dayDuration(level);
         } catch (Exception e) {
             return NeutralDelegate.DAY_DURATION;
+        }
+    }
+
+    public static void onRainStarted(ServerLevel level, CloudRegion cloudRegion) {
+        try {
+            DELEGATE.get().onRainStarted(level, cloudRegion);
+        } catch (Exception e) {
+            LOGGER.warn("Season delegate failed while handling rain start.", e);
+        }
+    }
+
+    public static void onRainEnded(ServerLevel level, CloudRegion cloudRegion) {
+        try {
+            DELEGATE.get().onRainEnded(level, cloudRegion);
+        } catch (Exception e) {
+            LOGGER.warn("Season delegate failed while handling rain end.", e);
         }
     }
 

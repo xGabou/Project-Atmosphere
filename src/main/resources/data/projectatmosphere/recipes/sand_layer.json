@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:sand" }
+  ],
+  "result": { "item": "projectatmosphere:sand_layer", "count": 8 }
+}

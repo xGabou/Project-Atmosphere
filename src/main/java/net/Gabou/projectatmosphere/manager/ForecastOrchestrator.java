@@ -347,6 +347,18 @@ public class ForecastOrchestrator {
         return getCurrentTemperature(key, tick);
     }
 
+    public static float getCurrentTemperature(RegionInstanceKey regionKey, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            return state.getTemperature();
+        }
+        ForecastRegion region = resolveRegionForecast(regionKey);
+        if (region != null) {
+            return region.sampleTemperature(Vec3.atCenterOf(regionKey.center()), tick);
+        }
+        return 0f;
+    }
+
     /**
      * Get humidity for any biome
      */
@@ -372,6 +384,18 @@ public class ForecastOrchestrator {
         }
         BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
         return getCurrentHumidity(key, tick);
+    }
+
+    public static float getCurrentHumidity(RegionInstanceKey regionKey, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            return state.getHumidityPercent();
+        }
+        ForecastRegion region = resolveRegionForecast(regionKey);
+        if (region != null) {
+            return region.sampleHumidity(Vec3.atCenterOf(regionKey.center()), tick);
+        }
+        return 0f;
     }
 
     /**
@@ -401,6 +425,18 @@ public class ForecastOrchestrator {
         return getCurrentPressure(key, tick);
     }
 
+    public static float getCurrentPressure(RegionInstanceKey regionKey, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            return state.getPressure();
+        }
+        ForecastRegion region = resolveRegionForecast(regionKey);
+        if (region != null) {
+            return region.samplePressure(tick);
+        }
+        return 0f;
+    }
+
     /**
      * Get wind for any biome
      */
@@ -425,6 +461,19 @@ public class ForecastOrchestrator {
                 + (lowPressure * 0.1f);
 
         return Math.max(0f, Math.min(1f, combined));
+    }
+
+    public static float getCurrentStormChance(RegionInstanceKey regionKey, long tick) {
+        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            float rain = Math.min(1f, state.getRainIntensity());
+            float cloud = state.getCloudCover();
+            float wind = Math.min(1f, state.getWindStrength() / 18f);
+            float lowPressure = Math.min(1f, Math.max(0f, (1013.25f - state.getPressure()) / 55f));
+            return Math.max(0f, Math.min(1f, (rain * 0.45f) + (cloud * 0.3f) + (wind * 0.15f) + (lowPressure * 0.1f)));
+        }
+        ForecastRegion region = resolveRegionForecast(regionKey);
+        return region == null ? 0f : region.sampleStorm(tick);
     }
 
     public static void tick(ServerLevel level) {
@@ -574,6 +623,17 @@ public class ForecastOrchestrator {
         }
         try {
             return REGION_ORCHESTRATOR.ensureLoaded(regionKey);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static ForecastRegion resolveRegionForecast(RegionInstanceKey key) {
+        if (key == null || REGION_ORCHESTRATOR == null) {
+            return null;
+        }
+        try {
+            return REGION_ORCHESTRATOR.ensureLoaded(key);
         } catch (Throwable ignored) {
             return null;
         }

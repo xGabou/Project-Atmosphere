@@ -1,0 +1,10 @@
+﻿net\Gabou\projectatmosphere\telemetry\TelemetryModels\AnomalyMarker.java
+net\Gabou\projectatmosphere\telemetry\TelemetryModels\AtmosphereCouplingSample.java
+net\Gabou\projectatmosphere\telemetry\TelemetryModels\HumidityBudgetSample.java
+net\Gabou\projectatmosphere\telemetry\TelemetryModels\CloudCreated.java
+net\Gabou\projectatmosphere\telemetry\TelemetryModels\CloudDied.java
+net\Gabou\projectatmosphere\telemetry\TelemetryModels\CloudEvolved.java
+net\Gabou\projectatmosphere\telemetry\TelemetryModels\CloudTickSummary.java
+net\Gabou\projectatmosphere\telemetry\TelemetryModels\PrecipitationDecisionTrace.java
+net\Gabou\projectatmosphere\client\hurricane\cache\ClientHurricaneStateCache\RenderableHurricane.java
+net\Gabou\projectatmosphere\modules\temperature\config\BiomeTempConfig\Season.java

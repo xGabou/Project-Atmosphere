@@ -1,6 +1,7 @@
 /.gradle/
 /build/
 /run/
+/.idea/
 
 /run/config/
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_1_2025_11_21_PM_[Changes]/buildOutputCleanup.lock
@@ -30,6 +31,8 @@
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_54_PM_[Changes]/fileHashes.lock
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]1/fileHashes.lock
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]2/fileHashes.lock
+/gradle/wrapper/gradle-wrapper.jar
+/gradle/wrapper/gradle-wrapper.properties
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_1_2025_11_21_PM_[Changes]/md5-checksums.bin
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_54_PM_[Changes]/md5-checksums.bin
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]1/md5-checksums.bin
@@ -48,7 +51,10 @@
 /src/main/java/net/Gabou/projectatmosphere/temperature (2).zip
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM__Changes_1.xml
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM__Changes_2.xml
-/.idea/
-/.idea/
+.idea/
 
-.ai/
+docs/decompiled-mods/Dynamic Trees/.tmp_dynamictrees/
+docs/decompiled-mods/Dynamic Trees/.tmp_dynamictrees_full/
+
+/docs/PA-docs/Studies/pa_realistic_cloud_renderer_design.md
+/docs/PA-docs/Core Systems/Studies/pa_realistic_cloud_renderer_design.md
