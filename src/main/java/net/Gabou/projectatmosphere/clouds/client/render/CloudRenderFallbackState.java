@@ -15,7 +15,6 @@ import java.util.Locale;
  */
 public final class CloudRenderFallbackState {
     private static final int FALLBACK_COLOR = 0xFFFF3030;
-    private static final float VISIBLE_ALPHA_THRESHOLD = 0.001F;
 
     private static volatile FailureStatus status = FailureStatus.inactive();
     private static volatile CloudRenderSnapshot lastKnownGoodSnapshot;
@@ -41,55 +40,7 @@ public final class CloudRenderFallbackState {
         }
 
         if (stats.renderedSnapshots() > 0) {
-            if (!stats.outputAlphaSampled()) {
-                clearActiveFailure();
-                return;
-            }
-
-            if (stats.shaderDebugMode()) {
-                activate(
-                        "Cloud shader debug",
-                        buildDetail(
-                                String.format(
-                                        Locale.ROOT,
-                                        "diagnostic shader visualization active; cloud target alpha %.5f",
-                                        stats.maxOutputAlpha()
-                                ),
-                                stats
-                        ),
-                        candidateSnapshot,
-                        cameraPosition,
-                        stats,
-                        false
-                );
-                return;
-            }
-
-            if (stats.maxOutputAlpha() > VISIBLE_ALPHA_THRESHOLD) {
-                clearActiveFailure();
-                return;
-            }
-
-            if (stats.frustumSkippedSnapshots() > 0) {
-                clearActiveFailure();
-                return;
-            }
-
-            activate(
-                    "No cloud output",
-                    buildDetail(
-                            String.format(
-                                    Locale.ROOT,
-                                    "draws were submitted but cloud target alpha stayed %.5f",
-                                    stats.maxOutputAlpha()
-                            ),
-                            stats
-                    ),
-                    candidateSnapshot,
-                    cameraPosition,
-                    stats,
-                    false
-            );
+            clearActiveFailure();
             return;
         }
 
@@ -104,11 +55,6 @@ public final class CloudRenderFallbackState {
             if (!status.active()) {
                 clearActiveFailure();
             }
-            return;
-        }
-
-        if (stats.frustumSkippedSnapshots() >= stats.renderableSnapshots()) {
-            clearActiveFailure();
             return;
         }
 

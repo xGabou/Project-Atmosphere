@@ -14,9 +14,14 @@ import java.util.List;
 
 public final class CloudShadowRenderer {
     private static final int DEFAULT_GRID_RESOLUTION = 64;
+    private static final long SHADOW_REFRESH_TICKS = 20L;
+    private static final double SHADOW_REFRESH_CAMERA_DISTANCE_SQ = 16.0D * 16.0D;
     private static final float MIN_SHADOW_BOUNDS_RADIUS = 256.0F;
     private static final float SHADOW_FADE_RADIUS_SCALE = 1.25F;
     private static final float MAX_CELL_ADDITIVE_SHADOW = 0.92F;
+    private static long lastPublishedWorldTime = Long.MIN_VALUE;
+    private static Vec3 lastPublishedCameraPosition;
+    private static int lastPublishedSnapshotCount = -1;
 
     private CloudShadowRenderer() {
     }
@@ -27,12 +32,18 @@ public final class CloudShadowRenderer {
     ) {
         if (!isEnabled() || snapshots.isEmpty()) {
             CloudShadowMapAccess.clear();
+            resetCache();
+            return;
+        }
+
+        if (!shouldRefresh(frameContext, snapshots)) {
             return;
         }
 
         ShadowBounds bounds = resolveBounds(frameContext, snapshots);
         if (!bounds.isValid()) {
             CloudShadowMapAccess.clear();
+            resetCache();
             return;
         }
 
@@ -63,10 +74,35 @@ public final class CloudShadowRenderer {
                 frameContext.getWorldTime(),
                 values
         ));
+        lastPublishedWorldTime = frameContext.getWorldTime();
+        lastPublishedCameraPosition = frameContext.getCameraPosition();
+        lastPublishedSnapshotCount = snapshots.size();
     }
 
     public static void clear() {
         CloudShadowMapAccess.clear();
+        resetCache();
+    }
+
+    private static boolean shouldRefresh(
+            @NotNull CloudRenderFrameContext frameContext,
+            @NotNull List<CloudRenderSnapshot> snapshots
+    ) {
+        long worldTime = frameContext.getWorldTime();
+        if (lastPublishedWorldTime == Long.MIN_VALUE
+                || worldTime - lastPublishedWorldTime >= SHADOW_REFRESH_TICKS
+                || snapshots.size() != lastPublishedSnapshotCount
+                || lastPublishedCameraPosition == null) {
+            return true;
+        }
+
+        return frameContext.getCameraPosition().distanceToSqr(lastPublishedCameraPosition) >= SHADOW_REFRESH_CAMERA_DISTANCE_SQ;
+    }
+
+    private static void resetCache() {
+        lastPublishedWorldTime = Long.MIN_VALUE;
+        lastPublishedCameraPosition = null;
+        lastPublishedSnapshotCount = -1;
     }
 
     private static float sampleCloudOcclusion(@NotNull List<CloudRenderSnapshot> snapshots, float worldX, float worldZ) {

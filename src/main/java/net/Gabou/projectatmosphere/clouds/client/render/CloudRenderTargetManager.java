@@ -83,7 +83,6 @@ public final class CloudRenderTargetManager {
             );
             if (ownsCloudColorTarget) {
                 cloudColorTarget.destroyBuffers();
-                CloudGlDebug.checkErrors("cloud-target-clear");
             }
         }
 
@@ -190,44 +189,12 @@ public final class CloudRenderTargetManager {
                     ownsCloudColorTarget,
                     cloudColorTargetHasDepth
             );
-            CloudGlDebug.checkErrors("cloud-target-create");
+            destroyHistoryTargets();
+            cloudHistoryReadIndex = 0;
+            cloudHistoryValid = false;
+        } else if (cloudHistoryValid) {
+            cloudHistoryValid = false;
         }
-
-        ensureHistoryTargets(width, height);
-    }
-
-    private static void ensureHistoryTargets(int width, int height) {
-        boolean recreate = false;
-        for (RenderTarget target : cloudHistoryTargets) {
-            if (target == null || target.width != width || target.height != height) {
-                recreate = true;
-                break;
-            }
-        }
-
-        if (!recreate) {
-            return;
-        }
-
-        destroyHistoryTargets();
-        for (int i = 0; i < cloudHistoryTargets.length; i++) {
-            RenderTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
-            target.setFilterMode(GL11.GL_LINEAR);
-            target.resize(width, height, Minecraft.ON_OSX);
-            target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
-            target.clear(Minecraft.ON_OSX);
-            cloudHistoryTargets[i] = target;
-        }
-        cloudHistoryReadIndex = 0;
-        cloudHistoryValid = false;
-        ProjectAtmosphere.LOGGER.info(
-                "[CloudState] cloudHistory.create size={}x{} readColor={} writeColor={}",
-                width,
-                height,
-                cloudHistoryTargets[0].getColorTextureId(),
-                cloudHistoryTargets[1].getColorTextureId()
-        );
-        CloudGlDebug.checkErrors("cloud-history-create");
     }
 
     private static void destroyCloudColorTargetIfOwned() {
