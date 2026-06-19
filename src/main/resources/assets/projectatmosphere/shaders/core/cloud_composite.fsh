@@ -8,6 +8,7 @@ uniform float BlurRadius;
 uniform float BlurStrength;
 uniform float HistoryBlendWeight;
 uniform int UseHistory;
+uniform int CompositeDebugMode;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -28,6 +29,9 @@ void accumulateAlphaWeightedSample(
         inout float alphaWeightTotal
 ) {
     vec4 sampleColor = texture(CloudColorSampler, uv + offset);
+    if (sampleColor.a > 0.001) {
+        sampleColor.rgb /= sampleColor.a;
+    }
     float alphaWeight = weight * max(sampleColor.a, 0.001);
     weightedRgb += sampleColor.rgb * alphaWeight;
     weightedAlpha += sampleColor.a * weight;
@@ -37,6 +41,9 @@ void accumulateAlphaWeightedSample(
 
 vec4 alphaWeightedBlur(vec2 uv) {
     vec4 center = texture(CloudColorSampler, uv);
+    if (center.a > 0.001) {
+        center.rgb /= center.a;
+    }
     float radius = max(BlurRadius, 0.0);
     float strength = saturate(BlurStrength);
     if (radius <= 0.001 || strength <= 0.001) {
@@ -103,7 +110,7 @@ void main() {
 
     float sceneDepth = texture(SceneDepthSampler, texCoord).r;
 
-    if (sceneDepth + DEPTH_BIAS < cloudDepth) {
+    if (CompositeDebugMode == 0 && sceneDepth + DEPTH_BIAS < cloudDepth) {
         discard;
     }
 

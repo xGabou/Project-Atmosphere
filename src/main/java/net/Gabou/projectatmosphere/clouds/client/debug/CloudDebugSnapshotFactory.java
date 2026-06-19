@@ -9,11 +9,15 @@ import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
 import net.Gabou.projectatmosphere.modules.weather.StormVisualTier;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.UUID;
+
 /**
  * Crée les snapshots utilisés uniquement par le rendu debug.
  * Cette classe ne modifie jamais les snapshots live courants.
  */
 public final class CloudDebugSnapshotFactory {
+    private static final UUID DEBUG_REGION_ID = new UUID(0L, 0L);
+    private static final UUID DEBUG_CLUSTER_ID = new UUID(0L, 1L);
     private static final Vec3 DEFAULT_CENTER = new Vec3(0.0D, 110.0D, 0.0D);
 
     private static final float DEBUG_RADIUS = 16.0F;
@@ -78,6 +82,8 @@ public final class CloudDebugSnapshotFactory {
 
         return new CloudRenderSnapshot(
                 true,
+                DEBUG_REGION_ID,
+                DEBUG_CLUSTER_ID,
                 "minecraft:overworld",
                 0L,
                 0.0F,
@@ -96,6 +102,13 @@ public final class CloudDebugSnapshotFactory {
                 0,
                 20 * 60 * 10,
                 1.0F,
+                0.0F,
+                DEBUG_RADIUS,
+                DEBUG_COVERAGE,
+                DEBUG_DENSITY,
+                DEBUG_RADIUS,
+                0L,
+                0L,
                 0.0F,
                 CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID,
                 CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID,
@@ -140,6 +153,8 @@ public final class CloudDebugSnapshotFactory {
 
         return new CloudRenderSnapshot(
                 base.isEnabled(),
+                base.getRegionId(),
+                base.getClusterId(),
                 base.getDimension(),
                 base.getWorldTime(),
                 base.getPartialTick(),
@@ -159,6 +174,13 @@ public final class CloudDebugSnapshotFactory {
                 base.getLifetimeTicks(),
                 base.getGrowth(),
                 base.getDecay(),
+                base.getTargetRadius(),
+                base.getTargetCoverage(),
+                base.getTargetDensity(),
+                base.getSpawnRadius(),
+                base.getLastMotionTick(),
+                base.getLastGrowthTick(),
+                base.getLastGrowthRate(),
                 base.getCloudTypeId(),
                 base.getPreviousCloudTypeId(),
                 base.getMorphologyFamily(),

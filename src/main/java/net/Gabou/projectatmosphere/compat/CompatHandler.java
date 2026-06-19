@@ -57,6 +57,7 @@ public class CompatHandler {
         return isTemperatureModLoaded(TemperatureMod.COLD_SWEAT);
     }
 
+
     public static boolean isATemperatureModLoaded() {
         return getActiveTemperatureMod() != TemperatureMod.NONE;
     }

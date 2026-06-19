@@ -56,7 +56,7 @@ side = "BOTH"
 
 [[dependencies."${mod_id}"]]
 modId = "simpleclouds"
-mandatory = true
+mandatory = false
 versionRange = "[0.7.3,)"
 ordering = "AFTER"
 side = "BOTH"
@@ -72,6 +72,20 @@ side = "BOTH"
 modId = "distanthorizons"
 mandatory = false
 versionRange = "[3.0.1-b,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "coolrain"
+mandatory = true
+versionRange = "*"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies."${mod_id}"]]
+modId = "projectatmospherefortfc"
+mandatory = false
+versionRange = "[1.2.0,)"
 ordering = "AFTER"
 side = "BOTH"
 

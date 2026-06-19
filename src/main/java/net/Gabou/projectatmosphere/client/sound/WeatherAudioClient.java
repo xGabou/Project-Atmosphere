@@ -5,17 +5,17 @@ import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
-import net.Gabou.projectatmosphere.registry.ModSounds;
+import net.Gabou.projectatmosphere.compat.coolrain.CoolRainCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.registries.RegistryObject;
 
 @OnlyIn(Dist.CLIENT)
 public final class WeatherAudioClient {
@@ -42,20 +42,20 @@ public final class WeatherAudioClient {
     }
 
     public static void stopAll() {
-        if (activeLoop != null) {
-            activeLoop.stopSound();
-            activeLoop = null;
-        }
+        stopRainLoop();
         activeTier = RainTier.NONE;
         thunderCooldownTicks = 0;
     }
 
     private static void updateRainLoop(Minecraft minecraft, float rainStrength) {
+        if (CoolRainCompat.isLoaded()) {
+            stopRainLoop();
+            return;
+        }
+
         RainTier targetTier = RainTier.fromRainStrength(rainStrength);
         if (targetTier != activeTier) {
-            if (activeLoop != null) {
-                activeLoop.fadeOut();
-            }
+            stopRainLoop();
             activeTier = targetTier;
             activeLoop = targetTier == RainTier.NONE ? null : new RainLoop(targetTier);
             if (activeLoop != null) {
@@ -82,21 +82,23 @@ public final class WeatherAudioClient {
             return;
         }
 
-        SoundEvent sound = soundForThunderDistance(candidate.distance()).get();
+        SoundEvent sound = soundForThunderDistance(candidate.distance());
         float volume = Mth.clamp(0.25F + sample.thunderStrength() * 0.85F + candidate.strength() * 0.35F, 0.2F, 1.4F);
         float pitch = 0.92F + minecraft.level.random.nextFloat() * 0.16F;
         minecraft.level.playLocalSound(candidate.position().x(), candidate.position().y(), candidate.position().z(), sound, SoundSource.WEATHER, volume, pitch, false);
         thunderCooldownTicks = THUNDER_MIN_DELAY_TICKS + minecraft.level.random.nextInt(THUNDER_RANDOM_DELAY_TICKS);
     }
 
-    private static RegistryObject<SoundEvent> soundForThunderDistance(float distance) {
+    private static SoundEvent soundForThunderDistance(float distance) {
         if (distance < 96.0F) {
-            return ModSounds.THUNDER_RUMBLING_CLOSE;
+            return net.Gabou.projectatmosphere.registry.ModSounds.THUNDER_RUMBLING_CLOSE.get();
         }
         if (distance < 256.0F) {
-            return ModSounds.THUNDER_HIT_SEMI_DISTANT;
+            return net.Gabou.projectatmosphere.registry.ModSounds.THUNDER_HIT_SEMI_DISTANT.get();
         }
-        return distance < 512.0F ? ModSounds.THUNDER_HIT_DISTANT : ModSounds.THUNDER_RUMBLING_DISTANT;
+        return distance < 512.0F
+                ? net.Gabou.projectatmosphere.registry.ModSounds.THUNDER_HIT_DISTANT.get()
+                : net.Gabou.projectatmosphere.registry.ModSounds.THUNDER_RUMBLING_DISTANT.get();
     }
 
     private static ThunderCandidate nearestThunderCloud(Vec3 playerPosition) {
@@ -117,15 +119,23 @@ public final class WeatherAudioClient {
         return best;
     }
 
+    private static void stopRainLoop() {
+        if (activeLoop != null) {
+            activeLoop.stopSound();
+            activeLoop = null;
+        }
+        activeTier = RainTier.NONE;
+    }
+
     private enum RainTier {
         NONE(null),
-        LIGHT(ModSounds.RAIN_LIGHT),
-        MEDIUM(ModSounds.RAIN_MEDIUM),
-        HEAVY(ModSounds.RAIN_HEAVY);
+        LIGHT(SoundEvents.WEATHER_RAIN),
+        MEDIUM(SoundEvents.WEATHER_RAIN),
+        HEAVY(SoundEvents.WEATHER_RAIN);
 
-        private final RegistryObject<SoundEvent> sound;
+        private final SoundEvent sound;
 
-        RainTier(RegistryObject<SoundEvent> sound) {
+        RainTier(SoundEvent sound) {
             this.sound = sound;
         }
 
@@ -153,13 +163,12 @@ public final class WeatherAudioClient {
         }
 
         SoundEvent soundEvent() {
-            return sound.get();
+            return sound;
         }
     }
 
     private static final class RainLoop extends AbstractTickableSoundInstance {
         private float targetVolume;
-        private boolean fadingOut;
 
         private RainLoop(RainTier tier) {
             super(tier.soundEvent(), SoundSource.WEATHER, Minecraft.getInstance().level.getRandom());
@@ -172,21 +181,16 @@ public final class WeatherAudioClient {
 
         @Override
         public void tick() {
-            if (Minecraft.getInstance().level == null || fadingOut && volume <= 0.01F) {
+            if (Minecraft.getInstance().level == null) {
                 stop();
                 return;
             }
 
-            float target = fadingOut ? 0.0F : targetVolume;
-            this.volume = Mth.lerp(0.08F, this.volume, target);
+            this.volume = Mth.lerp(0.08F, this.volume, targetVolume);
         }
 
         private void setTargetVolume(float targetVolume) {
             this.targetVolume = Mth.clamp(targetVolume, 0.0F, 1.0F);
-        }
-
-        private void fadeOut() {
-            this.fadingOut = true;
         }
 
         private void stopSound() {

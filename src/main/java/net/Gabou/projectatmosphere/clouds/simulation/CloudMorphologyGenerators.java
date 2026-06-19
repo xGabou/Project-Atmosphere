@@ -74,9 +74,17 @@ final class CloudMorphologyGenerators {
             finalRadius = Math.max(10.0F, finalRadius * (0.52F + random.nextFloat() * 0.24F));
         }
 
-        cluster.setRadius(finalRadius);
-        cluster.setDensity(Mth.clamp(plan.density() * (0.90F + random.nextFloat() * 0.18F), 0.0F, 1.0F));
-        cluster.setCoverage(Mth.clamp(plan.coverage() * (0.88F + random.nextFloat() * 0.20F), 0.0F, 1.0F));
+        float finalDensity = Mth.clamp(plan.density() * (0.90F + random.nextFloat() * 0.18F), 0.0F, 1.0F);
+        float finalCoverage = Mth.clamp(plan.coverage() * (0.88F + random.nextFloat() * 0.20F), 0.0F, 1.0F);
+        float initialRadius = Math.max(6.0F, finalRadius * 0.72F);
+        float initialDensity = Mth.clamp(finalDensity * 0.82F, 0.0F, 1.0F);
+        float initialCoverage = Mth.clamp(finalCoverage * 0.82F, 0.0F, 1.0F);
+
+        cluster.setRadius(initialRadius);
+        cluster.setSpawnRadius(initialRadius);
+        cluster.setGrowthTargets(finalRadius, finalCoverage, finalDensity);
+        cluster.setDensity(initialDensity);
+        cluster.setCoverage(initialCoverage);
         cluster.setEdgeSoftness(Mth.clamp(plan.edgeSoftness() * (0.88F + random.nextFloat() * 0.24F), 0.02F, 0.95F));
 
         if (plan.family() == CloudMorphologyFamily.TOWER && clusterIndex > 0) {
@@ -85,7 +93,10 @@ final class CloudMorphologyGenerators {
         }
         if (plan.family() == CloudMorphologyFamily.STORM_ANVIL && clusterIndex > plan.clusterCount() / 2) {
             cluster.setVerticalBounds(cluster.getBaseY() + plan.baseDrop() * 0.38F, cluster.getTopY() + plan.topRise() * 0.22F);
-            cluster.setRadius(cluster.getRadius() * 1.24F);
+            float anvilRadius = cluster.getRadius() * 1.24F;
+            cluster.setRadius(anvilRadius);
+            cluster.setSpawnRadius(anvilRadius);
+            cluster.setTargetRadius(Math.max(cluster.getTargetRadius(), finalRadius * 1.24F));
         }
     }
 
@@ -110,6 +121,32 @@ final class CloudMorphologyGenerators {
         cluster.setDensity(Mth.clamp(densityFor(family, visual), 0.0F, 1.0F));
         cluster.setCoverage(Mth.clamp(coverageFor(family, visual, shape), 0.0F, 1.0F));
         cluster.setEdgeSoftness(Mth.clamp(edgeSoftnessFor(family, visual, shape), 0.02F, 0.95F));
+        cluster.setSpawnRadius(cluster.getRadius());
+        cluster.setGrowthTargets(cluster.getRadius(), cluster.getCoverage(), cluster.getDensity());
+    }
+
+    static void retargetCluster(@NotNull CloudClusterState cluster, @NotNull CloudTypeDefinition definition) {
+        CloudShapeProfile shape = definition.getShapeProfile();
+        CloudVisualProfile visual = definition.getVisualProfile();
+        CloudMorphologyFamily family = definition.getMorphologyFamily();
+
+        double centerY = cluster.getCenter().y();
+        float existingRadius = Math.max(1.0F, cluster.getRadius());
+        float mergeBoost = 1.0F + cluster.getMergePressure() * 0.18F;
+        float targetRadius = Math.max(shape.getBaseRadius() * radiusMultiplier(family), existingRadius * mergeBoost);
+        float targetBaseY = (float) centerY - shape.getBaseOffset() * baseMultiplier(family);
+        float targetTopY = (float) centerY + shape.getTopOffset() * topMultiplier(family) + cluster.getMergePressure() * 12.0F;
+
+        cluster.setMorphologyFamily(family);
+        cluster.setVerticalBounds(
+                Math.min(cluster.getBaseY(), targetBaseY),
+                Math.max(cluster.getTopY(), targetTopY)
+        );
+        cluster.setGrowthTargets(
+                Math.max(existingRadius, targetRadius),
+                Mth.clamp(coverageFor(family, visual, shape), 0.0F, 1.0F),
+                Mth.clamp(densityFor(family, visual), 0.0F, 1.0F)
+        );
     }
 
     private static SpawnPlan puffPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {

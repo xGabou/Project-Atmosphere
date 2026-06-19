@@ -243,6 +243,12 @@ public final class CloudDiagnosticsOverlay {
             }
         }
 
+        CloudRenderFallbackState.FailureStatus fallback = CloudRenderFallbackState.getStatus();
+        if (fallback.active() && lines.size() < maxLines) {
+            lines.add("Fallback " + fallback.title()
+                    + " | " + fallback.detail());
+        }
+
         if (showRenderSection() && full && lines.size() < maxLines) {
             lines.add("CPU " + formatFloat(stats.frameCpuMs())
                     + "/" + formatFloat(stats.raymarchCpuMs())

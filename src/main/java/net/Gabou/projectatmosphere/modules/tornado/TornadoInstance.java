@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.weather.StormCloudAttachment;
 import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
 import net.Gabou.projectatmosphere.modules.weather.StormMotionModel;
 import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
@@ -34,6 +35,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -169,6 +171,7 @@ public class TornadoInstance {
 
     @Nullable
     private CloudRegion cloudRegion;
+    private StormCloudAttachment cloudAttachment = StormCloudAttachment.NONE;
 
     public TornadoInstance(Vec3 position, float radius, WindVector wind, @Nullable CloudRegion cloudRegion) {
         this(UUID.randomUUID(), position, radius, wind, 0.05F, (float) position.y, Math.max(96.0F, radius * 12.0F), cloudRegion, StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F)));
@@ -254,6 +257,13 @@ public class TornadoInstance {
     public void setCloudRegion(@Nullable CloudRegion cloudRegion) {
         this.cloudRegion = cloudRegion;
         this.detachedTicks = cloudRegion == null ? this.detachedTicks : 0;
+        if (cloudRegion == null) {
+            this.cloudAttachment = StormCloudAttachment.NONE;
+        }
+    }
+
+    public StormCloudAttachment getCloudAttachment() {
+        return this.cloudAttachment;
     }
 
     public float getVisualBottomY() {
@@ -475,7 +485,8 @@ public class TornadoInstance {
                 this.stormLevel,
                 this.recentDebrisScore,
                 this.computeFormationProgress(0.0F),
-                this.phase
+                this.phase,
+                this.cloudAttachment.withLifecycle(this.phase, this.normalizedIntensity)
         );
     }
 
@@ -600,6 +611,7 @@ public class TornadoInstance {
         this.recentDebrisScore = snapshot.recentDebrisScore();
         this.phase = snapshot.phase();
         this.cloudRegion = region;
+        this.cloudAttachment = snapshot.cloudAttachment();
         this.anchorX = (float) this.position.x;
         this.anchorZ = (float) this.position.z;
         float formationProgress = Mth.clamp(snapshot.formationProgress(), 0.0F, 1.0F);
@@ -703,6 +715,30 @@ public class TornadoInstance {
         float reachToCloudBase = Math.max(0.0F, cloudBase - groundedBottomY);
         this.targetVisualHeight = Math.max(96.0F, reachToCloudBase + this.maxRadius * 6.0F + 40.0F);
         this.applyIntensityToVisuals();
+        this.refreshCloudAttachment(cloudBase);
+    }
+
+    private void refreshCloudAttachment(float cloudBaseY) {
+        if (this.cloudRegion == null) {
+            this.cloudAttachment = StormCloudAttachment.NONE;
+            return;
+        }
+
+        float funnelTopY = cloudBaseY;
+        float cloudTopY = Math.max(cloudBaseY + 1.0F, cloudBaseY + this.maxRadius * 8.0F);
+        Vec3 attachmentPoint = new Vec3(this.position.x, funnelTopY, this.position.z);
+        this.cloudAttachment = StormCloudAttachment.attached(
+                createSimpleCloudParentId(this.cloudRegion),
+                null,
+                "simpleclouds",
+                attachmentPoint,
+                cloudBaseY,
+                cloudTopY,
+                funnelTopY,
+                this.phase,
+                Math.max(this.normalizedIntensity, this.wind.gustSpeed() / 120.0F),
+                this.normalizedIntensity
+        );
     }
 
     private void updateMovement(ServerLevel level, long gameTime) {
@@ -1285,6 +1321,18 @@ public class TornadoInstance {
             return null;
         }
         return tornadoRegion.findTornado(this.id);
+    }
+
+    private static UUID createSimpleCloudParentId(CloudRegion cloudRegion) {
+        String key = "simpleclouds:"
+                + cloudRegion.getCloudTypeId()
+                + ":"
+                + cloudRegion.getOrderWeight()
+                + ":"
+                + cloudRegion.getGrowTicks()
+                + ":"
+                + cloudRegion.getInitialWorldRadius();
+        return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
     }
 
     private static float defaultTargetIntensity(float radius, WindVector wind, int stormLevel) {

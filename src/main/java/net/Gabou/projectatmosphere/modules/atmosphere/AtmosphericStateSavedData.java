@@ -84,6 +84,7 @@ public final class AtmosphericStateSavedData extends SavedData {
         root.put("ActiveRegions", activeRegions);
 
         root.put("Scheduler", AtmosphericUpdateScheduler.savePersistentState());
+        root.put("WeakLows", WeakLowManager.savePersistentState());
         root.put("Cyclones", CycloneManager.savePersistentState());
         root.put("OceanBasins", OceanBasinManager.savePersistentState());
         root.put("WindEngine", WindEngine.savePersistentState());
@@ -121,6 +122,7 @@ public final class AtmosphericStateSavedData extends SavedData {
         AtmosphericStateRegistry.replaceActiveStates(activeRegions);
 
         AtmosphericUpdateScheduler.loadPersistentState(payload.getCompound("Scheduler"));
+        WeakLowManager.loadPersistentState(payload.getCompound("WeakLows"));
         CycloneManager.loadPersistentState(level, payload.getCompound("Cyclones"));
         OceanBasinManager.loadPersistentState(payload.getCompound("OceanBasins"));
         WindEngine.loadPersistentState(payload.getCompound("WindEngine"));

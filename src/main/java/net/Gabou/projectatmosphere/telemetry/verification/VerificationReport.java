@@ -23,8 +23,10 @@ public final class VerificationReport {
     private final WeatherCellSection weatherCells;
     private final CloudSection clouds;
     private final CloudBackendSection cloudBackend;
+    private final PaNativeBackendSection paNativeBackend;
     private final MorphologySection morphology;
     private final EvolutionSection evolution;
+    private final NearestNativeCloud nearestNativeCloud;
     private final PersistenceSection persistence;
     private final List<String> issues;
 
@@ -38,8 +40,10 @@ public final class VerificationReport {
             WeatherCellSection weatherCells,
             CloudSection clouds,
             CloudBackendSection cloudBackend,
+            PaNativeBackendSection paNativeBackend,
             MorphologySection morphology,
             EvolutionSection evolution,
+            NearestNativeCloud nearestNativeCloud,
             PersistenceSection persistence,
             List<String> issues
     ) {
@@ -52,8 +56,10 @@ public final class VerificationReport {
         this.weatherCells = weatherCells;
         this.clouds = clouds;
         this.cloudBackend = cloudBackend;
+        this.paNativeBackend = paNativeBackend;
         this.morphology = morphology;
         this.evolution = evolution;
+        this.nearestNativeCloud = nearestNativeCloud;
         this.persistence = persistence;
         this.issues = List.copyOf(issues);
     }
@@ -94,12 +100,20 @@ public final class VerificationReport {
         return cloudBackend;
     }
 
+    public PaNativeBackendSection paNativeBackend() {
+        return paNativeBackend;
+    }
+
     public MorphologySection morphology() {
         return morphology;
     }
 
     public EvolutionSection evolution() {
         return evolution;
+    }
+
+    public NearestNativeCloud nearestNativeCloud() {
+        return nearestNativeCloud;
     }
 
     public PersistenceSection persistence() {
@@ -257,6 +271,20 @@ public final class VerificationReport {
     ) {
     }
 
+    public record PaNativeBackendSection(
+            boolean paNativeEnabled,
+            int paNativeCloudsStored,
+            int paNativeCloudsSynced,
+            int paNativeCloudsRendered,
+            boolean nativeCloudSyncActive,
+            boolean nativeCloudRenderActive,
+            boolean nativeCloudShadowActive,
+            boolean fallbackDarkeningActive,
+            boolean lightingMetadataActive,
+            boolean dhMetadataActive
+    ) {
+    }
+
     public record NearestCloud(
             String cloudTypeId,
             double distanceMeters,
@@ -321,6 +349,35 @@ public final class VerificationReport {
             boolean morphologyNoiseStable,
             String renderBounds,
             String lodTier
+    ) {
+    }
+
+    public record NearestNativeCloud(
+            String cloudId,
+            String type,
+            String position,
+            String previousPosition,
+            String velocity,
+            float windCoupling,
+            boolean motionActive,
+            String motionBlockedReason,
+            float radius,
+            float targetRadius,
+            float renderedRadius,
+            float radiusCap,
+            float coverage,
+            float targetCoverage,
+            float density,
+            float targetDensity,
+            float growthRate,
+            boolean growthActive,
+            String growthBlockedReason,
+            int age,
+            int lifetime,
+            long lastStateTick,
+            long lastSyncTick,
+            long lastRenderSnapshotTick,
+            String renderBounds
     ) {
     }
 

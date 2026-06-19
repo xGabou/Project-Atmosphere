@@ -15,6 +15,8 @@ import java.util.Collection;
  * Cette classe envoie seulement des CloudRegionRenderData.
  */
 public final class CloudRegionSyncManager {
+    private static volatile long lastSyncTick;
+    private static volatile int lastSyncedCount;
 
     private CloudRegionSyncManager() {
 
@@ -33,8 +35,12 @@ public final class CloudRegionSyncManager {
             return;
         }
 
+        Collection<CloudRegionRenderData> renderData =
+                CloudRegionManager.getInstance().getActiveRenderData(level);
+        recordSync(level.getGameTime(), renderData.size());
+
         for (ServerPlayer player : level.players()) {
-            syncPlayer(player);
+            send(player, renderData);
         }
     }
 
@@ -53,7 +59,28 @@ public final class CloudRegionSyncManager {
 
         Collection<CloudRegionRenderData> renderData =
                 CloudRegionManager.getInstance().getActiveRenderData(level);
+        recordSync(level.getGameTime(), renderData.size());
 
+        send(player, renderData);
+    }
+
+    public static long getLastSyncTick() {
+        return lastSyncTick;
+    }
+
+    public static int getLastSyncedCount() {
+        return lastSyncedCount;
+    }
+
+    private static void recordSync(long gameTime, int count) {
+        lastSyncTick = Math.max(0L, gameTime);
+        lastSyncedCount = Math.max(0, count);
+    }
+
+    private static void send(ServerPlayer player, Collection<CloudRegionRenderData> renderData) {
+        if (player == null) {
+            return;
+        }
         NetworkHandler.CHANNEL.send(
                 PacketDistributor.PLAYER.with(() -> player),
                 new SyncCloudRegionsPacket(renderData)

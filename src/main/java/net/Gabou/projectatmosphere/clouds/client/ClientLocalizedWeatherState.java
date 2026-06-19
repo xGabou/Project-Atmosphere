@@ -3,10 +3,10 @@ package net.Gabou.projectatmosphere.clouds.client;
 import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
 import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -84,10 +84,13 @@ public final class ClientLocalizedWeatherState {
 
     private static BlockPos resolveSamplePos() {
         Minecraft minecraft = Minecraft.getInstance();
-        Entity cameraEntity = minecraft.cameraEntity != null ? minecraft.cameraEntity : minecraft.player;
-        if (cameraEntity != null) {
-            Vec3 position = cameraEntity.position();
+        if (minecraft.gameRenderer != null) {
+            Camera camera = minecraft.gameRenderer.getMainCamera();
+            Vec3 position = camera.getPosition();
             return BlockPos.containing(position);
+        }
+        if (minecraft.player != null) {
+            return BlockPos.containing(minecraft.player.getEyePosition());
         }
         return BlockPos.ZERO;
     }

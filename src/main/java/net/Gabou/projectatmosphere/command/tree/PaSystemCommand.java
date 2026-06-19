@@ -13,6 +13,7 @@ public final class PaSystemCommand {
         return Commands.literal("system")
                 .then(Commands.literal("cpu")
                         .executes(ctx -> CommandSystemService.sendCpuInfo(ctx.getSource())))
+                .then(PaTelemetryCommand.build())
                 .then(Commands.literal("reload")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> CommandSystemService.reloadSystem(ctx.getSource())))
@@ -26,6 +27,7 @@ public final class PaSystemCommand {
                                     false,
                                     "System commands",
                                     "/pa system cpu",
+                                    "/pa system telemetry export",
                                     "/pa system reload",
                                     "/pa system sync"
                             );

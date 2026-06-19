@@ -96,7 +96,6 @@ public class CloudLibrary {
             "smaller_stratocumulus",
             "islands",
             "spots",
-            "pattern",
             "cumulus_noise",
             "dense_cumulus",
             "tall_noise"
@@ -176,7 +175,6 @@ public class CloudLibrary {
                  "smaller_stratocumulus",
                  "islands",
                  "spots",
-                 "pattern",
                  "cumulus_noise",
                  "dense_cumulus",
                  "tall_noise" -> 2;

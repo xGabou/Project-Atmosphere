@@ -18,6 +18,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Vector4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 
@@ -64,6 +65,12 @@ public final class CloudRaymarchRenderer {
             return false;
         }
 
+        ProjectedBounds projectedBounds = resolveProjectedBounds(frameContext, snapshot, outputTarget);
+        if (!projectedBounds.visible()) {
+            CloudRenderDiagnostics.recordFrustumSkipped();
+            return false;
+        }
+
         ensureFullscreenQuad();
         if (fullscreenQuad == null) {
             return false;
@@ -75,27 +82,139 @@ public final class CloudRaymarchRenderer {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
-        RenderSystem.disableDepthTest();
+        if (writeDepth) {
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthFunc(GL11.GL_ALWAYS);
+        } else {
+            RenderSystem.disableDepthTest();
+        }
         RenderSystem.depthMask(writeDepth);
         RenderSystem.setShader(() -> shader);
 
+        boolean shaderDebugMode = false;
+        CloudRenderDiagnostics.recordShaderDebugMode(false);
         shader.safeGetUniform("WriteDepth").set(writeDepth ? 1 : 0);
+        shader.safeGetUniform("CloudDebugMode").set(shaderDebugMode ? 1 : 0);
         shader.setSampler("DepthSampler", sceneDepthTextureId);
         CloudUniformUploader.apply(shader, frameContext, snapshot, outputTarget);
         shader.apply();
 
+        boolean scissorEnabled = projectedBounds.shouldScissor(outputTarget);
+        if (scissorEnabled) {
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(projectedBounds.x(), projectedBounds.y(), projectedBounds.width(), projectedBounds.height());
+        }
+
         gpuTimer.begin();
-        fullscreenQuad.bind();
-        fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
-        VertexBuffer.unbind();
-        gpuTimer.end();
+        CloudGlDebug.pushGroup("cloud-volume-draw");
+        try {
+            fullscreenQuad.bind();
+            fullscreenQuad.drawWithShader(
+                    frameContext.getModelViewMatrix(),
+                    frameContext.getProjectionMatrix(),
+                    shader
+            );
+            VertexBuffer.unbind();
+            CloudGlDebug.checkErrors("cloud-volume-draw");
+        } finally {
+            gpuTimer.end();
+            CloudGlDebug.popGroup();
+            if (scissorEnabled) {
+                GL11.glDisable(GL11.GL_SCISSOR_TEST);
+            }
+        }
         shader.clear();
 
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         return true;
+    }
+
+    private static ProjectedBounds resolveProjectedBounds(
+            @NotNull CloudRenderFrameContext frameContext,
+            @NotNull CloudRenderSnapshot snapshot,
+            @NotNull RenderTarget target
+    ) {
+        if (target.width <= 0 || target.height <= 0 || snapshot.getRegionCenter() == null) {
+            return ProjectedBounds.full(target);
+        }
+
+        Vec3 camera = frameContext.getCameraPosition();
+        Vec3 center = snapshot.getRegionCenter();
+        float radius = Math.max(1.0F, snapshot.getRegionRadius());
+        float verticalPadding = renderVerticalPadding(snapshot, radius);
+        float minXWorld = (float) center.x() - radius;
+        float maxXWorld = (float) center.x() + radius;
+        float minYWorld = snapshot.getCloudBaseY() - verticalPadding;
+        float maxYWorld = snapshot.getCloudTopY() + verticalPadding;
+        float minZWorld = (float) center.z() - radius;
+        float maxZWorld = (float) center.z() + radius;
+
+        if (camera.x() >= minXWorld && camera.x() <= maxXWorld
+                && camera.y() >= minYWorld && camera.y() <= maxYWorld
+                && camera.z() >= minZWorld && camera.z() <= maxZWorld) {
+            return ProjectedBounds.full(target);
+        }
+
+        Matrix4f viewProjection = new Matrix4f(frameContext.getProjectionMatrix()).mul(frameContext.getModelViewMatrix());
+        float minNdcX = Float.POSITIVE_INFINITY;
+        float minNdcY = Float.POSITIVE_INFINITY;
+        float maxNdcX = Float.NEGATIVE_INFINITY;
+        float maxNdcY = Float.NEGATIVE_INFINITY;
+
+        for (int xi = 0; xi < 2; xi++) {
+            float x = xi == 0 ? minXWorld : maxXWorld;
+            for (int yi = 0; yi < 2; yi++) {
+                float y = yi == 0 ? minYWorld : maxYWorld;
+                for (int zi = 0; zi < 2; zi++) {
+                    float z = zi == 0 ? minZWorld : maxZWorld;
+                    Vector4f clip = viewProjection.transform(new Vector4f(x, y, z, 1.0F));
+                    if (clip.w() <= 0.05F) {
+                        return ProjectedBounds.full(target);
+                    }
+                    float ndcX = clip.x() / clip.w();
+                    float ndcY = clip.y() / clip.w();
+                    minNdcX = Math.min(minNdcX, ndcX);
+                    minNdcY = Math.min(minNdcY, ndcY);
+                    maxNdcX = Math.max(maxNdcX, ndcX);
+                    maxNdcY = Math.max(maxNdcY, ndcY);
+                }
+            }
+        }
+
+        // Be conservative here: the raymarch pass already clips against the 3D cloud AABB.
+        // If the projected box is uncertain, render the full target instead of skipping the cloud.
+        float offscreenMargin = 0.04F;
+        if (maxNdcX < -1.0F - offscreenMargin
+                || minNdcX > 1.0F + offscreenMargin
+                || maxNdcY < -1.0F - offscreenMargin
+                || minNdcY > 1.0F + offscreenMargin) {
+            return ProjectedBounds.hidden();
+        }
+
+        int padding = 2;
+        int minX = Mth.floor((Mth.clamp(minNdcX, -1.0F, 1.0F) * 0.5F + 0.5F) * target.width) - padding;
+        int maxX = Mth.ceil((Mth.clamp(maxNdcX, -1.0F, 1.0F) * 0.5F + 0.5F) * target.width) + padding;
+        int minY = Mth.floor((Mth.clamp(minNdcY, -1.0F, 1.0F) * 0.5F + 0.5F) * target.height) - padding;
+        int maxY = Mth.ceil((Mth.clamp(maxNdcY, -1.0F, 1.0F) * 0.5F + 0.5F) * target.height) + padding;
+
+        int scissorX = Mth.clamp(minX, 0, target.width);
+        int scissorY = Mth.clamp(minY, 0, target.height);
+        int scissorMaxX = Mth.clamp(maxX, 0, target.width);
+        int scissorMaxY = Mth.clamp(maxY, 0, target.height);
+        if (scissorMaxX <= scissorX || scissorMaxY <= scissorY) {
+            return ProjectedBounds.full(target);
+        }
+        return new ProjectedBounds(true, scissorX, scissorY, scissorMaxX - scissorX, scissorMaxY - scissorY);
+    }
+
+    private static float renderVerticalPadding(@NotNull CloudRenderSnapshot snapshot, float radius) {
+        float heightRange = Math.max(0.001F, snapshot.getCloudTopY() - snapshot.getCloudBaseY());
+        float sheetFactor = Mth.clampedMap(snapshot.getHeightSquash(), 1.20F, 3.20F, 0.0F, 1.0F);
+        return sheetFactor * Math.min(28.0F, Math.max(heightRange * 0.45F, radius * 0.035F));
     }
 
     public static boolean resolveTemporalTarget(
@@ -210,12 +329,19 @@ public final class CloudRaymarchRenderer {
         shader.safeGetUniform("BlurStrength").set(Mth.clamp(blurStrength, 0.0F, 1.0F));
         shader.safeGetUniform("HistoryBlendWeight").set(Mth.clamp(historyWeight, 0.0F, 0.95F));
         shader.safeGetUniform("UseHistory").set(useHistory ? 1 : 0);
+        shader.safeGetUniform("CompositeDebugMode").set(0);
         shader.apply();
 
-        fullscreenQuad.bind();
-        fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
-        VertexBuffer.unbind();
-        shader.clear();
+        CloudGlDebug.pushGroup("cloud-composite-draw");
+        try {
+            fullscreenQuad.bind();
+            fullscreenQuad.drawWithShader(new Matrix4f(), new Matrix4f(), shader);
+            VertexBuffer.unbind();
+            shader.clear();
+            CloudGlDebug.checkErrors("cloud-composite-draw");
+        } finally {
+            CloudGlDebug.popGroup();
+        }
 
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
@@ -320,5 +446,22 @@ public final class CloudRaymarchRenderer {
         fullscreenQuad.bind();
         fullscreenQuad.upload(builder.end());
         VertexBuffer.unbind();
+    }
+
+    private record ProjectedBounds(boolean visible, int x, int y, int width, int height) {
+        private static ProjectedBounds hidden() {
+            return new ProjectedBounds(false, 0, 0, 0, 0);
+        }
+
+        private static ProjectedBounds full(RenderTarget target) {
+            return new ProjectedBounds(true, 0, 0, Math.max(1, target.width), Math.max(1, target.height));
+        }
+
+        private boolean shouldScissor(RenderTarget target) {
+            return this.visible
+                    && this.width > 0
+                    && this.height > 0
+                    && (this.x > 0 || this.y > 0 || this.width < target.width || this.height < target.height);
+        }
     }
 }

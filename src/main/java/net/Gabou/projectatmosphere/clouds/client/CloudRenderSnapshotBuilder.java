@@ -53,6 +53,8 @@ public final class CloudRenderSnapshotBuilder {
 
         return new CloudRenderSnapshot(
                 renderData.isActive(),
+                renderData.getRegionId(),
+                renderData.getClusterId(),
                 renderData.getDimensionId(),
                 worldTime,
                 partialTick,
@@ -72,6 +74,13 @@ public final class CloudRenderSnapshotBuilder {
                 renderData.getLifetimeTicks(),
                 renderData.getGrowth(),
                 renderData.getDecay(),
+                renderData.getTargetRadius(),
+                renderData.getTargetCoverage(),
+                renderData.getTargetDensity(),
+                renderData.getSpawnRadius(),
+                renderData.getLastMotionTick(),
+                renderData.getLastGrowthTick(),
+                renderData.getLastGrowthRate(),
                 renderData.getCloudTypeId(),
                 renderData.getPreviousCloudTypeId(),
                 renderData.getMorphologyFamily(),

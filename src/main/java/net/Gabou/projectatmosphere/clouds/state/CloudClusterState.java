@@ -43,6 +43,13 @@ public final class CloudClusterState {
     private static final String TAG_LIFETIME_TICKS = "LifetimeTicks";
     private static final String TAG_GROWTH = "Growth";
     private static final String TAG_DECAY = "Decay";
+    private static final String TAG_TARGET_RADIUS = "TargetRadius";
+    private static final String TAG_TARGET_COVERAGE = "TargetCoverage";
+    private static final String TAG_TARGET_DENSITY = "TargetDensity";
+    private static final String TAG_SPAWN_RADIUS = "SpawnRadius";
+    private static final String TAG_LAST_MOTION_TICK = "LastMotionTick";
+    private static final String TAG_LAST_GROWTH_TICK = "LastGrowthTick";
+    private static final String TAG_LAST_GROWTH_RATE = "LastGrowthRate";
     private static final String TAG_MERGE_PRESSURE = "MergePressure";
     private static final String TAG_CLOUD_TYPE_ID = "CloudTypeId";
     private static final String TAG_PREVIOUS_CLOUD_TYPE_ID = "PreviousCloudTypeId";
@@ -58,6 +65,7 @@ public final class CloudClusterState {
     private static final float DEFAULT_EDGE_SOFTNESS = 0.35F;
     private static final int DEFAULT_LIFETIME_TICKS = 20 * 60 * 10;
     private static final int TRANSITION_BLEND_TICKS = 20 * 15;
+    public static final float RADIUS_CAP = 1400.0F;
 
     private final UUID clusterId;
     private final ResourceKey<Level> dimension;
@@ -75,6 +83,13 @@ public final class CloudClusterState {
     private int lifetimeTicks;
     private float growth;
     private float decay;
+    private float targetRadius;
+    private float targetCoverage;
+    private float targetDensity;
+    private float spawnRadius;
+    private long lastMotionTick;
+    private long lastGrowthTick;
+    private float lastGrowthRate;
     private float mergePressure;
     private String cloudTypeId;
     private String previousCloudTypeId;
@@ -108,6 +123,13 @@ public final class CloudClusterState {
         this.lifetimeTicks = DEFAULT_LIFETIME_TICKS;
         this.growth = 1.0F;
         this.decay = 0.0F;
+        this.targetRadius = this.radius;
+        this.targetCoverage = this.coverage;
+        this.targetDensity = this.density;
+        this.spawnRadius = this.radius;
+        this.lastMotionTick = 0L;
+        this.lastGrowthTick = 0L;
+        this.lastGrowthRate = 0.0F;
         this.mergePressure = 0.0F;
         this.cloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.previousCloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
@@ -191,7 +213,7 @@ public final class CloudClusterState {
             throw new IllegalArgumentException("radius must be greater than 0");
         }
 
-        this.radius = radius;
+        this.radius = Math.min(radius, RADIUS_CAP);
     }
 
     public float getBaseY() {
@@ -273,6 +295,76 @@ public final class CloudClusterState {
 
     public void setDecay(float decay) {
         this.decay = clamp01(decay);
+    }
+
+    public float getTargetRadius() {
+        return targetRadius;
+    }
+
+    public void setTargetRadius(float targetRadius) {
+        if (targetRadius <= 0.0F) {
+            throw new IllegalArgumentException("targetRadius must be greater than 0");
+        }
+
+        this.targetRadius = Math.min(targetRadius, RADIUS_CAP);
+    }
+
+    public float getTargetCoverage() {
+        return targetCoverage;
+    }
+
+    public void setTargetCoverage(float targetCoverage) {
+        this.targetCoverage = clamp01(targetCoverage);
+    }
+
+    public float getTargetDensity() {
+        return targetDensity;
+    }
+
+    public void setTargetDensity(float targetDensity) {
+        this.targetDensity = clamp01(targetDensity);
+    }
+
+    public float getSpawnRadius() {
+        return spawnRadius;
+    }
+
+    public void setSpawnRadius(float spawnRadius) {
+        if (spawnRadius <= 0.0F) {
+            throw new IllegalArgumentException("spawnRadius must be greater than 0");
+        }
+
+        this.spawnRadius = Math.min(spawnRadius, RADIUS_CAP);
+    }
+
+    public long getLastMotionTick() {
+        return lastMotionTick;
+    }
+
+    public void setLastMotionTick(long lastMotionTick) {
+        this.lastMotionTick = Math.max(0L, lastMotionTick);
+    }
+
+    public long getLastGrowthTick() {
+        return lastGrowthTick;
+    }
+
+    public void setLastGrowthTick(long lastGrowthTick) {
+        this.lastGrowthTick = Math.max(0L, lastGrowthTick);
+    }
+
+    public float getLastGrowthRate() {
+        return lastGrowthRate;
+    }
+
+    public void setLastGrowthRate(float lastGrowthRate) {
+        this.lastGrowthRate = Float.isFinite(lastGrowthRate) ? lastGrowthRate : 0.0F;
+    }
+
+    public void setGrowthTargets(float targetRadius, float targetCoverage, float targetDensity) {
+        setTargetRadius(targetRadius);
+        setTargetCoverage(targetCoverage);
+        setTargetDensity(targetDensity);
     }
 
     public float getMergePressure() {
@@ -367,6 +459,13 @@ public final class CloudClusterState {
         setDensity(weightedFloat(density, thisWeight, other.density, otherWeight));
         setCoverage(weightedFloat(coverage, thisWeight, other.coverage, otherWeight));
         setEdgeSoftness(weightedFloat(edgeSoftness, thisWeight, other.edgeSoftness, otherWeight));
+        setTargetRadius(Math.max(targetRadius, other.targetRadius));
+        setTargetCoverage(weightedFloat(targetCoverage, thisWeight, other.targetCoverage, otherWeight));
+        setTargetDensity(weightedFloat(targetDensity, thisWeight, other.targetDensity, otherWeight));
+        setSpawnRadius(Math.min(spawnRadius, other.spawnRadius));
+        setLastMotionTick(Math.max(lastMotionTick, other.lastMotionTick));
+        setLastGrowthTick(Math.max(lastGrowthTick, other.lastGrowthTick));
+        setLastGrowthRate(Math.max(lastGrowthRate, other.lastGrowthRate));
         setAgeTicks(Math.round(weightedFloat((float) ageTicks, thisWeight, (float) other.ageTicks, otherWeight)));
         setLifetimeTicks(Math.round(Math.max(lifetimeTicks, other.lifetimeTicks)));
         setGrowth(weightedFloat(growth, thisWeight, other.growth, otherWeight));
@@ -411,6 +510,13 @@ public final class CloudClusterState {
         tag.putInt(TAG_LIFETIME_TICKS, lifetimeTicks);
         tag.putFloat(TAG_GROWTH, growth);
         tag.putFloat(TAG_DECAY, decay);
+        tag.putFloat(TAG_TARGET_RADIUS, targetRadius);
+        tag.putFloat(TAG_TARGET_COVERAGE, targetCoverage);
+        tag.putFloat(TAG_TARGET_DENSITY, targetDensity);
+        tag.putFloat(TAG_SPAWN_RADIUS, spawnRadius);
+        tag.putLong(TAG_LAST_MOTION_TICK, lastMotionTick);
+        tag.putLong(TAG_LAST_GROWTH_TICK, lastGrowthTick);
+        tag.putFloat(TAG_LAST_GROWTH_RATE, lastGrowthRate);
         tag.putFloat(TAG_MERGE_PRESSURE, mergePressure);
         tag.putString(TAG_CLOUD_TYPE_ID, cloudTypeId);
         tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, previousCloudTypeId);
@@ -471,6 +577,13 @@ public final class CloudClusterState {
         int lifetimeTicks = tag.contains(TAG_LIFETIME_TICKS) ? tag.getInt(TAG_LIFETIME_TICKS) : DEFAULT_LIFETIME_TICKS;
         float growth = tag.contains(TAG_GROWTH) ? tag.getFloat(TAG_GROWTH) : 1.0F;
         float decay = tag.contains(TAG_DECAY) ? tag.getFloat(TAG_DECAY) : 0.0F;
+        float targetRadius = tag.contains(TAG_TARGET_RADIUS) ? tag.getFloat(TAG_TARGET_RADIUS) : radius;
+        float targetCoverage = tag.contains(TAG_TARGET_COVERAGE) ? tag.getFloat(TAG_TARGET_COVERAGE) : coverage;
+        float targetDensity = tag.contains(TAG_TARGET_DENSITY) ? tag.getFloat(TAG_TARGET_DENSITY) : density;
+        float spawnRadius = tag.contains(TAG_SPAWN_RADIUS) ? tag.getFloat(TAG_SPAWN_RADIUS) : radius;
+        long lastMotionTick = tag.contains(TAG_LAST_MOTION_TICK) ? tag.getLong(TAG_LAST_MOTION_TICK) : 0L;
+        long lastGrowthTick = tag.contains(TAG_LAST_GROWTH_TICK) ? tag.getLong(TAG_LAST_GROWTH_TICK) : 0L;
+        float lastGrowthRate = tag.contains(TAG_LAST_GROWTH_RATE) ? tag.getFloat(TAG_LAST_GROWTH_RATE) : 0.0F;
         float mergePressure = tag.contains(TAG_MERGE_PRESSURE) ? tag.getFloat(TAG_MERGE_PRESSURE) : 0.0F;
         String cloudTypeId = tag.contains(TAG_CLOUD_TYPE_ID, Tag.TAG_STRING)
                 ? tag.getString(TAG_CLOUD_TYPE_ID)
@@ -503,6 +616,11 @@ public final class CloudClusterState {
         state.setLifetimeTicks(lifetimeTicks);
         state.setGrowth(growth);
         state.setDecay(decay);
+        state.setGrowthTargets(Math.max(1.0F, targetRadius), targetCoverage, targetDensity);
+        state.setSpawnRadius(Math.max(1.0F, spawnRadius));
+        state.setLastMotionTick(lastMotionTick);
+        state.setLastGrowthTick(lastGrowthTick);
+        state.setLastGrowthRate(lastGrowthRate);
         state.setMergePressure(mergePressure);
         state.setCloudTypeId(cloudTypeId);
         state.setPreviousCloudTypeId(previousCloudTypeId);

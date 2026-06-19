@@ -120,12 +120,13 @@ public class AtmosphereManager {
             EventHandler.onRegenerate();
             AtmosphereCloudServices.get().clearForRegeneration(world);
             if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-                TornadoManager.clearTornadoes();
-                HurricaneManager.clearHurricanes(world);
+                world.getServer().execute(() -> {
+                    TornadoManager.clearTornadoes();
+                    HurricaneManager.clearHurricanes(world);
+                });
             }
             ForecastOrchestrator.clearAndRegenerate(world);
         });
-        AtmosphereCloudServices.get().clearForRegeneration(world);
 
     }
 

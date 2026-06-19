@@ -19,56 +19,6 @@
     ]
   },
 
-  "rain.light": {
-    "category": "weather",
-    "sounds": [
-      {
-        "name": "projectatmosphere:light_rain",
-        "stream": true
-      },
-      {
-        "name": "projectatmosphere:light_rain2",
-        "stream": true
-      },
-      {
-        "name": "projectatmosphere:light_rain3",
-        "stream": true
-      }
-    ]
-  },
-
-  "rain.medium": {
-    "category": "weather",
-    "sounds": [
-      {
-        "name": "projectatmosphere:medium_rain",
-        "stream": true
-      },
-      {
-        "name": "projectatmosphere:medium_rain2",
-        "stream": true
-      },
-      {
-        "name": "projectatmosphere:medium_rain3",
-        "stream": true
-      }
-    ]
-  },
-
-  "rain.heavy": {
-    "category": "weather",
-    "sounds": [
-      {
-        "name": "projectatmosphere:heavy_rain",
-        "stream": true
-      },
-      {
-        "name": "projectatmosphere:heavy_rain2",
-        "stream": true
-      }
-    ]
-  },
-
   "thunder.in_clouds": {
     "category": "weather",
     "sounds": [

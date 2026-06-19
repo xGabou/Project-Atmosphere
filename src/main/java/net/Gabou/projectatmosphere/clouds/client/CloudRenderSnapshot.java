@@ -7,9 +7,13 @@ import net.Gabou.projectatmosphere.modules.weather.PrecipitationTier;
 import net.Gabou.projectatmosphere.modules.weather.StormVisualTier;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.UUID;
+
 public final class CloudRenderSnapshot {
 
     private final boolean enabled;
+    private final UUID regionId;
+    private final UUID clusterId;
     private final String dimension;
     private final long worldTime;
     private final float partialTick;
@@ -29,6 +33,13 @@ public final class CloudRenderSnapshot {
     private final int lifetimeTicks;
     private final float growth;
     private final float decay;
+    private final float targetRadius;
+    private final float targetCoverage;
+    private final float targetDensity;
+    private final float spawnRadius;
+    private final long lastMotionTick;
+    private final long lastGrowthTick;
+    private final float lastGrowthRate;
     private final String cloudTypeId;
     private final String previousCloudTypeId;
     private final CloudMorphologyFamily morphologyFamily;
@@ -58,6 +69,8 @@ public final class CloudRenderSnapshot {
 
     public CloudRenderSnapshot(
             boolean enabled,
+            UUID regionId,
+            UUID clusterId,
             String dimension,
             long worldTime,
             float partialTick,
@@ -77,6 +90,13 @@ public final class CloudRenderSnapshot {
             int lifetimeTicks,
             float growth,
             float decay,
+            float targetRadius,
+            float targetCoverage,
+            float targetDensity,
+            float spawnRadius,
+            long lastMotionTick,
+            long lastGrowthTick,
+            float lastGrowthRate,
             String cloudTypeId,
             String previousCloudTypeId,
             CloudMorphologyFamily morphologyFamily,
@@ -105,6 +125,8 @@ public final class CloudRenderSnapshot {
             float lightningInfluence
     ) {
         this.enabled = enabled;
+        this.regionId = regionId == null ? new UUID(0L, 0L) : regionId;
+        this.clusterId = clusterId == null ? new UUID(0L, 0L) : clusterId;
         this.dimension = dimension;
         this.worldTime = worldTime;
         this.partialTick = partialTick;
@@ -124,6 +146,13 @@ public final class CloudRenderSnapshot {
         this.lifetimeTicks = lifetimeTicks;
         this.growth = growth;
         this.decay = decay;
+        this.targetRadius = targetRadius;
+        this.targetCoverage = clamp01(targetCoverage);
+        this.targetDensity = clamp01(targetDensity);
+        this.spawnRadius = spawnRadius;
+        this.lastMotionTick = Math.max(0L, lastMotionTick);
+        this.lastGrowthTick = Math.max(0L, lastGrowthTick);
+        this.lastGrowthRate = Float.isFinite(lastGrowthRate) ? lastGrowthRate : 0.0F;
         this.cloudTypeId = cloudTypeId;
         this.previousCloudTypeId = previousCloudTypeId;
         this.morphologyFamily = morphologyFamily == null ? CloudMorphologyFamily.PUFF : morphologyFamily;
@@ -154,6 +183,14 @@ public final class CloudRenderSnapshot {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public UUID getRegionId() {
+        return regionId;
+    }
+
+    public UUID getClusterId() {
+        return clusterId;
     }
 
     public String getDimension() {
@@ -230,6 +267,34 @@ public final class CloudRenderSnapshot {
 
     public float getDecay() {
         return decay;
+    }
+
+    public float getTargetRadius() {
+        return targetRadius;
+    }
+
+    public float getTargetCoverage() {
+        return targetCoverage;
+    }
+
+    public float getTargetDensity() {
+        return targetDensity;
+    }
+
+    public float getSpawnRadius() {
+        return spawnRadius;
+    }
+
+    public long getLastMotionTick() {
+        return lastMotionTick;
+    }
+
+    public long getLastGrowthTick() {
+        return lastGrowthTick;
+    }
+
+    public float getLastGrowthRate() {
+        return lastGrowthRate;
     }
 
     public String getCloudTypeId() {

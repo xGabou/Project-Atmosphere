@@ -77,20 +77,6 @@ public class NetworkHandler {
                     .add();
         }
 
-        // -----------------------------------------------------------------
-        // Handshake / server-bound packets
-        // -----------------------------------------------------------------
-        CHANNEL.messageBuilder(AuthChallengePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(AuthChallengePacket::decode)
-                .encoder(AuthChallengePacket::encode)
-                .consumerMainThread(AuthChallengePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(AuthChallengeReplyPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
-                .decoder(AuthChallengeReplyPacket::decode)
-                .encoder(AuthChallengeReplyPacket::encode)
-                .consumerMainThread(AuthChallengeReplyPacket::handle)
-                .add();
-
 
         // -----------------------------------------------------------------
         // Clouds

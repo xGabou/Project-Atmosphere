@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
+import net.Gabou.projectatmosphere.modules.atmosphere.WeakLowManager;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
@@ -575,6 +576,7 @@ public class ForecastOrchestrator {
 
         SeasonalAtmosphericDrift.tick(level);
         AtmosphericUpdateScheduler.tick(level);
+        WeakLowManager.tick(level);
         WeatherCellManager.tick(level);
         Set<RegionInstanceKey> activeRegions = getActiveRegions(level);
         OceanBasinManager.update(level, activeRegions);
@@ -656,6 +658,7 @@ public class ForecastOrchestrator {
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
             CloudManager.initialize(level);
         }
+        WeakLowManager.initialize(level);
         CycloneManager.initialize(level);
         OceanBasinManager.initialize(level);
     }

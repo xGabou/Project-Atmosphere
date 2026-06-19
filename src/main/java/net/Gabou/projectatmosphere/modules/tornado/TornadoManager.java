@@ -9,6 +9,7 @@ import net.Gabou.projectatmosphere.api.common.cloud.region.TornadoDescriptor;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.weather.StormCloudAttachment;
 import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
@@ -67,7 +68,8 @@ public class TornadoManager {
                 StormSeverityScale.fromNormalized(Mth.clamp((radius - 5.0F) / 20.0F, 0.25F, 1.0F)),
                 0.0F,
                 0.0F,
-                net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase.FORMING
+                net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase.FORMING,
+                StormCloudAttachment.NONE
         ));
     }
 

@@ -69,6 +69,19 @@ public final class ServerTelemetrySampler {
         }
     }
 
+    public static void captureServerSnapshot(ServerLevel level) {
+        if (level == null || !AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+            return;
+        }
+
+        long gameTime = level.getGameTime();
+        for (ServerPlayer player : level.players()) {
+            recordPlayerSample(level, player, player.blockPosition(), gameTime);
+        }
+        emitDominantBiomeOccupancy(gameTime);
+        recordRegionForecasts(level, gameTime);
+    }
+
     private static void recordPlayerSample(ServerLevel level, ServerPlayer player, BlockPos pos, long gameTime) {
         RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
         ResourceLocation biomeId = AtmosphereUtils.getBiomeLocation(pos, level);

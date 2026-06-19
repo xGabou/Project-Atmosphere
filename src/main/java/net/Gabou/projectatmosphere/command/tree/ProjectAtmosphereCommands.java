@@ -13,6 +13,7 @@ public final class ProjectAtmosphereCommands {
         boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
         dispatcher.register(
                 Commands.literal("pa")
+                        .requires(source -> source.hasPermission(2))
                         .then(PaHelpCommand.build())
                         .then(PaStatusCommand.build())
                         .then(PaDebugCommand.build())

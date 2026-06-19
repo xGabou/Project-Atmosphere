@@ -169,6 +169,9 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue TORNADO_RENDER_DOWNSAMPLE;
 
     public static final ForgeConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
+    public static final ForgeConfigSpec.IntValue CYCLONE_CANDIDATE_SCAN_RADIUS_REGIONS;
+    public static final ForgeConfigSpec.IntValue CYCLONE_CANDIDATE_SCAN_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.IntValue CYCLONE_CANDIDATE_MAX_REGIONS_PER_TICK;
 
     public static final ForgeConfigSpec.BooleanValue DEBUG_MODE;
     public static final ForgeConfigSpec.EnumValue<CloudDiagnosticsOverlayMode> CLOUD_DIAGNOSTICS_OVERLAY;
@@ -325,6 +328,15 @@ public class AtmoCommonConfig {
         STORM_SEVERITY_BOOSTER = builder
                 .comment("Global multiplier for storm severity calculations")
                 .defineInRange("stormSeverityBooster", 3.2d, 0.5d, 28d);
+        CYCLONE_CANDIDATE_SCAN_RADIUS_REGIONS = builder
+                .comment("Forecast-region radius around each active player used for weak-low and cyclone candidate scans.")
+                .defineInRange("cycloneCandidateScanRadiusRegions", 10, 1, 32);
+        CYCLONE_CANDIDATE_SCAN_INTERVAL_TICKS = builder
+                .comment("Ticks between weak-low/cyclone candidate scan passes.")
+                .defineInRange("cycloneCandidateScanIntervalTicks", 600, 20, 24000);
+        CYCLONE_CANDIDATE_MAX_REGIONS_PER_TICK = builder
+                .comment("Maximum forecast-known regions evaluated per candidate scan pass.")
+                .defineInRange("cycloneCandidateMaxRegionsPerTick", 512, 16, 4096);
         EVENTS_ENABLED = builder
                 .comment("Enable storm and weather event spawning/processing")
                 .define("eventsEnabled", true);

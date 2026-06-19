@@ -5,6 +5,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,16 +32,25 @@ public final class CloudRenderDiagnostics {
     private static int targetWidth;
     private static int targetHeight;
     private static boolean downscaled;
+    private static float cameraX;
+    private static float cameraY;
+    private static float cameraZ;
     private static int sourceSnapshots;
     private static int renderableSnapshots;
     private static int renderedSnapshots;
     private static int submitSkippedSnapshots;
+    private static int frustumSkippedSnapshots;
     private static boolean compositeSubmitted;
     private static String lastCloudTypeId = "";
     private static String lastCloudMorphologyFamily = "";
     private static String lastCloudShapeId = "";
     private static int lastCloudSeed;
     private static float lastCloudRadius;
+    private static float lastCloudBaseY;
+    private static float lastCloudTopY;
+    private static float lastCloudDensity;
+    private static float lastCloudCoverage;
+    private static Vec3 lastCloudCenter = Vec3.ZERO;
     private static long frameCpuStartNs;
     private static long raymarchCpuNs;
     private static long compositeCpuNs;
@@ -53,6 +63,9 @@ public final class CloudRenderDiagnostics {
     private static int compositeGpuAgeFrames;
     private static int raymarchGpuPendingQueries;
     private static int compositeGpuPendingQueries;
+    private static boolean outputAlphaSampled;
+    private static float maxOutputAlpha;
+    private static boolean shaderDebugMode;
 
     private CloudRenderDiagnostics() {
     }
@@ -75,16 +88,25 @@ public final class CloudRenderDiagnostics {
         targetWidth = cloudTarget.width;
         targetHeight = cloudTarget.height;
         downscaled = usesDownscaledTarget;
+        cameraX = (float) frameContext.getCameraPosition().x();
+        cameraY = (float) frameContext.getCameraPosition().y();
+        cameraZ = (float) frameContext.getCameraPosition().z();
         sourceSnapshots = Math.max(0, sourceSnapshotCount);
         renderableSnapshots = Math.max(0, renderableSnapshotCount);
         renderedSnapshots = 0;
         submitSkippedSnapshots = 0;
+        frustumSkippedSnapshots = 0;
         compositeSubmitted = false;
         lastCloudTypeId = "";
         lastCloudMorphologyFamily = "";
         lastCloudShapeId = "";
         lastCloudSeed = 0;
         lastCloudRadius = 0.0F;
+        lastCloudBaseY = 0.0F;
+        lastCloudTopY = 0.0F;
+        lastCloudDensity = 0.0F;
+        lastCloudCoverage = 0.0F;
+        lastCloudCenter = Vec3.ZERO;
         frameCpuStartNs = System.nanoTime();
         raymarchCpuNs = 0L;
         compositeCpuNs = 0L;
@@ -97,6 +119,9 @@ public final class CloudRenderDiagnostics {
         compositeGpuAgeFrames = -1;
         raymarchGpuPendingQueries = 0;
         compositeGpuPendingQueries = 0;
+        outputAlphaSampled = false;
+        maxOutputAlpha = 0.0F;
+        shaderDebugMode = false;
     }
 
     public static void recordRendered(@NotNull CloudRenderSnapshot snapshot) {
@@ -110,6 +135,11 @@ public final class CloudRenderDiagnostics {
         lastCloudShapeId = snapshot.getShapeProfile().getShapeId();
         lastCloudSeed = snapshot.getCloudSeed();
         lastCloudRadius = snapshot.getRegionRadius();
+        lastCloudBaseY = snapshot.getCloudBaseY();
+        lastCloudTopY = snapshot.getCloudTopY();
+        lastCloudDensity = snapshot.getDensity();
+        lastCloudCoverage = snapshot.getCoverage();
+        lastCloudCenter = snapshot.getRegionCenter() != null ? snapshot.getRegionCenter() : Vec3.ZERO;
     }
 
     public static void recordSubmitSkipped() {
@@ -118,6 +148,14 @@ public final class CloudRenderDiagnostics {
         }
 
         submitSkippedSnapshots++;
+    }
+
+    public static void recordFrustumSkipped() {
+        if (!frameOpen) {
+            return;
+        }
+
+        frustumSkippedSnapshots++;
     }
 
     public static void recordCompositeSubmitted(boolean submitted) {
@@ -174,6 +212,23 @@ public final class CloudRenderDiagnostics {
         compositeGpuPendingQueries = Math.max(0, compositePending);
     }
 
+    public static void recordMaxOutputAlpha(float alpha) {
+        if (!frameOpen) {
+            return;
+        }
+
+        outputAlphaSampled = true;
+        maxOutputAlpha = Math.max(0.0F, Math.min(1.0F, alpha));
+    }
+
+    public static void recordShaderDebugMode(boolean active) {
+        if (!frameOpen) {
+            return;
+        }
+
+        shaderDebugMode = shaderDebugMode || active;
+    }
+
     public static void finishFrame() {
         if (!frameOpen) {
             return;
@@ -193,11 +248,15 @@ public final class CloudRenderDiagnostics {
                 targetWidth,
                 targetHeight,
                 downscaled,
+                cameraX,
+                cameraY,
+                cameraZ,
                 sourceSnapshots,
                 renderableSnapshots,
                 renderedSnapshots,
                 filteredSkipped,
                 submitSkippedSnapshots,
+                frustumSkippedSnapshots,
                 totalSkipped,
                 compositeSubmitted,
                 lastCloudTypeId,
@@ -205,6 +264,13 @@ public final class CloudRenderDiagnostics {
                 lastCloudShapeId,
                 lastCloudSeed,
                 lastCloudRadius,
+                lastCloudBaseY,
+                lastCloudTopY,
+                lastCloudDensity,
+                lastCloudCoverage,
+                (float) lastCloudCenter.x(),
+                (float) lastCloudCenter.y(),
+                (float) lastCloudCenter.z(),
                 nsToMs(frameCpuNs),
                 nsToMs(raymarchCpuNs),
                 nsToMs(compositeCpuNs),
@@ -217,6 +283,9 @@ public final class CloudRenderDiagnostics {
                 compositeGpuAgeFrames,
                 raymarchGpuPendingQueries,
                 compositeGpuPendingQueries,
+                outputAlphaSampled,
+                maxOutputAlpha,
+                shaderDebugMode,
                 estimatePixelStepsMillions()
         );
         lastStats = stats;
@@ -273,7 +342,7 @@ public final class CloudRenderDiagnostics {
 
         lastLoggedWorldTime = stats.worldTime();
         ProjectAtmosphere.LOGGER.info(
-                "[CloudRender] quality={} steps={} scale={} main={}x{} target={}x{} downscaled={} snapshots={}/{} rendered={} skipped={} filtered={} submitSkipped={} composite={} workMPxSteps={} cpuMs={} rayCpuMs={} compositeCpuMs={} rayGpuMs={} compositeGpuMs={} gpuTimer={} rayAge={} rayPending={} compAge={} compPending={} lastCloud={}",
+                "[CloudRender] quality={} steps={} scale={} main={}x{} target={}x{} downscaled={} camera={} {},{} snapshots={}/{} rendered={} skipped={} filtered={} submitSkipped={} frustumSkipped={} composite={} sampledAlpha={} maxAlpha={} shaderDebug={} workMPxSteps={} cpuMs={} rayCpuMs={} compositeCpuMs={} rayGpuMs={} compositeGpuMs={} gpuTimer={} rayAge={} rayPending={} compAge={} compPending={} lastCloud={}",
                 stats.qualityName(),
                 stats.raymarchSteps(),
                 formatFloat(stats.resolutionScale()),
@@ -282,13 +351,20 @@ public final class CloudRenderDiagnostics {
                 stats.targetWidth(),
                 stats.targetHeight(),
                 stats.downscaled(),
+                formatFloat(stats.cameraX()),
+                formatFloat(stats.cameraY()),
+                formatFloat(stats.cameraZ()),
                 stats.renderableSnapshots(),
                 stats.sourceSnapshots(),
                 stats.renderedSnapshots(),
                 stats.totalSkippedSnapshots(),
                 stats.filteredSkippedSnapshots(),
                 stats.submitSkippedSnapshots(),
+                stats.frustumSkippedSnapshots(),
                 stats.compositeSubmitted(),
+                stats.outputAlphaSampled(),
+                formatFloat(stats.maxOutputAlpha()),
+                stats.shaderDebugMode(),
                 formatFloat(stats.pixelStepMegas()),
                 formatFloat(stats.frameCpuMs()),
                 formatFloat(stats.raymarchCpuMs()),
@@ -342,11 +418,15 @@ public final class CloudRenderDiagnostics {
             int targetWidth,
             int targetHeight,
             boolean downscaled,
+            float cameraX,
+            float cameraY,
+            float cameraZ,
             int sourceSnapshots,
             int renderableSnapshots,
             int renderedSnapshots,
             int filteredSkippedSnapshots,
             int submitSkippedSnapshots,
+            int frustumSkippedSnapshots,
             int totalSkippedSnapshots,
             boolean compositeSubmitted,
             @Nullable String lastCloudTypeId,
@@ -354,6 +434,13 @@ public final class CloudRenderDiagnostics {
             @Nullable String lastCloudShapeId,
             int lastCloudSeed,
             float lastCloudRadius,
+            float lastCloudBaseY,
+            float lastCloudTopY,
+            float lastCloudDensity,
+            float lastCloudCoverage,
+            float lastCloudCenterX,
+            float lastCloudCenterY,
+            float lastCloudCenterZ,
             float frameCpuMs,
             float raymarchCpuMs,
             float compositeCpuMs,
@@ -366,6 +453,9 @@ public final class CloudRenderDiagnostics {
             int compositeGpuAgeFrames,
             int raymarchGpuPendingQueries,
             int compositeGpuPendingQueries,
+            boolean outputAlphaSampled,
+            float maxOutputAlpha,
+            boolean shaderDebugMode,
             float pixelStepMegas
     ) {
         private static FrameStats empty() {
@@ -379,6 +469,10 @@ public final class CloudRenderDiagnostics {
                     0,
                     0,
                     false,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0,
                     0,
                     0,
                     0,
@@ -390,6 +484,13 @@ public final class CloudRenderDiagnostics {
                     "",
                     "",
                     0,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
                     0.0F,
                     0.0F,
                     0.0F,
@@ -403,6 +504,9 @@ public final class CloudRenderDiagnostics {
                     -1,
                     0,
                     0,
+                    false,
+                    0.0F,
+                    false,
                     0.0F
             );
         }
@@ -414,7 +518,15 @@ public final class CloudRenderDiagnostics {
 
             String shape = lastCloudShapeId == null || lastCloudShapeId.isBlank() ? "shape=unknown" : "shape=" + lastCloudShapeId;
             String morphology = lastCloudMorphologyFamily == null || lastCloudMorphologyFamily.isBlank() ? "morphology=unknown" : "morphology=" + lastCloudMorphologyFamily;
-            return lastCloudTypeId + "/" + morphology + "/" + shape + "/seed=" + lastCloudSeed + "/radius=" + formatFloat(lastCloudRadius);
+            return lastCloudTypeId
+                    + "/" + morphology
+                    + "/" + shape
+                    + "/seed=" + lastCloudSeed
+                    + "/radius=" + formatFloat(lastCloudRadius)
+                    + "/baseTop=" + formatFloat(lastCloudBaseY) + "-" + formatFloat(lastCloudTopY)
+                    + "/density=" + formatFloat(lastCloudDensity)
+                    + "/coverage=" + formatFloat(lastCloudCoverage)
+                    + "/center=" + formatFloat(lastCloudCenterX) + "," + formatFloat(lastCloudCenterY) + "," + formatFloat(lastCloudCenterZ);
         }
     }
 }

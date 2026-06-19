@@ -210,8 +210,8 @@ public final class CloudRenderLodManager {
                 1.0F
         );
         return new CloudVisualState(
-                null,
-                null,
+                snapshot.getRegionId(),
+                snapshot.getClusterId(),
                 snapshot.getDimension(),
                 snapshot.getCloudTypeId(),
                 snapshot.getMorphologyFamily(),

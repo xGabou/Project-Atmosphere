@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderFallbackState;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -32,16 +33,6 @@ public class TelemetryDebugClientCommand {
                 LiteralArgumentBuilder.<CommandSourceStack>literal("pa")
                         .then(Commands.literal("system")
                                 .then(Commands.literal("telemetry")
-                                        .then(Commands.literal("export")
-                                                .executes(ctx -> {
-                                                    if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
-                                                        ctx.getSource().sendFailure(Component.literal("Telemetry export is disabled in the config."));
-                                                        return 0;
-                                                    }
-                                                    ctx.getSource().sendSuccess(() -> Component.literal("Preparing telemetry archive..."), false);
-                                                    TelemetryExportService.get().exportAsync(ctx.getSource());
-                                                    return 1;
-                                                }))
                                         .then(Commands.literal("open")
                                                 .executes(ctx -> {
                                                     if (!AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
@@ -71,12 +62,19 @@ public class TelemetryDebugClientCommand {
                                             int currentSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots().size();
                                             int renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots().size();
                                             boolean hasDebugSnapshot = CloudRenderStateHolder.getInstance().hasDebugSnapshot();
+                                            CloudRenderFallbackState.FailureStatus fallbackStatus = CloudRenderFallbackState.getStatus();
 
                                             StringBuilder message = new StringBuilder("Cloud client status")
                                                     .append("\ncacheRegions=").append(cachedRegions)
                                                     .append("\ncurrentSnapshots=").append(currentSnapshots)
                                                     .append("\nrenderableLiveSnapshots=").append(renderableSnapshots)
-                                                    .append("\ndebugSnapshot=").append(hasDebugSnapshot);
+                                                    .append("\ndebugSnapshot=").append(hasDebugSnapshot)
+                                                    .append("\nfallbackActive=").append(fallbackStatus.active());
+
+                                            if (fallbackStatus.active()) {
+                                                message.append("\nfallbackTitle=").append(fallbackStatus.title())
+                                                        .append("\nfallbackDetail=").append(fallbackStatus.detail());
+                                            }
 
                                             if (cachedRegions > 0) {
                                                 CloudRegionRenderData data = ClientCloudRegionDataCache.getCurrentRegions().get(0);

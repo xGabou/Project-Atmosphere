@@ -20,6 +20,7 @@
     { "name": "BlurRadius", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "BlurStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "HistoryBlendWeight", "type": "float", "count": 1, "values": [ 0.0 ] },
-    { "name": "UseHistory", "type": "int", "count": 1, "values": [ 0 ] }
+    { "name": "UseHistory", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "CompositeDebugMode", "type": "int", "count": 1, "values": [ 0 ] }
   ]
 }

@@ -60,7 +60,18 @@ final class CloudRegionRegistry {
                 continue;
             }
 
-            renderDataList.add(CloudRegionRenderDataFactory.create(state, simulationTick));
+            int activeClusterCount = 0;
+            for (CloudClusterState cluster : state.getClusters()) {
+                if (cluster == null || !cluster.isActive()) {
+                    continue;
+                }
+                renderDataList.add(CloudRegionRenderDataFactory.createForCluster(state, cluster, simulationTick));
+                activeClusterCount++;
+            }
+
+            if (activeClusterCount == 0) {
+                renderDataList.add(CloudRegionRenderDataFactory.create(state, simulationTick));
+            }
         }
 
         return renderDataList;

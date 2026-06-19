@@ -3,6 +3,9 @@ package net.Gabou.projectatmosphere.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.Gabou.projectatmosphere.clouds.client.render.CustomPrecipitationRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
@@ -41,6 +44,26 @@ public class MixinLevelRenderer {
     public void projectatmosphere$customRainHook_renderSnowAndRain(LightTexture texture, float partialTick, double camX, double camY, double camZ, CallbackInfo ci) {
         if (CustomPrecipitationRenderer.renderSnowAndRain(this.level, texture, partialTick, camX, camY, camZ)) {
             ci.cancel();
+        }
+    }
+
+    @Inject(
+            method = "renderLevel",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Options;getCloudsType()Lnet/minecraft/client/CloudStatus;")
+    )
+    public void projectatmosphere$renderPaCloudsBeforeWeather_renderLevel(
+            PoseStack stack,
+            float partialTick,
+            long finishTimeNano,
+            boolean renderBlockOutline,
+            Camera camera,
+            GameRenderer gameRenderer,
+            LightTexture lightTexture,
+            Matrix4f projectionMatrix,
+            CallbackInfo ci
+    ) {
+        if (AtmosphereCloudPolicy.shouldRenderPaClouds(this.level)) {
+            CloudRenderHook.renderFromLevelRenderer(this.level, stack, projectionMatrix, partialTick, camera.getPosition());
         }
     }
 

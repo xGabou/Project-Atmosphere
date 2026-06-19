@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.transport;
 
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
@@ -97,6 +98,14 @@ public final class CloudRegionRenderDataFactory {
             @NotNull CloudRegionState region,
             @NotNull CloudClusterState cluster
     ) {
+        return createForCluster(region, cluster, 0L);
+    }
+
+    public static @NotNull CloudRegionRenderData createForCluster(
+            @NotNull CloudRegionState region,
+            @NotNull CloudClusterState cluster,
+            long simulationTick
+    ) {
         CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cluster.getCloudTypeId());
         CloudTypeDefinition previousDefinition = CloudTypeRegistry.getOrDefault(cluster.getPreviousCloudTypeId());
         CloudVisualProfile profile = CloudVisualProfile.blend(
@@ -118,7 +127,7 @@ public final class CloudRegionRenderDataFactory {
                 cluster.getCoverage(),
                 cluster.getEdgeSoftness(),
                 0xFFFFFFFF,
-                0L,
+                simulationTick,
                 definition,
                 profile,
                 shapeProfile
@@ -144,8 +153,15 @@ public final class CloudRegionRenderDataFactory {
         float finalCoverage = clamp01(coverage * (1.0F + (mergePressure * 0.07F)));
         float finalEdgeSoftness = clamp01(edgeSoftness + (mergePressure * 0.16F));
         float finalRadius = Math.max(1.0F, metrics.radius() * mergeScale);
-        float finalBaseY = metrics.baseY() - (mergePressure * 2.5F);
-        float finalTopY = Math.max(finalBaseY + 1.0F, metrics.topY() + (mergePressure * 6.5F));
+        VerticalBounds verticalBounds = expandRenderableVerticalBounds(
+                definition.getMorphologyFamily(),
+                profile,
+                finalRadius,
+                metrics.baseY() - (mergePressure * 2.5F),
+                metrics.topY() + (mergePressure * 6.5F)
+        );
+        float finalBaseY = verticalBounds.baseY();
+        float finalTopY = verticalBounds.topY();
         PrecipitationTier precipitationTier = resolvePrecipitationTier(definition, profile, finalDensity, finalCoverage);
         float stormDarkening = Math.max(definition.getStormVisualTier().getDarkness(), definition.getMaterialProfile().getStormCoreDarkening());
         float shadowContribution = clamp01(
@@ -177,6 +193,13 @@ public final class CloudRegionRenderDataFactory {
                 cluster.getLifetimeTicks(),
                 cluster.getGrowth(),
                 cluster.getDecay(),
+                cluster.getTargetRadius(),
+                cluster.getTargetCoverage(),
+                cluster.getTargetDensity(),
+                cluster.getSpawnRadius(),
+                cluster.getLastMotionTick(),
+                cluster.getLastGrowthTick(),
+                cluster.getLastGrowthRate(),
                 definition.getId(),
                 cluster.getPreviousCloudTypeId(),
                 cluster.getMorphologyFamily(),
@@ -204,6 +227,34 @@ public final class CloudRegionRenderDataFactory {
                 shadowContribution,
                 lightningInfluence
         );
+    }
+
+    private static @NotNull VerticalBounds expandRenderableVerticalBounds(
+            @NotNull CloudMorphologyFamily family,
+            @NotNull CloudVisualProfile profile,
+            float radius,
+            float baseY,
+            float topY
+    ) {
+        float span = Math.max(1.0F, topY - baseY);
+        float minimumSpan = switch (family) {
+            case SHEET -> Mth.clamp(radius * 0.10F, 32.0F, 72.0F);
+            case CELLULAR_SHEET -> Mth.clamp(radius * 0.16F, 36.0F, 84.0F);
+            case FILAMENT -> Mth.clamp(radius * 0.035F, 10.0F, 26.0F);
+            default -> span;
+        };
+
+        minimumSpan *= Mth.clamp(profile.getVerticalThickness() * profile.getHeightSquash(), 0.80F, 1.35F);
+        if (span >= minimumSpan) {
+            return new VerticalBounds(baseY, Math.max(baseY + 1.0F, topY));
+        }
+
+        float centerY = (baseY + topY) * 0.5F;
+        float halfSpan = minimumSpan * 0.5F;
+        return new VerticalBounds(centerY - halfSpan, centerY + halfSpan);
+    }
+
+    private record VerticalBounds(float baseY, float topY) {
     }
 
     private record RenderMetrics(

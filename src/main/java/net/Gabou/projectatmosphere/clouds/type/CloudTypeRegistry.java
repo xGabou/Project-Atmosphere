@@ -115,7 +115,7 @@ public final class CloudTypeRegistry {
                 "Stratus nebulosus",
                 CloudFamily.STRATUS,
                 CloudMorphologyFamily.SHEET,
-                new CloudVisualProfile(0.24F, 0.14F, 0.50F, 0.46F, 0.42F, 0.008F, 0.044F, 0.058F, 0.72F, 1.20F, 3.70F, 0.00F, 0.00F, 0.00F),
+                new CloudVisualProfile(0.46F, 0.18F, 0.46F, 0.38F, 0.42F, 0.008F, 0.054F, 0.066F, 0.76F, 1.14F, 2.15F, 0.00F, 0.00F, 0.00F),
                 new CloudSpawnConditions(0.62F, 1.00F, -20.0F, 24.0F, 0.92F, 1.08F, 0.00F, 0.00F, 0.00F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -125,7 +125,7 @@ public final class CloudTypeRegistry {
                 "Stratocumulus",
                 CloudFamily.STRATOCUMULUS,
                 CloudMorphologyFamily.CELLULAR_SHEET,
-                new CloudVisualProfile(0.62F, 0.50F, 0.34F, 0.24F, 0.36F, 0.014F, 0.092F, 0.128F, 0.82F, 0.96F, 2.35F, 0.04F, 0.00F, 0.00F),
+                new CloudVisualProfile(0.82F, 0.50F, 0.32F, 0.22F, 0.36F, 0.014F, 0.104F, 0.136F, 0.86F, 0.98F, 1.65F, 0.06F, 0.00F, 0.00F),
                 new CloudSpawnConditions(0.48F, 1.00F, -15.0F, 30.0F, 0.90F, 1.10F, 0.00F, 0.00F, 0.00F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -135,7 +135,7 @@ public final class CloudTypeRegistry {
                 "Nimbostratus",
                 CloudFamily.NIMBOSTRATUS,
                 CloudMorphologyFamily.SHEET,
-                new CloudVisualProfile(0.34F, 0.16F, 0.52F, 0.40F, 0.82F, 0.009F, 0.054F, 0.070F, 1.12F, 1.28F, 3.20F, 0.00F, 0.00F, 0.54F),
+                new CloudVisualProfile(0.58F, 0.18F, 0.48F, 0.34F, 0.82F, 0.009F, 0.064F, 0.080F, 1.16F, 1.24F, 2.05F, 0.00F, 0.00F, 0.54F),
                 new CloudSpawnConditions(0.72F, 1.00F, -10.0F, 22.0F, 0.80F, 1.00F, 0.15F, 0.10F, 0.05F),
                 new CloudEvolutionRules(List.of())
         ));

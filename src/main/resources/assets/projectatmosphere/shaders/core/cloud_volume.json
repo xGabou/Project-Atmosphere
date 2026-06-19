@@ -64,6 +64,14 @@
     { "name": "CloudTowerStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudAnvilStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudPrecipitationCoreStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudMaterialDarkness", "type": "float", "count": 1, "values": [ 0.12 ] },
+    { "name": "CloudMaterialPrecipitationTint", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudMaterialOpacityBias", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CloudMaterialUndersideDarkness", "type": "float", "count": 1, "values": [ 0.24 ] },
+    { "name": "CloudMaterialEdgeErosion", "type": "float", "count": 1, "values": [ 0.18 ] },
+    { "name": "CloudStormCoreDarkening", "type": "float", "count": 1, "values": [ 0.12 ] },
+    { "name": "CloudMaterialShadowContribution", "type": "float", "count": 1, "values": [ 0.72 ] },
+    { "name": "CloudMaterialLightningResponse", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CloudShapeLobeCounts", "type": "float", "count": 2, "values": [ 4.0, 9.0 ] },
     { "name": "CloudShapeLobeStrength", "type": "float", "count": 1, "values": [ 0.50 ] },
     { "name": "CloudShapeVerticalTilt", "type": "float", "count": 1, "values": [ 0.0 ] },
@@ -75,10 +83,17 @@
     { "name": "CloudShapeEdgeRaggedness", "type": "float", "count": 1, "values": [ 0.32 ] },
     { "name": "CloudShapeStormWallStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudMorphologyFamily", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "CloudStormVisualTier", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "CloudStormVisualDarkness", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudPrecipitationTier", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "CloudPrecipitationIntensity", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudShadowContribution", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "CloudLightningInfluence", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudSeed", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 32 ] },
     { "name": "RayJitterFrame", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "RayJitterStrength", "type": "float", "count": 1, "values": [ 1.0 ] },
-    { "name": "RayJitterTemporalStrength", "type": "float", "count": 1, "values": [ 0.25 ] }
+    { "name": "RayJitterTemporalStrength", "type": "float", "count": 1, "values": [ 0.25 ] },
+    { "name": "CloudDebugMode", "type": "int", "count": 1, "values": [ 0 ] }
   ]
 }

@@ -1,8 +1,7 @@
 package net.Gabou.projectatmosphere;
 
 
-import net.Gabou.projectatmosphere.auth.ClientLauncherGuards;
-import net.Gabou.projectatmosphere.auth.ServerAuth;
+
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDataReloadListener;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
@@ -86,13 +85,14 @@ public class ProjectAtmosphere {
         MinecraftForge.EVENT_BUS.addListener((TickEvent.ServerTickEvent event)-> {
             if (event.phase == TickEvent.Phase.END) {
                 TickCounter.onServerTick();
-                ServerAuth.onTick(event.getServer());
             }
         });
         ModParticles.register(modEventBus);
         ModTabs.REGISTRY.register(modEventBus);
         ModBlocks.REGISTRY.register(modEventBus);
         SeasonBootstrap.initOrCrash();
+
+
     }
 
 
@@ -128,7 +128,6 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
-            ServerAuth.onLogout(player);
             ServerLevel world = Objects.requireNonNull(player.getServer()).getLevel(ServerLevel.OVERWORLD);
             if (world != null) {
                 AtmosphereManager.onPlayerLogout(world, player);
@@ -171,11 +170,11 @@ public class ProjectAtmosphere {
     }
 
 
+    @SuppressWarnings("removal")
     private void clientSetup(final FMLClientSetupEvent event, FMLJavaModLoadingContext context) {
         event.enqueueWork(() -> {
             if(ProjectAtmosphere.DEBUG_MODE)
                 LOGGER.info("Setting up Project Atmosphere (Client)");
-            ClientLauncherGuards.enforce();
             ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS,context);
             Map<String, String> translations = Language.getInstance().getLanguageData();
             translations.put("sandstorm.debug.blocked", "Nothing to report. Stay alert.");
@@ -202,12 +201,9 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!ServerAuth.onLogin(player)) return;
-        if (!ServerAuth.enforceLocalLauncherDetection(player)) return;
         if(ProjectAtmosphere.DEBUG_MODE)
             LOGGER.info("Player logged in!");
         AtmosphereManager.onPlayerLogin(player.getServer().getLevel(ServerLevel.OVERWORLD), player);
-        ServerAuth.sendChallenge(player);
 
 
         

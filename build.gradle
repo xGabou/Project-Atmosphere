@@ -120,58 +120,88 @@ repositories {
 
 
 dependencies {
-    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    //implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7027745")
-    compileOnly fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
-    compileOnly fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:7870940")
+
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+
+    // Core dependencies
+    implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
+    implementation fg.deobf("curse.maven:gabous-libs-1367332:8280104")
+    implementation fg.deobf("curse.maven:spark-361579:4738952")
+    implementation fg.deobf("curse.maven:cloth-config-348521:5729105")
+
+    // Project Atmosphere required dependencies
+    implementation fg.deobf("curse.maven:serene-seasons-291874:8246702")
+    implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
+    implementation fg.deobf("curse.maven:betterdays-895618:7046761")
+
+    // Simple Clouds dependencies
+    // Simple Clouds dependencies
+    def enableSimpleCloudsRuntime = project.findProperty("enableSimpleCloudsRuntime") == "true"
+
     implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
     implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
-    compileOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
-    compileOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
-    implementation fg.deobf("curse.maven:betterdays-895618:7013807")
+
+    if (enableSimpleCloudsRuntime) {
+        implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
+    } else {
+        compileOnly fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
+    }
+
+    compileOnly fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:7870940")
+    compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
+    implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
+    implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
+    compileOnly fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:7870940")
+    compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
+    //implementation fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:8234238")
+
+    // World generation dependencies
+    compileOnly fg.deobf("curse.maven:tectonic-686836:7197834")
+    implementation fg.deobf("curse.maven:lithostitched-936015:6742615")
+    implementation fg.deobf(files("libs/tectonic-3.0.17-forge-1.20.1-dev.jar"))
+    compileOnly fg.deobf("curse.maven:continents-682515:7842288")
+
+    // Weather and season compatibility
+    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:8244461")
+    compileOnly fg.deobf("curse.maven:ecliptic-seasons-1118306:8257701")
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
-    compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
-    compileOnly fg.deobf("curse.maven:serene-seasons-plus-1288843:8238045")
     compileOnly fg.deobf("curse.maven:rainboows-1121832:6421980")
     compileOnly fg.deobf("curse.maven:auroras-1105290:6040671")
-    implementation fg.deobf("curse.maven:gabous-libs-1367332:8237907")
-    implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
-    implementation fg.deobf("curse.maven:tectonic-686836:7197834")
-    compileOnly fg.deobf("curse.maven:continents-682515:7078247")
-    implementation fg.deobf("curse.maven:lithostitched-936015:6742615")
-    compileOnly fg.deobf("curse.maven:ecliptic-seasons-1118306:7274743")
-
-    compileOnly fg.deobf("curse.maven:project-atmosphere-for-tfc-1391548:7261639")
-    compileOnly fg.deobf("curse.maven:dynamictrees-252818:7502488")
-    compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
     compileOnly "maven.modrinth:protomanlys-weather:0.16.4-1.20.1-alpha"
-    //implementation "curse.maven:nolijium-969602:6264798"
 
+    // Temperature and survival compatibility
+    compileOnly fg.deobf("curse.maven:legendary-survival-overhaul-840254:7603852")
+    compileOnly fg.deobf("curse.maven:tough-as-nails-246391:5815863")
+    compileOnly fg.deobf("curse.maven:cold-sweat-506194:8170903")
 
-//    implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))
-    implementation fg.deobf(files("libs/tectonic-3.0.17-forge-1.20.1-dev.jar"))
-
-
-    //runtimeOnly(fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844"))
-    //runtimeOnly(fg.deobf("curse.maven:tough-as-nails-246391:5815863"))
-
+    // Visual and rendering compatibility
+    compileOnly fg.deobf("curse.maven:lodestone-616457:6213794")
+    compileOnly fg.deobf("curse.maven:distant-horizons-508933:7948170")
     runtimeOnly fg.deobf("curse.maven:chloride-931925:6615986")
     runtimeOnly fg.deobf("curse.maven:embeddium-908741:5681725")
-    compileOnly fg.deobf("curse.maven:distant-horizons-508933:7948170")
 
-    // Local dependency, ensure the file exists in the libs directory
-    // Example mod dependency with JEI - using fg.deobf() ensures the dependency is remapped to your development mappings
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
+    //Sounds
+    implementation fg.deobf("curse.maven:cool-rain-reforged-1346978:7270440")
+
+    // Nature and addon compatibility
+    compileOnly fg.deobf("curse.maven:project-atmosphere-for-tfc-1391548:7261639")
+    compileOnly fg.deobf("curse.maven:dynamictrees-252818:7502488")
+
+    // JEI
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:15.8.2.26")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:15.8.2.26")
     runtimeOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge:15.8.2.26")
-    runtimeOnly(fg.deobf("curse.maven:jade-324717:6271651"))
-    implementation fg.deobf("curse.maven:serene-seasons-291874:6398227")
-    implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
-    implementation fg.deobf("curse.maven:spark-361579:4738952")
-    implementation fg.deobf("curse.maven:cloth-config-348521:5729105")
-    compileOnly fg.deobf("curse.maven:cold-sweat-506194:6880105")
+
+    // Runtime tools
+    runtimeOnly fg.deobf("curse.maven:jade-324717:6271651")
+
+    // Disabled dependencies
+    // implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:7027745")
+    // implementation "curse.maven:nolijium-969602:6264798"
+    // implementation files(fg.deobf("/libs/Serene Seasons Plus-forge-1.20.1-1.20.1-3.0.4.jar"))
+    // runtimeOnly fg.deobf("curse.maven:legendary-survival-overhaul-840254:6717844")
+    // runtimeOnly fg.deobf("curse.maven:tough-as-nails-246391:5815863")
 }
 
 tasks.named('processResources', ProcessResources).configure {

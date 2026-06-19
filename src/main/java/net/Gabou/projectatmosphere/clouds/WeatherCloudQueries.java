@@ -63,17 +63,12 @@ public final class WeatherCloudQueries {
             return CloudWeatherSample.NONE;
         }
 
-        boolean canPrecipitateAtPosition = !requireSky || level.canSeeSky(pos);
-        if (!canPrecipitateAtPosition) {
-            return CloudWeatherSample.NONE;
-        }
-
         Collection<?> regions = getRegions(level);
         String dimensionId = level.dimension().location().toString();
         boolean snowing = level.getBiome(pos).value().coldEnoughToSnow(pos);
         CloudWeatherSample strongest = CloudWeatherSample.NONE;
         for (Object region : regions) {
-            CloudWeatherSample sample = sampleLocalRegion(region, dimensionId, pos, snowing);
+            CloudWeatherSample sample = sampleLocalRegion(region, dimensionId, pos, snowing, requireSky, level.canSeeSky(pos));
             if (sample.rainStrength() > strongest.rainStrength()) {
                 strongest = sample;
             }
@@ -162,7 +157,14 @@ public final class WeatherCloudQueries {
         return samplePeakStrength(inputs, thunderOnly);
     }
 
-    private static @NotNull CloudWeatherSample sampleLocalRegion(Object region, String dimensionId, BlockPos pos, boolean snowing) {
+    private static @NotNull CloudWeatherSample sampleLocalRegion(
+            Object region,
+            String dimensionId,
+            BlockPos pos,
+            boolean snowing,
+            boolean requireSky,
+            boolean canSeeSky
+    ) {
         RegionWeatherInputs inputs = readInputs(region, dimensionId);
         if (inputs == null || pos == null) {
             return CloudWeatherSample.NONE;
@@ -173,7 +175,11 @@ public final class WeatherCloudQueries {
         if (inputs.precipitationCoreStrength() <= 0.0F || inputs.center() == null || inputs.radius() <= 0.0F) {
             return CloudWeatherSample.NONE;
         }
-        if ((float) pos.getY() + 0.5F > inputs.topY()) {
+        float y = (float) pos.getY() + 0.5F;
+        if (y > inputs.topY()) {
+            return CloudWeatherSample.NONE;
+        }
+        if (requireSky && y < inputs.baseY() && !canSeeSky) {
             return CloudWeatherSample.NONE;
         }
 
@@ -193,10 +199,9 @@ public final class WeatherCloudQueries {
         }
 
         float horizontalFade = horizontalFade(normalizedHorizontal, inputs.edgeSoftness());
-        float y = (float) pos.getY() + 0.5F;
         float verticalFade = y <= inputs.baseY()
                 ? 1.0F
-                : 1.0F - smoothstep(inputs.baseY(), inputs.topY(), y);
+                : Math.max(0.35F, 1.0F - smoothstep(inputs.baseY(), inputs.topY(), y));
 
         float cloudCoverStrength = Mth.clamp(effectiveCoverage * horizontalFade, 0.0F, 1.0F);
         float rainStrength = Mth.clamp(

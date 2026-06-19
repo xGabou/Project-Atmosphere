@@ -4,6 +4,7 @@ import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.blocks.BlockManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendBridgeSnapshot;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
@@ -63,6 +64,21 @@ public final class SimpleCloudsAtmosphereCloudService implements AtmosphereCloud
 
     @Override
     public void clearForRegeneration(ServerLevel level) {
+        if (level == null) {
+            return;
+        }
+        if (!level.getServer().isSameThread()) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "[SimpleCloudsCompat] clearForRegeneration entered from {}; scheduling cloud removal on the server thread.",
+                    Thread.currentThread().getName()
+            );
+            level.getServer().execute(() -> clearForRegenerationOnServerThread(level));
+            return;
+        }
+        clearForRegenerationOnServerThread(level);
+    }
+
+    private void clearForRegenerationOnServerThread(ServerLevel level) {
         CloudManager.get(level).getCloudGenerator().removeAllClouds();
         AtmosphereCloudRegionTracker.clear();
         CloudRegionQueue.clear();

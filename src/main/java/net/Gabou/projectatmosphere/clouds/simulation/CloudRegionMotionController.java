@@ -50,6 +50,7 @@ final class CloudRegionMotionController {
             cluster.setPreviousCenter(currentCenter);
             cluster.setCenter(nextCenter);
             cluster.setVelocity(velocity);
+            cluster.setLastMotionTick(level.getGameTime());
             changed = true;
         }
 

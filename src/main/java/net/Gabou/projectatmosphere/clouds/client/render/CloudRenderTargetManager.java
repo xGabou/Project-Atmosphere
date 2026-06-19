@@ -7,8 +7,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import org.lwjgl.opengl.GL11;
 
-import java.util.Locale;
-
 /**
  * Gère les futures cibles de rendu des nuages Project Atmosphere.
  * Cette classe ne fait pas de rendu et ne lit jamais le backend.
@@ -85,7 +83,7 @@ public final class CloudRenderTargetManager {
             );
             if (ownsCloudColorTarget) {
                 cloudColorTarget.destroyBuffers();
-                logGlError("cloud-target-clear");
+                CloudGlDebug.checkErrors("cloud-target-clear");
             }
         }
 
@@ -192,7 +190,7 @@ public final class CloudRenderTargetManager {
                     ownsCloudColorTarget,
                     cloudColorTargetHasDepth
             );
-            logGlError("cloud-target-create");
+            CloudGlDebug.checkErrors("cloud-target-create");
         }
 
         ensureHistoryTargets(width, height);
@@ -229,7 +227,7 @@ public final class CloudRenderTargetManager {
                 cloudHistoryTargets[0].getColorTextureId(),
                 cloudHistoryTargets[1].getColorTextureId()
         );
-        logGlError("cloud-history-create");
+        CloudGlDebug.checkErrors("cloud-history-create");
     }
 
     private static void destroyCloudColorTargetIfOwned() {
@@ -250,20 +248,7 @@ public final class CloudRenderTargetManager {
         cloudHistoryValid = false;
     }
 
-    private static void logGlError(String context) {
-        int error = GL11.glGetError();
-        if (error == GL11.GL_NO_ERROR) {
-            return;
-        }
-
-        ProjectAtmosphere.LOGGER.warn(
-                "[CloudState] glError context={} code=0x{}",
-                context,
-                String.format(Locale.ROOT, "%04X", error)
-        );
-    }
-
     private static String formatFloat(float value) {
-        return String.format(Locale.ROOT, "%.2f", value);
+        return String.format(java.util.Locale.ROOT, "%.2f", value);
     }
 }

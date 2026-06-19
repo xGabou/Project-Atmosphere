@@ -2,6 +2,9 @@ package net.Gabou.projectatmosphere.telemetry.verification;
 
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendStatus;
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendResolver;
+import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
@@ -42,6 +45,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.ModList;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -69,8 +73,10 @@ public final class VerificationCollector {
         VerificationReport.WeatherCellSection weatherCells = collectWeatherCells(level, pos, issues);
         VerificationReport.CloudSection clouds = collectClouds(level, pos, issues);
         VerificationReport.CloudBackendSection cloudBackend = collectCloudBackend(level, issues);
+        VerificationReport.PaNativeBackendSection paNativeBackend = collectPaNativeBackend(level);
         VerificationReport.MorphologySection morphology = collectMorphology(level, clouds.activeRegionCount(), issues);
         VerificationReport.EvolutionSection evolution = collectEvolution(level, pos, issues);
+        VerificationReport.NearestNativeCloud nearestNativeCloud = collectNearestNativeCloud(level, pos);
         VerificationReport.PersistenceSection persistence = collectPersistence(level, issues);
 
         return new VerificationReport(
@@ -83,8 +89,10 @@ public final class VerificationCollector {
                 weatherCells,
                 clouds,
                 cloudBackend,
+                paNativeBackend,
                 morphology,
                 evolution,
+                nearestNativeCloud,
                 persistence,
                 issues
         );
@@ -564,6 +572,97 @@ public final class VerificationCollector {
         );
     }
 
+    private static VerificationReport.PaNativeBackendSection collectPaNativeBackend(ServerLevel level) {
+        boolean paNativeEnabled = CloudBackendResolver.resolve(level) == CloudVisualBackend.PA_NATIVE;
+        int stored = CloudRegionStateStore.size(level);
+        int rendered = 0;
+        for (CloudRegionState region : CloudRegionStateStore.getActiveRegions(level)) {
+            if (region != null && region.isActive()) {
+                rendered++;
+            }
+        }
+        boolean shadowActive = safeBooleanConfig(AtmoCommonConfig.ENABLE_CLOUD_SHADOW_MAP, false);
+        boolean dhActive = safeBooleanConfig(AtmoCommonConfig.ENABLE_DISTANT_HORIZONS_ADAPTER, true)
+                && ModList.get().isLoaded("distanthorizons");
+
+        return new VerificationReport.PaNativeBackendSection(
+                paNativeEnabled,
+                stored,
+                CloudRegionSyncManager.getLastSyncedCount(),
+                rendered,
+                paNativeEnabled && CloudRegionSyncManager.getLastSyncTick() > 0L,
+                paNativeEnabled && rendered > 0,
+                paNativeEnabled && shadowActive,
+                paNativeEnabled && shadowActive,
+                paNativeEnabled,
+                paNativeEnabled && dhActive
+        );
+    }
+
+    private static VerificationReport.NearestNativeCloud collectNearestNativeCloud(ServerLevel level, BlockPos pos) {
+        CloudRegionState nearestRegion = null;
+        CloudClusterState nearestCluster = null;
+        double nearestDistance = Double.MAX_VALUE;
+        Vec3 sample = Vec3.atCenterOf(pos);
+
+        for (CloudRegionState region : CloudRegionStateStore.getActiveRegions(level)) {
+            if (region == null || !region.isActive()) {
+                continue;
+            }
+            for (CloudClusterState cluster : region.getClusters()) {
+                if (cluster == null || !cluster.isActive()) {
+                    continue;
+                }
+                double distance = cluster.getCenter().distanceTo(sample);
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearestRegion = region;
+                    nearestCluster = cluster;
+                }
+            }
+        }
+
+        if (nearestRegion == null || nearestCluster == null) {
+            return null;
+        }
+
+        CloudRegionRenderData renderData = CloudRegionRenderDataFactory.createForCluster(nearestRegion, nearestCluster);
+        Vec3 velocity = nearestCluster.getVelocity();
+        boolean movementEnabled = safeBooleanConfig(AtmoCommonConfig.ENABLE_CLOUD_MOVEMENT, true);
+        boolean movementFrozen = safeBooleanConfig(AtmoCommonConfig.FREEZE_CLOUD_MOVEMENT, false);
+        boolean motionActive = movementEnabled && !movementFrozen && velocity != null && velocity.lengthSqr() > 0.0000001D;
+        String motionBlockedReason = resolveNativeMotionBlockedReason(movementEnabled, movementFrozen, velocity);
+        boolean growthActive = isNativeGrowthActive(nearestCluster);
+
+        return new VerificationReport.NearestNativeCloud(
+                nearestCluster.getClusterId().toString(),
+                nearestCluster.getCloudTypeId(),
+                formatVec(nearestCluster.getCenter()),
+                formatVec(nearestCluster.getPreviousCenter()),
+                formatVec(velocity),
+                safeCloudWindDriftScale(),
+                motionActive,
+                motionBlockedReason,
+                nearestCluster.getRadius(),
+                nearestCluster.getTargetRadius(),
+                renderData.getRadius(),
+                CloudClusterState.RADIUS_CAP,
+                nearestCluster.getCoverage(),
+                nearestCluster.getTargetCoverage(),
+                nearestCluster.getDensity(),
+                nearestCluster.getTargetDensity(),
+                nearestCluster.getLastGrowthRate(),
+                growthActive,
+                resolveNativeGrowthBlockedReason(nearestCluster),
+                nearestCluster.getAgeTicks(),
+                nearestCluster.getLifetimeTicks(),
+                Math.max(nearestCluster.getLastMotionTick(), nearestCluster.getLastGrowthTick()),
+                CloudRegionSyncManager.getLastSyncTick(),
+                level.getGameTime(),
+                formatBounds(renderData)
+        );
+    }
+
     private static VerificationReport.MorphologySection collectMorphology(
             ServerLevel level,
             int activeRegionCount,
@@ -664,9 +763,9 @@ public final class VerificationCollector {
             RegionInstanceKey regionKey = RegionInstanceKey.from(BlockPos.containing(center));
             RegionAtmosphereState atmosphere = AtmosphericStateRegistry.getState(regionKey);
             AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(regionKey, atmosphere);
-            float targetRadius = Math.max(shape.getBaseRadius(), nearest.getRadius());
-            float targetCoverage = renderData.getCoverage();
-            float targetDensity = renderData.getDensity();
+            float targetRadius = cluster != null ? cluster.getTargetRadius() : Math.max(shape.getBaseRadius(), nearest.getRadius());
+            float targetCoverage = cluster != null ? cluster.getTargetCoverage() : renderData.getCoverage();
+            float targetDensity = cluster != null ? cluster.getTargetDensity() : renderData.getDensity();
             float driftSpeed = (float) Math.sqrt(velocity.x() * velocity.x() + velocity.z() * velocity.z());
             float windCoupling = safeCloudWindDriftScale();
             String radiusCap = resolveRadiusCap(nearest);
@@ -687,7 +786,7 @@ public final class VerificationCollector {
                     targetRadius,
                     radiusCap,
                     targetRadius - nearest.getRadius(),
-                    nearest.getGrowth() < 1.0F ? 1.0F / 600.0F : 0.0F,
+                    cluster != null ? cluster.getLastGrowthRate() : 0.0F,
                     growthBlockedReason,
                     nearest.getCoverage(),
                     renderData.getCoverage(),
@@ -706,8 +805,8 @@ public final class VerificationCollector {
                     driftSpeed,
                     windCoupling,
                     motionSource,
-                    ageTicks,
-                    ageTicks,
+                    cluster != null ? cluster.getLastMotionTick() : ageTicks,
+                    cluster != null ? cluster.getLastGrowthTick() : ageTicks,
                     level.getGameTime(),
                     nearest.getCloudSeed(),
                     true,
@@ -748,22 +847,22 @@ public final class VerificationCollector {
             return "unknown";
         }
         if (region.getRadius() >= 1399.5F) {
-            return "radius capped by migration (Simple Clouds -> PA_NATIVE clamp 1400.00)";
+            return "radius capped at 1400.00";
         }
-        return "not capped by migration; raw radius from cloud type geometry/cluster aggregation";
+        return "not capped";
     }
 
     private static String resolveGrowthBlockedReason(CloudRegionState region, String radiusCap) {
         if (region == null) {
             return "unknown";
         }
-        if (radiusCap != null && radiusCap.contains("migration")) {
-            return "raw radius fixed at migration cap; lifecycle growth affects visual alpha only";
+        if (radiusCap != null && radiusCap.contains("capped")) {
+            return "radius capped";
         }
         if (region.getGrowth() >= 1.0F) {
             return "growth complete; radius/coverage/density are stable backend geometry values";
         }
-        return "lifecycle growth active; raw radius is not resized by lifecycle growth";
+        return "lifecycle growth active; backend geometry integrates toward targets";
     }
 
     private static String resolveCloudMotionSource(Vec3 velocity) {
@@ -773,11 +872,59 @@ public final class VerificationCollector {
         return "server regional wind drift; client extrapolates between sync packets";
     }
 
+    private static String resolveNativeMotionBlockedReason(boolean movementEnabled, boolean movementFrozen, Vec3 velocity) {
+        if (!movementEnabled) {
+            return "ENABLE_CLOUD_MOVEMENT=false";
+        }
+        if (movementFrozen) {
+            return "FREEZE_CLOUD_MOVEMENT=true";
+        }
+        if (velocity == null || velocity.lengthSqr() <= 0.0000001D) {
+            return "no resolved wind velocity";
+        }
+        return "none";
+    }
+
+    private static boolean isNativeGrowthActive(CloudClusterState cluster) {
+        if (cluster == null || !cluster.isActive() || cluster.getDecay() > 0.0F) {
+            return false;
+        }
+        return cluster.getAgeTicks() < 600
+                && (Math.abs(cluster.getRadius() - cluster.getTargetRadius()) > 0.001F
+                || Math.abs(cluster.getCoverage() - cluster.getTargetCoverage()) > 0.0005F
+                || Math.abs(cluster.getDensity() - cluster.getTargetDensity()) > 0.0005F);
+    }
+
+    private static String resolveNativeGrowthBlockedReason(CloudClusterState cluster) {
+        if (cluster == null || !cluster.isActive()) {
+            return "inactive";
+        }
+        if (cluster.getDecay() > 0.0F) {
+            return "decaying";
+        }
+        if (cluster.getRadius() >= CloudClusterState.RADIUS_CAP - 0.5F
+                && cluster.getTargetRadius() >= CloudClusterState.RADIUS_CAP - 0.5F) {
+            return "radius capped";
+        }
+        if (isNativeGrowthActive(cluster)) {
+            return "none";
+        }
+        return "target reached";
+    }
+
     private static float safeCloudWindDriftScale() {
         try {
             return AtmoCommonConfig.CLOUD_WIND_DRIFT_SCALE.get().floatValue();
         } catch (IllegalStateException exception) {
             return 0.035F;
+        }
+    }
+
+    private static boolean safeBooleanConfig(net.minecraftforge.common.ForgeConfigSpec.BooleanValue value, boolean fallback) {
+        try {
+            return value.get();
+        } catch (IllegalStateException exception) {
+            return fallback;
         }
     }
 

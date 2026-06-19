@@ -28,6 +28,8 @@ final class CloudRenderLodSnapshotFactory {
 
         return new CloudRenderSnapshot(
                 source.isEnabled(),
+                source.getRegionId(),
+                source.getClusterId(),
                 source.getDimension(),
                 source.getWorldTime(),
                 source.getPartialTick(),
@@ -47,6 +49,13 @@ final class CloudRenderLodSnapshotFactory {
                 source.getLifetimeTicks(),
                 source.getGrowth(),
                 source.getDecay(),
+                source.getTargetRadius(),
+                source.getTargetCoverage(),
+                source.getTargetDensity(),
+                source.getSpawnRadius(),
+                source.getLastMotionTick(),
+                source.getLastGrowthTick(),
+                source.getLastGrowthRate(),
                 source.getCloudTypeId(),
                 source.getPreviousCloudTypeId(),
                 source.getMorphologyFamily(),
