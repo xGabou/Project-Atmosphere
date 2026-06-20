@@ -88,6 +88,10 @@ public final class CloudRenderer {
             List<CloudRenderSnapshot> sourceSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots();
             List<CloudRenderSnapshot> renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots();
             List<CloudRenderLodPlan> renderPlans = CloudRenderLodManager.createPlans(frameContext, renderableSnapshots);
+            CloudRenderAabb.logOneCloud(
+                    frameContext,
+                    renderPlans.isEmpty() ? null : renderPlans.get(0).snapshot()
+            );
             CloudRenderDiagnostics.beginFrame(
                     frameContext,
                     mainTarget,
@@ -99,7 +103,7 @@ public final class CloudRenderer {
 
             String screenName = minecraft.screen == null ? "none" : minecraft.screen.getClass().getSimpleName();
             CloudShadowRenderer.update(frameContext, renderableSnapshots);
-            FallbackDarkeningPass.updateFrame(frameContext, minecraft.level);
+            FallbackDarkeningPass.updateFrame(frameContext, minecraft.level, renderableSnapshots);
             FallbackDarkeningPass.applyTerrainDarkening(frameContext, mainTarget, null);
             AtmospherePipelineAdapter pipelineAdapter = AtmospherePipelineAdapters.select();
             int shadowDepthTextureId = -1;

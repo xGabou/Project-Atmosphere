@@ -121,7 +121,7 @@ public final class CloudRenderDiagnostics {
         compositeGpuPendingQueries = 0;
         outputAlphaSampled = false;
         maxOutputAlpha = 0.0F;
-        shaderDebugMode = false;
+        shaderDebugMode = CloudRenderDebugMode.current().isActive();
     }
 
     public static void recordRendered(@NotNull CloudRenderSnapshot snapshot) {
@@ -342,7 +342,7 @@ public final class CloudRenderDiagnostics {
 
         lastLoggedWorldTime = stats.worldTime();
         ProjectAtmosphere.LOGGER.info(
-                "[CloudRender] quality={} steps={} scale={} main={}x{} target={}x{} downscaled={} camera={} {},{} snapshots={}/{} rendered={} skipped={} filtered={} submitSkipped={} frustumSkipped={} composite={} sampledAlpha={} maxAlpha={} shaderDebug={} workMPxSteps={} cpuMs={} rayCpuMs={} compositeCpuMs={} rayGpuMs={} compositeGpuMs={} gpuTimer={} rayAge={} rayPending={} compAge={} compPending={} lastCloud={}",
+                "[CloudRender] quality={} steps={} scale={} main={}x{} target={}x{} downscaled={} camera={} {},{} snapshots={}/{} rendered={} skipped={} filtered={} submitSkipped={} frustumSkipped={} composite={} sampledAlpha={} maxAlpha={} shaderDebug={} cloudDebug={} workMPxSteps={} cpuMs={} rayCpuMs={} compositeCpuMs={} rayGpuMs={} compositeGpuMs={} gpuTimer={} rayAge={} rayPending={} compAge={} compPending={} lastCloud={}",
                 stats.qualityName(),
                 stats.raymarchSteps(),
                 formatFloat(stats.resolutionScale()),
@@ -365,6 +365,7 @@ public final class CloudRenderDiagnostics {
                 stats.outputAlphaSampled(),
                 formatFloat(stats.maxOutputAlpha()),
                 stats.shaderDebugMode(),
+                CloudRenderDebugMode.current().serializedName(),
                 formatFloat(stats.pixelStepMegas()),
                 formatFloat(stats.frameCpuMs()),
                 formatFloat(stats.raymarchCpuMs()),

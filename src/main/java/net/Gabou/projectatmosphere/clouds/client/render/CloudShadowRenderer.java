@@ -17,7 +17,7 @@ public final class CloudShadowRenderer {
     private static final long SHADOW_REFRESH_TICKS = 20L;
     private static final double SHADOW_REFRESH_CAMERA_DISTANCE_SQ = 16.0D * 16.0D;
     private static final float MIN_SHADOW_BOUNDS_RADIUS = 256.0F;
-    private static final float SHADOW_FADE_RADIUS_SCALE = 1.25F;
+    private static final float SHADOW_FADE_RADIUS_SCALE = 1.58F;
     private static final float MAX_CELL_ADDITIVE_SHADOW = 0.92F;
     private static long lastPublishedWorldTime = Long.MIN_VALUE;
     private static Vec3 lastPublishedCameraPosition;
@@ -121,14 +121,7 @@ public final class CloudShadowRenderer {
                 continue;
             }
 
-            float footprint = 1.0F - smoothstep(0.52F, 1.0F, distanceNorm);
-            float density = Mth.clamp(snapshot.getDensity() * snapshot.getDensityMultiplier(), 0.0F, 1.0F);
-            float coverage = Mth.clamp(snapshot.getCoverage() * snapshot.getCoverageMultiplier(), 0.0F, 1.0F);
-            float stormBias = Math.max(snapshot.getStormVisualTier().getShadowBias(), snapshot.getStormCoreDarkening());
-            float precipitationBias = snapshot.getPrecipitationTier().getRepresentativeIntensity() * 0.22F;
-            float contribution = snapshot.getShadowContribution()
-                    * footprint
-                    * Mth.clamp(density * 0.45F + coverage * 0.35F + stormBias * 0.22F + precipitationBias, 0.0F, 1.0F);
+            float contribution = CloudDensityProvider.sampleShadowDensity(snapshot, worldX, worldZ);
 
             accumulated = 1.0F - ((1.0F - accumulated) * (1.0F - contribution));
             if (accumulated >= MAX_CELL_ADDITIVE_SHADOW) {

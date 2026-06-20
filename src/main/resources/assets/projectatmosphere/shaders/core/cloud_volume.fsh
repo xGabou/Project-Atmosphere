@@ -61,6 +61,9 @@ uniform float CloudStormCoreDarkening;
 uniform float CloudMaterialShadowContribution;
 uniform float CloudMaterialLightningResponse;
 uniform vec2 CloudShapeLobeCounts;
+uniform float CloudShapeBaseRadius;
+uniform float CloudShapeBaseOffset;
+uniform float CloudShapeTopOffset;
 uniform float CloudShapeLobeStrength;
 uniform float CloudShapeVerticalTilt;
 uniform float CloudShapeWindShearStrength;
@@ -95,6 +98,15 @@ const int MORPHOLOGY_SHEET = 3;
 const int MORPHOLOGY_CELLULAR_SHEET = 4;
 const int MORPHOLOGY_FILAMENT = 5;
 const int MORPHOLOGY_SPIRAL_STORM = 6;
+const int CLOUD_DEBUG_OFF = 0;
+const int CLOUD_DEBUG_BOUNDS = 1;
+const int CLOUD_DEBUG_RAY_ENTRY_EXIT = 2;
+const int CLOUD_DEBUG_LOCAL_RGB = 3;
+const int CLOUD_DEBUG_VERTICAL_Y01 = 4;
+const int CLOUD_DEBUG_PRIMARY_MASS = 5;
+const int CLOUD_DEBUG_VERTICAL_ENVELOPE = 6;
+const int CLOUD_DEBUG_FINAL_DENSITY = 7;
+const int CLOUD_DEBUG_UNLIT_NO_LIGHTING = 8;
 
 float saturate(float value) {
     return clamp(value, 0.0, 1.0);
@@ -328,149 +340,298 @@ bool intersectAabb(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax, out float tNear, out 
     return tFar > max(tNear, 0.0);
 }
 
-float sampleCloudField(vec3 samplePos, vec3 seedOffset, float seedValue) {
-    float heightRange = max(CloudTopY - CloudBaseY, 0.001);
-    float vertical = (samplePos.y - CloudBaseY) / heightRange;
-    float verticalPadding = max(0.04, smoothstep(1.20, 3.20, CloudHeightSquash) * 0.18);
-    if (vertical < -verticalPadding || vertical > 1.0 + verticalPadding) {
-        return 0.0;
-    }
+vec3 normalizeAabbLocal(vec3 samplePos, vec3 bmin, vec3 bmax) {
+    return clamp((samplePos - bmin) / max(bmax - bmin, vec3(0.001)), 0.0, 1.0);
+}
 
-    float lifecycleFactor = saturate(CloudGrowth * (1.0 - CloudDecay));
-    float materialOpacity = clamp(CloudMaterialOpacityBias, 0.0, 2.0);
-    float precipitationPacking = 1.0 + saturate(CloudPrecipitationIntensity + CloudPrecipitationCoreStrength) * 0.18;
-    float effectiveDensity = saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier * lifecycleFactor * materialOpacity * precipitationPacking);
-    if (effectiveDensity <= 0.001) {
-        return 0.0;
-    }
+float normalizeCloudVertical(vec3 samplePos) {
+    return saturate((samplePos.y - CloudBaseY) / max(CloudTopY - CloudBaseY, 0.001));
+}
 
+void emitCloudDebug(vec4 color, vec3 depthPos, float sceneDepth) {
+    gl_FragDepth = WriteDepth != 0 ? projectDepth(depthPos) : sceneDepth;
+    fragColor = color;
+}
+
+struct CloudDensitySample {
+    float finalDensity;
+    float unlitDensity;
+    float primaryMass;
+    float secondaryLobes;
+    float tertiaryPuffs;
+    float heightFactor;
+    float edgeFactor;
+    float coreFactor;
+    float erosionFactor;
+    float opticalDepthHint;
+    float precipitationCoreFactor;
+};
+
+CloudDensitySample emptyDensitySample() {
+    return CloudDensitySample(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+}
+
+bool isSheetFamily() {
+    return CloudMorphologyFamily == MORPHOLOGY_SHEET
+        || CloudMorphologyFamily == MORPHOLOGY_CELLULAR_SHEET
+        || CloudMorphologyFamily == MORPHOLOGY_FILAMENT;
+}
+
+bool isTowerFamily() {
+    return CloudMorphologyFamily == MORPHOLOGY_TOWER
+        || CloudMorphologyFamily == MORPHOLOGY_STORM_ANVIL
+        || CloudMorphologyFamily == MORPHOLOGY_SPIRAL_STORM;
+}
+
+float deriveEffectiveDensity() {
+    float lifecycle = saturate(CloudGrowth * (1.0 - CloudDecay));
+    float precipitationPacking = 1.0 + saturate(CloudPrecipitationIntensity + CloudPrecipitationCoreStrength) * 0.14;
+    return saturate(CloudDensity * CloudDensityMultiplier * lifecycle * clamp(CloudMaterialOpacityBias, 0.0, 2.0) * precipitationPacking);
+}
+
+float deriveEffectiveCoverage() {
+    float lifecycle = saturate(CloudGrowth * (1.0 - CloudDecay));
+    return saturate(CloudCoverage * CloudCoverageMultiplier * lifecycle);
+}
+
+float deriveSheetness() {
+    float sheetness = saturate((CloudHeightSquash - 1.0) * 0.42);
+    return isSheetFamily() ? 1.0 : sheetness;
+}
+
+float deriveTowerness() {
+    float towerness = saturate(CloudTowerStrength);
+    return isTowerFamily() ? max(0.72, towerness) : towerness;
+}
+
+float deriveStormDepth(float towerness) {
+    return saturate(
+        max(CloudStormVisualDarkness, CloudStormCoreDarkening) * 0.45
+        + CloudPrecipitationCoreStrength * 0.24
+        + towerness * 0.20
+        + CloudAnvilStrength * 0.11
+    );
+}
+
+int deriveLobeCount(float seedValue) {
+    float minCount = max(1.0, CloudShapeLobeCounts.x);
+    float maxCount = max(minCount, CloudShapeLobeCounts.y);
+    return int(clamp(floor(mix(minCount, maxCount, hash1(seedValue + 17.0)) + 0.5), 1.0, 16.0));
+}
+
+vec3 toLocalVolume(vec3 samplePos, float seedValue, float vertical) {
     vec2 localHorizontal = samplePos.xz - CloudCenter.xz;
     vec2 shearDirection = safeNormalize2(abs(CloudVelocity.x) + abs(CloudVelocity.z) > 0.001
         ? CloudVelocity.xz
         : vec2(hash1(seedValue + 211.0) - 0.5, hash1(seedValue + 223.0) - 0.5), vec2(1.0, 0.0));
     float shear = (vertical - 0.35) * (CloudShapeWindShearStrength * 0.22 + CloudShapeVerticalTilt * 0.14);
     localHorizontal -= shearDirection * CloudRadius * shear;
-
     float radiusInv = 1.0 / max(CloudRadius, 0.001);
-    vec3 localVolume = vec3(localHorizontal.x * radiusInv, vertical, localHorizontal.y * radiusInv);
-    if (length(localVolume.xz) > 1.35) {
-        return 0.0;
-    }
-
-    float sheetness = saturate((CloudHeightSquash - 1.10) * 0.42);
-    if (CloudMorphologyFamily == MORPHOLOGY_SHEET || CloudMorphologyFamily == MORPHOLOGY_CELLULAR_SHEET || CloudMorphologyFamily == MORPHOLOGY_FILAMENT) {
-        sheetness = max(sheetness, 0.72);
-    }
-    float towerness = saturate(CloudTowerStrength);
-    if (CloudMorphologyFamily == MORPHOLOGY_TOWER || CloudMorphologyFamily == MORPHOLOGY_STORM_ANVIL || CloudMorphologyFamily == MORPHOLOGY_SPIRAL_STORM) {
-        towerness = max(towerness, 0.70);
-    }
-
-    float baseSoftness = max(CloudBaseSoftness, 0.025);
-    float topSoftness = max(CloudTopSoftness, 0.025);
-    float verticalEnvelope = smoothstep(-verticalPadding, baseSoftness, vertical)
-        * (1.0 - smoothstep(1.0 - topSoftness, 1.0 + verticalPadding, vertical));
-
-    vec3 mainRadius = vec3(
-        mix(0.62, 1.02, sheetness) + CloudAnvilStrength * CloudShapeAnvilSpread * 0.22,
-        mix(0.34, 0.20, sheetness) + towerness * 0.18,
-        mix(0.58, 0.92, sheetness)
-    );
-    float mainY = mix(0.48, 0.44, sheetness);
-    float field = ellipsoidField(localVolume, vec3(0.0, mainY, 0.0), mainRadius) * mix(0.55, 0.38, sheetness);
-
-    for (int i = 0; i < 12; i++) {
-        float fi = float(i);
-        float a = fi * 2.399963 + hash1(seedValue + fi * 19.7) * 1.45;
-        float ring = mix(0.05, mix(0.58, 0.92, sheetness), hash1(seedValue + fi * 37.1));
-        float radialJitter = mix(0.72, 1.18, hash1(seedValue + fi * 43.9));
-        float yRand = hash1(seedValue + fi * 53.3);
-        float y = mix(0.18, 0.78, yRand);
-        y = mix(y, 0.42 + (yRand - 0.5) * 0.34, sheetness);
-        y = mix(y, mix(0.12, 0.92, fi / 11.0), towerness * 0.68);
-
-        vec2 centerXZ = vec2(cos(a), sin(a)) * ring * radialJitter;
-        centerXZ = rotate2(centerXZ, hash1(seedValue + 607.0) * 1.35);
-        vec3 center = vec3(centerXZ.x, y, centerXZ.y);
-
-        float lobeScale = mix(0.78, 1.26, hash1(seedValue + fi * 71.9));
-        vec3 radius = vec3(
-            mix(0.16, 0.34, hash1(seedValue + fi * 83.0)),
-            mix(0.12, 0.26, hash1(seedValue + fi * 97.0)),
-            mix(0.15, 0.33, hash1(seedValue + fi * 109.0))
-        ) * lobeScale;
-        radius.xz *= mix(0.95, 1.48, sheetness);
-        radius.y *= mix(1.15, 0.68, sheetness);
-        radius.xz *= mix(1.0, mix(0.78, 0.46, CloudShapeTowerNarrowing), towerness * smoothstep(0.60, 1.0, y));
-        radius.y *= mix(1.0, 1.34, towerness);
-
-        field = max(field, ellipsoidField(localVolume, center, radius));
-    }
-
-    float horizontalNorm = length(localVolume.xz);
-    float edgeFactor = smoothstep(0.42, 1.08, horizontalNorm);
-    vec3 motion = (CloudCenter - CloudPreviousCenter) * (0.22 + CloudPartialTick * 0.08);
-    vec3 noisePos = samplePos + motion + seedOffset;
-    float noiseScale = max(CloudNoiseScale, 0.001);
-    float detailNoiseScale = max(CloudDetailNoiseScale, 0.001);
-    float erosionNoiseScale = max(CloudErosionNoiseScale, 0.001);
-    float bodyNoise = fbm(noisePos * vec3(noiseScale, noiseScale * 1.55, noiseScale) + vec3(0.0, CloudWorldTime * 0.0012, 0.0), 3);
-    float detailNoise = fbm(noisePos * vec3(detailNoiseScale, detailNoiseScale * 1.25, detailNoiseScale) + seedOffset * 0.017, 2);
-    float erosionNoise = paCloudNoise3(noisePos * vec3(erosionNoiseScale, erosionNoiseScale * 1.50, erosionNoiseScale) + vec3(31.0, CloudWorldTime * -0.0025, 6.0) + seedOffset * 0.011) * 0.5 + 0.5;
-
-    float lobeRaggedness = saturate(CloudShapeEdgeRaggedness + CloudMaterialEdgeErosion * 0.55 + CloudEdgeErosionStrength * 0.55);
-    float edgeCarve = smoothstep(0.48, 0.92, erosionNoise) * edgeFactor * mix(0.18, 0.58, lobeRaggedness);
-    float cellularCarve = 0.0;
-    if (CloudMorphologyFamily == MORPHOLOGY_CELLULAR_SHEET) {
-        cellularCarve = smoothstep(0.50, 0.78, 1.0 - detailNoise) * mix(0.16, 0.44, CloudShapeCellSplitStrength + 0.35);
-    } else {
-        cellularCarve = smoothstep(0.62, 0.90, detailNoise) * edgeFactor * mix(0.06, 0.28, lobeRaggedness);
-    }
-
-    float fieldBeforeCarve = field;
-    field = max(0.0, field - edgeCarve - cellularCarve);
-    float softVolume = smoothstep(0.05, 0.72, field);
-    float corePreserve = smoothstep(0.32, 0.78, fieldBeforeCarve) * (1.0 - edgeFactor * 0.70);
-    softVolume = max(softVolume, corePreserve * mix(0.32, 0.58, CloudPrecipitationCoreStrength));
-
-    float underside = saturate(max(CloudBaseDarkness, CloudMaterialUndersideDarkness));
-    float baseProfile = mix(1.0, 0.88 - underside * 0.10, underside * (1.0 - smoothstep(0.0, 0.38, vertical)));
-    float bodyGradient = mix(0.72, 1.16, bodyNoise) * mix(0.82, 1.10, detailNoise);
-    float towerBoost = 1.0 + towerness * smoothstep(0.20, 0.82, vertical) * (1.0 - smoothstep(0.92, 1.0, vertical)) * 0.35;
-    float anvilBoost = 1.0 + CloudAnvilStrength * smoothstep(0.58, 0.88, vertical) * smoothstep(0.22, 0.88, horizontalNorm) * 0.28;
-    float precipitationCore = 1.0 + (CloudPrecipitationCoreStrength + CloudPrecipitationIntensity * 0.45)
-        * (1.0 - smoothstep(0.34, 0.76, vertical))
-        * (1.0 - smoothstep(0.20, 0.72, horizontalNorm))
-        * 0.28;
-
-    return saturate(effectiveDensity * softVolume * verticalEnvelope * bodyGradient * towerBoost * anvilBoost * precipitationCore * baseProfile);
+    return vec3(localHorizontal.x * radiusInv, vertical, localHorizontal.y * radiusInv);
 }
 
-vec3 computeSampleLighting(vec3 samplePos, float density, vec3 rayDir) {
+float sampleVerticalEnvelope(float y, float sheetness, float towerness) {
+    float verticalThickness = clamp(CloudVerticalThickness, 0.05, 4.0);
+    float padding = clamp(0.045 + verticalThickness * 0.045, 0.045, 0.22);
+    float baseSoftness = max(CloudBaseSoftness, 0.025);
+    float topSoftness = max(CloudTopSoftness, 0.035);
+    float base = smoothstep(-padding, baseSoftness, y);
+    float top = 1.0 - smoothstep(1.0 - topSoftness, 1.0 + padding, y);
+    float denseStart = mix(0.08, 0.02, sheetness);
+    float denseEnd = mix(0.70 + verticalThickness * 0.08, 0.94, towerness);
+    denseEnd = mix(denseEnd, 0.58 + verticalThickness * 0.06, sheetness);
+    float denseBand = smoothstep(-0.02, denseStart, y) * (1.0 - smoothstep(denseEnd, 1.06, y));
+    float fillWeight = saturate(verticalThickness * 0.30 + towerness * 0.46 + sheetness * 0.24);
+    float puffyTop = mix(1.0, 0.82 + smoothstep(0.38, 0.86, y) * 0.18, towerness);
+    return saturate(base * top * mix(denseBand, 1.0, fillWeight) * puffyTop);
+}
+
+float samplePrimaryMass(vec3 localVolume, float sheetness, float towerness) {
+    float y = localVolume.y;
+    float heightRange = max(CloudTopY - CloudBaseY, 0.001);
+    float baseRadiusScale = clamp(CloudShapeBaseRadius / max(CloudRadius, 1.0), 0.24, 1.45);
+    float baseOffset = clamp(CloudShapeBaseOffset / heightRange, 0.0, 0.92);
+    float topOffset = clamp(CloudShapeTopOffset / heightRange, 0.02, 1.75);
+    float baseRadius = mix(baseRadiusScale, max(baseRadiusScale, 0.96), sheetness);
+    float topNarrow = mix(1.0, mix(0.82, 0.46, CloudShapeTowerNarrowing), towerness * smoothstep(0.42, 1.0, y));
+    float anvilSpread = 1.0 + CloudAnvilStrength * CloudShapeAnvilSpread * smoothstep(0.58, 0.90, y) * 0.82;
+    float horizontalRadius = baseRadius * topNarrow * anvilSpread * mix(0.92, 1.30, sheetness);
+    float zRadius = horizontalRadius * mix(0.88, 1.12, sheetness);
+    float bodyCenterY = mix(0.48, 0.42 + baseOffset * 0.10, sheetness);
+    float bodyHeight = clamp(mix(
+        0.36 + CloudVerticalThickness * 0.11 + towerness * 0.26 + topOffset * 0.04,
+        0.20 + CloudVerticalThickness * 0.05 + topOffset * 0.025,
+        sheetness
+    ), 0.16, 0.86);
+    float body = ellipsoidField(localVolume, vec3(0.0, bodyCenterY, 0.0), vec3(horizontalRadius, bodyHeight, zRadius));
+    float baseShelf = (1.0 - smoothstep(0.04, 0.28, y))
+        * (1.0 - smoothstep(0.72, 1.18, length(localVolume.xz)))
+        * (0.18 + CloudShapeBaseFlattening * 0.46);
+    float towerColumn = towerness
+        * (1.0 - smoothstep(0.22, 0.72, length(localVolume.xz)))
+        * smoothstep(0.08, 0.32, y)
+        * (1.0 - smoothstep(0.95, 1.08, y))
+        * 0.48;
+    float sheetLayer = sheetness
+        * (1.0 - smoothstep(0.58, 1.12, length(localVolume.xz)))
+        * (1.0 - smoothstep(0.18 + CloudVerticalThickness * 0.04, 0.52, abs(y - 0.48)))
+        * 0.52;
+    return saturate(max(body, max(baseShelf, max(towerColumn, sheetLayer))));
+}
+
+float sampleSecondaryLobes(vec3 localVolume, float seedValue, int lobeCount, float sheetness, float towerness) {
+    float result = 0.0;
+    for (int i = 0; i < 16; i++) {
+        if (i >= lobeCount) {
+            break;
+        }
+        float fi = float(i);
+        float a = fi * 2.399963 + hash1(seedValue + 41.0 + fi * 11.0) * 1.65;
+        float ring = mix(0.08, mix(0.52, 0.92, sheetness), hash1(seedValue + 97.0 + fi * 13.0));
+        float yRand = hash1(seedValue + 173.0 + fi * 17.0);
+        float y = mix(0.20, 0.78, yRand);
+        y = mix(y, 0.42 + (yRand - 0.5) * 0.30, sheetness);
+        y = mix(y, mix(0.10, 0.92, fi / max(1.0, float(lobeCount) - 1.0)), towerness * 0.72);
+        float radialJitter = mix(0.74, 1.16, hash1(seedValue + 251.0 + fi * 19.0));
+        vec3 center = vec3(cos(a) * ring * radialJitter, y, sin(a) * ring * radialJitter);
+        float radiusJitter = mix(0.78, 1.24, hash1(seedValue + 307.0 + fi * 23.0));
+        vec3 radius = vec3(
+            mix(0.18, 0.36, hash1(seedValue + 359.0 + fi * 29.0)),
+            mix(0.12, 0.28, hash1(seedValue + 421.0 + fi * 31.0)),
+            mix(0.18, 0.35, hash1(seedValue + 463.0 + fi * 37.0))
+        ) * radiusJitter;
+        radius.xz *= vec2(mix(1.0, 1.58, sheetness), mix(1.0, 1.38, sheetness));
+        radius.y *= mix(1.14, 0.62, sheetness);
+        radius.xz *= mix(vec2(1.0), vec2(mix(0.82, 0.48, CloudShapeTowerNarrowing)), towerness * smoothstep(0.58, 1.0, y));
+        radius.y *= 1.0 + towerness * 0.30;
+        result = max(result, ellipsoidField(localVolume, center, radius));
+    }
+    float attach = 1.0 - smoothstep(1.04, 1.44, length(localVolume.xz));
+    return saturate(result * attach);
+}
+
+float sampleTertiaryPuffs(vec3 localVolume, vec3 seedOffset, float sheetness, float towerness) {
+    vec3 noisePos = vec3(localVolume.x * 4.0, localVolume.y * 2.4 + CloudWorldTime * 0.0007, localVolume.z * 4.0) + seedOffset * 0.00031;
+    float bodyNoise = fbm(noisePos, 3);
+    float detailNoise = fbm(noisePos * 2.13 + vec3(17.0, 3.0, 11.0), 2);
+    float edgeWeight = smoothstep(0.30, 1.08, length(localVolume.xz));
+    float topWeight = smoothstep(0.34, 0.86, localVolume.y);
+    float puff = saturate((bodyNoise * 0.62 + detailNoise * 0.38 - 0.42) * 1.35);
+    return puff * saturate(edgeWeight * 0.58 + topWeight * 0.34 + sheetness * 0.34);
+}
+
+float sampleEdgeFactor(vec3 localVolume) {
+    float horizontalEdge = smoothstep(0.48, 1.10, length(localVolume.xz));
+    float baseEdge = 1.0 - smoothstep(0.05, 0.22, localVolume.y);
+    float topEdge = smoothstep(0.78, 1.04, localVolume.y);
+    return saturate(max(horizontalEdge, max(baseEdge, topEdge) * 0.45));
+}
+
+float sampleSoftErosion(vec3 localVolume, vec3 seedOffset, float edgeFactor, float sheetness) {
+    float erosionStrength = saturate(CloudEdgeErosionStrength + CloudMaterialEdgeErosion * 0.45 + CloudShapeEdgeRaggedness * 0.45);
+    if (erosionStrength <= 0.001) {
+        return 0.0;
+    }
+    vec3 noisePos = vec3(localVolume.x * 5.3, localVolume.y * 3.1 - CloudWorldTime * 0.0009, localVolume.z * 5.3) + seedOffset * 0.00017;
+    float erosionNoise = fbm(noisePos, 3);
+    float verticalEdge = max(1.0 - smoothstep(0.05, 0.24, localVolume.y), smoothstep(0.76, 1.04, localVolume.y));
+    float erosionMask = saturate(edgeFactor * 0.82 + verticalEdge * 0.18);
+    float cellular = sheetness > 0.55
+        ? saturate((0.56 - erosionNoise) * CloudShapeCellSplitStrength) * 0.24
+        : 0.0;
+    float softErosion = smoothstep(0.42, 0.86, erosionNoise) * erosionMask * mix(0.05, 0.34, erosionStrength);
+    return saturate(softErosion + cellular) * 0.42;
+}
+
+CloudDensitySample sampleCloudDensity(vec3 samplePos, vec3 seedOffset, float seedValue) {
+    float heightRange = max(CloudTopY - CloudBaseY, 0.001);
+    float vertical = (samplePos.y - CloudBaseY) / heightRange;
+    float verticalPadding = clamp(0.045 + clamp(CloudVerticalThickness, 0.05, 4.0) * 0.045, 0.045, 0.22);
+    if (vertical < -verticalPadding || vertical > 1.0 + verticalPadding) {
+        return emptyDensitySample();
+    }
+
+    float effectiveDensity = deriveEffectiveDensity();
+    float effectiveCoverage = deriveEffectiveCoverage();
+    if (effectiveDensity <= 0.001 || effectiveCoverage <= 0.001) {
+        return emptyDensitySample();
+    }
+
+    vec3 localVolume = toLocalVolume(samplePos, seedValue, vertical);
+    if (length(localVolume.xz) > 1.65) {
+        return emptyDensitySample();
+    }
+
+    float sheetness = deriveSheetness();
+    float towerness = deriveTowerness();
+    float stormDepth = deriveStormDepth(towerness);
+    int lobeCount = deriveLobeCount(seedValue);
+    float lobeStrength = saturate(CloudShapeLobeStrength);
+    float puffStrength = clamp(0.10 + lobeStrength * 0.26 + towerness * 0.16 - sheetness * 0.08, 0.04, 0.48);
+    float heightFactor = sampleVerticalEnvelope(localVolume.y, sheetness, towerness);
+    if (heightFactor <= 0.0001) {
+        return emptyDensitySample();
+    }
+
+    float primaryMass = samplePrimaryMass(localVolume, sheetness, towerness);
+    float secondaryLobes = sampleSecondaryLobes(localVolume, seedValue, lobeCount, sheetness, towerness);
+    float tertiaryPuffs = sampleTertiaryPuffs(localVolume, seedOffset, sheetness, towerness);
+    float unlitDensity = clamp(max(primaryMass, secondaryLobes * lobeStrength) + tertiaryPuffs * puffStrength, 0.0, 1.35);
+    float edgeFactor = sampleEdgeFactor(localVolume);
+    float coreFactor = saturate(smoothstep(0.34, 0.80, unlitDensity) * (1.0 - edgeFactor * 0.68));
+    float erosionFactor = sampleSoftErosion(localVolume, seedOffset, edgeFactor, sheetness);
+    float erodedMass = max(0.0, unlitDensity - erosionFactor);
+    float softMass = smoothstep(0.045, 0.72, erodedMass);
+    float densityShape = max(softMass, coreFactor * mix(0.24, 0.46, stormDepth));
+    float coverageFill = mix(0.28, 1.0, effectiveCoverage);
+    float finalDensity = saturate(densityShape * heightFactor * effectiveDensity * coverageFill);
+    float opticalDepthHint = saturate(finalDensity * (0.42 + effectiveCoverage * 0.36 + stormDepth * 0.22));
+    float precipitationCoreFactor = saturate(
+        (1.0 - smoothstep(0.22, 0.74, length(localVolume.xz)))
+        * (1.0 - smoothstep(0.42, 1.02, localVolume.y))
+        * (CloudPrecipitationCoreStrength + CloudPrecipitationIntensity * 0.55)
+    );
+
+    return CloudDensitySample(
+        finalDensity,
+        unlitDensity,
+        primaryMass,
+        secondaryLobes,
+        tertiaryPuffs,
+        heightFactor,
+        edgeFactor,
+        coreFactor,
+        erosionFactor,
+        opticalDepthHint,
+        precipitationCoreFactor
+    );
+}
+
+vec3 computeSampleLighting(vec3 samplePos, CloudDensitySample sample, vec3 rayDir) {
+    float density = sample.finalDensity;
     float heightRange = max(CloudTopY - CloudBaseY, 0.001);
     float vertical = saturate((samplePos.y - CloudBaseY) / heightRange);
     float bottomFactor = 1.0 - smoothstep(0.15, 0.65, vertical);
     float topFactor = smoothstep(0.35, 1.0, vertical);
 
-    float horizontalDistance = length(samplePos.xz - CloudCenter.xz);
-    float normalizedHorizontal = horizontalDistance / max(CloudRadius, 0.001);
-    float edgeFactor = smoothstep(0.55, 1.0, normalizedHorizontal);
+    float edgeFactor = sample.edgeFactor;
     float sunFacing = saturate(dot(normalize(SunDirection), normalize(-rayDir)));
     float rimLight = pow(edgeFactor, 1.5)
-        * SunsetStrength
         * EdgeLightStrength
+        * (0.35 + SunsetStrength * 0.65)
         * (0.30 + sunFacing * 0.70)
         * (0.45 + topFactor * 0.55);
 
     float stormDarkness = saturate(max(CloudStormVisualDarkness, CloudStormCoreDarkening));
-    float materialDarkness = saturate(CloudMaterialDarkness + stormDarkness * 0.55);
+    float materialDarkness = saturate(CloudMaterialDarkness + stormDarkness * 0.36);
     float shadowing = saturate(CloudShadowContribution + CloudMaterialShadowContribution * 0.65);
-    float densityDarkening = exp(-density * LightAbsorption * (1.0 + shadowing * 0.55 + stormDarkness * 0.45));
+    float densityDarkening = exp(-sample.opticalDepthHint * LightAbsorption * (0.58 + shadowing * 0.30 + stormDarkness * 0.24));
     vec3 precipitationTint = mix(vec3(1.0), vec3(0.62, 0.68, 0.74), saturate(CloudMaterialPrecipitationTint + CloudPrecipitationIntensity * 0.35));
-    vec3 compatibilityTint = mix(CloudColor.rgb * precipitationTint, vec3(1.0), 0.78 - materialDarkness * 0.18);
-    float undersideDarkening = saturate(UndersideDarkening + CloudBaseDarkness * 0.30 + CloudMaterialUndersideDarkness * 0.45 + stormDarkness * 0.35);
-    vec3 baseLighting = AmbientCloudColor * compatibilityTint * mix(1.0 - undersideDarkening, 1.0, vertical);
-    vec3 sunLighting = SunColor * rimLight;
+    vec3 compatibilityTint = mix(CloudColor.rgb * precipitationTint, vec3(1.0), 0.72 - materialDarkness * 0.12);
+    float undersideDarkening = saturate(UndersideDarkening * 0.66 + CloudBaseDarkness * 0.22 + CloudMaterialUndersideDarkness * 0.30 + stormDarkness * 0.20);
+    float undersideLift = mix(0.54, 0.84, topFactor) + sample.coreFactor * 0.08;
+    vec3 baseLighting = AmbientCloudColor * compatibilityTint * mix(undersideLift * (1.0 - undersideDarkening), 1.0, vertical);
+    vec3 sunLighting = SunColor * rimLight * (0.55 + sample.edgeFactor * 0.45);
     vec3 lightningLift = SunColor * CloudLightningInfluence * CloudMaterialLightningResponse * density * 0.08;
     vec3 horizonGlow = SunColor
         * HorizonGlowStrength
@@ -488,8 +649,12 @@ void main() {
 
     float heightRange = max(CloudTopY - CloudBaseY, 0.001);
     float volumePaddingY = smoothstep(1.20, 3.20, CloudHeightSquash) * min(28.0, max(heightRange * 0.45, CloudRadius * 0.035));
-    vec3 volumeMin = vec3(CloudCenter.x - CloudRadius, CloudBaseY - volumePaddingY, CloudCenter.z - CloudRadius);
-    vec3 volumeMax = vec3(CloudCenter.x + CloudRadius, CloudTopY + volumePaddingY, CloudCenter.z + CloudRadius);
+    float shapeRadiusScale = clamp(CloudShapeBaseRadius / max(CloudRadius, 1.0), 1.0, 1.45);
+    float lobeReach = mix(1.16, 1.42, saturate(CloudShapeLobeStrength));
+    float anvilReach = 1.0 + CloudAnvilStrength * CloudShapeAnvilSpread * 0.82;
+    float volumeRadius = CloudRadius * min(1.58, max(max(shapeRadiusScale, lobeReach), anvilReach));
+    vec3 volumeMin = vec3(CloudCenter.x - volumeRadius, CloudBaseY - volumePaddingY, CloudCenter.z - volumeRadius);
+    vec3 volumeMax = vec3(CloudCenter.x + volumeRadius, CloudTopY + volumePaddingY, CloudCenter.z + volumeRadius);
 
     float tNear;
     float tFar;
@@ -498,6 +663,37 @@ void main() {
     }
 
     tNear = max(tNear, 0.0);
+    float debugFar = max(tFar, tNear);
+    float debugMidT = mix(tNear, debugFar, 0.5);
+    vec3 debugMidPos = rayOrigin + rayDir * debugMidT;
+
+    if (CloudDebugMode == CLOUD_DEBUG_BOUNDS) {
+        float debugSceneDepth = texture(DepthSampler, screenUv).r;
+        emitCloudDebug(vec4(0.55, 0.55, 0.55, 0.35), rayOrigin + rayDir * tNear, debugSceneDepth);
+        return;
+    }
+    if (CloudDebugMode == CLOUD_DEBUG_RAY_ENTRY_EXIT) {
+        float debugSceneDepth = texture(DepthSampler, screenUv).r;
+        float invMaxDistance = 1.0 / max(MaxDistance, 0.001);
+        vec3 color = vec3(
+            saturate(tNear * invMaxDistance),
+            saturate(debugFar * invMaxDistance),
+            saturate((debugFar - tNear) * invMaxDistance)
+        );
+        emitCloudDebug(vec4(color, 0.75), rayOrigin + rayDir * tNear, debugSceneDepth);
+        return;
+    }
+    if (CloudDebugMode == CLOUD_DEBUG_LOCAL_RGB) {
+        float debugSceneDepth = texture(DepthSampler, screenUv).r;
+        emitCloudDebug(vec4(normalizeAabbLocal(debugMidPos, volumeMin, volumeMax), 0.80), debugMidPos, debugSceneDepth);
+        return;
+    }
+    if (CloudDebugMode == CLOUD_DEBUG_VERTICAL_Y01) {
+        float debugSceneDepth = texture(DepthSampler, screenUv).r;
+        float y01 = normalizeCloudVertical(debugMidPos);
+        emitCloudDebug(vec4(vec3(y01), 0.80), debugMidPos, debugSceneDepth);
+        return;
+    }
 
     float sceneDepth = texture(DepthSampler, screenUv).r;
     float sceneDistance = MaxDistance;
@@ -508,7 +704,7 @@ void main() {
 
     float maxRay = min(min(tFar, MaxDistance), sceneDistance);
     if (maxRay <= tNear + 0.001) {
-        if (CloudDebugMode != 0) {
+        if (CloudDebugMode != CLOUD_DEBUG_OFF && CloudDebugMode < CLOUD_DEBUG_PRIMARY_MASS) {
             gl_FragDepth = sceneDepth;
             fragColor = vec4(1.0, 0.84, 0.05, 0.70);
             return;
@@ -537,6 +733,10 @@ void main() {
     vec3 seedOffset = seedOffset3();
     float seedValue = float(CloudSeed);
     float maxDensitySample = 0.0;
+    bool scalarDebugMode = CloudDebugMode == CLOUD_DEBUG_PRIMARY_MASS
+        || CloudDebugMode == CLOUD_DEBUG_VERTICAL_ENVELOPE
+        || CloudDebugMode == CLOUD_DEBUG_FINAL_DENSITY
+        || CloudDebugMode == CLOUD_DEBUG_UNLIT_NO_LIGHTING;
 
     for (int step = 0; step < MAX_RAYMARCH_STEPS; step++) {
         if (step >= steps || transmittance < 0.02) {
@@ -544,17 +744,30 @@ void main() {
         }
 
         vec3 samplePos = rayOrigin + rayDir * t;
-        float density = sampleCloudField(samplePos, seedOffset, seedValue);
+        CloudDensitySample densitySample = sampleCloudDensity(samplePos, seedOffset, seedValue);
+        float debugDensity = densitySample.finalDensity;
+        if (CloudDebugMode == CLOUD_DEBUG_PRIMARY_MASS) {
+            debugDensity = densitySample.primaryMass;
+        } else if (CloudDebugMode == CLOUD_DEBUG_VERTICAL_ENVELOPE) {
+            debugDensity = densitySample.heightFactor;
+        }
+        float density = scalarDebugMode ? saturate(debugDensity) : densitySample.finalDensity;
         maxDensitySample = max(maxDensitySample, density);
         if (density > 0.0005) {
             if (!firstCloudDepthSet && density > 0.018) {
                 firstCloudDepth = projectDepth(samplePos);
                 firstCloudDepthSet = true;
             }
-            float softenedDensity = pow(density, 1.18);
-            float extinction = mix(3.0, 5.6, saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier));
+            float softenedDensity = pow(density, 1.04);
+            float extinction = mix(1.35, 3.10, saturate(deriveEffectiveDensity() * deriveEffectiveCoverage()));
+            extinction *= mix(0.84, 1.14, densitySample.coreFactor);
             float alpha = 1.0 - exp(-softenedDensity * stepSize * extinction);
-            vec3 cloudTint = computeSampleLighting(samplePos, density, rayDir);
+            vec3 cloudTint = computeSampleLighting(samplePos, densitySample, rayDir);
+            if (CloudDebugMode == CLOUD_DEBUG_UNLIT_NO_LIGHTING) {
+                cloudTint = vec3(0.62);
+            } else if (scalarDebugMode) {
+                cloudTint = vec3(saturate(debugDensity));
+            }
             accum += cloudTint * alpha * transmittance;
             transmittance *= (1.0 - alpha);
         }
@@ -564,7 +777,7 @@ void main() {
 
     float rawAlpha = 1.0 - transmittance;
     if (rawAlpha <= 0.001) {
-        if (CloudDebugMode != 0) {
+        if (CloudDebugMode != CLOUD_DEBUG_OFF && CloudDebugMode < CLOUD_DEBUG_PRIMARY_MASS) {
             gl_FragDepth = WriteDepth != 0 ? firstCloudDepth : sceneDepth;
             fragColor = maxDensitySample > 0.0005
                 ? vec4(0.05, 0.88, 1.0, 0.70)
@@ -575,11 +788,16 @@ void main() {
     }
 
     vec3 color = accum / max(rawAlpha, 0.0001);
-    float fogFactor = smoothstep(FogStart, FogEnd, min(t, MaxDistance));
-    color = mix(color, FogColor.rgb, fogFactor * 0.35);
+    if (!scalarDebugMode) {
+        float fogFactor = smoothstep(FogStart, FogEnd, min(t, MaxDistance));
+        color = mix(color, FogColor.rgb, fogFactor * 0.35);
+    }
 
-    float opacityBoost = mix(0.92, 1.18, saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier));
-    opacityBoost *= mix(0.78, 1.18, saturate(CloudMaterialOpacityBias * 0.5));
+    float opacityBoost = 1.0;
+    if (!scalarDebugMode) {
+        opacityBoost = mix(0.92, 1.18, saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier));
+        opacityBoost *= mix(0.78, 1.18, saturate(CloudMaterialOpacityBias * 0.5));
+    }
     gl_FragDepth = WriteDepth != 0 && firstCloudDepthSet ? firstCloudDepth : sceneDepth;
     fragColor = vec4(color, clamp(rawAlpha * opacityBoost, 0.0, 1.0));
 }

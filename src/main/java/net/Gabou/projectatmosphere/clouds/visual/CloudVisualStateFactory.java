@@ -1,10 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.visual;
 
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
-import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
-import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.util.RegionInstanceKey;
-import net.minecraft.core.BlockPos;
 
 /**
  * Converts existing read-only cloud render transport data into shared visual
@@ -54,13 +50,6 @@ public final class CloudVisualStateFactory {
     }
 
     private static float resolveCloudWater(CloudRegionRenderData data) {
-        if (data == null || data.getCenter() == null) {
-            return 0.0F;
-        }
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(RegionInstanceKey.from(BlockPos.containing(data.getCenter())));
-        if (state != null) {
-            return state.getCloudWater();
-        }
         return CloudVisualMetrics.cloudWaterProxy(data);
     }
 }

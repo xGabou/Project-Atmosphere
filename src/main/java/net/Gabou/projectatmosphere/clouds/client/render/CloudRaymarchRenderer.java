@@ -84,9 +84,10 @@ public final class CloudRaymarchRenderer {
         RenderSystem.depthMask(writeDepth);
         RenderSystem.setShader(() -> shader);
 
-        CloudRenderDiagnostics.recordShaderDebugMode(false);
+        CloudRenderDebugMode debugMode = CloudRenderDebugMode.current();
+        CloudRenderDiagnostics.recordShaderDebugMode(debugMode.isActive());
         shader.safeGetUniform("WriteDepth").set(writeDepth ? 1 : 0);
-        shader.safeGetUniform("CloudDebugMode").set(0);
+        shader.safeGetUniform("CloudDebugMode").set(debugMode.id());
         shader.setSampler("DepthSampler", sceneDepthTextureId);
         CloudUniformUploader.apply(shader, frameContext, snapshot, outputTarget);
         shader.apply();

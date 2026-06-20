@@ -89,6 +89,8 @@ public final class CloudRenderHook {
             );
         }
 
+        renderDebugBoundsWireframe(frameContext, renderableSnapshots);
+
         CloudRenderSnapshot fallbackSnapshot = CloudRenderFallbackState.getFallbackSnapshot(frameContext.getCameraPosition());
         if (fallbackSnapshot == null) {
             return;
@@ -96,6 +98,19 @@ public final class CloudRenderHook {
 
         MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
         CloudWireframeRenderer.render(fallbackSnapshot, frameContext.getPoseStack(), buffer, frameContext.getCameraPosition());
+        buffer.endBatch(RenderType.lines());
+    }
+
+    private static void renderDebugBoundsWireframe(
+            CloudRenderFrameContext frameContext,
+            List<CloudRenderSnapshot> renderableSnapshots
+    ) {
+        if (!CloudRenderDebugMode.current().isActive() || renderableSnapshots.isEmpty()) {
+            return;
+        }
+
+        MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
+        CloudWireframeRenderer.render(renderableSnapshots.get(0), frameContext.getPoseStack(), buffer, frameContext.getCameraPosition());
         buffer.endBatch(RenderType.lines());
     }
 }

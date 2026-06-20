@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.client.debug;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderAabb;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -23,31 +24,22 @@ public final class CloudWireframeRenderer {
             return;
         }
 
-        Vec3 center = snapshot.getRegionCenter();
-        float radius = snapshot.getRegionRadius();
-        float cloudBaseY = snapshot.getCloudBaseY();
-        float cloudTopY = snapshot.getCloudTopY();
-
-        if (center == null || radius <= 0.0F || cloudTopY <= cloudBaseY) {
+        CloudRenderAabb.Bounds bounds = CloudRenderAabb.compute(snapshot);
+        if (bounds == null) {
             return;
         }
 
-        double minX = -radius;
-        double maxX = radius;
-        double minY = cloudBaseY - center.y();
-        double maxY = cloudTopY - center.y();
-        double minZ = -radius;
-        double maxZ = radius;
+        double minX = bounds.min().x() - cameraPosition.x();
+        double minY = bounds.min().y() - cameraPosition.y();
+        double minZ = bounds.min().z() - cameraPosition.z();
+        double maxX = bounds.max().x() - cameraPosition.x();
+        double maxY = bounds.max().y() - cameraPosition.y();
+        double maxZ = bounds.max().z() - cameraPosition.z();
 
-        if (minX > maxX || minY > maxY || minZ > maxZ) {
-            return;
-        }
-
-        Vec3 renderOffset = center.subtract(cameraPosition);
-        drawBox(poseStack, bufferSource, renderOffset, minX, minY, minZ, maxX, maxY, maxZ, snapshot.getDebugColorOrTint());
+        drawBox(poseStack, bufferSource, minX, minY, minZ, maxX, maxY, maxZ, snapshot.getDebugColorOrTint());
     }
 
-    private static void drawBox(PoseStack poseStack, MultiBufferSource bufferSource, Vec3 renderOffset, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, int color){
+    private static void drawBox(PoseStack poseStack, MultiBufferSource bufferSource, double minX, double minY, double minZ, double maxX, double maxY, double maxZ, int color){
         float alpha = ((color >> 24) & 255) / 255.0F;
         float red = ((color >> 16) & 255) / 255.0F;
         float green = ((color >> 8) & 255) / 255.0F;
@@ -58,7 +50,6 @@ public final class CloudWireframeRenderer {
         VertexConsumer consumer = bufferSource.getBuffer(RenderType.lines());
 
         poseStack.pushPose();
-        poseStack.translate(renderOffset.x(), renderOffset.y(), renderOffset.z());
         LevelRenderer.renderLineBox(
                 poseStack,
                 consumer,

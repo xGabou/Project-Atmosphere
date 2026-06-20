@@ -103,6 +103,9 @@ public final class CloudUniformUploader {
                 (float) snapshot.getShapeProfile().getLobeCountMin(),
                 (float) snapshot.getShapeProfile().getLobeCountMax()
         );
+        shader.safeGetUniform("CloudShapeBaseRadius").set(snapshot.getShapeProfile().getBaseRadius());
+        shader.safeGetUniform("CloudShapeBaseOffset").set(snapshot.getShapeProfile().getBaseOffset());
+        shader.safeGetUniform("CloudShapeTopOffset").set(snapshot.getShapeProfile().getTopOffset());
         shader.safeGetUniform("CloudShapeLobeStrength").set(snapshot.getShapeProfile().getLobeStrength());
         shader.safeGetUniform("CloudShapeVerticalTilt").set(snapshot.getShapeProfile().getVerticalTilt());
         shader.safeGetUniform("CloudShapeWindShearStrength").set(snapshot.getShapeProfile().getWindShearStrength());

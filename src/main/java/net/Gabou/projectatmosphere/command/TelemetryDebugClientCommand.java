@@ -8,6 +8,7 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderFallbackState;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderDebugMode;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -121,9 +122,42 @@ public class TelemetryDebugClientCommand {
                                             ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);
                                             return 1;
                                         }))
+                                .then(buildCloudRenderDebugCommand())
                                 .then(TornadoRenderDebugClientCommand.build())
                         )
         );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCloudRenderDebugCommand() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("cloudRenderDebug")
+                .executes(ctx -> sendCloudRenderDebugStatus(ctx.getSource()));
+
+        for (CloudRenderDebugMode mode : CloudRenderDebugMode.values()) {
+            root.then(Commands.literal(mode.serializedName())
+                    .executes(ctx -> setCloudRenderDebugMode(ctx.getSource(), mode)));
+        }
+
+        root.then(Commands.literal("status")
+                .executes(ctx -> sendCloudRenderDebugStatus(ctx.getSource())));
+        return root;
+    }
+
+    private static int setCloudRenderDebugMode(CommandSourceStack source, CloudRenderDebugMode mode) {
+        CloudRenderDebugMode.setCurrent(mode);
+        source.sendSuccess(
+                () -> Component.literal("Cloud render debug mode set to " + mode.serializedName() + " (" + mode.id() + ")."),
+                false
+        );
+        return 1;
+    }
+
+    private static int sendCloudRenderDebugStatus(CommandSourceStack source) {
+        CloudRenderDebugMode mode = CloudRenderDebugMode.current();
+        source.sendSuccess(
+                () -> Component.literal("Cloud render debug mode is " + mode.serializedName() + " (" + mode.id() + ")."),
+                false
+        );
+        return 1;
     }
 
 }

@@ -2,7 +2,9 @@ package net.Gabou.projectatmosphere.clouds.client.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
+import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
+import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.lighting.CloudLightingManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.client.Minecraft;
@@ -17,6 +19,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * Conservative world darkening for players beneath significant storm clouds.
  * Works without shaderpack cooperation via fog biasing and optional terrain overlay.
@@ -30,12 +34,16 @@ public final class FallbackDarkeningPass {
     private FallbackDarkeningPass() {
     }
 
-    public static void updateFrame(@NotNull CloudRenderFrameContext frameContext, @Nullable ClientLevel level) {
+    public static void updateFrame(
+            @NotNull CloudRenderFrameContext frameContext,
+            @Nullable ClientLevel level,
+            @NotNull List<CloudRenderSnapshot> snapshots
+    ) {
         if (level == null) {
             CloudLightingManager.clear();
             return;
         }
-        CloudLightingManager.update(level, frameContext.getCameraPosition(), frameContext.getPartialTick());
+        CloudLightingManager.updateFromSnapshots(snapshots, frameContext.getCameraPosition(), frameContext.getPartialTick());
     }
 
     public static boolean applyTerrainDarkening(
@@ -103,7 +111,11 @@ public final class FallbackDarkeningPass {
             CloudLightingManager.clear();
             return;
         }
-        CloudLightingManager.update(level, cameraPosition, partialTick);
+        CloudLightingManager.updateFromSnapshots(
+                CloudRenderController.getRenderableLiveSnapshots(),
+                cameraPosition,
+                partialTick
+        );
     }
 
     private static float combinedDarkeningFactor() {
