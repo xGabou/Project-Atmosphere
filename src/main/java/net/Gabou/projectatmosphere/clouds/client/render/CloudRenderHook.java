@@ -1,43 +1,85 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
-import net.Gabou.projectatmosphere.clouds.client.debug.CloudWireframeRenderer;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderDiagnostics;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateUpdater;
 import net.Gabou.projectatmosphere.clouds.client.lighting.CloudLightingManager;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 
 import java.util.List;
 
 /**
- * Hook de rendu live des nuages Project Atmosphere.
- * Cette classe ne gère pas le debug et ne lit jamais debugSnapshot.
+ * Live Project Atmosphere cloud render hook.
  */
 public final class CloudRenderHook {
 
     private CloudRenderHook() {
-
     }
 
-    /**
-     * Appelle le futur renderer live pendant le rendu du niveau.
-     *
-     * @param event événement de rendu du niveau
-     */
-    public static void renderFromLevelRenderer(
-            ClientLevel level,
-            com.mojang.blaze3d.vertex.PoseStack poseStack,
+    @SubscribeEvent
+    public static void onRenderLevelStage(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
+            return;
+        }
+
+        renderFromRenderStage(
+                event.getLevelRenderer(),
+                event.getPoseStack(),
+                event.getProjectionMatrix(),
+                event.getPartialTick(),
+                event.getCamera(),
+                event.getCamera().getPosition()
+        );
+    }
+
+    public static void renderFromRenderStage(
+            LevelRenderer levelRenderer,
+            PoseStack poseStack,
             Matrix4f projectionMatrix,
             float partialTick,
-            net.minecraft.world.phys.Vec3 cameraPosition
+            Camera camera,
+            Vec3 cameraPosition
+    ) {
+        if (levelRenderer == null || camera == null) {
+            return;
+        }
+
+        renderVolumetricClouds(
+                Minecraft.getInstance().level,
+                poseStack,
+                projectionMatrix,
+                partialTick,
+                cameraPosition
+        );
+    }
+
+    public static void renderFromLevelRenderer(
+            ClientLevel level,
+            PoseStack poseStack,
+            Matrix4f projectionMatrix,
+            float partialTick,
+            Vec3 cameraPosition
+    ) {
+        // Bypassed intentionally while validating the post-weather render path.
+    }
+
+    private static void renderVolumetricClouds(
+            ClientLevel level,
+            PoseStack poseStack,
+            Matrix4f projectionMatrix,
+            float partialTick,
+            Vec3 cameraPosition
     ) {
         if (level == null) {
             CloudRenderStateUpdater.clearCurrentSnapshots();
@@ -88,47 +130,5 @@ public final class CloudRenderHook {
                     CloudRenderDiagnostics.getLastStats()
             );
         }
-
-        renderDebugBoundsWireframe(frameContext);
-
-//        CloudRenderSnapshot fallbackSnapshot = CloudRenderFallbackState.getFallbackSnapshot(frameContext.getCameraPosition());
-//        if (fallbackSnapshot == null) {
-//            return;
-//        }
-//
-//        renderWireframeWithCamera(fallbackSnapshot, frameContext);
-    }
-
-    private static void renderDebugBoundsWireframe(
-            CloudRenderFrameContext frameContext
-    ) {
-        CloudRenderSnapshot snapshot = CloudRenderAabb.getDebugWireframeSnapshot();
-        if (!CloudRenderDebugMode.current().isActive() || snapshot == null) {
-            return;
-        }
-        renderWireframeWithCamera(snapshot, frameContext);
-    }
-
-    private static void renderWireframeWithCamera(
-            CloudRenderSnapshot snapshot,
-            CloudRenderFrameContext frameContext
-    ) {
-        if (snapshot == null || frameContext == null) {
-            return;
-        }
-
-        MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
-
-        frameContext.getPoseStack().pushPose();
-        frameContext.getPoseStack().translate(
-                -frameContext.getCameraPosition().x(),
-                -frameContext.getCameraPosition().y(),
-                -frameContext.getCameraPosition().z()
-        );
-
-        CloudWireframeRenderer.render(snapshot, frameContext.getPoseStack(), buffer);
-
-        frameContext.getPoseStack().popPose();
-        buffer.endBatch(RenderType.lines());
     }
 }

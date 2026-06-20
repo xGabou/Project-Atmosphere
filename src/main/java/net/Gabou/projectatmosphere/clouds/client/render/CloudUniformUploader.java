@@ -35,11 +35,13 @@ public final class CloudUniformUploader {
     ) {
         shader.safeGetUniform("ModelViewMat").set(frameContext.getModelViewMatrix());
         shader.safeGetUniform("ProjMat").set(frameContext.getProjectionMatrix());
-        shader.safeGetUniform("InverseProjMat").set(frameContext.getInverseProjectionMatrix());
-        shader.safeGetUniform("InverseModelViewMat").set(frameContext.getInverseModelViewMatrix());
+        Matrix4f inverseProjection = new Matrix4f(frameContext.getProjectionMatrix()).invert();
+        Matrix4f inverseView = new Matrix4f(frameContext.getModelViewMatrix()).invert();
+        shader.safeGetUniform("InverseProjectionMatrix").set(inverseProjection);
+        shader.safeGetUniform("InverseViewMatrix").set(inverseView);
 
         Vec3 cameraPosition = frameContext.getCameraPosition();
-        shader.safeGetUniform("CameraPos").set(
+        shader.safeGetUniform("CameraPosition").set(
                 (float) cameraPosition.x(),
                 (float) cameraPosition.y(),
                 (float) cameraPosition.z()

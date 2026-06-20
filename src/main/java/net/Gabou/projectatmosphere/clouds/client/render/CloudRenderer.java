@@ -133,7 +133,7 @@ public final class CloudRenderer {
                     + downscaled;
             if (CloudRenderDiagnostics.shouldLogStateSnapshot(frameContext.getWorldTime(), stateSignature)) {
                 ProjectAtmosphere.LOGGER.info(
-                        "[CloudState] stage=BEFORE_WEATHER screen={} worldTime={} adapter={} quality={} steps={} scale={} main={}x{} mainColor={} mainDepth={} cloud={}x{} cloudColor={} cloudDepth={} shadowDepth={} intermediate={} downscaled={}",
+                        "[CloudState] stage=AFTER_WEATHER screen={} worldTime={} adapter={} quality={} steps={} scale={} main={}x{} mainColor={} mainDepth={} cloud={}x{} cloudColor={} cloudDepth={} shadowDepth={} intermediate={} downscaled={}",
                         screenName,
                         frameContext.getWorldTime(),
                         pipelineAdapter.id(),

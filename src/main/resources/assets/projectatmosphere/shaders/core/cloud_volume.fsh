@@ -4,9 +4,9 @@ uniform sampler2D DepthSampler;
 
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
-uniform mat4 InverseProjMat;
-uniform mat4 InverseModelViewMat;
-uniform vec3 CameraPos;
+uniform mat4 InverseProjectionMatrix;
+uniform mat4 InverseViewMatrix;
+uniform vec3 CameraPosition;
 uniform vec4 CloudColor;
 uniform vec3 SunDirection;
 uniform vec3 SunColor;
@@ -309,15 +309,28 @@ vec3 seedOffset3() {
 
 vec3 reconstructWorld(vec2 uv, float depth) {
     vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-    vec4 view = InverseProjMat * clip;
+    vec4 view = InverseProjectionMatrix * clip;
     view /= view.w;
-    vec4 world = InverseModelViewMat * vec4(view.xyz, 1.0);
+    vec4 world = InverseViewMatrix * vec4(view.xyz, 1.0);
     return world.xyz / world.w;
 }
 
-vec3 getWorldRay(vec2 uv) {
-    vec3 farWorld = reconstructWorld(uv, 1.0);
-    return normalize(farWorld - CameraPos);
+vec3 getWorldRay(vec2 screenUV) {
+    vec2 uv = screenUV * 2.0 - 1.0;
+
+    vec4 nearClip = vec4(uv, 0.0, 1.0);
+    vec4 farClip = vec4(uv, 1.0, 1.0);
+
+    vec4 nearView = InverseProjectionMatrix * nearClip;
+    vec4 farView = InverseProjectionMatrix * farClip;
+
+    nearView.xyz /= nearView.w;
+    farView.xyz /= farView.w;
+
+    vec3 nearWorld = (InverseViewMatrix * nearView).xyz;
+    vec3 farWorld = (InverseViewMatrix * farView).xyz;
+
+    return normalize(farWorld - nearWorld);
 }
 
 float projectDepth(vec3 worldPos) {
@@ -645,7 +658,7 @@ vec3 computeSampleLighting(vec3 samplePos, CloudDensitySample sample, vec3 rayDi
 void main() {
     vec2 screenUv = gl_FragCoord.xy / OutSize;
     vec3 rayDir = getWorldRay(screenUv);
-    vec3 rayOrigin = CameraPos;
+    vec3 rayOrigin = CameraPosition;
 
     vec3 volumeMin = CloudBoundsMin;
     vec3 volumeMax = CloudBoundsMax;

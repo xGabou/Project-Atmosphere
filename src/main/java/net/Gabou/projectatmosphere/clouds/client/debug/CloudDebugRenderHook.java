@@ -1,11 +1,13 @@
 package net.Gabou.projectatmosphere.clouds.client.debug;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderAabb;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderDebugMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -28,12 +30,24 @@ public final class CloudDebugRenderHook {
             return;
         }
 
-        if (shouldRenderDebugCloud) {
-            CloudRenderSnapshot snapshot = CloudRenderStateHolder.getInstance().getDebugSnapshot();
-            PoseStack poseStack = event.getPoseStack();
-            MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
-            CloudWireframeRenderer.render(snapshot, poseStack, buffer);
-            buffer.endBatch(RenderType.lines());
+        if (!shouldRenderDebugCloud && !CloudRenderDebugMode.current().isActive()) {
+            return;
         }
+
+        PoseStack poseStack = event.getPoseStack();
+        Vec3 cameraPosition = event.getCamera().getPosition();
+        MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
+
+        poseStack.pushPose();
+        poseStack.translate(-cameraPosition.x(), -cameraPosition.y(), -cameraPosition.z());
+        if (shouldRenderDebugCloud) {
+            CloudWireframeRenderer.render(CloudRenderStateHolder.getInstance().getDebugSnapshot(), poseStack, buffer);
+        }
+        if (CloudRenderDebugMode.current().isActive()) {
+            CloudWireframeRenderer.render(CloudRenderAabb.getDebugWireframeSnapshot(), poseStack, buffer);
+        }
+        poseStack.popPose();
+
+        buffer.endBatch(RenderType.lines());
     }
 }

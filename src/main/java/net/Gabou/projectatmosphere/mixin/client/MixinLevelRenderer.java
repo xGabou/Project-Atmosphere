@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.Gabou.projectatmosphere.clouds.client.render.CustomPrecipitationRenderer;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -62,9 +61,7 @@ public class MixinLevelRenderer {
             Matrix4f projectionMatrix,
             CallbackInfo ci
     ) {
-        if (AtmosphereCloudPolicy.shouldRenderPaClouds(this.level)) {
-            CloudRenderHook.renderFromLevelRenderer(this.level, stack, projectionMatrix, partialTick, camera.getPosition());
-        }
+        // PA volumetric clouds render from RenderLevelStageEvent.Stage.AFTER_WEATHER.
     }
 
     @ModifyConstant(method = "tickRain", constant = @Constant(floatValue = 0.2F, ordinal = 0))
