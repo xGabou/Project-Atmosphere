@@ -8,15 +8,14 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 
 public final class CloudWireframeRenderer {
 
     private CloudWireframeRenderer() {
     }
 
-    public static void render(CloudRenderSnapshot snapshot, PoseStack poseStack, MultiBufferSource bufferSource, Vec3 cameraPosition) {
-        if (snapshot == null || poseStack == null || bufferSource == null || cameraPosition == null) {
+    public static void render(CloudRenderSnapshot snapshot, PoseStack poseStack, MultiBufferSource bufferSource) {
+        if (snapshot == null || poseStack == null || bufferSource == null) {
             return;
         }
 
@@ -29,12 +28,12 @@ public final class CloudWireframeRenderer {
             return;
         }
 
-        double minX = bounds.min().x() - cameraPosition.x();
-        double minY = bounds.min().y() - cameraPosition.y();
-        double minZ = bounds.min().z() - cameraPosition.z();
-        double maxX = bounds.max().x() - cameraPosition.x();
-        double maxY = bounds.max().y() - cameraPosition.y();
-        double maxZ = bounds.max().z() - cameraPosition.z();
+        double minX = bounds.min().x();
+        double minY = bounds.min().y();
+        double minZ = bounds.min().z();
+        double maxX = bounds.max().x();
+        double maxY = bounds.max().y();
+        double maxZ = bounds.max().z();
 
         drawBox(poseStack, bufferSource, minX, minY, minZ, maxX, maxY, maxZ, snapshot.getDebugColorOrTint());
     }

@@ -41,6 +41,8 @@
     { "name": "CloudRadius", "type": "float", "count": 1, "values": [ 64.0 ] },
     { "name": "CloudBaseY", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CloudTopY", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CloudBoundsMin", "type": "float", "count": 3, "values": [ -64.0, 0.0, -64.0 ] },
+    { "name": "CloudBoundsMax", "type": "float", "count": 3, "values": [ 64.0, 1.0, 64.0 ] },
     { "name": "CloudDensity", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CloudCoverage", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "CloudEdgeSoftness", "type": "float", "count": 1, "values": [ 0.35 ] },

@@ -6,7 +6,6 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -33,9 +32,7 @@ public final class CloudDebugRenderHook {
             CloudRenderSnapshot snapshot = CloudRenderStateHolder.getInstance().getDebugSnapshot();
             PoseStack poseStack = event.getPoseStack();
             MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
-            Vec3 cameraPosition = event.getCamera().getPosition();
-
-            CloudWireframeRenderer.render(snapshot, poseStack, buffer, cameraPosition);
+            CloudWireframeRenderer.render(snapshot, poseStack, buffer);
             buffer.endBatch(RenderType.lines());
         }
     }

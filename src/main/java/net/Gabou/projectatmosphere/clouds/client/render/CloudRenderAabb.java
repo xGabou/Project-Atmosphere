@@ -13,7 +13,9 @@ import java.util.Locale;
 
 public final class CloudRenderAabb {
     private static final int LOG_INTERVAL_TICKS = 20;
-    private static long lastLoggedWorldTime = Long.MIN_VALUE;
+    private static long lastWireframeLoggedWorldTime = Long.MIN_VALUE;
+    private static long lastShaderUploadLoggedWorldTime = Long.MIN_VALUE;
+    private static volatile CloudRenderSnapshot debugWireframeSnapshot;
 
     private CloudRenderAabb() {
     }
@@ -40,9 +42,23 @@ public final class CloudRenderAabb {
         float anvilReach = 1.0F + snapshot.getAnvilStrength() * shape.getAnvilSpread() * 0.82F;
         float volumeRadius = radius * Math.min(1.58F, Math.max(Math.max(shapeRadiusScale, lobeReach), anvilReach));
 
-        Vec3 min = new Vec3(center.x() - volumeRadius, baseY - volumePaddingY, center.z() - volumeRadius);
-        Vec3 max = new Vec3(center.x() + volumeRadius, topY + volumePaddingY, center.z() + volumeRadius);
+        float minX = (float) center.x() - volumeRadius;
+        float minY = baseY - volumePaddingY;
+        float minZ = (float) center.z() - volumeRadius;
+        float maxX = (float) center.x() + volumeRadius;
+        float maxY = topY + volumePaddingY;
+        float maxZ = (float) center.z() + volumeRadius;
+        Vec3 min = new Vec3(minX, minY, minZ);
+        Vec3 max = new Vec3(maxX, maxY, maxZ);
         return new Bounds(center, radius, baseY, topY, volumeRadius, volumePaddingY, min, max);
+    }
+
+    public static void setDebugWireframeSnapshot(@Nullable CloudRenderSnapshot snapshot) {
+        debugWireframeSnapshot = snapshot;
+    }
+
+    public static @Nullable CloudRenderSnapshot getDebugWireframeSnapshot() {
+        return debugWireframeSnapshot;
     }
 
     public static void logOneCloud(@NotNull CloudRenderFrameContext frameContext, @Nullable CloudRenderSnapshot snapshot) {
@@ -51,20 +67,47 @@ public final class CloudRenderAabb {
         }
 
         long worldTime = frameContext.getWorldTime();
-        if (worldTime == lastLoggedWorldTime || worldTime % LOG_INTERVAL_TICKS != 0L) {
+        if (worldTime == lastWireframeLoggedWorldTime || worldTime % LOG_INTERVAL_TICKS != 0L) {
             return;
         }
 
-        lastLoggedWorldTime = worldTime;
+        lastWireframeLoggedWorldTime = worldTime;
         Bounds bounds = compute(snapshot);
         if (bounds == null) {
-            ProjectAtmosphere.LOGGER.info("[CloudAABB] worldTime={} cloud=none", worldTime);
+            ProjectAtmosphere.LOGGER.info("[CloudAABB] source=wireframe worldTime={} cloud=none", worldTime);
             return;
         }
 
+        logBounds("wireframe", frameContext, bounds);
+    }
+
+    public static void logShaderUpload(
+            @NotNull CloudRenderFrameContext frameContext,
+            @Nullable Bounds bounds
+    ) {
+        if (!CloudRenderDebugMode.current().isActive()) {
+            return;
+        }
+
+        long worldTime = frameContext.getWorldTime();
+        if (worldTime == lastShaderUploadLoggedWorldTime || worldTime % LOG_INTERVAL_TICKS != 0L) {
+            return;
+        }
+
+        lastShaderUploadLoggedWorldTime = worldTime;
+        if (bounds == null) {
+            ProjectAtmosphere.LOGGER.info("[CloudAABB] source=shaderUpload worldTime={} cloud=none", worldTime);
+            return;
+        }
+
+        logBounds("shaderUpload", frameContext, bounds);
+    }
+
+    private static void logBounds(@NotNull String source, @NotNull CloudRenderFrameContext frameContext, @NotNull Bounds bounds) {
         ProjectAtmosphere.LOGGER.info(
-                "[CloudAABB] worldTime={} mode={} center={} radius={} baseY={} topY={} min={} max={} volumeRadius={} paddingY={}",
-                worldTime,
+                "[CloudAABB] source={} worldTime={} mode={} center={} radius={} baseY={} topY={} min={} max={} volumeRadius={} paddingY={}",
+                source,
+                frameContext.getWorldTime(),
                 CloudRenderDebugMode.current().serializedName(),
                 format(bounds.center()),
                 fmt(bounds.regionRadius()),
@@ -87,7 +130,7 @@ public final class CloudRenderAabb {
     }
 
     private static String fmt(float value) {
-        return String.format(Locale.ROOT, "%.2f", value);
+        return String.format(Locale.ROOT, "%.6f", value);
     }
 
     public record Bounds(

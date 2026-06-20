@@ -68,6 +68,20 @@ public final class CloudUniformUploader {
         shader.safeGetUniform("CloudRadius").set(snapshot.getRegionRadius());
         shader.safeGetUniform("CloudBaseY").set(snapshot.getCloudBaseY());
         shader.safeGetUniform("CloudTopY").set(snapshot.getCloudTopY());
+        CloudRenderAabb.Bounds bounds = CloudRenderAabb.compute(snapshot);
+        if (bounds != null) {
+            shader.safeGetUniform("CloudBoundsMin").set(
+                    (float) bounds.min().x(),
+                    (float) bounds.min().y(),
+                    (float) bounds.min().z()
+            );
+            shader.safeGetUniform("CloudBoundsMax").set(
+                    (float) bounds.max().x(),
+                    (float) bounds.max().y(),
+                    (float) bounds.max().z()
+            );
+        }
+        CloudRenderAabb.logShaderUpload(frameContext, bounds);
         shader.safeGetUniform("CloudDensity").set(snapshot.getDensity());
         shader.safeGetUniform("CloudCoverage").set(snapshot.getCoverage());
         shader.safeGetUniform("CloudEdgeSoftness").set(snapshot.getEdgeSoftness());

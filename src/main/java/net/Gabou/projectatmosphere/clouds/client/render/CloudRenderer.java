@@ -65,6 +65,7 @@ public final class CloudRenderer {
      * @param frameContext contexte de rendu de la frame courante
      */
     public static void render(@NotNull CloudRenderFrameContext frameContext) {
+        CloudRenderAabb.setDebugWireframeSnapshot(null);
         Minecraft minecraft = Minecraft.getInstance();
         try {
             RenderTarget mainTarget = minecraft.getMainRenderTarget();
@@ -88,9 +89,11 @@ public final class CloudRenderer {
             List<CloudRenderSnapshot> sourceSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots();
             List<CloudRenderSnapshot> renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots();
             List<CloudRenderLodPlan> renderPlans = CloudRenderLodManager.createPlans(frameContext, renderableSnapshots);
+            CloudRenderSnapshot debugAabbSnapshot = renderPlans.isEmpty() ? null : renderPlans.get(0).snapshot();
+            CloudRenderAabb.setDebugWireframeSnapshot(debugAabbSnapshot);
             CloudRenderAabb.logOneCloud(
                     frameContext,
-                    renderPlans.isEmpty() ? null : renderPlans.get(0).snapshot()
+                    debugAabbSnapshot
             );
             CloudRenderDiagnostics.beginFrame(
                     frameContext,

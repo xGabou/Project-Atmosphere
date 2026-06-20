@@ -29,6 +29,8 @@ uniform vec3 CloudVelocity;
 uniform float CloudRadius;
 uniform float CloudBaseY;
 uniform float CloudTopY;
+uniform vec3 CloudBoundsMin;
+uniform vec3 CloudBoundsMax;
 uniform float CloudDensity;
 uniform float CloudCoverage;
 uniform float CloudEdgeSoftness;
@@ -314,10 +316,8 @@ vec3 reconstructWorld(vec2 uv, float depth) {
 }
 
 vec3 getWorldRay(vec2 uv) {
-    vec4 clip = vec4(uv * 2.0 - 1.0, 1.0, 1.0);
-    vec4 view = InverseProjMat * clip;
-    view /= view.w;
-    return normalize((InverseModelViewMat * vec4(normalize(view.xyz), 0.0)).xyz);
+    vec3 farWorld = reconstructWorld(uv, 1.0);
+    return normalize(farWorld - CameraPos);
 }
 
 float projectDepth(vec3 worldPos) {
@@ -647,14 +647,8 @@ void main() {
     vec3 rayDir = getWorldRay(screenUv);
     vec3 rayOrigin = CameraPos;
 
-    float heightRange = max(CloudTopY - CloudBaseY, 0.001);
-    float volumePaddingY = smoothstep(1.20, 3.20, CloudHeightSquash) * min(28.0, max(heightRange * 0.45, CloudRadius * 0.035));
-    float shapeRadiusScale = clamp(CloudShapeBaseRadius / max(CloudRadius, 1.0), 1.0, 1.45);
-    float lobeReach = mix(1.16, 1.42, saturate(CloudShapeLobeStrength));
-    float anvilReach = 1.0 + CloudAnvilStrength * CloudShapeAnvilSpread * 0.82;
-    float volumeRadius = CloudRadius * min(1.58, max(max(shapeRadiusScale, lobeReach), anvilReach));
-    vec3 volumeMin = vec3(CloudCenter.x - volumeRadius, CloudBaseY - volumePaddingY, CloudCenter.z - volumeRadius);
-    vec3 volumeMax = vec3(CloudCenter.x + volumeRadius, CloudTopY + volumePaddingY, CloudCenter.z + volumeRadius);
+    vec3 volumeMin = CloudBoundsMin;
+    vec3 volumeMax = CloudBoundsMax;
 
     float tNear;
     float tFar;

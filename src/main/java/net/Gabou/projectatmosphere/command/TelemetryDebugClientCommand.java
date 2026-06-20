@@ -13,6 +13,7 @@ import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
+import net.Gabou.projectatmosphere.tools.debug.WorldSpaceDebugCubeRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -122,10 +123,46 @@ public class TelemetryDebugClientCommand {
                                             ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);
                                             return 1;
                                         }))
+                                .then(buildWorldSpaceTestCubeCommand())
                                 .then(buildCloudRenderDebugCommand())
                                 .then(TornadoRenderDebugClientCommand.build())
                         )
         );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildWorldSpaceTestCubeCommand() {
+        return Commands.literal("worldSpaceTestCube")
+                .executes(ctx -> sendWorldSpaceTestCubeStatus(ctx.getSource()))
+                .then(Commands.literal("on")
+                        .executes(ctx -> setWorldSpaceTestCube(ctx.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(ctx -> setWorldSpaceTestCube(ctx.getSource(), false)))
+                .then(Commands.literal("status")
+                        .executes(ctx -> sendWorldSpaceTestCubeStatus(ctx.getSource())));
+    }
+
+    private static int setWorldSpaceTestCube(CommandSourceStack source, boolean enabled) {
+        if (FMLEnvironment.production) {
+            source.sendFailure(Component.literal("This command is only available in a development environment."));
+            return 0;
+        }
+
+        WorldSpaceDebugCubeRenderer.setEnabled(enabled);
+        source.sendSuccess(
+                () -> Component.literal(enabled
+                        ? "World-space test cube enabled. Anchor captures from player position on the next render frame."
+                        : "World-space test cube disabled."),
+                false
+        );
+        return 1;
+    }
+
+    private static int sendWorldSpaceTestCubeStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal(WorldSpaceDebugCubeRenderer.status()),
+                false
+        );
+        return 1;
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildCloudRenderDebugCommand() {

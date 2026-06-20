@@ -15,6 +15,7 @@ import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.compat.auroras.AuroraCompatController;
 import net.Gabou.projectatmosphere.compat.rainbows.RainbowWeatherTracker;
 import net.Gabou.projectatmosphere.config.AtmoConfigScreen;
+import net.Gabou.projectatmosphere.tools.debug.WorldSpaceDebugCubeRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.ConfigScreenHandler;
@@ -41,6 +42,9 @@ public class ClientOnlyRegistrar {
         } else {
             MinecraftForge.EVENT_BUS.register(SimpleCloudsWhiteoutFogHandler.class);
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; PA cloud client hooks disabled.");
+        }
+        if (!FMLEnvironment.production) {
+            MinecraftForge.EVENT_BUS.register(WorldSpaceDebugCubeRenderer.class);
         }
 
         context.registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class,

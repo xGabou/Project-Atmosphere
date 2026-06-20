@@ -89,28 +89,46 @@ public final class CloudRenderHook {
             );
         }
 
-        renderDebugBoundsWireframe(frameContext, renderableSnapshots);
+        renderDebugBoundsWireframe(frameContext);
 
-        CloudRenderSnapshot fallbackSnapshot = CloudRenderFallbackState.getFallbackSnapshot(frameContext.getCameraPosition());
-        if (fallbackSnapshot == null) {
-            return;
-        }
-
-        MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
-        CloudWireframeRenderer.render(fallbackSnapshot, frameContext.getPoseStack(), buffer, frameContext.getCameraPosition());
-        buffer.endBatch(RenderType.lines());
+//        CloudRenderSnapshot fallbackSnapshot = CloudRenderFallbackState.getFallbackSnapshot(frameContext.getCameraPosition());
+//        if (fallbackSnapshot == null) {
+//            return;
+//        }
+//
+//        renderWireframeWithCamera(fallbackSnapshot, frameContext);
     }
 
     private static void renderDebugBoundsWireframe(
-            CloudRenderFrameContext frameContext,
-            List<CloudRenderSnapshot> renderableSnapshots
+            CloudRenderFrameContext frameContext
     ) {
-        if (!CloudRenderDebugMode.current().isActive() || renderableSnapshots.isEmpty()) {
+        CloudRenderSnapshot snapshot = CloudRenderAabb.getDebugWireframeSnapshot();
+        if (!CloudRenderDebugMode.current().isActive() || snapshot == null) {
+            return;
+        }
+        renderWireframeWithCamera(snapshot, frameContext);
+    }
+
+    private static void renderWireframeWithCamera(
+            CloudRenderSnapshot snapshot,
+            CloudRenderFrameContext frameContext
+    ) {
+        if (snapshot == null || frameContext == null) {
             return;
         }
 
         MultiBufferSource.BufferSource buffer = Minecraft.getInstance().renderBuffers().bufferSource();
-        CloudWireframeRenderer.render(renderableSnapshots.get(0), frameContext.getPoseStack(), buffer, frameContext.getCameraPosition());
+
+        frameContext.getPoseStack().pushPose();
+        frameContext.getPoseStack().translate(
+                -frameContext.getCameraPosition().x(),
+                -frameContext.getCameraPosition().y(),
+                -frameContext.getCameraPosition().z()
+        );
+
+        CloudWireframeRenderer.render(snapshot, frameContext.getPoseStack(), buffer);
+
+        frameContext.getPoseStack().popPose();
         buffer.endBatch(RenderType.lines());
     }
 }
