@@ -221,6 +221,60 @@ float towerStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
     return saturate(field * mix(0.68, 1.18, sideTurbulence));
 }
 
+float congestusPrimaryField(vec3 localVolume, vec3 seedOffset, float seedValue) {
+    vec3 p = localVolume;
+    float rotation = hash1(seedValue + 131.0) * 0.72 - 0.36;
+    p.xz = rotate2(p.xz, rotation);
+
+    float lean = (p.y - 0.42) * (hash1(seedValue + 173.0) - 0.5) * 0.14;
+    p.x -= lean;
+    p.z += lean * 0.35;
+
+    float primary = 0.0;
+
+    primary = max(primary, ellipsoidField(p, vec3( 0.00, 0.17,  0.00), vec3(0.84, 0.20, 0.58)) * 0.92);
+    primary = max(primary, ellipsoidField(p, vec3(-0.42, 0.22,  0.10), vec3(0.40, 0.20, 0.34)) * 0.96);
+    primary = max(primary, ellipsoidField(p, vec3( 0.38, 0.24, -0.08), vec3(0.44, 0.22, 0.36)) * 0.98);
+    primary = max(primary, ellipsoidField(p, vec3(-0.16, 0.36, -0.18), vec3(0.42, 0.25, 0.36)));
+    primary = max(primary, ellipsoidField(p, vec3( 0.22, 0.42,  0.16), vec3(0.44, 0.27, 0.38)));
+    primary = max(primary, ellipsoidField(p, vec3(-0.06, 0.56,  0.02), vec3(0.40, 0.30, 0.36)));
+    primary = max(primary, ellipsoidField(p, vec3( 0.18, 0.70, -0.04), vec3(0.34, 0.24, 0.32)) * 0.94);
+    primary = max(primary, ellipsoidField(p, vec3(-0.08, 0.82,  0.08), vec3(0.28, 0.18, 0.26)) * 0.82);
+
+    for (int i = 0; i < 10; i++) {
+        float fi = float(i);
+        float h = mix(0.22, 0.86, hash1(seedValue + 300.0 + fi * 19.0));
+        float angle = fi * 2.399963 + hash1(seedValue + 410.0 + fi * 23.0) * 1.5;
+        float ring = mix(0.22, 0.58, hash1(seedValue + 500.0 + fi * 29.0));
+        ring *= mix(1.05, 0.55, h);
+
+        vec3 center = vec3(cos(angle) * ring, h, sin(angle) * ring);
+
+        float s = mix(0.12, 0.24, hash1(seedValue + 600.0 + fi * 31.0));
+        vec3 radius = vec3(s * 1.25, s * 0.95, s * 1.15);
+
+        float lobe = ellipsoidField(p, center, radius);
+        float attach = smoothstep(0.02, 0.22, primary);
+        primary = max(primary, lobe * attach * 0.95);
+    }
+
+    float baseFeather = smoothstep(-0.04, 0.10, p.y);
+    float topFeather = 1.0 - smoothstep(0.96, 1.10, p.y);
+    primary *= baseFeather * topFeather;
+
+    float edge = 1.0 - smoothstep(0.18, 0.70, primary);
+    float edgeErosionNoise = fbm(p * vec3(8.0, 5.5, 8.0) + seedOffset * 0.00031, 3);
+    float fineErosionNoise = fbm(p * vec3(18.0, 10.0, 18.0) + seedOffset * 0.00061 + vec3(17.0, 3.0, 11.0), 2);
+    float verticalErosionMask = smoothstep(0.08, 0.28, p.y) * (1.0 - smoothstep(0.94, 1.08, p.y));
+    float erosion = (1.0 - edgeErosionNoise) * edge * 0.30;
+    erosion += (1.0 - fineErosionNoise) * edge * verticalErosionMask * 0.10;
+
+    primary = max(0.0, primary - erosion);
+    primary = smoothstep(0.015, 0.86, primary);
+
+    return saturate(primary);
+}
+
 float stormAnvilStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
     float tower = towerStructuralField(localVolume, seedOffset, seedValue) * 0.86;
     float upper = smoothstep(0.52, 0.74, localVolume.y) * (1.0 - smoothstep(0.96, 1.0, localVolume.y));
@@ -278,7 +332,7 @@ float spiralStormStructuralField(vec3 localVolume, vec3 seedOffset, float seedVa
 
 float morphologyStructuralField(vec3 localVolume, vec3 seedOffset, float seedValue) {
     if (CloudMorphologyFamily == MORPHOLOGY_TOWER) {
-        return towerStructuralField(localVolume, seedOffset, seedValue);
+        return congestusPrimaryField(localVolume, seedOffset, seedValue);
     }
     if (CloudMorphologyFamily == MORPHOLOGY_STORM_ANVIL) {
         return stormAnvilStructuralField(localVolume, seedOffset, seedValue);
@@ -459,16 +513,31 @@ float sampleVerticalEnvelope(float y, float sheetness, float towerness) {
     return saturate(base * top * mix(denseBand, 1.0, fillWeight) * puffyTop);
 }
 
-float samplePrimaryMass(vec3 localVolume, float sheetness, float towerness) {
+float samplePrimaryMass(vec3 localVolume, vec3 seedOffset, float sheetness, float towerness) {
+    if (CloudMorphologyFamily == MORPHOLOGY_TOWER) {
+        return congestusPrimaryField(localVolume, seedOffset, float(CloudSeed));
+    }
+
     float y = localVolume.y;
+    float y01 = saturate(y);
     float heightRange = max(CloudTopY - CloudBaseY, 0.001);
     float baseRadiusScale = clamp(CloudShapeBaseRadius / max(CloudRadius, 1.0), 0.24, 1.45);
     float baseOffset = clamp(CloudShapeBaseOffset / heightRange, 0.0, 0.92);
     float topOffset = clamp(CloudShapeTopOffset / heightRange, 0.02, 1.75);
     float baseRadius = mix(baseRadiusScale, max(baseRadiusScale, 0.96), sheetness);
-    float topNarrow = mix(1.0, mix(0.82, 0.46, CloudShapeTowerNarrowing), towerness * smoothstep(0.42, 1.0, y));
+    float towerBlend = saturate(towerness * (1.0 - sheetness));
+    vec3 noisePos = localVolume * vec3(3.4, 2.1, 3.4) + seedOffset * 0.00023;
+    float sideNoise = fbm(noisePos, 3);
+    float detailNoise = fbm(noisePos * 2.17 + vec3(11.7, 5.1, 19.3), 2);
+    float brokenNoise = sideNoise * 0.68 + detailNoise * 0.32;
+    float lowerProfile = 1.0 - smoothstep(0.02, 0.38, y01);
+    float midProfile = smoothstep(0.18, 0.72, y01) * (1.0 - smoothstep(0.72, 1.02, y01));
+    float topProfile = smoothstep(0.58, 0.96, y01);
+    float baseBulge = 1.0 + towerBlend * 0.44 * lowerProfile;
+    float risingNarrow = 1.0 - towerBlend * mix(0.16, 0.36, saturate(CloudShapeTowerNarrowing)) * smoothstep(0.20, 0.82, y01);
+    float topSoftSpread = 1.0 + towerBlend * 0.16 * smoothstep(0.62, 0.86, y01) * (1.0 - smoothstep(0.92, 1.08, y));
     float anvilSpread = 1.0 + CloudAnvilStrength * CloudShapeAnvilSpread * smoothstep(0.58, 0.90, y) * 0.82;
-    float horizontalRadius = baseRadius * topNarrow * anvilSpread * mix(0.92, 1.30, sheetness);
+    float horizontalRadius = baseRadius * baseBulge * risingNarrow * topSoftSpread * anvilSpread * mix(0.92, 1.30, sheetness);
     float zRadius = horizontalRadius * mix(0.88, 1.12, sheetness);
     float bodyCenterY = mix(0.48, 0.42 + baseOffset * 0.10, sheetness);
     float bodyHeight = clamp(mix(
@@ -477,19 +546,37 @@ float samplePrimaryMass(vec3 localVolume, float sheetness, float towerness) {
         sheetness
     ), 0.16, 0.86);
     float body = ellipsoidField(localVolume, vec3(0.0, bodyCenterY, 0.0), vec3(horizontalRadius, bodyHeight, zRadius));
-    float baseShelf = (1.0 - smoothstep(0.04, 0.28, y))
-        * (1.0 - smoothstep(0.72, 1.18, length(localVolume.xz)))
-        * (0.18 + CloudShapeBaseFlattening * 0.46);
-    float towerColumn = towerness
-        * (1.0 - smoothstep(0.22, 0.72, length(localVolume.xz)))
-        * smoothstep(0.08, 0.32, y)
-        * (1.0 - smoothstep(0.95, 1.08, y))
-        * 0.48;
+    body *= mix(1.0, mix(0.82, 1.04, brokenNoise), towerBlend);
+
+    vec2 radiusProfile = max(vec2(horizontalRadius, zRadius), vec2(0.001));
+    float radial = length(localVolume.xz / radiusProfile);
+    float sideBreak = towerBlend * ((brokenNoise - 0.5) * 0.22 + (detailNoise - 0.5) * 0.12 * (midProfile + topProfile));
+    float noisyRadial = radial + sideBreak;
+    float topNoiseOffset = (brokenNoise - 0.5) * towerBlend * 0.07;
+    float verticalColumn = smoothstep(-0.04, 0.16, y) * (1.0 - smoothstep(0.88 + topNoiseOffset, 1.08, y));
+    float towerColumn = towerBlend
+        * (1.0 - smoothstep(0.40, 1.02, noisyRadial))
+        * verticalColumn
+        * mix(0.78, 1.04, brokenNoise)
+        * 0.72;
+
+    float baseRadial = length(localVolume.xz / max(vec2(baseRadius * 1.28, baseRadius * 1.18), vec2(0.001)));
+    float baseShelf = (1.0 - smoothstep(-0.02, 0.34, y))
+        * (1.0 - smoothstep(0.42, 1.28, baseRadial))
+        * (0.16 + CloudShapeBaseFlattening * 0.30 + towerBlend * 0.12)
+        * mix(0.88, 1.08, sideNoise);
+    float topBreak = towerBlend
+        * topProfile
+        * smoothstep(0.36, 0.76, detailNoise)
+        * smoothstep(0.54, 1.04, noisyRadial)
+        * 0.30;
     float sheetLayer = sheetness
         * (1.0 - smoothstep(0.58, 1.12, length(localVolume.xz)))
         * (1.0 - smoothstep(0.18 + CloudVerticalThickness * 0.04, 0.52, abs(y - 0.48)))
         * 0.52;
-    return saturate(max(body, max(baseShelf, max(towerColumn, sheetLayer))));
+    float primary = max(body * mix(0.72, 0.58, towerBlend), max(baseShelf, max(towerColumn, sheetLayer)));
+    primary = max(0.0, primary - topBreak);
+    return saturate(primary * mix(0.74, 0.66, towerBlend));
 }
 
 float sampleSecondaryLobes(vec3 localVolume, float seedValue, int lobeCount, float sheetness, float towerness) {
@@ -540,7 +627,7 @@ float sampleEdgeFactor(vec3 localVolume) {
     return saturate(max(horizontalEdge, max(baseEdge, topEdge) * 0.45));
 }
 
-float sampleSoftErosion(vec3 localVolume, vec3 seedOffset, float edgeFactor, float sheetness) {
+float sampleSoftErosion(vec3 localVolume, vec3 seedOffset, float edgeFactor, float sheetness, float towerness) {
     float erosionStrength = saturate(CloudEdgeErosionStrength + CloudMaterialEdgeErosion * 0.45 + CloudShapeEdgeRaggedness * 0.45);
     if (erosionStrength <= 0.001) {
         return 0.0;
@@ -549,11 +636,15 @@ float sampleSoftErosion(vec3 localVolume, vec3 seedOffset, float edgeFactor, flo
     float erosionNoise = fbm(noisePos, 3);
     float verticalEdge = max(1.0 - smoothstep(0.05, 0.24, localVolume.y), smoothstep(0.76, 1.04, localVolume.y));
     float erosionMask = saturate(edgeFactor * 0.82 + verticalEdge * 0.18);
+    float towerTopBreak = towerness
+        * smoothstep(0.58, 1.02, localVolume.y)
+        * smoothstep(0.36, 0.80, erosionNoise)
+        * 0.22;
     float cellular = sheetness > 0.55
         ? saturate((0.56 - erosionNoise) * CloudShapeCellSplitStrength) * 0.24
         : 0.0;
     float softErosion = smoothstep(0.42, 0.86, erosionNoise) * erosionMask * mix(0.05, 0.34, erosionStrength);
-    return saturate(softErosion + cellular) * 0.42;
+    return saturate(softErosion + cellular + towerTopBreak) * mix(0.42, 0.58, saturate(towerness));
 }
 
 CloudDensitySample sampleCloudDensity(vec3 samplePos, vec3 seedOffset, float seedValue) {
@@ -586,14 +677,24 @@ CloudDensitySample sampleCloudDensity(vec3 samplePos, vec3 seedOffset, float see
         return emptyDensitySample();
     }
 
-    float primaryMass = samplePrimaryMass(localVolume, sheetness, towerness);
+    float edgeFactor = sampleEdgeFactor(localVolume);
+    float erosionFactor = sampleSoftErosion(localVolume, seedOffset, edgeFactor, sheetness, towerness);
+    float rawPrimaryMass = samplePrimaryMass(localVolume, seedOffset, sheetness, towerness);
+    float primaryMass = max(0.0, rawPrimaryMass - erosionFactor * mix(0.55, 1.05, towerness));
     float secondaryLobes = sampleSecondaryLobes(localVolume, seedValue, lobeCount, sheetness, towerness);
     float tertiaryPuffs = sampleTertiaryPuffs(localVolume, seedOffset, sheetness, towerness);
-    float unlitDensity = clamp(max(primaryMass, secondaryLobes * lobeStrength) + tertiaryPuffs * puffStrength, 0.0, 1.35);
-    float edgeFactor = sampleEdgeFactor(localVolume);
+    float primaryGate = smoothstep(0.04, 0.28, primaryMass);
+    secondaryLobes *= primaryGate;
+    tertiaryPuffs *= primaryGate;
+    float unlitDensity = clamp(
+        primaryMass
+        + secondaryLobes * lobeStrength * 0.35
+        + tertiaryPuffs * puffStrength * 0.25,
+        0.0,
+        1.0
+    );
     float coreFactor = saturate(smoothstep(0.34, 0.80, unlitDensity) * (1.0 - edgeFactor * 0.68));
-    float erosionFactor = sampleSoftErosion(localVolume, seedOffset, edgeFactor, sheetness);
-    float erodedMass = max(0.0, unlitDensity - erosionFactor);
+    float erodedMass = max(0.0, unlitDensity - erosionFactor * mix(0.35, 0.70, towerness));
     float softMass = smoothstep(0.045, 0.72, erodedMass);
     float densityShape = max(softMass, coreFactor * mix(0.24, 0.46, stormDepth));
     float coverageFill = mix(0.28, 1.0, effectiveCoverage);
@@ -636,13 +737,13 @@ vec3 computeSampleLighting(vec3 samplePos, CloudDensitySample sample, vec3 rayDi
         * (0.45 + topFactor * 0.55);
 
     float stormDarkness = saturate(max(CloudStormVisualDarkness, CloudStormCoreDarkening));
-    float materialDarkness = saturate(CloudMaterialDarkness + stormDarkness * 0.36);
+    float materialDarkness = saturate(CloudMaterialDarkness * 0.55 + stormDarkness * 0.22);
     float shadowing = saturate(CloudShadowContribution + CloudMaterialShadowContribution * 0.65);
-    float densityDarkening = exp(-sample.opticalDepthHint * LightAbsorption * (0.58 + shadowing * 0.30 + stormDarkness * 0.24));
+    float densityDarkening = exp(-sample.opticalDepthHint * (LightAbsorption * 0.58) * (0.42 + shadowing * 0.18 + stormDarkness * 0.12));
     vec3 precipitationTint = mix(vec3(1.0), vec3(0.62, 0.68, 0.74), saturate(CloudMaterialPrecipitationTint + CloudPrecipitationIntensity * 0.35));
-    vec3 compatibilityTint = mix(CloudColor.rgb * precipitationTint, vec3(1.0), 0.72 - materialDarkness * 0.12);
-    float undersideDarkening = saturate(UndersideDarkening * 0.66 + CloudBaseDarkness * 0.22 + CloudMaterialUndersideDarkness * 0.30 + stormDarkness * 0.20);
-    float undersideLift = mix(0.54, 0.84, topFactor) + sample.coreFactor * 0.08;
+    vec3 compatibilityTint = mix(CloudColor.rgb * precipitationTint, vec3(1.0), 0.80 - materialDarkness * 0.08);
+    float undersideDarkening = saturate(UndersideDarkening * 0.42 + CloudBaseDarkness * 0.12 + CloudMaterialUndersideDarkness * 0.18 + stormDarkness * 0.12);
+    float undersideLift = mix(0.68, 0.92, topFactor) + sample.coreFactor * 0.08;
     vec3 baseLighting = AmbientCloudColor * compatibilityTint * mix(undersideLift * (1.0 - undersideDarkening), 1.0, vertical);
     vec3 sunLighting = SunColor * rimLight * (0.55 + sample.edgeFactor * 0.45);
     vec3 lightningLift = SunColor * CloudLightningInfluence * CloudMaterialLightningResponse * density * 0.08;
@@ -745,6 +846,37 @@ void main() {
         || CloudDebugMode == CLOUD_DEBUG_FINAL_DENSITY
         || CloudDebugMode == CLOUD_DEBUG_UNLIT_NO_LIGHTING;
 
+    if (scalarDebugMode) {
+        float scalarT = t;
+        for (int step = 0; step < MAX_RAYMARCH_STEPS; step++) {
+            if (step >= steps) {
+                break;
+            }
+
+            vec3 samplePos = rayOrigin + rayDir * scalarT;
+            CloudDensitySample densitySample = sampleCloudDensity(samplePos, seedOffset, seedValue);
+            float debugDensity = densitySample.finalDensity;
+            if (CloudDebugMode == CLOUD_DEBUG_PRIMARY_MASS) {
+                debugDensity = densitySample.primaryMass;
+            } else if (CloudDebugMode == CLOUD_DEBUG_VERTICAL_ENVELOPE) {
+                debugDensity = densitySample.heightFactor;
+            }
+
+            float scalarValue = saturate(debugDensity);
+            maxDensitySample = max(maxDensitySample, scalarValue);
+            if (!firstCloudDepthSet && scalarValue > 0.001) {
+                firstCloudDepth = projectDepth(samplePos);
+                firstCloudDepthSet = true;
+            }
+
+            scalarT += stepSize;
+        }
+
+        gl_FragDepth = WriteDepth != 0 && firstCloudDepthSet ? firstCloudDepth : sceneDepth;
+        fragColor = vec4(vec3(maxDensitySample), maxDensitySample > 0.001 ? 0.80 : 0.0);
+        return;
+    }
+
     for (int step = 0; step < MAX_RAYMARCH_STEPS; step++) {
         if (step >= steps || transmittance < 0.02) {
             break;
@@ -752,13 +884,7 @@ void main() {
 
         vec3 samplePos = rayOrigin + rayDir * t;
         CloudDensitySample densitySample = sampleCloudDensity(samplePos, seedOffset, seedValue);
-        float debugDensity = densitySample.finalDensity;
-        if (CloudDebugMode == CLOUD_DEBUG_PRIMARY_MASS) {
-            debugDensity = densitySample.primaryMass;
-        } else if (CloudDebugMode == CLOUD_DEBUG_VERTICAL_ENVELOPE) {
-            debugDensity = densitySample.heightFactor;
-        }
-        float density = scalarDebugMode ? saturate(debugDensity) : densitySample.finalDensity;
+        float density = densitySample.finalDensity;
         maxDensitySample = max(maxDensitySample, density);
         if (density > 0.0005) {
             if (!firstCloudDepthSet && density > 0.018) {
@@ -766,14 +892,12 @@ void main() {
                 firstCloudDepthSet = true;
             }
             float softenedDensity = pow(density, 1.04);
-            float extinction = mix(1.35, 3.10, saturate(deriveEffectiveDensity() * deriveEffectiveCoverage()));
-            extinction *= mix(0.84, 1.14, densitySample.coreFactor);
+            float extinction = mix(0.78, 1.85, saturate(deriveEffectiveDensity() * deriveEffectiveCoverage()));
+            extinction *= mix(0.78, 1.02, densitySample.coreFactor);
             float alpha = 1.0 - exp(-softenedDensity * stepSize * extinction);
             vec3 cloudTint = computeSampleLighting(samplePos, densitySample, rayDir);
             if (CloudDebugMode == CLOUD_DEBUG_UNLIT_NO_LIGHTING) {
                 cloudTint = vec3(0.62);
-            } else if (scalarDebugMode) {
-                cloudTint = vec3(saturate(debugDensity));
             }
             accum += cloudTint * alpha * transmittance;
             transmittance *= (1.0 - alpha);
@@ -802,8 +926,8 @@ void main() {
 
     float opacityBoost = 1.0;
     if (!scalarDebugMode) {
-        opacityBoost = mix(0.92, 1.18, saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier));
-        opacityBoost *= mix(0.78, 1.18, saturate(CloudMaterialOpacityBias * 0.5));
+        opacityBoost = mix(0.74, 1.02, saturate(CloudDensity * CloudCoverage * CloudDensityMultiplier * CloudCoverageMultiplier));
+        opacityBoost *= mix(0.70, 1.04, saturate(CloudMaterialOpacityBias * 0.5));
     }
     gl_FragDepth = WriteDepth != 0 && firstCloudDepthSet ? firstCloudDepth : sceneDepth;
     fragColor = vec4(color, clamp(rawAlpha * opacityBoost, 0.0, 1.0));
