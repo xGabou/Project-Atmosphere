@@ -247,6 +247,16 @@ tasks.named('jar', Jar).configure {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+tasks.register('cloudFieldSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs the standalone CloudField renderer sandbox without launching Minecraft.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.field.CloudFieldSandbox'
+    workingDir = project.rootDir
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs += [

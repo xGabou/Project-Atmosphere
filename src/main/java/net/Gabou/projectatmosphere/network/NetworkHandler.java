@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.field.network.SyncCloudFieldsPacket;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.network.SyncCloudRegionsPacket;
 import net.Gabou.projectatmosphere.network.SyncWindPacket;
@@ -10,7 +11,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class NetworkHandler {
-    private static final String PROTOCOL_VERSION = "6";
+    private static final String PROTOCOL_VERSION = "7";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -85,6 +86,11 @@ public class NetworkHandler {
                 .decoder(SyncCloudRegionsPacket::decode)
                 .encoder(SyncCloudRegionsPacket::encode)
                 .consumerMainThread(SyncCloudRegionsPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncCloudFieldsPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncCloudFieldsPacket::decode)
+                .encoder(SyncCloudFieldsPacket::encode)
+                .consumerMainThread(SyncCloudFieldsPacket::handle)
                 .add();
     }
 }

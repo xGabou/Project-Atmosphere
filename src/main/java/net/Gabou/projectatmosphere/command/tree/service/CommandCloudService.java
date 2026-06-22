@@ -3,6 +3,8 @@ package net.Gabou.projectatmosphere.command.tree.service;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
+import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudGroupSpawner;
@@ -81,6 +83,7 @@ public final class CommandCloudService {
                 return 0;
             }
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
             PaCommandMessages.success(
                     source,
                     true,
@@ -100,6 +103,7 @@ public final class CommandCloudService {
         }
 
         CloudRegionSyncManager.syncPlayer(player);
+        CloudFieldSyncManager.syncPlayer(player);
         PaCommandMessages.success(
                 source,
                 true,
@@ -153,13 +157,36 @@ public final class CommandCloudService {
         ServerLevel level = source.getLevel();
         int storedCount = CloudRegionManager.getInstance().getCloudRegionCount(level);
         int activeRenderDataCount = CloudRegionManager.getInstance().getActiveRenderData(level).size();
+        int activeFieldCount = CloudFieldRuntimeManager.getInstance().ensureCurrent(level).fields().size();
         PaCommandMessages.success(
                 source,
                 false,
                 "Cloud count",
                 "Stored: " + storedCount,
-                "Active render data: " + activeRenderDataCount
+                "Active render data: " + activeRenderDataCount,
+                "Active CloudFields: " + activeFieldCount
         );
+        return 1;
+    }
+
+    public static int sendCloudFieldList(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        List<String> lines = CloudFieldRuntimeManager.getInstance().describeCloudFields(level);
+        if (lines.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: CloudField list\nResult: no active CloudFields"), false);
+            return 1;
+        }
+
+        StringBuilder message = new StringBuilder("[Project Atmosphere]\nAction: CloudField list");
+        message.append("\nActive fields: ").append(lines.size());
+        int limit = Math.min(lines.size(), 8);
+        for (int i = 0; i < limit; i++) {
+            message.append("\n").append(i + 1).append(". ").append(lines.get(i));
+        }
+        if (lines.size() > limit) {
+            message.append("\n... ").append(lines.size() - limit).append(" more");
+        }
+        source.sendSuccess(() -> Component.literal(message.toString()), false);
         return 1;
     }
 
@@ -190,6 +217,7 @@ public final class CommandCloudService {
         ServerPlayer player = source.getPlayer();
         if (player != null) {
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
         }
         PaCommandMessages.success(source, true, "Cloud regions cleared");
         return 1;
@@ -201,6 +229,7 @@ public final class CommandCloudService {
         ServerPlayer player = source.getPlayer();
         if (player != null) {
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
         }
         PaCommandMessages.success(
                 source,
@@ -217,6 +246,7 @@ public final class CommandCloudService {
             return 0;
         }
         CloudRegionSyncManager.syncPlayer(player);
+        CloudFieldSyncManager.syncPlayer(player);
         PaCommandMessages.success(source, false, "Cloud sync sent");
         return 1;
     }
@@ -270,6 +300,7 @@ public final class CommandCloudService {
         ServerPlayer player = source.getPlayer();
         if (player != null) {
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
         }
         return true;
     }

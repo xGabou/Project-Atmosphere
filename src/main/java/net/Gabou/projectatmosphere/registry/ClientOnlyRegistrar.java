@@ -1,9 +1,12 @@
 package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
+import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudDiagnosticsOverlay;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.render.FallbackDarkeningPass;
@@ -32,6 +35,8 @@ public class ClientOnlyRegistrar {
 
     public static void registerClient(IEventBus modEventBus, FMLJavaModLoadingContext context) {
         boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
+        CloudFieldPacketDispatcher.setClientSink(ClientCloudFieldCache::setCurrentSnapshots);
+        CloudFieldPacketDispatcher.setClientSupplier(ClientCloudFieldCache::getCurrentSnapshots);
         CloudRegionPacketDispatcher.setClientSink(ClientCloudRegionDataCache::setCurrentRegions);
         CloudRegionPacketDispatcher.setClientSupplier(ClientCloudRegionDataCache::getCurrentRegions);
         MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
@@ -39,6 +44,7 @@ public class ClientOnlyRegistrar {
         if (!simpleCloudsLoaded) {
             MinecraftForge.EVENT_BUS.register(CloudRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudDebugRenderHook.class);
+            MinecraftForge.EVENT_BUS.register(CloudFieldDebugRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudDiagnosticsOverlay.class);
             MinecraftForge.EVENT_BUS.register(FallbackDarkeningPass.class);
         } else {

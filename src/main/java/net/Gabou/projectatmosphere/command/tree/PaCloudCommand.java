@@ -48,6 +48,8 @@ public final class PaCloudCommand {
                         .executes(ctx -> CommandCloudService.sendCloudList(ctx.getSource())))
                 .then(Commands.literal("count")
                         .executes(ctx -> CommandCloudService.sendCloudCount(ctx.getSource())))
+                .then(Commands.literal("fields")
+                        .executes(ctx -> CommandCloudService.sendCloudFieldList(ctx.getSource())))
                 .then(Commands.literal("clear")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> CommandCloudService.clearClouds(ctx.getSource()))
@@ -76,6 +78,7 @@ public final class PaCloudCommand {
                                     "/pa cloud snowstorm [overwrite]",
                                     "/pa cloud list",
                                     "/pa cloud count",
+                                    "/pa cloud fields",
                                     "/pa cloud clear",
                                     "/pa cloud clear inactive",
                                     "/pa cloud freeze <true|false>",

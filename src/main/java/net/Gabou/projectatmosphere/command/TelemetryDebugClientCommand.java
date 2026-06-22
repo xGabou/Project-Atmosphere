@@ -3,10 +3,12 @@ package net.Gabou.projectatmosphere.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
+import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderFallbackState;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderDebugMode;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
@@ -61,6 +63,7 @@ public class TelemetryDebugClientCommand {
                                 .then(Commands.literal("cloudStatus")
                                         .executes(ctx -> {
                                             int cachedRegions = ClientCloudRegionDataCache.getCurrentRegions().size();
+                                            int cachedFields = ClientCloudFieldCache.getCurrentSnapshots().size();
                                             int currentSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots().size();
                                             int renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots().size();
                                             boolean hasDebugSnapshot = CloudRenderStateHolder.getInstance().hasDebugSnapshot();
@@ -68,6 +71,7 @@ public class TelemetryDebugClientCommand {
 
                                             StringBuilder message = new StringBuilder("Cloud client status")
                                                     .append("\ncacheRegions=").append(cachedRegions)
+                                                    .append("\ncacheCloudFields=").append(cachedFields)
                                                     .append("\ncurrentSnapshots=").append(currentSnapshots)
                                                     .append("\nrenderableLiveSnapshots=").append(renderableSnapshots)
                                                     .append("\ndebugSnapshot=").append(hasDebugSnapshot)
@@ -125,6 +129,7 @@ public class TelemetryDebugClientCommand {
                                         }))
                                 .then(buildWorldSpaceTestCubeCommand())
                                 .then(buildCloudRenderDebugCommand())
+                                .then(buildCloudFieldDebugCommand())
                                 .then(TornadoRenderDebugClientCommand.build())
                         )
         );
@@ -192,6 +197,37 @@ public class TelemetryDebugClientCommand {
         CloudRenderDebugMode mode = CloudRenderDebugMode.current();
         source.sendSuccess(
                 () -> Component.literal("Cloud render debug mode is " + mode.serializedName() + " (" + mode.id() + ")."),
+                false
+        );
+        return 1;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCloudFieldDebugCommand() {
+        return Commands.literal("cloudFieldDebug")
+                .executes(ctx -> sendCloudFieldDebugStatus(ctx.getSource()))
+                .then(Commands.literal("on")
+                        .executes(ctx -> setCloudFieldDebug(ctx.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(ctx -> setCloudFieldDebug(ctx.getSource(), false)))
+                .then(Commands.literal("status")
+                        .executes(ctx -> sendCloudFieldDebugStatus(ctx.getSource())));
+    }
+
+    private static int setCloudFieldDebug(CommandSourceStack source, boolean enabled) {
+        CloudFieldDebugRenderConfig.setEnabled(enabled);
+        source.sendSuccess(
+                () -> Component.literal(enabled
+                        ? "CloudField debug renderer enabled."
+                        : "CloudField debug renderer disabled. It will still show while cloudRenderDebug is active."),
+                false
+        );
+        return 1;
+    }
+
+    private static int sendCloudFieldDebugStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal(CloudFieldDebugRenderConfig.status()
+                        + "\ncachedCloudFields=" + ClientCloudFieldCache.getCurrentSnapshots().size()),
                 false
         );
         return 1;

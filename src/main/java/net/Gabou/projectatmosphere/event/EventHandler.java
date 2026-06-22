@@ -3,6 +3,8 @@ package net.Gabou.projectatmosphere.event;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
+import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
+import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudService;
@@ -61,6 +63,7 @@ public class EventHandler {
         CloudVisualBackend activeBackend = CloudBackendMigrationManager.tick(serverLevel, cloudService);
         if (activeBackend == CloudVisualBackend.PA_NATIVE) {
             CloudRegionManager.getInstance().tickCloudRegions(serverLevel);
+            CloudFieldRuntimeManager.getInstance().tick(serverLevel);
         }
 
         if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
@@ -86,6 +89,7 @@ public class EventHandler {
         AtmosphereStatusSyncManager.syncPlayers(serverLevel);
         if (activeBackend == CloudVisualBackend.PA_NATIVE) {
             CloudRegionSyncManager.syncPlayers(serverLevel);
+            CloudFieldSyncManager.syncPlayers(serverLevel);
         }
         if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
             hasDisplayedMessage = true;
@@ -113,6 +117,7 @@ public class EventHandler {
             AtmosphereStatusSyncManager.syncPlayer(player);
             if (CloudBackendMigrationManager.status(level).currentBackend() == CloudVisualBackend.PA_NATIVE) {
                 CloudRegionSyncManager.syncPlayer(player);
+                CloudFieldSyncManager.syncPlayer(player);
             }
 
         }
