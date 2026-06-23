@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSource;
+
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.UUID;
 public final class CloudFieldStore {
     private final Map<UUID, CloudField> fields = new LinkedHashMap<>();
     private final Map<UUID, CloudFieldRuntimeState> runtimeStates = new LinkedHashMap<>();
+    private final Map<UUID, CloudFieldSource> targetSources = new LinkedHashMap<>();
     private final CloudFieldLifecycleController lifecycleController;
 
     public CloudFieldStore(CloudFieldLifecycleController lifecycleController) {
@@ -38,6 +41,7 @@ public final class CloudFieldStore {
         }
         CloudField removed = fields.remove(fieldId);
         runtimeStates.remove(fieldId);
+        targetSources.remove(fieldId);
         return Optional.ofNullable(removed);
     }
 
@@ -53,6 +57,31 @@ public final class CloudFieldStore {
             return Optional.empty();
         }
         return Optional.ofNullable(runtimeStates.get(fieldId));
+    }
+
+    /**
+     * Stores the latest backend/source target for an existing or newly created
+     * field. The source is read during lifecycle ticks, not during rendering.
+     */
+    public void setTargetSource(UUID fieldId, CloudFieldSource source) {
+        if (fieldId == null) {
+            return;
+        }
+        if (source == null) {
+            targetSources.remove(fieldId);
+            return;
+        }
+        targetSources.put(fieldId, source);
+    }
+
+    /**
+     * Returns the latest backend/source target used to evolve a field.
+     */
+    public Optional<CloudFieldSource> getTargetSource(UUID fieldId) {
+        if (fieldId == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(targetSources.get(fieldId));
     }
 
     public List<CloudField> listActiveFields() {
@@ -76,10 +105,15 @@ public final class CloudFieldStore {
             CloudFieldLifecycleController.TickResult result = lifecycleController.tick(
                     field,
                     runtimeStates.get(field.fieldId()),
-                    context
+                    context,
+                    targetSources.get(field.fieldId())
             );
             fields.put(result.field().fieldId(), result.field());
             runtimeStates.put(result.field().fieldId(), result.runtimeState());
+            if (!result.field().fieldId().equals(field.fieldId())) {
+                CloudFieldSource source = targetSources.remove(field.fieldId());
+                setTargetSource(result.field().fieldId(), source);
+            }
         }
         removeExpiredFields();
     }
@@ -88,6 +122,7 @@ public final class CloudFieldStore {
         int before = fields.size();
         fields.values().removeIf(CloudField::isExpired);
         runtimeStates.keySet().removeIf(fieldId -> !fields.containsKey(fieldId));
+        targetSources.keySet().removeIf(fieldId -> !fields.containsKey(fieldId));
         return before - fields.size();
     }
 

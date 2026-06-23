@@ -1,18 +1,37 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSource;
+
 import java.util.Objects;
 
 /**
- * Owns the neutral field update flow: age, wind movement, LOD classification,
- * and hydration state updates.
+ * Integration point for one CloudField runtime tick. Formation target
+ * resolution and state evolution are delegated to dedicated production classes;
+ * this controller keeps LOD classification and runtime hydration wiring.
  */
 public final class CloudFieldLifecycleController {
     private final CloudFieldDistanceClassifier distanceClassifier;
     private final CloudFieldHydrationController hydrationController;
+    private final CloudFieldTargetResolver targetResolver;
+    private final CloudFieldEvolutionController evolutionController;
 
     public CloudFieldLifecycleController(
             CloudFieldDistanceClassifier distanceClassifier,
             CloudFieldHydrationController hydrationController
+    ) {
+        this(
+                distanceClassifier,
+                hydrationController,
+                CloudFieldTargetResolver.createDefault(),
+                CloudFieldEvolutionController.createDefault()
+        );
+    }
+
+    public CloudFieldLifecycleController(
+            CloudFieldDistanceClassifier distanceClassifier,
+            CloudFieldHydrationController hydrationController,
+            CloudFieldTargetResolver targetResolver,
+            CloudFieldEvolutionController evolutionController
     ) {
         this.distanceClassifier = distanceClassifier == null
                 ? CloudFieldDistanceClassifier.defaultClassifier()
@@ -20,6 +39,12 @@ public final class CloudFieldLifecycleController {
         this.hydrationController = hydrationController == null
                 ? CloudFieldHydrationController.defaultController()
                 : hydrationController;
+        this.targetResolver = targetResolver == null
+                ? CloudFieldTargetResolver.createDefault()
+                : targetResolver;
+        this.evolutionController = evolutionController == null
+                ? CloudFieldEvolutionController.createDefault()
+                : evolutionController;
     }
 
     public static CloudFieldLifecycleController defaultController() {
@@ -30,12 +55,26 @@ public final class CloudFieldLifecycleController {
     }
 
     public TickResult tick(CloudField field, CloudFieldRuntimeState runtimeState, CloudFieldTickContext context) {
+        return tick(field, runtimeState, context, null);
+    }
+
+    /**
+     * Advances a field by resolving its backend/weather target, evolving the
+     * persistent state, then refreshing LOD hydration runtime state.
+     */
+    public TickResult tick(
+            CloudField field,
+            CloudFieldRuntimeState runtimeState,
+            CloudFieldTickContext context,
+            CloudFieldSource source
+    ) {
         Objects.requireNonNull(field, "field");
         CloudFieldTickContext tickContext = context == null
                 ? CloudFieldTickContext.of(field.center(), 0L, 0.0F)
                 : context;
 
-        CloudField advancedField = field.movedByWind(tickContext.deltaTicks());
+        CloudFieldTarget target = targetResolver.resolve(field, source);
+        CloudField advancedField = evolutionController.evolve(field, target, tickContext);
         CloudFieldDistanceClassifier classifier = tickContext.distanceClassifier() == null
                 ? distanceClassifier
                 : tickContext.distanceClassifier();
@@ -61,6 +100,22 @@ public final class CloudFieldLifecycleController {
 
     public CloudFieldHydrationController hydrationController() {
         return hydrationController;
+    }
+
+    /**
+     * Returns the resolver that converts backend source data into evolution
+     * targets for this lifecycle controller.
+     */
+    public CloudFieldTargetResolver targetResolver() {
+        return targetResolver;
+    }
+
+    /**
+     * Returns the controller that evolves persistent CloudField state toward
+     * resolved targets.
+     */
+    public CloudFieldEvolutionController evolutionController() {
+        return evolutionController;
     }
 
     public record TickResult(

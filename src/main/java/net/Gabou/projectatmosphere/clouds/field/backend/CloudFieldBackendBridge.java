@@ -5,8 +5,10 @@ import net.Gabou.projectatmosphere.clouds.field.CloudFieldStore;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -50,7 +52,14 @@ public final class CloudFieldBackendBridge {
             boolean removeMissingSourceFields
     ) {
         Objects.requireNonNull(store, "store");
-        List<CloudFieldUpdatePlan> plans = planUpdates(store, snapshot);
+        CloudFieldSourceSnapshot sourceSnapshot = snapshot == null
+                ? CloudFieldSourceSnapshot.of(List.of(), 0L, "", "empty")
+                : snapshot;
+        List<CloudFieldUpdatePlan> plans = planUpdates(store, sourceSnapshot);
+        Map<UUID, CloudFieldSource> sourceByFieldId = new HashMap<>();
+        for (CloudFieldSource source : sourceSnapshot.sources()) {
+            sourceByFieldId.put(factory.fieldIdFor(source), source);
+        }
         Set<UUID> sourceFieldIds = new HashSet<>();
         int created = 0;
         int updated = 0;
@@ -74,12 +83,13 @@ public final class CloudFieldBackendBridge {
             }
             if (plan.createNewField()) {
                 created++;
+                store.addField(desired);
             } else if (plan.hasFieldChanges()) {
                 updated++;
             } else {
                 unchanged++;
             }
-            store.addField(desired);
+            store.setTargetSource(plan.fieldId(), sourceByFieldId.get(plan.fieldId()));
         }
 
         if (removeMissingSourceFields) {
