@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSourceType;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,20 @@ public final class CloudFieldSnapshotFactory {
             CloudField field,
             CloudFieldRuntimeState runtimeState,
             CloudFieldTickContext context
+    ) {
+        return create(field, runtimeState, context, CloudFieldSourceKind.UNKNOWN);
+    }
+
+    /**
+     * Creates a render-safe snapshot and stamps source-kind metadata for client
+     * debug filtering/coloring. The source kind is metadata only; it does not
+     * change field evolution.
+     */
+    public CloudFieldSnapshot create(
+            CloudField field,
+            CloudFieldRuntimeState runtimeState,
+            CloudFieldTickContext context,
+            CloudFieldSourceKind sourceKind
     ) {
         Objects.requireNonNull(field, "field");
         CloudFieldTickContext tickContext = context == null
@@ -41,6 +57,7 @@ public final class CloudFieldSnapshotFactory {
                 field.windVector(),
                 field.verticalDevelopment(),
                 field.stormPotential(),
+                sourceKind,
                 state.currentLodBand(),
                 state.previousLodBand(),
                 state.hydrationState(),
@@ -60,6 +77,19 @@ public final class CloudFieldSnapshotFactory {
             Map<UUID, CloudFieldRuntimeState> runtimeStates,
             CloudFieldTickContext context
     ) {
+        return createRendererInput(fields, runtimeStates, Map.of(), context);
+    }
+
+    /**
+     * Creates renderer input for active fields while preserving source-kind
+     * metadata from the server store into each snapshot.
+     */
+    public CloudFieldRendererInput createRendererInput(
+            Collection<CloudField> fields,
+            Map<UUID, CloudFieldRuntimeState> runtimeStates,
+            Map<UUID, CloudFieldSourceType> sourceTypes,
+            CloudFieldTickContext context
+    ) {
         CloudFieldTickContext tickContext = context == null
                 ? CloudFieldTickContext.of(null, 0L, 0.0F)
                 : context;
@@ -75,7 +105,8 @@ public final class CloudFieldSnapshotFactory {
                 .map(field -> create(
                         field,
                         runtimeStates == null ? null : runtimeStates.get(field.fieldId()),
-                        tickContext
+                        tickContext,
+                        CloudFieldSourceKind.fromSourceType(sourceTypes == null ? null : sourceTypes.get(field.fieldId()))
                 ))
                 .toList();
         return new CloudFieldRendererInput(

@@ -6,6 +6,7 @@ import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderHook;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudDiagnosticsOverlay;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
@@ -44,7 +45,11 @@ public class ClientOnlyRegistrar {
         if (!simpleCloudsLoaded) {
             MinecraftForge.EVENT_BUS.register(CloudRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudDebugRenderHook.class);
+            // CloudFieldVolumeRenderHook is the active experimental GLSL CloudField renderer.
+            // CloudFieldDebugRenderHook remains registered only for explicit legacy diagnostics
+            // and is off by default so one CloudField visual path draws unless requested.
             MinecraftForge.EVENT_BUS.register(CloudFieldDebugRenderHook.class);
+            MinecraftForge.EVENT_BUS.register(CloudFieldVolumeRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudDiagnosticsOverlay.class);
             MinecraftForge.EVENT_BUS.register(FallbackDarkeningPass.class);
         } else {

@@ -68,12 +68,26 @@ public final class CloudFieldLifecycleController {
             CloudFieldTickContext context,
             CloudFieldSource source
     ) {
+        return tick(field, runtimeState, context, source, 0);
+    }
+
+    /**
+     * Advances a field with source staleness context. Missing source ticks add
+     * decay pressure but do not remove the persistent field immediately.
+     */
+    public TickResult tick(
+            CloudField field,
+            CloudFieldRuntimeState runtimeState,
+            CloudFieldTickContext context,
+            CloudFieldSource source,
+            int missingSourceTicks
+    ) {
         Objects.requireNonNull(field, "field");
         CloudFieldTickContext tickContext = context == null
                 ? CloudFieldTickContext.of(field.center(), 0L, 0.0F)
                 : context;
 
-        CloudFieldTarget target = targetResolver.resolve(field, source);
+        CloudFieldTarget target = targetResolver.resolve(field, source, missingSourceTicks);
         CloudField advancedField = evolutionController.evolve(field, target, tickContext);
         CloudFieldDistanceClassifier classifier = tickContext.distanceClassifier() == null
                 ? distanceClassifier

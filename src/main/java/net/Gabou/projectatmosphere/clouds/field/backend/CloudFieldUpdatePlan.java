@@ -95,6 +95,41 @@ public record CloudFieldUpdatePlan(
         );
     }
 
+    /**
+     * Describes a source retarget/rebind for an existing persistent field. The
+     * field identity is preserved; lifecycle evolution will move it toward the
+     * new source target.
+     */
+    public static CloudFieldUpdatePlan retarget(
+            CloudField existing,
+            CloudFieldSource source,
+            CloudFieldFactory factory
+    ) {
+        Objects.requireNonNull(existing, "existing");
+        Objects.requireNonNull(source, "source");
+        CloudFieldFactory fieldFactory = factory == null ? new CloudFieldFactory() : factory;
+        return new CloudFieldUpdatePlan(
+                source.sourceId(),
+                source.sourceType(),
+                existing.fieldId(),
+                false,
+                false,
+                false,
+                !sameVec(existing.center(), source.center()),
+                !sameFloat(existing.radius(), source.radius()),
+                !sameFloat(existing.baseY(), source.baseY()) || !sameFloat(existing.topY(), source.topY()),
+                !sameVec(existing.windVector(), source.wind()),
+                !sameFloat(existing.density(), source.density()),
+                !sameFloat(existing.coverage(), source.coverage()),
+                !sameFloat(existing.growth(), source.growth()),
+                !sameFloat(existing.decay(), source.decay()),
+                !sameFloat(existing.verticalDevelopment(), source.verticalDevelopment()),
+                !sameFloat(existing.stormPotential(), source.stormPotential()),
+                existing.cloudletCount() != fieldFactory.cloudletCountFor(source),
+                existing
+        );
+    }
+
     public static CloudFieldUpdatePlan removal(CloudFieldSource source, UUID fieldId, boolean existingFieldPresent) {
         return new CloudFieldUpdatePlan(
                 source == null ? "" : source.sourceId(),

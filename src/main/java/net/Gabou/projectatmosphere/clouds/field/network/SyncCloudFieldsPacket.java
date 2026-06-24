@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.field.network;
 
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldHydrationState;
+import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.CloudLodBand;
 import net.minecraft.network.FriendlyByteBuf;
@@ -21,6 +22,9 @@ import java.util.function.Supplier;
  * and cloudlet id.
  */
 public final class SyncCloudFieldsPacket {
+    private static final int VERSION_MARKER = -1;
+    private static final int VERSION_SOURCE_KIND = 2;
+
     private final List<CloudFieldSnapshot> fields;
 
     public SyncCloudFieldsPacket(Collection<CloudFieldSnapshot> fields) {
@@ -28,10 +32,16 @@ public final class SyncCloudFieldsPacket {
     }
 
     public SyncCloudFieldsPacket(FriendlyByteBuf buffer) {
-        int count = buffer.readVarInt();
+        int first = buffer.readVarInt();
+        int version = 1;
+        int count = first;
+        if (first == VERSION_MARKER) {
+            version = buffer.readVarInt();
+            count = buffer.readVarInt();
+        }
         List<CloudFieldSnapshot> decoded = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            decoded.add(decodeSnapshot(buffer));
+            decoded.add(decodeSnapshot(buffer, version));
         }
         this.fields = List.copyOf(decoded);
     }
@@ -41,6 +51,8 @@ public final class SyncCloudFieldsPacket {
     }
 
     public void encode(FriendlyByteBuf buffer) {
+        buffer.writeVarInt(VERSION_MARKER);
+        buffer.writeVarInt(VERSION_SOURCE_KIND);
         buffer.writeVarInt(fields.size());
         for (CloudFieldSnapshot snapshot : fields) {
             encodeSnapshot(buffer, snapshot);
@@ -76,6 +88,7 @@ public final class SyncCloudFieldsPacket {
         writeVec(buffer, snapshot.windVector());
         buffer.writeFloat(snapshot.verticalDevelopment());
         buffer.writeFloat(snapshot.stormPotential());
+        buffer.writeEnum(snapshot.sourceKind());
         buffer.writeEnum(snapshot.lodBand());
         buffer.writeEnum(snapshot.previousLodBand());
         buffer.writeEnum(snapshot.hydrationState());
@@ -87,7 +100,7 @@ public final class SyncCloudFieldsPacket {
         buffer.writeLong(snapshot.worldTime());
     }
 
-    private static CloudFieldSnapshot decodeSnapshot(FriendlyByteBuf buffer) {
+    private static CloudFieldSnapshot decodeSnapshot(FriendlyByteBuf buffer, int version) {
         UUID fieldId = buffer.readUUID();
         long seed = buffer.readLong();
         String dimensionId = buffer.readUtf();
@@ -104,6 +117,9 @@ public final class SyncCloudFieldsPacket {
         Vec3 wind = readVec(buffer);
         float verticalDevelopment = buffer.readFloat();
         float stormPotential = buffer.readFloat();
+        CloudFieldSourceKind sourceKind = version >= VERSION_SOURCE_KIND
+                ? buffer.readEnum(CloudFieldSourceKind.class)
+                : CloudFieldSourceKind.UNKNOWN;
         CloudLodBand lodBand = buffer.readEnum(CloudLodBand.class);
         CloudLodBand previousLodBand = buffer.readEnum(CloudLodBand.class);
         CloudFieldHydrationState hydrationState = buffer.readEnum(CloudFieldHydrationState.class);
@@ -131,6 +147,7 @@ public final class SyncCloudFieldsPacket {
                 wind,
                 verticalDevelopment,
                 stormPotential,
+                sourceKind,
                 lodBand,
                 previousLodBand,
                 hydrationState,

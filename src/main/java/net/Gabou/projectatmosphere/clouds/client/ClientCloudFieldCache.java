@@ -105,6 +105,7 @@ public final class ClientCloudFieldCache {
                 snapshot.windVector(),
                 snapshot.verticalDevelopment(),
                 snapshot.stormPotential(),
+                snapshot.sourceKind(),
                 runtime.currentLodBand(),
                 runtime.previousLodBand(),
                 runtime.hydrationState(),

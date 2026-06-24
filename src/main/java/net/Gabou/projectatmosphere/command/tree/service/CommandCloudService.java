@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.command.tree.service;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldBackendBridge;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
 import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
@@ -187,6 +188,97 @@ public final class CommandCloudService {
             message.append("\n... ").append(lines.size() - limit).append(" more");
         }
         source.sendSuccess(() -> Component.literal(message.toString()), false);
+        return 1;
+    }
+
+    /**
+     * Sends a debug-only comparison of persistent CloudField state against the
+     * resolved evolution target.
+     */
+    public static int sendCloudFieldEvolution(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        List<String> lines = CloudFieldRuntimeManager.getInstance().describeCloudFieldEvolution(level);
+        if (lines.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: CloudField evolution\nResult: no active CloudFields"), false);
+            return 1;
+        }
+
+        StringBuilder message = new StringBuilder("[Project Atmosphere]\nAction: CloudField evolution");
+        message.append("\nActive fields: ").append(lines.size());
+        int limit = Math.min(lines.size(), 5);
+        for (int i = 0; i < limit; i++) {
+            message.append("\n").append(i + 1).append(". ").append(lines.get(i));
+        }
+        if (lines.size() > limit) {
+            message.append("\n... ").append(lines.size() - limit).append(" more");
+        }
+        source.sendSuccess(() -> Component.literal(message.toString()), false);
+        return 1;
+    }
+
+    /**
+     * Sends debug-only CloudField source/apply/removal stats from the latest
+     * runtime tick.
+     */
+    public static int sendCloudFieldStats(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        List<String> lines = CloudFieldRuntimeManager.getInstance().describeCloudFieldStats(level);
+        StringBuilder message = new StringBuilder("[Project Atmosphere]\nAction: CloudField stats");
+        int limit = Math.min(lines.size(), 12);
+        for (int i = 0; i < limit; i++) {
+            message.append("\n").append(lines.get(i));
+        }
+        if (lines.size() > limit) {
+            message.append("\n... ").append(lines.size() - limit).append(" more");
+        }
+        source.sendSuccess(() -> Component.literal(message.toString()), false);
+        return 1;
+    }
+
+    /**
+     * Spawns one server-side debug CloudField through the production field
+     * bridge/store path without creating a PA cloud region.
+     */
+    public static int spawnDebugCloudField(CommandSourceStack source) {
+        ServerPlayer player = PaCommandSupport.requirePlayer(source, "CloudField debug spawn is only available to players.");
+        if (player == null) {
+            return 0;
+        }
+
+        CloudFieldBackendBridge.ApplyResult result =
+                CloudFieldRuntimeManager.getInstance().spawnDebugField(player);
+        CloudFieldSyncManager.syncPlayer(player);
+        PaCommandMessages.success(
+                source,
+                true,
+                "Debug CloudField spawned",
+                "Created: " + result.created(),
+                "Updated: " + result.updated(),
+                "Rebound: " + result.reboundSourceFields(),
+                "Duplicates skipped: " + result.duplicateSourcesSkipped(),
+                "Lifetime: 12000 ticks"
+        );
+        return 1;
+    }
+
+    /**
+     * Clears server-side CloudField runtime state only. Backend PA cloud
+     * regions are left intact and can recreate fields on the next runtime tick.
+     */
+    public static int clearCloudFields(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        int removed = CloudFieldRuntimeManager.getInstance().clearRuntimeFields(level);
+        ServerPlayer player = source.getPlayer();
+        if (player != null) {
+            CloudFieldSyncManager.syncPlayer(player);
+        }
+        PaCommandMessages.success(
+                source,
+                true,
+                "CloudFields cleared",
+                "Removed runtime fields: " + removed,
+                "Backend cloud regions were not removed"
+        );
         return 1;
     }
 

@@ -25,6 +25,7 @@ public record CloudFieldSnapshot(
         Vec3 windVector,
         float verticalDevelopment,
         float stormPotential,
+        CloudFieldSourceKind sourceKind,
         CloudLodBand lodBand,
         CloudLodBand previousLodBand,
         CloudFieldHydrationState hydrationState,
@@ -52,6 +53,7 @@ public record CloudFieldSnapshot(
         windVector = windVector == null ? Vec3.ZERO : windVector;
         verticalDevelopment = clamp01(verticalDevelopment);
         stormPotential = clamp01(stormPotential);
+        sourceKind = sourceKind == null ? CloudFieldSourceKind.UNKNOWN : sourceKind;
         lodBand = lodBand == null ? CloudLodBand.DYNAMIC : lodBand;
         previousLodBand = previousLodBand == null ? lodBand : previousLodBand;
         hydrationState = hydrationState == null ? CloudFieldHydrationState.NOT_HYDRATED : hydrationState;

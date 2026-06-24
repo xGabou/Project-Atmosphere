@@ -49,7 +49,19 @@ public final class PaCloudCommand {
                 .then(Commands.literal("count")
                         .executes(ctx -> CommandCloudService.sendCloudCount(ctx.getSource())))
                 .then(Commands.literal("fields")
-                        .executes(ctx -> CommandCloudService.sendCloudFieldList(ctx.getSource())))
+                        .executes(ctx -> CommandCloudService.sendCloudFieldList(ctx.getSource()))
+                        .then(Commands.literal("list")
+                                .executes(ctx -> CommandCloudService.sendCloudFieldList(ctx.getSource())))
+                        .then(Commands.literal("evolution")
+                                .executes(ctx -> CommandCloudService.sendCloudFieldEvolution(ctx.getSource())))
+                        .then(Commands.literal("stats")
+                                .executes(ctx -> CommandCloudService.sendCloudFieldStats(ctx.getSource())))
+                        .then(Commands.literal("spawn")
+                                .requires(source -> source.hasPermission(2))
+                                .executes(ctx -> CommandCloudService.spawnDebugCloudField(ctx.getSource())))
+                        .then(Commands.literal("clear")
+                                .requires(source -> source.hasPermission(2))
+                                .executes(ctx -> CommandCloudService.clearCloudFields(ctx.getSource()))))
                 .then(Commands.literal("clear")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> CommandCloudService.clearClouds(ctx.getSource()))
@@ -79,6 +91,11 @@ public final class PaCloudCommand {
                                     "/pa cloud list",
                                     "/pa cloud count",
                                     "/pa cloud fields",
+                                    "/pa cloud fields list",
+                                    "/pa cloud fields evolution",
+                                    "/pa cloud fields stats",
+                                    "/pa cloud fields spawn",
+                                    "/pa cloud fields clear",
                                     "/pa cloud clear",
                                     "/pa cloud clear inactive",
                                     "/pa cloud freeze <true|false>",

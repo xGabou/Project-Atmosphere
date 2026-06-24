@@ -1,0 +1,50 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "srcalpha",
+    "dstrgb": "1-srcalpha"
+  },
+  "vertex": "projectatmosphere:cloud_field_volume",
+  "fragment": "projectatmosphere:cloud_field_volume",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [],
+  "uniforms": [
+    { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "VolumeMin", "type": "float", "count": 3, "values": [ -64.0, 0.0, -64.0 ] },
+    { "name": "VolumeMax", "type": "float", "count": 3, "values": [ 64.0, 64.0, 64.0 ] },
+    { "name": "CameraPos", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "FieldCenter", "type": "float", "count": 3, "values": [ 0.0, 96.0, 0.0 ] },
+    { "name": "FieldRadius", "type": "float", "count": 1, "values": [ 120.0 ] },
+    { "name": "FieldBaseY", "type": "float", "count": 1, "values": [ 80.0 ] },
+    { "name": "FieldTopY", "type": "float", "count": 1, "values": [ 160.0 ] },
+    { "name": "FieldDensity", "type": "float", "count": 1, "values": [ 0.8 ] },
+    { "name": "FieldCoverage", "type": "float", "count": 1, "values": [ 0.75 ] },
+    { "name": "FieldHydration", "type": "float", "count": 1, "values": [ 0.8 ] },
+    { "name": "FieldGrowth", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "FieldDecay", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "FieldHumidityInfluence", "type": "float", "count": 1, "values": [ 0.75 ] },
+    { "name": "FieldWind", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "FieldVerticalDevelopment", "type": "float", "count": 1, "values": [ 0.35 ] },
+    { "name": "FieldStormPotential", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "FieldAgeTicks", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "FieldLifetimeTicks", "type": "float", "count": 1, "values": [ 12000.0 ] },
+    { "name": "FieldSeed", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "FieldCloudletCount", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "FieldSourceKind", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "AnimationTime", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "DebugMode", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "TuneOpacityStrength", "type": "float", "count": 1, "values": [ 0.42 ] },
+    { "name": "TuneDensityThreshold", "type": "float", "count": 1, "values": [ 0.0012 ] },
+    { "name": "TuneMaxFinalAlpha", "type": "float", "count": 1, "values": [ 0.95 ] },
+    { "name": "TuneNoiseStrength", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "TuneErosionStrength", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "TuneBrightness", "type": "float", "count": 1, "values": [ 1.08 ] },
+    { "name": "TuneUndersideDarkening", "type": "float", "count": 1, "values": [ 0.34 ] },
+    { "name": "TuneDensityBoost", "type": "float", "count": 1, "values": [ 2.0 ] },
+    { "name": "TuneAnimSpeed", "type": "float", "count": 1, "values": [ 0.015 ] }
+  ]
+}
