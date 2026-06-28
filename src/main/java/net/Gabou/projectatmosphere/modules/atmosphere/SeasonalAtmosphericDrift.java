@@ -2,10 +2,12 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.seasons.SeasonClimateProfile;
+import net.Gabou.projectatmosphere.seasons.SeasonMoistureStage;
 import net.Gabou.projectatmosphere.seasons.SeasonSnapshot;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
@@ -106,6 +108,8 @@ public final class SeasonalAtmosphericDrift {
         tag.putString("Stage", currentSnapshot.stage().name());
         tag.putFloat("Progress", currentSnapshot.progress());
         tag.putFloat("SnapshotTemperatureOffset", currentSnapshot.temperatureOffset());
+        tag.putString("MoistureStage", currentSnapshot.moistureStage().name());
+        tag.putFloat("MoistureProgress", currentSnapshot.moistureProgress());
         tag.putLong("LastTick", lastTick);
         tag.putLong("LastTransitionGameTime", lastTransitionGameTime);
         tag.put("Modifier", currentModifier.save());
@@ -122,7 +126,9 @@ public final class SeasonalAtmosphericDrift {
         SeasonStage stage = parseStage(tag.getString("Stage"));
         float progress = Mth.clamp(tag.getFloat("Progress"), 0f, 1f);
         float temperatureOffset = tag.getFloat("SnapshotTemperatureOffset");
-        currentSnapshot = new SeasonSnapshot(providerId, stage, progress, temperatureOffset);
+        SeasonMoistureStage moistureStage = parseMoistureStage(tag.getString("MoistureStage"));
+        float moistureProgress = Mth.clamp(tag.getFloat("MoistureProgress"), 0f, 1f);
+        currentSnapshot = new SeasonSnapshot(providerId, stage, progress, temperatureOffset, moistureStage, moistureProgress);
         currentModifier = tag.contains("Modifier", Tag.TAG_COMPOUND)
                 ? SeasonalModifier.load(tag.getCompound("Modifier"))
                 : SeasonalModifier.forSnapshot(currentSnapshot);
@@ -138,9 +144,11 @@ public final class SeasonalAtmosphericDrift {
         lastTransitionGameTime = gameTime;
         if (logTransition && !sameSeasonIdentity(previous, currentSnapshot)) {
             ProjectAtmosphere.LOGGER.info(
-                    "[Atmosphere] Seasonal drift target changed: {} -> {} via provider {}.",
+                    "[Atmosphere] Seasonal drift target changed: {}/{} -> {}/{} via provider {}.",
                     previous.stage(),
+                    previous.moistureStage(),
                     currentSnapshot.stage(),
+                    currentSnapshot.moistureStage(),
                     currentSnapshot.providerId()
             );
         }
@@ -157,7 +165,8 @@ public final class SeasonalAtmosphericDrift {
                 continue;
             }
             boolean activeRegion = active.contains(state.getRegionId());
-            applyToState(state, modifier, dayTime, activeRegion);
+            SeasonSnapshot regionalSnapshot = safeSnapshot(level, state.getPosition());
+            applyToState(state, SeasonalModifier.forSnapshot(regionalSnapshot), dayTime, activeRegion);
         }
     }
 
@@ -211,11 +220,18 @@ public final class SeasonalAtmosphericDrift {
         return snapshot == null ? SeasonSnapshot.neutral() : snapshot;
     }
 
+    private static SeasonSnapshot safeSnapshot(ServerLevel level, BlockPos pos) {
+        SeasonSnapshot snapshot = SeasonTimeHelper.snapshot(level, pos);
+        return snapshot == null ? SeasonSnapshot.neutral() : snapshot;
+    }
+
     private static boolean sameSeasonIdentity(SeasonSnapshot a, SeasonSnapshot b) {
         if (a == null || b == null) {
             return false;
         }
-        return a.stage() == b.stage() && Objects.equals(a.providerId(), b.providerId());
+        return a.stage() == b.stage()
+                && a.moistureStage() == b.moistureStage()
+                && Objects.equals(a.providerId(), b.providerId());
     }
 
     private static ResourceLocation parseProvider(String value) {
@@ -241,6 +257,16 @@ public final class SeasonalAtmosphericDrift {
         return SeasonStage.NEUTRAL;
     }
 
+    private static SeasonMoistureStage parseMoistureStage(String value) {
+        try {
+            if (value != null && !value.isBlank()) {
+                return SeasonMoistureStage.valueOf(value);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return SeasonMoistureStage.NEUTRAL;
+    }
+
     private record SeasonalModifier(
             SeasonStage stage,
             float temperatureOffsetC,
@@ -261,13 +287,39 @@ public final class SeasonalAtmosphericDrift {
             float strength = stage == SeasonStage.NEUTRAL
                     ? 0f
                     : SeasonClimateProfile.seasonalStrength(progress);
-            return switch (stage) {
+            SeasonalModifier seasonal = switch (stage) {
                 case SPRING -> scale(new SeasonalModifier(stage, 0f, 1.05f, 0.03f, -0.2f, 0.36f, 0.04f, 0.95f), strength);
                 case SUMMER -> scale(new SeasonalModifier(stage, 0f, 1.08f, 0.04f, -1.2f, 0.42f, 0.08f, 1.08f), strength);
                 case AUTUMN -> scale(new SeasonalModifier(stage, 0f, 0.96f, -0.02f, 0.6f, 0.30f, -0.02f, 0.88f), strength);
                 case WINTER -> scale(new SeasonalModifier(stage, 0f, 0.82f, -0.06f, 1.5f, 0.22f, -0.06f, 0.72f), strength);
                 case NEUTRAL -> neutral();
             };
+            return applyMoisture(seasonal, snapshot);
+        }
+
+        private static SeasonalModifier applyMoisture(SeasonalModifier seasonal, SeasonSnapshot snapshot) {
+            if (snapshot == null || snapshot.moistureStage() == SeasonMoistureStage.NEUTRAL) {
+                return seasonal;
+            }
+            float strength = SeasonClimateProfile.seasonalStrength(Mth.clamp(snapshot.moistureProgress(), 0f, 1f));
+            SeasonalModifier moisture = switch (snapshot.moistureStage()) {
+                case WET -> scale(new SeasonalModifier(seasonal.stage(), 0f, 1.14f, 0.08f, -0.8f, 0.50f, 0.12f, seasonal.sunlightMultiplier()), strength);
+                case DRY -> scale(new SeasonalModifier(seasonal.stage(), 0f, 0.78f, -0.10f, 0.8f, 0.18f, -0.10f, seasonal.sunlightMultiplier()), strength);
+                case NEUTRAL -> neutral();
+            };
+            float cloudWaterCapacity = snapshot.moistureStage() == SeasonMoistureStage.WET
+                    ? Math.max(seasonal.cloudWaterCapacity(), moisture.cloudWaterCapacity())
+                    : Math.min(seasonal.cloudWaterCapacity(), moisture.cloudWaterCapacity());
+            return new SeasonalModifier(
+                    seasonal.stage(),
+                    seasonal.temperatureOffsetC(),
+                    seasonal.humidityMultiplier() * moisture.humidityMultiplier(),
+                    seasonal.humidityOffset() + moisture.humidityOffset(),
+                    seasonal.pressureOffsetHpa() + moisture.pressureOffsetHpa(),
+                    cloudWaterCapacity,
+                    seasonal.cloudWaterBias() + moisture.cloudWaterBias(),
+                    seasonal.sunlightMultiplier()
+            );
         }
 
         static SeasonalModifier scale(SeasonalModifier base, float strength) {

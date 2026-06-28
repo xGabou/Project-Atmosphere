@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.client.render.field;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -7,7 +8,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
 /**
- * Uploads one synced CloudField snapshot to the prototype volume shader.
+ * Uploads one synced CloudField snapshot to the bounded volume shader.
  */
 public final class CloudFieldVolumeUniformUploader {
     private CloudFieldVolumeUniformUploader() {
@@ -29,10 +30,23 @@ public final class CloudFieldVolumeUniformUploader {
             CloudFieldSnapshot snapshot,
             CloudFieldVolumeRenderer.Bounds bounds,
             Matrix4f modelViewMat,
-            Matrix4f projectionMat
+            Matrix4f projectionMat,
+            RenderTarget outputTarget,
+            int sceneDepthTextureId,
+            int raymarchSteps,
+            boolean useSceneDepth
     ) {
         shader.safeGetUniform("ModelViewMat").set(modelViewMat);
         shader.safeGetUniform("ProjMat").set(projectionMat);
+        shader.safeGetUniform("InvModelViewMat").set(new Matrix4f(modelViewMat).invert());
+        shader.safeGetUniform("InvProjMat").set(new Matrix4f(projectionMat).invert());
+        if (outputTarget != null) {
+            shader.safeGetUniform("OutputSize").set((float) outputTarget.width, (float) outputTarget.height);
+        } else {
+            shader.safeGetUniform("OutputSize").set(1.0F, 1.0F);
+        }
+        shader.setSampler("SceneDepthSampler", Math.max(0, sceneDepthTextureId));
+        shader.safeGetUniform("UseSceneDepth").set(useSceneDepth ? 1 : 0);
 
         Vec3 min = bounds.min();
         Vec3 max = bounds.max();
@@ -64,6 +78,8 @@ public final class CloudFieldVolumeUniformUploader {
 
         shader.safeGetUniform("FieldSourceKind").set(snapshot.sourceKind().shaderId());
         shader.safeGetUniform("AnimationTime").set((input.worldTime() + input.partialTick()) * 0.05F);
+        shader.safeGetUniform("RaymarchSteps").set(Math.max(4, raymarchSteps));
+        shader.safeGetUniform("DetailOctaves").set(CloudFieldVolumeRenderConfig.detailOctaves());
         shader.safeGetUniform("DebugMode").set(CloudFieldVolumeRenderConfig.mode().shaderId());
         shader.safeGetUniform("TuneOpacityStrength").set(CloudFieldVolumeRenderConfig.opacityStrength());
         shader.safeGetUniform("TuneDensityThreshold").set(CloudFieldVolumeRenderConfig.densityThreshold());

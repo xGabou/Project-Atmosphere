@@ -24,10 +24,11 @@ public class AtmoCommonConfig {
     }
 
     public enum CloudRaymarchQuality {
-        LOW("LOW", 16, 0.50F, 0.82F, 1.05F, 0.72F, 0.60F, 0.16F),
-        LOW_24("LOW 24", 24, 0.50F, 0.78F, 0.98F, 0.66F, 0.56F, 0.14F),
-        MEDIUM("MEDIUM", 32, 0.75F, 0.70F, 0.85F, 0.55F, 0.85F, 0.30F),
-        HIGH("HIGH", 64, 1.00F, 0.55F, 0.45F, 0.30F, 0.70F, 0.55F);
+        LOW("LOW", 16, 0.50F, 0.82F, 1.05F, 0.72F, 0.60F, 0.16F, 4, 2),
+        LOW_24("LOW 24", 24, 0.60F, 0.78F, 0.98F, 0.66F, 0.56F, 0.14F, 6, 2),
+        MEDIUM("MEDIUM", 32, 0.75F, 0.70F, 0.85F, 0.55F, 0.85F, 0.30F, 8, 3),
+        HIGH("HIGH", 48, 0.85F, 0.62F, 0.65F, 0.42F, 0.78F, 0.42F, 12, 4),
+        ULTRA("ULTRA", 64, 1.00F, 0.55F, 0.45F, 0.30F, 0.70F, 0.55F, 16, 4);
 
         private final String displayName;
         private final int raymarchSteps;
@@ -37,6 +38,8 @@ public class AtmoCommonConfig {
         private final float compositeBlurStrength;
         private final float rayJitterStrength;
         private final float rayJitterTemporalStrength;
+        private final int maxCloudFields;
+        private final int detailOctaves;
 
         CloudRaymarchQuality(
                 String displayName,
@@ -46,7 +49,9 @@ public class AtmoCommonConfig {
                 float compositeBlurRadius,
                 float compositeBlurStrength,
                 float rayJitterStrength,
-                float rayJitterTemporalStrength
+                float rayJitterTemporalStrength,
+                int maxCloudFields,
+                int detailOctaves
         ) {
             this.displayName = displayName;
             this.raymarchSteps = raymarchSteps;
@@ -56,6 +61,8 @@ public class AtmoCommonConfig {
             this.compositeBlurStrength = compositeBlurStrength;
             this.rayJitterStrength = rayJitterStrength;
             this.rayJitterTemporalStrength = rayJitterTemporalStrength;
+            this.maxCloudFields = maxCloudFields;
+            this.detailOctaves = detailOctaves;
         }
 
         /**
@@ -95,6 +102,14 @@ public class AtmoCommonConfig {
             return rayJitterTemporalStrength;
         }
 
+        public int getMaxCloudFields() {
+            return maxCloudFields;
+        }
+
+        public int getDetailOctaves() {
+            return detailOctaves;
+        }
+
         /**
          * Retourne la qualite suivante pour les boutons cyclables.
          *
@@ -119,6 +134,7 @@ public class AtmoCommonConfig {
 
     public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ForgeConfigSpec.EnumValue<CloudRaymarchQuality> CLOUD_RAYMARCH_QUALITY;
+    public static final ForgeConfigSpec.BooleanValue CLOUD_FIELD_RENDERER_ENABLED;
     public static final ForgeConfigSpec.IntValue NATIVE_CLOUD_SPAWN_HEIGHT;
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
@@ -265,8 +281,11 @@ public class AtmoCommonConfig {
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
         CLOUD_RAYMARCH_QUALITY = builder
-                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes a 50%, LOW 24=24 etapes a 50%, MEDIUM=32 etapes a 75%, HIGH=64 etapes a 100%")
+                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes a 50%, LOW 24=24 etapes a 60%, MEDIUM=32 etapes a 75%, HIGH=48 etapes a 85%, ULTRA=64 etapes a 100%")
                 .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
+        CLOUD_FIELD_RENDERER_ENABLED = builder
+                .comment("Enable the Project Atmosphere CloudField volume renderer when Simple Clouds is not installed. Disable this as a persistent kill switch to fall back to vanilla clouds.")
+                .define("cloudFieldRendererEnabled", true);
         builder.pop();
 
         builder.push("clouds");

@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.Gabou.projectatmosphere.clouds.client.render.CustomPrecipitationRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -34,7 +35,8 @@ public class MixinLevelRenderer {
 
     @Inject(method = "renderClouds", at = @At("HEAD"), cancellable = true)
     public void projectAtmosphere$overrideCloudRendering_renderClouds(PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, CallbackInfo ci) {
-        if (AtmosphereCloudPolicy.shouldSuppressVanillaClouds(this.level)) {
+        if (AtmosphereCloudPolicy.shouldSuppressVanillaClouds(this.level)
+                && CloudFieldVolumeRenderConfig.canOwnVanillaCloudLayer()) {
             ci.cancel();
         }
     }

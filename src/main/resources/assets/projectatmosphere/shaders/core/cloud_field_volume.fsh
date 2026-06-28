@@ -2,6 +2,12 @@
 
 uniform vec3 VolumeMin;
 uniform vec3 VolumeMax;
+uniform mat4 ModelViewMat;
+uniform mat4 ProjMat;
+uniform mat4 InvModelViewMat;
+uniform mat4 InvProjMat;
+uniform sampler2D SceneDepthSampler;
+uniform vec2 OutputSize;
 uniform vec3 CameraPos;
 uniform vec3 FieldCenter;
 uniform float FieldRadius;
@@ -22,26 +28,29 @@ uniform float FieldSeed;
 uniform float FieldCloudletCount;
 uniform int FieldSourceKind;
 uniform float AnimationTime;
+uniform int RaymarchSteps;
+uniform int DetailOctaves;
+uniform int UseSceneDepth;
 uniform int DebugMode;
 // Runtime tuning uniforms. Defaults are provided by cloud_field_volume.json and
 // can be changed in-game with /pa cloud fields render tune ...
-uniform float TuneOpacityStrength;     // default 0.42, alpha = 1.0 - exp(-density * strength)
-uniform float TuneDensityThreshold;    // default 0.0012, keeps empty sky transparent
-uniform float TuneMaxFinalAlpha;       // default 0.95, clamps final opacity
+uniform float TuneOpacityStrength;     // default 0.34, alpha = 1.0 - exp(-density * strength)
+uniform float TuneDensityThreshold;    // default 0.0016, keeps empty sky transparent
+uniform float TuneMaxFinalAlpha;       // default 0.90, clamps final opacity
 uniform float TuneNoiseStrength;       // default 1.0, puff/lobe breakup scale
-uniform float TuneErosionStrength;     // default 1.0, edge erosion scale
-uniform float TuneBrightness;          // default 1.08, neutral cloud brightness
-uniform float TuneUndersideDarkening;  // default 0.34, gray underside amount
-uniform float TuneDensityBoost;        // default 2.0, normal-mode readability boost
-uniform float TuneAnimSpeed;           // default 0.015, subtle detail drift only
+uniform float TuneErosionStrength;     // default 1.2, edge erosion scale
+uniform float TuneBrightness;          // default 1.0, neutral cloud brightness
+uniform float TuneUndersideDarkening;  // default 0.52, gray underside amount
+uniform float TuneDensityBoost;        // default 1.55, normal-mode readability boost
+uniform float TuneAnimSpeed;           // default 0.012, subtle detail drift only
 
 in vec2 texCoord;
 in vec3 fragWorldPos;
 
 out vec4 fragColor;
 
-const int RAY_STEPS = 28;
-const float NORMAL_MAX_SAMPLE_ALPHA = 0.32;
+const int MAX_RAY_STEPS = 64;
+const float NORMAL_MAX_SAMPLE_ALPHA = 0.24;
 
 float saturate(float value) {
     return clamp(value, 0.0, 1.0);
@@ -74,7 +83,10 @@ vec2 intersectBox(vec3 rayOrigin, vec3 rayDirection) {
 }
 
 float hash1(float n) {
-    return fract(sin(n) * 43758.5453123);
+    n = fract(n * 0.1031);
+    n *= n + 33.33;
+    n *= n + n;
+    return fract(n);
 }
 
 float noise3(vec3 p) {
@@ -95,7 +107,11 @@ float noise3(vec3 p) {
 float fbm(vec3 p) {
     float value = 0.0;
     float amplitude = 0.55;
+    int octaves = clamp(DetailOctaves, 1, 4);
     for (int i = 0; i < 4; i++) {
+        if (i >= octaves) {
+            break;
+        }
         value += noise3(p) * amplitude;
         p *= 2.03;
         amplitude *= 0.50;
@@ -103,9 +119,95 @@ float fbm(vec3 p) {
     return value;
 }
 
-float height01At(vec3 p) {
+vec3 reconstructWorldPosition(vec2 uv, float depth) {
+    vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 view = InvProjMat * clip;
+    view /= max(abs(view.w), 0.00001);
+    vec4 world = InvModelViewMat * view;
+    world /= max(abs(world.w), 0.00001);
+    return world.xyz;
+}
+
+float sceneRayEnd(vec3 rayDirection, float fallbackEnd) {
+    if (UseSceneDepth == 0) {
+        return fallbackEnd;
+    }
+    vec2 uv = gl_FragCoord.xy / max(OutputSize, vec2(1.0));
+    uv = clamp(uv, vec2(0.0), vec2(1.0));
+    float sceneDepth = texture(SceneDepthSampler, uv).r;
+    if (sceneDepth >= 0.99999) {
+        return fallbackEnd;
+    }
+    vec3 sceneWorld = reconstructWorldPosition(uv, sceneDepth);
+    float sceneT = dot(sceneWorld - CameraPos, rayDirection);
+    return min(fallbackEnd, max(0.0, sceneT - 0.35));
+}
+
+float worldDepth(vec3 p) {
+    vec4 clip = ProjMat * ModelViewMat * vec4(p, 1.0);
+    float ndcDepth = clip.z / max(abs(clip.w), 0.00001);
+    return clamp(ndcDepth * 0.5 + 0.5, 0.0, 1.0);
+}
+
+float sourceVisualMultiplier() {
+    if (FieldSourceKind == 1) {
+        return 0.92; // manual debug source: real CloudField, useful for QA
+    }
+    if (FieldSourceKind == 2) {
+        return 0.38; // WEATHER_SUMMARY: coarse weather cloud/haze source
+    }
+    if (FieldSourceKind == 3) {
+        return 1.00; // PA_CLUSTER: strongest direct CloudField source
+    }
+    if (FieldSourceKind == 4) {
+        return 0.78; // PA_REGION: broad regional source
+    }
+    return 0.55; // UNKNOWN: conservative
+}
+
+vec3 fieldLocalAt(vec3 p) {
+    return vec3(p.x - FieldCenter.x, p.y - FieldBaseY, p.z - FieldCenter.z);
+}
+
+float localBaseOffsetAt(vec3 p) {
     float heightSpan = max(FieldTopY - FieldBaseY, 1.0);
-    return saturate((p.y - FieldBaseY) / heightSpan);
+    vec2 localXZ = p.xz - FieldCenter.xz;
+    float radius = max(FieldRadius, 1.0);
+    float radial = length(localXZ) / radius;
+    float interior = 1.0 - smoothstep(0.50, 1.08, radial);
+    float low = fbm(vec3(localXZ * 0.020, FieldSeed * 0.021));
+    float medium = fbm(vec3(localXZ * 0.055, FieldSeed * 0.047));
+    return ((low - 0.5) * 0.09 + (medium - 0.5) * 0.035)
+        * heightSpan
+        * interior
+        * TuneNoiseStrength;
+}
+
+float localTopOffsetAt(vec3 p) {
+    float heightSpan = max(FieldTopY - FieldBaseY, 1.0);
+    vec2 localXZ = p.xz - FieldCenter.xz;
+    float radius = max(FieldRadius, 1.0);
+    float radial = length(localXZ) / radius;
+    float interior = 1.0 - smoothstep(0.35, 1.10, radial);
+    float topLobe = fbm(vec3(localXZ * 0.017, FieldSeed * 0.063));
+    float towerBoost = mix(0.06, 0.13, saturate(FieldVerticalDevelopment));
+    return (topLobe - 0.5) * heightSpan * towerBoost * interior * TuneNoiseStrength;
+}
+
+float localBaseYAt(vec3 p) {
+    return FieldBaseY + localBaseOffsetAt(p);
+}
+
+float localTopYAt(vec3 p) {
+    float baseY = localBaseYAt(p);
+    return max(baseY + 1.0, FieldTopY + localTopOffsetAt(p));
+}
+
+float height01At(vec3 p) {
+    float baseY = localBaseYAt(p);
+    float topY = localTopYAt(p);
+    float heightSpan = max(topY - baseY, 1.0);
+    return saturate((p.y - baseY) / heightSpan);
 }
 
 float horizontalMaskAt(vec3 p) {
@@ -121,35 +223,60 @@ float horizontalMaskAt(vec3 p) {
 
     // Low-frequency lobe noise breaks the perfect cylinder side wall without
     // depending on per-frame random data.
-    float lobeNoise = fbm(vec3((p.xz - FieldCenter.xz) * 0.018, FieldSeed * 0.013));
-    float lobeOffset = (lobeNoise - 0.5) * mix(0.10, 0.24, saturate(FieldVerticalDevelopment)) * TuneNoiseStrength;
+    vec2 localXZ = p.xz - FieldCenter.xz;
+    float lobeNoise = fbm(vec3(localXZ * 0.018, FieldSeed * 0.013));
+    float scallopNoise = fbm(vec3(localXZ * 0.047, FieldSeed * 0.041 + height01 * 2.0));
+    float lobeOffset = (
+        (lobeNoise - 0.5) * mix(0.13, 0.30, saturate(FieldVerticalDevelopment))
+        + (scallopNoise - 0.5) * 0.11 * smoothstep(0.10, 0.86, height01)
+    ) * TuneNoiseStrength;
     float shapedRadial = radial / max(0.25, towerScale + anvilSpread + lobeOffset);
 
-    float edgeStart = mix(0.42, 0.78, saturate(FieldCoverage));
+    float edgeStart = clamp(mix(0.38, 0.76, saturate(FieldCoverage)) + (scallopNoise - 0.5) * 0.07 * TuneNoiseStrength, 0.28, 0.84);
     return 1.0 - smoothstep(edgeStart, 1.0, shapedRadial);
 }
 
 float verticalMaskAt(vec3 p) {
     float height01 = height01At(p);
     float stormLift = saturate(FieldStormPotential) * 0.08;
-    // Flatter lower deck, then a rounded upper body. This keeps the debug
-    // cloud from reading like a perfect dome or hard vertical cylinder.
-    float baseFalloff = smoothstep(0.03, 0.11, height01);
-    float topFalloff = 1.0 - smoothstep(0.76 + stormLift, 1.0, height01);
+    vec2 localXZ = p.xz - FieldCenter.xz;
+    float undersideNoise = fbm(vec3(localXZ * 0.050, FieldSeed * 0.071));
+    float topNoise = fbm(vec3(localXZ * 0.026, FieldSeed * 0.093));
+    // Stable local base/top variation breaks the old perfectly flat deck while
+    // keeping the broad cumulus mass deterministic.
+    float baseStart = mix(0.015, 0.055, undersideNoise);
+    float baseFalloff = smoothstep(baseStart, baseStart + 0.095, height01);
+    float topFalloff = 1.0 - smoothstep(0.74 + stormLift + (topNoise - 0.5) * 0.055, 1.0, height01);
     float upperBody = mix(0.92, 1.12, smoothstep(0.20, 0.68, height01) * (1.0 - smoothstep(0.88, 1.0, height01)));
     return saturate(baseFalloff * topFalloff * upperBody);
 }
 
 float densityAt(vec3 p) {
+    float heightSpan = max(FieldTopY - FieldBaseY, 1.0);
+    float cheapVerticalPad = max(4.0, heightSpan * 0.18);
+    if (p.y < FieldBaseY - cheapVerticalPad || p.y > FieldTopY + cheapVerticalPad) {
+        return 0.0;
+    }
+    float cheapRadius = max(FieldRadius, 1.0) * 1.24;
+    if (dot(p.xz - FieldCenter.xz, p.xz - FieldCenter.xz) > cheapRadius * cheapRadius) {
+        return 0.0;
+    }
+
     float horizontalMask = horizontalMaskAt(p);
     float verticalMask = verticalMaskAt(p);
     float baseShape = horizontalMask * verticalMask;
+    if (baseShape <= 0.0001) {
+        return 0.0;
+    }
 
     // Stable field-local noise owns the visible puff layout and silhouette.
     // It intentionally does not use time, so the main shape does not regenerate.
-    vec3 fieldLocal = vec3(p.x - FieldCenter.x, p.y - FieldBaseY, p.z - FieldCenter.z);
+    vec3 fieldLocal = fieldLocalAt(p);
+    fieldLocal.y = p.y - localBaseYAt(p);
     float largeNoise = fbm(fieldLocal * 0.010 + vec3(FieldSeed * 0.003));
     float erosionNoise = fbm(fieldLocal * 0.038 + vec3(FieldSeed * 0.017));
+    float undersideNoise = fbm(fieldLocal * vec3(0.050, 0.018, 0.050) + vec3(FieldSeed * 0.061));
+    float topLobeNoise = fbm(fieldLocal * vec3(0.024, 0.018, 0.024) + vec3(FieldSeed * 0.083));
 
     // Animated detail is deliberately tiny and slow. It adds a faint internal
     // drift without changing the stable lobe/erosion layout.
@@ -164,6 +291,10 @@ float densityAt(vec3 p) {
     float puffMask = smoothstep(coverageThreshold, 0.95, largeNoise + baseShape * 0.42);
     float erodedShape = baseShape * mix(1.0 - 0.22 * TuneNoiseStrength, 1.0 + 0.18 * TuneNoiseStrength, largeNoise);
     erodedShape -= edgeRegion * erosionNoise * mix(0.20, 0.44, 1.0 - saturate(FieldCoverage)) * TuneErosionStrength;
+    float undersideRegion = (1.0 - smoothstep(0.08, 0.30, height01At(p))) * smoothstep(0.08, 0.42, horizontalMask);
+    erodedShape -= undersideRegion * undersideNoise * 0.16 * TuneErosionStrength;
+    float topRegion = smoothstep(0.42, 0.90, height01At(p));
+    erodedShape *= mix(1.0, mix(0.82, 1.20, topLobeNoise), topRegion * 0.30 * TuneNoiseStrength);
     erodedShape += (detailNoise - 0.5) * edgeRegion * 0.06 * TuneNoiseStrength * smoothstep(0.0, 0.05, TuneAnimSpeed);
     erodedShape = saturate(erodedShape) * puffMask;
 
@@ -177,7 +308,7 @@ float densityAt(vec3 p) {
     float cloudletDensityHint = mix(0.95, 1.05, saturate(FieldCloudletCount / 96.0));
     float humidityBoost = mix(0.85, 1.15, saturate(FieldHumidityInfluence));
     float stormBoost = mix(1.0, 1.35, saturate(FieldStormPotential));
-    return saturate(erodedShape * weatherDensity * endOfLifeFade * cloudletDensityHint * humidityBoost * stormBoost * TuneDensityBoost);
+    return saturate(erodedShape * weatherDensity * endOfLifeFade * cloudletDensityHint * humidityBoost * stormBoost * TuneDensityBoost * sourceVisualMultiplier());
 }
 
 float boundsAlphaAt(vec3 p) {
@@ -242,28 +373,46 @@ void main() {
     vec3 rayDirection = normalize(toFragment);
     vec2 hit = intersectBox(CameraPos, rayDirection);
     float rayStart = max(hit.x, 0.0);
-    float rayEnd = hit.y;
-    if (rayEnd <= rayStart) {
+    float rawRayEnd = hit.y;
+    if (rawRayEnd <= rayStart) {
         discard;
     }
 
-    vec3 midpoint = CameraPos + rayDirection * ((rayStart + rayEnd) * 0.5);
     if (DebugMode > 0) {
+        vec3 midpoint = CameraPos + rayDirection * ((rayStart + rawRayEnd) * 0.5);
         vec3 debugPoint = DebugMode == 1 ? fragWorldPos : midpoint;
+        gl_FragDepth = gl_FragCoord.z;
         fragColor = debugColor(debugPoint);
         return;
     }
 
-    float stepSize = (rayEnd - rayStart) / float(RAY_STEPS);
+    float rayEnd = sceneRayEnd(rayDirection, rawRayEnd);
+    if (rayEnd <= rayStart) {
+        discard;
+    }
+
+    int stepCount = clamp(RaymarchSteps, 4, MAX_RAY_STEPS);
+    float stepSize = (rayEnd - rayStart) / float(stepCount);
+    float referenceStepSize = max((max(FieldRadius, 1.0) * 2.0) / 64.0, 1.0);
+    float jitter = hash1(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233)) + FieldSeed) - 0.5;
     float transmittance = 1.0;
     vec3 accumulated = vec3(0.0);
+    float firstCloudDepth = 1.0;
+    bool hasCloudDepth = false;
 
-    for (int i = 0; i < RAY_STEPS; i++) {
-        float t = rayStart + (float(i) + 0.5) * stepSize;
+    for (int i = 0; i < MAX_RAY_STEPS; i++) {
+        if (i >= stepCount) {
+            break;
+        }
+        float t = rayStart + (float(i) + 0.5 + jitter * 0.35) * stepSize;
         vec3 p = CameraPos + rayDirection * t;
         float density = densityAt(p);
         if (density <= TuneDensityThreshold) {
             continue;
+        }
+        if (!hasCloudDepth) {
+            firstCloudDepth = worldDepth(p);
+            hasCloudDepth = true;
         }
 
         float height01 = height01At(p);
@@ -276,7 +425,8 @@ void main() {
         vec3 topColor = vec3(1.00, 1.00, 0.96) * TuneBrightness;
         vec3 cloudColor = mix(undersideColor, topColor, underside) * stormDarkening * softLight;
 
-        float sampleAlpha = clamp(1.0 - exp(-density * TuneOpacityStrength), 0.0, NORMAL_MAX_SAMPLE_ALPHA);
+        float stepOpacityScale = clamp(stepSize / referenceStepSize, 0.20, 4.0);
+        float sampleAlpha = clamp(1.0 - exp(-density * TuneOpacityStrength * stepOpacityScale), 0.0, NORMAL_MAX_SAMPLE_ALPHA);
         accumulated += transmittance * sampleAlpha * cloudColor;
         transmittance *= 1.0 - sampleAlpha;
         if (transmittance < 0.02) {
@@ -290,5 +440,6 @@ void main() {
     }
 
     vec3 color = accumulated / max(alpha, 0.0001);
+    gl_FragDepth = firstCloudDepth;
     fragColor = vec4(color, min(alpha, TuneMaxFinalAlpha));
 }

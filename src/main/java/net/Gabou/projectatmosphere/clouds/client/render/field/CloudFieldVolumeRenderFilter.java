@@ -3,7 +3,8 @@ package net.Gabou.projectatmosphere.clouds.client.render.field;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Client-side test filter for isolating CloudField snapshot volume rendering.
+ * Diagnostic filter for isolating synced CloudField snapshots while tuning the
+ * renderer. Normal gameplay should use ALL.
  */
 public enum CloudFieldVolumeRenderFilter {
     ALL("all"),

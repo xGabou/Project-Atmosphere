@@ -28,7 +28,7 @@ public final class SereneSeasonsEventBridge {
                     Season.SubSeason oldSeason = event.getPrevSeason();
                     Season.SubSeason newSeason = event.getNewSeason();
                     if (newSeason != oldSeason && isSereneSeasonsPlusLoaded()) {
-                        EnvironmentHelper.onSeasonChange(serverLevel, Math.abs(newSeason.ordinal() - oldSeason.ordinal()) != 1);
+                        EnvironmentHelper.onSeasonChange(serverLevel, !areAdjacent(oldSeason, newSeason, Season.SubSeason.values().length));
                     }
                 }
             }
@@ -40,13 +40,18 @@ public final class SereneSeasonsEventBridge {
                     AtmosphereManager.onSeasonChange(serverLevel);
                     Season.TropicalSeason oldSeason = event.getPrevSeason();
                     Season.TropicalSeason newSeason = event.getNewSeason();
-                    boolean skippedAdjacentSeason = Math.abs(newSeason.ordinal() - oldSeason.ordinal()) != 1;
+                    boolean skippedAdjacentSeason = !areAdjacent(oldSeason, newSeason, Season.TropicalSeason.values().length);
                     if (newSeason != oldSeason && isSereneSeasonsPlusLoaded()) {
                         EnvironmentHelper.onSeasonChange(serverLevel, skippedAdjacentSeason);
                     }
                 }
             }
         });
+    }
+
+    private static boolean areAdjacent(Enum<?> oldSeason, Enum<?> newSeason, int seasonCount) {
+        int diff = Math.abs(newSeason.ordinal() - oldSeason.ordinal());
+        return diff == 1 || diff == seasonCount - 1;
     }
 
     /**

@@ -10,10 +10,15 @@
     "Position",
     "UV0"
   ],
-  "samplers": [],
+  "samplers": [
+    { "name": "SceneDepthSampler" }
+  ],
   "uniforms": [
     { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
     { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "InvModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "InvProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "OutputSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
     { "name": "VolumeMin", "type": "float", "count": 3, "values": [ -64.0, 0.0, -64.0 ] },
     { "name": "VolumeMax", "type": "float", "count": 3, "values": [ 64.0, 64.0, 64.0 ] },
     { "name": "CameraPos", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
@@ -36,15 +41,18 @@
     { "name": "FieldCloudletCount", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "FieldSourceKind", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "AnimationTime", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 32 ] },
+    { "name": "DetailOctaves", "type": "int", "count": 1, "values": [ 3 ] },
+    { "name": "UseSceneDepth", "type": "int", "count": 1, "values": [ 1 ] },
     { "name": "DebugMode", "type": "int", "count": 1, "values": [ 0 ] },
-    { "name": "TuneOpacityStrength", "type": "float", "count": 1, "values": [ 0.42 ] },
-    { "name": "TuneDensityThreshold", "type": "float", "count": 1, "values": [ 0.0012 ] },
-    { "name": "TuneMaxFinalAlpha", "type": "float", "count": 1, "values": [ 0.95 ] },
+    { "name": "TuneOpacityStrength", "type": "float", "count": 1, "values": [ 0.34 ] },
+    { "name": "TuneDensityThreshold", "type": "float", "count": 1, "values": [ 0.0016 ] },
+    { "name": "TuneMaxFinalAlpha", "type": "float", "count": 1, "values": [ 0.90 ] },
     { "name": "TuneNoiseStrength", "type": "float", "count": 1, "values": [ 1.0 ] },
-    { "name": "TuneErosionStrength", "type": "float", "count": 1, "values": [ 1.0 ] },
-    { "name": "TuneBrightness", "type": "float", "count": 1, "values": [ 1.08 ] },
-    { "name": "TuneUndersideDarkening", "type": "float", "count": 1, "values": [ 0.34 ] },
-    { "name": "TuneDensityBoost", "type": "float", "count": 1, "values": [ 2.0 ] },
-    { "name": "TuneAnimSpeed", "type": "float", "count": 1, "values": [ 0.015 ] }
+    { "name": "TuneErosionStrength", "type": "float", "count": 1, "values": [ 1.2 ] },
+    { "name": "TuneBrightness", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "TuneUndersideDarkening", "type": "float", "count": 1, "values": [ 0.52 ] },
+    { "name": "TuneDensityBoost", "type": "float", "count": 1, "values": [ 1.55 ] },
+    { "name": "TuneAnimSpeed", "type": "float", "count": 1, "values": [ 0.012 ] }
   ]
 }

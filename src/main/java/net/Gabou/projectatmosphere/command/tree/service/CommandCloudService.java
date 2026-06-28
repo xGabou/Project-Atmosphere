@@ -162,10 +162,10 @@ public final class CommandCloudService {
         PaCommandMessages.success(
                 source,
                 false,
-                "Cloud count",
-                "Stored: " + storedCount,
-                "Active render data: " + activeRenderDataCount,
-                "Active CloudFields: " + activeFieldCount
+                "CloudField count",
+                "Active CloudFields: " + activeFieldCount,
+                "Legacy stored regions: " + storedCount,
+                "Legacy active render data: " + activeRenderDataCount
         );
         return 1;
     }
@@ -236,11 +236,28 @@ public final class CommandCloudService {
     }
 
     /**
-     * Spawns one server-side debug CloudField through the production field
-     * bridge/store path without creating a PA cloud region.
+     * Spawns one server-side test CloudField through the production field
+     * bridge/store path without creating a legacy PA cloud region.
+     *
+     * @param source command source
+     * @return command result
      */
-    public static int spawnDebugCloudField(CommandSourceStack source) {
-        ServerPlayer player = PaCommandSupport.requirePlayer(source, "CloudField debug spawn is only available to players.");
+    public static int spawnCloudField(CommandSourceStack source) {
+        return spawnCloudField(source, null);
+    }
+
+    /**
+     * Spawns one server-side test CloudField through the production field
+     * bridge/store path. The optional id is accepted for `/pa cloud spawn <id>`
+     * compatibility, but this path creates a real CloudField source instead of
+     * the old native cloud-region visual.
+     *
+     * @param source command source
+     * @param requestedId optional legacy requested cloud id
+     * @return command result
+     */
+    public static int spawnCloudField(CommandSourceStack source, String requestedId) {
+        ServerPlayer player = PaCommandSupport.requirePlayer(source, "CloudField spawning is only available to players.");
         if (player == null) {
             return 0;
         }
@@ -248,10 +265,15 @@ public final class CommandCloudService {
         CloudFieldBackendBridge.ApplyResult result =
                 CloudFieldRuntimeManager.getInstance().spawnDebugField(player);
         CloudFieldSyncManager.syncPlayer(player);
+        String requestedLine = requestedId == null || requestedId.isBlank()
+                ? "Requested id: none"
+                : "Requested id: " + requestedId + " (legacy hint accepted; CloudField source controls shape)";
         PaCommandMessages.success(
                 source,
                 true,
-                "Debug CloudField spawned",
+                "Test CloudField spawned",
+                requestedLine,
+                "Source kind: MANUAL_DEBUG",
                 "Created: " + result.created(),
                 "Updated: " + result.updated(),
                 "Rebound: " + result.reboundSourceFields(),
@@ -259,6 +281,16 @@ public final class CommandCloudService {
                 "Lifetime: 12000 ticks"
         );
         return 1;
+    }
+
+    /**
+     * Legacy debug spawn helper retained for old weatherdebug aliases.
+     *
+     * @param source command source
+     * @return command result
+     */
+    public static int spawnDebugCloudField(CommandSourceStack source) {
+        return spawnCloudField(source, null);
     }
 
     /**

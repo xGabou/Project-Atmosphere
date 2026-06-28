@@ -17,9 +17,10 @@ public final class PaCloudCommand {
         return Commands.literal("cloud")
                 .then(Commands.literal("spawn")
                         .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> CommandCloudService.spawnCloudField(ctx.getSource()))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .suggests(PaCommandSuggestions.CLOUD_TYPE_SUGGESTIONS)
-                                .executes(ctx -> CommandCloudService.spawnCloud(ctx.getSource(), StringArgumentType.getString(ctx, "id")))))
+                                .executes(ctx -> CommandCloudService.spawnCloudField(ctx.getSource(), StringArgumentType.getString(ctx, "id")))))
                 .then(Commands.literal("rain")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> CommandCloudService.spawnRain(ctx.getSource(), 1))
@@ -45,26 +46,16 @@ public final class PaCloudCommand {
                                         BoolArgumentType.getBool(ctx, "overwrite")
                                 ))))
                 .then(Commands.literal("list")
-                        .executes(ctx -> CommandCloudService.sendCloudList(ctx.getSource())))
+                        .executes(ctx -> CommandCloudService.sendCloudFieldList(ctx.getSource())))
                 .then(Commands.literal("count")
                         .executes(ctx -> CommandCloudService.sendCloudCount(ctx.getSource())))
-                .then(Commands.literal("fields")
-                        .executes(ctx -> CommandCloudService.sendCloudFieldList(ctx.getSource()))
-                        .then(Commands.literal("list")
-                                .executes(ctx -> CommandCloudService.sendCloudFieldList(ctx.getSource())))
-                        .then(Commands.literal("evolution")
-                                .executes(ctx -> CommandCloudService.sendCloudFieldEvolution(ctx.getSource())))
-                        .then(Commands.literal("stats")
-                                .executes(ctx -> CommandCloudService.sendCloudFieldStats(ctx.getSource())))
-                        .then(Commands.literal("spawn")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(ctx -> CommandCloudService.spawnDebugCloudField(ctx.getSource())))
-                        .then(Commands.literal("clear")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(ctx -> CommandCloudService.clearCloudFields(ctx.getSource()))))
+                .then(Commands.literal("stats")
+                        .executes(ctx -> CommandCloudService.sendCloudFieldStats(ctx.getSource())))
+                .then(Commands.literal("evolution")
+                        .executes(ctx -> CommandCloudService.sendCloudFieldEvolution(ctx.getSource())))
                 .then(Commands.literal("clear")
                         .requires(source -> source.hasPermission(2))
-                        .executes(ctx -> CommandCloudService.clearClouds(ctx.getSource()))
+                        .executes(ctx -> CommandCloudService.clearCloudFields(ctx.getSource()))
                         .then(Commands.literal("inactive")
                                 .requires(source -> source.hasPermission(2))
                                 .executes(ctx -> CommandCloudService.clearInactiveClouds(ctx.getSource()))))
@@ -84,20 +75,19 @@ public final class PaCloudCommand {
                                     ctx.getSource(),
                                     false,
                                     "Cloud commands",
-                                    "/pa cloud spawn <id>",
+                                    "/pa cloud spawn",
+                                    "/pa cloud spawn [id]",
                                     "/pa cloud rain [intensity]",
                                     "/pa cloud thunder [intensity]",
                                     "/pa cloud snowstorm [overwrite]",
                                     "/pa cloud list",
                                     "/pa cloud count",
-                                    "/pa cloud fields",
-                                    "/pa cloud fields list",
-                                    "/pa cloud fields evolution",
-                                    "/pa cloud fields stats",
-                                    "/pa cloud fields spawn",
-                                    "/pa cloud fields clear",
+                                    "/pa cloud stats",
+                                    "/pa cloud evolution",
+                                    "/pa cloud render on|off|status",
+                                    "/pa cloud render quality <low|low_24|low_24_steps|medium|high|ultra>",
                                     "/pa cloud clear",
-                                    "/pa cloud clear inactive",
+                                    "/pa cloud clear inactive (legacy region cleanup)",
                                     "/pa cloud freeze <true|false>",
                                     "/pa cloud sync"
                             );

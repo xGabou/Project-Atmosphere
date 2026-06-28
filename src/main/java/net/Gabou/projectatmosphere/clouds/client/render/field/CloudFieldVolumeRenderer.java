@@ -1,14 +1,20 @@
 package net.Gabou.projectatmosphere.clouds.client.render.field;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.client.render.mesh.VolumeBoxMesh;
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
@@ -16,15 +22,16 @@ import org.lwjgl.opengl.GL11;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Draws synced CloudField snapshots as simple bounded volumetric prototype
- * clouds. The renderer reads only CloudFieldRendererInput and does not query
- * backend or weather systems.
+ * Draws synced CloudField snapshots as bounded volumetric clouds. The renderer
+ * reads only CloudFieldRendererInput and does not query backend or weather
+ * systems directly.
  */
 public final class CloudFieldVolumeRenderer {
-    private static final int MAX_FIELDS_PER_FRAME = 16;
     private static final VolumeBoxMesh VOLUME_BOX = new VolumeBoxMesh();
+    private static final CloudGpuTimer GPU_TIMER = new CloudGpuTimer();
 
     private CloudFieldVolumeRenderer() {
     }
@@ -44,11 +51,17 @@ public final class CloudFieldVolumeRenderer {
             PoseStack poseStack,
             Matrix4f projectionMatrix,
             String dimensionId,
-            int cachedSnapshots
+            int cachedSnapshots,
+            Frustum frustum,
+            RenderTarget outputTarget,
+            int sceneDepthTextureId,
+            boolean downscaleApplied
     ) {
         CloudFieldVolumeRenderMode mode = CloudFieldVolumeRenderConfig.mode();
         CloudFieldVolumeRenderFilter filter = CloudFieldVolumeRenderConfig.filter();
         ShaderInstance shader = CloudFieldVolumeShaders.getShader();
+        boolean debugMode = mode != CloudFieldVolumeRenderMode.NORMAL;
+        GPU_TIMER.poll();
         if (shader == null) {
             return CloudFieldVolumeRenderStats.idle(true, false, mode, filter, "shader_unavailable", cachedSnapshots);
         }
@@ -57,91 +70,152 @@ public final class CloudFieldVolumeRenderer {
         }
 
         Stats stats = new Stats(dimensionId, input.worldTime(), cachedSnapshots, input.fields().size(), mode, filter);
+        RenderTarget target = outputTarget == null ? Minecraft.getInstance().getMainRenderTarget() : outputTarget;
+        stats.recordTarget(target, downscaleApplied);
         List<FieldDraw> candidates = new ArrayList<>();
+        double maxRenderDistance = Math.max(100.0D, AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get());
+        double maxRenderDistanceSqr = maxRenderDistance * maxRenderDistance;
         for (CloudFieldSnapshot snapshot : input.fields()) {
             if (snapshot == null) {
                 stats.invalidGeometrySkipped++;
                 stats.lastSkipReason = "null_snapshot";
+                stats.recordRawField("null result=skipped:null_snapshot");
                 continue;
             }
+            Bounds bounds = boundsFor(snapshot);
             if (!dimensionMatches(snapshot, dimensionId)) {
                 stats.wrongDimensionSkipped++;
                 stats.lastSkipReason = "wrong_dimension";
+                stats.recordField(snapshot, bounds, input.cameraPosition(), "skipped:wrong_dimension", "dimension_mismatch");
                 continue;
             }
             if (!snapshot.hasVisibleClouds()) {
                 stats.notVisibleSkipped++;
                 stats.lastSkipReason = "not_visible";
+                stats.recordField(snapshot, bounds, input.cameraPosition(), "skipped:not_visible", "snapshot_visible=false");
                 continue;
             }
-            Bounds bounds = boundsFor(snapshot);
             if (!isValid(bounds)) {
                 stats.invalidGeometrySkipped++;
                 stats.lastSkipReason = "invalid_geometry";
+                stats.recordField(snapshot, bounds, input.cameraPosition(), "skipped:invalid_geometry", "invalid_bounds");
+                continue;
+            }
+            if (!debugMode && frustum != null && !frustum.isVisible(bounds.toAabb())) {
+                stats.frustumSkipped++;
+                stats.lastSkipReason = "frustum";
+                stats.recordField(snapshot, bounds, input.cameraPosition(), "skipped:frustum", "visible=false frustum=culled");
+                continue;
+            }
+            double distanceSqr = bounds.distanceToSqr(input.cameraPosition());
+            if (!debugMode && distanceSqr > maxRenderDistanceSqr) {
+                stats.distanceSkipped++;
+                stats.lastSkipReason = "distance";
+                stats.recordField(snapshot, bounds, input.cameraPosition(), "skipped:distance", "visible=false distance_culled");
                 continue;
             }
             stats.visibleFields++;
-            candidates.add(new FieldDraw(snapshot, bounds, bounds.center().distanceToSqr(input.cameraPosition())));
+            candidates.add(new FieldDraw(snapshot, bounds, distanceSqr, fieldPriority(snapshot, bounds, input.cameraPosition())));
         }
 
         stats.fieldsBeforeFilter = candidates.size();
-        candidates = applyFilter(candidates, filter);
-        stats.filterSkipped += Math.max(0, stats.fieldsBeforeFilter - candidates.size());
+        List<FieldDraw> filteredCandidates = applyFilter(candidates, filter);
+        for (FieldDraw candidate : candidates) {
+            if (!containsField(filteredCandidates, candidate)) {
+                stats.recordField(candidate.snapshot(), candidate.bounds(), input.cameraPosition(), "skipped:filtered_out", "visible=true frustum=passed");
+            }
+        }
+        candidates = filteredCandidates;
+        stats.filterSkipped += Math.max(0, stats.fieldsBeforeFilter - filteredCandidates.size());
         if (stats.filterSkipped > 0) {
             stats.lastSkipReason = "filtered_out";
         }
         stats.visibleFields = candidates.size();
 
-        candidates.sort(Comparator.comparingDouble(FieldDraw::distanceSqr).reversed());
-        if (candidates.size() > MAX_FIELDS_PER_FRAME) {
-            stats.maxFieldLimitSkipped += candidates.size() - MAX_FIELDS_PER_FRAME;
+        int maxFieldsPerFrame = CloudFieldVolumeRenderConfig.maxRenderedFields();
+        if (candidates.size() > maxFieldsPerFrame) {
+            candidates.sort(Comparator.comparingDouble(FieldDraw::priority).reversed());
+            stats.maxFieldLimitSkipped += candidates.size() - maxFieldsPerFrame;
             stats.lastSkipReason = "max_field_limit";
-            candidates = new ArrayList<>(candidates.subList(0, MAX_FIELDS_PER_FRAME));
+            for (int i = maxFieldsPerFrame; i < candidates.size(); i++) {
+                FieldDraw skipped = candidates.get(i);
+                stats.recordField(skipped.snapshot(), skipped.bounds(), input.cameraPosition(), "skipped:max_field_limit", "visible=true frustum=passed");
+            }
+            candidates = new ArrayList<>(candidates.subList(0, maxFieldsPerFrame));
         }
+        candidates.sort(Comparator.comparingDouble(FieldDraw::distanceSqr).reversed());
 
         if (candidates.isEmpty()) {
             return stats.toRenderStats();
         }
 
-        Matrix4f modelViewMat = poseStack.last().pose();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.depthMask(false);
-        RenderSystem.setShader(() -> shader);
-
         try {
-            for (FieldDraw candidate : candidates) {
-                if (candidate.bounds().contains(input.cameraPosition())) {
-                    RenderSystem.disableCull();
-                } else {
-                    RenderSystem.enableCull();
-                }
+            Matrix4f modelViewMat = poseStack.last().pose();
+            if (target != null) {
+                target.bindWrite(false);
+            }
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthFunc(debugMode ? GL11.GL_ALWAYS : GL11.GL_LEQUAL);
+            RenderSystem.depthMask(downscaleApplied && !debugMode);
+            RenderSystem.setShader(() -> shader);
 
-                CloudFieldVolumeUniformUploader.apply(
-                        shader,
-                        input,
-                        candidate.snapshot(),
-                        candidate.bounds(),
-                        modelViewMat,
-                        projectionMatrix
-                );
-                shader.apply();
-                VOLUME_BOX.draw(shader, modelViewMat, projectionMatrix);
-                shader.clear();
-                stats.renderedFields++;
-                stats.recordRendered(candidate.snapshot());
+            GPU_TIMER.begin();
+            try {
+                for (FieldDraw candidate : candidates) {
+                    if (candidate.bounds().contains(input.cameraPosition())) {
+                        RenderSystem.enableCull();
+                        GL11.glCullFace(GL11.GL_FRONT);
+                    } else {
+                        RenderSystem.enableCull();
+                        GL11.glCullFace(GL11.GL_BACK);
+                    }
+
+                    CloudFieldVolumeUniformUploader.apply(
+                            shader,
+                            input,
+                            candidate.snapshot(),
+                            candidate.bounds(),
+                            modelViewMat,
+                            projectionMatrix,
+                            target,
+                            sceneDepthTextureId,
+                            raymarchStepsFor(candidate, maxRenderDistance),
+                            !debugMode && sceneDepthTextureId > 0
+                    );
+                    shader.apply();
+                    try {
+                        VOLUME_BOX.draw(shader, modelViewMat, projectionMatrix);
+                    } finally {
+                        shader.clear();
+                    }
+                    stats.renderedFields++;
+                    stats.recordRendered(candidate.snapshot());
+                    stats.recordField(candidate.snapshot(), candidate.bounds(), input.cameraPosition(), "rendered", "visible=true frustum=passed");
+                }
+            } finally {
+                GPU_TIMER.end();
+                stats.recordGpuTimer(GPU_TIMER);
             }
         } finally {
-            RenderSystem.depthMask(true);
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
-            RenderSystem.enableCull();
-            RenderSystem.disableBlend();
+            restoreRenderState();
         }
 
         return stats.toRenderStats();
+    }
+
+    /**
+     * Restores the render state touched by the CloudField volume pass. The hook
+     * also calls this defensively when it catches a render exception.
+     */
+    public static void restoreRenderState() {
+        RenderSystem.depthMask(true);
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
+        RenderSystem.enableCull();
+        GL11.glCullFace(GL11.GL_BACK);
+        RenderSystem.disableBlend();
     }
 
     private static boolean dimensionMatches(CloudFieldSnapshot snapshot, String dimensionId) {
@@ -203,8 +277,51 @@ public final class CloudFieldVolumeRenderer {
         return filtered;
     }
 
+    private static boolean containsField(List<FieldDraw> candidates, FieldDraw target) {
+        for (FieldDraw candidate : candidates) {
+            if (candidate.snapshot().fieldId().equals(target.snapshot().fieldId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static double fieldPriority(CloudFieldSnapshot snapshot, Bounds bounds, Vec3 cameraPosition) {
+        if (bounds.contains(cameraPosition)) {
+            return Double.MAX_VALUE * 0.25D;
+        }
+        double distanceSqr = Math.max(1.0D, bounds.distanceToSqr(cameraPosition));
+        double radius = Math.max(1.0D, snapshot.radius());
+        double projectedContribution = (radius * radius) / distanceSqr;
+        return projectedContribution
+                * Math.max(0.10D, sourceVisualMultiplier(snapshot.sourceKind()))
+                * Math.max(0.10D, snapshot.effectiveDensity())
+                * Math.max(0.10D, snapshot.effectiveCoverage());
+    }
+
+    private static int raymarchStepsFor(FieldDraw draw, double maxRenderDistance) {
+        int baseSteps = CloudFieldVolumeRenderConfig.raymarchSteps();
+        if (CloudFieldVolumeRenderConfig.quality() == AtmoCommonConfig.CloudRaymarchQuality.ULTRA) {
+            return baseSteps;
+        }
+        double distance = Math.sqrt(Math.max(0.0D, draw.distanceSqr()));
+        double ratio = maxRenderDistance <= 0.0D ? 0.0D : distance / maxRenderDistance;
+        float multiplier = ratio > 0.70D ? 0.50F : ratio > 0.35D ? 0.75F : 1.0F;
+        return Math.max(8, Math.round(baseSteps * multiplier));
+    }
+
     private static String sourceLabel(CloudFieldSnapshot snapshot) {
         return snapshot.sourceKind().serializedName();
+    }
+
+    private static float sourceVisualMultiplier(CloudFieldSourceKind sourceKind) {
+        return switch (sourceKind == null ? CloudFieldSourceKind.UNKNOWN : sourceKind) {
+            case MANUAL_DEBUG -> 0.92F;
+            case WEATHER_SUMMARY -> 0.38F;
+            case PA_CLUSTER -> 1.0F;
+            case PA_REGION -> 0.78F;
+            case UNKNOWN -> 0.55F;
+        };
     }
 
     private static String shortId(CloudFieldSnapshot snapshot) {
@@ -237,9 +354,31 @@ public final class CloudFieldVolumeRenderer {
                     && Mth.clamp(position.y(), min.y(), max.y()) == position.y()
                     && Mth.clamp(position.z(), min.z(), max.z()) == position.z();
         }
+
+        public AABB toAabb() {
+            return new AABB(min.x(), min.y(), min.z(), max.x(), max.y(), max.z());
+        }
+
+        public double distanceToSqr(Vec3 position) {
+            Vec3 safePosition = position == null ? Vec3.ZERO : position;
+            double dx = axisDistance(safePosition.x(), min.x(), max.x());
+            double dy = axisDistance(safePosition.y(), min.y(), max.y());
+            double dz = axisDistance(safePosition.z(), min.z(), max.z());
+            return dx * dx + dy * dy + dz * dz;
+        }
+
+        private static double axisDistance(double value, double min, double max) {
+            if (value < min) {
+                return min - value;
+            }
+            if (value > max) {
+                return value - max;
+            }
+            return 0.0D;
+        }
     }
 
-    private record FieldDraw(CloudFieldSnapshot snapshot, Bounds bounds, double distanceSqr) {
+    private record FieldDraw(CloudFieldSnapshot snapshot, Bounds bounds, double distanceSqr, double priority) {
     }
 
     private static final class Stats {
@@ -250,6 +389,7 @@ public final class CloudFieldVolumeRenderer {
         private final CloudFieldVolumeRenderMode mode;
         private final CloudFieldVolumeRenderFilter filter;
         private final List<String> renderedFieldLabels = new ArrayList<>();
+        private final List<String> fieldDiagnostics = new ArrayList<>();
         private int fieldsBeforeFilter;
         private int visibleFields;
         private int renderedFields;
@@ -258,6 +398,10 @@ public final class CloudFieldVolumeRenderer {
         private int notVisibleSkipped;
         private int filterSkipped;
         private int maxFieldLimitSkipped;
+        private int frustumSkipped;
+        private int distanceSkipped;
+        private String targetDiagnostics = "none";
+        private String performanceDiagnostics = "gpuMs=unavailable";
         private String lastSkipReason = "none";
 
         private Stats(
@@ -283,8 +427,86 @@ public final class CloudFieldVolumeRenderer {
             renderedFieldLabels.add(shortId(snapshot) + ":" + sourceLabel(snapshot));
         }
 
+        private void recordTarget(RenderTarget target, boolean downscaleApplied) {
+            if (target == null) {
+                targetDiagnostics = "missing";
+                return;
+            }
+            RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
+            String targetKind = target == mainTarget ? "main" : "cloud_downscale";
+            targetDiagnostics = targetKind
+                    + " size=" + target.width + "x" + target.height
+                    + " downscaleApplied=" + downscaleApplied
+                    + " depth=" + (target.getDepthTextureId() > 0);
+        }
+
+        private void recordGpuTimer(CloudGpuTimer gpuTimer) {
+            if (gpuTimer == null || !gpuTimer.isSupported()) {
+                performanceDiagnostics = "gpuMs=unsupported";
+                return;
+            }
+            if (!gpuTimer.hasResult()) {
+                performanceDiagnostics = "gpuMs=pending pendingQueries=" + gpuTimer.getPendingQueries();
+                return;
+            }
+            performanceDiagnostics = "gpuMs=" + CloudFieldVolumeRenderStats.format(gpuTimer.getLastMilliseconds())
+                    + " resultAgeFrames=" + gpuTimer.getLastResultAgeFrames()
+                    + " pendingQueries=" + gpuTimer.getPendingQueries();
+        }
+
+        private void recordRawField(String detail) {
+            if (fieldDiagnostics.size() >= 8) {
+                return;
+            }
+            fieldDiagnostics.add(detail);
+        }
+
+        private void recordField(
+                CloudFieldSnapshot snapshot,
+                Bounds bounds,
+                Vec3 cameraPosition,
+                String result,
+                String visibility
+        ) {
+            if (fieldDiagnostics.size() >= 8) {
+                return;
+            }
+            Vec3 center = snapshot.center();
+            boolean validBounds = isValid(bounds);
+            boolean cameraInside = validBounds && bounds.contains(cameraPosition);
+            Vec3 distanceAnchor = validBounds ? bounds.center() : center;
+            double cameraDistance = Math.sqrt(distanceAnchor.distanceToSqr(cameraPosition));
+            fieldDiagnostics.add(String.format(
+                    Locale.ROOT,
+                    "%s:%s sourceVisual=%.2f center=%.1f,%.1f,%.1f radius=%.1f baseTop=%.1f/%.1f density=%.3f coverage=%.3f hydration=%.3f vertical=%.3f cameraDistance=%.1f cameraInsideVolume=%s %s result=%s",
+                    shortId(snapshot),
+                    sourceLabel(snapshot),
+                    sourceVisualMultiplier(snapshot.sourceKind()),
+                    center.x(),
+                    center.y(),
+                    center.z(),
+                    snapshot.radius(),
+                    snapshot.baseY(),
+                    snapshot.topY(),
+                    snapshot.density(),
+                    snapshot.coverage(),
+                    snapshot.hydrationProgress(),
+                    snapshot.verticalDevelopment(),
+                    cameraDistance,
+                    cameraInside,
+                    visibility,
+                    result
+            ));
+        }
+
         private CloudFieldVolumeRenderStats toRenderStats() {
-            int skipped = wrongDimensionSkipped + invalidGeometrySkipped + notVisibleSkipped + filterSkipped + maxFieldLimitSkipped;
+            int skipped = wrongDimensionSkipped
+                    + invalidGeometrySkipped
+                    + notVisibleSkipped
+                    + filterSkipped
+                    + maxFieldLimitSkipped
+                    + frustumSkipped
+                    + distanceSkipped;
             return new CloudFieldVolumeRenderStats(
                     true,
                     true,
@@ -306,7 +528,13 @@ public final class CloudFieldVolumeRenderer {
                     notVisibleSkipped,
                     filterSkipped,
                     maxFieldLimitSkipped,
+                    frustumSkipped,
+                    distanceSkipped,
                     renderedFieldLabels.isEmpty() ? "none" : String.join(",", renderedFieldLabels),
+                    fieldDiagnostics.isEmpty() ? "none" : String.join("\n", fieldDiagnostics),
+                    targetDiagnostics,
+                    performanceDiagnostics,
+                    "none",
                     lastSkipReason
             );
         }

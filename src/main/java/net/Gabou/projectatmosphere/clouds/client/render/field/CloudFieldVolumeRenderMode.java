@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.field;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Debug modes understood by the CloudField volume prototype shader.
+ * Diagnostic modes understood by the CloudField volume shader.
  */
 public enum CloudFieldVolumeRenderMode {
     NORMAL(0, "normal"),

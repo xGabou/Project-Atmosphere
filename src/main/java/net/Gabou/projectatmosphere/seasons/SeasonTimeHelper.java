@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.seasons;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -35,6 +36,15 @@ public final class SeasonTimeHelper {
             return DELEGATE.get().snapshot(level);
         } catch (Exception e) {
             LOGGER.warn("Season delegate failed; using neutral snapshot.", e);
+            return SeasonSnapshot.neutral();
+        }
+    }
+
+    public static SeasonSnapshot snapshot(Level level, BlockPos pos) {
+        try {
+            return DELEGATE.get().snapshot(level, pos);
+        } catch (Exception e) {
+            LOGGER.warn("Season delegate failed for position {}; using neutral snapshot.", pos, e);
             return SeasonSnapshot.neutral();
         }
     }

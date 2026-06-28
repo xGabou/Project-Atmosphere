@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.seasons;
 
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 
@@ -10,6 +11,10 @@ public interface SeasonTimeDelegate {
     }
 
     SeasonSnapshot snapshot(Level level);
+
+    default SeasonSnapshot snapshot(Level level, BlockPos pos) {
+        return snapshot(level);
+    }
 
     long seasonCycleTicks(Level level);
 

@@ -251,9 +251,8 @@ public class TelemetryDebugClientCommand {
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildClientCloudFieldsCommand() {
         return Commands.literal("cloud")
-                .then(Commands.literal("fields")
-                        .then(buildCloudFieldVolumeControls("render"))
-                        .then(buildCloudFieldLegacyDebugControls("legacydebug")));
+                .then(buildCloudFieldVolumeControls("render"))
+                .then(buildCloudFieldLegacyDebugControls("legacydebug"));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildCloudFieldVolumeControls(String literalName) {
@@ -281,6 +280,7 @@ public class TelemetryDebugClientCommand {
                     .executes(ctx -> setCloudFieldVolumeFilter(ctx.getSource(), filter)));
         }
         root.then(filterRoot);
+        root.then(buildCloudFieldVolumeQualityCommand());
         root.then(buildCloudFieldVolumeTuneCommand());
         return root;
     }
@@ -318,6 +318,45 @@ public class TelemetryDebugClientCommand {
                 () -> Component.literal("CloudField volume render filter set to "
                         + filter.serializedName()
                         + "."),
+                false
+        );
+        return 1;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildCloudFieldVolumeQualityCommand() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("quality")
+                .executes(ctx -> sendCloudFieldVolumeQualityStatus(ctx.getSource()))
+                .then(Commands.literal("status")
+                        .executes(ctx -> sendCloudFieldVolumeQualityStatus(ctx.getSource())));
+
+        for (AtmoCommonConfig.CloudRaymarchQuality quality : AtmoCommonConfig.CloudRaymarchQuality.values()) {
+            root.then(Commands.literal(CloudFieldVolumeRenderConfig.serializedQualityName(quality))
+                    .executes(ctx -> setCloudFieldVolumeQuality(ctx.getSource(), quality)));
+        }
+        root.then(Commands.literal("low_24_steps")
+                .executes(ctx -> setCloudFieldVolumeQuality(ctx.getSource(), AtmoCommonConfig.CloudRaymarchQuality.LOW_24)));
+        root.then(Commands.literal("sublime")
+                .executes(ctx -> setCloudFieldVolumeQuality(ctx.getSource(), AtmoCommonConfig.CloudRaymarchQuality.ULTRA)));
+        return root;
+    }
+
+    private static int setCloudFieldVolumeQuality(CommandSourceStack source, AtmoCommonConfig.CloudRaymarchQuality quality) {
+        CloudFieldVolumeRenderConfig.setQuality(quality);
+        source.sendSuccess(
+                () -> Component.literal("CloudField render quality set to "
+                        + CloudFieldVolumeRenderConfig.serializedQualityName(quality)
+                        + ".\n"
+                        + CloudFieldVolumeRenderConfig.qualityStatus()),
+                false
+        );
+        return 1;
+    }
+
+    private static int sendCloudFieldVolumeQualityStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal("CloudField render quality\n"
+                        + CloudFieldVolumeRenderConfig.qualityStatus()
+                        + "\ncommand=/pa cloud render quality <low|low_24|low_24_steps|medium|high|ultra>"),
                 false
         );
         return 1;
@@ -394,9 +433,9 @@ public class TelemetryDebugClientCommand {
         source.sendSuccess(
                 () -> Component.literal("CloudField volume tuning\n"
                         + CloudFieldVolumeRenderConfig.tuningStatus()
-                        + "\ncommands=/pa cloud fields render tune <opacity|threshold|erosion|noise|brightness|underside|maxalpha|densityboost|animspeed> <value>"
-                        + "\npreset=/pa cloud fields render tune preset <soft|dense|wispy|debug>"
-                        + "\nreset=/pa cloud fields render tune reset"),
+                        + "\ncommands=/pa cloud render tune <opacity|threshold|erosion|noise|brightness|underside|maxalpha|densityboost|animspeed> <value>"
+                        + "\npreset=/pa cloud render tune preset <soft|dense|wispy|debug>"
+                        + "\nreset=/pa cloud render tune reset"),
                 false
         );
         return 1;
@@ -419,13 +458,14 @@ public class TelemetryDebugClientCommand {
                         + "\n" + cloudFieldRendererOwnershipStatus()
                         + "\nlegacyRendererStatus="
                         + CloudFieldDebugRenderConfig.status().replace("\n", " | ")
-                        + "\ncommands=/pa cloud fields render on|off|status"
-                        + "\ncompact=/pa cloud fields render status"
-                        + "\nlegacydebug=/pa cloud fields legacydebug on|off|status"
-                        + "\nmode=/pa cloud fields render mode <normal|bounds|horizontal|height|vertical|density|source>"
-                        + "\nfilter=/pa cloud fields render filter <all|manual|weather|nearest|first>"
-                        + "\ntune=/pa cloud fields render tune <opacity|threshold|erosion|noise|brightness|underside|maxalpha|densityboost|animspeed> <value>"
-                        + "\npreset=/pa cloud fields render tune preset <soft|dense|wispy|debug>"),
+                        + "\ncommands=/pa cloud render on|off|status"
+                        + "\ncompact=/pa cloud render status"
+                        + "\nlegacydebug=/pa cloud legacydebug on|off|status"
+                        + "\nmode=/pa cloud render mode <normal|bounds|horizontal|height|vertical|density|source>"
+                        + "\nfilter=/pa cloud render filter <all|manual|weather|nearest|first>"
+                        + "\nquality=/pa cloud render quality <low|low_24|low_24_steps|medium|high|ultra>"
+                        + "\ntune=/pa cloud render tune <opacity|threshold|erosion|noise|brightness|underside|maxalpha|densityboost|animspeed> <value>"
+                        + "\npreset=/pa cloud render tune preset <soft|dense|wispy|debug>"),
                 false
         );
         return 1;
@@ -437,7 +477,10 @@ public class TelemetryDebugClientCommand {
         return "volumeRendererEnabled=" + volumeEnabled
                 + "\nlegacyCloudFieldRendererEnabled=" + legacyEnabled
                 + "\nduplicateCloudFieldRenderPathsActive=" + (volumeEnabled && legacyEnabled)
-                + "\nactiveCloudFieldRenderer=" + activeCloudFieldRenderer(volumeEnabled, legacyEnabled);
+                + "\nactiveCloudFieldRenderer=" + activeCloudFieldRenderer(volumeEnabled, legacyEnabled)
+                + "\nactiveMainCloudRenderer=cloudfield_volume"
+                + "\nlegacyCloudRendererEnabled=false"
+                + "\nduplicateCloudRenderPathsActive=false";
     }
 
     private static String activeCloudFieldRenderer(boolean volumeEnabled, boolean legacyEnabled) {

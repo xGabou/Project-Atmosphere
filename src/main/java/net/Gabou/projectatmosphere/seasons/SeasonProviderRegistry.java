@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.seasons;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
@@ -37,6 +38,15 @@ public final class SeasonProviderRegistry {
             return getProvider().snapshot(level);
         } catch (Exception e) {
             LOGGER.warn("Season provider '{}' failed; falling back to neutral.", getProvider().id(), e);
+            return SeasonSnapshot.neutral();
+        }
+    }
+
+    public static SeasonSnapshot snapshot(Level level, BlockPos pos) {
+        try {
+            return getProvider().snapshot(level, pos);
+        } catch (Exception e) {
+            LOGGER.warn("Season provider '{}' failed for position {}; falling back to neutral.", getProvider().id(), pos, e);
             return SeasonSnapshot.neutral();
         }
     }

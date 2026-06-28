@@ -1,15 +1,22 @@
 package net.Gabou.projectatmosphere.clouds.client.render.field;
 
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import net.minecraftforge.fml.config.ConfigTracker;
+import net.minecraftforge.fml.config.ModConfig;
 
 /**
- * Client-only controls and last-frame diagnostics for the bounded CloudField
- * volume prototype renderer. This experimental path is command-enabled and is
- * not the final global raymarcher, cloud shadow path, or Atmospheric Shaders
- * integration.
+ * Client-only controls and last-frame diagnostics for synced CloudField volume
+ * rendering. This bounded path is experimental, but it renders real
+ * CloudFieldSnapshot objects and is not a throwaway debug visual.
  */
 public final class CloudFieldVolumeRenderConfig {
-    private static volatile boolean enabled;
+    private static final long ERROR_LOG_INTERVAL_MILLIS = 10_000L;
+
+    private static volatile boolean enabled = true;
     private static volatile CloudFieldVolumeRenderMode mode = CloudFieldVolumeRenderMode.NORMAL;
     private static volatile CloudFieldVolumeRenderFilter filter = CloudFieldVolumeRenderFilter.ALL;
     private static volatile float opacityStrength = CloudFieldVolumeTuneTarget.OPACITY.defaultValue();
@@ -21,8 +28,9 @@ public final class CloudFieldVolumeRenderConfig {
     private static volatile float maxFinalAlpha = CloudFieldVolumeTuneTarget.MAX_ALPHA.defaultValue();
     private static volatile float densityBoost = CloudFieldVolumeTuneTarget.DENSITY_BOOST.defaultValue();
     private static volatile float animSpeed = CloudFieldVolumeTuneTarget.ANIM_SPEED.defaultValue();
+    private static volatile long lastErrorLogMillis;
     private static volatile CloudFieldVolumeRenderStats lastStats = CloudFieldVolumeRenderStats.idle(
-            false,
+            true,
             false,
             CloudFieldVolumeRenderMode.NORMAL,
             CloudFieldVolumeRenderFilter.ALL,
@@ -40,8 +48,14 @@ public final class CloudFieldVolumeRenderConfig {
      */
     public static void setEnabled(boolean shouldEnable) {
         enabled = shouldEnable;
+        try {
+            AtmoCommonConfig.CLOUD_FIELD_RENDERER_ENABLED.set(shouldEnable);
+            saveCommonConfigForMod(ProjectAtmosphere.MODID);
+        } catch (Exception exception) {
+            ProjectAtmosphere.LOGGER.warn("[CloudFieldVolume] failed to persist renderer enabled={}", shouldEnable, exception);
+        }
         lastStats = CloudFieldVolumeRenderStats.idle(
-                enabled,
+                isEnabled(),
                 CloudFieldVolumeShaders.isReady(),
                 mode,
                 filter,
@@ -56,7 +70,16 @@ public final class CloudFieldVolumeRenderConfig {
      * @return true when enabled by client command
      */
     public static boolean isEnabled() {
-        return enabled;
+        return enabled && configuredEnabled();
+    }
+
+    /**
+     * Returns whether the client cloud mixin may suppress vanilla clouds for
+     * this renderer. Render exceptions flip only the volatile flag, so vanilla
+     * becomes the fail-safe fallback without rewriting the user's config.
+     */
+    public static boolean canOwnVanillaCloudLayer() {
+        return isEnabled();
     }
 
     /**
@@ -67,7 +90,7 @@ public final class CloudFieldVolumeRenderConfig {
     public static void setMode(CloudFieldVolumeRenderMode nextMode) {
         mode = nextMode == null ? CloudFieldVolumeRenderMode.NORMAL : nextMode;
         lastStats = CloudFieldVolumeRenderStats.idle(
-                enabled,
+                isEnabled(),
                 CloudFieldVolumeShaders.isReady(),
                 mode,
                 filter,
@@ -93,7 +116,7 @@ public final class CloudFieldVolumeRenderConfig {
     public static void setFilter(CloudFieldVolumeRenderFilter nextFilter) {
         filter = nextFilter == null ? CloudFieldVolumeRenderFilter.ALL : nextFilter;
         lastStats = CloudFieldVolumeRenderStats.idle(
-                enabled,
+                isEnabled(),
                 CloudFieldVolumeShaders.isReady(),
                 mode,
                 filter,
@@ -109,6 +132,72 @@ public final class CloudFieldVolumeRenderConfig {
      */
     public static CloudFieldVolumeRenderFilter filter() {
         return filter;
+    }
+
+    /**
+     * Sets the active CloudField renderer quality profile.
+     *
+     * @param nextQuality quality profile to use for subsequent frames
+     */
+    public static void setQuality(AtmoCommonConfig.CloudRaymarchQuality nextQuality) {
+        AtmoCommonConfig.CloudRaymarchQuality quality = nextQuality == null
+                ? AtmoCommonConfig.CloudRaymarchQuality.MEDIUM
+                : nextQuality;
+        try {
+            AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(quality);
+            saveCommonConfigForMod(ProjectAtmosphere.MODID);
+        } catch (Exception exception) {
+            ProjectAtmosphere.LOGGER.warn("[CloudFieldVolume] failed to persist renderer quality={}", quality.name(), exception);
+        }
+        lastStats = CloudFieldVolumeRenderStats.idle(
+                isEnabled(),
+                CloudFieldVolumeShaders.isReady(),
+                mode,
+                filter,
+                "quality_changed_waiting_for_render_frame",
+                lastStats.cachedSnapshots()
+        );
+    }
+
+    /**
+     * Returns the current CloudField renderer quality profile.
+     *
+     * @return active quality profile
+     */
+    public static AtmoCommonConfig.CloudRaymarchQuality quality() {
+        return AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get();
+    }
+
+    /**
+     * Returns the raymarch step count requested by the active quality profile.
+     *
+     * @return shader raymarch steps
+     */
+    public static int raymarchSteps() {
+        return quality().getRaymarchSteps();
+    }
+
+    /**
+     * Returns the per-frame field cap requested by the active quality profile.
+     *
+     * @return maximum rendered fields for one frame
+     */
+    public static int maxRenderedFields() {
+        return quality().getMaxCloudFields();
+    }
+
+    /**
+     * Returns the resolution scale for the active static quality preset.
+     */
+    public static float resolutionScale() {
+        return quality().getResolutionScale();
+    }
+
+    /**
+     * Returns the number of procedural FBM octaves the shader should use.
+     */
+    public static int detailOctaves() {
+        return quality().getDetailOctaves();
     }
 
     /**
@@ -132,7 +221,7 @@ public final class CloudFieldVolumeRenderConfig {
             case ANIM_SPEED -> animSpeed = clamped;
         }
         lastStats = CloudFieldVolumeRenderStats.idle(
-                enabled,
+                isEnabled(),
                 CloudFieldVolumeShaders.isReady(),
                 mode,
                 filter,
@@ -158,7 +247,7 @@ public final class CloudFieldVolumeRenderConfig {
         densityBoost = CloudFieldVolumeTuneTarget.DENSITY_BOOST.clamp(safePreset.densityBoost());
         animSpeed = CloudFieldVolumeTuneTarget.ANIM_SPEED.clamp(safePreset.animSpeed());
         lastStats = CloudFieldVolumeRenderStats.idle(
-                enabled,
+                isEnabled(),
                 CloudFieldVolumeShaders.isReady(),
                 mode,
                 filter,
@@ -168,14 +257,14 @@ public final class CloudFieldVolumeRenderConfig {
     }
 
     /**
-     * Restores all runtime shader tuning values to prototype defaults.
+     * Restores all runtime shader tuning values to renderer defaults.
      */
     public static void resetTuning() {
         for (CloudFieldVolumeTuneTarget target : CloudFieldVolumeTuneTarget.values()) {
             setTuning(target, target.defaultValue());
         }
         lastStats = CloudFieldVolumeRenderStats.idle(
-                enabled,
+                isEnabled(),
                 CloudFieldVolumeShaders.isReady(),
                 mode,
                 filter,
@@ -293,8 +382,36 @@ public final class CloudFieldVolumeRenderConfig {
      */
     public static void recordStats(CloudFieldVolumeRenderStats stats) {
         lastStats = stats == null
-                ? CloudFieldVolumeRenderStats.idle(enabled, CloudFieldVolumeShaders.isReady(), mode, filter, "missing_stats", 0)
+                ? CloudFieldVolumeRenderStats.idle(isEnabled(), CloudFieldVolumeShaders.isReady(), mode, filter, "missing_stats", 0)
                 : stats;
+    }
+
+    /**
+     * Records a caught CloudField render exception, disables the pass, and
+     * rate-limits logging so one bad frame cannot corrupt subsequent ticks.
+     *
+     * @param throwable render exception caught by the hook
+     * @param cachedSnapshots client snapshot cache size at failure time
+     */
+    public static void recordRenderException(Throwable throwable, int cachedSnapshots) {
+        enabled = false;
+        String summary = summarizeThrowable(throwable);
+        lastStats = CloudFieldVolumeRenderStats.renderError(
+                CloudFieldVolumeShaders.isReady(),
+                mode,
+                filter,
+                cachedSnapshots,
+                summary
+        );
+        long now = System.currentTimeMillis();
+        if (now - lastErrorLogMillis >= ERROR_LOG_INTERVAL_MILLIS) {
+            lastErrorLogMillis = now;
+            ProjectAtmosphere.LOGGER.error(
+                    "[CloudFieldVolume] renderException pass disabled; use /pa cloud render on after fixing the cause. {}",
+                    summary,
+                    throwable
+            );
+        }
     }
 
     /**
@@ -313,7 +430,9 @@ public final class CloudFieldVolumeRenderConfig {
      */
     public static String status() {
         return lastStats.compactStatus()
-                + "\nexperimentalVolumeRendererDefault=disabled_until_command_enabled"
+                + "\n" + qualityStatus()
+                + "\nskyboxTextureIntegration=pending_no_skybox_texture_resource_found"
+                + "\ncloudFieldRendererDefault=enabled_without_simple_clouds"
                 + "\n" + tuningStatus();
     }
 
@@ -324,11 +443,40 @@ public final class CloudFieldVolumeRenderConfig {
      */
     public static String verboseStatus() {
         return lastStats.verboseStatus()
-                + "\ncurrentEnabled=" + enabled
+                + "\ncurrentEnabled=" + isEnabled()
+                + "\nvolatileRendererEnabled=" + enabled
+                + "\nconfiguredRendererEnabled=" + configuredEnabled()
                 + "\ncurrentMode=" + mode.serializedName() + " (" + mode.shaderId() + ")"
                 + "\ncurrentFilter=" + filter.serializedName()
-                + "\nexperimentalVolumeRendererDefault=disabled_until_command_enabled"
+                + "\ncurrentQuality=" + serializedQualityName(quality())
+                + "\n" + qualityStatus()
+                + "\ndownscaleCompositeStatus=active_for_non_ultra_static_presets"
+                + "\nskyboxTextureIntegration=pending_no_skybox_texture_resource_found"
+                + "\ncloudFieldRendererDefault=enabled_without_simple_clouds"
                 + "\n" + tuningStatus();
+    }
+
+    /**
+     * Formats the current quality profile and effective render target size.
+     *
+     * @return single-line quality status
+     */
+    public static String qualityStatus() {
+        RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
+        AtmoCommonConfig.CloudRaymarchQuality quality = quality();
+        int mainWidth = mainTarget == null ? 0 : mainTarget.width;
+        int mainHeight = mainTarget == null ? 0 : mainTarget.height;
+        float scale = quality.getResolutionScale();
+        int effectiveWidth = Math.max(1, Math.round(mainWidth * scale));
+        int effectiveHeight = Math.max(1, Math.round(mainHeight * scale));
+        return "quality=" + serializedQualityName(quality)
+                + " steps=" + quality.getRaymarchSteps()
+                + " downscaleFactor=" + CloudFieldVolumeRenderStats.format(scale)
+                + " effectiveTarget=" + effectiveWidth + "x" + effectiveHeight
+                + " maxFields=" + quality.getMaxCloudFields()
+                + " detailOctaves=" + quality.getDetailOctaves()
+                + " staticPreset=true"
+                + " downscaleApplied=" + (scale < 0.999F);
     }
 
     /**
@@ -346,5 +494,46 @@ public final class CloudFieldVolumeRenderConfig {
                 + " tune.underside=" + CloudFieldVolumeRenderStats.format(undersideDarkening)
                 + " tune.densityboost=" + CloudFieldVolumeRenderStats.format(densityBoost)
                 + " tune.animspeed=" + CloudFieldVolumeRenderStats.format(animSpeed);
+    }
+
+    private static String summarizeThrowable(Throwable throwable) {
+        if (throwable == null) {
+            return "unknown";
+        }
+        String message = throwable.getMessage();
+        String type = throwable.getClass().getSimpleName();
+        if (message == null || message.isBlank()) {
+            return type;
+        }
+        String sanitized = message.replace('\n', ' ').replace('\r', ' ');
+        return type + ": " + sanitized;
+    }
+
+    private static boolean configuredEnabled() {
+        try {
+            return AtmoCommonConfig.CLOUD_FIELD_RENDERER_ENABLED.get();
+        } catch (Exception exception) {
+            return true;
+        }
+    }
+
+    public static String serializedQualityName(AtmoCommonConfig.CloudRaymarchQuality quality) {
+        AtmoCommonConfig.CloudRaymarchQuality safeQuality = quality == null
+                ? AtmoCommonConfig.CloudRaymarchQuality.MEDIUM
+                : quality;
+        return safeQuality.name().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static void saveCommonConfigForMod(String modId) {
+        var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
+        if (set == null) {
+            return;
+        }
+        for (ModConfig config : set) {
+            if (config.getModId().equals(modId)) {
+                config.save();
+                return;
+            }
+        }
     }
 }

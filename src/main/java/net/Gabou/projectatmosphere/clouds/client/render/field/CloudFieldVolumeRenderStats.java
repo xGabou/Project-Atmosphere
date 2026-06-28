@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.field;
 import java.util.Locale;
 
 /**
- * Last-frame diagnostics for the CloudField volume prototype renderer. It is
+ * Last-frame diagnostics for the CloudField volume renderer. It is
  * intentionally command-readable instead of log-spammed every render frame.
  */
 public record CloudFieldVolumeRenderStats(
@@ -27,7 +27,13 @@ public record CloudFieldVolumeRenderStats(
         int notVisibleSkipped,
         int filterSkipped,
         int maxFieldLimitSkipped,
+        int frustumSkipped,
+        int distanceSkipped,
         String lastRenderedFields,
+        String fieldDiagnostics,
+        String targetDiagnostics,
+        String performanceDiagnostics,
+        String lastRenderError,
         String lastSkipReason
 ) {
     public CloudFieldVolumeRenderStats {
@@ -35,6 +41,10 @@ public record CloudFieldVolumeRenderStats(
         filter = filter == null ? CloudFieldVolumeRenderFilter.ALL : filter;
         dimensionId = dimensionId == null || dimensionId.isBlank() ? "unknown" : dimensionId;
         lastRenderedFields = lastRenderedFields == null || lastRenderedFields.isBlank() ? "none" : lastRenderedFields;
+        fieldDiagnostics = fieldDiagnostics == null || fieldDiagnostics.isBlank() ? "none" : fieldDiagnostics;
+        targetDiagnostics = targetDiagnostics == null || targetDiagnostics.isBlank() ? "none" : targetDiagnostics;
+        performanceDiagnostics = performanceDiagnostics == null || performanceDiagnostics.isBlank() ? "none" : performanceDiagnostics;
+        lastRenderError = lastRenderError == null || lastRenderError.isBlank() ? "none" : lastRenderError;
         lastSkipReason = lastSkipReason == null || lastSkipReason.isBlank() ? "none" : lastSkipReason;
     }
 
@@ -81,8 +91,64 @@ public record CloudFieldVolumeRenderStats(
                 0,
                 0,
                 0,
+                0,
+                0,
+                "none",
+                "none",
+                "none",
+                "none",
                 "none",
                 reason
+        );
+    }
+
+    /**
+     * Creates a stats snapshot for a caught render exception. The render hook
+     * uses this after disabling the CloudField pass for fail-safe recovery.
+     *
+     * @param shaderReady whether the shader is loaded
+     * @param mode current render mode
+     * @param filter current diagnostic filter
+     * @param cachedSnapshots client snapshot cache size
+     * @param error command-readable exception summary
+     * @return command-readable error stats snapshot
+     */
+    public static CloudFieldVolumeRenderStats renderError(
+            boolean shaderReady,
+            CloudFieldVolumeRenderMode mode,
+            CloudFieldVolumeRenderFilter filter,
+            int cachedSnapshots,
+            String error
+    ) {
+        return new CloudFieldVolumeRenderStats(
+                false,
+                shaderReady,
+                mode,
+                filter,
+                "unknown",
+                -1L,
+                cachedSnapshots,
+                cachedSnapshots,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "none",
+                "none",
+                "none",
+                "none",
+                error,
+                "render_exception_disabled"
         );
     }
 
@@ -102,7 +168,12 @@ public record CloudFieldVolumeRenderStats(
                 + "\nrenderedFields=" + renderedFields
                 + "\nskippedFields=" + skippedFields
                 + "\nfilteredOut=" + filterSkipped
+                + "\nfrustumSkipped=" + frustumSkipped
+                + "\ndistanceSkipped=" + distanceSkipped
+                + "\nrenderTarget=" + targetDiagnostics
+                + "\nperformance=" + performanceDiagnostics
                 + "\nlastRenderedFields=" + lastRenderedFields
+                + "\nlastRenderError=" + lastRenderError
                 + "\nsourceKindInSnapshot=true";
     }
 
@@ -125,7 +196,10 @@ public record CloudFieldVolumeRenderStats(
                 + "\nskip.notVisible=" + notVisibleSkipped
                 + "\nskip.filteredOut=" + filterSkipped
                 + "\nskip.maxFieldLimit=" + maxFieldLimitSkipped
+                + "\nskip.frustum=" + frustumSkipped
+                + "\nskip.distance=" + distanceSkipped
                 + "\nsourceFilterMode=source_kind"
+                + "\nfieldDiagnostics:\n" + fieldDiagnostics
                 + "\nlastSkipReason=" + lastSkipReason;
     }
 

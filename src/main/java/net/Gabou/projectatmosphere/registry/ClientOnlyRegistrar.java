@@ -4,13 +4,8 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderHook;
-import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
-import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderHook;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldPacketDispatcher;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudDiagnosticsOverlay;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderHook;
-import net.Gabou.projectatmosphere.clouds.client.render.FallbackDarkeningPass;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.client.ClientTickHandler;
@@ -43,15 +38,14 @@ public class ClientOnlyRegistrar {
         MinecraftForge.EVENT_BUS.register(ClientTickHandler.class);
         MinecraftForge.EVENT_BUS.register(AtmosphereFogRenderHandler.class);
         if (!simpleCloudsLoaded) {
-            MinecraftForge.EVENT_BUS.register(CloudRenderHook.class);
-            MinecraftForge.EVENT_BUS.register(CloudDebugRenderHook.class);
-            // CloudFieldVolumeRenderHook is the active experimental GLSL CloudField renderer.
-            // CloudFieldDebugRenderHook remains registered only for explicit legacy diagnostics
-            // and is off by default so one CloudField visual path draws unless requested.
+            // CloudFieldVolumeRenderHook is the active experimental GLSL
+            // CloudField renderer for synced CloudField snapshots. The older
+            // pre-CloudField native CloudRenderHook/CloudDiagnosticsOverlay path
+            // is intentionally not registered as visual ownership anymore.
+            // CloudFieldDebugRenderHook remains available only for explicit
+            // legacy diagnostics and is off by default.
             MinecraftForge.EVENT_BUS.register(CloudFieldDebugRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudFieldVolumeRenderHook.class);
-            MinecraftForge.EVENT_BUS.register(CloudDiagnosticsOverlay.class);
-            MinecraftForge.EVENT_BUS.register(FallbackDarkeningPass.class);
         } else {
             MinecraftForge.EVENT_BUS.register(SimpleCloudsWhiteoutFogHandler.class);
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; PA cloud client hooks disabled.");
@@ -64,9 +58,5 @@ public class ClientOnlyRegistrar {
                 () -> new ConfigScreenHandler.ConfigScreenFactory((mc, screen) -> new AtmoConfigScreen(screen)));
         RainbowWeatherTracker.setEnabled(CompatHandler.isRainbowsLoaded());
         AuroraCompatController.setEnabled(CompatHandler.isAurorasLoaded());
-
-        if (!simpleCloudsLoaded && !FMLEnvironment.production) {
-            CloudDebugStateInitializer.initialize();
-        }
     }
 }

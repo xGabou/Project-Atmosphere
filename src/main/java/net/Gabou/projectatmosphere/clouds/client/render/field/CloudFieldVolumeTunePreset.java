@@ -3,14 +3,14 @@ package net.Gabou.projectatmosphere.clouds.client.render.field;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Client-only shader tuning presets for the bounded CloudField volume prototype.
+ * Client-only shader tuning presets for the bounded CloudField volume renderer.
  * These values affect uniforms only and never modify backend CloudField state.
  */
 public enum CloudFieldVolumeTunePreset {
-    SOFT("soft", 0.420F, 0.0012F, 1.0F, 1.0F, 1.08F, 0.34F, 0.95F, 2.0F, 0.015F),
-    DENSE("dense", 0.620F, 0.0008F, 0.85F, 0.85F, 1.06F, 0.46F, 0.98F, 2.6F, 0.012F),
-    WISPY("wispy", 0.260F, 0.0035F, 1.45F, 1.35F, 1.12F, 0.24F, 0.78F, 1.35F, 0.018F),
-    DEBUG("debug", 0.760F, 0.0005F, 0.35F, 0.55F, 1.30F, 0.20F, 0.99F, 2.8F, 0.0F);
+    SOFT("soft", 0.340F, 0.0016F, 1.20F, 1.0F, 1.0F, 0.52F, 0.90F, 1.55F, 0.012F),
+    DENSE("dense", 0.480F, 0.0012F, 1.05F, 0.95F, 1.02F, 0.56F, 0.94F, 2.10F, 0.010F),
+    WISPY("wispy", 0.240F, 0.0035F, 1.50F, 1.35F, 1.10F, 0.38F, 0.74F, 1.15F, 0.014F),
+    DEBUG("debug", 0.620F, 0.0007F, 0.55F, 0.65F, 1.18F, 0.42F, 0.96F, 2.30F, 0.0F);
 
     private final String serializedName;
     private final float opacity;

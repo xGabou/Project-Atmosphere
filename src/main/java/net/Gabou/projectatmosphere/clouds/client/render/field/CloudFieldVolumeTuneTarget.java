@@ -6,15 +6,15 @@ import org.jetbrains.annotations.NotNull;
  * Runtime shader tuning values exposed by the CloudField volume debug command.
  */
 public enum CloudFieldVolumeTuneTarget {
-    OPACITY("opacity", 0.0F, 1.5F, 0.420F),
-    THRESHOLD("threshold", 0.0F, 0.05F, 0.0012F),
-    EROSION("erosion", 0.0F, 2.0F, 1.0F),
+    OPACITY("opacity", 0.0F, 1.5F, 0.340F),
+    THRESHOLD("threshold", 0.0F, 0.05F, 0.0016F),
+    EROSION("erosion", 0.0F, 2.0F, 1.20F),
     NOISE("noise", 0.0F, 2.0F, 1.0F),
-    BRIGHTNESS("brightness", 0.2F, 2.5F, 1.08F),
-    UNDERSIDE("underside", 0.0F, 0.9F, 0.34F),
-    MAX_ALPHA("maxalpha", 0.05F, 1.0F, 0.95F),
-    DENSITY_BOOST("densityboost", 0.1F, 5.0F, 2.0F),
-    ANIM_SPEED("animspeed", 0.0F, 0.2F, 0.015F);
+    BRIGHTNESS("brightness", 0.2F, 2.5F, 1.0F),
+    UNDERSIDE("underside", 0.0F, 0.9F, 0.52F),
+    MAX_ALPHA("maxalpha", 0.05F, 1.0F, 0.90F),
+    DENSITY_BOOST("densityboost", 0.1F, 5.0F, 1.55F),
+    ANIM_SPEED("animspeed", 0.0F, 0.2F, 0.012F);
 
     private final String serializedName;
     private final float min;
