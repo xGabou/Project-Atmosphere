@@ -262,18 +262,21 @@ public final class CommandCloudService {
             return 0;
         }
 
-        CloudFieldBackendBridge.ApplyResult result =
+        CloudFieldRuntimeManager.DebugFieldSpawnResult spawnResult =
                 CloudFieldRuntimeManager.getInstance().spawnDebugField(player);
+        CloudFieldBackendBridge.ApplyResult result = spawnResult.applyResult();
         CloudFieldSyncManager.syncPlayer(player);
         String requestedLine = requestedId == null || requestedId.isBlank()
                 ? "Requested id: none"
-                : "Requested id: " + requestedId + " (legacy hint accepted; CloudField source controls shape)";
+                : "Requested id: " + requestedId + " (legacy hint accepted; manual CloudField preset controls shape)";
         PaCommandMessages.success(
                 source,
                 true,
-                "Test CloudField spawned",
+                "Manual test CloudField spawned",
                 requestedLine,
-                "Source kind: MANUAL_DEBUG",
+                "Source: manual_test (MANUAL_DEBUG)",
+                "Replaced previous manual test fields: " + spawnResult.replacedManualFields(),
+                "Automatic weather fields remain active; use /pa cloud render filter manual to isolate this cloud.",
                 "Created: " + result.created(),
                 "Updated: " + result.updated(),
                 "Rebound: " + result.reboundSourceFields(),

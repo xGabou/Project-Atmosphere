@@ -174,10 +174,10 @@ float localBaseOffsetAt(vec3 p) {
     vec2 localXZ = p.xz - FieldCenter.xz;
     float radius = max(FieldRadius, 1.0);
     float radial = length(localXZ) / radius;
-    float interior = 1.0 - smoothstep(0.50, 1.08, radial);
+    float interior = 1.0 - smoothstep(0.28, 0.84, radial);
     float low = fbm(vec3(localXZ * 0.020, FieldSeed * 0.021));
     float medium = fbm(vec3(localXZ * 0.055, FieldSeed * 0.047));
-    return ((low - 0.5) * 0.09 + (medium - 0.5) * 0.035)
+    return ((low - 0.5) * 0.045 + (medium - 0.5) * 0.018)
         * heightSpan
         * interior
         * TuneNoiseStrength;
@@ -188,9 +188,9 @@ float localTopOffsetAt(vec3 p) {
     vec2 localXZ = p.xz - FieldCenter.xz;
     float radius = max(FieldRadius, 1.0);
     float radial = length(localXZ) / radius;
-    float interior = 1.0 - smoothstep(0.35, 1.10, radial);
+    float interior = 1.0 - smoothstep(0.25, 0.88, radial);
     float topLobe = fbm(vec3(localXZ * 0.017, FieldSeed * 0.063));
-    float towerBoost = mix(0.06, 0.13, saturate(FieldVerticalDevelopment));
+    float towerBoost = mix(0.035, 0.090, saturate(FieldVerticalDevelopment));
     return (topLobe - 0.5) * heightSpan * towerBoost * interior * TuneNoiseStrength;
 }
 
@@ -213,27 +213,35 @@ float height01At(vec3 p) {
 float horizontalMaskAt(vec3 p) {
     float radius = max(FieldRadius, 1.0);
     float height01 = height01At(p);
-    float radial = length(p.xz - FieldCenter.xz) / radius;
-
-    // Vertical development narrows the upper part of the field into a simple
-    // cumulus/congestus tower hint. Storm potential lets the top spread back
-    // outward slightly as a crude anvil placeholder.
-    float towerScale = mix(1.0, mix(1.15, 0.58, height01), saturate(FieldVerticalDevelopment));
-    float anvilSpread = smoothstep(0.72, 1.0, height01) * saturate(FieldStormPotential) * 0.24;
-
-    // Low-frequency lobe noise breaks the perfect cylinder side wall without
-    // depending on per-frame random data.
     vec2 localXZ = p.xz - FieldCenter.xz;
-    float lobeNoise = fbm(vec3(localXZ * 0.018, FieldSeed * 0.013));
-    float scallopNoise = fbm(vec3(localXZ * 0.047, FieldSeed * 0.041 + height01 * 2.0));
-    float lobeOffset = (
-        (lobeNoise - 0.5) * mix(0.13, 0.30, saturate(FieldVerticalDevelopment))
-        + (scallopNoise - 0.5) * 0.11 * smoothstep(0.10, 0.86, height01)
-    ) * TuneNoiseStrength;
-    float shapedRadial = radial / max(0.25, towerScale + anvilSpread + lobeOffset);
+    float radial = length(localXZ) / radius;
+    float coverage = saturate(FieldCoverage);
+    float verticalDevelopment = saturate(FieldVerticalDevelopment);
+    float storm = saturate(FieldStormPotential);
 
-    float edgeStart = clamp(mix(0.38, 0.76, saturate(FieldCoverage)) + (scallopNoise - 0.5) * 0.07 * TuneNoiseStrength, 0.28, 0.84);
-    return 1.0 - smoothstep(edgeStart, 1.0, shapedRadial);
+    // A rounded cumulus envelope avoids the old cylinder/slab body. It is
+    // narrow at the base, full through the middle, and gently tapered at the
+    // top unless storm growth adds a small anvil spread.
+    float baseScale = mix(0.48, 1.0, smoothstep(0.02, 0.24, height01));
+    float upperScale = mix(1.0, mix(0.86, 0.58, verticalDevelopment), smoothstep(0.52, 1.0, height01));
+    float anvilSpread = smoothstep(0.76, 0.98, height01) * storm * 0.20;
+    float profileScale = max(0.22, baseScale * upperScale + anvilSpread);
+
+    // Restrict silhouette noise to the edge of the body. This keeps breakup
+    // visible without spawning large side shoots detached from the main mass.
+    float lobeNoise = fbm(vec3(localXZ * 0.012, FieldSeed * 0.013));
+    float scallopNoise = fbm(vec3(localXZ * 0.040, FieldSeed * 0.041 + height01 * 2.0));
+    float edgeBand = smoothstep(0.36, 0.96, radial) * (1.0 - smoothstep(1.02, 1.20, radial));
+    float silhouetteOffset = ((lobeNoise - 0.5) * 0.11 + (scallopNoise - 0.5) * 0.07)
+        * edgeBand
+        * TuneNoiseStrength;
+    float shapedRadial = radial / max(0.24, profileScale + silhouetteOffset);
+
+    float edgeStart = mix(0.50, 0.74, coverage);
+    float edgeWidth = mix(0.25, 0.17, coverage);
+    float verticalContour = smoothstep(0.00, 0.14, height01)
+        * (1.0 - smoothstep(0.88 + storm * 0.06, 1.0, height01));
+    return saturate((1.0 - smoothstep(edgeStart, edgeStart + edgeWidth, shapedRadial)) * verticalContour);
 }
 
 float verticalMaskAt(vec3 p) {
@@ -242,13 +250,12 @@ float verticalMaskAt(vec3 p) {
     vec2 localXZ = p.xz - FieldCenter.xz;
     float undersideNoise = fbm(vec3(localXZ * 0.050, FieldSeed * 0.071));
     float topNoise = fbm(vec3(localXZ * 0.026, FieldSeed * 0.093));
-    // Stable local base/top variation breaks the old perfectly flat deck while
-    // keeping the broad cumulus mass deterministic.
-    float baseStart = mix(0.015, 0.055, undersideNoise);
-    float baseFalloff = smoothstep(baseStart, baseStart + 0.095, height01);
-    float topFalloff = 1.0 - smoothstep(0.74 + stormLift + (topNoise - 0.5) * 0.055, 1.0, height01);
-    float upperBody = mix(0.92, 1.12, smoothstep(0.20, 0.68, height01) * (1.0 - smoothstep(0.88, 1.0, height01)));
-    return saturate(baseFalloff * topFalloff * upperBody);
+    float baseStart = mix(0.025, 0.060, undersideNoise);
+    float baseFalloff = smoothstep(baseStart, baseStart + 0.145, height01);
+    float topStart = 0.80 + stormLift + (topNoise - 0.5) * 0.035;
+    float topFalloff = 1.0 - smoothstep(topStart, 1.0, height01);
+    float middleLift = 0.82 + 0.24 * (1.0 - saturate(abs(height01 - 0.48) * 2.0));
+    return saturate(baseFalloff * topFalloff * middleLift);
 }
 
 float densityAt(vec3 p) {
@@ -257,7 +264,7 @@ float densityAt(vec3 p) {
     if (p.y < FieldBaseY - cheapVerticalPad || p.y > FieldTopY + cheapVerticalPad) {
         return 0.0;
     }
-    float cheapRadius = max(FieldRadius, 1.0) * 1.24;
+    float cheapRadius = max(FieldRadius, 1.0) * (1.14 + saturate(FieldStormPotential) * 0.10);
     if (dot(p.xz - FieldCenter.xz, p.xz - FieldCenter.xz) > cheapRadius * cheapRadius) {
         return 0.0;
     }
@@ -286,15 +293,15 @@ float densityAt(vec3 p) {
     }
     vec3 detailOffset = normalize(detailDirection) * AnimationTime * TuneAnimSpeed;
     float detailNoise = fbm(fieldLocal * 0.075 + detailOffset + vec3(FieldSeed * 0.031));
-    float edgeRegion = 1.0 - smoothstep(0.34, 0.92, baseShape);
-    float coverageThreshold = mix(0.60, 0.24, saturate(FieldCoverage));
-    float puffMask = smoothstep(coverageThreshold, 0.95, largeNoise + baseShape * 0.42);
-    float erodedShape = baseShape * mix(1.0 - 0.22 * TuneNoiseStrength, 1.0 + 0.18 * TuneNoiseStrength, largeNoise);
-    erodedShape -= edgeRegion * erosionNoise * mix(0.20, 0.44, 1.0 - saturate(FieldCoverage)) * TuneErosionStrength;
-    float undersideRegion = (1.0 - smoothstep(0.08, 0.30, height01At(p))) * smoothstep(0.08, 0.42, horizontalMask);
-    erodedShape -= undersideRegion * undersideNoise * 0.16 * TuneErosionStrength;
+    float edgeRegion = 1.0 - smoothstep(0.30, 0.90, baseShape);
+    float coverageThreshold = mix(0.58, 0.24, saturate(FieldCoverage));
+    float puffMask = smoothstep(coverageThreshold, 0.98, largeNoise * 0.78 + baseShape * 0.58);
+    float erodedShape = baseShape * mix(1.0 - 0.14 * TuneNoiseStrength, 1.0 + 0.12 * TuneNoiseStrength, largeNoise);
+    erodedShape -= edgeRegion * erosionNoise * mix(0.12, 0.34, 1.0 - saturate(FieldCoverage)) * TuneErosionStrength;
+    float undersideRegion = (1.0 - smoothstep(0.08, 0.32, height01At(p))) * smoothstep(0.16, 0.50, horizontalMask);
+    erodedShape -= undersideRegion * undersideNoise * 0.10 * TuneErosionStrength;
     float topRegion = smoothstep(0.42, 0.90, height01At(p));
-    erodedShape *= mix(1.0, mix(0.82, 1.20, topLobeNoise), topRegion * 0.30 * TuneNoiseStrength);
+    erodedShape *= mix(1.0, mix(0.88, 1.14, topLobeNoise), topRegion * 0.24 * TuneNoiseStrength);
     erodedShape += (detailNoise - 0.5) * edgeRegion * 0.06 * TuneNoiseStrength * smoothstep(0.0, 0.05, TuneAnimSpeed);
     erodedShape = saturate(erodedShape) * puffMask;
 
@@ -323,43 +330,52 @@ float boundsAlphaAt(vec3 p) {
     return shell + edge * 0.15;
 }
 
+float debugEnvelopeAt(vec3 p) {
+    return saturate(horizontalMaskAt(p) * verticalMaskAt(p));
+}
+
+float debugMaskAlpha(float mask, float maxAlpha) {
+    return smoothstep(0.015, 0.18, saturate(mask)) * maxAlpha;
+}
+
 vec4 debugColor(vec3 p) {
     if (DebugMode == 1) {
         return vec4(0.20, 0.68, 1.00, boundsAlphaAt(p));
     }
     if (DebugMode == 2) {
         float horizontalMask = horizontalMaskAt(p);
-        return vec4(horizontalMask, horizontalMask, horizontalMask, 0.72);
+        return vec4(horizontalMask, horizontalMask, horizontalMask, debugMaskAlpha(horizontalMask, 0.72));
     }
     if (DebugMode == 3) {
         float height01 = height01At(p);
-        return vec4(height01, 0.30, 1.0 - height01, 0.72);
+        return vec4(height01, 0.30, 1.0 - height01, debugMaskAlpha(debugEnvelopeAt(p), 0.72));
     }
     if (DebugMode == 4) {
         float verticalMask = verticalMaskAt(p);
-        return vec4(verticalMask, verticalMask * 0.75, 1.0 - verticalMask, 0.72);
+        return vec4(verticalMask, verticalMask * 0.75, 1.0 - verticalMask, debugMaskAlpha(debugEnvelopeAt(p), 0.72));
     }
     if (DebugMode == 5) {
         float density = densityAt(p);
-        return vec4(density, density, density, 0.78);
+        return vec4(density, density, density, debugMaskAlpha(density, 0.78));
     }
     if (DebugMode == 6) {
+        float sourceAlpha = debugMaskAlpha(debugEnvelopeAt(p), 0.55);
         if (FieldSourceKind == 0) {
-            return vec4(0.62, 0.62, 0.68, 0.55); // unknown
+            return vec4(0.62, 0.62, 0.68, sourceAlpha); // unknown
         }
         if (FieldSourceKind == 1) {
-            return vec4(0.42, 0.90, 0.55, 0.55); // manual debug
+            return vec4(0.42, 0.90, 0.55, sourceAlpha); // manual debug
         }
         if (FieldSourceKind == 2) {
-            return vec4(0.36, 0.72, 0.95, 0.55); // weather summary
+            return vec4(0.36, 0.72, 0.95, sourceAlpha); // weather summary
         }
         if (FieldSourceKind == 3) {
-            return vec4(0.95, 0.76, 0.38, 0.55); // PA cluster
+            return vec4(0.95, 0.76, 0.38, sourceAlpha); // PA cluster
         }
         if (FieldSourceKind == 4) {
-            return vec4(0.78, 0.54, 0.95, 0.55); // PA region
+            return vec4(0.78, 0.54, 0.95, sourceAlpha); // PA region
         }
-        return vec4(0.95, 0.44, 0.48, 0.55);
+        return vec4(0.95, 0.44, 0.48, sourceAlpha);
     }
     return vec4(0.0);
 }
@@ -383,6 +399,9 @@ void main() {
         vec3 debugPoint = DebugMode == 1 ? fragWorldPos : midpoint;
         gl_FragDepth = gl_FragCoord.z;
         fragColor = debugColor(debugPoint);
+        if (fragColor.a <= 0.001) {
+            discard;
+        }
         return;
     }
 
@@ -432,6 +451,10 @@ void main() {
         if (transmittance < 0.02) {
             break;
         }
+    }
+
+    if (!hasCloudDepth) {
+        discard;
     }
 
     float alpha = saturate(1.0 - transmittance);

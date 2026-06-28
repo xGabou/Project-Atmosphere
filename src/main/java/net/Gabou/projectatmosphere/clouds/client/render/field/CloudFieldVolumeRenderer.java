@@ -71,7 +71,9 @@ public final class CloudFieldVolumeRenderer {
 
         Stats stats = new Stats(dimensionId, input.worldTime(), cachedSnapshots, input.fields().size(), mode, filter);
         RenderTarget target = outputTarget == null ? Minecraft.getInstance().getMainRenderTarget() : outputTarget;
-        stats.recordTarget(target, downscaleApplied);
+        boolean sceneDepthClip = !debugMode && sceneDepthTextureId > 0 && !downscaleApplied;
+        boolean compositeOcclusion = !debugMode && downscaleApplied;
+        stats.recordTarget(target, downscaleApplied, sceneDepthClip, compositeOcclusion);
         List<FieldDraw> candidates = new ArrayList<>();
         double maxRenderDistance = Math.max(100.0D, AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get());
         double maxRenderDistanceSqr = maxRenderDistance * maxRenderDistance;
@@ -181,8 +183,8 @@ public final class CloudFieldVolumeRenderer {
                             projectionMatrix,
                             target,
                             sceneDepthTextureId,
-                            raymarchStepsFor(candidate, maxRenderDistance),
-                            !debugMode && sceneDepthTextureId > 0
+                            raymarchStepsFor(candidate),
+                            sceneDepthClip
                     );
                     shader.apply();
                     try {
@@ -299,15 +301,9 @@ public final class CloudFieldVolumeRenderer {
                 * Math.max(0.10D, snapshot.effectiveCoverage());
     }
 
-    private static int raymarchStepsFor(FieldDraw draw, double maxRenderDistance) {
+    private static int raymarchStepsFor(FieldDraw draw) {
         int baseSteps = CloudFieldVolumeRenderConfig.raymarchSteps();
-        if (CloudFieldVolumeRenderConfig.quality() == AtmoCommonConfig.CloudRaymarchQuality.ULTRA) {
-            return baseSteps;
-        }
-        double distance = Math.sqrt(Math.max(0.0D, draw.distanceSqr()));
-        double ratio = maxRenderDistance <= 0.0D ? 0.0D : distance / maxRenderDistance;
-        float multiplier = ratio > 0.70D ? 0.50F : ratio > 0.35D ? 0.75F : 1.0F;
-        return Math.max(8, Math.round(baseSteps * multiplier));
+        return Math.max(8, baseSteps);
     }
 
     private static String sourceLabel(CloudFieldSnapshot snapshot) {
@@ -427,7 +423,12 @@ public final class CloudFieldVolumeRenderer {
             renderedFieldLabels.add(shortId(snapshot) + ":" + sourceLabel(snapshot));
         }
 
-        private void recordTarget(RenderTarget target, boolean downscaleApplied) {
+        private void recordTarget(
+                RenderTarget target,
+                boolean downscaleApplied,
+                boolean sceneDepthClip,
+                boolean compositeOcclusion
+        ) {
             if (target == null) {
                 targetDiagnostics = "missing";
                 return;
@@ -437,6 +438,8 @@ public final class CloudFieldVolumeRenderer {
             targetDiagnostics = targetKind
                     + " size=" + target.width + "x" + target.height
                     + " downscaleApplied=" + downscaleApplied
+                    + " sceneDepthClip=" + sceneDepthClip
+                    + " compositeOcclusion=" + compositeOcclusion
                     + " depth=" + (target.getDepthTextureId() > 0);
         }
 

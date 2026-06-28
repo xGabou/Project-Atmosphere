@@ -251,8 +251,7 @@ public class TelemetryDebugClientCommand {
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildClientCloudFieldsCommand() {
         return Commands.literal("cloud")
-                .then(buildCloudFieldVolumeControls("render"))
-                .then(buildCloudFieldLegacyDebugControls("legacydebug"));
+                .then(buildCloudFieldVolumeControls("render"));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildCloudFieldVolumeControls(String literalName) {
@@ -456,11 +455,8 @@ public class TelemetryDebugClientCommand {
                 () -> Component.literal(CloudFieldVolumeRenderConfig.verboseStatus()
                         + "\ncachedCloudFields=" + ClientCloudFieldCache.getCurrentSnapshots().size()
                         + "\n" + cloudFieldRendererOwnershipStatus()
-                        + "\nlegacyRendererStatus="
-                        + CloudFieldDebugRenderConfig.status().replace("\n", " | ")
                         + "\ncommands=/pa cloud render on|off|status"
                         + "\ncompact=/pa cloud render status"
-                        + "\nlegacydebug=/pa cloud legacydebug on|off|status"
                         + "\nmode=/pa cloud render mode <normal|bounds|horizontal|height|vertical|density|source>"
                         + "\nfilter=/pa cloud render filter <all|manual|weather|nearest|first>"
                         + "\nquality=/pa cloud render quality <low|low_24|low_24_steps|medium|high|ultra>"

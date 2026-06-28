@@ -476,7 +476,10 @@ public final class CloudFieldVolumeRenderConfig {
                 + " maxFields=" + quality.getMaxCloudFields()
                 + " detailOctaves=" + quality.getDetailOctaves()
                 + " staticPreset=true"
-                + " downscaleApplied=" + (scale < 0.999F);
+                + " downscaleApplied=" + (scale < 0.999F)
+                + " normalDepthStrategy=" + (scale < 0.999F
+                        ? "composite_occlusion_no_shader_depth_clip"
+                        : "direct_scene_depth_clip");
     }
 
     /**

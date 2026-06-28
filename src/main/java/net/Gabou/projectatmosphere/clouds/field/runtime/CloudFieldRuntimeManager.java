@@ -80,6 +80,12 @@ public final class CloudFieldRuntimeManager {
         return INSTANCE;
     }
 
+    public record DebugFieldSpawnResult(
+            CloudFieldBackendBridge.ApplyResult applyResult,
+            int replacedManualFields
+    ) {
+    }
+
     public CloudFieldRendererInput tick(ServerLevel level) {
         Objects.requireNonNull(level, "level");
         CloudFieldStore store = storeFor(level);
@@ -183,9 +189,10 @@ public final class CloudFieldRuntimeManager {
      * Creates one debug CloudField at a player's position through the normal
      * backend bridge/store path. This is server-side test tooling only.
      */
-    public CloudFieldBackendBridge.ApplyResult spawnDebugField(ServerPlayer player) {
+    public DebugFieldSpawnResult spawnDebugField(ServerPlayer player) {
         Objects.requireNonNull(player, "player");
         ServerLevel level = player.serverLevel();
+        int replacedManualFields = clearManualDebugFields(level);
         Vec3 playerPosition = player.position();
         Vec3 center = new Vec3(playerPosition.x(), playerPosition.y() + 120.0D, playerPosition.z());
         Vec3 wind = nearestBackendWind(level, center);
@@ -256,7 +263,7 @@ public final class CloudFieldRuntimeManager {
         sourceSnapshots.put(dimension, snapshot);
         applyResults.put(dimension, applyResult);
         lastTickByLevel.put(dimension, level.getGameTime());
-        return applyResult;
+        return new DebugFieldSpawnResult(applyResult, replacedManualFields);
     }
 
     /**
@@ -272,6 +279,32 @@ public final class CloudFieldRuntimeManager {
         return removed;
     }
 
+    private int clearManualDebugFields(ServerLevel level) {
+        if (level == null) {
+            return 0;
+        }
+        ResourceKey<Level> dimension = level.dimension();
+        manualDebugSources.remove(dimension);
+
+        CloudFieldStore store = stores.get(dimension);
+        if (store == null) {
+            return 0;
+        }
+
+        int removed = 0;
+        for (CloudField field : store.listActiveFields()) {
+            CloudFieldSource source = store.getTargetSource(field.fieldId()).orElse(null);
+            SourceDebugInfo debugInfo = sourceDebugByField.get(field.fieldId());
+            boolean manualDebugSource = source != null && source.sourceType() == CloudFieldSourceType.MANUAL_DEBUG;
+            boolean manualDebugRecord = debugInfo != null && "MANUAL_DEBUG".equals(debugInfo.sourceType());
+            if ((manualDebugSource || manualDebugRecord) && store.removeField(field.fieldId()).isPresent()) {
+                sourceDebugByField.remove(field.fieldId());
+                removed++;
+            }
+        }
+        return removed;
+    }
+
     public List<String> describeCloudFields(ServerLevel level) {
         CloudFieldRendererInput input = ensureCurrent(level);
         List<CloudFieldSnapshot> fields = new ArrayList<>(input.fields());
@@ -279,7 +312,7 @@ public final class CloudFieldRuntimeManager {
         List<String> lines = new ArrayList<>();
         for (CloudFieldSnapshot snapshot : fields) {
             SourceDebugInfo source = sourceDebugByField.get(snapshot.fieldId());
-            String sourceText = source == null ? "unknown" : source.sourceType() + ":" + source.sourceId();
+            String sourceText = formatSourceDebug(source);
             lines.add(String.format(
                     Locale.ROOT,
                     "%s source=%s lod=%s hydration=%s %.2f density=%.2f coverage=%.2f cloudlets=%d/%d",
@@ -709,6 +742,23 @@ public final class CloudFieldRuntimeManager {
             return Vec3.ZERO;
         }
         return new Vec3(x / count, y / count, z / count);
+    }
+
+    private static String formatSourceDebug(SourceDebugInfo source) {
+        if (source == null) {
+            return "unknown";
+        }
+        return sourceCategory(source.sourceType()) + "(" + source.sourceType() + ":" + source.sourceId() + ")";
+    }
+
+    private static String sourceCategory(String sourceType) {
+        if ("MANUAL_DEBUG".equals(sourceType)) {
+            return "manual_test";
+        }
+        if ("WEATHER_SUMMARY".equals(sourceType)) {
+            return "automatic_weather";
+        }
+        return "backend";
     }
 
     private static String shortId(UUID id) {
