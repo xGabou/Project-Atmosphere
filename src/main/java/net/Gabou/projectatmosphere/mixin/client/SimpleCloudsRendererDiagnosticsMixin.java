@@ -4,6 +4,7 @@ import dev.nonamecrackers2.simpleclouds.client.mesh.chunk.MeshChunk;
 import dev.nonamecrackers2.simpleclouds.client.mesh.generator.CloudMeshGenerator;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.mixin.CloudMeshGeneratorDiagnosticsAccessor;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -21,6 +22,10 @@ public abstract class SimpleCloudsRendererDiagnosticsMixin {
             cancellable = true
     )
     private static void projectatmosphere$beginOpaquePass(CloudMeshGenerator generator, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float fogStart, float fogEnd, float partialTick, float r, float g, float b, Frustum frustum, boolean ditherFade, CallbackInfo ci) {
+        if (projectatmosphere$paNativeOwnsClouds()) {
+            ci.cancel();
+            return;
+        }
         if (ditherFade && ClientHurricaneStateCache.hasHurricanes()) {
             SimpleCloudsRenderer.renderCloudsOpaque(generator, stack, projMat, fogStart, fogEnd, partialTick, r, g, b, frustum, false);
             ci.cancel();
@@ -58,6 +63,10 @@ public abstract class SimpleCloudsRendererDiagnosticsMixin {
             cancellable = true
     )
     private static void projectatmosphere$beginTransparencyPass(CloudMeshGenerator generator, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float fogStart, float fogEnd, float partialTick, float r, float g, float b, Frustum frustum, boolean ditherFade, CallbackInfo ci) {
+        if (projectatmosphere$paNativeOwnsClouds()) {
+            ci.cancel();
+            return;
+        }
         if (ditherFade && ClientHurricaneStateCache.hasHurricanes()) {
             SimpleCloudsRenderer.renderCloudsTransparency(generator, stack, projMat, fogStart, fogEnd, partialTick, r, g, b, frustum, false);
             ci.cancel();
@@ -103,5 +112,14 @@ public abstract class SimpleCloudsRendererDiagnosticsMixin {
             }
         }
         return total;
+    }
+
+    private static boolean projectatmosphere$paNativeOwnsClouds() {
+        try {
+            return AtmoCommonConfig.CLOUD_VOLUMETRIC_RENDERER_ENABLED.get()
+                    && AtmoCommonConfig.CLOUD_FIELD_RENDERER_ENABLED.get();
+        } catch (IllegalStateException exception) {
+            return true;
+        }
     }
 }

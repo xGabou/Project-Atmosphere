@@ -20,18 +20,23 @@ vec3 reconstructWorld(vec2 uv, float depth) {
 
 void main() {
     float sceneDepth = texture(SceneDepthSampler, texCoord).r;
-    if (sceneDepth >= 0.9999) {
+    if (sceneDepth >= 0.995) {
         discard;
     }
 
     vec3 world = reconstructWorld(texCoord, sceneDepth);
+    if (world.y > 384.0) {
+        discard;
+    }
+
     vec2 boundsSize = max(ShadowBounds.zw - ShadowBounds.xy, vec2(1.0));
     vec2 shadowUv = (world.xz - ShadowBounds.xy) / boundsSize;
     if (shadowUv.x < 0.0 || shadowUv.x > 1.0 || shadowUv.y < 0.0 || shadowUv.y > 1.0) {
         discard;
     }
 
-    float shadow = texture(CloudShadowSampler, shadowUv).r;
+    float transmittance = texture(CloudShadowSampler, shadowUv).r;
+    float shadow = 1.0 - clamp(transmittance, 0.0, 1.0);
     float alpha = clamp(shadow * ShadowStrength, 0.0, 0.72);
     if (alpha <= 0.002) {
         discard;

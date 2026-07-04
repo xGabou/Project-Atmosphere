@@ -5,6 +5,9 @@ import dev.nonamecrackers2.simpleclouds.client.renderer.WorldEffects;
 import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendResolver;
+import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
@@ -25,7 +28,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
             return;
         }
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
+        if (!shouldApply(level)) {
             return;
         }
 
@@ -48,7 +51,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onComputeFogColor(ViewportEvent.ComputeFogColor event) {
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
+        if (!shouldApply(level)) {
             return;
         }
 
@@ -99,5 +102,20 @@ public final class SimpleCloudsWhiteoutFogHandler {
         float distToVerticalEdge = (float) Math.min(cameraPos.y - bottom, top - cameraPos.y);
         float vertical = 1.0F - Mth.clamp(distToVerticalEdge / 16.0F, 0.0F, 1.0F);
         return Mth.clamp(horizontal * vertical, 0.0F, 1.0F);
+    }
+
+    private static boolean shouldApply(ClientLevel level) {
+        if (level == null) {
+            return false;
+        }
+        try {
+            if (AtmoCommonConfig.CLOUD_VOLUMETRIC_RENDERER_ENABLED.get()
+                    && AtmoCommonConfig.CLOUD_FIELD_RENDERER_ENABLED.get()) {
+                return false;
+            }
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
+        return CloudBackendResolver.resolve(level) == CloudVisualBackend.SIMPLE_CLOUDS;
     }
 }

@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.field.backend;
 
 import net.Gabou.projectatmosphere.clouds.field.CloudField;
+import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.minecraft.world.phys.Vec3;
 
 import java.nio.charset.StandardCharsets;
@@ -12,7 +13,7 @@ import java.util.UUID;
  * Creates stable CloudFields from neutral backend source data.
  */
 public final class CloudFieldFactory {
-    private static final int MIN_DERIVED_CLOUDLETS = 4;
+    private static final int MIN_DERIVED_CLOUDLETS = 16;
     private static final int MAX_DERIVED_CLOUDLETS = 512;
 
     public Optional<CloudField> create(CloudFieldSource source) {
@@ -66,7 +67,15 @@ public final class CloudFieldFactory {
                 * Math.max(0.15F, source.effectiveCoverage())
                 * Math.max(0.15F, source.effectiveDensity());
         int derived = Math.round(footprint / 10.0F);
-        return clamp(derived, MIN_DERIVED_CLOUDLETS, MAX_DERIVED_CLOUDLETS);
+        return clamp(Math.max(derived, profileCloudletFloor(source)), MIN_DERIVED_CLOUDLETS, MAX_DERIVED_CLOUDLETS);
+    }
+
+    private static int profileCloudletFloor(CloudFieldSource source) {
+        CloudShapeProfile profile = CloudShapeProfile.defaultFor(source.cloudTypeId(), null, null);
+        int lobes = profile == null ? 0 : profile.getLobeCountMax();
+        int typeFloor = Math.max(MIN_DERIVED_CLOUDLETS, lobes * 2);
+        float radiusScale = source.radius() >= 96.0F ? 1.5F : 1.0F;
+        return Math.round(typeFloor * radiusScale);
     }
 
     public CloudFieldSource sourceFromField(CloudField field, CloudFieldSourceType sourceType, String sourceId) {

@@ -1,0 +1,727 @@
+╭─── Claude Code v2.1.200 ─────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Gabriel!               │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ What's new              │
+│                        ▘▘ ▝▝                       │ Changed `AskUserQuesti… │
+│    Fable 5 · Claude Pro · gabgalip@gmail.com's     │ Changed the "default" … │
+│    Organization                                    │ Fixed a crash at start… │
+│               G:\Project-Atmosphere                │ /release-notes for more │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ ▎ Fable 5 is back.
+ ▎ Until July 7, you can use up to 50% of your plan's weekly usage limit on Fable 5. If you hit your limit, you can continue on Fable 5 with usage credits. Fable 5 draws down usage faster than Opus 4.8. Learn more
+
+❯ /model                                                                        
+  ⎿  Set model to Fable 5 and saved as your default for new sessions
+
+❯ so this is what you did in cursor: ---                                        
+  name: Dynamic Cloud System Architecture                                       
+  overview: "A full technical design for a hybrid GPU/CPU cloud system:         
+  CPU-authoritative cloud cells splatted into a GPU weather map that drives one 
+  global raymarched density field, with GPU analytics read back for             
+  merging/classification, real ground shadows, sunset lighting, interior        
+  rendering, quality tiers, and a tornado-ready density pipeline."              
+  todos:                                                                        
+    - id: phase1-noise-lighting                                                 
+      content: Bake Perlin-Worley/Worley 3D noise + blue noise textures;        
+  rebuild raymarch shader with real sun lighting (Beer-powder, HG phase,        
+  multi-scatter, sky ambient, sunset colors)                                    
+      status: completed                                                         
+    - id: phase2-weather-map                                                    
+      content: Implement weather-map rasterization from cells and single global 
+  raymarch pass replacing per-field AABB rendering                              
+      status: completed                                                         
+    - id: phase3-temporal-tiers                                                 
+      content: Add temporal reprojection, blue-noise jitter, quality profiles   
+  (LOW-ULTRA), and frame-time governor                                          
+      status: completed                                                         
+    - id: phase4-cell-sim                                                       
+      content: Build CloudCell model with lifecycle (form/grow/dissolve),       
+  altitude-sheared wind motion, and delta network sync                          
+      status: completed                                                         
+    - id: phase5-analytics-classify                                             
+      content: Add GPU analytics compute pass with async fence+PBO readback,    
+  server-side merge/split hysteresis, and shape-derived cloud classifier        
+      status: completed                                                         
+    - id: phase6-shadows                                                        
+      content: Implement GPU cloud shadow map, depth-based post-process ground  
+  darkening, and shader pack API exposure                                       
+      status: completed                                                         
+    - id: phase7-interior                                                       
+      content: Couple in-cloud whiteout fog with raymarch, add near-camera      
+  detail boost, expose CloudDensityAt gameplay API                              
+      status: completed                                                         
+    - id: phase8-tornado-hooks                                                  
+      content: Add cell rotation property, funnel SDF slot in density function, 
+  and native-backend tornado eligibility                                        
+      status: completed                                                         
+  isProject: false                                                              
+  ---                                                                           
+                                                                                
+  # Dynamic Cloud System — Full Technical Design                                
+                                                                                
+  ## Why the current system can't get there                                     
+                                                                                
+  The active renderer ([CloudFieldVolumeRenderer.java](src/main/java/net/Gabou/ 
+  projectatmosphere/clouds/client/render/field/CloudFieldVolumeRenderer.java) + 
+  [cloud_field_volume.fsh](src/main/resources/assets/projectatmosphere/shaders  
+  /core/cloud_field_volume.fsh)) draws **one AABB box per CloudField**. This is 
+  the root cause of every symptom you listed:                                   
+                                                                                
+  - **Consistency / teleporting**: each field is an isolated box; when fields   
+  spawn, despawn, or get culled by the per-frame field cap, whole clouds p      
+  ──── (155 lines hidden) ───────────────────────────────────────────────────── 
+  h. The cell simulation still runs server-side data-only where SC needs        
+  weather inputs, matching current behavior.                                    
+  - Networking: replace `SyncCloudFieldsPacket` payload with cell records; send 
+  full snapshot on login/dimension change, then deltas (changed/added/removed   
+  cells) every 20 ticks — cheaper than today and scales to more cells. Client   
+  interpolation layer (Hermite + wind extrapolation) is retained nearly as-is.  
+  - Migration: build the new renderer behind a config flag alongside the        
+  current one; the CloudField store already isolates simulation from rendering, 
+  so the weather-map renderer can consume existing snapshots on day one, then   
+  the cell model replaces fields underneath.                                    
+                                                                                
+  ## Implementation roadmap (each phase is shippable)                           
+                                                                                
+  1. **Noise + lighting upgrade in place** — bake Perlin-Worley/Worley 3D       
+  textures + blue noise; wire real sun direction/color + Beer-powder + HG phase 
+  + ambient sky into a rebuilt raymarch shader. Immediate visual jump, no       
+  architecture change.                                                          
+  2. **Weather-map renderer** — cell splatting pass + single global raymarch    
+  replacing per-field boxes; coverage early-out; depth composite. Fixes         
+  consistency/merging visuals.                                                  
+  3. **Temporal + performance tiers** — reprojection, blue-noise jitter,        
+  quality profiles, frame-time governor.                                        
+  4. **Cell simulation v2** — CloudCell model, lifecycle (form/grow/dissolve),  
+  altitude-sheared wind motion, delta sync.                                     
+  5. **GPU analytics + merge/split + classifier** — compute pass, async         
+  readback, server hysteresis decisions, shape-derived typing.                  
+  6. **Shadows** — GPU shadow map + depth-based post darkening + shader pack    
+  API.                                                                          
+  7. **Interior polish** — whiteout fog coupling, near-camera detail, density   
+  query API.                                                                    
+  8. **Tornado hooks** — rotation property, funnel SDF slot in the density      
+  function, native-backend eligibility (full tornado visuals as its own later   
+  project).                                                                     
+                                                                                
+  ## Key risks                                                                  
+                                                                                
+  - **Async readback portability** (AMD/Intel/old NVidia): strictly fence+PBO,  
+  never stall; analytics are advisory so a broken readback degrades to the CPU  
+  fallback silently.                                                            
+  - **Iris/Oculus interaction**: core-shader replacement may conflict with pack 
+  pipelines; keep `shaderSafeMode` as the master off-switch for post passes     
+  and temporal history.                                                         
+  - **Weather map scrolling artifacts**: must be camera-texel-snapped and cells 
+  splatted in world space, or clouds will swim; addressed in phase 2            
+  acceptance criteria.                                                          
+                                                                                
+   but currently all i see is this: [Image #2], tho the cloud region is showing 
+  up in the command list. Can you investigate pls                               
+  ⎿  [Image #2]
+
+● I'll investigate. The screenshot shows the cloud volume rendering as a giant
+  black blob — the raymarch is accumulating opacity but the color is coming out
+  black, or the composite/blend is wrong. Let me look at the current shader and
+  renderer state.
+
+  Searched for 2 patterns, read 4 files, ran 1 shell command (ctrl+o to expand)
+
+● Lighting resolution looks sane. Two suspects remain: the ground-shadow post
+  pass (multiplies the whole screen) and the composite. Let me read both.
+
+  Searched for 1 pattern, read 15 files (ctrl+o to expand)
+
+● Let me check the remaining shaders (splat, shadow map, vertex shader) and see
+  whether the legacy field-volume hook still runs alongside the new pipeline.
+
+  Searched for 5 patterns, read 4 files (ctrl+o to expand)  ⎿  You've hit your session limit · resets 5:50pm (America/Toronto)
+     /upgrade to increase your usage limit.
+
+✻ Churned for 9m 55s
+
+❯ continue                                                                      
+
+● Let me verify the remaining wiring: whether the cell simulation is actually
+  ticked/synced server-side, and what heights legacy CloudField snapshots carry
+  (the fallback input).
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+● The cell sim is wired and synced. Let me check the shader registration and the
+  shadow-apply blend JSON, then I'll consolidate.
+
+  Read 2 files (ctrl+o to expand)
+
+● I've gathered substantial evidence. Let me consult the advisor before
+  finalizing my diagnosis.
+
+● Advising using Fable 5
+  ⎿  Advisor unavailable (unavailable)
+
+  Searched for 3 patterns, read 2 files, ran 6 shell commands (ctrl+o to expand)
+
+● Embeddium + NVIDIA — noted. Let me check the actual runtime config values
+  (spawn height may be overridden in the dev instance).
+
+  Read 1 file, ran 1 shell command (ctrl+o to expand)
+
+● Splat JSON is clean — only the volume shader declares ProjMat. Let me confirm
+  the exact vanilla-managed uniform names before renaming:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Update(src\main\resources\assets\projectatmosphere\shaders\core\cloud_atmosphe
+        re_volume.fsh)
+  ⎿  Added 4 lines, removed 1 line
+      13  uniform sampler3D BaseNoiseSampler;   // bound manually (3D)
+      14  uniform sampler3D DetailNoiseSampler; // bound manually (3D)
+      15  
+      16 -uniform mat4 ProjMat;                                          
+      16 +// Deliberately NOT named "ProjMat": VertexBuffer.drawWithShade
+         +r overwrites the                                               
+      17 +// vanilla-managed "ProjMat"/"ModelViewMat" uniforms with the m
+         +atrices passed to                                              
+      18 +// it (identity for this fullscreen pass), which would break de
+         +pth output.                                                    
+      19 +uniform mat4 CloudProjMat;                                     
+      20  uniform mat4 ViewRotMat;      // world->view rotation (camera-r
+          elative)
+      21  uniform mat4 InvProjMat;
+      22  uniform mat4 InvViewRotMat;
+
+● Update(src\main\resources\assets\projectatmosphere\shaders\core\cloud_atmosphe
+        re_volume.fsh)
+  ⎿  Added 1 line, removed 1 line
+      320  }
+      321  
+      322  float depthAt(vec3 relPos) {
+      323 -    vec4 clip = ProjMat * ViewRotMat * vec4(relPos, 1.0);     
+      323 +    vec4 clip = CloudProjMat * ViewRotMat * vec4(relPos, 1.0);
+      324      float ndcDepth = clip.z / max(abs(clip.w), 0.00001);
+      325      return clamp(ndcDepth * 0.5 + 0.5, 0.0, 1.0);
+      326  }
+
+● Update(src\main\resources\assets\projectatmosphere\shaders\core\cloud_atmosphe
+        re_volume.json)
+  ⎿  Added 1 line, removed 1 line
+      19      { "name": "HistorySampler" }
+      20    ],
+      21    "uniforms": [
+      22 -    { "name": "ProjMat", "type": "matrix4x4", "count": 16, "val
+         -ues": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 
+         -0.0, 0.0, 0.0, 0.0, 1.0 ] },                                   
+      22 +    { "name": "CloudProjMat", "type": "matrix4x4", "count": 16,
+         + "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 
+         +1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },                              
+      23      { "name": "ViewRotMat", "type": "matrix4x4", "count": 16, "
+          values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.
+          0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+      24      { "name": "InvProjMat", "type": "matrix4x4", "count": 16, "
+          values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.
+          0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+      25      { "name": "InvViewRotMat", "type": "matrix4x4", "count": 16
+          , "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+           1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+● Update(src\main\java\net\Gabou\projectatmosphere\clouds\client\render\volumetr
+        ic\VolumetricCloudRenderer.java)
+  ⎿  Added 1 line, removed 1 line
+      114          shader.setSampler("SceneDepthSampler", Math.max(0, mai
+           nTarget.getDepthTextureId()));
+      115          shader.setSampler("HistorySampler", historyValid ? his
+           toryTarget.getColorTextureId() : 0);
+      116  
+      117 -        shader.safeGetUniform("ProjMat").set(projection);     
+      117 +        shader.safeGetUniform("CloudProjMat").set(projection);
+      118          shader.safeGetUniform("ViewRotMat").set(viewRotation);
+      119          shader.safeGetUniform("InvProjMat").set(invProj);
+      120          shader.safeGetUniform("InvViewRotMat").set(invViewRot)
+           ;
+
+● One more small robustness fix — the ambient term can go negative at high
+  density (funnel union can push density past ~2.9), which produces negative
+  radiance:
+
+● Update(src\main\resources\assets\projectatmosphere\shaders\core\cloud_atmosphe
+        re_volume.fsh)
+  ⎿  Added 1 line, removed 1 line
+      294      vec3 sunTerm = LightColor * sunTint * scatter * powderTerm
+            * (4.0 * PI);
+      295      vec3 ambient = mix(AmbientBottom, AmbientTop, saturate(h01
+           ForAmbient));
+      296      ambient *= mix(1.0, 0.52, StormDarkening);
+      297 -    ambient *= 1.0 - localDensity * 0.35;                     
+      297 +    ambient *= max(1.0 - localDensity * 0.35, 0.0);           
+      298  
+      299      return sunTerm + ambient * 0.85;
+      300  }
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Transient Gradle error (binary store — likely because the dev client is
+  running). Let me retry once:
+
+  Ran 1 shell command, recalled 1 memory, wrote 2 memories (ctrl+o to expand)
+
+● Found it — and fixed the root cause. Restart the client (Java change, not just
+  F3+T) and the world should be visible again.
+
+  What you were seeing
+
+  That black blob is the new volumetric cloud pass drawing a giant cloud cell in
+  front of the entire world. Your logs confirm the pipeline was fully live
+  (shaders compiled at 14:02, noise textures ready at 14:04, no render
+  exceptions), so it wasn't a load failure — it was rendering, just with broken
+  depth.
+
+  Root cause
+
+  FullscreenQuad.draw() renders through vanilla's
+  VertexBuffer.drawWithShader(new Matrix4f(), new Matrix4f(), shader). I
+  verified against the decompiled 1.20.1 sources: _drawWithShader overwrites any
+  uniform named ProjMat (vanilla's managed PROJECTION_MATRIX name) with the
+  matrix you pass in — which was identity, since the fullscreen quad doesn't
+  need matrices for positioning.
+
+  So even though VolumetricCloudRenderer carefully uploaded the real projection
+  into ProjMat, it was silently replaced with identity right before the draw.
+  The raymarch shader's depthAt() then computed gl_FragDepth ≈ 0 (nearest
+  possible) for every cloud pixel, and the composite pass — which depth-tests
+  clouds against the scene — passed everywhere. Result: the cloud's silhouette
+  painted over all terrain. The black center is the thick core of a cell
+  overhead (sun scatter fully extinguished, only weak ambient), fading to gray
+  at its soft edges where the fogged sky shows through.
+
+  Fixes applied
+
+  - Renamed the uniform to CloudProjMat in cloud_atmosphere_volume.fsh, its
+  .json, and VolumetricCloudRenderer.java, so vanilla can no longer stomp it.
+  Your other names (ViewRotMat, InvProjMat, InvViewRotMat, WorldTime,
+  OutputSize) are safe — I checked them all against vanilla's managed list.
+  - Clamped ambient *= max(1.0 - localDensity * 0.35, 0.0) in the shader — with
+  the funnel smooth-union, density can exceed ~2.9 and this term went negative
+  (negative radiance = pushes toward black).
+
+  compileJava passes with only pre-existing warnings.
+
+  Things to watch after the fix (not changed)
+
+  - Undersides of thick cells will still be very dark at ULTRA — the
+  multi-scatter octaves decay fast (a *= 0.42) and storm darkening halves
+  ambient. If it reads too black in daylight, the tuning knobs are the octave
+  falloff in sampleLighting and the ambient floor.
+  - The 0.88 temporal history blend re-samples the history bilinearly every
+  frame, which will progressively smooth away noise detail. Worth revisiting
+  once the picture is right.
+  - Failure mode gap: one render exception sets runtimeEnabled = false for the
+  session, but CloudFieldVolumeRenderHook checks isActive() (config only) — so
+  the legacy fallback stays dormant too and you'd get no clouds until restart.
+  Fine for debugging, but you may want isActive() to reflect the runtime kill
+  switch.
+  - The two log warnings about OutputSize/NightFactor are harmless — the GLSL
+  compiler optimized out unused uniforms.
+
+  If clouds still look wrong after restarting,
+  VolumetricCloudRenderHook.status() (exposed through your telemetry/cloud debug
+  command) reports lastStatus, cell counts, and raymarch GPU time — that's the
+  quickest way to see which stage misbehaves next.
+
+✻ Cogitated for 13m 4s
+
+❯ /remote-control iphone17 
+
+❯ What’s left to do?                                                            
+
+● Short list — the core fix is done and compiles, but it's unverified in-game:
+
+  To verify (the main thing):
+  1. Restart the dev client (the CloudProjMat rename touched Java, so F3+T alone
+  won't pick it up).
+  2. Load the same world and confirm terrain is visible again and clouds sit
+  behind geometry instead of painting over it. If something's still off, your
+  telemetry/cloud debug command exposes VolumetricCloudRenderHook.status() —
+  lastStatus, cell count, and raymarch GPU time will point at the failing stage.
+
+  Known follow-ups I flagged but didn't change:
+  - Dark undersides — thick cells will still render near-black in daylight.
+  Tuning knobs: the multi-scatter octave falloff (a *= 0.42) and ambient floor
+  in sampleLighting.
+  - Temporal smearing — the 0.88 history blend re-samples bilinearly every frame
+  and will wash out noise detail over time; revisit once the base image looks
+  right.
+  - Failure-mode gap — one render exception disables the volumetric pass for the
+  session, but the legacy fallback checks config-only isActive(), so you end up
+  with no clouds until restart. Consider making isActive() reflect the runtime
+  kill switch.
+  - Uncommitted work: all of this (plus the large volumetric pipeline you
+  brought over from Cursor) is still unstaged on Forge-1.20.1 — worth committing
+  once the fix is confirmed in-game.
+
+  The one thing only you can do is step 1–2: run it and look. Everything else
+  hangs on what that shows.
+
+✻ Brewed for 22s
+
+❯ ok currently i have the same bug as before dont make guess how to fix use     
+  logs to find the issues, because even when theres no clouds it displayed      
+
+  Searched for 5 patterns, read 1 file, ran 5 shell commands (ctrl+o to expand)
+
+● Update(src\main\java\net\Gabou\projectatmosphere\clouds\client\render\volumetr
+        ic\VolumetricCloudRenderHook.java)
+  ⎿  Added 2 lines
+      37      private static volatile String lastStatus = "not_rendered_y
+          et";
+      38      private static long frameCounter;
+      39      private static long lastErrorLogMillis;
+      40 +    private static long lastStatusLogMillis;                   
+      41 +    private static String lastLoggedStatusKind = "";           
+      42  
+      43      private VolumetricCloudRenderHook() {
+      44      }
+
+● Update(src\main\java\net\Gabou\projectatmosphere\clouds\client\render\volumetr
+        ic\VolumetricCloudRenderHook.java)
+  ⎿  Added 3 lines, removed 1 line
+      145          float regionalEnergy = Mth.clamp(atmosphere.rainIntens
+           ity() * 0.8F, 0.0F, 1.0F);
+      146  
+      147          if (renderCells.isEmpty() && regionalCoverage <= 0.01F
+           ) {
+      148 -            lastStatus = "no_clouds";                         
+      148 +            setStatus("no_clouds", "cloudCover=" + atmosphere.
+          +cloudCover()                                                  
+      149 +                    + " cells=" + presentedCells.size()       
+      150 +                    + " fieldsFallback=" + renderCells.size())
+          +;                                                             
+      151              VolumetricCloudRenderer.invalidateHistory();
+      152              return;
+      153          }
+
+● Update(src\main\java\net\Gabou\projectatmosphere\clouds\client\render\volumetr
+        ic\VolumetricCloudRenderHook.java)
+  ⎿  Added 1 line, removed 1 line
+      167                  profile.weatherMapSize()
+      168          );
+      169          if (!weather.rendered()) {
+      170 -            lastStatus = "weather_map_unavailable";           
+      170 +            setStatus("weather_map_unavailable", "");         
+      171              return;
+      172          }
+      173  
+● Update(src\main\java\net\Gabou\projectatmosphere\clouds\client\render\volumetr
+        ic\VolumetricCloudRenderHook.java)
+  ⎿  Added 1 line, removed 1 line
+      236                  funnels
+      237          );
+      238          if (!rendered) {
+      239 -            lastStatus = "raymarch_not_ready";                
+      239 +            setStatus("raymarch_not_ready", "");              
+      240              if (mainTarget != null) {
+      241                  mainTarget.bindWrite(true);
+      242              }
+
+● Update(src\main\java\net\Gabou\projectatmosphere\clouds\client\render\volumetr
+        ic\VolumetricCloudRenderHook.java)
+  ⎿  Added 37 lines, removed 2 lines
+      265              );
+      266          }
+      267  
+      268 -        lastStatus = "rendered cells=" + renderCells.size()   
+      268 +        setStatus("rendered", "cells=" + renderCells.size()   
+      269 +                + " syncedCells=" + presentedCells.size()     
+      270                  + " weatherCells=" + weather.cellCount()
+      270 -                + " funnels=" + funnels.count();              
+      271 +                + " regionalCoverage=" + String.format(java.ut
+          +il.Locale.ROOT, "%.3f", regionalCoverage)                     
+      272 +                + " cloudCover=" + String.format(java.util.Loc
+          +ale.ROOT, "%.3f", atmosphere.cloudCover())                    
+      273 +                + " slab=" + String.format(java.util.Locale.RO
+          +OT, "%.1f..%.1f", weather.slabBaseY(), weather.slabTopY())    
+      274 +                + " camY=" + String.format(java.util.Locale.RO
+          +OT, "%.1f", cameraPos.y())                                    
+      275 +                + " lightDir=" + format(lighting.lightDirectio
+          +n())                                                          
+      276 +                + " lightColor=" + format(lighting.lightColor(
+          +))                                                            
+      277 +                + " ambTop=" + format(lighting.ambientTop())  
+      278 +                + " ambBot=" + format(lighting.ambientBottom()
+          +)                                                             
+      279 +                + " composited=" + composited                 
+      280 +                + " funnels=" + funnels.count()               
+      281 +                + " gpuMs=" + VolumetricCloudRenderer.lastGpuM
+          +illiseconds());                                               
+      282      }
+      283  
+      284 +    /**                                                       
+      285 +     * Records the frame status and mirrors it to the log, rat
+          +e-limited so the                                              
+      286 +     * pipeline state is reconstructable from latest.log witho
+          +ut a debugger:                                                
+      287 +     * immediately on status-kind changes, then at most every 
+          +5 seconds.                                                    
+      288 +     */                                                       
+      289 +    private static void setStatus(String kind, String detail) 
+          +{                                                             
+      290 +        lastStatus = detail.isEmpty() ? kind : kind + " " + de
+          +tail;                                                         
+      291 +        long now = System.currentTimeMillis();                
+      292 +        boolean kindChanged = !kind.equals(lastLoggedStatusKin
+          +d);                                                           
+      293 +        if (kindChanged || now - lastStatusLogMillis >= 5_000L
+          +) {                                                           
+      294 +            lastLoggedStatusMillisUpdate(now, kind);          
+      295 +            ProjectAtmosphere.LOGGER.info("[VolumetricClouds] 
+          +status {}", lastStatus);                                      
+      296 +        }                                                     
+      297 +    }                                                         
+      298 +                                                              
+      299 +    private static void lastLoggedStatusMillisUpdate(long now,
+          + String kind) {                                               
+      300 +        lastStatusLogMillis = now;                            
+      301 +        lastLoggedStatusKind = kind;                          
+      302 +    }                                                         
+      303 +                                                              
+      304 +    private static String format(org.joml.Vector3f v) {       
+      305 +        return String.format(java.util.Locale.ROOT, "(%.2f,%.2
+          +f,%.2f)", v.x, v.y, v.z);                                     
+      306 +    }                                                         
+      307 +                                                              
+      308      private static Vector3f averageWind(List<CloudCell> cells)
+            {
+      309          if (cells == null || cells.isEmpty()) {
+      310              return new Vector3f(0.015F, 0.0F, 0.006F);
+
+● Let me clean up that awkward helper:
+
+● Update(src\main\java\net\Gabou\projectatmosphere\clouds\client\render\volumetr
+        ic\VolumetricCloudRenderHook.java)
+  ⎿  Added 3 lines, removed 8 lines
+      289      private static void setStatus(String kind, String detail) 
+           {
+      290          lastStatus = detail.isEmpty() ? kind : kind + " " + de
+           tail;
+      291          long now = System.currentTimeMillis();
+      292 -        boolean kindChanged = !kind.equals(lastLoggedStatusKin
+          -d);                                                           
+      293 -        if (kindChanged || now - lastStatusLogMillis >= 5_000L
+          -) {                                                           
+      294 -            lastLoggedStatusMillisUpdate(now, kind);          
+      292 +        if (!kind.equals(lastLoggedStatusKind) || now - lastSt
+          +atusLogMillis >= 5_000L) {                                    
+      293 +            lastStatusLogMillis = now;                        
+      294 +            lastLoggedStatusKind = kind;                      
+      295              ProjectAtmosphere.LOGGER.info("[VolumetricClouds] 
+           status {}", lastStatus);
+      296          }
+      297      }
+      298  
+      299 -    private static void lastLoggedStatusMillisUpdate(long now,
+          - String kind) {                                               
+      300 -        lastStatusLogMillis = now;                            
+      301 -        lastLoggedStatusKind = kind;                          
+      302 -    }                                                         
+      303 -                                                              
+      299      private static String format(org.joml.Vector3f v) {
+      300          return String.format(java.util.Locale.ROOT, "(%.2f,%.2
+           f,%.2f)", v.x, v.y, v.z);
+      301      }
+
+● Now the command — /pa system volumetric status|on|off:
+
+● Update(src\main\java\net\Gabou\projectatmosphere\command\TelemetryDebugClientC
+        ommand.java)
+  ⎿  Added 1 line
+      20  import net.Gabou.projectatmosphere.clouds.client.render.field.C
+          loudFieldVolumeTuneTarget;
+      21  import net.Gabou.projectatmosphere.clouds.client.debug.CloudDeb
+          ugRenderHook;
+      22  import net.Gabou.projectatmosphere.clouds.client.debug.CloudDeb
+          ugStateInitializer;
+      23 +import net.Gabou.projectatmosphere.clouds.client.render.volumet
+         +ric.VolumetricCloudRenderHook;                                 
+      24  import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+      25  import net.Gabou.projectatmosphere.telemetry.TelemetryExportSer
+          vice;
+      26  import net.Gabou.projectatmosphere.tools.debug.WorldSpaceDebugC
+          ubeRenderer;
+
+● Update(src\main\java\net\Gabou\projectatmosphere\command\TelemetryDebugClientC
+        ommand.java)
+  ⎿  Added 1 line
+      136                                              ctx.getSource().se
+           ndSuccess(() -> Component.literal(message.toString()), false);
+      137                                              return 1;
+      138                                          }))
+      139 +                                .then(buildVolumetricCloudComm
+          +and())                                                        
+      140                                  .then(buildWorldSpaceTestCubeC
+           ommand())
+      141                                  .then(buildCloudRenderDebugCom
+           mand())
+      142                                  .then(buildCloudFieldDebugComm
+           and())
+
+● Update(src\main\java\net\Gabou\projectatmosphere\command\TelemetryDebugClientC
+        ommand.java)
+  ⎿  Added 27 lines
+      146          );
+      147      }
+      148  
+      149 +    private static LiteralArgumentBuilder<CommandSourceStack> 
+          +buildVolumetricCloudCommand() {                               
+      150 +        return Commands.literal("volumetric")                 
+      151 +                .executes(ctx -> sendVolumetricStatus(ctx.getS
+          +ource()))                                                     
+      152 +                .then(Commands.literal("status")              
+      153 +                        .executes(ctx -> sendVolumetricStatus(
+          +ctx.getSource())))                                            
+      154 +                .then(Commands.literal("on")                  
+      155 +                        .executes(ctx -> setVolumetricRuntimeE
+          +nabled(ctx.getSource(), true)))                               
+      156 +                .then(Commands.literal("off")                 
+      157 +                        .executes(ctx -> setVolumetricRuntimeE
+          +nabled(ctx.getSource(), false)));                             
+      158 +    }                                                         
+      159 +                                                              
+      160 +    private static int sendVolumetricStatus(CommandSourceStack
+          + source) {                                                    
+      161 +        source.sendSuccess(                                   
+      162 +                () -> Component.literal("Volumetric clouds\n" 
+          ++ VolumetricCloudRenderHook.status().replace(" ", "\n")),     
+      163 +                false);                                       
+      164 +        return 1;                                             
+      165 +    }                                                         
+      166 +                                                              
+      167 +    private static int setVolumetricRuntimeEnabled(CommandSour
+          +ceStack source, boolean enabled) {                            
+      168 +        VolumetricCloudRenderHook.setRuntimeEnabled(enabled); 
+      169 +        source.sendSuccess(                                   
+      170 +                () -> Component.literal("Volumetric cloud pipe
+          +line runtime switch: " + (enabled ? "on" : "off")             
+      171 +                        + (enabled ? "" : " (legacy CloudField
+          + volume renderer takes over next frame)")),                   
+      172 +                false);                                       
+      173 +        return 1;                                             
+      174 +    }                                                         
+      175 +                                                              
+      176      private static LiteralArgumentBuilder<CommandSourceStack> 
+           buildWorldSpaceTestCubeCommand() {
+      177          return Commands.literal("worldSpaceTestCube")
+      178                  .executes(ctx -> sendWorldSpaceTestCubeStatus(
+           ctx.getSource()))
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Compiles clean. Here's where things stand, based strictly on what the logs
+  show — plus the instrumentation I just added so the next run tells us the
+  answer instead of us guessing.
+
+  What today's log established
+
+  1. The ProjMat fix was in the running build —
+  build/resources/.../cloud_atmosphere_volume.json contains CloudProjMat and was
+  stamped 11:19:59, before your 11:20:03 launch. So the fix didn't cure this
+  symptom.
+  2. Your session sequence: teleport to Y=1000 → cleared regions ("Runtime
+  fields cleared: 1") → cloud list empty → blob still visible. Also, time set 
+  1000.
+  3. Key code fact: with zero cells, the volumetric pass renders only if
+  regional cloudCover > ~0.46 — it then splats a region-scale stratus sheet
+  driven by the atmosphere sim, which clearing cloud regions does not clear.
+  Your telemetry shows 60–85% humidity regions, so this is plausible. That would
+  explain "displays even with no clouds" — but the log has no line that proves
+  which pass is drawing. That's the gap I closed.
+
+  What I added (compiled, needs restart)
+
+  - Log-based status: the pipeline now writes [VolumetricClouds] status ... to
+  latest.log — immediately on every state change and every 5 s while rendering.
+  It includes cell count, synced cells, regionalCoverage, cloudCover, slab
+  Y-range, camera Y, light/ambient colors, whether the composite ran, and GPU
+  ms. When it doesn't render it logs why (no_clouds, raymarch_not_ready, …).
+  - /pa system volumetric status — same info in chat (the old status() method
+  existed but nothing exposed it).
+  - /pa system volumetric off|on — runtime kill switch for exactly this pass.
+
+  Test protocol (2 minutes, gives a definitive answer)
+
+  1. Restart, reproduce the blob.
+  2. Run /pa system volumetric off.
+    - Blob disappears → it is the volumetric raymarch; the [VolumetricClouds] 
+  status lines in the log right before that will show what fed it (I'd expect
+  cells=0 regionalCoverage>0 → the stratus sheet rendering black).
+    - Blob stays → it's not this pipeline. Note the legacy CloudField volume
+  renderer takes over when you switch this off — kill it too with /pa system 
+  cloudFieldVolume off. If the blob still survives both, the remaining
+  fullscreen suspects are the ground-shadow multiply pass
+  (enableVolumetricGroundShadows = false in the config to rule out) and the
+  older cloud/terrain-shadow passes.
+  3. Send me the new latest.log (or just the [VolumetricClouds] lines) — the
+  status values will pin the cause without any more speculation.
+
+  One heads-up from the values already visible: at time 1000 the sun is right at
+  the horizon, and the lighting model's daylight = clamp(sunDir.y * 3) will be
+  ~0 there — ambient collapses to near-night values, so any cloud rendered at
+  that time of day will currently come out near-black even when everything else
+  is correct. Worth retesting at time set 6000 too so a lighting-tuning issue
+  doesn't masquerade as the geometry bug.
+
+✻ Cooked for 5m 12s
+
+❯ with both off the blob is still there: [11:34:17] [Render thread/INFO]        
+  [minecraft/ChatComponent]: [System] [CHAT] CloudField volume                  
+  renderer\nenabled=false\nshaderReady=true\nmode=normal                        
+  (0)\nfilter=all\ncachedSnapshots=1\nfieldsBeforeFilter=0\nrenderedFields=0\ns 
+  kippedFields=0\nfilteredOut=0\nfrustumSkipped=0\ndistanceSkipped=0\nrenderTar 
+  get=none\nperformance=none\nlastRenderedFields=none\nfieldDiagnostics=none\nl 
+  astRenderError=none\nsourceKindInSnapshot=true\nquality=ultra steps=64        
+  downscaleFactor=1.000 effectiveTarget=2560x1369 maxFields=16 detailOctaves=4  
+  cloudletBudget=64 staticPreset=true downscaleApplied=false                    
+  normalDepthStrategy=direct_framebuffer_depth_test\ncompositeMode=final\ncloud 
+  FieldTarget=none\ncompositeGpuMs=not_used_native\nskyboxTextureIntegration=pe 
+  nding_no_skybox_texture_resource_found\ncloudFieldRendererDefault=enabled_wit 
+  hout_simple_clouds\ntune.opacity=0.340 tune.threshold=0.002                   
+  tune.maxFinalAlpha=0.900 tune.noise=1.000 tune.erosion=1.200                  
+  tune.brightness=1.000 tune.underside=0.520 tune.densityboost=1.550            
+  tune.animspeed=0.012\ncachedCloudFields=1\nvolumeRendererEnabled=false\nlegac 
+  yCloudFieldRendererEnabled=false\nduplicateCloudFieldRenderPathsActive=false\ 
+  nactiveCloudFieldRenderer=none\nactiveMainCloudRenderer=cloudfield_volume\nle 
+  gacyCloudRendererEnabled=false\nduplicateCloudRenderPathsActive=false         
+  [11:34:27] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT]    
+  Volumetric clouds\nvolumetricActive=false\nstatus=rendered\ncells=1\nsyncedCe 
+  lls=0\nweatherCells=1\nregionalCoverage=0.000\ncloudCover=0.000\nslab=145.0.. 
+  223.0\ncamY=37.6\nlightDir=(-0.66,0.75,0.12)\nlightColor=(0.48,0.49,0.50)\nam 
+  bTop=(0.05,0.06,0.10)\nambBot=(0.12,0.16,0.24)\ncomposited=true\nfunnels=0\ng 
+  puMs=0.007168\ncells=0\nraymarchGpuMs=0.007168\ngovernorScale=1.0\nanalytics= 
+  not_initialized                                                               
+   you can check latest.log                                                     
+
+● Both renderers off and the blob persists — that's decisive: the blob is 
+  neither the volumetric pass nor the legacy CloudField volume renderer.
+  Something else draws it. Also note your status shows cells=1 from a fallback
+  snapshot (cachedSnapshots=1) and night-time lighting. Let me scan the full log
+  for every PA render path that was active, then find the third renderer.
+
+  Searched for 4 patterns, read 1 file, ran 1 shell command (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ okay wait i didnt see it, but it seems that with both off the blob is only    
+  shown when im writting commands or in the pause menu.[Image #5]  also the sun 
+  look like this [Image #4]                                                     
+  ⎿  [Image #4]
+  ⎿  [Image #5]
+
+  Searched for 2 patterns, read 3 files, ran 1 shell command (ctrl+o to expand)  ⎿  You've hit your session limit · resets 3pm (America/Toronto)
+     /upgrade to increase your usage limit.
+
+✻ Churned for 4m 43s
+
+❯ /export                                                                       
+  ⎿  Conversation copied to clipboard
+
+❯ /export                                                                       
+  ⎿  Conversation copied to clipboard

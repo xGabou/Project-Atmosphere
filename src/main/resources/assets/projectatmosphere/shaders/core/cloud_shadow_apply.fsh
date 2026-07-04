@@ -29,7 +29,7 @@ float saturate(float v) {
 
 void main() {
     float sceneDepth = texture(SceneDepthSampler, texCoord).r;
-    if (sceneDepth >= 0.99999 || DaylightFactor <= 0.02) {
+    if (sceneDepth >= 0.995 || DaylightFactor <= 0.02) {
         fragColor = vec4(1.0);
         return;
     }

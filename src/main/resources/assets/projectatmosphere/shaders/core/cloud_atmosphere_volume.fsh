@@ -89,7 +89,12 @@ vec4 sampleWeather(vec2 worldXZ) {
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         return vec4(0.0, 0.35, 0.45, 0.0);
     }
-    return texture(WeatherMapSampler, uv);
+    vec4 weather = texture(WeatherMapSampler, uv);
+    float edgeDistance = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    float edgeFade = smoothstep(0.0, 0.055, edgeDistance);
+    weather.r *= edgeFade;
+    weather.a *= edgeFade;
+    return weather;
 }
 
 float heightGradient(float h01, float energy) {
@@ -153,7 +158,10 @@ float funnelBaseLowering(vec2 worldXZ, vec4 A, vec4 B) {
 
 float cloudDensity(vec3 p, float mipBias, bool useDetail, bool nearCamera) {
     vec4 weather = sampleWeather(p.xz);
-    float coverage = saturate(weather.r * CoverageMul);
+    // Weather-map coverage already includes the cloudlet density. Its normal
+    // spawned-field range is roughly 0.08..0.35; treating 0.92 as the full
+    // point erased those clouds before the raymarch ever saw them.
+    float coverage = smoothstep(0.012, 0.42, saturate(weather.r * CoverageMul));
     float energy = weather.a;
 
     float funnel = 0.0;
@@ -183,21 +191,25 @@ float cloudDensity(vec3 p, float mipBias, bool useDetail, bool nearCamera) {
 
         // Anvil: energetic cells spread coverage near the top.
         float anvil = smoothstep(0.68, 0.95, saturate(h01)) * energy * 0.30;
-        float coverageMod = saturate(coverage * (1.0 + anvil));
+        float coverageMod = saturate(coverage * (1.08 + anvil));
 
         vec3 wind = WindVec * WorldTime;
         vec3 samplePos = p + vec3(wind.x, 0.0, wind.z);
         // Height shear: tops drift ahead of bases.
         samplePos.xz += LightDir.xz * 0.0 + WindVec.xz * WorldTime * saturate(h01) * 0.35;
 
-        vec4 baseNoise = texture(BaseNoiseSampler, samplePos * 0.0016, mipBias);
+        // Cloudlets are tens to low hundreds of blocks wide. The old 0.0016
+        // scale sampled an almost constant value across an entire cloudlet,
+        // producing one smooth oval instead of separate billows.
+        vec4 baseNoise = texture(BaseNoiseSampler, samplePos * 0.0052, mipBias);
         float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
         float baseShape = remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0);
         baseShape *= hg;
-        cloud = remap(baseShape, 1.0 - coverageMod, 1.0, 0.0, 1.0) * coverageMod;
+        float openSkyBreakup = mix(0.76, 0.30, coverageMod);
+        cloud = remap(baseShape, openSkyBreakup, 1.0, 0.0, 1.0) * coverageMod;
 
         if (cloud > 0.003 && useDetail) {
-            vec3 detailPos = samplePos * 0.012 + vec3(WorldTime * 0.0006, WorldTime * 0.0002, -WorldTime * 0.0004);
+            vec3 detailPos = samplePos * 0.022 + vec3(WorldTime * 0.0006, WorldTime * 0.0002, -WorldTime * 0.0004);
             // Cheap curl-ish churn: offset detail lookup by low-freq noise.
             detailPos += (baseNoise.gbr - 0.5) * 0.18;
             vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
@@ -208,12 +220,13 @@ float cloudDensity(vec3 p, float mipBias, bool useDetail, bool nearCamera) {
             }
             // Wispy erosion near base, billowy rounding near top.
             float hfMod = mix(detailFbm, 1.0 - detailFbm, saturate(h01 * 4.0));
-            float erosion = mix(0.24, 0.42, energy);
+            float erosion = mix(0.28, 0.48, energy);
             cloud = remap(cloud, hfMod * erosion, 1.0, 0.0, 1.0);
         }
 
         // Storm cells hold more condensed water low in the cloud.
         cloud *= mix(1.0, 1.35, energy * (1.0 - saturate(h01)) * 0.6);
+        cloud *= smoothstep(0.012, 0.095, coverage);
     }
 
     float density = max(cloud, 0.0) * DensityMul;
@@ -422,7 +435,7 @@ void main() {
         bool nearCamera = t < 220.0;
         float density = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera);
 
-        if (density > 0.0012) {
+        if (density > 0.0008) {
             if (!fine) {
                 // Entered cloud with a coarse stride: back up and resolve fine.
                 t -= stepLength * 0.6;
@@ -440,6 +453,7 @@ void main() {
             float extinction = density * ExtinctionScale;
             float stepTrans = exp(-extinction * stepLength);
             vec3 radiance = sampleLighting(p, density, h01, cosTheta, blue, saturate(t / MaxRenderDistance));
+            radiance = max(radiance, mix(vec3(0.34, 0.35, 0.36), vec3(0.07, 0.08, 0.11), NightFactor));
 
             // Energy-conserving analytic integration over the step.
             vec3 integrated = radiance * (1.0 - stepTrans);
@@ -478,7 +492,10 @@ void main() {
         }
     }
 
-    if (result.a < 0.004) {
+    vec3 straightFloor = mix(vec3(0.58, 0.60, 0.63), vec3(0.070, 0.080, 0.105), NightFactor);
+    result.rgb = max(result.rgb, straightFloor * result.a);
+
+    if (result.a < 0.002) {
         gl_FragDepth = 1.0;
         fragColor = vec4(0.0);
         return;

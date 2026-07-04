@@ -7,6 +7,7 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateUpdater;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.clouds.client.lighting.CloudLightingManager;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -32,6 +33,13 @@ public final class CloudRenderHook {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
             return;
         }
+        // The weather-map volumetric pipeline owns PA cloud visuals when it
+        // is configured. This older per-region raymarch previously ran in
+        // parallel and produced the persistent fullscreen black oval even
+        // after the CloudField render switches were turned off.
+        if (nativeVolumetricPipelineConfigured()) {
+            return;
+        }
 
         renderFromRenderStage(
                 event.getLevelRenderer(),
@@ -41,6 +49,14 @@ public final class CloudRenderHook {
                 event.getCamera(),
                 event.getCamera().getPosition()
         );
+    }
+
+    private static boolean nativeVolumetricPipelineConfigured() {
+        try {
+            return AtmoCommonConfig.CLOUD_VOLUMETRIC_RENDERER_ENABLED.get();
+        } catch (IllegalStateException exception) {
+            return true;
+        }
     }
 
     public static void renderFromRenderStage(

@@ -51,6 +51,10 @@ public final class CloudFieldVolumeRenderConfig {
      */
     public static void setEnabled(boolean shouldEnable) {
         enabled = shouldEnable;
+        if (!shouldEnable) {
+            CloudFieldRenderTargetManager.shutdown();
+            recordPipelineDiagnostics("cloudFieldTarget=none", "compositeGpuMs=not_used_disabled");
+        }
         try {
             AtmoCommonConfig.CLOUD_FIELD_RENDERER_ENABLED.set(shouldEnable);
             saveCommonConfigForMod(ProjectAtmosphere.MODID);

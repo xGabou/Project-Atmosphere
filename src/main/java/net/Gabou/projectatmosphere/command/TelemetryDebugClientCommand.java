@@ -20,6 +20,7 @@ import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeTu
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeTuneTarget;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
 import net.Gabou.projectatmosphere.tools.debug.WorldSpaceDebugCubeRenderer;
@@ -135,6 +136,7 @@ public class TelemetryDebugClientCommand {
                                             ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);
                                             return 1;
                                         }))
+                                .then(buildVolumetricCloudCommand())
                                 .then(buildWorldSpaceTestCubeCommand())
                                 .then(buildCloudRenderDebugCommand())
                                 .then(buildCloudFieldDebugCommand())
@@ -142,6 +144,33 @@ public class TelemetryDebugClientCommand {
                                 .then(TornadoRenderDebugClientCommand.build())
                         )
         );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildVolumetricCloudCommand() {
+        return Commands.literal("volumetric")
+                .executes(ctx -> sendVolumetricStatus(ctx.getSource()))
+                .then(Commands.literal("status")
+                        .executes(ctx -> sendVolumetricStatus(ctx.getSource())))
+                .then(Commands.literal("on")
+                        .executes(ctx -> setVolumetricRuntimeEnabled(ctx.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(ctx -> setVolumetricRuntimeEnabled(ctx.getSource(), false)));
+    }
+
+    private static int sendVolumetricStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal("Volumetric clouds\n" + VolumetricCloudRenderHook.status().replace(" ", "\n")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricRuntimeEnabled(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudRenderHook.setRuntimeEnabled(enabled);
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud pipeline runtime switch: " + (enabled ? "on" : "off")
+                        + (enabled ? "" : " (legacy CloudField volume renderer takes over next frame)")),
+                false);
+        return 1;
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildWorldSpaceTestCubeCommand() {
@@ -295,6 +324,9 @@ public class TelemetryDebugClientCommand {
 
     private static int setCloudFieldVolumeRender(CommandSourceStack source, boolean enabled) {
         if (enabled) {
+            CloudFieldDebugRenderConfig.setEnabled(false);
+        } else {
+            VolumetricCloudRenderHook.setRuntimeEnabled(false);
             CloudFieldDebugRenderConfig.setEnabled(false);
         }
         CloudFieldVolumeRenderConfig.setEnabled(enabled);

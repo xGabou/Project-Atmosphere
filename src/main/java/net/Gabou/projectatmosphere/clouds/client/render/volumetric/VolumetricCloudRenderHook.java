@@ -5,14 +5,17 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
 import net.Gabou.projectatmosphere.clouds.analytics.CloudCellAnalyticsPass;
+import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.cell.client.ClientCloudCellCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
-import net.Gabou.projectatmosphere.clouds.client.render.ClientShaderPipelineHelper;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeDebugMode;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
+import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
+import net.Gabou.projectatmosphere.clouds.field.CloudletId;
+import net.Gabou.projectatmosphere.clouds.field.CloudletLayout;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -37,6 +40,8 @@ public final class VolumetricCloudRenderHook {
     private static volatile String lastStatus = "not_rendered_yet";
     private static long frameCounter;
     private static long lastErrorLogMillis;
+    private static long lastStatusLogMillis;
+    private static String lastLoggedStatusKind = "";
 
     private VolumetricCloudRenderHook() {
     }
@@ -65,6 +70,13 @@ public final class VolumetricCloudRenderHook {
 
     public static void setRuntimeEnabled(boolean enabled) {
         runtimeEnabled = enabled;
+        if (!enabled) {
+            lastStatus = "disabled";
+            VolumetricCloudRenderer.invalidateHistory();
+            VolumetricCloudRenderTargets.shutdown();
+            CloudShadowMapAccess.clear();
+            CameraCloudDensityTracker.reset();
+        }
     }
 
     @SubscribeEvent
@@ -107,11 +119,27 @@ public final class VolumetricCloudRenderHook {
         long gameTime = level.getGameTime();
         float worldTimeTicks = (gameTime % 1_728_000L) + partialTick;
 
-        // 1. Gather cells: prefer the synced cell simulation, fall back to
-        // legacy CloudField snapshots so the renderer works from day one.
+        // 1. Gather render cells. Spawned/native PA clouds still arrive as
+        // CloudField snapshots; prefer them over the newer autonomous cell
+        // simulation so manual cloud spawns render the cloud the user asked
+        // for instead of unrelated background cells.
         List<CloudCell> presentedCells = ClientCloudCellCache.presentCells(dimensionId, gameTime, partialTick);
         List<VolumetricRenderCell> renderCells = new ArrayList<>();
-        if (!presentedCells.isEmpty()) {
+        CloudFieldRendererInput input = ClientCloudFieldCache.createRendererInput(cameraPos, gameTime, partialTick);
+        List<CloudFieldSnapshot> fieldSnapshots = new ArrayList<>(input.fields());
+        fieldSnapshots.sort(Comparator.comparingDouble(snapshot -> snapshot.center().distanceToSqr(cameraPos)));
+        for (CloudFieldSnapshot snapshot : fieldSnapshots) {
+            if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
+                break;
+            }
+            if (snapshot != null && snapshot.hasVisibleClouds()
+                    && (dimensionId.isBlank() || dimensionId.equals(snapshot.dimensionId()))) {
+                addFieldRenderCells(snapshot, renderCells);
+            }
+        }
+
+        String renderSource = renderCells.isEmpty() ? "none" : "fields";
+        if (renderCells.isEmpty() && !presentedCells.isEmpty()) {
             presentedCells.sort(Comparator.comparingDouble(cell -> cell.distanceSqrTo(cameraPos.x(), cameraPos.z())));
             for (CloudCell cell : presentedCells) {
                 if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
@@ -121,29 +149,23 @@ public final class VolumetricCloudRenderHook {
                     renderCells.add(VolumetricRenderCell.fromCell(cell));
                 }
             }
-        } else {
-            CloudFieldRendererInput input = ClientCloudFieldCache.createRendererInput(cameraPos, gameTime, partialTick);
-            for (CloudFieldSnapshot snapshot : input.fields()) {
-                if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
-                    break;
-                }
-                if (snapshot != null && snapshot.hasVisibleClouds()
-                        && (dimensionId.isBlank() || dimensionId.equals(snapshot.dimensionId()))) {
-                    renderCells.add(VolumetricRenderCell.fromFieldSnapshot(snapshot));
-                }
-            }
+            renderSource = renderCells.isEmpty() ? "none" : "cells";
         }
+        boolean renderingFields = "fields".equals(renderSource);
 
         // 2. Interior fog tracking runs even when nothing is visible so the
         // whiteout releases smoothly after leaving a cloud.
-        CameraCloudDensityTracker.update(presentedCells, cameraPos);
+        CameraCloudDensityTracker.update(renderingFields ? List.<CloudCell>of() : presentedCells, cameraPos);
 
         AtmosphereClientState.Snapshot atmosphere = AtmosphereClientState.getSnapshot();
         float regionalCoverage = Mth.clamp((atmosphere.cloudCover() - 0.45F) * 1.4F, 0.0F, 1.0F);
         float regionalEnergy = Mth.clamp(atmosphere.rainIntensity() * 0.8F, 0.0F, 1.0F);
 
         if (renderCells.isEmpty() && regionalCoverage <= 0.01F) {
-            lastStatus = "no_clouds";
+            setStatus("no_clouds", "cloudCover=" + atmosphere.cloudCover()
+                    + " cells=" + presentedCells.size()
+                    + " fields=" + fieldSnapshots.size()
+                    + " source=" + renderSource);
             VolumetricCloudRenderer.invalidateHistory();
             return;
         }
@@ -163,13 +185,13 @@ public final class VolumetricCloudRenderHook {
                 profile.weatherMapSize()
         );
         if (!weather.rendered()) {
-            lastStatus = "weather_map_unavailable";
+            setStatus("weather_map_unavailable", "");
             return;
         }
 
         RenderTarget mainTarget = minecraft.getMainRenderTarget();
         Matrix4f projection = new Matrix4f(event.getProjectionMatrix());
-        Matrix4f viewRotation = new Matrix4f(event.getPoseStack().last().pose());
+        Matrix4f viewRotation = cameraViewRotation(event);
         Vector3f cameraPosF = new Vector3f((float) cameraPos.x(), (float) cameraPos.y(), (float) cameraPos.z());
 
         // 4. Ground shadows: GPU-resident end to end. Skipped when an external
@@ -190,34 +212,27 @@ public final class VolumetricCloudRenderHook {
                 );
             }
             VolumetricCloudShadowRenderer.publishSnapshot(
-                    presentedCells,
+                    renderingFields ? List.<CloudCell>of() : presentedCells,
                     lighting.lightDirection(),
                     cameraPos.x(),
                     cameraPos.z(),
                     weather.slabBaseY(),
                     groundY
             );
-            boolean applyPost = !ClientShaderPipelineHelper.isConservativeShaderPathPreferred();
-            if (applyPost) {
-                float daylight = Mth.clamp(lighting.lightDirection().y * 2.6F, 0.0F, 1.0F)
-                        * (1.0F - lighting.nightFactor());
-                VolumetricCloudShadowRenderer.applyGroundShadows(
-                        mainTarget,
-                        new Matrix4f(projection).invert(),
-                        new Matrix4f(viewRotation).invert(),
-                        cameraPosF,
-                        lighting.lightDirection(),
-                        weather.slabBaseY(),
-                        groundY,
-                        0.38F,
-                        daylight
-                );
-            }
+            // Do not run the legacy fullscreen shadow post here. It samples
+            // mainTarget's depth texture while that same texture is attached
+            // to the draw framebuffer, an undefined OpenGL feedback loop that
+            // produces a black fullscreen oval on affected drivers. The
+            // generated shadow map remains published for shader integrations;
+            // an in-engine post must first copy scene depth to a detached
+            // texture before sampling it.
         }
 
         // 5. Raymarch with temporal reprojection.
-        Vector3f windVec = averageWind(presentedCells);
-        VolumetricCloudRenderer.FunnelUniforms funnels = buildFunnels(presentedCells, cameraPos);
+        Vector3f windVec = renderingFields ? defaultWind() : averageWind(presentedCells);
+        VolumetricCloudRenderer.FunnelUniforms funnels = renderingFields
+                ? VolumetricCloudRenderer.FunnelUniforms.NONE
+                : buildFunnels(presentedCells, cameraPos);
         boolean rendered = VolumetricCloudRenderer.render(
                 mainTarget,
                 weather,
@@ -232,7 +247,7 @@ public final class VolumetricCloudRenderHook {
                 funnels
         );
         if (!rendered) {
-            lastStatus = "raymarch_not_ready";
+            setStatus("raymarch_not_ready", "");
             if (mainTarget != null) {
                 mainTarget.bindWrite(true);
             }
@@ -252,7 +267,7 @@ public final class VolumetricCloudRenderHook {
 
         // 7. GPU analytics (Medium+ with GL 4.3): measure per-cell footprints
         // from the weather map and hand digests to the merge/split logic.
-        if (profile.analyticsEnabled() && !presentedCells.isEmpty()) {
+        if (profile.analyticsEnabled() && !renderingFields && !presentedCells.isEmpty()) {
             CloudCellAnalyticsPass.tick(
                     presentedCells,
                     VolumetricCloudRenderTargets.prepareWeatherTarget(profile.weatherMapSize()),
@@ -261,14 +276,112 @@ public final class VolumetricCloudRenderHook {
             );
         }
 
-        lastStatus = "rendered cells=" + renderCells.size()
+        setStatus("rendered", "cells=" + renderCells.size()
+                + " source=" + renderSource
+                + " syncedCells=" + presentedCells.size()
+                + " syncedFields=" + fieldSnapshots.size()
                 + " weatherCells=" + weather.cellCount()
-                + " funnels=" + funnels.count();
+                + " fieldCloudlets=" + fieldCloudletCount(fieldSnapshots, dimensionId)
+                + " regionalCoverage=" + String.format(java.util.Locale.ROOT, "%.3f", regionalCoverage)
+                + " cloudCover=" + String.format(java.util.Locale.ROOT, "%.3f", atmosphere.cloudCover())
+                + " slab=" + String.format(java.util.Locale.ROOT, "%.1f..%.1f", weather.slabBaseY(), weather.slabTopY())
+                + " camY=" + String.format(java.util.Locale.ROOT, "%.1f", cameraPos.y())
+                + " lightDir=" + format(lighting.lightDirection())
+                + " lightColor=" + format(lighting.lightColor())
+                + " ambTop=" + format(lighting.ambientTop())
+                + " ambBot=" + format(lighting.ambientBottom())
+                + " composited=" + composited
+                + " funnels=" + funnels.count()
+                + " gpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds());
+    }
+
+    /**
+     * Records the frame status and mirrors it to the log, rate-limited so the
+     * pipeline state is reconstructable from latest.log without a debugger:
+     * immediately on status-kind changes, then at most every 5 seconds.
+     */
+    private static void setStatus(String kind, String detail) {
+        lastStatus = detail.isEmpty() ? kind : kind + " " + detail;
+        long now = System.currentTimeMillis();
+        if (!kind.equals(lastLoggedStatusKind) || now - lastStatusLogMillis >= 5_000L) {
+            lastStatusLogMillis = now;
+            lastLoggedStatusKind = kind;
+            ProjectAtmosphere.LOGGER.info("[VolumetricClouds] status {}", lastStatus);
+        }
+    }
+
+    private static String format(org.joml.Vector3f v) {
+        return String.format(java.util.Locale.ROOT, "(%.2f,%.2f,%.2f)", v.x, v.y, v.z);
+    }
+
+    private static void addFieldRenderCells(
+            CloudFieldSnapshot snapshot,
+            List<VolumetricRenderCell> renderCells
+    ) {
+        if (snapshot == null || renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
+            return;
+        }
+        int cloudletCount = renderCloudletCount(snapshot);
+        for (int i = 0; i < cloudletCount; i++) {
+            if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
+                return;
+            }
+            renderCells.add(VolumetricRenderCell.fromFieldCloudlet(
+                    snapshot,
+                    CloudletLayout.generate(snapshot, CloudletId.of(i))
+            ));
+        }
+    }
+
+    private static int renderCloudletCount(CloudFieldSnapshot snapshot) {
+        if (snapshot == null || !snapshot.hasVisibleClouds()) {
+            return 0;
+        }
+        int active = snapshot.dynamicCloudletCount();
+        int target = Math.max(active, snapshot.targetCloudletCount());
+        CloudFieldSourceKind sourceKind = snapshot.sourceKind();
+        if (sourceKind == CloudFieldSourceKind.MANUAL_DEBUG) {
+            return Math.max(active, Math.min(target, 48));
+        }
+        if (sourceKind == CloudFieldSourceKind.PA_REGION || sourceKind == CloudFieldSourceKind.PA_CLUSTER) {
+            return Math.max(active, Math.min(target, 32));
+        }
+        return Math.max(active, Math.min(target, 24));
+    }
+
+    private static int fieldCloudletCount(List<CloudFieldSnapshot> snapshots, String dimensionId) {
+        int count = 0;
+        for (CloudFieldSnapshot snapshot : snapshots) {
+            if (snapshot != null && snapshot.hasVisibleClouds()
+                    && (dimensionId.isBlank() || dimensionId.equals(snapshot.dimensionId()))) {
+                count += renderCloudletCount(snapshot);
+            }
+        }
+        return count;
+    }
+
+    private static Matrix4f cameraViewRotation(RenderLevelStageEvent event) {
+        Matrix4f viewRotation = new Matrix4f(event.getPoseStack().last().pose());
+        // The volume shader expects camera-relative world->view rotation only.
+        // Pose-stack translation here corrupts cloud depth and can composite a
+        // local cloud as a fullscreen/oval slab.
+        viewRotation.m30(0.0F);
+        viewRotation.m31(0.0F);
+        viewRotation.m32(0.0F);
+        viewRotation.m03(0.0F);
+        viewRotation.m13(0.0F);
+        viewRotation.m23(0.0F);
+        viewRotation.m33(1.0F);
+        return viewRotation;
+    }
+
+    private static Vector3f defaultWind() {
+        return new Vector3f(0.015F, 0.0F, 0.006F);
     }
 
     private static Vector3f averageWind(List<CloudCell> cells) {
         if (cells == null || cells.isEmpty()) {
-            return new Vector3f(0.015F, 0.0F, 0.006F);
+            return defaultWind();
         }
         double x = 0.0D;
         double z = 0.0D;

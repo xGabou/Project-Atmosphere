@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowSnapshot;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
@@ -84,8 +85,7 @@ public final class VolumetricCloudShadowRenderer {
             FullscreenQuad.draw(shader);
         } finally {
             shader.clear();
-            RenderSystem.enableCull();
-            RenderSystem.depthMask(true);
+            CloudRenderStateGuard.restoreAfterCloudPass();
         }
         frameCounter++;
         return true;
@@ -137,11 +137,7 @@ public final class VolumetricCloudShadowRenderer {
             FullscreenQuad.draw(shader);
         } finally {
             shader.clear();
-            RenderSystem.disableBlend();
-            RenderSystem.enableCull();
-            RenderSystem.depthMask(true);
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
+            CloudRenderStateGuard.restoreAfterCloudPass(mainTarget);
         }
     }
 

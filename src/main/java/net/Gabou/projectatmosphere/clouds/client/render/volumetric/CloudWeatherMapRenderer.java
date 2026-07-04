@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.util.Mth;
 import org.lwjgl.opengl.GL20;
@@ -16,7 +17,7 @@ import java.util.List;
  */
 public final class CloudWeatherMapRenderer {
     public static final int MAX_CELLS = 96;
-    public static final float WEATHER_EXTENT = 8192.0F;
+    public static final float WEATHER_EXTENT = 4096.0F;
 
     private static final float[] posRadiusArray = new float[MAX_CELLS * 4];
     private static final float[] shapeArray = new float[MAX_CELLS * 4];
@@ -146,8 +147,7 @@ public final class CloudWeatherMapRenderer {
             FullscreenQuad.draw(shader);
         } finally {
             shader.clear();
-            RenderSystem.enableCull();
-            RenderSystem.depthMask(true);
+            CloudRenderStateGuard.restoreAfterCloudPass();
         }
         return new Result(true, originX, originZ, slabBase, slabTop, count);
     }

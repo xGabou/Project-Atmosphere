@@ -9,9 +9,9 @@ import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.GL11;
 
 /** Depth-aware upsample and scene composite for the CloudField target. */
 public final class CloudFieldCompositeRenderer {
@@ -44,12 +44,7 @@ public final class CloudFieldCompositeRenderer {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
-        if (mode == CloudFieldCompositeDebugMode.FINAL) {
-            RenderSystem.enableDepthTest();
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        } else {
-            RenderSystem.disableDepthTest();
-        }
+        RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.setShader(() -> shader);
         shader.setSampler("CloudColorSampler", source.getColorTextureId());
@@ -84,14 +79,7 @@ public final class CloudFieldCompositeRenderer {
     }
 
     public static void restoreRenderState() {
-        RenderSystem.colorMask(true, true, true, true);
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.enableCull();
-        GL11.glCullFace(GL11.GL_BACK);
-        RenderSystem.disableBlend();
-        RenderSystem.disableScissor();
+        CloudRenderStateGuard.restoreAfterCloudPass();
     }
 
     public static void shutdown() {

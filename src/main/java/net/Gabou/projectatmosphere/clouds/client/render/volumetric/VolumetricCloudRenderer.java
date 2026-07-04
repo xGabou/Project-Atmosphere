@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -85,9 +86,7 @@ public final class VolumetricCloudRenderer {
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         RenderTarget historyTarget = VolumetricCloudRenderTargets.historyCloudTarget();
-        boolean historyValid = profile.temporalEnabled()
-                && hasPrevFrame
-                && VolumetricCloudRenderTargets.isHistoryValid();
+        boolean historyValid = false;
 
         Matrix4f invProj = new Matrix4f(projection).invert();
         Matrix4f invViewRot = new Matrix4f(viewRotation).invert();
@@ -148,9 +147,9 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("UseSceneDepth").set(mainTarget.getDepthTextureId() > 0 ? 1 : 0);
         shader.safeGetUniform("HistoryValid").set(historyValid ? 1 : 0);
         shader.safeGetUniform("HistoryBlend").set(historyValid ? 0.88F : 0.0F);
-        shader.safeGetUniform("DensityMul").set(1.0F);
-        shader.safeGetUniform("CoverageMul").set(1.0F);
-        shader.safeGetUniform("ExtinctionScale").set(0.09F);
+        shader.safeGetUniform("DensityMul").set(1.05F);
+        shader.safeGetUniform("CoverageMul").set(1.25F);
+        shader.safeGetUniform("ExtinctionScale").set(0.055F);
         FunnelUniforms safeFunnels = funnels == null ? FunnelUniforms.NONE : funnels;
         shader.safeGetUniform("FunnelCount").set(safeFunnels.count());
         shader.safeGetUniform("Funnel0A").set(safeFunnels.f0a());
@@ -167,8 +166,7 @@ public final class VolumetricCloudRenderer {
             GPU_TIMER.end();
             unbind3dNoise();
             shader.clear();
-            RenderSystem.enableCull();
-            RenderSystem.depthFunc(GL11.GL_LEQUAL);
+            CloudRenderStateGuard.restoreAfterCloudPass(mainTarget);
         }
 
         prevProj.set(projection);

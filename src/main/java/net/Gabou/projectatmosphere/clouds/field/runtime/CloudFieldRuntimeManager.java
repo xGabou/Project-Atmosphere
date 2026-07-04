@@ -196,7 +196,7 @@ public final class CloudFieldRuntimeManager {
         int replacedManualFields = clearManualDebugFields(level);
         int suppressedBackendFields = clearNonManualFields(level);
         Vec3 playerPosition = player.position();
-        Vec3 center = new Vec3(playerPosition.x(), playerPosition.y() + 120.0D, playerPosition.z());
+        Vec3 center = new Vec3(playerPosition.x(), playerPosition.y() + 220.0D, playerPosition.z());
         Vec3 wind = nearestBackendWind(level, center);
         String dimensionId = level.dimension().location().toString();
         String sourceId = String.format(
@@ -212,9 +212,9 @@ public final class CloudFieldRuntimeManager {
                 CloudFieldSourceType.MANUAL_DEBUG,
                 dimensionId,
                 center,
-                120.0F,
-                (float) playerPosition.y() + 80.0F,
-                (float) playerPosition.y() + 160.0F,
+                90.0F,
+                (float) playerPosition.y() + 180.0F,
+                (float) playerPosition.y() + 260.0F,
                 0.80F,
                 0.75F,
                 0.80F,

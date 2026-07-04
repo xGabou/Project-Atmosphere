@@ -42,7 +42,10 @@ public final class VolumetricCloudLighting {
 
     public static Frame resolve(ClientLevel level, Vec3 cameraPosition, float partialTick) {
         float timeOfDay = level.getTimeOfDay(partialTick);
-        float celestial = (timeOfDay - 0.25F) * ((float) Math.PI * 2.0F);
+        // ClientLevel#getTimeOfDay already uses Minecraft's celestial phase:
+        // zero is midday and 0.5 is midnight. Subtracting another quarter
+        // turn made a bright daytime sky select the moon-light branch.
+        float celestial = timeOfDay * ((float) Math.PI * 2.0F);
         Vector3f sunDirection = new Vector3f(
                 -Mth.sin(celestial),
                 Mth.cos(celestial),

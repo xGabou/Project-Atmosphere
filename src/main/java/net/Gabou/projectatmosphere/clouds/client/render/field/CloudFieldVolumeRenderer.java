@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.client.render.mesh.VolumeBoxMesh;
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
@@ -217,14 +218,7 @@ public final class CloudFieldVolumeRenderer {
      * also calls this defensively when it catches a render exception.
      */
     public static void restoreRenderState() {
-        RenderSystem.colorMask(true, true, true, true);
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.enableCull();
-        GL11.glCullFace(GL11.GL_BACK);
-        RenderSystem.disableBlend();
-        RenderSystem.disableScissor();
+        CloudRenderStateGuard.restoreAfterCloudPass();
     }
 
     private static boolean dimensionMatches(CloudFieldSnapshot snapshot, String dimensionId) {

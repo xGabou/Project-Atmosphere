@@ -27,6 +27,7 @@
     "MultiRegionCloudMeshGeneratorMixin",
     "client.DefaultPipelineTornadoMixin",
     "client.ClientLevelWeatherMixin",
+    "client.MixinGuiVignette",
     "client.MixinGameRenderer",
     "client.MixinMinecraftLevelLifecycle",
     "client.InstanceableMeshDiagnosticsMixin",

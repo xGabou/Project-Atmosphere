@@ -112,11 +112,16 @@ void main() {
 
         coverage = 1.0 - (1.0 - coverage) * (1.0 - cellCoverage);
         float weight = cellCoverage;
-        // Interior of the cell keeps the true base; edges lift the base for a
-        // rounded underside on the aggregate mass.
-        float edgeLift = (1.0 - footprint) * 0.10;
+        // Collapse both vertical faces toward the middle at the footprint
+        // edge. A 2D footprint extruded between a flat base/top reads as a
+        // camera-facing card even when its density contains noise; this
+        // encodes an ellipsoidal cloudlet envelope in the weather map.
+        float edge01 = 1.0 - footprint;
+        float cellSpan = max(shape.z - shape.y, 2.0 / slabSpan);
+        float edgeLift = edge01 * cellSpan * 0.42;
+        float edgeDrop = edge01 * cellSpan * 0.42;
         baseAccum += (shape.y + edgeLift) * weight;
-        topAccum += shape.z * weight;
+        topAccum += (shape.z - edgeDrop) * weight;
         energyAccum += media.y * weight;
         weightAccum += weight;
     }
