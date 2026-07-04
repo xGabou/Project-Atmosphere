@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.event;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
+import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
 import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
@@ -64,6 +65,9 @@ public class EventHandler {
         if (activeBackend == CloudVisualBackend.PA_NATIVE) {
             CloudRegionManager.getInstance().tickCloudRegions(serverLevel);
             CloudFieldRuntimeManager.getInstance().tick(serverLevel);
+            if (AtmoCommonConfig.CLOUD_VOLUMETRIC_RENDERER_ENABLED.get()) {
+                CloudCellSimulationManager.getInstance().tick(serverLevel);
+            }
         }
 
         if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
@@ -118,6 +122,7 @@ public class EventHandler {
             if (CloudBackendMigrationManager.status(level).currentBackend() == CloudVisualBackend.PA_NATIVE) {
                 CloudRegionSyncManager.syncPlayer(player);
                 CloudFieldSyncManager.syncPlayer(player);
+                CloudCellSimulationManager.getInstance().syncPlayer(player);
             }
 
         }

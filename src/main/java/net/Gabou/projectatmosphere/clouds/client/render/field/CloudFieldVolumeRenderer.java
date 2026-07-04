@@ -71,7 +71,10 @@ public final class CloudFieldVolumeRenderer {
 
         Stats stats = new Stats(dimensionId, input.worldTime(), cachedSnapshots, input.fields().size(), mode, filter);
         RenderTarget target = outputTarget == null ? Minecraft.getInstance().getMainRenderTarget() : outputTarget;
-        boolean sceneDepthClip = !debugMode && sceneDepthTextureId > 0 && !downscaleApplied;
+        // Sampling main depth is safe only while drawing into the dedicated
+        // downscaled target. Native rendering relies on framebuffer depth and
+        // avoids sampling an attached texture.
+        boolean sceneDepthClip = !debugMode && downscaleApplied && sceneDepthTextureId > 0;
         boolean compositeOcclusion = !debugMode && downscaleApplied;
         stats.recordTarget(target, downscaleApplied, sceneDepthClip, compositeOcclusion);
         List<FieldDraw> candidates = new ArrayList<>();
@@ -154,8 +157,10 @@ public final class CloudFieldVolumeRenderer {
         try {
             Matrix4f modelViewMat = poseStack.last().pose();
             if (target != null) {
-                target.bindWrite(false);
+                target.bindWrite(true);
             }
+            RenderSystem.disableScissor();
+            RenderSystem.colorMask(true, true, true, true);
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
             RenderSystem.enableDepthTest();
@@ -212,12 +217,14 @@ public final class CloudFieldVolumeRenderer {
      * also calls this defensively when it catches a render exception.
      */
     public static void restoreRenderState() {
+        RenderSystem.colorMask(true, true, true, true);
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
         RenderSystem.depthFunc(GL11.GL_LEQUAL);
         RenderSystem.enableCull();
         GL11.glCullFace(GL11.GL_BACK);
         RenderSystem.disableBlend();
+        RenderSystem.disableScissor();
     }
 
     private static boolean dimensionMatches(CloudFieldSnapshot snapshot, String dimensionId) {
@@ -397,7 +404,7 @@ public final class CloudFieldVolumeRenderer {
         private int frustumSkipped;
         private int distanceSkipped;
         private String targetDiagnostics = "none";
-        private String performanceDiagnostics = "gpuMs=unavailable";
+        private String performanceDiagnostics = "raymarchGpuMs=unavailable";
         private String lastSkipReason = "none";
 
         private Stats(
@@ -445,16 +452,16 @@ public final class CloudFieldVolumeRenderer {
 
         private void recordGpuTimer(CloudGpuTimer gpuTimer) {
             if (gpuTimer == null || !gpuTimer.isSupported()) {
-                performanceDiagnostics = "gpuMs=unsupported";
+                performanceDiagnostics = "raymarchGpuMs=unsupported";
                 return;
             }
             if (!gpuTimer.hasResult()) {
-                performanceDiagnostics = "gpuMs=pending pendingQueries=" + gpuTimer.getPendingQueries();
+                performanceDiagnostics = "raymarchGpuMs=pending pendingRaymarchQueries=" + gpuTimer.getPendingQueries();
                 return;
             }
-            performanceDiagnostics = "gpuMs=" + CloudFieldVolumeRenderStats.format(gpuTimer.getLastMilliseconds())
-                    + " resultAgeFrames=" + gpuTimer.getLastResultAgeFrames()
-                    + " pendingQueries=" + gpuTimer.getPendingQueries();
+            performanceDiagnostics = "raymarchGpuMs=" + CloudFieldVolumeRenderStats.format(gpuTimer.getLastMilliseconds())
+                    + " raymarchAgeFrames=" + gpuTimer.getLastResultAgeFrames()
+                    + " pendingRaymarchQueries=" + gpuTimer.getPendingQueries();
         }
 
         private void recordRawField(String detail) {
@@ -479,9 +486,11 @@ public final class CloudFieldVolumeRenderer {
             boolean cameraInside = validBounds && bounds.contains(cameraPosition);
             Vec3 distanceAnchor = validBounds ? bounds.center() : center;
             double cameraDistance = Math.sqrt(distanceAnchor.distanceToSqr(cameraPosition));
+            Vec3 min = validBounds ? bounds.min() : Vec3.ZERO;
+            Vec3 max = validBounds ? bounds.max() : Vec3.ZERO;
             fieldDiagnostics.add(String.format(
                     Locale.ROOT,
-                    "%s:%s sourceVisual=%.2f center=%.1f,%.1f,%.1f radius=%.1f baseTop=%.1f/%.1f density=%.3f coverage=%.3f hydration=%.3f vertical=%.3f cameraDistance=%.1f cameraInsideVolume=%s %s result=%s",
+                    "%s:%s sourceVisual=%.2f center=%.1f,%.1f,%.1f radius=%.1f baseTop=%.1f/%.1f volumeMin=%.1f,%.1f,%.1f volumeMax=%.1f,%.1f,%.1f density=%.3f coverage=%.3f hydration=%.3f vertical=%.3f cloudlets=%d/%d cloudletBudget=%d cameraDistance=%.1f cameraInsideVolume=%s %s result=%s",
                     shortId(snapshot),
                     sourceLabel(snapshot),
                     sourceVisualMultiplier(snapshot.sourceKind()),
@@ -491,10 +500,19 @@ public final class CloudFieldVolumeRenderer {
                     snapshot.radius(),
                     snapshot.baseY(),
                     snapshot.topY(),
+                    min.x(),
+                    min.y(),
+                    min.z(),
+                    max.x(),
+                    max.y(),
+                    max.z(),
                     snapshot.density(),
                     snapshot.coverage(),
                     snapshot.hydrationProgress(),
                     snapshot.verticalDevelopment(),
+                    snapshot.activeCloudletCount(),
+                    snapshot.targetCloudletCount(),
+                    CloudFieldVolumeRenderConfig.cloudletBudget(),
                     cameraDistance,
                     cameraInside,
                     visibility,

@@ -173,6 +173,7 @@ public record CloudFieldVolumeRenderStats(
                 + "\nrenderTarget=" + targetDiagnostics
                 + "\nperformance=" + performanceDiagnostics
                 + "\nlastRenderedFields=" + lastRenderedFields
+                + "\nfieldDiagnostics=" + fieldDiagnostics
                 + "\nlastRenderError=" + lastRenderError
                 + "\nsourceKindInSnapshot=true";
     }

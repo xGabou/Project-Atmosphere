@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderFallbackState;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderDebugMode;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeDebugMode;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderFilter;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderMode;
@@ -279,6 +280,14 @@ public class TelemetryDebugClientCommand {
                     .executes(ctx -> setCloudFieldVolumeFilter(ctx.getSource(), filter)));
         }
         root.then(filterRoot);
+
+        LiteralArgumentBuilder<CommandSourceStack> compositeRoot = Commands.literal("composite")
+                .executes(ctx -> sendCloudFieldCompositeModeStatus(ctx.getSource()));
+        for (CloudFieldCompositeDebugMode compositeMode : CloudFieldCompositeDebugMode.values()) {
+            compositeRoot.then(Commands.literal(compositeMode.serializedName())
+                    .executes(ctx -> setCloudFieldCompositeMode(ctx.getSource(), compositeMode)));
+        }
+        root.then(compositeRoot);
         root.then(buildCloudFieldVolumeQualityCommand());
         root.then(buildCloudFieldVolumeTuneCommand());
         return root;
@@ -317,6 +326,25 @@ public class TelemetryDebugClientCommand {
                 () -> Component.literal("CloudField volume render filter set to "
                         + filter.serializedName()
                         + "."),
+                false
+        );
+        return 1;
+    }
+
+    private static int setCloudFieldCompositeMode(CommandSourceStack source, CloudFieldCompositeDebugMode mode) {
+        CloudFieldVolumeRenderConfig.setCompositeDebugMode(mode);
+        source.sendSuccess(
+                () -> Component.literal("CloudField composite mode set to " + mode.serializedName() + "."),
+                false
+        );
+        return 1;
+    }
+
+    private static int sendCloudFieldCompositeModeStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal("CloudField composite mode="
+                        + CloudFieldVolumeRenderConfig.compositeDebugMode().serializedName()
+                        + "\ncommand=/pa cloud render composite <final|color|depth|alignment|alpha>"),
                 false
         );
         return 1;
@@ -457,8 +485,9 @@ public class TelemetryDebugClientCommand {
                         + "\n" + cloudFieldRendererOwnershipStatus()
                         + "\ncommands=/pa cloud render on|off|status"
                         + "\ncompact=/pa cloud render status"
-                        + "\nmode=/pa cloud render mode <normal|bounds|horizontal|height|vertical|density|source>"
+                        + "\nmode=/pa cloud render mode <normal|bounds|horizontal|height|vertical|density|source|densitymask>"
                         + "\nfilter=/pa cloud render filter <all|manual|weather|nearest|first>"
+                        + "\ncomposite=/pa cloud render composite <final|color|depth|alignment|alpha>"
                         + "\nquality=/pa cloud render quality <low|low_24|low_24_steps|medium|high|ultra>"
                         + "\ntune=/pa cloud render tune <opacity|threshold|erosion|noise|brightness|underside|maxalpha|densityboost|animspeed> <value>"
                         + "\npreset=/pa cloud render tune preset <soft|dense|wispy|debug>"),

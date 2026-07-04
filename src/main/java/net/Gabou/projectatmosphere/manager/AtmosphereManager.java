@@ -5,6 +5,7 @@ package net.Gabou.projectatmosphere.manager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
+import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.command.tree.ProjectAtmosphereCommands;
@@ -212,6 +213,7 @@ public class AtmosphereManager {
         AtmosphereStatusSyncManager.syncPlayer(player);
         if (CloudBackendMigrationManager.status(player.serverLevel()).currentBackend() == CloudVisualBackend.PA_NATIVE) {
             CloudRegionSyncManager.syncPlayer(player);
+            CloudCellSimulationManager.getInstance().syncPlayer(player);
         }
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
             TornadoManager.syncToPlayer(player);

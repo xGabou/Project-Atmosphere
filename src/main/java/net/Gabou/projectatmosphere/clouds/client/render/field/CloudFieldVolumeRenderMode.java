@@ -12,7 +12,8 @@ public enum CloudFieldVolumeRenderMode {
     HEIGHT(3, "height"),
     VERTICAL(4, "vertical"),
     DENSITY(5, "density"),
-    SOURCE(6, "source");
+    SOURCE(6, "source"),
+    DENSITY_MASK(7, "densitymask");
 
     private final int shaderId;
     private final String serializedName;

@@ -1,0 +1,61 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "zero",
+    "srcalpha": "one",
+    "dstalpha": "zero"
+  },
+  "vertex": "projectatmosphere:cloud_volume",
+  "fragment": "projectatmosphere:cloud_atmosphere_volume",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    { "name": "WeatherMapSampler" },
+    { "name": "BlueNoiseSampler" },
+    { "name": "SceneDepthSampler" },
+    { "name": "HistorySampler" }
+  ],
+  "uniforms": [
+    { "name": "CloudProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "ViewRotMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "InvProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "InvViewRotMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "PrevViewProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "CameraPos", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "OutputSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+    { "name": "WeatherOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "WeatherExtent", "type": "float", "count": 1, "values": [ 8192.0 ] },
+    { "name": "SlabBaseY", "type": "float", "count": 1, "values": [ 120.0 ] },
+    { "name": "SlabTopY", "type": "float", "count": 1, "values": [ 320.0 ] },
+    { "name": "LightDir", "type": "float", "count": 3, "values": [ 0.3, 0.9, 0.2 ] },
+    { "name": "LightColor", "type": "float", "count": 3, "values": [ 1.0, 0.97, 0.9 ] },
+    { "name": "AmbientTop", "type": "float", "count": 3, "values": [ 0.5, 0.6, 0.75 ] },
+    { "name": "AmbientBottom", "type": "float", "count": 3, "values": [ 0.3, 0.32, 0.34 ] },
+    { "name": "SunsetStrength", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "NightFactor", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "StormDarkening", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "WindVec", "type": "float", "count": 3, "values": [ 0.02, 0.0, 0.008 ] },
+    { "name": "WorldTime", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "FrameIndex", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "RaymarchSteps", "type": "int", "count": 1, "values": [ 40 ] },
+    { "name": "LightSteps", "type": "int", "count": 1, "values": [ 5 ] },
+    { "name": "ScatterOctaves", "type": "int", "count": 1, "values": [ 3 ] },
+    { "name": "DetailQuality", "type": "int", "count": 1, "values": [ 1 ] },
+    { "name": "StepScale", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "MaxRenderDistance", "type": "float", "count": 1, "values": [ 2000.0 ] },
+    { "name": "UseSceneDepth", "type": "int", "count": 1, "values": [ 1 ] },
+    { "name": "HistoryValid", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "HistoryBlend", "type": "float", "count": 1, "values": [ 0.88 ] },
+    { "name": "DensityMul", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CoverageMul", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "ExtinctionScale", "type": "float", "count": 1, "values": [ 0.09 ] },
+    { "name": "FunnelCount", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "Funnel0A", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] },
+    { "name": "Funnel0B", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] },
+    { "name": "Funnel1A", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] },
+    { "name": "Funnel1B", "type": "float", "count": 4, "values": [ 0.0, 0.0, 0.0, 0.0 ] }
+  ]
+}

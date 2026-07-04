@@ -202,7 +202,7 @@ public final class CloudRaymarchRenderer {
         }
 
         applyLinearFiltering(sourceTarget.getColorTextureId());
-        applyLinearFiltering(depthTarget.getDepthTextureId());
+        applyNearestFiltering(depthTarget.getDepthTextureId());
         if (historyTarget != null) {
             applyLinearFiltering(historyTarget.getColorTextureId());
         }
@@ -210,23 +210,25 @@ public final class CloudRaymarchRenderer {
         if (blendToDestination) {
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthFunc(GL11.GL_LEQUAL);
         } else {
             RenderSystem.disableBlend();
+            RenderSystem.disableDepthTest();
         }
         RenderSystem.disableCull();
-        RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.setShader(() -> shader);
 
         shader.setSampler("CloudColorSampler", sourceTarget.getColorTextureId());
         shader.setSampler("CloudDepthSampler", depthTarget.getDepthTextureId());
-        shader.setSampler("SceneDepthSampler", sceneDepthTextureId);
         shader.setSampler("CloudHistorySampler", historyTarget != null ? historyTarget.getColorTextureId() : sourceTarget.getColorTextureId());
         shader.safeGetUniform("BlurRadius").set(Math.max(0.0F, blurRadius));
         shader.safeGetUniform("BlurStrength").set(Mth.clamp(blurStrength, 0.0F, 1.0F));
         shader.safeGetUniform("HistoryBlendWeight").set(Mth.clamp(historyWeight, 0.0F, 0.95F));
         shader.safeGetUniform("UseHistory").set(useHistory ? 1 : 0);
         shader.safeGetUniform("CompositeDebugMode").set(0);
+        shader.safeGetUniform("UseFramebufferDepth").set(blendToDestination ? 1 : 0);
         shader.apply();
 
         fullscreenQuad.bind();
@@ -236,6 +238,7 @@ public final class CloudRaymarchRenderer {
 
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         return true;
@@ -317,6 +320,18 @@ public final class CloudRaymarchRenderer {
         RenderSystem.bindTexture(textureId);
         GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+    }
+
+    private static void applyNearestFiltering(int textureId) {
+        if (textureId <= 0) {
+            return;
+        }
+
+        RenderSystem.bindTexture(textureId);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
         GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
         GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
     }

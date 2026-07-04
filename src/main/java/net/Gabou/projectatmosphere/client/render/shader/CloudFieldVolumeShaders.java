@@ -20,8 +20,11 @@ import java.io.IOException;
 public final class CloudFieldVolumeShaders {
     private static final ResourceLocation SHADER_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_field_volume");
+    private static final ResourceLocation COMPOSITE_SHADER_ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_field_composite");
 
     private static ShaderInstance shader;
+    private static ShaderInstance compositeShader;
 
     private CloudFieldVolumeShaders() {
     }
@@ -38,6 +41,10 @@ public final class CloudFieldVolumeShaders {
             shader = loaded;
             ProjectAtmosphere.LOGGER.info("[CloudFieldVolume] shaderReload.ready shader={}", SHADER_ID);
         });
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), COMPOSITE_SHADER_ID, DefaultVertexFormat.POSITION_TEX), loaded -> {
+            compositeShader = loaded;
+            ProjectAtmosphere.LOGGER.info("[CloudFieldVolume] shaderReload.ready composite={}", COMPOSITE_SHADER_ID);
+        });
     }
 
     /**
@@ -49,12 +56,16 @@ public final class CloudFieldVolumeShaders {
         return shader;
     }
 
+    public static ShaderInstance getCompositeShader() {
+        return compositeShader;
+    }
+
     /**
      * Reports whether the CloudField volume shader is available this frame.
      *
      * @return true when the shader has been registered successfully
      */
     public static boolean isReady() {
-        return shader != null;
+        return shader != null && compositeShader != null;
     }
 }

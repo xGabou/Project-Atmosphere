@@ -82,14 +82,15 @@ public final class CloudFieldRuntimeManager {
 
     public record DebugFieldSpawnResult(
             CloudFieldBackendBridge.ApplyResult applyResult,
-            int replacedManualFields
+            int replacedManualFields,
+            int suppressedBackendFields
     ) {
     }
 
     public CloudFieldRendererInput tick(ServerLevel level) {
         Objects.requireNonNull(level, "level");
         CloudFieldStore store = storeFor(level);
-        CloudFieldSourceSnapshot sourceSnapshot = withManualDebugSources(level, sourceCollector.collect(level));
+        CloudFieldSourceSnapshot sourceSnapshot = sourceSnapshotForRuntime(level);
         CloudFieldBackendBridge.ApplyResult applyResult = backendBridge.applySnapshot(store, sourceSnapshot, true);
         recordSourceDebug(applyResult.plans());
         recordRemovalDebug(level.dimension(), applyResult.removals());
@@ -193,6 +194,7 @@ public final class CloudFieldRuntimeManager {
         Objects.requireNonNull(player, "player");
         ServerLevel level = player.serverLevel();
         int replacedManualFields = clearManualDebugFields(level);
+        int suppressedBackendFields = clearNonManualFields(level);
         Vec3 playerPosition = player.position();
         Vec3 center = new Vec3(playerPosition.x(), playerPosition.y() + 120.0D, playerPosition.z());
         Vec3 wind = nearestBackendWind(level, center);
@@ -237,7 +239,7 @@ public final class CloudFieldRuntimeManager {
         });
 
         CloudFieldStore store = storeFor(level);
-        CloudFieldSourceSnapshot snapshot = withManualDebugSources(level, sourceCollector.collect(level));
+        CloudFieldSourceSnapshot snapshot = manualDebugSourceSnapshot(level);
         CloudFieldBackendBridge.ApplyResult applyResult = backendBridge.applySnapshot(store, snapshot, false);
         recordSourceDebug(applyResult.plans());
         recordRemovalDebug(level.dimension(), applyResult.removals());
@@ -263,7 +265,7 @@ public final class CloudFieldRuntimeManager {
         sourceSnapshots.put(dimension, snapshot);
         applyResults.put(dimension, applyResult);
         lastTickByLevel.put(dimension, level.getGameTime());
-        return new DebugFieldSpawnResult(applyResult, replacedManualFields);
+        return new DebugFieldSpawnResult(applyResult, replacedManualFields, suppressedBackendFields);
     }
 
     /**
@@ -298,6 +300,29 @@ public final class CloudFieldRuntimeManager {
             boolean manualDebugSource = source != null && source.sourceType() == CloudFieldSourceType.MANUAL_DEBUG;
             boolean manualDebugRecord = debugInfo != null && "MANUAL_DEBUG".equals(debugInfo.sourceType());
             if ((manualDebugSource || manualDebugRecord) && store.removeField(field.fieldId()).isPresent()) {
+                sourceDebugByField.remove(field.fieldId());
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    private int clearNonManualFields(ServerLevel level) {
+        if (level == null) {
+            return 0;
+        }
+        CloudFieldStore store = stores.get(level.dimension());
+        if (store == null) {
+            return 0;
+        }
+
+        int removed = 0;
+        for (CloudField field : store.listActiveFields()) {
+            CloudFieldSource source = store.getTargetSource(field.fieldId()).orElse(null);
+            SourceDebugInfo debugInfo = sourceDebugByField.get(field.fieldId());
+            boolean manualDebugSource = source != null && source.sourceType() == CloudFieldSourceType.MANUAL_DEBUG;
+            boolean manualDebugRecord = debugInfo != null && "MANUAL_DEBUG".equals(debugInfo.sourceType());
+            if (!manualDebugSource && !manualDebugRecord && store.removeField(field.fieldId()).isPresent()) {
                 sourceDebugByField.remove(field.fieldId());
                 removed++;
             }
@@ -406,14 +431,14 @@ public final class CloudFieldRuntimeManager {
         ));
         lines.add(String.format(
                 Locale.ROOT,
-                "collector playerBlock=%s dimension=%s sampledRegions=%d activeRegions=%d sampledPaClusters=%d activeClusters=%d regionFallbacks=%d weatherSampledRegions=%d weatherNoCloudRegion=%d weatherFallbackCandidates=%d weatherFallbackCreated=%d finalCollectedSources=%d",
+                "collector playerBlock=%s dimension=%s sampledRegions=%d activeRegions=%d sampledPaClusters=%d activeClusters=%d regionSources=%d weatherSampledRegions=%d weatherNoCloudRegion=%d weatherFallbackCandidates=%d weatherFallbackCreated=%d finalCollectedSources=%d",
                 collectorDebug.playerBlockPosition(),
                 collectorDebug.dimensionId(),
                 collectorDebug.sampledRegionCount(),
                 collectorDebug.activeRegionCount(),
                 collectorDebug.sampledPaClusterCount(),
                 collectorDebug.activeClusterCount(),
-                collectorDebug.regionFallbackCount(),
+                collectorDebug.regionSourceCount(),
                 collectorDebug.sampledWeatherRegionCount(),
                 collectorDebug.weatherRegionsWithoutCloudRegion(),
                 collectorDebug.weatherFallbackCandidateCount(),
@@ -572,23 +597,25 @@ public final class CloudFieldRuntimeManager {
         }
     }
 
-    private CloudFieldSourceSnapshot withManualDebugSources(ServerLevel level, CloudFieldSourceSnapshot snapshot) {
-        CloudFieldSourceSnapshot base = snapshot == null
-                ? CloudFieldSourceSnapshot.of(List.of(), level.getGameTime(), level.dimension().location().toString(), "empty")
-                : snapshot;
+    private CloudFieldSourceSnapshot sourceSnapshotForRuntime(ServerLevel level) {
+        if (manualDebugSourceCount(level) > 0) {
+            return manualDebugSourceSnapshot(level);
+        }
+        return sourceCollector.collect(level);
+    }
+
+    private CloudFieldSourceSnapshot manualDebugSourceSnapshot(ServerLevel level) {
+        if (level == null) {
+            return CloudFieldSourceSnapshot.of(List.of(), 0L, "", "manual-debug-empty");
+        }
         Collection<CloudFieldSource> manualSources = manualDebugSources
                 .getOrDefault(level.dimension(), Map.of())
                 .values();
-        if (manualSources.isEmpty()) {
-            return base;
-        }
-        List<CloudFieldSource> merged = new ArrayList<>(base.sources());
-        merged.addAll(manualSources);
         return CloudFieldSourceSnapshot.of(
-                merged,
-                base.capturedGameTime(),
-                base.dimensionId(),
-                base.sourceDescription() + "+manual-debug"
+                List.copyOf(manualSources),
+                level.getGameTime(),
+                level.dimension().location().toString(),
+                manualSources.isEmpty() ? "manual-debug-empty" : "manual-debug-only"
         );
     }
 

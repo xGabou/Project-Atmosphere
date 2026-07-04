@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.cell.network.CloudCellAnalyticsPacket;
+import net.Gabou.projectatmosphere.clouds.cell.network.CloudCellDeltaPacket;
+import net.Gabou.projectatmosphere.clouds.cell.network.SyncCloudCellsPacket;
 import net.Gabou.projectatmosphere.clouds.field.network.SyncCloudFieldsPacket;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.network.SyncCloudRegionsPacket;
@@ -11,7 +14,7 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class NetworkHandler {
-    private static final String PROTOCOL_VERSION = "7";
+    private static final String PROTOCOL_VERSION = "8";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -91,6 +94,21 @@ public class NetworkHandler {
                 .decoder(SyncCloudFieldsPacket::decode)
                 .encoder(SyncCloudFieldsPacket::encode)
                 .consumerMainThread(SyncCloudFieldsPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SyncCloudCellsPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncCloudCellsPacket::decode)
+                .encoder(SyncCloudCellsPacket::encode)
+                .consumerMainThread(SyncCloudCellsPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(CloudCellDeltaPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(CloudCellDeltaPacket::decode)
+                .encoder(CloudCellDeltaPacket::encode)
+                .consumerMainThread(CloudCellDeltaPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(CloudCellAnalyticsPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .decoder(CloudCellAnalyticsPacket::decode)
+                .encoder(CloudCellAnalyticsPacket::encode)
+                .consumerMainThread(CloudCellAnalyticsPacket::handle)
                 .add();
     }
 }

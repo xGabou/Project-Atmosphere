@@ -135,6 +135,8 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
     public static final ForgeConfigSpec.EnumValue<CloudRaymarchQuality> CLOUD_RAYMARCH_QUALITY;
     public static final ForgeConfigSpec.BooleanValue CLOUD_FIELD_RENDERER_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue CLOUD_VOLUMETRIC_RENDERER_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_VOLUMETRIC_GROUND_SHADOWS;
     public static final ForgeConfigSpec.IntValue NATIVE_CLOUD_SPAWN_HEIGHT;
     public static final ForgeConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
     public static final ForgeConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
@@ -286,6 +288,12 @@ public class AtmoCommonConfig {
         CLOUD_FIELD_RENDERER_ENABLED = builder
                 .comment("Enable the Project Atmosphere CloudField volume renderer when Simple Clouds is not installed. Disable this as a persistent kill switch to fall back to vanilla clouds.")
                 .define("cloudFieldRendererEnabled", true);
+        CLOUD_VOLUMETRIC_RENDERER_ENABLED = builder
+                .comment("Enable the PA-native volumetric cloud pipeline (weather-map + global raymarch). When disabled, the legacy per-field CloudField renderer is used instead.")
+                .define("cloudVolumetricRendererEnabled", true);
+        ENABLE_VOLUMETRIC_GROUND_SHADOWS = builder
+                .comment("Apply volumetric cloud ground shadows as a depth-based post-process. The GPU shadow map texture stays published for shader packs even when this is disabled.")
+                .define("enableVolumetricGroundShadows", true);
         builder.pop();
 
         builder.push("clouds");

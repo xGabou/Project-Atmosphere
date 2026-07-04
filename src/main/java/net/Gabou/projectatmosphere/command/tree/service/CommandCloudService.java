@@ -56,6 +56,13 @@ public final class CommandCloudService {
     private CommandCloudService() {
     }
 
+    public static int spawnCloud(CommandSourceStack source) {
+        String defaultCloudId = AtmosphereCloudServices.isSimpleCloudsLoaded()
+                ? "cumulus"
+                : CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
+        return spawnCloud(source, defaultCloudId);
+    }
+
     public static int spawnCloud(CommandSourceStack source, String cloudId) {
         ServerPlayer player = PaCommandSupport.requirePlayer(source, "Cloud spawning is only available to players.");
         if (player == null) {
@@ -68,6 +75,7 @@ public final class CommandCloudService {
             return 0;
         }
 
+        int clearedRuntimeFields = CloudFieldRuntimeManager.getInstance().clearRuntimeFields(level);
         BlockPos pos = player.blockPosition();
         RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
         WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
@@ -92,6 +100,7 @@ public final class CommandCloudService {
                     "Cloud: " + cloudId,
                     "Region: " + regionKey,
                     "Wind: " + PaCommandSupport.formatWind(wind),
+                    "Cleared stale runtime fields: " + clearedRuntimeFields,
                     "Result: Simple Clouds region created"
             );
             return 1;
@@ -113,6 +122,7 @@ public final class CommandCloudService {
                 "Resolved: " + state.getCloudTypeId(),
                 "Region: " + regionKey,
                 "Wind: " + PaCommandSupport.formatWind(wind),
+                "Cleared stale runtime fields: " + clearedRuntimeFields,
                 "Result: native PA region created"
         );
         return 1;
@@ -162,10 +172,10 @@ public final class CommandCloudService {
         PaCommandMessages.success(
                 source,
                 false,
-                "CloudField count",
+                "Cloud count",
                 "Active CloudFields: " + activeFieldCount,
-                "Legacy stored regions: " + storedCount,
-                "Legacy active render data: " + activeRenderDataCount
+                "Stored cloud regions: " + storedCount,
+                "Active render data: " + activeRenderDataCount
         );
         return 1;
     }
@@ -236,8 +246,8 @@ public final class CommandCloudService {
     }
 
     /**
-     * Spawns one server-side test CloudField through the production field
-     * bridge/store path without creating a legacy PA cloud region.
+     * Legacy/debug-only CloudField spawn retained for weatherdebug aliases.
+     * Normal /pa cloud spawn creates a real cloud region through spawnCloud.
      *
      * @param source command source
      * @return command result
@@ -247,10 +257,9 @@ public final class CommandCloudService {
     }
 
     /**
-     * Spawns one server-side test CloudField through the production field
-     * bridge/store path. The optional id is accepted for `/pa cloud spawn <id>`
-     * compatibility, but this path creates a real CloudField source instead of
-     * the old native cloud-region visual.
+     * Legacy/debug-only CloudField spawn retained for weatherdebug aliases.
+     * The optional id is only a legacy hint; normal /pa cloud spawn <id>
+     * creates a real cloud region through spawnCloud.
      *
      * @param source command source
      * @param requestedId optional legacy requested cloud id
@@ -275,8 +284,10 @@ public final class CommandCloudService {
                 "Manual test CloudField spawned",
                 requestedLine,
                 "Source: manual_test (MANUAL_DEBUG)",
+                "Manual debug isolation: active",
                 "Replaced previous manual test fields: " + spawnResult.replacedManualFields(),
-                "Automatic weather fields remain active; use /pa cloud render filter manual to isolate this cloud.",
+                "Suppressed automatic/backend fields for this test: " + spawnResult.suppressedBackendFields(),
+                "Use /weatherdebug clouds clearFields to leave manual debug isolation.",
                 "Created: " + result.created(),
                 "Updated: " + result.updated(),
                 "Rebound: " + result.reboundSourceFields(),
@@ -341,12 +352,18 @@ public final class CommandCloudService {
     public static int clearClouds(CommandSourceStack source) {
         ServerLevel level = source.getLevel();
         CloudRegionManager.getInstance().clearCloudRegions(level);
+        int removedRuntimeFields = CloudFieldRuntimeManager.getInstance().clearRuntimeFields(level);
         ServerPlayer player = source.getPlayer();
         if (player != null) {
             CloudRegionSyncManager.syncPlayer(player);
             CloudFieldSyncManager.syncPlayer(player);
         }
-        PaCommandMessages.success(source, true, "Cloud regions cleared");
+        PaCommandMessages.success(
+                source,
+                true,
+                "Cloud regions cleared",
+                "Runtime fields cleared: " + removedRuntimeFields
+        );
         return 1;
     }
 

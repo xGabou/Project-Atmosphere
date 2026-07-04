@@ -256,6 +256,9 @@ public final class CloudFieldBackendBridge {
                 continue;
             }
             CloudFieldSource oldSource = store.getTargetSource(field.fieldId()).orElse(null);
+            if (!sourceTypesCanShareField(oldSource, source)) {
+                continue;
+            }
             if (oldSource != null && liveSourcesByExactFieldId.containsKey(factory.fieldIdFor(oldSource))) {
                 continue;
             }
@@ -289,14 +292,17 @@ public final class CloudFieldBackendBridge {
             if (field.isExpired() || !field.dimensionId().equals(source.dimensionId())) {
                 continue;
             }
-            if (!sourceShapeCompatible(field, source) || !sourceWeatherCompatible(field, store.getTargetSource(field.fieldId()).orElse(null), source)) {
+            CloudFieldSource oldSource = store.getTargetSource(field.fieldId()).orElse(null);
+            if (!sourceTypesCanShareField(oldSource, source)) {
+                continue;
+            }
+            if (!sourceShapeCompatible(field, source) || !sourceWeatherCompatible(field, oldSource, source)) {
                 continue;
             }
             double distance = horizontalDistance(field.center(), source.center());
             if (distance > rebindDistanceThreshold(field, source)) {
                 continue;
             }
-            CloudFieldSource oldSource = store.getTargetSource(field.fieldId()).orElse(null);
             boolean oldSourceStillLive = oldSource != null && liveSourcesByExactFieldId.containsKey(factory.fieldIdFor(oldSource));
             boolean stale = store.isSourceMissing(field.fieldId()) || !oldSourceStillLive;
             DuplicateCandidate candidate = new DuplicateCandidate(
@@ -352,6 +358,27 @@ public final class CloudFieldBackendBridge {
         }
         return Math.abs(oldSource.density() - newSource.density()) <= DENSITY_TOLERANCE
                 && Math.abs(oldSource.coverage() - newSource.coverage()) <= COVERAGE_TOLERANCE;
+    }
+
+    private static boolean sourceTypesCanShareField(CloudFieldSource oldSource, CloudFieldSource newSource) {
+        if (newSource == null) {
+            return false;
+        }
+        if (oldSource == null) {
+            return newSource.sourceType() != CloudFieldSourceType.MANUAL_DEBUG;
+        }
+        CloudFieldSourceType oldType = oldSource.sourceType();
+        CloudFieldSourceType newType = newSource.sourceType();
+        if (oldType == newType) {
+            return true;
+        }
+        if (oldType == CloudFieldSourceType.MANUAL_DEBUG || newType == CloudFieldSourceType.MANUAL_DEBUG) {
+            return false;
+        }
+        if (oldType == CloudFieldSourceType.WEATHER_SUMMARY || newType == CloudFieldSourceType.WEATHER_SUMMARY) {
+            return false;
+        }
+        return true;
     }
 
     private static double rebindDistanceThreshold(CloudField field, CloudFieldSource source) {

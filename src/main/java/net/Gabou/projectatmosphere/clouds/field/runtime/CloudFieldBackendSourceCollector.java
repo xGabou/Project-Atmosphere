@@ -66,7 +66,7 @@ public final class CloudFieldBackendSourceCollector {
 
         int sampledClusterCount = 0;
         int activeClusterCountTotal = 0;
-        int regionFallbackCount = 0;
+        int regionSourceCount = 0;
         int rejectedCandidates = 0;
         int rejectedNoRegionState = 0;
         int rejectedNoAtmosphereState = 0;
@@ -98,7 +98,6 @@ public final class CloudFieldBackendSourceCollector {
                 continue;
             }
 
-            int activeClusterCount = 0;
             for (CloudClusterState cluster : region.getClusters()) {
                 sampledClusterCount++;
                 if (cluster == null || !cluster.isActive()) {
@@ -111,92 +110,84 @@ public final class CloudFieldBackendSourceCollector {
                     rejectedWrongDimension++;
                     continue;
                 }
-                CloudFieldSource source = adapter.fromCluster(region, cluster);
-                if (source.isUsable()) {
-                    sources.add(source);
-                    activeClusterCount++;
-                    activeClusterCountTotal++;
-                } else {
-                    rejectedCandidates++;
-                    rejectedOther++;
-                }
+                activeClusterCountTotal++;
             }
 
-            if (activeClusterCount == 0) {
-                CloudFieldSource source = adapter.fromRegion(region);
-                if (source.isUsable()) {
-                    sources.add(source);
-                    regionFallbackCount++;
-                } else {
-                    rejectedCandidates++;
-                    rejectedOther++;
-                }
+            CloudFieldSource source = adapter.fromRegion(region);
+            if (source.isUsable()) {
+                sources.add(source);
+                regionSourceCount++;
+            } else {
+                rejectedCandidates++;
+                rejectedOther++;
             }
         }
 
         int weatherFallbackCandidates = 0;
         int weatherFallbackCreated = 0;
-        for (RegionInstanceKey key : sampledKeys.stream().sorted(regionKeyComparator()).toList()) {
-            if (weatherFallbackCreated >= MAX_WEATHER_SUMMARY_SOURCES) {
-                break;
-            }
-            weatherFallbackCandidates++;
-            boolean hasCloudRegion = representedRegionKeys.contains(key);
-            if (!hasCloudRegion) {
-                weatherRegionsWithoutCloudRegion++;
-            }
-            if (hasCloudRegion) {
-                rejectedCandidates++;
-                rejectedSourceDuplicate++;
-                continue;
-            }
+        if (regionSourceCount == 0) {
+            for (RegionInstanceKey key : sampledKeys.stream().sorted(regionKeyComparator()).toList()) {
+                if (weatherFallbackCreated >= MAX_WEATHER_SUMMARY_SOURCES) {
+                    break;
+                }
+                weatherFallbackCandidates++;
+                boolean hasCloudRegion = representedRegionKeys.contains(key);
+                if (!hasCloudRegion) {
+                    weatherRegionsWithoutCloudRegion++;
+                }
+                if (hasCloudRegion) {
+                    rejectedCandidates++;
+                    rejectedSourceDuplicate++;
+                    continue;
+                }
 
-            RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
-            ForecastRegion forecast = forecasts.get(key);
-            if (state == null && forecast == null) {
-                rejectedCandidates++;
-                rejectedNoRegionState++;
-                rejectedNoAtmosphereState++;
-                continue;
+                RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+                ForecastRegion forecast = forecasts.get(key);
+                if (state == null && forecast == null) {
+                    rejectedCandidates++;
+                    rejectedNoRegionState++;
+                    rejectedNoAtmosphereState++;
+                    continue;
+                }
+                CloudFieldSource source = weatherSummarySource(level, key, state, forecast);
+                if (source == null) {
+                    rejectedCandidates++;
+                    rejectedOther++;
+                    continue;
+                }
+                if (source.humidityInfluence() < MIN_FALLBACK_HUMIDITY) {
+                    rejectedCandidates++;
+                    rejectedHumidityTooLow++;
+                    continue;
+                }
+                if (source.coverage() < MIN_FALLBACK_CLOUD_POTENTIAL) {
+                    rejectedCandidates++;
+                    rejectedCloudCoverTooLow++;
+                    continue;
+                }
+                if (source.density() <= 0.001F) {
+                    rejectedCandidates++;
+                    rejectedDensityTooLow++;
+                    continue;
+                }
+                if (source.radius() <= 1.0F) {
+                    rejectedCandidates++;
+                    rejectedRadiusTooSmall++;
+                    continue;
+                }
+                if (source.topY() <= source.baseY()) {
+                    rejectedCandidates++;
+                    rejectedInvalidBaseTop++;
+                    continue;
+                }
+                if (!source.isUsable()) {
+                    rejectedCandidates++;
+                    rejectedOther++;
+                    continue;
+                }
+                sources.add(source);
+                weatherFallbackCreated++;
             }
-            CloudFieldSource source = weatherSummarySource(level, key, state, forecast);
-            if (source == null) {
-                rejectedCandidates++;
-                rejectedOther++;
-                continue;
-            }
-            if (source.humidityInfluence() < MIN_FALLBACK_HUMIDITY) {
-                rejectedCandidates++;
-                rejectedHumidityTooLow++;
-                continue;
-            }
-            if (source.coverage() < MIN_FALLBACK_CLOUD_POTENTIAL) {
-                rejectedCandidates++;
-                rejectedCloudCoverTooLow++;
-                continue;
-            }
-            if (source.density() <= 0.001F) {
-                rejectedCandidates++;
-                rejectedDensityTooLow++;
-                continue;
-            }
-            if (source.radius() <= 1.0F) {
-                rejectedCandidates++;
-                rejectedRadiusTooSmall++;
-                continue;
-            }
-            if (source.topY() <= source.baseY()) {
-                rejectedCandidates++;
-                rejectedInvalidBaseTop++;
-                continue;
-            }
-            if (!source.isUsable()) {
-                rejectedCandidates++;
-                rejectedOther++;
-                continue;
-            }
-            sources.add(source);
-            weatherFallbackCreated++;
         }
 
         DebugInfo debugInfo = new DebugInfo(
@@ -206,7 +197,7 @@ public final class CloudFieldBackendSourceCollector {
                 activeRegions.size(),
                 sampledClusterCount,
                 activeClusterCountTotal,
-                regionFallbackCount,
+                regionSourceCount,
                 sampledKeys.size(),
                 weatherRegionsWithoutCloudRegion,
                 weatherFallbackCandidates,
@@ -231,7 +222,7 @@ public final class CloudFieldBackendSourceCollector {
                 sources,
                 level.getGameTime(),
                 level.dimension().location().toString(),
-                "pa-native-active-clusters"
+                "pa-native-active-regions"
         );
     }
 
@@ -380,7 +371,7 @@ public final class CloudFieldBackendSourceCollector {
             int activeRegionCount,
             int sampledPaClusterCount,
             int activeClusterCount,
-            int regionFallbackCount,
+            int regionSourceCount,
             int sampledWeatherRegionCount,
             int weatherRegionsWithoutCloudRegion,
             int weatherFallbackCandidateCount,

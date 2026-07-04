@@ -2,12 +2,9 @@ package net.Gabou.projectatmosphere.clouds.client.render.field;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.Gabou.projectatmosphere.client.render.shader.CloudShaders;
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRaymarchRenderer;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderProfile;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderTargetManager;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -25,6 +22,12 @@ public final class CloudFieldVolumeRenderHook {
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
+            return;
+        }
+
+        // The PA-native volumetric pipeline owns cloud visuals when active;
+        // this legacy per-field renderer stays dormant as its fallback.
+        if (VolumetricCloudRenderHook.isActive()) {
             return;
         }
 
@@ -75,18 +78,18 @@ public final class CloudFieldVolumeRenderHook {
             int sceneDepthTextureId = mainTarget == null ? 0 : mainTarget.getDepthTextureId();
             float resolutionScale = CloudFieldVolumeRenderConfig.resolutionScale();
             boolean debugMode = CloudFieldVolumeRenderConfig.mode() != CloudFieldVolumeRenderMode.NORMAL;
-            if (!debugMode && mainTarget != null && resolutionScale < 0.999F && CloudShaders.getCompositeShader() != null) {
-                CloudRenderTargetManager.prepareTargets(CloudRenderProfile.createDefault());
-                RenderTarget cloudTarget = CloudRenderTargetManager.getCloudColorTarget();
+            boolean inspectComposite = CloudFieldVolumeRenderConfig.compositeDebugMode()
+                    != CloudFieldCompositeDebugMode.FINAL;
+            if (!debugMode && mainTarget != null && (resolutionScale < 0.999F || inspectComposite)
+                    && CloudFieldVolumeShaders.getCompositeShader() != null) {
+                RenderTarget cloudTarget = CloudFieldRenderTargetManager.prepare(mainTarget, resolutionScale);
                 if (cloudTarget != null) {
                     outputTarget = cloudTarget;
                     downscaleApplied = true;
-                    cloudTarget.bindWrite(true);
-                    cloudTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
-                    cloudTarget.clear(Minecraft.ON_OSX);
+                    CloudFieldRenderTargetManager.clearAndBind(cloudTarget);
                 }
             } else if (mainTarget != null) {
-                mainTarget.bindWrite(false);
+                mainTarget.bindWrite(true);
             }
 
             CloudFieldRendererInput input = ClientCloudFieldCache.createRendererInput(
@@ -109,23 +112,30 @@ public final class CloudFieldVolumeRenderHook {
                     downscaleApplied
             );
             if (downscaleApplied && mainTarget != null && outputTarget != null && stats.renderedFields() > 0) {
-                boolean composited = CloudRaymarchRenderer.compositeTarget(
-                        outputTarget,
+                boolean composited = CloudFieldCompositeRenderer.composite(
                         outputTarget,
                         mainTarget,
-                        sceneDepthTextureId,
-                        CloudFieldVolumeRenderConfig.quality().getCompositeBlurRadius(),
-                        CloudFieldVolumeRenderConfig.quality().getCompositeBlurStrength()
+                        CloudFieldVolumeRenderConfig.compositeDebugMode()
                 );
                 if (!composited) {
-                    mainTarget.bindWrite(false);
+                    mainTarget.bindWrite(true);
                 }
             } else if (mainTarget != null) {
-                mainTarget.bindWrite(false);
+                mainTarget.bindWrite(true);
             }
+            CloudFieldVolumeRenderConfig.recordPipelineDiagnostics(
+                    CloudFieldRenderTargetManager.diagnostics(mainTarget),
+                    downscaleApplied
+                            ? CloudFieldCompositeRenderer.performanceDiagnostics()
+                            : "compositeGpuMs=not_used_native"
+            );
             CloudFieldVolumeRenderConfig.recordStats(stats);
         } catch (Throwable throwable) {
             CloudFieldVolumeRenderer.restoreRenderState();
+            CloudFieldCompositeRenderer.restoreRenderState();
+            if (minecraft.getMainRenderTarget() != null) {
+                minecraft.getMainRenderTarget().bindWrite(true);
+            }
             CloudFieldVolumeRenderConfig.recordRenderException(throwable, cachedSnapshots);
         } finally {
             if (pushed) {

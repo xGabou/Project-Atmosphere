@@ -45,7 +45,7 @@ public final class CloudFieldVolumeUniformUploader {
         } else {
             shader.safeGetUniform("OutputSize").set(1.0F, 1.0F);
         }
-        shader.setSampler("SceneDepthSampler", Math.max(0, sceneDepthTextureId));
+        shader.setSampler("SceneDepthSampler", useSceneDepth ? Math.max(0, sceneDepthTextureId) : 0);
         shader.safeGetUniform("UseSceneDepth").set(useSceneDepth ? 1 : 0);
 
         Vec3 min = bounds.min();
@@ -80,6 +80,7 @@ public final class CloudFieldVolumeUniformUploader {
         shader.safeGetUniform("AnimationTime").set((input.worldTime() + input.partialTick()) * 0.05F);
         shader.safeGetUniform("RaymarchSteps").set(Math.max(4, raymarchSteps));
         shader.safeGetUniform("DetailOctaves").set(CloudFieldVolumeRenderConfig.detailOctaves());
+        shader.safeGetUniform("CloudletBudget").set(CloudFieldVolumeRenderConfig.cloudletBudget());
         shader.safeGetUniform("DebugMode").set(CloudFieldVolumeRenderConfig.mode().shaderId());
         shader.safeGetUniform("TuneOpacityStrength").set(CloudFieldVolumeRenderConfig.opacityStrength());
         shader.safeGetUniform("TuneDensityThreshold").set(CloudFieldVolumeRenderConfig.densityThreshold());

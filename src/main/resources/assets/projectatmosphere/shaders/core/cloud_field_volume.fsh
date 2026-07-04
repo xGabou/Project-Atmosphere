@@ -30,6 +30,7 @@ uniform int FieldSourceKind;
 uniform float AnimationTime;
 uniform int RaymarchSteps;
 uniform int DetailOctaves;
+uniform int CloudletBudget;
 uniform int UseSceneDepth;
 uniform int DebugMode;
 // Runtime tuning uniforms. Defaults are provided by cloud_field_volume.json and
@@ -50,6 +51,7 @@ in vec3 fragWorldPos;
 out vec4 fragColor;
 
 const int MAX_RAY_STEPS = 64;
+const int MAX_CLOUDLET_SAMPLES = 64;
 const float NORMAL_MAX_SAMPLE_ALPHA = 0.24;
 
 float saturate(float value) {
@@ -89,6 +91,10 @@ float hash1(float n) {
     return fract(n);
 }
 
+float cloudletUnit(int index, int salt) {
+    return hash1(float(index) * 37.719 + float(salt) * 19.371 + FieldSeed * 0.173);
+}
+
 float noise3(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
@@ -107,11 +113,28 @@ float noise3(vec3 p) {
 float fbm(vec3 p) {
     float value = 0.0;
     float amplitude = 0.55;
+    float amplitudeSum = 0.0;
     int octaves = clamp(DetailOctaves, 1, 4);
     for (int i = 0; i < 4; i++) {
         if (i >= octaves) {
             break;
         }
+        value += noise3(p) * amplitude;
+        amplitudeSum += amplitude;
+        p *= 2.03;
+        amplitude *= 0.50;
+    }
+    // Keep the density range stable across presets. Octave count changes
+    // detail frequency, not the cloud's overall coverage/visibility.
+    return value * (1.03125 / max(amplitudeSum, 0.0001));
+}
+
+// Large-scale cloud geometry stays identical across quality modes and does not
+// need four detail octaves. Fine density detail continues to use fbm().
+float fbmShape(vec3 p) {
+    float value = 0.0;
+    float amplitude = 0.55;
+    for (int i = 0; i < 2; i++) {
         value += noise3(p) * amplitude;
         p *= 2.03;
         amplitude *= 0.50;
@@ -134,7 +157,9 @@ float sceneRayEnd(vec3 rayDirection, float fallbackEnd) {
     }
     vec2 uv = gl_FragCoord.xy / max(OutputSize, vec2(1.0));
     uv = clamp(uv, vec2(0.0), vec2(1.0));
-    float sceneDepth = texture(SceneDepthSampler, uv).r;
+    ivec2 sceneSize = textureSize(SceneDepthSampler, 0);
+    ivec2 sceneCoord = clamp(ivec2(uv * vec2(sceneSize)), ivec2(0), sceneSize - ivec2(1));
+    float sceneDepth = texelFetch(SceneDepthSampler, sceneCoord, 0).r;
     if (sceneDepth >= 0.99999) {
         return fallbackEnd;
     }
@@ -175,8 +200,8 @@ float localBaseOffsetAt(vec3 p) {
     float radius = max(FieldRadius, 1.0);
     float radial = length(localXZ) / radius;
     float interior = 1.0 - smoothstep(0.28, 0.84, radial);
-    float low = fbm(vec3(localXZ * 0.020, FieldSeed * 0.021));
-    float medium = fbm(vec3(localXZ * 0.055, FieldSeed * 0.047));
+    float low = fbmShape(vec3(localXZ * 0.020, FieldSeed * 0.021));
+    float medium = fbmShape(vec3(localXZ * 0.055, FieldSeed * 0.047));
     return ((low - 0.5) * 0.045 + (medium - 0.5) * 0.018)
         * heightSpan
         * interior
@@ -189,7 +214,7 @@ float localTopOffsetAt(vec3 p) {
     float radius = max(FieldRadius, 1.0);
     float radial = length(localXZ) / radius;
     float interior = 1.0 - smoothstep(0.25, 0.88, radial);
-    float topLobe = fbm(vec3(localXZ * 0.017, FieldSeed * 0.063));
+    float topLobe = fbmShape(vec3(localXZ * 0.017, FieldSeed * 0.063));
     float towerBoost = mix(0.035, 0.090, saturate(FieldVerticalDevelopment));
     return (topLobe - 0.5) * heightSpan * towerBoost * interior * TuneNoiseStrength;
 }
@@ -210,9 +235,34 @@ float height01At(vec3 p) {
     return saturate((p.y - baseY) / heightSpan);
 }
 
-float horizontalMaskAt(vec3 p) {
+// The normal raymarch needs base, top, and normalized height together. The old
+// path recomputed the same FBM base/top offsets every time a mask needed the
+// height, resulting in 31 FBM evaluations per density sample. Compute the
+// shared geometry once for the normal path instead.
+void shapeGeometryAt(vec3 p, out float baseY, out float topY, out float height01) {
+    float heightSpan = max(FieldTopY - FieldBaseY, 1.0);
+    vec2 localXZ = p.xz - FieldCenter.xz;
+    float radial = length(localXZ) / max(FieldRadius, 1.0);
+
+    float baseInterior = 1.0 - smoothstep(0.28, 0.84, radial);
+    float low = fbmShape(vec3(localXZ * 0.020, FieldSeed * 0.021));
+    float medium = fbmShape(vec3(localXZ * 0.055, FieldSeed * 0.047));
+    float baseOffset = ((low - 0.5) * 0.045 + (medium - 0.5) * 0.018)
+        * heightSpan
+        * baseInterior
+        * TuneNoiseStrength;
+    baseY = FieldBaseY + baseOffset;
+
+    float topInterior = 1.0 - smoothstep(0.25, 0.88, radial);
+    float topLobe = fbmShape(vec3(localXZ * 0.017, FieldSeed * 0.063));
+    float towerBoost = mix(0.035, 0.090, saturate(FieldVerticalDevelopment));
+    float topOffset = (topLobe - 0.5) * heightSpan * towerBoost * topInterior * TuneNoiseStrength;
+    topY = max(baseY + 1.0, FieldTopY + topOffset);
+    height01 = saturate((p.y - baseY) / max(topY - baseY, 1.0));
+}
+
+float horizontalMaskAtHeight(vec3 p, float height01) {
     float radius = max(FieldRadius, 1.0);
-    float height01 = height01At(p);
     vec2 localXZ = p.xz - FieldCenter.xz;
     float radial = length(localXZ) / radius;
     float coverage = saturate(FieldCoverage);
@@ -229,8 +279,8 @@ float horizontalMaskAt(vec3 p) {
 
     // Restrict silhouette noise to the edge of the body. This keeps breakup
     // visible without spawning large side shoots detached from the main mass.
-    float lobeNoise = fbm(vec3(localXZ * 0.012, FieldSeed * 0.013));
-    float scallopNoise = fbm(vec3(localXZ * 0.040, FieldSeed * 0.041 + height01 * 2.0));
+    float lobeNoise = fbmShape(vec3(localXZ * 0.012, FieldSeed * 0.013));
+    float scallopNoise = fbmShape(vec3(localXZ * 0.040, FieldSeed * 0.041 + height01 * 2.0));
     float edgeBand = smoothstep(0.36, 0.96, radial) * (1.0 - smoothstep(1.02, 1.20, radial));
     float silhouetteOffset = ((lobeNoise - 0.5) * 0.11 + (scallopNoise - 0.5) * 0.07)
         * edgeBand
@@ -244,12 +294,15 @@ float horizontalMaskAt(vec3 p) {
     return saturate((1.0 - smoothstep(edgeStart, edgeStart + edgeWidth, shapedRadial)) * verticalContour);
 }
 
-float verticalMaskAt(vec3 p) {
-    float height01 = height01At(p);
+float horizontalMaskAt(vec3 p) {
+    return horizontalMaskAtHeight(p, height01At(p));
+}
+
+float verticalMaskAtHeight(vec3 p, float height01) {
     float stormLift = saturate(FieldStormPotential) * 0.08;
     vec2 localXZ = p.xz - FieldCenter.xz;
-    float undersideNoise = fbm(vec3(localXZ * 0.050, FieldSeed * 0.071));
-    float topNoise = fbm(vec3(localXZ * 0.026, FieldSeed * 0.093));
+    float undersideNoise = fbmShape(vec3(localXZ * 0.050, FieldSeed * 0.071));
+    float topNoise = fbmShape(vec3(localXZ * 0.026, FieldSeed * 0.093));
     float baseStart = mix(0.025, 0.060, undersideNoise);
     float baseFalloff = smoothstep(baseStart, baseStart + 0.145, height01);
     float topStart = 0.80 + stormLift + (topNoise - 0.5) * 0.035;
@@ -258,7 +311,62 @@ float verticalMaskAt(vec3 p) {
     return saturate(baseFalloff * topFalloff * middleLift);
 }
 
-float densityAt(vec3 p) {
+float verticalMaskAt(vec3 p) {
+    return verticalMaskAtHeight(p, height01At(p));
+}
+
+float cloudletShapeAt(vec3 p, float localBaseY, float height01, float envelopeMask) {
+    int activeCount = int(max(FieldCloudletCount + 0.5, 0.0));
+    int generatedCount = activeCount > 0 ? activeCount : 6;
+    int sampleBudget = clamp(CloudletBudget, 1, MAX_CLOUDLET_SAMPLES);
+    int sampleCount = clamp(min(generatedCount, sampleBudget), 1, MAX_CLOUDLET_SAMPLES);
+    float heightSpan = max(FieldTopY - FieldBaseY, 1.0);
+    float fieldRadius = max(FieldRadius, 1.0);
+    vec3 fieldLocal = fieldLocalAt(p);
+    fieldLocal.y = p.y - localBaseY;
+    float accumulated = 0.0;
+    float nearest = 0.0;
+
+    for (int i = 0; i < MAX_CLOUDLET_SAMPLES; i++) {
+        if (i >= sampleCount) {
+            break;
+        }
+
+        int cloudletIndex = int(floor((float(i) + 0.5) * float(generatedCount) / float(sampleCount)));
+        float angle = cloudletUnit(cloudletIndex, 1) * 6.2831853;
+        float ring = sqrt(cloudletUnit(cloudletIndex, 2)) * fieldRadius * 0.76;
+        float cloudletHeight01 = 0.12 + cloudletUnit(cloudletIndex, 3) * 0.76;
+        float radiusScale = mix(0.13, 0.28, cloudletUnit(cloudletIndex, 4)) * mix(1.08, 0.66, cloudletHeight01);
+        float horizontalRadius = max(2.0, fieldRadius * radiusScale);
+        float verticalRadius = max(2.0, horizontalRadius * mix(0.62, 1.18, cloudletUnit(cloudletIndex, 5)) * mix(0.72, 1.12, saturate(heightSpan / max(fieldRadius, 1.0))));
+        float densityScale = mix(0.72, 1.12, cloudletUnit(cloudletIndex, 6));
+        float coverageWeight = mix(0.58, 1.00, cloudletUnit(cloudletIndex, 7));
+        vec3 center = vec3(
+            cos(angle) * ring,
+            heightSpan * cloudletHeight01,
+            sin(angle) * ring
+        );
+
+        vec3 q = vec3(
+            (fieldLocal.x - center.x) / horizontalRadius,
+            (fieldLocal.y - center.y) / verticalRadius,
+            (fieldLocal.z - center.z) / horizontalRadius
+        );
+        float distance01 = length(q);
+        float core = 1.0 - smoothstep(0.42, 1.08, distance01);
+        float feather = 1.0 - smoothstep(0.82, 1.34, distance01);
+        float cloudlet = saturate(core * 0.82 + feather * 0.24) * densityScale * coverageWeight;
+        accumulated += cloudlet * 0.36;
+        nearest = max(nearest, cloudlet);
+    }
+
+    float merged = saturate(max(nearest, accumulated));
+    float coverageGate = smoothstep(mix(0.30, 0.12, saturate(FieldCoverage)), 0.86, merged);
+    return saturate(merged * coverageGate * smoothstep(0.02, 0.18, envelopeMask));
+}
+
+float densityAndHeightAt(vec3 p, out float sampledHeight01) {
+    sampledHeight01 = 0.0;
     float heightSpan = max(FieldTopY - FieldBaseY, 1.0);
     float cheapVerticalPad = max(4.0, heightSpan * 0.18);
     if (p.y < FieldBaseY - cheapVerticalPad || p.y > FieldTopY + cheapVerticalPad) {
@@ -269,17 +377,43 @@ float densityAt(vec3 p) {
         return 0.0;
     }
 
-    float horizontalMask = horizontalMaskAt(p);
-    float verticalMask = verticalMaskAt(p);
+    // Reject samples well outside the analytic cumulus envelope before any
+    // procedural noise. The generous margin retains noisy silhouette lobes.
+    float approximateHeight01 = saturate((p.y - FieldBaseY) / heightSpan);
+    float approximateRadial = length(p.xz - FieldCenter.xz) / max(FieldRadius, 1.0);
+    float approximateBaseScale = mix(0.48, 1.0, smoothstep(0.02, 0.24, approximateHeight01));
+    float approximateUpperScale = mix(
+        1.0,
+        mix(0.86, 0.58, saturate(FieldVerticalDevelopment)),
+        smoothstep(0.52, 1.0, approximateHeight01)
+    );
+    float approximateAnvil = smoothstep(0.76, 0.98, approximateHeight01)
+        * saturate(FieldStormPotential)
+        * 0.20;
+    float approximateProfile = max(0.22, approximateBaseScale * approximateUpperScale + approximateAnvil);
+    if (approximateRadial > approximateProfile * 1.30 + 0.10) {
+        return 0.0;
+    }
+
+    float localBaseY;
+    float localTopY;
+    float height01;
+    shapeGeometryAt(p, localBaseY, localTopY, height01);
+    sampledHeight01 = height01;
+    float horizontalMask = horizontalMaskAtHeight(p, height01);
+    float verticalMask = verticalMaskAtHeight(p, height01);
     float baseShape = horizontalMask * verticalMask;
     if (baseShape <= 0.0001) {
         return 0.0;
     }
 
-    // Stable field-local noise owns the visible puff layout and silhouette.
-    // It intentionally does not use time, so the main shape does not regenerate.
     vec3 fieldLocal = fieldLocalAt(p);
-    fieldLocal.y = p.y - localBaseYAt(p);
+    fieldLocal.y = p.y - localBaseY;
+    float cloudletShape = cloudletShapeAt(p, localBaseY, height01, baseShape);
+    if (cloudletShape <= 0.0001) {
+        return 0.0;
+    }
+
     float largeNoise = fbm(fieldLocal * 0.010 + vec3(FieldSeed * 0.003));
     float erosionNoise = fbm(fieldLocal * 0.038 + vec3(FieldSeed * 0.017));
     float undersideNoise = fbm(fieldLocal * vec3(0.050, 0.018, 0.050) + vec3(FieldSeed * 0.061));
@@ -287,23 +421,24 @@ float densityAt(vec3 p) {
 
     // Animated detail is deliberately tiny and slow. It adds a faint internal
     // drift without changing the stable lobe/erosion layout.
-    vec3 detailDirection = FieldWind;
-    if (length(detailDirection) < 0.001) {
-        detailDirection = vec3(0.35, 0.0, 0.12);
-    }
-    vec3 detailOffset = normalize(detailDirection) * AnimationTime * TuneAnimSpeed;
-    float detailNoise = fbm(fieldLocal * 0.075 + detailOffset + vec3(FieldSeed * 0.031));
     float edgeRegion = 1.0 - smoothstep(0.30, 0.90, baseShape);
-    float coverageThreshold = mix(0.58, 0.24, saturate(FieldCoverage));
-    float puffMask = smoothstep(coverageThreshold, 0.98, largeNoise * 0.78 + baseShape * 0.58);
-    float erodedShape = baseShape * mix(1.0 - 0.14 * TuneNoiseStrength, 1.0 + 0.12 * TuneNoiseStrength, largeNoise);
+    float detailNoise = 0.5;
+    if (edgeRegion > 0.001 && TuneAnimSpeed > 0.0001) {
+        vec3 detailDirection = FieldWind;
+        if (length(detailDirection) < 0.001) {
+            detailDirection = vec3(0.35, 0.0, 0.12);
+        }
+        vec3 detailOffset = normalize(detailDirection) * AnimationTime * TuneAnimSpeed;
+        detailNoise = fbm(fieldLocal * 0.075 + detailOffset + vec3(FieldSeed * 0.031));
+    }
+    float erodedShape = cloudletShape * mix(0.92 - 0.10 * TuneNoiseStrength, 1.08 + 0.10 * TuneNoiseStrength, largeNoise);
     erodedShape -= edgeRegion * erosionNoise * mix(0.12, 0.34, 1.0 - saturate(FieldCoverage)) * TuneErosionStrength;
-    float undersideRegion = (1.0 - smoothstep(0.08, 0.32, height01At(p))) * smoothstep(0.16, 0.50, horizontalMask);
+    float undersideRegion = (1.0 - smoothstep(0.08, 0.32, height01)) * smoothstep(0.16, 0.50, horizontalMask);
     erodedShape -= undersideRegion * undersideNoise * 0.10 * TuneErosionStrength;
-    float topRegion = smoothstep(0.42, 0.90, height01At(p));
+    float topRegion = smoothstep(0.42, 0.90, height01);
     erodedShape *= mix(1.0, mix(0.88, 1.14, topLobeNoise), topRegion * 0.24 * TuneNoiseStrength);
     erodedShape += (detailNoise - 0.5) * edgeRegion * 0.06 * TuneNoiseStrength * smoothstep(0.0, 0.05, TuneAnimSpeed);
-    erodedShape = saturate(erodedShape) * puffMask;
+    erodedShape = saturate(erodedShape) * baseShape;
 
     float weatherDensity = saturate(FieldDensity)
         * saturate(FieldCoverage)
@@ -316,6 +451,11 @@ float densityAt(vec3 p) {
     float humidityBoost = mix(0.85, 1.15, saturate(FieldHumidityInfluence));
     float stormBoost = mix(1.0, 1.35, saturate(FieldStormPotential));
     return saturate(erodedShape * weatherDensity * endOfLifeFade * cloudletDensityHint * humidityBoost * stormBoost * TuneDensityBoost * sourceVisualMultiplier());
+}
+
+float densityAt(vec3 p) {
+    float sampledHeight01;
+    return densityAndHeightAt(p, sampledHeight01);
 }
 
 float boundsAlphaAt(vec3 p) {
@@ -377,6 +517,14 @@ vec4 debugColor(vec3 p) {
         }
         return vec4(0.95, 0.44, 0.48, sourceAlpha);
     }
+    if (DebugMode == 7) {
+        float density = densityAt(p);
+        if (density <= TuneDensityThreshold) {
+            return vec4(0.0);
+        }
+        float visible = smoothstep(TuneDensityThreshold, max(TuneDensityThreshold * 8.0, 0.08), density);
+        return vec4(visible, visible, visible, max(0.22, visible));
+    }
     return vec4(0.0);
 }
 
@@ -392,6 +540,30 @@ void main() {
     float rawRayEnd = hit.y;
     if (rawRayEnd <= rayStart) {
         discard;
+    }
+
+    if (DebugMode == 7) {
+        int stepBudget = clamp(RaymarchSteps, 4, MAX_RAY_STEPS);
+        float rayLength = rawRayEnd - rayStart;
+        float stepSize = rayLength / float(stepBudget);
+        float maxDensity = 0.0;
+        for (int i = 0; i < MAX_RAY_STEPS; i++) {
+            if (i >= stepBudget) {
+                break;
+            }
+            float t = rayStart + (float(i) + 0.5) * stepSize;
+            vec3 p = CameraPos + rayDirection * t;
+            float height01;
+            float density = densityAndHeightAt(p, height01);
+            maxDensity = max(maxDensity, density);
+        }
+        if (maxDensity <= TuneDensityThreshold) {
+            discard;
+        }
+        float visible = smoothstep(TuneDensityThreshold, max(TuneDensityThreshold * 8.0, 0.08), maxDensity);
+        gl_FragDepth = gl_FragCoord.z;
+        fragColor = vec4(visible, visible, visible, 0.92);
+        return;
     }
 
     if (DebugMode > 0) {
@@ -410,8 +582,15 @@ void main() {
         discard;
     }
 
-    int stepCount = clamp(RaymarchSteps, 4, MAX_RAY_STEPS);
-    float stepSize = (rayEnd - rayStart) / float(stepCount);
+    int stepBudget = clamp(RaymarchSteps, 4, MAX_RAY_STEPS);
+    float rayLength = rayEnd - rayStart;
+    float cloudReferenceLength = min(
+        max(FieldRadius, 1.0) * 2.0,
+        max(FieldTopY - FieldBaseY, 1.0)
+    );
+    float targetStepSize = max(cloudReferenceLength / float(stepBudget), 0.50);
+    int stepCount = int(clamp(ceil(rayLength / targetStepSize), 4.0, float(stepBudget)));
+    float stepSize = rayLength / float(stepCount);
     float referenceStepSize = max((max(FieldRadius, 1.0) * 2.0) / 64.0, 1.0);
     float jitter = hash1(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233)) + FieldSeed) - 0.5;
     float transmittance = 1.0;
@@ -425,7 +604,8 @@ void main() {
         }
         float t = rayStart + (float(i) + 0.5 + jitter * 0.35) * stepSize;
         vec3 p = CameraPos + rayDirection * t;
-        float density = densityAt(p);
+        float height01;
+        float density = densityAndHeightAt(p, height01);
         if (density <= TuneDensityThreshold) {
             continue;
         }
@@ -434,7 +614,6 @@ void main() {
             hasCloudDepth = true;
         }
 
-        float height01 = height01At(p);
         float underside = mix(1.0 - TuneUndersideDarkening, 1.0, smoothstep(0.10, 0.76, height01));
         vec3 sideNormal = normalize(vec3(p.x - FieldCenter.x, FieldRadius * 0.28, p.z - FieldCenter.z));
         float sunSide = dot(sideNormal, normalize(vec3(-0.45, 0.62, 0.25))) * 0.5 + 0.5;

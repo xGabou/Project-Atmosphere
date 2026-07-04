@@ -1,10 +1,18 @@
 package net.Gabou.projectatmosphere.registry;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.analytics.CloudCellAnalyticsPass;
+import net.Gabou.projectatmosphere.clouds.api.CloudDensityQuery;
+import net.Gabou.projectatmosphere.clouds.cell.CloudCellDensityMath;
+import net.Gabou.projectatmosphere.clouds.cell.client.ClientCloudCellCache;
+import net.Gabou.projectatmosphere.clouds.cell.network.CloudCellAnalyticsPacket;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
 import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudWhiteoutFogHandler;
+import net.Gabou.projectatmosphere.network.NetworkHandler;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
@@ -46,6 +54,16 @@ public class ClientOnlyRegistrar {
             // legacy diagnostics and is off by default.
             MinecraftForge.EVENT_BUS.register(CloudFieldDebugRenderHook.class);
             MinecraftForge.EVENT_BUS.register(CloudFieldVolumeRenderHook.class);
+            // PA-native volumetric pipeline: takes visual ownership over the
+            // CloudField renderer when cloudVolumetricRendererEnabled is set.
+            MinecraftForge.EVENT_BUS.register(VolumetricCloudRenderHook.class);
+            MinecraftForge.EVENT_BUS.register(VolumetricCloudWhiteoutFogHandler.class);
+            CloudDensityQuery.setClientProvider((level, x, y, z) -> CloudCellDensityMath.densityAt(
+                    ClientCloudCellCache.presentCells(
+                            level.dimension().location().toString(), level.getGameTime(), 0.0F),
+                    x, y, z));
+            CloudCellAnalyticsPass.setReportSink(reports ->
+                    NetworkHandler.CHANNEL.sendToServer(new CloudCellAnalyticsPacket(reports)));
         } else {
             MinecraftForge.EVENT_BUS.register(SimpleCloudsWhiteoutFogHandler.class);
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; PA cloud client hooks disabled.");

@@ -10,6 +10,8 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateUpdater;
 import net.Gabou.projectatmosphere.client.render.pipeline.AtmospherePipelineAdapter;
 import net.Gabou.projectatmosphere.client.render.pipeline.AtmospherePipelineAdapters;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldRenderTargetManager;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
@@ -41,6 +43,7 @@ public final class CloudRenderer {
     public static void onMainWindowResize(int width, int height) {
         CloudRaymarchRenderer.resetTemporalState();
         CloudRenderTargetManager.onResize(width, height);
+        CloudFieldRenderTargetManager.onResize();
     }
 
     public static void onClientLevelChanged() {
@@ -49,6 +52,7 @@ public final class CloudRenderer {
         CloudRaymarchRenderer.resetTemporalState();
         CloudRenderFallbackState.resetAll();
         CloudRenderTargetManager.onLevelChanged();
+        CloudFieldRenderTargetManager.onLevelChanged();
     }
 
     public static void shutdown() {
@@ -57,6 +61,8 @@ public final class CloudRenderer {
         CloudRaymarchRenderer.resetTemporalState();
         CloudRenderFallbackState.resetAll();
         CloudRenderTargetManager.shutdown();
+        CloudFieldRenderTargetManager.shutdown();
+        CloudFieldCompositeRenderer.shutdown();
     }
 
     /**

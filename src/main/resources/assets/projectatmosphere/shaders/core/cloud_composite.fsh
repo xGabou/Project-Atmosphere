@@ -2,18 +2,16 @@
 
 uniform sampler2D CloudColorSampler;
 uniform sampler2D CloudDepthSampler;
-uniform sampler2D SceneDepthSampler;
 uniform sampler2D CloudHistorySampler;
 uniform float BlurRadius;
 uniform float BlurStrength;
 uniform float HistoryBlendWeight;
 uniform int UseHistory;
 uniform int CompositeDebugMode;
+uniform int UseFramebufferDepth;
 
 in vec2 texCoord;
 out vec4 fragColor;
-
-const float DEPTH_BIAS = 0.0005;
 
 vec4 sampleCloudColor(vec2 uv) {
     return texture(CloudColorSampler, clamp(uv, vec2(0.0), vec2(1.0)));
@@ -44,11 +42,17 @@ void main() {
     ivec2 cloudDepthSize = textureSize(CloudDepthSampler, 0);
     ivec2 cloudDepthCoord = clamp(ivec2(texCoord * vec2(cloudDepthSize)), ivec2(0), cloudDepthSize - ivec2(1));
     float cloudDepth = texelFetch(CloudDepthSampler, cloudDepthCoord, 0).r;
-
-    float sceneDepth = texture(SceneDepthSampler, texCoord).r;
-
-    if (CompositeDebugMode == 0 && sceneDepth + DEPTH_BIAS < cloudDepth) {
+    if (cloudDepth >= 1.0) {
         discard;
+    }
+
+    // The destination scene depth is attached to the framebuffer during this
+    // pass. Sampling that same texture here creates an undefined OpenGL
+    // feedback loop and caused the downscaled cloud to be discarded on some
+    // drivers. Write the raymarched cloud depth and let the fixed-function
+    // depth test compare it against the attached scene depth instead.
+    if (UseFramebufferDepth != 0 && CompositeDebugMode == 0) {
+        gl_FragDepth = cloudDepth;
     }
 
     fragColor = cloudColor;

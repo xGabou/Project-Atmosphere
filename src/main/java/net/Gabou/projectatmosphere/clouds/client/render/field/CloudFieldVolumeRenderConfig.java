@@ -19,6 +19,9 @@ public final class CloudFieldVolumeRenderConfig {
     private static volatile boolean enabled = true;
     private static volatile CloudFieldVolumeRenderMode mode = CloudFieldVolumeRenderMode.NORMAL;
     private static volatile CloudFieldVolumeRenderFilter filter = CloudFieldVolumeRenderFilter.ALL;
+    private static volatile CloudFieldCompositeDebugMode compositeDebugMode = CloudFieldCompositeDebugMode.FINAL;
+    private static volatile String compositePerformanceDiagnostics = "compositeGpuMs=unavailable";
+    private static volatile String pipelineTargetDiagnostics = "cloudFieldTarget=none";
     private static volatile float opacityStrength = CloudFieldVolumeTuneTarget.OPACITY.defaultValue();
     private static volatile float densityThreshold = CloudFieldVolumeTuneTarget.THRESHOLD.defaultValue();
     private static volatile float erosionStrength = CloudFieldVolumeTuneTarget.EROSION.defaultValue();
@@ -134,6 +137,23 @@ public final class CloudFieldVolumeRenderConfig {
         return filter;
     }
 
+    public static void setCompositeDebugMode(CloudFieldCompositeDebugMode nextMode) {
+        compositeDebugMode = nextMode == null ? CloudFieldCompositeDebugMode.FINAL : nextMode;
+    }
+
+    public static CloudFieldCompositeDebugMode compositeDebugMode() {
+        return compositeDebugMode;
+    }
+
+    public static void recordPipelineDiagnostics(String targetDiagnostics, String compositePerformance) {
+        pipelineTargetDiagnostics = targetDiagnostics == null || targetDiagnostics.isBlank()
+                ? "cloudFieldTarget=none"
+                : targetDiagnostics;
+        compositePerformanceDiagnostics = compositePerformance == null || compositePerformance.isBlank()
+                ? "compositeGpuMs=unavailable"
+                : compositePerformance;
+    }
+
     /**
      * Sets the active CloudField renderer quality profile.
      *
@@ -174,7 +194,7 @@ public final class CloudFieldVolumeRenderConfig {
      * @return shader raymarch steps
      */
     public static int raymarchSteps() {
-        return quality().getRaymarchSteps();
+        return qualityProfile().raymarchSteps();
     }
 
     /**
@@ -183,21 +203,29 @@ public final class CloudFieldVolumeRenderConfig {
      * @return maximum rendered fields for one frame
      */
     public static int maxRenderedFields() {
-        return quality().getMaxCloudFields();
+        return qualityProfile().maxCloudFields();
     }
 
     /**
      * Returns the resolution scale for the active static quality preset.
      */
     public static float resolutionScale() {
-        return quality().getResolutionScale();
+        return qualityProfile().resolutionScale();
     }
 
     /**
      * Returns the number of procedural FBM octaves the shader should use.
      */
     public static int detailOctaves() {
-        return quality().getDetailOctaves();
+        return qualityProfile().detailOctaves();
+    }
+
+    public static int cloudletBudget() {
+        return qualityProfile().cloudletBudget();
+    }
+
+    public static CloudFieldQualityProfile qualityProfile() {
+        return CloudFieldQualityProfile.forQuality(quality());
     }
 
     /**
@@ -431,6 +459,9 @@ public final class CloudFieldVolumeRenderConfig {
     public static String status() {
         return lastStats.compactStatus()
                 + "\n" + qualityStatus()
+                + "\ncompositeMode=" + compositeDebugMode.serializedName()
+                + "\n" + pipelineTargetDiagnostics
+                + "\n" + compositePerformanceDiagnostics
                 + "\nskyboxTextureIntegration=pending_no_skybox_texture_resource_found"
                 + "\ncloudFieldRendererDefault=enabled_without_simple_clouds"
                 + "\n" + tuningStatus();
@@ -448,9 +479,12 @@ public final class CloudFieldVolumeRenderConfig {
                 + "\nconfiguredRendererEnabled=" + configuredEnabled()
                 + "\ncurrentMode=" + mode.serializedName() + " (" + mode.shaderId() + ")"
                 + "\ncurrentFilter=" + filter.serializedName()
+                + "\ncurrentCompositeMode=" + compositeDebugMode.serializedName()
                 + "\ncurrentQuality=" + serializedQualityName(quality())
                 + "\n" + qualityStatus()
-                + "\ndownscaleCompositeStatus=active_for_non_ultra_static_presets"
+                + "\n" + pipelineTargetDiagnostics
+                + "\n" + compositePerformanceDiagnostics
+                + "\ndownscaleCompositeStatus=dedicated_paired_color_depth_upsample"
                 + "\nskyboxTextureIntegration=pending_no_skybox_texture_resource_found"
                 + "\ncloudFieldRendererDefault=enabled_without_simple_clouds"
                 + "\n" + tuningStatus();
@@ -464,22 +498,24 @@ public final class CloudFieldVolumeRenderConfig {
     public static String qualityStatus() {
         RenderTarget mainTarget = Minecraft.getInstance().getMainRenderTarget();
         AtmoCommonConfig.CloudRaymarchQuality quality = quality();
+        CloudFieldQualityProfile profile = CloudFieldQualityProfile.forQuality(quality);
         int mainWidth = mainTarget == null ? 0 : mainTarget.width;
         int mainHeight = mainTarget == null ? 0 : mainTarget.height;
-        float scale = quality.getResolutionScale();
-        int effectiveWidth = Math.max(1, Math.round(mainWidth * scale));
-        int effectiveHeight = Math.max(1, Math.round(mainHeight * scale));
+        float scale = profile.resolutionScale();
+        int effectiveWidth = Math.max(1, (int) Math.ceil(mainWidth * scale));
+        int effectiveHeight = Math.max(1, (int) Math.ceil(mainHeight * scale));
         return "quality=" + serializedQualityName(quality)
-                + " steps=" + quality.getRaymarchSteps()
+                + " steps=" + profile.raymarchSteps()
                 + " downscaleFactor=" + CloudFieldVolumeRenderStats.format(scale)
                 + " effectiveTarget=" + effectiveWidth + "x" + effectiveHeight
-                + " maxFields=" + quality.getMaxCloudFields()
-                + " detailOctaves=" + quality.getDetailOctaves()
+                + " maxFields=" + profile.maxCloudFields()
+                + " detailOctaves=" + profile.detailOctaves()
+                + " cloudletBudget=" + profile.cloudletBudget()
                 + " staticPreset=true"
                 + " downscaleApplied=" + (scale < 0.999F)
                 + " normalDepthStrategy=" + (scale < 0.999F
-                        ? "composite_occlusion_no_shader_depth_clip"
-                        : "direct_scene_depth_clip");
+                        ? "paired_depth_aware_upsample"
+                        : "direct_framebuffer_depth_test");
     }
 
     /**
