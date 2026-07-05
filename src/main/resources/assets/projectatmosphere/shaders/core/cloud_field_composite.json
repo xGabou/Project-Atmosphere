@@ -17,6 +17,7 @@
     { "name": "CloudDepthSampler" }
   ],
   "uniforms": [
-    { "name": "CompositeMode", "type": "int", "count": 1, "values": [ 0 ] }
+    { "name": "CompositeMode", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "DepthCompositeEnabled", "type": "int", "count": 1, "values": [ 1 ] }
   ]
 }

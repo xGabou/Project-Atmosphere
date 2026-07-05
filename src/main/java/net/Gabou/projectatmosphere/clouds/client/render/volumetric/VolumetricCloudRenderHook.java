@@ -10,7 +10,7 @@ import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.cell.client.ClientCloudCellCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
-import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeDebugMode;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderConfig;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
@@ -29,6 +29,7 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * PA-native volumetric cloud pipeline hook. Replaces per-field AABB raymarch
@@ -128,6 +129,8 @@ public final class VolumetricCloudRenderHook {
         CloudFieldRendererInput input = ClientCloudFieldCache.createRendererInput(cameraPos, gameTime, partialTick);
         List<CloudFieldSnapshot> fieldSnapshots = new ArrayList<>(input.fields());
         fieldSnapshots.sort(Comparator.comparingDouble(snapshot -> snapshot.center().distanceToSqr(cameraPos)));
+        List<VolumetricCloudFrameDiagnostics.FieldInfo> fieldDiagnostics =
+                buildFieldDiagnostics(fieldSnapshots, dimensionId);
         for (CloudFieldSnapshot snapshot : fieldSnapshots) {
             if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
                 break;
@@ -170,17 +173,24 @@ public final class VolumetricCloudRenderHook {
             return;
         }
 
-        VolumetricQualityProfile profile = VolumetricQualityProfile.forQuality(
-                AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get());
+        AtmoCommonConfig.CloudRaymarchQuality configuredQuality = AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.get();
+        VolumetricQualityProfile profile = VolumetricQualityProfile.forQuality(configuredQuality);
+        if (VolumetricCloudDebugConfig.fullResolutionEnabled() && profile.resolutionScale() < 1.0F) {
+            profile = profile.withResolutionScale(1.0F);
+        }
         VolumetricCloudLighting.Frame lighting = VolumetricCloudLighting.resolve(level, cameraPos, partialTick);
 
-        // 3. Weather map splat (every frame; cells move every frame).
+        // 3. Weather map splat (every frame; cells move every frame). Spawned
+        // field clouds never inherit the rain-coupled regional sheet, so they
+        // stay identical when the camera moves between rain and clear air.
+        boolean includeRegionalLayer = !renderingFields;
         CloudWeatherMapRenderer.Result weather = CloudWeatherMapRenderer.render(
                 renderCells,
                 cameraPos.x(),
                 cameraPos.z(),
                 regionalCoverage,
                 regionalEnergy,
+                includeRegionalLayer,
                 worldTimeTicks,
                 profile.weatherMapSize()
         );
@@ -233,6 +243,9 @@ public final class VolumetricCloudRenderHook {
         VolumetricCloudRenderer.FunnelUniforms funnels = renderingFields
                 ? VolumetricCloudRenderer.FunnelUniforms.NONE
                 : buildFunnels(presentedCells, cameraPos);
+        VolumetricCloudRenderer.Tuning tuning = renderingFields
+                ? VolumetricCloudRenderer.Tuning.FIELDS
+                : VolumetricCloudRenderer.Tuning.CELLS;
         boolean rendered = VolumetricCloudRenderer.render(
                 mainTarget,
                 weather,
@@ -244,7 +257,9 @@ public final class VolumetricCloudRenderHook {
                 windVec,
                 profile,
                 Math.max(300.0F, AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get()),
-                funnels
+                funnels,
+                tuning,
+                VolumetricCloudDebugConfig.sceneRayLimitEnabled()
         );
         if (!rendered) {
             setStatus("raymarch_not_ready", "");
@@ -254,16 +269,35 @@ public final class VolumetricCloudRenderHook {
             return;
         }
 
-        // 6. Depth-aware upsample composite into the main target.
+        // 6. Depth-aware upsample composite into the main target. The debug
+        // mode from /pa system cloudFieldVolume composite <mode> applies here
+        // too, so the raw volumetric buffer can be inspected in-game.
         boolean composited = CloudFieldCompositeRenderer.composite(
                 VolumetricCloudRenderTargets.currentCloudTarget(),
                 mainTarget,
-                CloudFieldCompositeDebugMode.FINAL
+                CloudFieldVolumeRenderConfig.compositeDebugMode(),
+                VolumetricCloudDebugConfig.depthCompositeEnabled()
         );
+        RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         if (!composited && mainTarget != null) {
             mainTarget.bindWrite(true);
         }
         VolumetricCloudRenderer.finishFrame();
+        recordFrameDiagnostics(
+                frameCounter,
+                gameTime,
+                partialTick,
+                cameraPos,
+                configuredQuality,
+                profile,
+                mainTarget,
+                cloudTarget,
+                weather,
+                fieldSnapshots.size(),
+                fieldDiagnostics,
+                renderCells,
+                composited
+        );
 
         // 7. GPU analytics (Medium+ with GL 4.3): measure per-cell footprints
         // from the weather map and hand digests to the merge/split logic.
@@ -282,6 +316,19 @@ public final class VolumetricCloudRenderHook {
                 + " syncedFields=" + fieldSnapshots.size()
                 + " weatherCells=" + weather.cellCount()
                 + " fieldCloudlets=" + fieldCloudletCount(fieldSnapshots, dimensionId)
+                + " regionalSource=" + (renderingFields
+                        ? "disabled_for_fields"
+                        : (regionalCoverage > 0.01F ? "enabled" : "none"))
+                + " debug[depthComposite=" + VolumetricCloudDebugConfig.depthCompositeEnabled()
+                + " sceneRayLimit=" + VolumetricCloudDebugConfig.sceneRayLimitEnabled()
+                + " coveragePretest=" + VolumetricCloudDebugConfig.coveragePretestEnabled()
+                + " pretestSamples=" + VolumetricCloudDebugConfig.coveragePretestSamples()
+                + " pretestThreshold=" + String.format(Locale.ROOT, "%.4f", VolumetricCloudDebugConfig.coveragePretestThreshold())
+                + " pretestDilation=" + VolumetricCloudDebugConfig.coveragePretestDilation()
+                + " weatherCoverageScale=" + String.format(Locale.ROOT, "%.2f", VolumetricCloudDebugConfig.weatherCoverageScale())
+                + " fullres=" + VolumetricCloudDebugConfig.fullResolutionEnabled() + "]"
+                + " historyValid=" + VolumetricCloudRenderer.lastHistoryValid()
+                + " tuning[" + tuning.summary() + "]"
                 + " regionalCoverage=" + String.format(java.util.Locale.ROOT, "%.3f", regionalCoverage)
                 + " cloudCover=" + String.format(java.util.Locale.ROOT, "%.3f", atmosphere.cloudCover())
                 + " slab=" + String.format(java.util.Locale.ROOT, "%.1f..%.1f", weather.slabBaseY(), weather.slabTopY())
@@ -347,6 +394,209 @@ public final class VolumetricCloudRenderHook {
             return Math.max(active, Math.min(target, 32));
         }
         return Math.max(active, Math.min(target, 24));
+    }
+
+    private static List<VolumetricCloudFrameDiagnostics.FieldInfo> buildFieldDiagnostics(
+            List<CloudFieldSnapshot> snapshots,
+            String dimensionId
+    ) {
+        if (snapshots == null || snapshots.isEmpty()) {
+            return List.of();
+        }
+        List<VolumetricCloudFrameDiagnostics.FieldInfo> diagnostics = new ArrayList<>(snapshots.size());
+        int simulatedUsedCells = 0;
+        for (CloudFieldSnapshot snapshot : snapshots) {
+            if (snapshot == null) {
+                diagnostics.add(VolumetricCloudFrameDiagnostics.FieldInfo.unknown("null_snapshot"));
+                continue;
+            }
+
+            int activeCloudlets = snapshot.activeCloudletCount();
+            int targetCloudlets = snapshot.targetCloudletCount();
+            boolean lodHydrationSkipped = targetCloudlets > activeCloudlets;
+            boolean dimensionMatches = dimensionId == null
+                    || dimensionId.isBlank()
+                    || dimensionId.equals(snapshot.dimensionId());
+            if (!dimensionMatches) {
+                diagnostics.add(VolumetricCloudFrameDiagnostics.fieldInfo(
+                        snapshot,
+                        0,
+                        Math.max(0, targetCloudlets),
+                        false,
+                        false,
+                        lodHydrationSkipped,
+                        false,
+                        "wrong_dimension"
+                ));
+                continue;
+            }
+            if (!snapshot.hasVisibleClouds()) {
+                diagnostics.add(VolumetricCloudFrameDiagnostics.fieldInfo(
+                        snapshot,
+                        0,
+                        Math.max(0, targetCloudlets),
+                        false,
+                        false,
+                        lodHydrationSkipped,
+                        false,
+                        "not_visible"
+                ));
+                continue;
+            }
+
+            int requestedByRenderer = renderCloudletCount(snapshot);
+            int rendered = 0;
+            boolean skippedByMaxCells = false;
+            if (simulatedUsedCells >= CloudWeatherMapRenderer.MAX_CELLS) {
+                skippedByMaxCells = requestedByRenderer > 0;
+            } else {
+                int remaining = CloudWeatherMapRenderer.MAX_CELLS - simulatedUsedCells;
+                rendered = Math.min(requestedByRenderer, remaining);
+                skippedByMaxCells = requestedByRenderer > remaining;
+                simulatedUsedCells += rendered;
+            }
+
+            boolean skippedByRenderCap = targetCloudlets > requestedByRenderer;
+            int skippedCloudlets = Math.max(0, targetCloudlets - rendered);
+            String reason = "rendered";
+            if (rendered <= 0 && skippedByMaxCells) {
+                reason = "max_cells";
+            } else if (skippedByMaxCells || skippedByRenderCap || lodHydrationSkipped) {
+                reason = "partial";
+            }
+
+            diagnostics.add(VolumetricCloudFrameDiagnostics.fieldInfo(
+                    snapshot,
+                    rendered,
+                    skippedCloudlets,
+                    skippedByMaxCells,
+                    skippedByRenderCap,
+                    lodHydrationSkipped,
+                    false,
+                    reason
+            ));
+        }
+        return List.copyOf(diagnostics);
+    }
+
+    private static void recordFrameDiagnostics(
+            long frameIndex,
+            long gameTime,
+            float partialTick,
+            Vec3 cameraPos,
+            AtmoCommonConfig.CloudRaymarchQuality configuredQuality,
+            VolumetricQualityProfile profile,
+            RenderTarget mainTarget,
+            RenderTarget cloudTarget,
+            CloudWeatherMapRenderer.Result weather,
+            int fieldsReceived,
+            List<VolumetricCloudFrameDiagnostics.FieldInfo> fieldDiagnostics,
+            List<VolumetricRenderCell> renderCells,
+            boolean composited
+    ) {
+        VolumetricCloudFrameDiagnostics.RenderBounds bounds =
+                VolumetricCloudFrameDiagnostics.boundsForCells(renderCells);
+        int droppedBeforeSplat = 0;
+        if (fieldDiagnostics != null) {
+            for (VolumetricCloudFrameDiagnostics.FieldInfo field : fieldDiagnostics) {
+                droppedBeforeSplat += Math.max(0, field.skippedCloudletCount());
+            }
+        }
+        String qualityName = configuredQuality == null
+                ? "unknown"
+                : configuredQuality.name().toLowerCase(Locale.ROOT);
+        boolean sceneDepthAvailable = mainTarget != null && mainTarget.getDepthTextureId() > 0;
+        RenderTarget weatherTarget = VolumetricCloudRenderTargets.weatherTargetOrNull();
+        String weatherTextureSize = weatherTarget == null
+                ? profile.weatherMapSize() + "x" + profile.weatherMapSize() + " requested"
+                : VolumetricCloudFrameDiagnostics.targetSize(weatherTarget);
+        float worldUnitsPerWeatherTexel = CloudWeatherMapRenderer.WEATHER_EXTENT
+                / Math.max(1, profile.weatherMapSize());
+        float averageCloudletRadiusTexels = Float.NaN;
+        float minCloudletRadiusTexels = Float.NaN;
+        float maxCloudletRadiusTexels = Float.NaN;
+        if (renderCells != null && !renderCells.isEmpty() && worldUnitsPerWeatherTexel > 0.0F) {
+            float totalRadiusTexels = 0.0F;
+            float minRadiusTexels = Float.POSITIVE_INFINITY;
+            float maxRadiusTexels = Float.NEGATIVE_INFINITY;
+            int radiusSamples = 0;
+            for (VolumetricRenderCell cell : renderCells) {
+                if (cell == null) {
+                    continue;
+                }
+                float averageRadius = (cell.radiusMajor() + cell.radiusMinor()) * 0.5F;
+                float radiusTexels = averageRadius / worldUnitsPerWeatherTexel;
+                if (!Float.isFinite(radiusTexels)) {
+                    continue;
+                }
+                totalRadiusTexels += radiusTexels;
+                minRadiusTexels = Math.min(minRadiusTexels, radiusTexels);
+                maxRadiusTexels = Math.max(maxRadiusTexels, radiusTexels);
+                radiusSamples++;
+            }
+            if (radiusSamples > 0) {
+                averageCloudletRadiusTexels = totalRadiusTexels / radiusSamples;
+                minCloudletRadiusTexels = minRadiusTexels;
+                maxCloudletRadiusTexels = maxRadiusTexels;
+            }
+        }
+        VolumetricCloudFrameDiagnostics.WeatherInfo weatherInfo =
+                new VolumetricCloudFrameDiagnostics.WeatherInfo(
+                        weather.originX(),
+                        weather.originZ(),
+                        CloudWeatherMapRenderer.WEATHER_EXTENT,
+                        weatherTextureSize,
+                        weather.cellCount(),
+                        droppedBeforeSplat,
+                        weather.slabBaseY(),
+                        weather.slabTopY(),
+                        bounds.baseY(),
+                        bounds.topY(),
+                        true,
+                        worldUnitsPerWeatherTexel,
+                        averageCloudletRadiusTexels,
+                        minCloudletRadiusTexels,
+                        maxCloudletRadiusTexels,
+                        VolumetricCloudFrameDiagnostics.WeatherTextureStats.unknown("not_captured")
+                );
+        VolumetricCloudFrameDiagnostics.DepthCompositeInfo depthComposite =
+                new VolumetricCloudFrameDiagnostics.DepthCompositeInfo(
+                        sceneDepthAvailable && VolumetricCloudDebugConfig.sceneRayLimitEnabled(),
+                        composited && VolumetricCloudDebugConfig.depthCompositeEnabled(),
+                        "max(0.00002,(1-selectedDepth)*0.08)",
+                        profile.resolutionScale(),
+                        VolumetricCloudDebugConfig.depthCompositeEnabled()
+                                ? "depth-paired bilinear cloud_field_composite"
+                                : "debug raw bilinear cloud_field_composite",
+                        VolumetricCloudDebugConfig.depthCompositeEnabled(),
+                        "unknown"
+                );
+
+        VolumetricCloudFrameDiagnostics.record(new VolumetricCloudFrameDiagnostics.Snapshot(
+                System.currentTimeMillis(),
+                frameIndex,
+                gameTime,
+                partialTick,
+                cameraPos.x(),
+                cameraPos.y(),
+                cameraPos.z(),
+                isActive(),
+                qualityName,
+                VolumetricCloudFrameDiagnostics.targetSize(cloudTarget),
+                VolumetricCloudFrameDiagnostics.targetSize(mainTarget),
+                VolumetricCloudRenderer.lastHistoryValid(),
+                VolumetricCloudRenderTargets.isHistoryValid(),
+                VolumetricCloudFrameDiagnostics.compositeName(CloudFieldVolumeRenderConfig.compositeDebugMode()),
+                mainTarget == null ? -1 : mainTarget.getDepthTextureId(),
+                sceneDepthAvailable,
+                fieldsReceived,
+                fieldDiagnostics == null ? List.of() : fieldDiagnostics,
+                renderCells == null ? 0 : renderCells.size(),
+                VolumetricCloudFrameDiagnostics.cellInfos(renderCells),
+                bounds,
+                weatherInfo,
+                depthComposite
+        ));
     }
 
     private static int fieldCloudletCount(List<CloudFieldSnapshot> snapshots, String dimensionId) {

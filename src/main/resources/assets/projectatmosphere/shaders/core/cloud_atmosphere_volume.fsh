@@ -50,6 +50,10 @@ uniform float StepScale;     // frame-time governor multiplier (0.5 .. 1.0)
 uniform float MaxRenderDistance;
 
 uniform int UseSceneDepth;
+uniform int CoveragePretestEnabled;
+uniform int CoveragePretestSamples;
+uniform float CoveragePretestThreshold;
+uniform int CoveragePretestDilation;
 uniform int HistoryValid;
 uniform float HistoryBlend;
 
@@ -95,6 +99,29 @@ vec4 sampleWeather(vec2 worldXZ) {
     weather.r *= edgeFade;
     weather.a *= edgeFade;
     return weather;
+}
+
+float pretestWeatherCoverage(vec2 worldXZ) {
+    float bestCoverage = sampleWeather(worldXZ).r;
+    int dilation = clamp(CoveragePretestDilation, 0, 2);
+    if (dilation <= 0) {
+        return bestCoverage;
+    }
+
+    vec2 texelWorld = vec2(WeatherExtent) / vec2(textureSize(WeatherMapSampler, 0));
+    for (int y = -2; y <= 2; y++) {
+        if (abs(y) > dilation) {
+            continue;
+        }
+        for (int x = -2; x <= 2; x++) {
+            if (abs(x) > dilation || (x == 0 && y == 0)) {
+                continue;
+            }
+            vec2 neighborXZ = worldXZ + vec2(float(x), float(y)) * texelWorld;
+            bestCoverage = max(bestCoverage, sampleWeather(neighborXZ).r);
+        }
+    }
+    return bestCoverage;
 }
 
 float heightGradient(float h01, float energy) {
@@ -253,7 +280,7 @@ float dualLobePhase(float cosTheta) {
     return mix(henyeyGreenstein(cosTheta, -0.18), henyeyGreenstein(cosTheta, 0.62), 0.72);
 }
 
-float lightMarchOpticalDepth(vec3 p, float coneJitter) {
+float lightMarchOpticalDepth(vec3 p) {
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
     float opticalDepth = 0.0;
     float stepLength = 14.0;
@@ -262,13 +289,17 @@ float lightMarchOpticalDepth(vec3 p, float coneJitter) {
         if (i >= steps) {
             break;
         }
-        // Cone spread: successive taps wander off-axis a little so thin
-        // gaps do not read as hard occluders.
-        float spread = (float(i) + coneJitter) * 0.28;
+        // Cone spread: successive taps wander off-axis a little so thin gaps
+        // do not read as hard occluders. The pattern is a FIXED golden-angle
+        // spiral per tap index: deriving it from per-pixel jitter gives every
+        // pixel a different light path, which shows up as salt-and-pepper
+        // radiance noise that temporal filtering cannot integrate away.
+        float ang = float(i) * 2.399963;
+        float spread = (float(i) + 0.5) * 0.28;
         vec3 offset = vec3(
-            sin(coneJitter * 37.0 + float(i) * 2.3),
-            cos(coneJitter * 21.0 + float(i) * 1.7) * 0.5,
-            sin(coneJitter * 53.0 + float(i) * 3.1)
+            cos(ang),
+            0.35 * sin(ang * 1.7),
+            sin(ang)
         ) * spread * stepLength * 0.24;
         pos += LightDir * stepLength;
         float density = cloudDensity(pos + offset, float(i) * 0.6, i < 2, false);
@@ -278,8 +309,8 @@ float lightMarchOpticalDepth(vec3 p, float coneJitter) {
     return opticalDepth;
 }
 
-vec3 sampleLighting(vec3 p, float localDensity, float h01ForAmbient, float cosTheta, float coneJitter, float distance01) {
-    float opticalDepth = lightMarchOpticalDepth(p, coneJitter) * ExtinctionScale;
+vec3 sampleLighting(vec3 p, float localDensity, float h01ForAmbient, float cosTheta, float distance01) {
+    float opticalDepth = lightMarchOpticalDepth(p) * ExtinctionScale;
 
     // Multi-scattering octaves (Hillaire): each octave sees weaker extinction
     // and a flatter phase, which keeps thick storm cores luminous.
@@ -383,12 +414,17 @@ void main() {
 
     // Coverage pre-test: sample the weather map along the ray and skip fully
     // clear rays. This is the biggest saver on clear days.
-    bool anyCoverage = FunnelCount > 0;
+    bool anyCoverage = FunnelCount > 0 || CoveragePretestEnabled == 0;
     if (!anyCoverage) {
-        for (int i = 0; i < 6; i++) {
-            float t = mix(t0, t1, (float(i) + 0.5) / 6.0);
+        int pretestSamples = clamp(CoveragePretestSamples, 6, 16);
+        float threshold = max(CoveragePretestThreshold, 0.0);
+        for (int i = 0; i < 16; i++) {
+            if (i >= pretestSamples) {
+                break;
+            }
+            float t = mix(t0, t1, (float(i) + 0.5) / float(pretestSamples));
             vec3 p = CameraPos + rayDir * t;
-            if (sampleWeather(p.xz).r > 0.004) {
+            if (pretestWeatherCoverage(p.xz) > threshold) {
                 anyCoverage = true;
                 break;
             }
@@ -452,7 +488,7 @@ void main() {
 
             float extinction = density * ExtinctionScale;
             float stepTrans = exp(-extinction * stepLength);
-            vec3 radiance = sampleLighting(p, density, h01, cosTheta, blue, saturate(t / MaxRenderDistance));
+            vec3 radiance = sampleLighting(p, density, h01, cosTheta, saturate(t / MaxRenderDistance));
             radiance = max(radiance, mix(vec3(0.34, 0.35, 0.36), vec3(0.07, 0.08, 0.11), NightFactor));
 
             // Energy-conserving analytic integration over the step.
@@ -477,17 +513,28 @@ void main() {
     vec4 result = vec4(accumulated, alpha);
 
     // Temporal reprojection: reproject the representative cloud point into the
-    // previous frame and blend history when it lands on-screen and matches.
+    // previous frame and blend history when it lands on-screen. History is
+    // CLAMPED to the current result +- a margin instead of confidence-rejected:
+    // rejection keyed on alpha difference throws history away exactly where
+    // the jitter noise is (noise -> alpha delta -> rejection -> permanent
+    // grain), while clamping bounds any ghost to a few frames and still
+    // integrates the dither everywhere.
     if (HistoryValid == 1 && HistoryBlend > 0.001) {
         vec4 prevClip = PrevViewProjMat * vec4(relRepresentative, 1.0);
         if (prevClip.w > 0.0001) {
             vec2 prevUv = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
             if (prevUv.x > 0.001 && prevUv.x < 0.999 && prevUv.y > 0.001 && prevUv.y < 0.999) {
                 vec4 history = texture(HistorySampler, prevUv);
-                float alphaDelta = abs(history.a - result.a);
-                float confidence = 1.0 - smoothstep(0.12, 0.45, alphaDelta);
-                float blend = HistoryBlend * confidence;
-                result = mix(result, history, blend);
+                history = clamp(history, result - 0.25, result + 0.25);
+                // Fade history out near the screen border: reprojection there
+                // samples clamp-to-edge stretched texels during camera turns,
+                // which otherwise smears as streaks along the edges.
+                float borderDistance = min(
+                    min(prevUv.x, 1.0 - prevUv.x),
+                    min(prevUv.y, 1.0 - prevUv.y)
+                );
+                float edgeFade = smoothstep(0.0, 0.04, borderDistance);
+                result = mix(result, history, HistoryBlend * edgeFade);
             }
         }
     }

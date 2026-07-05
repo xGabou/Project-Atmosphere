@@ -26,6 +26,15 @@ public final class CloudFieldCompositeRenderer {
             RenderTarget destination,
             CloudFieldCompositeDebugMode requestedMode
     ) {
+        return composite(source, destination, requestedMode, true);
+    }
+
+    public static boolean composite(
+            RenderTarget source,
+            RenderTarget destination,
+            CloudFieldCompositeDebugMode requestedMode,
+            boolean depthAwareComposite
+    ) {
         ShaderInstance shader = CloudFieldVolumeShaders.getCompositeShader();
         if (source == null || destination == null || shader == null || source.getDepthTextureId() <= 0) {
             return false;
@@ -50,6 +59,7 @@ public final class CloudFieldCompositeRenderer {
         shader.setSampler("CloudColorSampler", source.getColorTextureId());
         shader.setSampler("CloudDepthSampler", source.getDepthTextureId());
         shader.safeGetUniform("CompositeMode").set(mode.shaderId());
+        shader.safeGetUniform("DepthCompositeEnabled").set(depthAwareComposite ? 1 : 0);
         shader.apply();
 
         GPU_TIMER.begin();

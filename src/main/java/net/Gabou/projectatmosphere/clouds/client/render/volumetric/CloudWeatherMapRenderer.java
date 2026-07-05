@@ -56,6 +56,10 @@ public final class CloudWeatherMapRenderer {
      * @param cameraZ camera world Z
      * @param regionalCoverage 0..1 stratus/overcast layer amount
      * @param regionalEnergy 0..1 regional storminess
+     * @param includeRegionalLayer whether the region-scale stratus sheet is
+     *        splatted at all; spawned field clouds must not inherit the
+     *        rain-coupled overcast layer, only autonomous/background rendering
+     *        keeps it
      * @param worldTime world time (ticks with partial)
      * @param mapSize weather map resolution from the quality profile
      * @return per-frame weather map metadata for downstream passes
@@ -66,6 +70,7 @@ public final class CloudWeatherMapRenderer {
             double cameraZ,
             float regionalCoverage,
             float regionalEnergy,
+            boolean includeRegionalLayer,
             float worldTime,
             int mapSize
     ) {
@@ -86,6 +91,7 @@ public final class CloudWeatherMapRenderer {
         lastOriginZ = originZ;
 
         // Slab bounds: envelope of all cell layers plus the regional sheet.
+        float effectiveRegional = includeRegionalLayer ? Mth.clamp(regionalCoverage, 0.0F, 1.0F) : 0.0F;
         float slabBase = Float.MAX_VALUE;
         float slabTop = -Float.MAX_VALUE;
         int count = 0;
@@ -97,7 +103,7 @@ public final class CloudWeatherMapRenderer {
             slabTop = Math.max(slabTop, cell.topY());
             count++;
         }
-        if (regionalCoverage > 0.01F || count == 0) {
+        if (effectiveRegional > 0.01F || count == 0) {
             slabBase = Math.min(slabBase, 150.0F);
             slabTop = Math.max(slabTop, 260.0F);
         }
@@ -137,8 +143,9 @@ public final class CloudWeatherMapRenderer {
         shader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
         shader.safeGetUniform("SlabBaseY").set(slabBase);
         shader.safeGetUniform("SlabTopY").set(slabTop);
-        shader.safeGetUniform("RegionalCoverage").set(Mth.clamp(regionalCoverage, 0.0F, 1.0F));
+        shader.safeGetUniform("RegionalCoverage").set(effectiveRegional);
         shader.safeGetUniform("RegionalEnergy").set(Mth.clamp(regionalEnergy, 0.0F, 1.0F));
+        shader.safeGetUniform("WeatherCoverageScale").set(VolumetricCloudDebugConfig.weatherCoverageScale());
         shader.safeGetUniform("WorldTime").set(worldTime);
         shader.safeGetUniform("CellCount").set(count);
         shader.apply();

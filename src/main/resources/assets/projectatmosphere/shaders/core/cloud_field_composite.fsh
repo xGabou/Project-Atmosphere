@@ -3,6 +3,7 @@
 uniform sampler2D CloudColorSampler;
 uniform sampler2D CloudDepthSampler;
 uniform int CompositeMode;
+uniform int DepthCompositeEnabled;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -82,6 +83,16 @@ void main() {
             discard;
         }
         fragColor = vec4(vec3(clamp(rawColor.a, 0.0, 1.0)), 1.0);
+        return;
+    }
+
+    if (DepthCompositeEnabled == 0) {
+        vec4 rawColor = texture(CloudColorSampler, texCoord);
+        if (rawColor.a <= ALPHA_EPSILON) {
+            discard;
+        }
+        vec3 straightColor = rawColor.rgb / max(rawColor.a, ALPHA_EPSILON);
+        fragColor = vec4(straightColor, clamp(rawColor.a, 0.0, 1.0));
         return;
     }
 

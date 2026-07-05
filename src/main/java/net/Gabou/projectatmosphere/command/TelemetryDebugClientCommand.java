@@ -2,7 +2,9 @@ package net.Gabou.projectatmosphere.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.FloatArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
@@ -20,7 +22,10 @@ import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeTu
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeTuneTarget;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudFrameDiagnostics;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudDebugConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
 import net.Gabou.projectatmosphere.tools.debug.WorldSpaceDebugCubeRenderer;
@@ -151,6 +156,68 @@ public class TelemetryDebugClientCommand {
                 .executes(ctx -> sendVolumetricStatus(ctx.getSource()))
                 .then(Commands.literal("status")
                         .executes(ctx -> sendVolumetricStatus(ctx.getSource())))
+                .then(Commands.literal("diagnostics")
+                        .executes(ctx -> sendVolumetricDiagnostics(ctx.getSource()))
+                        .then(Commands.literal("log")
+                                .executes(ctx -> sendVolumetricDiagnosticsLogStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricDiagnosticsLog(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricDiagnosticsLog(ctx.getSource(), false)))))
+                .then(Commands.literal("debug")
+                        .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                        .then(Commands.literal("depthComposite")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricDepthComposite(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricDepthComposite(ctx.getSource(), false))))
+                        .then(Commands.literal("sceneRayLimit")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricSceneRayLimit(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricSceneRayLimit(ctx.getSource(), false))))
+                        .then(Commands.literal("coveragePretest")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricCoveragePretest(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricCoveragePretest(ctx.getSource(), false))))
+                        .then(Commands.literal("coveragePretestSamples")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.argument("value", IntegerArgumentType.integer(6, 16))
+                                        .executes(ctx -> setVolumetricCoveragePretestSamples(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "value")
+                                        ))))
+                        .then(Commands.literal("coveragePretestThreshold")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.argument("value", FloatArgumentType.floatArg(0.0F, 0.05F))
+                                        .executes(ctx -> setVolumetricCoveragePretestThreshold(
+                                                ctx.getSource(),
+                                                FloatArgumentType.getFloat(ctx, "value")
+                                        ))))
+                        .then(Commands.literal("coveragePretestDilation")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.argument("value", IntegerArgumentType.integer(0, 2))
+                                        .executes(ctx -> setVolumetricCoveragePretestDilation(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "value")
+                                        ))))
+                        .then(Commands.literal("weatherCoverageScale")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.argument("value", FloatArgumentType.floatArg(0.25F, 4.0F))
+                                        .executes(ctx -> setVolumetricWeatherCoverageScale(
+                                                ctx.getSource(),
+                                                FloatArgumentType.getFloat(ctx, "value")
+                                        ))))
+                        .then(Commands.literal("fullres")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricFullResolution(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricFullResolution(ctx.getSource(), false)))))
                 .then(Commands.literal("on")
                         .executes(ctx -> setVolumetricRuntimeEnabled(ctx.getSource(), true)))
                 .then(Commands.literal("off")
@@ -160,6 +227,119 @@ public class TelemetryDebugClientCommand {
     private static int sendVolumetricStatus(CommandSourceStack source) {
         source.sendSuccess(
                 () -> Component.literal("Volumetric clouds\n" + VolumetricCloudRenderHook.status().replace(" ", "\n")),
+                false);
+        return 1;
+    }
+
+    private static int sendVolumetricDiagnostics(CommandSourceStack source) {
+        VolumetricCloudFrameDiagnostics.captureLatestWeatherTextureStats();
+        source.sendSuccess(
+                () -> Component.literal(VolumetricCloudFrameDiagnostics.formattedLatest()),
+                false);
+        return 1;
+    }
+
+    private static int sendVolumetricDebugStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug\n" + VolumetricCloudDebugConfig.status()),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricDepthComposite(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setDepthCompositeEnabled(enabled);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug depthComposite " + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricSceneRayLimit(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setSceneRayLimitEnabled(enabled);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug sceneRayLimit " + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricFullResolution(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setFullResolutionEnabled(enabled);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug fullres " + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricCoveragePretest(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setCoveragePretestEnabled(enabled);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug coveragePretest " + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricCoveragePretestSamples(CommandSourceStack source, int samples) {
+        VolumetricCloudDebugConfig.setCoveragePretestSamples(samples);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug coveragePretestSamples "
+                        + VolumetricCloudDebugConfig.coveragePretestSamples()),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricCoveragePretestThreshold(CommandSourceStack source, float threshold) {
+        VolumetricCloudDebugConfig.setCoveragePretestThreshold(threshold);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug coveragePretestThreshold "
+                        + VolumetricCloudDebugConfig.coveragePretestThreshold()),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricCoveragePretestDilation(CommandSourceStack source, int dilation) {
+        VolumetricCloudDebugConfig.setCoveragePretestDilation(dilation);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug coveragePretestDilation "
+                        + VolumetricCloudDebugConfig.coveragePretestDilation()),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricWeatherCoverageScale(CommandSourceStack source, float scale) {
+        VolumetricCloudDebugConfig.setWeatherCoverageScale(scale);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug weatherCoverageScale "
+                        + VolumetricCloudDebugConfig.weatherCoverageScale()),
+                false);
+        return 1;
+    }
+
+    private static int sendVolumetricDiagnosticsLogStatus(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud diagnostics per-frame log="
+                        + (VolumetricCloudFrameDiagnostics.isFrameLogEnabled() ? "on" : "off")
+                        + "\ncommand=/pa cloud volumetric diagnostics log <on|off>"),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricDiagnosticsLog(CommandSourceStack source, boolean enabled) {
+        if (enabled && !ProjectAtmosphere.DEBUG_MODE) {
+            source.sendFailure(Component.literal("Volumetric diagnostics per-frame logging requires Project Atmosphere debug mode."));
+            return 0;
+        }
+        VolumetricCloudFrameDiagnostics.setFrameLogEnabled(enabled);
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud diagnostics per-frame log "
+                        + (enabled ? "enabled" : "disabled") + "."),
                 false);
         return 1;
     }
@@ -281,7 +461,8 @@ public class TelemetryDebugClientCommand {
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildClientCloudFieldsCommand() {
         return Commands.literal("cloud")
-                .then(buildCloudFieldVolumeControls("render"));
+                .then(buildCloudFieldVolumeControls("render"))
+                .then(buildVolumetricCloudCommand());
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> buildCloudFieldVolumeControls(String literalName) {

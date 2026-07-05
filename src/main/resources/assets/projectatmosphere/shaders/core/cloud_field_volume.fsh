@@ -95,7 +95,9 @@ float cloudletUnit(int index, int salt) {
     return hash1(float(index) * 37.719 + float(salt) * 19.371 + FieldSeed * 0.173);
 }
 
-float noise3(vec3 p) {
+// Not named "noise3": that is a reserved GLSL built-in (vec3 noise3(genType)),
+// and redeclaring it with a float return type fails strict drivers.
+float valueNoise3(vec3 p) {
     vec3 i = floor(p);
     vec3 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -119,7 +121,7 @@ float fbm(vec3 p) {
         if (i >= octaves) {
             break;
         }
-        value += noise3(p) * amplitude;
+        value += valueNoise3(p) * amplitude;
         amplitudeSum += amplitude;
         p *= 2.03;
         amplitude *= 0.50;
@@ -135,7 +137,7 @@ float fbmShape(vec3 p) {
     float value = 0.0;
     float amplitude = 0.55;
     for (int i = 0; i < 2; i++) {
-        value += noise3(p) * amplitude;
+        value += valueNoise3(p) * amplitude;
         p *= 2.03;
         amplitude *= 0.50;
     }

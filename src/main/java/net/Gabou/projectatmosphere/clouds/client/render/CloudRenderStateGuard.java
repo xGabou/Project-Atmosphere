@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.client.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.shaders.BlendMode;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
@@ -25,6 +26,15 @@ public final class CloudRenderStateGuard {
         RenderSystem.colorMask(true, true, true, true);
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.disableScissor();
+        // PA shader JSONs carry blend blocks; ShaderInstance.apply() stores
+        // them in the private static BlendMode.lastApplied cache. Vanilla sky
+        // and GUI code sets blending manually and relies on lastApplied being
+        // the default-opaque mode (so their shaders' BlendMode.apply() is a
+        // no-op). A stale non-default cache makes the next default-blend
+        // shader disable blending mid-draw — the sun/moon quads then render
+        // their black texture frame opaque. Applying the default BlendMode
+        // resets the cache and restores that invariant.
+        new BlendMode().apply();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableBlend();
         RenderSystem.depthMask(true);

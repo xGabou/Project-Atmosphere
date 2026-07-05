@@ -71,7 +71,9 @@ public record VolumetricRenderCell(
             CloudletLayout.Cloudlet cloudlet
     ) {
         Vec3 center = cloudlet.worldCenter(snapshot);
-        float radius = Math.max(6.0F, cloudlet.horizontalRadius() * 1.45F);
+        // Modest expansion: enough for neighboring cloudlets to overlap into
+        // one mass, not so much that they merge into a giant flat card.
+        float radius = Math.max(6.0F, cloudlet.horizontalRadius() * 1.22F);
         float verticalRadius = radius * Math.max(0.65F, cloudlet.verticalScale() * 1.08F);
         float baseY = Math.max(snapshot.baseY(), (float) center.y() - verticalRadius * 0.82F);
         float topY = Math.min(snapshot.topY(), (float) center.y() + verticalRadius * 0.98F);

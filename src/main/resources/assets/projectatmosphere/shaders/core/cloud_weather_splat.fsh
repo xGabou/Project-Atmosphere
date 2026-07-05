@@ -13,6 +13,7 @@ uniform float SlabBaseY;
 uniform float SlabTopY;
 uniform float RegionalCoverage; // 0..1 stratus/overcast layer amount
 uniform float RegionalEnergy;
+uniform float WeatherCoverageScale;
 uniform float WorldTime;
 uniform int CellCount;
 
@@ -78,8 +79,9 @@ void main() {
         vec4 posRadius = CellPosRadius[i];
         vec4 shape = CellShape[i];
         vec4 media = CellMedia[i];
+        vec2 scaledRadius = max(posRadius.zw * max(WeatherCoverageScale, 0.001), vec2(1.0));
         vec2 delta = warpedXZ - posRadius.xy;
-        float maxRadius = max(posRadius.z, posRadius.w) * 1.45;
+        float maxRadius = max(scaledRadius.x, scaledRadius.y) * 1.45;
         if (dot(delta, delta) > maxRadius * maxRadius) {
             continue;
         }
@@ -90,7 +92,7 @@ void main() {
             delta.x * cosO - delta.y * sinO,
             delta.x * sinO + delta.y * cosO
         );
-        vec2 normalized = local / max(vec2(posRadius.z, posRadius.w), vec2(1.0));
+        vec2 normalized = local / scaledRadius;
         float r = length(normalized);
 
         // Per-cell angular harmonics seeded by the cell id give each cell a
@@ -111,7 +113,11 @@ void main() {
         }
 
         coverage = 1.0 - (1.0 - coverage) * (1.0 - cellCoverage);
-        float weight = cellCoverage;
+        // Sharpened weight: the locally dominant cloudlet decides base/top
+        // instead of every overlapping cloudlet being averaged into one broad
+        // planar slab (the source of the flat sheets and horizontal band
+        // artifacts where many cloudlets overlap).
+        float weight = cellCoverage * cellCoverage * cellCoverage;
         // Collapse both vertical faces toward the middle at the footprint
         // edge. A 2D footprint extruded between a flat base/top reads as a
         // camera-facing card even when its density contains noise; this
@@ -136,7 +142,10 @@ void main() {
             float sheetBase = 0.30 + sheetNoise * 0.05;
             float sheetTop = sheetBase + 0.12 + regional * 0.08;
             coverage = 1.0 - (1.0 - coverage) * (1.0 - sheet * 0.85);
-            float weight = sheet * 0.6;
+            // Same sharpened weighting as the cloudlets so the sheet only
+            // dictates base/top where it actually dominates local coverage.
+            float sheetWeight = sheet * 0.6;
+            float weight = sheetWeight * sheetWeight * sheetWeight;
             baseAccum += sheetBase * weight;
             topAccum += sheetTop * weight;
             energyAccum += RegionalEnergy * weight;
@@ -144,7 +153,9 @@ void main() {
         }
     }
 
-    if (weightAccum <= 0.0005 || coverage <= 0.002) {
+    // weightAccum guard is numeric-safety only: cubed weights get tiny at
+    // cloudlet edges while coverage is still meaningful there.
+    if (weightAccum <= 0.0000005 || coverage <= 0.002) {
         fragColor = vec4(0.0, 0.35, 0.45, 0.0);
         return;
     }

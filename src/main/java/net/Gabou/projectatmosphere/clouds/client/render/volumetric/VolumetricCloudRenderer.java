@@ -29,6 +29,7 @@ public final class VolumetricCloudRenderer {
     private static boolean hasPrevFrame;
     private static long frameIndex;
     private static volatile float lastGpuMilliseconds = -1.0F;
+    private static volatile boolean lastHistoryValid;
 
     private VolumetricCloudRenderer() {
     }
@@ -43,7 +44,38 @@ public final class VolumetricCloudRenderer {
 
     public static void invalidateHistory() {
         hasPrevFrame = false;
+        lastHistoryValid = false;
         VolumetricCloudRenderTargets.invalidateHistory();
+    }
+
+    /** Whether the last raymarch consumed temporal history (for status/logs). */
+    public static boolean lastHistoryValid() {
+        return lastHistoryValid;
+    }
+
+    /**
+     * Source-aware raymarch tuning. Spawned CloudField clouds need a denser
+     * extinction response than the autonomous cell simulation: their weather
+     * map coverage comes from many small cloudlets, so the same extinction
+     * scale that suits broad cells renders them mostly see-through. History
+     * blend stays below the old 0.88 so reprojection cannot ghost-smear the
+     * noise detail away.
+     */
+    public record Tuning(
+            float densityMul,
+            float coverageMul,
+            float extinctionScale,
+            float historyBlend
+    ) {
+        public static final Tuning FIELDS = new Tuning(1.45F, 1.25F, 0.115F, 0.85F);
+        public static final Tuning CELLS = new Tuning(1.05F, 1.25F, 0.055F, 0.85F);
+
+        public String summary() {
+            return String.format(
+                    java.util.Locale.ROOT,
+                    "density=%.2f coverage=%.2f extinction=%.3f historyBlend=%.2f",
+                    densityMul, coverageMul, extinctionScale, historyBlend);
+        }
     }
 
     /**
@@ -62,7 +94,9 @@ public final class VolumetricCloudRenderer {
             Vector3f windVec,
             VolumetricQualityProfile profile,
             float maxRenderDistance,
-            FunnelUniforms funnels
+            FunnelUniforms funnels,
+            Tuning tuning,
+            boolean sceneRayLimitEnabled
     ) {
         ShaderInstance shader = VolumetricCloudShaders.volumeShader();
         if (shader == null || mainTarget == null || !weather.rendered()) {
@@ -86,7 +120,15 @@ public final class VolumetricCloudRenderer {
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         RenderTarget historyTarget = VolumetricCloudRenderTargets.historyCloudTarget();
-        boolean historyValid = false;
+        // History is only consumed when the ping-pong target actually holds
+        // last frame's clouds and no camera cut/resize/no-cloud frame
+        // invalidated it since. Everything else ghosts.
+        Tuning safeTuning = tuning == null ? Tuning.CELLS : tuning;
+        boolean historyValid = profile.temporalEnabled()
+                && hasPrevFrame
+                && historyTarget != null
+                && VolumetricCloudRenderTargets.isHistoryValid();
+        lastHistoryValid = historyValid;
 
         Matrix4f invProj = new Matrix4f(projection).invert();
         Matrix4f invViewRot = new Matrix4f(viewRotation).invert();
@@ -144,12 +186,16 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("DetailQuality").set(profile.detailQuality());
         shader.safeGetUniform("StepScale").set(stepScale);
         shader.safeGetUniform("MaxRenderDistance").set(Math.max(300.0F, maxRenderDistance));
-        shader.safeGetUniform("UseSceneDepth").set(mainTarget.getDepthTextureId() > 0 ? 1 : 0);
+        shader.safeGetUniform("UseSceneDepth").set(sceneRayLimitEnabled && mainTarget.getDepthTextureId() > 0 ? 1 : 0);
+        shader.safeGetUniform("CoveragePretestEnabled").set(VolumetricCloudDebugConfig.coveragePretestEnabled() ? 1 : 0);
+        shader.safeGetUniform("CoveragePretestSamples").set(VolumetricCloudDebugConfig.coveragePretestSamples());
+        shader.safeGetUniform("CoveragePretestThreshold").set(VolumetricCloudDebugConfig.coveragePretestThreshold());
+        shader.safeGetUniform("CoveragePretestDilation").set(VolumetricCloudDebugConfig.coveragePretestDilation());
         shader.safeGetUniform("HistoryValid").set(historyValid ? 1 : 0);
-        shader.safeGetUniform("HistoryBlend").set(historyValid ? 0.88F : 0.0F);
-        shader.safeGetUniform("DensityMul").set(1.05F);
-        shader.safeGetUniform("CoverageMul").set(1.25F);
-        shader.safeGetUniform("ExtinctionScale").set(0.055F);
+        shader.safeGetUniform("HistoryBlend").set(historyValid ? safeTuning.historyBlend() : 0.0F);
+        shader.safeGetUniform("DensityMul").set(safeTuning.densityMul());
+        shader.safeGetUniform("CoverageMul").set(safeTuning.coverageMul());
+        shader.safeGetUniform("ExtinctionScale").set(safeTuning.extinctionScale());
         FunnelUniforms safeFunnels = funnels == null ? FunnelUniforms.NONE : funnels;
         shader.safeGetUniform("FunnelCount").set(safeFunnels.count());
         shader.safeGetUniform("Funnel0A").set(safeFunnels.f0a());

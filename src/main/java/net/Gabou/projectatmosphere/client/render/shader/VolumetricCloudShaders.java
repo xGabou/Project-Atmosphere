@@ -44,6 +44,9 @@ public final class VolumetricCloudShaders {
                 loaded -> shadowMapShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADOW_APPLY_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> shadowApplyShader = loaded);
+        // Reloaded programs render into fresh state; stale history would blend
+        // pre-reload frames into the new output.
+        net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderer.invalidateHistory();
         ProjectAtmosphere.LOGGER.info("[VolumetricClouds] shader programs registered");
     }
 

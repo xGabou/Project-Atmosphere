@@ -20,6 +20,7 @@
     { "name": "SlabTopY", "type": "float", "count": 1, "values": [ 320.0 ] },
     { "name": "RegionalCoverage", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "RegionalEnergy", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "WeatherCoverageScale", "type": "float", "count": 1, "values": [ 1.0 ] },
     { "name": "WorldTime", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "CellCount", "type": "int", "count": 1, "values": [ 0 ] }
   ]

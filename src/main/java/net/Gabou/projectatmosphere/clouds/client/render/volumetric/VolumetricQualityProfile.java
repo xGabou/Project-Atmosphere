@@ -41,4 +41,18 @@ public record VolumetricQualityProfile(
             case ULTRA -> ULTRA;
         };
     }
+
+    public VolumetricQualityProfile withResolutionScale(float newResolutionScale) {
+        return new VolumetricQualityProfile(
+                raymarchSteps,
+                newResolutionScale,
+                lightSteps,
+                scatterOctaves,
+                detailQuality,
+                weatherMapSize,
+                temporalEnabled,
+                shadowUpdateInterval,
+                analyticsEnabled
+        );
+    }
 }

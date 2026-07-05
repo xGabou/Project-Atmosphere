@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL30;
 
 /**
  * Owns all offscreen targets of the volumetric cloud pipeline: the weather
@@ -54,6 +55,10 @@ public final class VolumetricCloudRenderTargets {
         return shadowTarget;
     }
 
+    public static RenderTarget weatherTargetOrNull() {
+        return weatherTarget;
+    }
+
     /**
      * Prepares the pair of raymarch targets at the requested scale of the main
      * target. Invalidate history on any resize.
@@ -72,6 +77,7 @@ public final class VolumetricCloudRenderTargets {
                 RenderTarget target = new TextureTarget(width, height, true, Minecraft.ON_OSX);
                 target.setFilterMode(GL11.GL_LINEAR);
                 configureClamp(target.getColorTextureId());
+                upgradeColorToRgba16f(target.getColorTextureId(), width, height);
                 configureDepth(target.getDepthTextureId());
                 target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
                 cloudTargets[i] = target;
@@ -146,6 +152,32 @@ public final class VolumetricCloudRenderTargets {
             }
         }
         historyValid = false;
+    }
+
+    /**
+     * Re-specs a TextureTarget's RGBA8 color texture as RGBA16F. The cloud
+     * buffers hold premultiplied color that the composite divides by alpha;
+     * 8-bit quantization amplified by 1/alpha shows as speckle at soft cloud
+     * edges, and repeated temporal blends drift in 8 bits. The FBO attachment
+     * references the texture object, so a level-0 respec is picked up as-is.
+     */
+    private static void upgradeColorToRgba16f(int textureId, int width, int height) {
+        if (textureId <= 0) {
+            return;
+        }
+        RenderSystem.bindTexture(textureId);
+        GlStateManager._texImage2D(
+                GL11.GL_TEXTURE_2D,
+                0,
+                GL30.GL_RGBA16F,
+                width,
+                height,
+                0,
+                GL11.GL_RGBA,
+                GL30.GL_HALF_FLOAT,
+                null
+        );
+        RenderSystem.bindTexture(0);
     }
 
     private static void configureClamp(int textureId) {
