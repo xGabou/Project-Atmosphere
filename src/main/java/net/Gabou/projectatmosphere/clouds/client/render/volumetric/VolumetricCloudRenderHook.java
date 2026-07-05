@@ -325,6 +325,9 @@ public final class VolumetricCloudRenderHook {
                 + " pretestSamples=" + VolumetricCloudDebugConfig.coveragePretestSamples()
                 + " pretestThreshold=" + String.format(Locale.ROOT, "%.4f", VolumetricCloudDebugConfig.coveragePretestThreshold())
                 + " pretestDilation=" + VolumetricCloudDebugConfig.coveragePretestDilation()
+                + " adaptiveWeatherFootprint=" + VolumetricCloudDebugConfig.adaptiveWeatherFootprintEnabled()
+                + " history=" + VolumetricCloudDebugConfig.historyEnabled()
+                + " sentinelHeights=" + VolumetricCloudDebugConfig.sentinelHeightsEnabled()
                 + " weatherCoverageScale=" + String.format(Locale.ROOT, "%.2f", VolumetricCloudDebugConfig.weatherCoverageScale())
                 + " fullres=" + VolumetricCloudDebugConfig.fullResolutionEnabled() + "]"
                 + " historyValid=" + VolumetricCloudRenderer.lastHistoryValid()
@@ -552,11 +555,20 @@ public final class VolumetricCloudRenderHook {
                         weather.slabTopY(),
                         bounds.baseY(),
                         bounds.topY(),
+                        VolumetricCloudFrameDiagnostics.inputHeightStats(renderCells),
                         true,
                         worldUnitsPerWeatherTexel,
                         averageCloudletRadiusTexels,
                         minCloudletRadiusTexels,
                         maxCloudletRadiusTexels,
+                        weather.footprintStats().adaptiveEnabled(),
+                        weather.footprintStats().targetRadiusTexels(),
+                        weather.footprintStats().averageAdaptiveScale(),
+                        weather.footprintStats().minAdaptiveScale(),
+                        weather.footprintStats().maxAdaptiveScale(),
+                        weather.footprintStats().averageEffectiveRadiusTexels(),
+                        weather.footprintStats().minEffectiveRadiusTexels(),
+                        weather.footprintStats().maxEffectiveRadiusTexels(),
                         VolumetricCloudFrameDiagnostics.WeatherTextureStats.unknown("not_captured")
                 );
         VolumetricCloudFrameDiagnostics.DepthCompositeInfo depthComposite =

@@ -18,6 +18,8 @@ import java.util.List;
 public final class CloudWeatherMapRenderer {
     public static final int MAX_CELLS = 96;
     public static final float WEATHER_EXTENT = 4096.0F;
+    public static final float ADAPTIVE_TARGET_RADIUS_TEXELS = 2.25F;
+    public static final float MAX_ADAPTIVE_FOOTPRINT_SCALE = 1.5F;
 
     private static final float[] posRadiusArray = new float[MAX_CELLS * 4];
     private static final float[] shapeArray = new float[MAX_CELLS * 4];
@@ -35,9 +37,42 @@ public final class CloudWeatherMapRenderer {
             double originZ,
             float slabBaseY,
             float slabTopY,
-            int cellCount
+            int cellCount,
+            FootprintStats footprintStats
     ) {
-        public static final Result EMPTY = new Result(false, 0.0D, 0.0D, 120.0F, 320.0F, 0);
+        public static final Result EMPTY = new Result(
+                false,
+                0.0D,
+                0.0D,
+                120.0F,
+                320.0F,
+                0,
+                FootprintStats.unknown()
+        );
+    }
+
+    public record FootprintStats(
+            boolean adaptiveEnabled,
+            float targetRadiusTexels,
+            float minAdaptiveScale,
+            float averageAdaptiveScale,
+            float maxAdaptiveScale,
+            float minEffectiveRadiusTexels,
+            float averageEffectiveRadiusTexels,
+            float maxEffectiveRadiusTexels
+    ) {
+        private static FootprintStats unknown() {
+            return new FootprintStats(
+                    false,
+                    ADAPTIVE_TARGET_RADIUS_TEXELS,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN
+            );
+        }
     }
 
     public static double lastOriginX() {
@@ -111,6 +146,16 @@ public final class CloudWeatherMapRenderer {
         slabTop += 12.0F;
         float slabSpan = Math.max(slabTop - slabBase, 8.0F);
 
+        boolean adaptiveFootprint = VolumetricCloudDebugConfig.adaptiveWeatherFootprintEnabled();
+        float manualCoverageScale = VolumetricCloudDebugConfig.weatherCoverageScale();
+        float minAdaptiveScale = Float.POSITIVE_INFINITY;
+        float maxAdaptiveScale = Float.NEGATIVE_INFINITY;
+        float totalAdaptiveScale = 0.0F;
+        float minEffectiveRadiusTexels = Float.POSITIVE_INFINITY;
+        float maxEffectiveRadiusTexels = Float.NEGATIVE_INFINITY;
+        float totalEffectiveRadiusTexels = 0.0F;
+        int footprintSamples = 0;
+
         count = 0;
         for (VolumetricRenderCell cell : cells) {
             if (cell == null || count >= MAX_CELLS) {
@@ -128,9 +173,35 @@ public final class CloudWeatherMapRenderer {
             mediaArray[base] = cell.density();
             mediaArray[base + 1] = cell.energy();
             mediaArray[base + 2] = cell.seed01();
-            mediaArray[base + 3] = 0.0F;
+            float averageRadiusWorld = (cell.radiusMajor() + cell.radiusMinor()) * 0.5F;
+            float projectedRadiusTexels = averageRadiusWorld / Math.max(texelSize, 0.001F);
+            float adaptiveScale = adaptiveFootprintScale(projectedRadiusTexels, adaptiveFootprint);
+            mediaArray[base + 3] = adaptiveScale;
+            if (Float.isFinite(projectedRadiusTexels)) {
+                float effectiveRadiusTexels = projectedRadiusTexels * adaptiveScale * manualCoverageScale;
+                minAdaptiveScale = Math.min(minAdaptiveScale, adaptiveScale);
+                maxAdaptiveScale = Math.max(maxAdaptiveScale, adaptiveScale);
+                totalAdaptiveScale += adaptiveScale;
+                minEffectiveRadiusTexels = Math.min(minEffectiveRadiusTexels, effectiveRadiusTexels);
+                maxEffectiveRadiusTexels = Math.max(maxEffectiveRadiusTexels, effectiveRadiusTexels);
+                totalEffectiveRadiusTexels += effectiveRadiusTexels;
+                footprintSamples++;
+            }
             count++;
         }
+
+        FootprintStats footprintStats = footprintSamples == 0
+                ? FootprintStats.unknown()
+                : new FootprintStats(
+                        adaptiveFootprint,
+                        ADAPTIVE_TARGET_RADIUS_TEXELS,
+                        minAdaptiveScale,
+                        totalAdaptiveScale / footprintSamples,
+                        maxAdaptiveScale,
+                        minEffectiveRadiusTexels,
+                        totalEffectiveRadiusTexels / footprintSamples,
+                        maxEffectiveRadiusTexels
+                );
 
         VolumetricCloudRenderTargets.clearAndBind(target);
         RenderSystem.disableBlend();
@@ -145,7 +216,10 @@ public final class CloudWeatherMapRenderer {
         shader.safeGetUniform("SlabTopY").set(slabTop);
         shader.safeGetUniform("RegionalCoverage").set(effectiveRegional);
         shader.safeGetUniform("RegionalEnergy").set(Mth.clamp(regionalEnergy, 0.0F, 1.0F));
-        shader.safeGetUniform("WeatherCoverageScale").set(VolumetricCloudDebugConfig.weatherCoverageScale());
+        shader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
+        shader.safeGetUniform("SentinelHeightsEnabled").set(
+                VolumetricCloudDebugConfig.sentinelHeightsEnabled() ? 1 : 0
+        );
         shader.safeGetUniform("WorldTime").set(worldTime);
         shader.safeGetUniform("CellCount").set(count);
         shader.apply();
@@ -156,7 +230,19 @@ public final class CloudWeatherMapRenderer {
             shader.clear();
             CloudRenderStateGuard.restoreAfterCloudPass();
         }
-        return new Result(true, originX, originZ, slabBase, slabTop, count);
+        return new Result(true, originX, originZ, slabBase, slabTop, count, footprintStats);
+    }
+
+    static float adaptiveFootprintScale(float projectedRadiusTexels, boolean enabled) {
+        if (!enabled || !Float.isFinite(projectedRadiusTexels)) {
+            return 1.0F;
+        }
+        float safeRadius = Math.max(projectedRadiusTexels, 0.001F);
+        return Mth.clamp(
+                ADAPTIVE_TARGET_RADIUS_TEXELS / safeRadius,
+                1.0F,
+                MAX_ADAPTIVE_FOOTPRINT_SCALE
+        );
     }
 
     /**

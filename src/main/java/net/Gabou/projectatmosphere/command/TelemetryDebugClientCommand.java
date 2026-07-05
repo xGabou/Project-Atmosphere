@@ -184,6 +184,24 @@ public class TelemetryDebugClientCommand {
                                         .executes(ctx -> setVolumetricCoveragePretest(ctx.getSource(), true)))
                                 .then(Commands.literal("off")
                                         .executes(ctx -> setVolumetricCoveragePretest(ctx.getSource(), false))))
+                        .then(Commands.literal("adaptiveWeatherFootprint")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricAdaptiveWeatherFootprint(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricAdaptiveWeatherFootprint(ctx.getSource(), false))))
+                        .then(Commands.literal("history")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricHistory(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricHistory(ctx.getSource(), false))))
+                        .then(Commands.literal("sentinelHeights")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("on")
+                                        .executes(ctx -> setVolumetricSentinelHeights(ctx.getSource(), true)))
+                                .then(Commands.literal("off")
+                                        .executes(ctx -> setVolumetricSentinelHeights(ctx.getSource(), false))))
                         .then(Commands.literal("coveragePretestSamples")
                                 .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
                                 .then(Commands.argument("value", IntegerArgumentType.integer(6, 16))
@@ -278,6 +296,34 @@ public class TelemetryDebugClientCommand {
         VolumetricCloudRenderer.invalidateHistory();
         source.sendSuccess(
                 () -> Component.literal("Volumetric cloud debug coveragePretest " + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricAdaptiveWeatherFootprint(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setAdaptiveWeatherFootprintEnabled(enabled);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug adaptiveWeatherFootprint "
+                        + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricHistory(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setHistoryEnabled(enabled);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug history " + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricSentinelHeights(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setSentinelHeightsEnabled(enabled);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug sentinelHeights " + (enabled ? "on" : "off")),
                 false);
         return 1;
     }

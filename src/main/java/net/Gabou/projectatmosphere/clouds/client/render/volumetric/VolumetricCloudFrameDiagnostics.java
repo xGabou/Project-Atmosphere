@@ -122,6 +122,46 @@ public final class VolumetricCloudFrameDiagnostics {
         return new RenderBounds(minX, maxX, minZ, maxZ, baseY, topY);
     }
 
+    public static InputHeightStats inputHeightStats(List<VolumetricRenderCell> cells) {
+        if (cells == null || cells.isEmpty()) {
+            return InputHeightStats.unknown();
+        }
+        float minBase = Float.POSITIVE_INFINITY;
+        float maxBase = Float.NEGATIVE_INFINITY;
+        float minTop = Float.POSITIVE_INFINITY;
+        float maxTop = Float.NEGATIVE_INFINITY;
+        float minThickness = Float.POSITIVE_INFINITY;
+        float maxThickness = Float.NEGATIVE_INFINITY;
+        double totalThickness = 0.0D;
+        int count = 0;
+        for (VolumetricRenderCell cell : cells) {
+            if (cell == null || !Float.isFinite(cell.baseY()) || !Float.isFinite(cell.topY())) {
+                continue;
+            }
+            float thickness = Math.max(0.0F, cell.topY() - cell.baseY());
+            minBase = Math.min(minBase, cell.baseY());
+            maxBase = Math.max(maxBase, cell.baseY());
+            minTop = Math.min(minTop, cell.topY());
+            maxTop = Math.max(maxTop, cell.topY());
+            minThickness = Math.min(minThickness, thickness);
+            maxThickness = Math.max(maxThickness, thickness);
+            totalThickness += thickness;
+            count++;
+        }
+        if (count == 0) {
+            return InputHeightStats.unknown();
+        }
+        return new InputHeightStats(
+                minBase,
+                maxBase,
+                minTop,
+                maxTop,
+                minThickness,
+                (float) (totalThickness / count),
+                maxThickness
+        );
+    }
+
     public static FieldInfo fieldInfo(
             CloudFieldSnapshot snapshot,
             int renderedCloudlets,
@@ -280,7 +320,8 @@ public final class VolumetricCloudFrameDiagnostics {
                     .append(" quality=").append(qualityProfile)
                     .append("\ncloudTarget=").append(cloudTargetSize)
                     .append("\nmainTarget=").append(mainTargetSize)
-                    .append("\nhistoryConsumedThisFrame=").append(historyConsumedThisFrame)
+                    .append("\nhistoryEnabled=").append(VolumetricCloudDebugConfig.historyEnabled())
+                    .append(" historyConsumedThisFrame=").append(historyConsumedThisFrame)
                     .append(" historyTargetValidAfterFrame=").append(historyTargetValidAfterFrame)
                     .append("\ncompositeMode=").append(compositeMode)
                     .append("\nsceneDepthTextureId=").append(sceneDepthTextureId)
@@ -322,6 +363,16 @@ public final class VolumetricCloudFrameDiagnostics {
                     .append(" slabTop=").append(fmt(weather.slabTopY()))
                     .append("\ninputMinBaseY=").append(fmt(weather.inputMinBaseY()))
                     .append(" inputMaxTopY=").append(fmt(weather.inputMaxTopY()))
+                    .append("\ninputCloudletBaseRange=")
+                    .append(fmt(weather.inputHeightStats().minBaseY())).append("..")
+                    .append(fmt(weather.inputHeightStats().maxBaseY()))
+                    .append(" inputCloudletTopRange=")
+                    .append(fmt(weather.inputHeightStats().minTopY())).append("..")
+                    .append(fmt(weather.inputHeightStats().maxTopY()))
+                    .append("\ninputCloudletThickness min/avg/max=")
+                    .append(fmt(weather.inputHeightStats().minThickness())).append("/")
+                    .append(fmt(weather.inputHeightStats().averageThickness())).append("/")
+                    .append(fmt(weather.inputHeightStats().maxThickness()))
                     .append("\noverlapCollapsedToTexelHeightRange=").append(weather.overlapCollapsedToTexelHeightRange())
                     .append("\ncoverageRange=").append(weather.textureStats().coverageRange())
                     .append(" activeTexels=").append(weather.textureStats().activeTexels())
@@ -334,9 +385,36 @@ public final class VolumetricCloudFrameDiagnostics {
                     .append(fmt(weather.minCloudletRadiusTexels()))
                     .append("/")
                     .append(fmt(weather.maxCloudletRadiusTexels()))
+                    .append("\nadaptiveWeatherFootprint=").append(weather.adaptiveWeatherFootprintEnabled())
+                    .append(" targetRadiusTexels=").append(fmt(weather.targetRadiusTexels()))
+                    .append(" weatherCoverageScale=").append(fmt(VolumetricCloudDebugConfig.weatherCoverageScale()))
+                    .append(" sentinelHeights=")
+                    .append(VolumetricCloudDebugConfig.sentinelHeightsEnabled() ? "on" : "off")
+                    .append("\nadaptiveFootprintScale min/avg/max=")
+                    .append(fmt(weather.minAdaptiveFootprintScale()))
+                    .append("/")
+                    .append(fmt(weather.averageAdaptiveFootprintScale()))
+                    .append("/")
+                    .append(fmt(weather.maxAdaptiveFootprintScale()))
+                    .append("\neffectiveRadiusTexels min/avg/max=")
+                    .append(fmt(weather.minEffectiveRadiusTexels()))
+                    .append("/")
+                    .append(fmt(weather.averageEffectiveRadiusTexels()))
+                    .append("/")
+                    .append(fmt(weather.maxEffectiveRadiusTexels()))
                     .append("\nbaseHeightRange=").append(weather.textureStats().baseHeightRange())
                     .append(" topHeightRange=").append(weather.textureStats().topHeightRange())
                     .append("\nthicknessRange=").append(weather.textureStats().thicknessRange())
+                    .append(" thicknessMinAvgMax=").append(weather.textureStats().thicknessMinAvgMax())
+                    .append("\nthicknessPercent below4/below8/below12/above20=")
+                    .append(weather.textureStats().thicknessBelow4Percent()).append("/")
+                    .append(weather.textureStats().thicknessBelow8Percent()).append("/")
+                    .append(weather.textureStats().thicknessBelow12Percent()).append("/")
+                    .append(weather.textureStats().thicknessAbove20Percent())
+                    .append("\nheightVariance base/top/thickness=")
+                    .append(weather.textureStats().baseHeightVariance()).append("/")
+                    .append(weather.textureStats().topHeightVariance()).append("/")
+                    .append(weather.textureStats().thicknessVariance())
                     .append("\ntexelsWithMultipleCloudlets=").append(weather.textureStats().multiCloudletTexels());
 
             builder.append("\n\nDepth and composite")
@@ -468,15 +546,25 @@ public final class VolumetricCloudFrameDiagnostics {
             float slabTopY,
             float inputMinBaseY,
             float inputMaxTopY,
+            InputHeightStats inputHeightStats,
             boolean overlapCollapsedToTexelHeightRange,
             float worldUnitsPerWeatherTexel,
             float averageCloudletRadiusTexels,
             float minCloudletRadiusTexels,
             float maxCloudletRadiusTexels,
+            boolean adaptiveWeatherFootprintEnabled,
+            float targetRadiusTexels,
+            float averageAdaptiveFootprintScale,
+            float minAdaptiveFootprintScale,
+            float maxAdaptiveFootprintScale,
+            float averageEffectiveRadiusTexels,
+            float minEffectiveRadiusTexels,
+            float maxEffectiveRadiusTexels,
             WeatherTextureStats textureStats
     ) {
         public WeatherInfo {
             textureSize = safe(textureSize);
+            inputHeightStats = inputHeightStats == null ? InputHeightStats.unknown() : inputHeightStats;
             textureStats = textureStats == null ? WeatherTextureStats.unknown("not_captured") : textureStats;
         }
 
@@ -492,7 +580,16 @@ public final class VolumetricCloudFrameDiagnostics {
                     Float.NaN,
                     Float.NaN,
                     Float.NaN,
+                    InputHeightStats.unknown(),
                     true,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    false,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
                     Float.NaN,
                     Float.NaN,
                     Float.NaN,
@@ -513,12 +610,43 @@ public final class VolumetricCloudFrameDiagnostics {
                     slabTopY,
                     inputMinBaseY,
                     inputMaxTopY,
+                    inputHeightStats,
                     overlapCollapsedToTexelHeightRange,
                     worldUnitsPerWeatherTexel,
                     averageCloudletRadiusTexels,
                     minCloudletRadiusTexels,
                     maxCloudletRadiusTexels,
+                    adaptiveWeatherFootprintEnabled,
+                    targetRadiusTexels,
+                    averageAdaptiveFootprintScale,
+                    minAdaptiveFootprintScale,
+                    maxAdaptiveFootprintScale,
+                    averageEffectiveRadiusTexels,
+                    minEffectiveRadiusTexels,
+                    maxEffectiveRadiusTexels,
                     stats
+            );
+        }
+    }
+
+    public record InputHeightStats(
+            float minBaseY,
+            float maxBaseY,
+            float minTopY,
+            float maxTopY,
+            float minThickness,
+            float averageThickness,
+            float maxThickness
+    ) {
+        static InputHeightStats unknown() {
+            return new InputHeightStats(
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN,
+                    Float.NaN
             );
         }
     }
@@ -529,6 +657,14 @@ public final class VolumetricCloudFrameDiagnostics {
             String baseHeightRange,
             String topHeightRange,
             String thicknessRange,
+            String thicknessMinAvgMax,
+            String thicknessBelow4Percent,
+            String thicknessBelow8Percent,
+            String thicknessBelow12Percent,
+            String thicknessAbove20Percent,
+            String baseHeightVariance,
+            String topHeightVariance,
+            String thicknessVariance,
             String activeTexelPercent,
             String estimatedTexelsPerCloudlet,
             String multiCloudletTexels
@@ -538,6 +674,14 @@ public final class VolumetricCloudFrameDiagnostics {
             baseHeightRange = safe(baseHeightRange);
             topHeightRange = safe(topHeightRange);
             thicknessRange = safe(thicknessRange);
+            thicknessMinAvgMax = safe(thicknessMinAvgMax);
+            thicknessBelow4Percent = safe(thicknessBelow4Percent);
+            thicknessBelow8Percent = safe(thicknessBelow8Percent);
+            thicknessBelow12Percent = safe(thicknessBelow12Percent);
+            thicknessAbove20Percent = safe(thicknessAbove20Percent);
+            baseHeightVariance = safe(baseHeightVariance);
+            topHeightVariance = safe(topHeightVariance);
+            thicknessVariance = safe(thicknessVariance);
             activeTexelPercent = safe(activeTexelPercent);
             estimatedTexelsPerCloudlet = safe(estimatedTexelsPerCloudlet);
             multiCloudletTexels = safe(multiCloudletTexels);
@@ -545,7 +689,24 @@ public final class VolumetricCloudFrameDiagnostics {
 
         static WeatherTextureStats unknown(String reason) {
             String value = "unknown" + (reason == null || reason.isBlank() ? "" : "(" + reason + ")");
-            return new WeatherTextureStats(0, value, value, value, value, value, value, "unknown");
+            return new WeatherTextureStats(
+                    0,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    value,
+                    "unknown"
+            );
         }
     }
 
@@ -643,6 +804,16 @@ public final class VolumetricCloudFrameDiagnostics {
         float maxTop = Float.NEGATIVE_INFINITY;
         float minThickness = Float.POSITIVE_INFINITY;
         float maxThickness = Float.NEGATIVE_INFINITY;
+        double baseSum = 0.0D;
+        double baseSquareSum = 0.0D;
+        double topSum = 0.0D;
+        double topSquareSum = 0.0D;
+        double thicknessSum = 0.0D;
+        double thicknessSquareSum = 0.0D;
+        int thicknessBelow4 = 0;
+        int thicknessBelow8 = 0;
+        int thicknessBelow12 = 0;
+        int thicknessAbove20 = 0;
 
         int pixelCount = width * height;
         for (int pixel = 0; pixel < pixelCount; pixel++) {
@@ -664,6 +835,24 @@ public final class VolumetricCloudFrameDiagnostics {
             maxTop = Math.max(maxTop, topY);
             minThickness = Math.min(minThickness, thickness);
             maxThickness = Math.max(maxThickness, thickness);
+            baseSum += baseY;
+            baseSquareSum += (double) baseY * baseY;
+            topSum += topY;
+            topSquareSum += (double) topY * topY;
+            thicknessSum += thickness;
+            thicknessSquareSum += (double) thickness * thickness;
+            if (thickness < 4.0F) {
+                thicknessBelow4++;
+            }
+            if (thickness < 8.0F) {
+                thicknessBelow8++;
+            }
+            if (thickness < 12.0F) {
+                thicknessBelow12++;
+            }
+            if (thickness > 20.0F) {
+                thicknessAbove20++;
+            }
         }
 
         if (activeTexels == 0) {
@@ -673,6 +862,14 @@ public final class VolumetricCloudFrameDiagnostics {
                     "none",
                     "none",
                     "none",
+                    "none",
+                    "0.00%",
+                    "0.00%",
+                    "0.00%",
+                    "0.00%",
+                    "0.00",
+                    "0.00",
+                    "0.00",
                     "0.00%",
                     "0.00",
                     "unknown"
@@ -681,6 +878,15 @@ public final class VolumetricCloudFrameDiagnostics {
 
         float activePercent = activeTexels * 100.0F / Math.max(1, pixelCount);
         float texelsPerCloudlet = activeTexels / (float) Math.max(1, cloudletsSplatted);
+        double averageBase = baseSum / activeTexels;
+        double averageTop = topSum / activeTexels;
+        double averageThickness = thicknessSum / activeTexels;
+        double baseVariance = Math.max(0.0D, baseSquareSum / activeTexels - averageBase * averageBase);
+        double topVariance = Math.max(0.0D, topSquareSum / activeTexels - averageTop * averageTop);
+        double thicknessVariance = Math.max(
+                0.0D,
+                thicknessSquareSum / activeTexels - averageThickness * averageThickness
+        );
 
         return new WeatherTextureStats(
                 activeTexels,
@@ -688,6 +894,14 @@ public final class VolumetricCloudFrameDiagnostics {
                 fmt(minBase) + ".." + fmt(maxBase),
                 fmt(minTop) + ".." + fmt(maxTop),
                 fmt(minThickness) + ".." + fmt(maxThickness),
+                fmt(minThickness) + "/" + fmt(averageThickness) + "/" + fmt(maxThickness),
+                fmt(thicknessBelow4 * 100.0F / activeTexels) + "%",
+                fmt(thicknessBelow8 * 100.0F / activeTexels) + "%",
+                fmt(thicknessBelow12 * 100.0F / activeTexels) + "%",
+                fmt(thicknessAbove20 * 100.0F / activeTexels) + "%",
+                fmt(baseVariance),
+                fmt(topVariance),
+                fmt(thicknessVariance),
                 fmt(activePercent) + "%",
                 fmt(texelsPerCloudlet),
                 "unknown"

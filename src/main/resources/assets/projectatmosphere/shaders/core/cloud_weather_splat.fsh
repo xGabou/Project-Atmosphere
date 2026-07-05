@@ -14,13 +14,14 @@ uniform float SlabTopY;
 uniform float RegionalCoverage; // 0..1 stratus/overcast layer amount
 uniform float RegionalEnergy;
 uniform float WeatherCoverageScale;
+uniform int SentinelHeightsEnabled;
 uniform float WorldTime;
 uniform int CellCount;
 
 // Uploaded manually (glUniform4fv), not through the vanilla uniform system:
 // CellPosRadius[i] = (worldX, worldZ, radiusMajor, radiusMinor)
 // CellShape[i]     = (orientationRadians, base01, top01, edgeSoftness)
-// CellMedia[i]     = (density, energy, seed01, unused)
+// CellMedia[i]     = (density, energy, seed01, adaptiveFootprintScale)
 const int MAX_CELLS = 96;
 uniform vec4 CellPosRadius[MAX_CELLS];
 uniform vec4 CellShape[MAX_CELLS];
@@ -79,7 +80,8 @@ void main() {
         vec4 posRadius = CellPosRadius[i];
         vec4 shape = CellShape[i];
         vec4 media = CellMedia[i];
-        vec2 scaledRadius = max(posRadius.zw * max(WeatherCoverageScale, 0.001), vec2(1.0));
+        float footprintScale = max(media.w, 0.001) * max(WeatherCoverageScale, 0.001);
+        vec2 scaledRadius = max(posRadius.zw * footprintScale, vec2(1.0));
         vec2 delta = warpedXZ - posRadius.xy;
         float maxRadius = max(scaledRadius.x, scaledRadius.y) * 1.45;
         if (dot(delta, delta) > maxRadius * maxRadius) {
@@ -153,9 +155,13 @@ void main() {
         }
     }
 
-    // weightAccum guard is numeric-safety only: cubed weights get tiny at
-    // cloudlet edges while coverage is still meaningful there.
-    if (weightAccum <= 0.0000005 || coverage <= 0.002) {
+    // Old mode preserves the original fringe sentinel threshold exactly.
+    // New mode only uses the sentinel when no cloudlet contributed at all;
+    // even a tiny positive cubed weight still carries a valid weighted
+    // base/top pair and is numerically safe to normalize.
+    if (weightAccum <= 0.0
+            || (SentinelHeightsEnabled == 1
+                && (weightAccum <= 0.0000005 || coverage <= 0.002))) {
         fragColor = vec4(0.0, 0.35, 0.45, 0.0);
         return;
     }
@@ -164,5 +170,14 @@ void main() {
     float top01 = clamp(topAccum / weightAccum, 0.0, 1.0);
     top01 = max(top01, base01 + 2.0 / slabSpan);
     float energy = clamp(energyAccum / weightAccum, 0.0, 1.0);
+    if (coverage <= 0.002) {
+        // Coverage still gates density. In the new comparison mode, retain
+        // real fringe heights so bilinear filtering cannot pull neighboring
+        // cloud texels toward the fixed empty-map sentinel slab.
+        fragColor = SentinelHeightsEnabled == 1
+            ? vec4(0.0, 0.35, 0.45, 0.0)
+            : vec4(0.0, base01, top01, 0.0);
+        return;
+    }
     fragColor = vec4(saturate(coverage), base01, top01, energy);
 }

@@ -124,7 +124,8 @@ public final class VolumetricCloudRenderer {
         // last frame's clouds and no camera cut/resize/no-cloud frame
         // invalidated it since. Everything else ghosts.
         Tuning safeTuning = tuning == null ? Tuning.CELLS : tuning;
-        boolean historyValid = profile.temporalEnabled()
+        boolean historyValid = VolumetricCloudDebugConfig.historyEnabled()
+                && profile.temporalEnabled()
                 && hasPrevFrame
                 && historyTarget != null
                 && VolumetricCloudRenderTargets.isHistoryValid();

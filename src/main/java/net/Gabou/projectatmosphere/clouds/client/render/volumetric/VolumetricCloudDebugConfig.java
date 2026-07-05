@@ -9,6 +9,9 @@ public final class VolumetricCloudDebugConfig {
     private static volatile boolean depthCompositeEnabled = true;
     private static volatile boolean sceneRayLimitEnabled = true;
     private static volatile boolean coveragePretestEnabled = true;
+    private static volatile boolean adaptiveWeatherFootprintEnabled = true;
+    private static volatile boolean historyEnabled = true;
+    private static volatile boolean sentinelHeightsEnabled = true;
     private static volatile boolean fullResolutionEnabled;
     private static volatile float weatherCoverageScale = 1.0F;
     private static volatile int coveragePretestSamples = 6;
@@ -48,6 +51,30 @@ public final class VolumetricCloudDebugConfig {
 
     public static void setCoveragePretestEnabled(boolean enabled) {
         coveragePretestEnabled = enabled;
+    }
+
+    public static boolean adaptiveWeatherFootprintEnabled() {
+        return adaptiveWeatherFootprintEnabled;
+    }
+
+    public static void setAdaptiveWeatherFootprintEnabled(boolean enabled) {
+        adaptiveWeatherFootprintEnabled = enabled;
+    }
+
+    public static boolean historyEnabled() {
+        return historyEnabled;
+    }
+
+    public static void setHistoryEnabled(boolean enabled) {
+        historyEnabled = enabled;
+    }
+
+    public static boolean sentinelHeightsEnabled() {
+        return sentinelHeightsEnabled;
+    }
+
+    public static void setSentinelHeightsEnabled(boolean enabled) {
+        sentinelHeightsEnabled = enabled;
     }
 
     public static float weatherCoverageScale() {
@@ -97,6 +124,9 @@ public final class VolumetricCloudDebugConfig {
                 + "\ncoveragePretestSamples=" + coveragePretestSamples
                 + "\ncoveragePretestThreshold=" + coveragePretestThreshold
                 + "\ncoveragePretestDilation=" + coveragePretestDilation
+                + "\nadaptiveWeatherFootprint=" + (adaptiveWeatherFootprintEnabled ? "on" : "off")
+                + "\nhistory=" + (historyEnabled ? "on" : "off")
+                + "\nsentinelHeights=" + (sentinelHeightsEnabled ? "on" : "off")
                 + "\nfullres=" + (fullResolutionEnabled ? "on" : "off")
                 + "\nweatherCoverageScale=" + weatherCoverageScale;
     }
