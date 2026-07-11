@@ -130,28 +130,35 @@ dependencies {
     implementation fg.deobf("curse.maven:spark-361579:4738952")
     implementation fg.deobf("curse.maven:cloth-config-348521:5729105")
 
-    // Project Atmosphere required dependencies
-    implementation fg.deobf("curse.maven:serene-seasons-291874:8246702")
-    implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
+    // Optional season integrations. Keep their APIs available to compile the
+    // conditionally-loaded bridges, but do not silently put them on every dev
+    // runtime: that would make "starts without Serene Seasons" untestable.
+    def enableSereneSeasonsRuntime = project.findProperty("enableSereneSeasonsRuntime") == "true"
+    if (enableSereneSeasonsRuntime) {
+        implementation fg.deobf("curse.maven:serene-seasons-291874:8246702")
+        implementation fg.deobf("curse.maven:glitchcore-955399:5787839")
+        implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:8244461")
+    } else {
+        compileOnly fg.deobf("curse.maven:serene-seasons-291874:8246702")
+        compileOnly fg.deobf("curse.maven:glitchcore-955399:5787839")
+        compileOnly fg.deobf("curse.maven:serene-seasons-plus-1288843:8244461")
+    }
     implementation fg.deobf("curse.maven:betterdays-895618:7046761")
 
-    // Simple Clouds dependencies
-    // Simple Clouds dependencies
+    // Simple Clouds and its libraries are optional as one runtime unit. The
+    // compile-only branch is the default so a missing integration dependency
+    // is exercised by normal development launches.
     def enableSimpleCloudsRuntime = project.findProperty("enableSimpleCloudsRuntime") == "true"
-
-    implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
-    implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
-
     if (enableSimpleCloudsRuntime) {
+        implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
+        implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
         implementation fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
     } else {
+        compileOnly fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
+        compileOnly fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
         compileOnly fg.deobf("nonamecrackers2:simpleclouds:0.7.3+1.20.1-forge")
     }
 
-    compileOnly fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:7870940")
-    compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
-    implementation fg.deobf("nonamecrackers2:crackerslib-forge:${crackerslib_version}")
-    implementation fg.deobf("nonamecrackers2:simplecloudsapi-forge:${api_version}")
     compileOnly fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:7870940")
     compileOnly fg.deobf("curse.maven:simple-clouds-1121215:6928978")
     //implementation fg.deobf("curse.maven:oculus-for-simpleclouds-1386686:8234238")
@@ -163,7 +170,6 @@ dependencies {
     compileOnly fg.deobf("curse.maven:continents-682515:7842288")
 
     // Weather and season compatibility
-    implementation fg.deobf("curse.maven:serene-seasons-plus-1288843:8244461")
     compileOnly fg.deobf("curse.maven:ecliptic-seasons-1118306:8257701")
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:rainboows-1121832:6421980")
