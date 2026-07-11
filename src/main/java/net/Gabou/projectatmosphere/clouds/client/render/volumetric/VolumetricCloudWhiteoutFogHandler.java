@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
+import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
@@ -23,6 +24,11 @@ public final class VolumetricCloudWhiteoutFogHandler {
         if (event.getType() != FogType.NONE) {
             return;
         }
+        ClientLevel level = Minecraft.getInstance().level;
+        if (!ClientCloudRenderOwnership.ownsBaseCloudRendering(level)
+                || !ClientCloudVisualDensity.hasRenderedData()) {
+            return;
+        }
         float density = CameraCloudDensityTracker.smoothedCameraDensity();
         if (density <= 0.03F) {
             return;
@@ -40,7 +46,8 @@ public final class VolumetricCloudWhiteoutFogHandler {
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onComputeFogColor(ViewportEvent.ComputeFogColor event) {
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
+        if (!ClientCloudRenderOwnership.ownsBaseCloudRendering(level)
+                || !ClientCloudVisualDensity.hasRenderedData()) {
             return;
         }
         float density = CameraCloudDensityTracker.smoothedCameraDensity();

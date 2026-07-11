@@ -12,7 +12,7 @@ import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.client.Minecraft;
+import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -112,7 +112,7 @@ public class SandStormManager {
 
                         if (!lastBiomeFlag) {
                             for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
-                                Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(), null);
+                                player.connection.send(new ClientboundStopSoundPacket(soundEvent.getLocation(), null));
                             }
                         }
                     }

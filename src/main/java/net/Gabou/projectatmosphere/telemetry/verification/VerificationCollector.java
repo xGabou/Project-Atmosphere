@@ -45,7 +45,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.fml.ModList;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -582,8 +581,9 @@ public final class VerificationCollector {
             }
         }
         boolean shadowActive = safeBooleanConfig(AtmoCommonConfig.ENABLE_CLOUD_SHADOW_MAP, false);
-        boolean dhActive = safeBooleanConfig(AtmoCommonConfig.ENABLE_DISTANT_HORIZONS_ADAPTER, true)
-                && ModList.get().isLoaded("distanthorizons");
+        // PA currently consumes the active framebuffer generically; it does not
+        // publish a dedicated, server-verifiable DH metadata adapter.
+        boolean dhActive = false;
 
         return new VerificationReport.PaNativeBackendSection(
                 paNativeEnabled,

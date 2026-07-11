@@ -173,6 +173,10 @@ public final class CloudFieldValidation {
                 new Vec3(0.15D, 0.0D, -0.04D),
                 0.70F,
                 0.20F,
+                "cumulus_humilis",
+                net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily.PUFF,
+                0.0F,
+                0.0F,
                 32,
                 2400L,
                 0L

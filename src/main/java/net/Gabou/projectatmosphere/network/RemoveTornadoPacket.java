@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.network;
 
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -35,7 +34,7 @@ public class RemoveTornadoPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            TornadoManager.removeClientTornado(this.id);
+            SevereWeatherClientPacketHandlers.removeTornado(this.id);
         });
         ctx.get().setPacketHandled(true);
     }

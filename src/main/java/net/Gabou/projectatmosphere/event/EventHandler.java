@@ -4,6 +4,7 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
 import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
 import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
+import net.Gabou.projectatmosphere.clouds.cell.sim.NativeTornadoEffects;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
 import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
@@ -67,6 +68,7 @@ public class EventHandler {
             CloudFieldRuntimeManager.getInstance().tick(serverLevel);
             if (AtmoCommonConfig.CLOUD_VOLUMETRIC_RENDERER_ENABLED.get()) {
                 CloudCellSimulationManager.getInstance().tick(serverLevel);
+                NativeTornadoEffects.tick(serverLevel);
             }
         }
 

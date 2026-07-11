@@ -24,6 +24,12 @@ public final class CameraCloudDensityTracker {
                 ? 0.0F
                 : CloudCellDensityMath.densityAt(cells, cameraPos.x(), cameraPos.y(), cameraPos.z());
 
+        update(raw);
+    }
+
+    public static void update(float rawDensity) {
+        float raw = Mth.clamp(rawDensity, 0.0F, 1.0F);
+
         long now = System.nanoTime();
         float deltaSeconds = lastUpdateNanos == 0L
                 ? 0.05F

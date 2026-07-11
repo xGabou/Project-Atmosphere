@@ -9,6 +9,10 @@ import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.cell.client.ClientCloudCellCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
+import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
+import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame;
+import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthResolver;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderConfig;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
@@ -17,6 +21,9 @@ import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
 import net.Gabou.projectatmosphere.clouds.field.CloudletId;
 import net.Gabou.projectatmosphere.clouds.field.CloudletLayout;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
@@ -28,8 +35,12 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * PA-native volumetric cloud pipeline hook. Replaces per-field AABB raymarch
@@ -43,12 +54,14 @@ public final class VolumetricCloudRenderHook {
     private static long lastErrorLogMillis;
     private static long lastStatusLogMillis;
     private static String lastLoggedStatusKind = "";
+    private static Map<UUID, Integer> previousCloudletAllocations = Map.of();
+    private static volatile CloudletBudgetStats lastCloudletBudgetStats = CloudletBudgetStats.empty();
 
     private VolumetricCloudRenderHook() {
     }
 
     /** True when the volumetric pipeline owns cloud visuals this session. */
-    public static boolean isActive() {
+    public static boolean isRuntimeConfigured() {
         if (!runtimeEnabled) {
             return false;
         }
@@ -60,12 +73,19 @@ public final class VolumetricCloudRenderHook {
         }
     }
 
+    /** True only when this renderer is the selected base-cloud owner. */
+    public static boolean isActive() {
+        return ClientCloudRenderOwnership.ownsVolumetricPass(Minecraft.getInstance().level);
+    }
+
     public static String status() {
         return "volumetricActive=" + isActive()
                 + " status=" + lastStatus
                 + " cells=" + ClientCloudCellCache.trackedCellCount()
                 + " raymarchGpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds()
                 + " governorScale=" + VolumetricCloudRenderer.governorStepScale()
+                + " cloudlets[" + lastCloudletBudgetStats.summary() + "]"
+                + " " + CloudWeatherMapRenderer.cacheStatus()
                 + " analytics=" + CloudCellAnalyticsPass.status();
     }
 
@@ -76,7 +96,10 @@ public final class VolumetricCloudRenderHook {
             VolumetricCloudRenderer.invalidateHistory();
             VolumetricCloudRenderTargets.shutdown();
             CloudShadowMapAccess.clear();
+            ClientCloudVisualDensity.clear();
             CameraCloudDensityTracker.reset();
+            previousCloudletAllocations = Map.of();
+            lastCloudletBudgetStats = CloudletBudgetStats.empty();
         }
     }
 
@@ -94,14 +117,10 @@ public final class VolumetricCloudRenderHook {
             return;
         }
 
-        try {
+        try (CloudRenderStateGuard.State ignored = CloudRenderStateGuard.capture()) {
             renderFrame(event, minecraft, level);
         } catch (Throwable throwable) {
-            runtimeEnabled = false;
-            CloudFieldCompositeRenderer.restoreRenderState();
-            if (minecraft.getMainRenderTarget() != null) {
-                minecraft.getMainRenderTarget().bindWrite(true);
-            }
+            setRuntimeEnabled(false);
             lastStatus = "render_exception:" + throwable.getClass().getSimpleName();
             long now = System.currentTimeMillis();
             if (now - lastErrorLogMillis >= 10_000L) {
@@ -129,20 +148,18 @@ public final class VolumetricCloudRenderHook {
         CloudFieldRendererInput input = ClientCloudFieldCache.createRendererInput(cameraPos, gameTime, partialTick);
         List<CloudFieldSnapshot> fieldSnapshots = new ArrayList<>(input.fields());
         fieldSnapshots.sort(Comparator.comparingDouble(snapshot -> snapshot.center().distanceToSqr(cameraPos)));
+        CloudletAllocationPlan cloudletPlan = allocateFieldCloudlets(fieldSnapshots, dimensionId, cameraPos);
         List<VolumetricCloudFrameDiagnostics.FieldInfo> fieldDiagnostics =
-                buildFieldDiagnostics(fieldSnapshots, dimensionId);
-        for (CloudFieldSnapshot snapshot : fieldSnapshots) {
-            if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
-                break;
-            }
-            if (snapshot != null && snapshot.hasVisibleClouds()
-                    && (dimensionId.isBlank() || dimensionId.equals(snapshot.dimensionId()))) {
-                addFieldRenderCells(snapshot, renderCells);
-            }
+                buildFieldDiagnostics(fieldSnapshots, dimensionId, cloudletPlan);
+        for (CloudFieldSnapshot snapshot : cloudletPlan.orderedFields()) {
+            addFieldRenderCells(snapshot, cloudletPlan.acceptedFor(snapshot.fieldId()), renderCells);
         }
 
         String renderSource = renderCells.isEmpty() ? "none" : "fields";
-        if (renderCells.isEmpty() && !presentedCells.isEmpty()) {
+        // A visible field whose LOD requests zero identifiable cloudlets must
+        // stay at zero. Falling through to autonomous cells here used to
+        // silently repopulate the frame and defeat the field LOD decision.
+        if (renderCells.isEmpty() && cloudletPlan.visibleFields() == 0 && !presentedCells.isEmpty()) {
             presentedCells.sort(Comparator.comparingDouble(cell -> cell.distanceSqrTo(cameraPos.x(), cameraPos.z())));
             for (CloudCell cell : presentedCells) {
                 if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
@@ -153,12 +170,19 @@ public final class VolumetricCloudRenderHook {
                 }
             }
             renderSource = renderCells.isEmpty() ? "none" : "cells";
+        } else if (!renderCells.isEmpty()) {
+            // Severe cells carry funnel state derived from the same fields (or
+            // an explicit command cell). Keep their parent volume represented
+            // without allowing them to consume the field cloudlet budget.
+            for (CloudCell cell : presentedCells) {
+                if (cell.funnelStrength() <= 0.005F
+                        || renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
+                    continue;
+                }
+                renderCells.add(VolumetricRenderCell.fromCell(cell));
+            }
         }
         boolean renderingFields = "fields".equals(renderSource);
-
-        // 2. Interior fog tracking runs even when nothing is visible so the
-        // whiteout releases smoothly after leaving a cloud.
-        CameraCloudDensityTracker.update(renderingFields ? List.<CloudCell>of() : presentedCells, cameraPos);
 
         AtmosphereClientState.Snapshot atmosphere = AtmosphereClientState.getSnapshot();
         float regionalCoverage = Mth.clamp((atmosphere.cloudCover() - 0.45F) * 1.4F, 0.0F, 1.0F);
@@ -170,6 +194,9 @@ public final class VolumetricCloudRenderHook {
                     + " fields=" + fieldSnapshots.size()
                     + " source=" + renderSource);
             VolumetricCloudRenderer.invalidateHistory();
+            CloudShadowMapAccess.clear();
+            ClientCloudVisualDensity.clear();
+            CameraCloudDensityTracker.update(0.0F);
             return;
         }
 
@@ -179,6 +206,12 @@ public final class VolumetricCloudRenderHook {
             profile = profile.withResolutionScale(1.0F);
         }
         VolumetricCloudLighting.Frame lighting = VolumetricCloudLighting.resolve(level, cameraPos, partialTick);
+
+        // Resolve this before any PA pass changes framebuffer bindings. Forge's
+        // active target can be the main, Fabulous weather, or an external
+        // pipeline target; the resolver detaches its depth for safe sampling.
+        RenderTarget mainTarget = minecraft.getMainRenderTarget();
+        SceneDepthFrame sceneDepth = SceneDepthResolver.resolve(mainTarget);
 
         // 3. Weather map splat (every frame; cells move every frame). Spawned
         // field clouds never inherit the rain-coupled regional sheet, so they
@@ -196,10 +229,11 @@ public final class VolumetricCloudRenderHook {
         );
         if (!weather.rendered()) {
             setStatus("weather_map_unavailable", "");
+            ClientCloudVisualDensity.clear();
+            CameraCloudDensityTracker.update(0.0F);
             return;
         }
 
-        RenderTarget mainTarget = minecraft.getMainRenderTarget();
         Matrix4f projection = new Matrix4f(event.getProjectionMatrix());
         Matrix4f viewRotation = cameraViewRotation(event);
         Vector3f cameraPosF = new Vector3f((float) cameraPos.x(), (float) cameraPos.y(), (float) cameraPos.z());
@@ -229,25 +263,41 @@ public final class VolumetricCloudRenderHook {
                     weather.slabBaseY(),
                     groundY
             );
-            // Do not run the legacy fullscreen shadow post here. It samples
-            // mainTarget's depth texture while that same texture is attached
-            // to the draw framebuffer, an undefined OpenGL feedback loop that
-            // produces a black fullscreen oval on affected drivers. The
-            // generated shadow map remains published for shader integrations;
-            // an in-engine post must first copy scene depth to a detached
-            // texture before sampling it.
+            float daylightFactor = Mth.clamp(
+                    lighting.lightDirection().y * (1.0F - lighting.nightFactor()),
+                    0.0F,
+                    1.0F
+            );
+            VolumetricCloudShadowRenderer.applyGroundShadows(
+                    mainTarget,
+                    sceneDepth,
+                    new Matrix4f(projection).invert(),
+                    new Matrix4f(viewRotation).invert(),
+                    cameraPosF,
+                    lighting.lightDirection(),
+                    weather.slabBaseY(),
+                    groundY,
+                    0.38F,
+                    daylightFactor
+            );
+        } else {
+            CloudShadowMapAccess.clear();
         }
 
         // 5. Raymarch with temporal reprojection.
-        Vector3f windVec = renderingFields ? defaultWind() : averageWind(presentedCells);
-        VolumetricCloudRenderer.FunnelUniforms funnels = renderingFields
-                ? VolumetricCloudRenderer.FunnelUniforms.NONE
-                : buildFunnels(presentedCells, cameraPos);
+        Vector3f windVec = resolveVisualWind(
+                renderingFields ? fieldSnapshots : List.of(),
+                renderingFields ? List.of() : presentedCells,
+                cameraPos,
+                gameTime
+        );
+        VolumetricCloudRenderer.FunnelUniforms funnels = buildFunnels(presentedCells, cameraPos);
         VolumetricCloudRenderer.Tuning tuning = renderingFields
                 ? VolumetricCloudRenderer.Tuning.FIELDS
                 : VolumetricCloudRenderer.Tuning.CELLS;
         boolean rendered = VolumetricCloudRenderer.render(
                 mainTarget,
+                sceneDepth,
                 weather,
                 lighting,
                 projection,
@@ -263,9 +313,8 @@ public final class VolumetricCloudRenderHook {
         );
         if (!rendered) {
             setStatus("raymarch_not_ready", "");
-            if (mainTarget != null) {
-                mainTarget.bindWrite(true);
-            }
+            ClientCloudVisualDensity.clear();
+            CameraCloudDensityTracker.update(0.0F);
             return;
         }
 
@@ -276,12 +325,32 @@ public final class VolumetricCloudRenderHook {
                 VolumetricCloudRenderTargets.currentCloudTarget(),
                 mainTarget,
                 CloudFieldVolumeRenderConfig.compositeDebugMode(),
-                VolumetricCloudDebugConfig.depthCompositeEnabled()
+                VolumetricCloudDebugConfig.depthCompositeEnabled(),
+                sceneDepth
         );
-        RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
-        if (!composited && mainTarget != null) {
-            mainTarget.bindWrite(true);
+        if (composited) {
+            ClientCloudVisualDensity.publishVolumetric(
+                    dimensionId,
+                    renderingFields
+                            ? ClientCloudVisualDensity.Source.VOLUMETRIC_FIELDS
+                            : ClientCloudVisualDensity.Source.VOLUMETRIC_CELLS,
+                    renderCells,
+                    weather,
+                    regionalCoverage,
+                    regionalEnergy,
+                    includeRegionalLayer,
+                    worldTimeTicks,
+                    profile.weatherMapSize(),
+                    tuning
+            );
+            CameraCloudDensityTracker.update(
+                    ClientCloudVisualDensity.densityAt(dimensionId, cameraPos)
+            );
+        } else {
+            ClientCloudVisualDensity.clear();
+            CameraCloudDensityTracker.update(0.0F);
         }
+        RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         VolumetricCloudRenderer.finishFrame();
         recordFrameDiagnostics(
                 frameCounter,
@@ -315,7 +384,7 @@ public final class VolumetricCloudRenderHook {
                 + " syncedCells=" + presentedCells.size()
                 + " syncedFields=" + fieldSnapshots.size()
                 + " weatherCells=" + weather.cellCount()
-                + " fieldCloudlets=" + fieldCloudletCount(fieldSnapshots, dimensionId)
+                + " cloudlets[" + cloudletPlan.stats().summary() + "]"
                 + " regionalSource=" + (renderingFields
                         ? "disabled_for_fields"
                         : (regionalCoverage > 0.01F ? "enabled" : "none"))
@@ -331,6 +400,8 @@ public final class VolumetricCloudRenderHook {
                 + " weatherCoverageScale=" + String.format(Locale.ROOT, "%.2f", VolumetricCloudDebugConfig.weatherCoverageScale())
                 + " fullres=" + VolumetricCloudDebugConfig.fullResolutionEnabled() + "]"
                 + " historyValid=" + VolumetricCloudRenderer.lastHistoryValid()
+                + " historyConfidence=" + String.format(
+                        Locale.ROOT, "%.2f", VolumetricCloudRenderer.lastHistoryConfidence())
                 + " tuning[" + tuning.summary() + "]"
                 + " regionalCoverage=" + String.format(java.util.Locale.ROOT, "%.3f", regionalCoverage)
                 + " cloudCover=" + String.format(java.util.Locale.ROOT, "%.3f", atmosphere.cloudCover())
@@ -366,12 +437,13 @@ public final class VolumetricCloudRenderHook {
 
     private static void addFieldRenderCells(
             CloudFieldSnapshot snapshot,
+            int cloudletCount,
             List<VolumetricRenderCell> renderCells
     ) {
-        if (snapshot == null || renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
+        if (snapshot == null || cloudletCount <= 0
+                || renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
             return;
         }
-        int cloudletCount = renderCloudletCount(snapshot);
         for (int i = 0; i < cloudletCount; i++) {
             if (renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
                 return;
@@ -383,31 +455,152 @@ public final class VolumetricCloudRenderHook {
         }
     }
 
-    private static int renderCloudletCount(CloudFieldSnapshot snapshot) {
+    /**
+     * Returns the renderer demand after the field LOD and hydration state have
+     * been applied. In particular, FAR_PROCEDURAL and HAZE must stay at zero:
+     * targetCloudletCount is a hydration target, not permission to bypass LOD.
+     */
+    private static int requestedCloudletCount(CloudFieldSnapshot snapshot) {
         if (snapshot == null || !snapshot.hasVisibleClouds()) {
             return 0;
         }
-        int active = snapshot.dynamicCloudletCount();
-        int target = Math.max(active, snapshot.targetCloudletCount());
-        CloudFieldSourceKind sourceKind = snapshot.sourceKind();
-        if (sourceKind == CloudFieldSourceKind.MANUAL_DEBUG) {
-            return Math.max(active, Math.min(target, 48));
+        return Math.min(
+                CloudWeatherMapRenderer.MAX_CELLS,
+                Math.min(snapshot.dynamicCloudletCount(), snapshot.targetCloudletCount())
+        );
+    }
+
+    /**
+     * Applies one strict frame-wide cloudlet budget. The weighted fair queue
+     * first gives each visible requesting field one stable CloudletId, then
+     * balances remaining slots according to distance, coverage, density,
+     * storm intensity and source importance. A small retention bonus reduces
+     * churn without ever exceeding the current quality budget.
+     */
+    private static CloudletAllocationPlan allocateFieldCloudlets(
+            List<CloudFieldSnapshot> snapshots,
+            String dimensionId,
+            Vec3 cameraPos
+    ) {
+        int budget = Math.max(0, Math.min(
+                CloudWeatherMapRenderer.MAX_CELLS,
+                CloudFieldVolumeRenderConfig.cloudletBudget()
+        ));
+        List<CloudletCandidate> candidates = new ArrayList<>();
+        Map<UUID, Integer> requestedByField = new HashMap<>();
+        int visibleFields = 0;
+        long totalRequested = 0L;
+
+        for (CloudFieldSnapshot snapshot : snapshots) {
+            if (snapshot == null || !snapshot.hasVisibleClouds()
+                    || (!dimensionId.isBlank() && !dimensionId.equals(snapshot.dimensionId()))) {
+                continue;
+            }
+            visibleFields++;
+            int requested = requestedCloudletCount(snapshot);
+            requestedByField.put(snapshot.fieldId(), requested);
+            totalRequested += requested;
+            if (requested > 0) {
+                candidates.add(new CloudletCandidate(
+                        snapshot,
+                        requested,
+                        cloudletPriority(snapshot, cameraPos)
+                ));
+            }
         }
-        if (sourceKind == CloudFieldSourceKind.PA_REGION || sourceKind == CloudFieldSourceKind.PA_CLUSTER) {
-            return Math.max(active, Math.min(target, 32));
+
+        candidates.sort(Comparator
+                .comparingDouble(CloudletCandidate::priority).reversed()
+                .thenComparing(candidate -> candidate.snapshot().fieldId()));
+
+        Map<UUID, Integer> acceptedByField = new LinkedHashMap<>();
+        int remaining = budget;
+        for (CloudletCandidate candidate : candidates) {
+            if (remaining <= 0) {
+                break;
+            }
+            acceptedByField.put(candidate.snapshot().fieldId(), 1);
+            remaining--;
         }
-        return Math.max(active, Math.min(target, 24));
+
+        while (remaining > 0) {
+            CloudletCandidate best = null;
+            double bestScore = Double.NEGATIVE_INFINITY;
+            for (CloudletCandidate candidate : candidates) {
+                UUID fieldId = candidate.snapshot().fieldId();
+                int accepted = acceptedByField.getOrDefault(fieldId, 0);
+                if (accepted >= candidate.requested()) {
+                    continue;
+                }
+                int previous = previousCloudletAllocations.getOrDefault(fieldId, 0);
+                double retention = accepted < previous ? 1.12D : 1.0D;
+                double score = candidate.priority() * retention / (accepted + 1.0D);
+                if (score > bestScore || (score == bestScore && best != null
+                        && fieldId.compareTo(best.snapshot().fieldId()) < 0)) {
+                    best = candidate;
+                    bestScore = score;
+                }
+            }
+            if (best == null) {
+                break;
+            }
+            UUID fieldId = best.snapshot().fieldId();
+            acceptedByField.put(fieldId, acceptedByField.getOrDefault(fieldId, 0) + 1);
+            remaining--;
+        }
+
+        int accepted = acceptedByField.values().stream().mapToInt(Integer::intValue).sum();
+        int requested = (int) Math.min(Integer.MAX_VALUE, totalRequested);
+        CloudletBudgetStats stats = new CloudletBudgetStats(
+                requested,
+                accepted,
+                Math.max(0, requested - accepted),
+                Math.max(0, budget - accepted),
+                visibleFields,
+                budget
+        );
+        previousCloudletAllocations = Map.copyOf(acceptedByField);
+        lastCloudletBudgetStats = stats;
+
+        List<CloudFieldSnapshot> orderedFields = candidates.stream()
+                .map(CloudletCandidate::snapshot)
+                .toList();
+        return new CloudletAllocationPlan(
+                orderedFields,
+                Map.copyOf(requestedByField),
+                Map.copyOf(acceptedByField),
+                stats,
+                visibleFields
+        );
+    }
+
+    private static double cloudletPriority(CloudFieldSnapshot snapshot, Vec3 cameraPos) {
+        double distance = Math.sqrt(snapshot.center().distanceToSqr(cameraPos));
+        double distanceScore = 1.0D / (1.0D + distance / Math.max(256.0D, snapshot.radius()));
+        double visualImportance = 0.30D
+                + snapshot.effectiveCoverage() * 0.28D
+                + snapshot.effectiveDensity() * 0.24D
+                + snapshot.stormPotential() * 0.12D
+                + snapshot.verticalDevelopment() * 0.06D;
+        double sourceImportance = switch (snapshot.sourceKind()) {
+            case MANUAL_DEBUG -> 1.18D;
+            case PA_CLUSTER -> 1.12D;
+            case PA_REGION -> 1.08D;
+            case WEATHER_SUMMARY -> 1.0D;
+            case UNKNOWN -> 0.92D;
+        };
+        return visualImportance * sourceImportance * (0.42D + distanceScore * 0.58D);
     }
 
     private static List<VolumetricCloudFrameDiagnostics.FieldInfo> buildFieldDiagnostics(
             List<CloudFieldSnapshot> snapshots,
-            String dimensionId
+            String dimensionId,
+            CloudletAllocationPlan allocationPlan
     ) {
         if (snapshots == null || snapshots.isEmpty()) {
             return List.of();
         }
         List<VolumetricCloudFrameDiagnostics.FieldInfo> diagnostics = new ArrayList<>(snapshots.size());
-        int simulatedUsedCells = 0;
         for (CloudFieldSnapshot snapshot : snapshots) {
             if (snapshot == null) {
                 diagnostics.add(VolumetricCloudFrameDiagnostics.FieldInfo.unknown("null_snapshot"));
@@ -447,23 +640,17 @@ public final class VolumetricCloudRenderHook {
                 continue;
             }
 
-            int requestedByRenderer = renderCloudletCount(snapshot);
-            int rendered = 0;
-            boolean skippedByMaxCells = false;
-            if (simulatedUsedCells >= CloudWeatherMapRenderer.MAX_CELLS) {
-                skippedByMaxCells = requestedByRenderer > 0;
-            } else {
-                int remaining = CloudWeatherMapRenderer.MAX_CELLS - simulatedUsedCells;
-                rendered = Math.min(requestedByRenderer, remaining);
-                skippedByMaxCells = requestedByRenderer > remaining;
-                simulatedUsedCells += rendered;
-            }
+            int requestedByRenderer = allocationPlan.requestedFor(snapshot.fieldId());
+            int rendered = allocationPlan.acceptedFor(snapshot.fieldId());
+            boolean skippedByMaxCells = requestedByRenderer > rendered;
 
             boolean skippedByRenderCap = targetCloudlets > requestedByRenderer;
             int skippedCloudlets = Math.max(0, targetCloudlets - rendered);
             String reason = "rendered";
             if (rendered <= 0 && skippedByMaxCells) {
-                reason = "max_cells";
+                reason = "cloudlet_budget";
+            } else if (rendered <= 0 && !snapshot.lodBand().hasIdentifiableCloudlets()) {
+                reason = "lod_procedural_only";
             } else if (skippedByMaxCells || skippedByRenderCap || lodHydrationSkipped) {
                 reason = "partial";
             }
@@ -611,15 +798,45 @@ public final class VolumetricCloudRenderHook {
         ));
     }
 
-    private static int fieldCloudletCount(List<CloudFieldSnapshot> snapshots, String dimensionId) {
-        int count = 0;
-        for (CloudFieldSnapshot snapshot : snapshots) {
-            if (snapshot != null && snapshot.hasVisibleClouds()
-                    && (dimensionId.isBlank() || dimensionId.equals(snapshot.dimensionId()))) {
-                count += renderCloudletCount(snapshot);
-            }
+    public record CloudletBudgetStats(
+            int requested,
+            int accepted,
+            int rejected,
+            int budgetRemaining,
+            int visibleFields,
+            int budget
+    ) {
+        private static CloudletBudgetStats empty() {
+            return new CloudletBudgetStats(0, 0, 0, 0, 0, 0);
         }
-        return count;
+
+        public String summary() {
+            return "requested=" + requested
+                    + ",accepted=" + accepted
+                    + ",rejected=" + rejected
+                    + ",remaining=" + budgetRemaining
+                    + ",visibleFields=" + visibleFields
+                    + ",budget=" + budget;
+        }
+    }
+
+    private record CloudletCandidate(CloudFieldSnapshot snapshot, int requested, double priority) {
+    }
+
+    private record CloudletAllocationPlan(
+            List<CloudFieldSnapshot> orderedFields,
+            Map<UUID, Integer> requestedByField,
+            Map<UUID, Integer> acceptedByField,
+            CloudletBudgetStats stats,
+            int visibleFields
+    ) {
+        private int requestedFor(UUID fieldId) {
+            return requestedByField.getOrDefault(fieldId, 0);
+        }
+
+        private int acceptedFor(UUID fieldId) {
+            return acceptedByField.getOrDefault(fieldId, 0);
+        }
     }
 
     private static Matrix4f cameraViewRotation(RenderLevelStageEvent event) {
@@ -637,21 +854,76 @@ public final class VolumetricCloudRenderHook {
         return viewRotation;
     }
 
-    private static Vector3f defaultWind() {
-        return new Vector3f(0.015F, 0.0F, 0.006F);
+    private static Vector3f resolveVisualWind(
+            List<CloudFieldSnapshot> fields,
+            List<CloudCell> cells,
+            Vec3 cameraPos,
+            long gameTime
+    ) {
+        Vector3f fieldWind = averageFieldWind(fields);
+        if (fieldWind.lengthSquared() > 1.0E-8F) {
+            return fieldWind;
+        }
+        Vector3f cellWind = averageCellWind(cells);
+        if (cellWind.lengthSquared() > 1.0E-8F) {
+            return cellWind;
+        }
+        // Regional-only sheets have no field/cell to average. Use the same
+        // synchronized forecast vector that drives server cloud motion.
+        WindVector regionalWind = ForecastOrchestrator.getWind(
+                BlockPos.containing(cameraPos), gameTime
+        );
+        float drift = Mth.clamp(
+                (regionalWind == null ? 0.0F : regionalWind.baseSpeed())
+                        * 0.05F * AtmoCommonConfig.CLOUD_WIND_DRIFT_SCALE.get().floatValue(),
+                0.0F,
+                0.45F
+        );
+        float angle = regionalWind == null ? 0.0F : regionalWind.angleRadians();
+        return new Vector3f(
+                (float) Math.cos(angle) * drift,
+                0.0F,
+                (float) Math.sin(angle) * drift
+        );
     }
 
-    private static Vector3f averageWind(List<CloudCell> cells) {
-        if (cells == null || cells.isEmpty()) {
-            return defaultWind();
+    private static Vector3f averageFieldWind(List<CloudFieldSnapshot> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return new Vector3f();
         }
         double x = 0.0D;
         double z = 0.0D;
-        for (CloudCell cell : cells) {
-            x += cell.wind().x();
-            z += cell.wind().z();
+        double weight = 0.0D;
+        for (CloudFieldSnapshot field : fields) {
+            if (field == null) {
+                continue;
+            }
+            double fieldWeight = Math.max(0.01D,
+                    field.effectiveDensity() * field.effectiveCoverage() * Math.max(1.0F, field.radius()));
+            x += field.windVector().x() * fieldWeight;
+            z += field.windVector().z() * fieldWeight;
+            weight += fieldWeight;
         }
-        return new Vector3f((float) (x / cells.size()), 0.0F, (float) (z / cells.size()));
+        return weight <= 0.0D ? new Vector3f() : new Vector3f((float) (x / weight), 0.0F, (float) (z / weight));
+    }
+
+    private static Vector3f averageCellWind(List<CloudCell> cells) {
+        if (cells == null || cells.isEmpty()) {
+            return new Vector3f();
+        }
+        double x = 0.0D;
+        double z = 0.0D;
+        double weight = 0.0D;
+        for (CloudCell cell : cells) {
+            if (cell == null) {
+                continue;
+            }
+            double cellWeight = Math.max(0.01D, cell.density() * cell.radiusMajor());
+            x += cell.wind().x() * cellWeight;
+            z += cell.wind().z() * cellWeight;
+            weight += cellWeight;
+        }
+        return weight <= 0.0D ? new Vector3f() : new Vector3f((float) (x / weight), 0.0F, (float) (z / weight));
     }
 
     /** Picks the two strongest nearby funnels for the analytic SDF slots. */

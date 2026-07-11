@@ -2,9 +2,13 @@ package net.Gabou.projectatmosphere.clouds.service;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendBridgeSnapshot;
 
 import java.util.List;
+import net.minecraft.nbt.CompoundTag;
 
 /**
  * Service d'intégration des systèmes de nuages utilisables par Project Atmosphere.
@@ -90,6 +94,52 @@ public interface AtmosphereCloudService {
      * @param level niveau serveur
      */
     default void simulateSevereCloudDebris(ServerLevel level) {
+    }
+
+    /** Advances severe-weather systems owned by this optional backend. */
+    default void tickSevereWeather(ServerLevel level) {
+    }
+
+    /** Clears severe-weather systems owned by this optional backend. */
+    default void clearSevereWeather(ServerLevel level) {
+    }
+
+    /** Synchronizes backend-specific severe weather to one player. */
+    default void syncSevereWeather(ServerPlayer player) {
+    }
+
+    default int activeTornadoCount() {
+        return 0;
+    }
+
+    default int activeHurricaneCount() {
+        return 0;
+    }
+
+    default void loadSevereWeather(
+            ServerLevel level,
+            List<CompoundTag> tornadoes,
+            List<CompoundTag> hurricanes
+    ) {
+    }
+
+    default void saveSevereWeather(
+            List<CompoundTag> tornadoes,
+            List<CompoundTag> hurricanes
+    ) {
+    }
+
+    /**
+     * Spawns a cloud through an external backend without exposing external
+     * cloud classes in common command code.
+     */
+    default boolean spawnExternalCloud(
+            ServerLevel level,
+            String cloudId,
+            RegionInstanceKey regionKey,
+            WindVector wind
+    ) {
+        return false;
     }
 
     /**

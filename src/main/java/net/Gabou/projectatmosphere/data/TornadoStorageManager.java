@@ -5,9 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -31,12 +28,7 @@ public final class TornadoStorageManager {
         RuntimeStormData data = RuntimeStormData.get(level);
         COOLDOWNS.clear();
         COOLDOWNS.putAll(data.cooldowns);
-        if (AtmoCommonConfig.ENABLE_TORNADOES.get()) {
-            TornadoManager.loadPersistentTornadoes(level, data.tornadoes);
-        } else {
-            TornadoManager.clearTornadoes();
-        }
-        HurricaneManager.loadPersistentHurricanes(level, data.hurricanes);
+        AtmosphereCloudServices.get().loadSevereWeather(level, data.tornadoes, data.hurricanes);
     }
 
     public static void save(ServerLevel level) {
@@ -47,11 +39,8 @@ public final class TornadoStorageManager {
         data.cooldowns.clear();
         data.cooldowns.putAll(COOLDOWNS);
         data.tornadoes.clear();
-        if (AtmoCommonConfig.ENABLE_TORNADOES.get()) {
-            data.tornadoes.addAll(TornadoManager.savePersistentTornadoes());
-        }
         data.hurricanes.clear();
-        data.hurricanes.addAll(HurricaneManager.savePersistentHurricanes());
+        AtmosphereCloudServices.get().saveSevereWeather(data.tornadoes, data.hurricanes);
         data.setDirty();
     }
 

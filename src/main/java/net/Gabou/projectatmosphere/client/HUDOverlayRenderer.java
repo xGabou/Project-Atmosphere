@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.client;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderFallbackState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -35,8 +34,6 @@ public class HUDOverlayRenderer {
         GuiGraphics guiGraphics = event.getGuiGraphics();
         Font font = mc.font;
 
-        renderCloudFallback(guiGraphics, font, mc);
-
         if (temperatureMessage == null || System.currentTimeMillis() > displayUntil) {
             temperatureMessage = null;
             return;
@@ -51,34 +48,6 @@ public class HUDOverlayRenderer {
         guiGraphics.drawString(font, temperatureMessage, x, y, 0xFFFFFF, true);
     }
 
-    private static void renderCloudFallback(GuiGraphics guiGraphics, Font font, Minecraft mc) {
-        CloudRenderFallbackState.FailureStatus status = CloudRenderFallbackState.getStatus();
-        if (!status.active()) {
-            return;
-        }
-
-        String title = "PA cloud fallback: " + status.title();
-        String detail = status.detail();
-        String counts = "source " + status.sourceSnapshots()
-                + " / renderable " + status.renderableSnapshots()
-                + " / rendered " + status.renderedSnapshots();
-
-        int titleWidth = font.width(title);
-        int detailWidth = font.width(detail);
-        int countsWidth = font.width(counts);
-        int contentWidth = Math.max(titleWidth, Math.max(detailWidth, countsWidth));
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int x = Math.max(8, (screenWidth - contentWidth) / 2 - 8);
-        int y = 10;
-        int right = Math.min(screenWidth - 8, x + contentWidth + 16);
-        int bottom = y + 28;
-
-        guiGraphics.fill(x, y, right, bottom, 0xD0401010);
-        guiGraphics.fill(x, y, right, y + 1, 0xFFFF4040);
-        guiGraphics.drawString(font, Component.literal(title), x + 8, y + 5, 0xFFFF8080, false);
-        guiGraphics.drawString(font, Component.literal(detail), x + 8, y + 15, 0xFFFFD6D6, false);
-        guiGraphics.drawString(font, Component.literal(counts), x + 8, y + 25, 0xFFFFD6D6, false);
-    }
 }
 
 

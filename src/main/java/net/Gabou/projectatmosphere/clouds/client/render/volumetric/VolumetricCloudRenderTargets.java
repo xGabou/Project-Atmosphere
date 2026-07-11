@@ -17,6 +17,7 @@ import org.lwjgl.opengl.GL30;
  */
 public final class VolumetricCloudRenderTargets {
     private static RenderTarget weatherTarget;
+    private static RenderTarget morphologyTarget;
     private static RenderTarget shadowTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
     private static int currentIndex;
@@ -55,8 +56,25 @@ public final class VolumetricCloudRenderTargets {
         return shadowTarget;
     }
 
+    public static RenderTarget prepareMorphologyTarget(int size) {
+        if (morphologyTarget == null || morphologyTarget.width != size) {
+            if (morphologyTarget != null) {
+                morphologyTarget.destroyBuffers();
+            }
+            morphologyTarget = new TextureTarget(size, size, false, Minecraft.ON_OSX);
+            morphologyTarget.setFilterMode(GL11.GL_LINEAR);
+            configureClamp(morphologyTarget.getColorTextureId());
+            morphologyTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        }
+        return morphologyTarget;
+    }
+
     public static RenderTarget weatherTargetOrNull() {
         return weatherTarget;
+    }
+
+    public static RenderTarget morphologyTargetOrNull() {
+        return morphologyTarget;
     }
 
     /**
@@ -133,9 +151,14 @@ public final class VolumetricCloudRenderTargets {
     }
 
     private static void destroyAll() {
+        CloudWeatherMapRenderer.invalidateCache();
         if (weatherTarget != null) {
             weatherTarget.destroyBuffers();
             weatherTarget = null;
+        }
+        if (morphologyTarget != null) {
+            morphologyTarget.destroyBuffers();
+            morphologyTarget = null;
         }
         if (shadowTarget != null) {
             shadowTarget.destroyBuffers();

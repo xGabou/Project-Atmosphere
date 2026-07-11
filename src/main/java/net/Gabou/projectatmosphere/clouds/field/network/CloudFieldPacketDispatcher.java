@@ -12,6 +12,8 @@ public final class CloudFieldPacketDispatcher {
     private static volatile CloudFieldSink clientSink = snapshots -> {
     };
     private static volatile CloudFieldSupplier clientSupplier = List::of;
+    private static volatile CloudFieldDeltaSink clientDeltaSink = (updated, removed) -> {
+    };
 
     private CloudFieldPacketDispatcher() {
     }
@@ -25,6 +27,11 @@ public final class CloudFieldPacketDispatcher {
         clientSupplier = supplier == null ? List::of : supplier;
     }
 
+    public static void setClientDeltaSink(CloudFieldDeltaSink sink) {
+        clientDeltaSink = sink == null ? (updated, removed) -> {
+        } : sink;
+    }
+
     public static void handleClientSnapshots(Collection<CloudFieldSnapshot> snapshots) {
         clientSink.accept(snapshots == null ? List.of() : List.copyOf(snapshots));
     }
@@ -32,6 +39,16 @@ public final class CloudFieldPacketDispatcher {
     public static Collection<CloudFieldSnapshot> getClientSnapshots() {
         Collection<CloudFieldSnapshot> snapshots = clientSupplier.get();
         return snapshots == null ? List.of() : List.copyOf(snapshots);
+    }
+
+    public static void handleClientDelta(
+            Collection<CloudFieldSnapshot> updated,
+            Collection<java.util.UUID> removed
+    ) {
+        clientDeltaSink.accept(
+                updated == null ? List.of() : List.copyOf(updated),
+                removed == null ? List.of() : List.copyOf(removed)
+        );
     }
 
     @FunctionalInterface
@@ -42,5 +59,10 @@ public final class CloudFieldPacketDispatcher {
     @FunctionalInterface
     public interface CloudFieldSupplier {
         Collection<CloudFieldSnapshot> get();
+    }
+
+    @FunctionalInterface
+    public interface CloudFieldDeltaSink {
+        void accept(Collection<CloudFieldSnapshot> updated, Collection<java.util.UUID> removed);
     }
 }

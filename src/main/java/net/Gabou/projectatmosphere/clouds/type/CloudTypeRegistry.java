@@ -35,7 +35,7 @@ public final class CloudTypeRegistry {
     );
 
     private static final Map<String, CloudTypeDefinition> BUILT_IN_TYPES = new LinkedHashMap<>();
-    private static final Map<String, CloudTypeDefinition> TYPES = new LinkedHashMap<>();
+    private static volatile Map<String, CloudTypeDefinition> types = Map.of();
 
     static {
         register(new CloudTypeDefinition(
@@ -159,29 +159,27 @@ public final class CloudTypeRegistry {
         if (id == null || id.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(TYPES.get(id));
+        return Optional.ofNullable(types.get(id));
     }
 
     public static CloudTypeDefinition getOrDefault(String id) {
-        return get(id).orElse(TYPES.get(DEFAULT_CLOUD_TYPE_ID));
+        return get(id).orElse(types.get(DEFAULT_CLOUD_TYPE_ID));
     }
 
     public static Map<String, CloudTypeDefinition> getAll() {
-        return Map.copyOf(TYPES);
+        return types;
     }
 
     public static synchronized void replaceDataPackDefinitions(Map<String, CloudTypeDefinition> dataPackDefinitions) {
-        TYPES.clear();
-        TYPES.putAll(BUILT_IN_TYPES);
-        if (dataPackDefinitions == null || dataPackDefinitions.isEmpty()) {
-            return;
-        }
-
-        for (CloudTypeDefinition definition : dataPackDefinitions.values()) {
-            if (definition != null && definition.getId() != null && !definition.getId().isBlank()) {
-                TYPES.put(definition.getId(), definition);
+        Map<String, CloudTypeDefinition> replacement = new LinkedHashMap<>(BUILT_IN_TYPES);
+        if (dataPackDefinitions != null && !dataPackDefinitions.isEmpty()) {
+            for (CloudTypeDefinition definition : dataPackDefinitions.values()) {
+                if (definition != null && definition.getId() != null && !definition.getId().isBlank()) {
+                    replacement.put(definition.getId(), definition);
+                }
             }
         }
+        types = Map.copyOf(replacement);
     }
 
     public static String getClearWeatherCloudId() {
@@ -221,7 +219,7 @@ public final class CloudTypeRegistry {
 
     private static void register(CloudTypeDefinition definition) {
         BUILT_IN_TYPES.put(definition.getId(), definition);
-        TYPES.put(definition.getId(), definition);
+        types = Map.copyOf(BUILT_IN_TYPES);
     }
 
     private static String pick(String[] ids) {

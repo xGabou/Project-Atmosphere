@@ -18,16 +18,10 @@ public final class TornadoProbabilityManager {
     private TornadoProbabilityManager() {}
 
     public static void init() {
-        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            return;
-        }
         // No-op for now
     }
 
     public static void onScheduledCheck(ServerLevel level) {
-        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            return;
-        }
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) return;
         long now = level.getGameTime();
         if (!TornadoSpawnScheduler.isSlotAvailable(now)) return;
@@ -48,7 +42,9 @@ public final class TornadoProbabilityManager {
                         AtmoCommonConfig.TORNADO_INTENSITY_MIN.get().floatValue(),
                         AtmoCommonConfig.TORNADO_INTENSITY_MAX.get().floatValue());
                 intensity = Math.max(intensity, 0.18F + StormSeverityScale.toNormalized(stormLevel) * 0.52F);
-                TornadoSpawner.spawn(key, level, clamp01(intensity));
+                if (!TornadoSpawner.spawn(key, level, clamp01(intensity))) {
+                    continue;
+                }
                 TornadoStorageManager.setCooldown(key,
                         now + minutesToTicks(AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get()));
                 TornadoSpawnScheduler.recordSpawn(now);
@@ -82,7 +78,11 @@ public final class TornadoProbabilityManager {
         if (StormSeverityScale.resolve(level, key, level.getGameTime()) < 6) {
             return false;
         }
-        return AtmosphereCloudServices.get().hasSevereCloudNearby(level, key.center(), 7);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return AtmosphereCloudServices.get().hasSevereCloudNearby(level, key.center(), 7);
+        }
+        return net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager.getInstance()
+                .hasEligibleNativeTornadoCellNear(level, key.center(), 1600.0D);
     }
 
     private static float thermalRisk(RegionInstanceKey key, ServerLevel level) {
@@ -92,6 +92,9 @@ public final class TornadoProbabilityManager {
                 - (AtmoCommonConfig.TORNADO_LAPSE_RATE_C_PER_100M.get().floatValue()
                 * (AtmoCommonConfig.TORNADO_ALOFT_DELTA_H_M.get().floatValue() / 100f));
         float tempContrast = Math.max(0f, tempSurface - tempAloft);
+        if (tempContrast < AtmoCommonConfig.TORNADO_MIN_TEMP_CONTRAST_C.get().floatValue()) {
+            return 0.0F;
+        }
         float risk = tempContrast / 10f;
         if (humidity >= AtmoCommonConfig.TORNADO_HUMIDITY_MIN_PERCENT.get().floatValue()) {
             risk += 1f;

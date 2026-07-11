@@ -1,5 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Objects;
@@ -25,6 +28,10 @@ public record CloudField(
         Vec3 windVector,
         float verticalDevelopment,
         float stormPotential,
+        String cloudTypeId,
+        CloudMorphologyFamily morphologyFamily,
+        float anvilStrength,
+        float precipitationIntensity,
         int cloudletCount,
         long ageTicks,
         long lifetimeTicks
@@ -43,6 +50,13 @@ public record CloudField(
         windVector = windVector == null ? Vec3.ZERO : windVector;
         verticalDevelopment = clamp01(verticalDevelopment);
         stormPotential = clamp01(stormPotential);
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
+        cloudTypeId = definition.getId();
+        morphologyFamily = morphologyFamily == null
+                ? definition.getMorphologyFamily()
+                : morphologyFamily;
+        anvilStrength = clamp01(anvilStrength);
+        precipitationIntensity = clamp01(precipitationIntensity);
         cloudletCount = Math.max(0, cloudletCount);
         ageTicks = Math.max(0L, ageTicks);
         lifetimeTicks = Math.max(0L, lifetimeTicks);
@@ -70,6 +84,10 @@ public record CloudField(
                 windVector,
                 verticalDevelopment,
                 stormPotential,
+                cloudTypeId,
+                morphologyFamily,
+                anvilStrength,
+                precipitationIntensity,
                 cloudletCount,
                 newAgeTicks,
                 lifetimeTicks
@@ -93,6 +111,10 @@ public record CloudField(
                 windVector,
                 verticalDevelopment,
                 stormPotential,
+                cloudTypeId,
+                morphologyFamily,
+                anvilStrength,
+                precipitationIntensity,
                 cloudletCount,
                 ageTicks,
                 lifetimeTicks
@@ -116,6 +138,10 @@ public record CloudField(
                 windVector,
                 verticalDevelopment,
                 stormPotential,
+                cloudTypeId,
+                morphologyFamily,
+                anvilStrength,
+                precipitationIntensity,
                 newCloudletCount,
                 ageTicks,
                 lifetimeTicks

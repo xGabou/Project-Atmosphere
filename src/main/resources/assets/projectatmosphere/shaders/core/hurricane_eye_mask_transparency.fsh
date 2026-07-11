@@ -4,14 +4,10 @@ uniform sampler2D SourceAccumSampler;
 uniform sampler2D SourceRevealageSampler;
 uniform sampler2D SourceDepthSampler;
 
-uniform mat4 ModelViewMat;
-uniform mat4 ProjMat;
 uniform mat4 InverseProjMat;
 uniform mat4 InverseModelViewMat;
 uniform vec3 CameraPos;
-uniform float AnimationTime;
 uniform float MaxDistance;
-uniform vec2 OutSize;
 uniform int ProtectionEnabled;
 uniform int StormCount;
 uniform float StormPositions[12];
@@ -19,22 +15,6 @@ uniform vec4 StormHeights;
 uniform vec4 EyeRadii;
 uniform vec4 EyeClearRadii;
 uniform vec4 EyeSlopes;
-uniform vec4 EyewallThicknesses;
-uniform vec4 CanopyRadii;
-uniform vec4 ShieldRadii;
-uniform vec4 CanopyBaseFactors;
-uniform vec4 CanopyTopFactors;
-uniform vec4 ShieldBaseFactors;
-uniform vec4 ShieldTopFactors;
-uniform vec4 BandStartRadii;
-uniform vec4 BandEndRadii;
-uniform vec4 BandWidths;
-uniform vec4 BandStrengths;
-uniform vec4 BandCounts;
-uniform vec4 FringeStrengths;
-uniform vec4 StormSpins;
-uniform vec4 StormIntensities;
-uniform vec4 StormSeeds;
 
 in vec2 texCoord;
 

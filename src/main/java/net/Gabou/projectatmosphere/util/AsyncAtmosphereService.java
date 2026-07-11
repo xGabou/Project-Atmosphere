@@ -2,11 +2,10 @@ package net.Gabou.projectatmosphere.util;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.async.PoolType;
-import net.minecraft.client.Minecraft;
-import net.minecraft.server.MinecraftServer;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraftforge.fml.LogicalSide;
+import net.minecraftforge.common.util.LogicalSidedProvider;
 import net.minecraftforge.fml.util.thread.EffectiveSide;
-import net.minecraftforge.server.ServerLifecycleHooks;
 
 import java.util.Objects;
 import java.util.concurrent.*;
@@ -64,7 +63,7 @@ public final class AsyncAtmosphereService {
             final boolean goodGpu = profile.isGoodEnoughGPU();
 
             // choose mode
-            final boolean USE_SHARED = lowSpec || cpu <= 4;
+            final boolean USE_SHARED = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get() || lowSpec || cpu <= 4;
             final boolean SPLIT_POOLS = !USE_SHARED;
 
             // queue caps: smaller on low-mem
@@ -202,43 +201,18 @@ public final class AsyncAtmosphereService {
      */
     public static void runOnMainThread(Runnable task) {
         Objects.requireNonNull(task, "task");
-        if (EffectiveSide.get() == LogicalSide.CLIENT) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null) {
-                mc.execute(task);
-            } else {
-                ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] Tried to schedule on client thread but Minecraft was null");
-            }
-        } else {
-            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-            if (server != null) {
-                server.execute(task);
-            } else {
-                ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] Tried to schedule on server thread but server was null");
-            }
-        }
+        LogicalSidedProvider.WORKQUEUE.get(EffectiveSide.get()).execute(task);
     }
 
     public static <T> T callOnMainThread(Callable<T> task) {
         Objects.requireNonNull(task, "task");
 
-        if (EffectiveSide.get() == LogicalSide.CLIENT) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null) {
-                try {
-                    return task.call(); // already on client thread
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        } else if (EffectiveSide.get() == LogicalSide.SERVER) {
-            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-            if (server != null && server.isSameThread()) {
-                try {
-                    return task.call(); // already on server thread
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
+        var workQueue = LogicalSidedProvider.WORKQUEUE.get(EffectiveSide.get());
+        if (workQueue.isSameThread()) {
+            try {
+                return task.call();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
 

@@ -52,7 +52,6 @@ public class AtmoConfigScreen extends Screen {
     private double tornadoIntensityMin;
     private double tornadoIntensityMax;
     private int tornadoCellCooldownMinutes;
-    private boolean tornadoAllowLegacyFallback;
     private boolean tornadoDebugLogging;
     private double tornadoRenderQuality;
     private double tornadoRenderDownsample;
@@ -187,7 +186,6 @@ public class AtmoConfigScreen extends Screen {
         this.tornadoIntensityMin = AtmoCommonConfig.TORNADO_INTENSITY_MIN.get();
         this.tornadoIntensityMax = AtmoCommonConfig.TORNADO_INTENSITY_MAX.get();
         this.tornadoCellCooldownMinutes = AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.get();
-        this.tornadoAllowLegacyFallback = AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.get();
         this.tornadoDebugLogging = AtmoCommonConfig.TORNADO_DEBUG_LOGGING.get();
         this.tornadoRenderQuality = AtmoCommonConfig.TORNADO_RENDER_QUALITY.get();
         this.tornadoRenderDownsample = AtmoCommonConfig.TORNADO_RENDER_DOWNSAMPLE.get();
@@ -314,11 +312,6 @@ public class AtmoConfigScreen extends Screen {
 
         addTitle("Tornado", y);
         y += 18;
-        addConfigWidget(Button.builder(toggleLabel("Legacy Tornado Fallback", tornadoAllowLegacyFallback), b -> {
-            tornadoAllowLegacyFallback = !tornadoAllowLegacyFallback;
-            b.setMessage(toggleLabel("Legacy Tornado Fallback", tornadoAllowLegacyFallback));
-        }).bounds(center - 100, y, 200, 20).build(), y);
-        y += 32;
         addConfigWidget(Button.builder(toggleLabel("Tornado Debug Logging", tornadoDebugLogging), b -> {
             tornadoDebugLogging = !tornadoDebugLogging;
             b.setMessage(toggleLabel("Tornado Debug Logging", tornadoDebugLogging));
@@ -560,7 +553,6 @@ public class AtmoConfigScreen extends Screen {
         AtmoCommonConfig.TORNADO_INTENSITY_MIN.set(tornadoIntensityMin);
         AtmoCommonConfig.TORNADO_INTENSITY_MAX.set(tornadoIntensityMax);
         AtmoCommonConfig.TORNADO_CELL_COOLDOWN_MINUTES.set(tornadoCellCooldownMinutes);
-        AtmoCommonConfig.TORNADO_ALLOW_LEGACY_FALLBACK.set(tornadoAllowLegacyFallback);
         AtmoCommonConfig.TORNADO_DEBUG_LOGGING.set(tornadoDebugLogging);
         AtmoCommonConfig.TORNADO_RENDER_QUALITY.set(tornadoRenderQuality);
         AtmoCommonConfig.TORNADO_RENDER_DOWNSAMPLE.set(tornadoRenderDownsample);

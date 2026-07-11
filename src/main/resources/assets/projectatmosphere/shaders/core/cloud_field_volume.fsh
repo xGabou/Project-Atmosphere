@@ -22,6 +22,11 @@ uniform float FieldHumidityInfluence;
 uniform vec3 FieldWind;
 uniform float FieldVerticalDevelopment;
 uniform float FieldStormPotential;
+uniform int FieldCloudProfile;
+uniform int FieldMorphologyFamily;
+uniform float FieldAnvilStrength;
+uniform float FieldPrecipitationIntensity;
+uniform float FieldLifecycleStage;
 uniform float FieldAgeTicks;
 uniform float FieldLifetimeTicks;
 uniform float FieldSeed;
@@ -60,6 +65,40 @@ float saturate(float value) {
 
 vec3 saturate(vec3 value) {
     return clamp(value, vec3(0.0), vec3(1.0));
+}
+
+float isSheetProfile() {
+    return (FieldCloudProfile == 1 || FieldCloudProfile == 2 || FieldCloudProfile == 5
+        || FieldMorphologyFamily == 3 || FieldMorphologyFamily == 4) ? 1.0 : 0.0;
+}
+
+float isFilamentProfile() {
+    return (FieldCloudProfile == 6 || FieldMorphologyFamily == 5) ? 1.0 : 0.0;
+}
+
+float isTowerProfile() {
+    return (FieldCloudProfile == 4 || FieldCloudProfile == 7
+        || FieldMorphologyFamily == 1 || FieldMorphologyFamily == 2
+        || FieldMorphologyFamily == 6) ? 1.0 : 0.0;
+}
+
+float profileRadiusScale(float height01) {
+    float verticalDevelopment = saturate(FieldVerticalDevelopment);
+    float storm = saturate(FieldStormPotential);
+    float baseScale = mix(0.48, 1.0, smoothstep(0.02, 0.24, height01));
+    float upperScale = mix(1.0, mix(0.86, 0.58, verticalDevelopment), smoothstep(0.52, 1.0, height01));
+    float explicitAnvil = max(saturate(FieldAnvilStrength), storm * isTowerProfile());
+    float anvilSpread = smoothstep(0.70, 0.96, height01) * explicitAnvil * 0.30;
+    float profileScale = max(0.22, baseScale * upperScale + anvilSpread);
+
+    float sheetScale = mix(1.02, 0.92, smoothstep(0.68, 1.0, height01));
+    profileScale = mix(profileScale, sheetScale, isSheetProfile());
+    float filamentScale = mix(0.86, 0.58, smoothstep(0.30, 1.0, height01));
+    profileScale = mix(profileScale, filamentScale, isFilamentProfile());
+    if (FieldMorphologyFamily == 6) {
+        profileScale += sin(height01 * 9.424778 + FieldSeed) * 0.035;
+    }
+    return max(0.20, profileScale);
 }
 
 float safeInverse(float value) {
@@ -268,16 +307,10 @@ float horizontalMaskAtHeight(vec3 p, float height01) {
     vec2 localXZ = p.xz - FieldCenter.xz;
     float radial = length(localXZ) / radius;
     float coverage = saturate(FieldCoverage);
-    float verticalDevelopment = saturate(FieldVerticalDevelopment);
-    float storm = saturate(FieldStormPotential);
-
-    // A rounded cumulus envelope avoids the old cylinder/slab body. It is
-    // narrow at the base, full through the middle, and gently tapered at the
-    // top unless storm growth adds a small anvil spread.
-    float baseScale = mix(0.48, 1.0, smoothstep(0.02, 0.24, height01));
-    float upperScale = mix(1.0, mix(0.86, 0.58, verticalDevelopment), smoothstep(0.52, 1.0, height01));
-    float anvilSpread = smoothstep(0.76, 0.98, height01) * storm * 0.20;
-    float profileScale = max(0.22, baseScale * upperScale + anvilSpread);
+    // The canonical type selects a real structural envelope: layered profiles
+    // stay broad, cirrus narrows into filaments, and convective profiles retain
+    // the rounded tower/anvil silhouette.
+    float profileScale = profileRadiusScale(height01);
 
     // Restrict silhouette noise to the edge of the body. This keeps breakup
     // visible without spawning large side shoots detached from the main mass.
@@ -292,7 +325,7 @@ float horizontalMaskAtHeight(vec3 p, float height01) {
     float edgeStart = mix(0.50, 0.74, coverage);
     float edgeWidth = mix(0.25, 0.17, coverage);
     float verticalContour = smoothstep(0.00, 0.14, height01)
-        * (1.0 - smoothstep(0.88 + storm * 0.06, 1.0, height01));
+        * (1.0 - smoothstep(0.88 + saturate(FieldStormPotential) * 0.06, 1.0, height01));
     return saturate((1.0 - smoothstep(edgeStart, edgeStart + edgeWidth, shapedRadial)) * verticalContour);
 }
 
@@ -310,7 +343,20 @@ float verticalMaskAtHeight(vec3 p, float height01) {
     float topStart = 0.80 + stormLift + (topNoise - 0.5) * 0.035;
     float topFalloff = 1.0 - smoothstep(topStart, 1.0, height01);
     float middleLift = 0.82 + 0.24 * (1.0 - saturate(abs(height01 - 0.48) * 2.0));
-    return saturate(baseFalloff * topFalloff * middleLift);
+    float convectiveMask = saturate(baseFalloff * topFalloff * middleLift);
+
+    float sheetBase = smoothstep(0.01, 0.13, height01);
+    float sheetTop = 1.0 - smoothstep(0.74, 0.99, height01);
+    float cellular = FieldMorphologyFamily == 4
+        ? mix(0.76, 1.08, undersideNoise)
+        : mix(0.90, 1.03, topNoise);
+    float sheetMask = saturate(sheetBase * sheetTop * cellular);
+
+    float filamentCenter = 1.0 - abs(height01 - 0.58) * 2.0;
+    float filamentMask = smoothstep(0.02, 0.42, filamentCenter)
+        * mix(0.66, 1.0, topNoise);
+    return saturate(mix(mix(convectiveMask, sheetMask, isSheetProfile()),
+        filamentMask, isFilamentProfile()));
 }
 
 float verticalMaskAt(vec3 p) {
@@ -374,7 +420,8 @@ float densityAndHeightAt(vec3 p, out float sampledHeight01) {
     if (p.y < FieldBaseY - cheapVerticalPad || p.y > FieldTopY + cheapVerticalPad) {
         return 0.0;
     }
-    float cheapRadius = max(FieldRadius, 1.0) * (1.14 + saturate(FieldStormPotential) * 0.10);
+    float cheapRadius = max(FieldRadius, 1.0)
+        * (1.14 + max(saturate(FieldStormPotential), saturate(FieldAnvilStrength)) * 0.18);
     if (dot(p.xz - FieldCenter.xz, p.xz - FieldCenter.xz) > cheapRadius * cheapRadius) {
         return 0.0;
     }
@@ -383,16 +430,7 @@ float densityAndHeightAt(vec3 p, out float sampledHeight01) {
     // procedural noise. The generous margin retains noisy silhouette lobes.
     float approximateHeight01 = saturate((p.y - FieldBaseY) / heightSpan);
     float approximateRadial = length(p.xz - FieldCenter.xz) / max(FieldRadius, 1.0);
-    float approximateBaseScale = mix(0.48, 1.0, smoothstep(0.02, 0.24, approximateHeight01));
-    float approximateUpperScale = mix(
-        1.0,
-        mix(0.86, 0.58, saturate(FieldVerticalDevelopment)),
-        smoothstep(0.52, 1.0, approximateHeight01)
-    );
-    float approximateAnvil = smoothstep(0.76, 0.98, approximateHeight01)
-        * saturate(FieldStormPotential)
-        * 0.20;
-    float approximateProfile = max(0.22, approximateBaseScale * approximateUpperScale + approximateAnvil);
+    float approximateProfile = profileRadiusScale(approximateHeight01);
     if (approximateRadial > approximateProfile * 1.30 + 0.10) {
         return 0.0;
     }
@@ -452,7 +490,12 @@ float densityAndHeightAt(vec3 p, out float sampledHeight01) {
     float cloudletDensityHint = mix(0.95, 1.05, saturate(FieldCloudletCount / 96.0));
     float humidityBoost = mix(0.85, 1.15, saturate(FieldHumidityInfluence));
     float stormBoost = mix(1.0, 1.35, saturate(FieldStormPotential));
-    return saturate(erodedShape * weatherDensity * endOfLifeFade * cloudletDensityHint * humidityBoost * stormBoost * TuneDensityBoost * sourceVisualMultiplier());
+    float precipitationBoost = mix(1.0, 1.16, saturate(FieldPrecipitationIntensity));
+    float lifecycleEnvelope = 1.0 - abs(saturate(FieldLifecycleStage) - 0.5) * 0.16;
+    float profileDensity = FieldCloudProfile == 6 ? 0.64 : (FieldCloudProfile == 1 ? 0.82 : 1.0);
+    return saturate(erodedShape * weatherDensity * endOfLifeFade * cloudletDensityHint
+        * humidityBoost * stormBoost * precipitationBoost * lifecycleEnvelope
+        * profileDensity * TuneDensityBoost * sourceVisualMultiplier());
 }
 
 float densityAt(vec3 p) {
@@ -620,7 +663,8 @@ void main() {
         vec3 sideNormal = normalize(vec3(p.x - FieldCenter.x, FieldRadius * 0.28, p.z - FieldCenter.z));
         float sunSide = dot(sideNormal, normalize(vec3(-0.45, 0.62, 0.25))) * 0.5 + 0.5;
         float softLight = mix(0.94, 1.10, sunSide) * mix(0.92, 1.08, height01);
-        float stormDarkening = mix(1.0, 0.64, saturate(FieldStormPotential) * (1.0 - height01));
+        float weatherDarkening = max(saturate(FieldStormPotential), saturate(FieldPrecipitationIntensity));
+        float stormDarkening = mix(1.0, 0.60, weatherDarkening * (1.0 - height01));
         vec3 undersideColor = vec3(0.62, 0.62, 0.60);
         vec3 topColor = vec3(1.00, 1.00, 0.96) * TuneBrightness;
         vec3 cloudColor = mix(undersideColor, topColor, underside) * stormDarkening * softLight;

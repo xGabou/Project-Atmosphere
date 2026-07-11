@@ -37,6 +37,10 @@ public final class CloudFieldFactory {
                 source.wind(),
                 source.verticalDevelopment(),
                 source.stormPotential(),
+                source.cloudTypeId(),
+                source.resolvedMorphologyFamily(),
+                source.anvilStrength(),
+                source.precipitationIntensity(),
                 cloudletCountFor(source),
                 source.ageTicks(),
                 source.lifetimeTicks()
@@ -100,8 +104,8 @@ public final class CloudFieldFactory {
                 field.ageTicks(),
                 field.lifetimeTicks(),
                 field.cloudletCount(),
-                null,
-                null,
+                field.cloudTypeId(),
+                field.morphologyFamily().name(),
                 !field.isExpired()
         );
     }

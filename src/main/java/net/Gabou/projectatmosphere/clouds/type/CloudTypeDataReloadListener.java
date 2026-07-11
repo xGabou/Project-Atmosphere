@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.type;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.modules.weather.StormVisualTier;
 import net.minecraft.resources.ResourceLocation;
@@ -12,6 +13,8 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraftforge.event.AddReloadListenerEvent;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -79,7 +82,7 @@ public final class CloudTypeDataReloadListener extends SimpleJsonResourceReloadL
         StormVisualTier stormVisualTier = enumValue(root, "stormVisualTier", StormVisualTier.class,
                 enumValue(root, "storm_visual_tier", StormVisualTier.class, base.getStormVisualTier()));
         CloudSpawnConditions spawn = parseSpawn(objectValue(root, "spawn"), base.getSpawnConditions());
-        CloudEvolutionRules evolution = root.has("evolution") ? base.getEvolutionRules() : base.getEvolutionRules();
+        CloudEvolutionRules evolution = parseEvolution(root.get("evolution"), base.getEvolutionRules());
 
         return new CloudTypeDefinition(
                 id,
@@ -194,6 +197,79 @@ public final class CloudTypeDataReloadListener extends SimpleJsonResourceReloadL
         );
     }
 
+    /**
+     * Parses the only rule list whose omission must be distinguishable from an
+     * intentional empty list. An array replaces the built-in targets. An
+     * object can opt into merge mode with {"mode":"merge","targets":[...]}
+     * (or {"merge":true,...}); duplicate target ids replace their base rule.
+     */
+    private static CloudEvolutionRules parseEvolution(JsonElement element, CloudEvolutionRules base) {
+        if (element == null || element.isJsonNull()) {
+            return base;
+        }
+        JsonArray targets;
+        boolean merge = false;
+        if (element.isJsonArray()) {
+            targets = element.getAsJsonArray();
+        } else if (element.isJsonObject()) {
+            JsonObject object = element.getAsJsonObject();
+            JsonElement targetElement = object.get("targets");
+            if (targetElement == null || !targetElement.isJsonArray()) {
+                throw new IllegalArgumentException("evolution object requires a targets array");
+            }
+            targets = targetElement.getAsJsonArray();
+            merge = booleanValue(object, "merge", false)
+                    || "merge".equalsIgnoreCase(stringValue(object, "mode", "replace"));
+        } else {
+            throw new IllegalArgumentException("evolution must be an array or object");
+        }
+
+        List<CloudEvolutionTarget> parsed = new ArrayList<>();
+        for (JsonElement targetElement : targets) {
+            if (targetElement == null || !targetElement.isJsonObject()) {
+                throw new IllegalArgumentException("each evolution target must be an object");
+            }
+            parsed.add(parseEvolutionTarget(targetElement.getAsJsonObject()));
+        }
+        if (!merge) {
+            return new CloudEvolutionRules(parsed);
+        }
+
+        LinkedHashMap<String, CloudEvolutionTarget> merged = new LinkedHashMap<>();
+        if (base != null) {
+            for (CloudEvolutionTarget target : base.getTargets()) {
+                merged.put(target.getTargetCloudTypeId(), target);
+            }
+        }
+        for (CloudEvolutionTarget target : parsed) {
+            merged.put(target.getTargetCloudTypeId(), target);
+        }
+        return new CloudEvolutionRules(List.copyOf(merged.values()));
+    }
+
+    private static CloudEvolutionTarget parseEvolutionTarget(JsonObject object) {
+        String targetId = stringValue(object, "targetCloudTypeId",
+                stringValue(object, "target_cloud_type_id", stringValue(object, "target", "")));
+        if (targetId.isBlank()) {
+            throw new IllegalArgumentException("evolution target requires targetCloudTypeId");
+        }
+        return new CloudEvolutionTarget(
+                targetId,
+                intValue(object, "minAgeTicks", intValue(object, "min_age_ticks", 0)),
+                floatValue(object, "minHumidity", floatValue(object, "min_humidity", Float.NaN)),
+                floatValue(object, "minInstability", floatValue(object, "min_instability", Float.NaN)),
+                floatValue(object, "maxPressure", floatValue(object, "max_pressure", Float.NaN)),
+                floatValue(object, "minStormChance", floatValue(object, "min_storm_chance", Float.NaN)),
+                floatValue(object, "minTemperature", floatValue(object, "min_temperature", Float.NaN)),
+                floatValue(object, "maxTemperature", floatValue(object, "max_temperature", Float.NaN)),
+                floatValue(object, "minDensity", floatValue(object, "min_density", Float.NaN)),
+                floatValue(object, "minCoverage", floatValue(object, "min_coverage", Float.NaN)),
+                floatValue(object, "minLift", floatValue(object, "min_lift", Float.NaN)),
+                floatValue(object, "minMergePressure", floatValue(object, "min_merge_pressure", Float.NaN)),
+                floatValue(object, "chancePerCheck", floatValue(object, "chance_per_check", 0.0F))
+        );
+    }
+
     private static String idFromResource(ResourceLocation resourceId) {
         String path = resourceId.getPath();
         int slash = path.lastIndexOf('/');
@@ -222,6 +298,11 @@ public final class CloudTypeDataReloadListener extends SimpleJsonResourceReloadL
     private static int intValue(JsonObject object, String key, int fallback) {
         JsonElement element = object.get(key);
         return element != null && element.isJsonPrimitive() ? element.getAsInt() : fallback;
+    }
+
+    private static boolean booleanValue(JsonObject object, String key, boolean fallback) {
+        JsonElement element = object.get(key);
+        return element != null && element.isJsonPrimitive() ? element.getAsBoolean() : fallback;
     }
 
     private static <T extends Enum<T>> T enumValue(JsonObject object, String key, Class<T> enumClass, T fallback) {

@@ -1,5 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Objects;
@@ -18,6 +21,10 @@ public record CloudFieldTarget(
         float targetHydration,
         float verticalDevelopment,
         float stormPotential,
+        String cloudTypeId,
+        CloudMorphologyFamily morphologyFamily,
+        float anvilStrength,
+        float precipitationIntensity,
         float decayPressure,
         Vec3 windInfluence,
         float growth,
@@ -35,6 +42,13 @@ public record CloudFieldTarget(
         targetHydration = clamp01(targetHydration);
         verticalDevelopment = clamp01(verticalDevelopment);
         stormPotential = clamp01(stormPotential);
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
+        cloudTypeId = definition.getId();
+        morphologyFamily = morphologyFamily == null
+                ? definition.getMorphologyFamily()
+                : morphologyFamily;
+        anvilStrength = clamp01(anvilStrength);
+        precipitationIntensity = clamp01(precipitationIntensity);
         decayPressure = clamp01(decayPressure);
         windInfluence = windInfluence == null ? Vec3.ZERO : windInfluence;
         growth = clamp01(growth);
@@ -59,6 +73,10 @@ public record CloudFieldTarget(
                 field.humidityInfluence(),
                 field.verticalDevelopment(),
                 field.stormPotential(),
+                field.cloudTypeId(),
+                field.morphologyFamily(),
+                field.anvilStrength(),
+                field.precipitationIntensity(),
                 field.decay(),
                 field.windVector(),
                 field.growth(),

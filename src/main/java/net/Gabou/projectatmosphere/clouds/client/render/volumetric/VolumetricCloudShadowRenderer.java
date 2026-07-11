@@ -3,11 +3,11 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowSnapshot;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCellDensityMath;
+import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
@@ -85,7 +85,6 @@ public final class VolumetricCloudShadowRenderer {
             FullscreenQuad.draw(shader);
         } finally {
             shader.clear();
-            CloudRenderStateGuard.restoreAfterCloudPass();
         }
         frameCounter++;
         return true;
@@ -97,6 +96,7 @@ public final class VolumetricCloudShadowRenderer {
      */
     public static void applyGroundShadows(
             RenderTarget mainTarget,
+            SceneDepthFrame sceneDepth,
             Matrix4f invProj,
             Matrix4f invViewRot,
             Vector3f cameraPos,
@@ -108,11 +108,15 @@ public final class VolumetricCloudShadowRenderer {
     ) {
         ShaderInstance shader = VolumetricCloudShaders.shadowApplyShader();
         RenderTarget shadowTarget = VolumetricCloudRenderTargets.shadowTargetOrNull();
-        if (shader == null || shadowTarget == null || mainTarget == null || daylightFactor <= 0.02F) {
+        if (shader == null || shadowTarget == null || mainTarget == null
+                || sceneDepth == null || !sceneDepth.valid() || !sceneDepth.detached()
+                || daylightFactor <= 0.02F) {
             return;
         }
 
-        mainTarget.bindWrite(true);
+        if (!net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard.bindCapturedDrawFramebuffer()) {
+            mainTarget.bindWrite(true);
+        }
         RenderSystem.enableBlend();
         // Multiply blend is applied by the shader JSON (dstcolor, 0).
         RenderSystem.disableDepthTest();
@@ -121,7 +125,7 @@ public final class VolumetricCloudShadowRenderer {
         RenderSystem.setShader(() -> shader);
 
         shader.setSampler("ShadowMapSampler", shadowTarget.getColorTextureId());
-        shader.setSampler("SceneDepthSampler", mainTarget.getDepthTextureId());
+        shader.setSampler("SceneDepthSampler", sceneDepth.textureId());
         shader.safeGetUniform("InvProjMat").set(invProj);
         shader.safeGetUniform("InvViewRotMat").set(invViewRot);
         shader.safeGetUniform("CameraPos").set(cameraPos.x, cameraPos.y, cameraPos.z);
@@ -137,7 +141,6 @@ public final class VolumetricCloudShadowRenderer {
             FullscreenQuad.draw(shader);
         } finally {
             shader.clear();
-            CloudRenderStateGuard.restoreAfterCloudPass(mainTarget);
         }
     }
 

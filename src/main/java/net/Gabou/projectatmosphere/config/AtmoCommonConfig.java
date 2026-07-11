@@ -24,45 +24,24 @@ public class AtmoCommonConfig {
     }
 
     public enum CloudRaymarchQuality {
-        LOW("LOW", 16, 0.50F, 0.82F, 1.05F, 0.72F, 0.60F, 0.16F, 4, 2),
-        LOW_24("LOW 24", 24, 0.60F, 0.78F, 0.98F, 0.66F, 0.56F, 0.14F, 6, 2),
-        MEDIUM("MEDIUM", 32, 0.75F, 0.70F, 0.85F, 0.55F, 0.85F, 0.30F, 8, 3),
-        HIGH("HIGH", 48, 0.85F, 0.62F, 0.65F, 0.42F, 0.78F, 0.42F, 12, 4),
-        ULTRA("ULTRA", 64, 1.00F, 0.55F, 0.45F, 0.30F, 0.70F, 0.55F, 16, 4);
+        LOW("LOW", 24, 0.25F),
+        LOW_24("LOW 32", 32, 0.375F),
+        MEDIUM("MEDIUM", 40, 0.50F),
+        HIGH("HIGH", 64, 0.50F),
+        ULTRA("ULTRA", 96, 0.75F);
 
         private final String displayName;
         private final int raymarchSteps;
         private final float resolutionScale;
-        private final float temporalHistoryWeight;
-        private final float compositeBlurRadius;
-        private final float compositeBlurStrength;
-        private final float rayJitterStrength;
-        private final float rayJitterTemporalStrength;
-        private final int maxCloudFields;
-        private final int detailOctaves;
 
         CloudRaymarchQuality(
                 String displayName,
                 int raymarchSteps,
-                float resolutionScale,
-                float temporalHistoryWeight,
-                float compositeBlurRadius,
-                float compositeBlurStrength,
-                float rayJitterStrength,
-                float rayJitterTemporalStrength,
-                int maxCloudFields,
-                int detailOctaves
+                float resolutionScale
         ) {
             this.displayName = displayName;
             this.raymarchSteps = raymarchSteps;
             this.resolutionScale = resolutionScale;
-            this.temporalHistoryWeight = temporalHistoryWeight;
-            this.compositeBlurRadius = compositeBlurRadius;
-            this.compositeBlurStrength = compositeBlurStrength;
-            this.rayJitterStrength = rayJitterStrength;
-            this.rayJitterTemporalStrength = rayJitterTemporalStrength;
-            this.maxCloudFields = maxCloudFields;
-            this.detailOctaves = detailOctaves;
         }
 
         /**
@@ -80,34 +59,6 @@ public class AtmoCommonConfig {
 
         public float getResolutionScale() {
             return resolutionScale;
-        }
-
-        public float getTemporalHistoryWeight() {
-            return temporalHistoryWeight;
-        }
-
-        public float getCompositeBlurRadius() {
-            return compositeBlurRadius;
-        }
-
-        public float getCompositeBlurStrength() {
-            return compositeBlurStrength;
-        }
-
-        public float getRayJitterStrength() {
-            return rayJitterStrength;
-        }
-
-        public float getRayJitterTemporalStrength() {
-            return rayJitterTemporalStrength;
-        }
-
-        public int getMaxCloudFields() {
-            return maxCloudFields;
-        }
-
-        public int getDetailOctaves() {
-            return detailOctaves;
         }
 
         /**
@@ -145,13 +96,10 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> CLOUD_DIMENSION_IDS;
     public static final ForgeConfigSpec.BooleanValue ENABLE_CUSTOM_PRECIPITATION_RENDERING;
     public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_SHADOW_MAP;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_LIGHTNING_VISUALS;
     public static final ForgeConfigSpec.BooleanValue ENABLE_CLOUD_MOVEMENT;
     public static final ForgeConfigSpec.BooleanValue FREEZE_CLOUD_MOVEMENT;
     public static final ForgeConfigSpec.DoubleValue CLOUD_WIND_DRIFT_SCALE;
     public static final ForgeConfigSpec.BooleanValue SHADER_SAFE_MODE;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_DISTANT_HORIZONS_ADAPTER;
-    public static final ForgeConfigSpec.BooleanValue ENABLE_VOXY_ADAPTER;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADOES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_HURRICANES;
     public static final ForgeConfigSpec.BooleanValue ENABLE_TORNADO_DESTRUCTION;
@@ -180,7 +128,6 @@ public class AtmoCommonConfig {
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MIN;
     public static final ForgeConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ForgeConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
-    public static final ForgeConfigSpec.BooleanValue TORNADO_ALLOW_LEGACY_FALLBACK;
     public static final ForgeConfigSpec.BooleanValue DISABLE_SIMPLE_CLOUDS_TORNADO_SSBO;
     public static final ForgeConfigSpec.BooleanValue TORNADO_DEBUG_LOGGING;
     public static final ForgeConfigSpec.DoubleValue TORNADO_RENDER_QUALITY;
@@ -283,7 +230,7 @@ public class AtmoCommonConfig {
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
         CLOUD_RAYMARCH_QUALITY = builder
-                .comment("Qualite du raymarch des nuages PA: LOW=16 etapes a 50%, LOW 24=24 etapes a 60%, MEDIUM=32 etapes a 75%, HIGH=48 etapes a 85%, ULTRA=64 etapes a 100%")
+                .comment("Qualite du raymarch volumetrique PA: LOW=24 etapes a 25%, LOW_24=32 etapes a 37.5%, MEDIUM=40 etapes a 50%, HIGH=64 etapes a 50%, ULTRA=96 etapes a 75%")
                 .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
         CLOUD_FIELD_RENDERER_ENABLED = builder
                 .comment("Enable the Project Atmosphere CloudField volume renderer when Simple Clouds is not installed. Disable this as a persistent kill switch to fall back to vanilla clouds.")
@@ -306,9 +253,6 @@ public class AtmoCommonConfig {
         ENABLE_CLOUD_SHADOW_MAP = builder
                 .comment("Enable Project Atmosphere cloud shadow map publication for render, terrain, fog, rainbow, and mod API consumers.")
                 .define("enableCloudShadowMap", true);
-        ENABLE_CLOUD_LIGHTNING_VISUALS = builder
-                .comment("Enable render-only cloud lightning visuals. Gameplay lightning bolts remain controlled separately.")
-                .define("enableCloudLightningVisuals", true);
         ENABLE_CLOUD_MOVEMENT = builder
                 .comment("Enable native Project Atmosphere cloud drift from regional wind.")
                 .define("enableCloudMovement", true);
@@ -321,12 +265,6 @@ public class AtmoCommonConfig {
         SHADER_SAFE_MODE = builder
                 .comment("Prefer conservative cloud rendering paths intended to avoid shader-pack conflicts.")
                 .define("shaderSafeMode", false);
-        ENABLE_DISTANT_HORIZONS_ADAPTER = builder
-                .comment("Enable the Project Atmosphere Distant Horizons render adapter when DH is loaded.")
-                .define("enableDistantHorizonsAdapter", true);
-        ENABLE_VOXY_ADAPTER = builder
-                .comment("Reserve the Project Atmosphere Voxy adapter toggle. No implementation is loaded unless a compatible Voxy port is present.")
-                .define("enableVoxyAdapter", false);
         builder.pop();
 
         builder.push("display");
@@ -449,9 +387,6 @@ public class AtmoCommonConfig {
         TORNADO_CELL_COOLDOWN_MINUTES = builder
                 .comment("Cooldown in minutes before a cell can spawn another tornado")
                 .defineInRange("cellCooldownMinutes", 20, 0, Integer.MAX_VALUE);
-        TORNADO_ALLOW_LEGACY_FALLBACK = builder
-                .comment("Allow falling back to the legacy mesh tornado when the SimpleClouds shader pack lacks the CloudStorms SSBO. Leave false to require the shader-driven funnel.")
-                .define("allowLegacyTornadoFallback", false);
         DISABLE_SIMPLE_CLOUDS_TORNADO_SSBO = builder
                 .comment("Disable Project Atmosphere's Simple Clouds storm SSBO integration. Tornado cloud carving uses safer uniforms; hurricane cloud shaping falls back off when this is enabled.")
                 .define("disableSimpleCloudsTornadoSSBO", false);

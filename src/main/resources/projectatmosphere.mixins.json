@@ -1,5 +1,6 @@
 {
   "required": true,
+  "minVersion": "0.8.5",
   "package": "net.Gabou.projectatmosphere.mixin",
   "compatibilityLevel": "JAVA_17",
   "plugin": "net.Gabou.projectatmosphere.mixin.PAMixinPlugin",
@@ -19,6 +20,7 @@
     "ServerLevelSnowStormMixin"
   ],
   "client": [
+    "client.BlendModeAccessor",
     "CloudMeshGeneratorDiagnosticsAccessor",
     "CloudMeshGeneratorDiagnosticsMixin",
     "CloudMeshGeneratorAccessor",
@@ -27,7 +29,6 @@
     "MultiRegionCloudMeshGeneratorMixin",
     "client.DefaultPipelineTornadoMixin",
     "client.ClientLevelWeatherMixin",
-    "client.MixinGuiVignette",
     "client.MixinGameRenderer",
     "client.MixinMinecraftLevelLifecycle",
     "client.InstanceableMeshDiagnosticsMixin",

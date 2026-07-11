@@ -1,10 +1,6 @@
 package net.Gabou.projectatmosphere.client.hurricane.cache;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneSemantics;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -18,10 +14,11 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class ClientHurricaneStateCache {
+    // Verified against Simple Clouds 0.7.3 SimpleCloudsConstants.CLOUD_SCALE.
+    private static final float SIMPLE_CLOUDS_SCALE = 8.0F;
     private static final int DEFAULT_BLEND_TICKS = 10;
     private static final int STALE_GRACE_TICKS = 60;
     private static final Map<UUID, Entry> ENTRIES = new LinkedHashMap<>();
-    private static final Map<UUID, CloudRegion> RESERVATION_REGIONS = new LinkedHashMap<>();
     private static long cachedSemanticTick = Long.MIN_VALUE;
     private static float cachedSemanticPartialTick = Float.NaN;
     private static List<HurricaneRenderSnapshot> cachedSemanticSnapshots = List.of();
@@ -38,7 +35,6 @@ public final class ClientHurricaneStateCache {
         long clientTick = mc.level != null ? mc.level.getGameTime() : 0L;
 
         Map<UUID, Entry> next = new LinkedHashMap<>();
-        Map<UUID, CloudRegion> nextReservations = new LinkedHashMap<>();
         for (HurricaneRenderSnapshot snapshot : snapshots) {
             Entry previous = ENTRIES.get(snapshot.id());
             if (previous == null) {
@@ -46,7 +42,6 @@ public final class ClientHurricaneStateCache {
             } else {
                 next.put(snapshot.id(), new Entry(previous.current, snapshot, clientTick));
             }
-            nextReservations.put(snapshot.id(), getReservationRegion(snapshot));
         }
         for (Map.Entry<UUID, Entry> existing : ENTRIES.entrySet()) {
             if (next.containsKey(existing.getKey())) {
@@ -55,14 +50,11 @@ public final class ClientHurricaneStateCache {
             Entry entry = existing.getValue();
             if (clientTick - entry.clientUpdateTick <= STALE_GRACE_TICKS) {
                 next.put(existing.getKey(), entry);
-                nextReservations.put(existing.getKey(), getReservationRegion(entry.current));
             }
         }
 
         ENTRIES.clear();
         ENTRIES.putAll(next);
-        RESERVATION_REGIONS.clear();
-        RESERVATION_REGIONS.putAll(nextReservations);
         invalidateSemanticSnapshotCache();
     }
 
@@ -77,14 +69,12 @@ public final class ClientHurricaneStateCache {
         }
         boolean removed = ENTRIES.entrySet().removeIf(entry -> level.getGameTime() - entry.getValue().clientUpdateTick > STALE_GRACE_TICKS);
         if (removed) {
-            RESERVATION_REGIONS.keySet().retainAll(ENTRIES.keySet());
             invalidateSemanticSnapshotCache();
         }
     }
 
     public static void clear() {
         ENTRIES.clear();
-        RESERVATION_REGIONS.clear();
         invalidateSemanticSnapshotCache();
     }
 
@@ -108,9 +98,7 @@ public final class ClientHurricaneStateCache {
             return cachedSemanticSnapshots;
         }
 
-        List<HurricaneRenderSnapshot> snapshots = ENTRIES.isEmpty()
-                ? projectatmosphere$getIntegratedServerSnapshots(mc)
-                : buildInterpolatedSnapshots(clientTick, partialTick);
+        List<HurricaneRenderSnapshot> snapshots = buildInterpolatedSnapshots(clientTick, partialTick);
         cachedSemanticTick = clientTick;
         cachedSemanticPartialTick = partialTick;
         cachedSemanticSnapshots = snapshots;
@@ -160,47 +148,7 @@ public final class ClientHurricaneStateCache {
         if (!ENTRIES.isEmpty()) {
             return true;
         }
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || !mc.hasSingleplayerServer()) {
-            return false;
-        }
-        return !HurricaneManager.getActiveHurricanes().isEmpty();
-    }
-
-    public static CloudRegion getReservationRegion(HurricaneRenderSnapshot snapshot) {
-        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            return null;
-        }
-        CloudRegion region = RESERVATION_REGIONS.get(snapshot.id());
-        if (region == null) {
-            region = HurricaneSemantics.createReservationRegion(snapshot);
-            RESERVATION_REGIONS.put(snapshot.id(), region);
-        } else {
-            HurricaneSemantics.updateReservationRegion(region, snapshot);
-        }
-        return region;
-    }
-
-    private static List<HurricaneRenderSnapshot> projectatmosphere$getIntegratedServerSnapshots(Minecraft mc) {
-        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            return List.of();
-        }
-        if (!mc.hasSingleplayerServer()) {
-            return List.of();
-        }
-        var server = mc.getSingleplayerServer();
-        if (server == null) {
-            return List.of();
-        }
-        List<net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance> active = HurricaneManager.getActiveHurricanes();
-        if (active.isEmpty()) {
-            return List.of();
-        }
-        List<HurricaneRenderSnapshot> snapshots = new ArrayList<>(active.size());
-        for (net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance hurricane : active) {
-            snapshots.add(hurricane.createRenderSnapshot());
-        }
-        return snapshots;
+        return false;
     }
 
     private static void invalidateSemanticSnapshotCache() {
@@ -223,20 +171,20 @@ public final class ClientHurricaneStateCache {
         for (HurricaneRenderSnapshot snapshot : snapshots) {
             renderables.add(new RenderableHurricane(
                     snapshot.id(),
-                    snapshot.centerX() / (double)SimpleCloudsConstants.CLOUD_SCALE,
-                    snapshot.centerZ() / (double)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.centerX() / (double)SIMPLE_CLOUDS_SCALE,
+                    snapshot.centerZ() / (double)SIMPLE_CLOUDS_SCALE,
                     snapshot.anchorY(),
-                    snapshot.coreRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    snapshot.stormExtentRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    snapshot.eyeRadius() / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    snapshot.edgeFade() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.coreRadius() / SIMPLE_CLOUDS_SCALE,
+                    snapshot.stormExtentRadius() / SIMPLE_CLOUDS_SCALE,
+                    snapshot.eyeRadius() / SIMPLE_CLOUDS_SCALE,
+                    snapshot.edgeFade() / SIMPLE_CLOUDS_SCALE,
                     snapshot.bandCount(),
-                    snapshot.bandWidth() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.bandWidth() / SIMPLE_CLOUDS_SCALE,
                     snapshot.spiralTightness(),
                     snapshot.rotationPhase(),
                     snapshot.rotationSpeed(),
-                    snapshot.transitionStart() / (float)SimpleCloudsConstants.CLOUD_SCALE,
-                    snapshot.transitionEnd() / (float)SimpleCloudsConstants.CLOUD_SCALE,
+                    snapshot.transitionStart() / SIMPLE_CLOUDS_SCALE,
+                    snapshot.transitionEnd() / SIMPLE_CLOUDS_SCALE,
                     snapshot.cloudTypeId(),
                     snapshot.ageTicks(),
                     Mth.clamp(snapshot.normalizedIntensity(), 0.0F, 1.0F),

@@ -85,7 +85,7 @@ public final class AtmosphereCloudRegionTracker {
         }
         CLOUD_REGIONS.add(cloudRegion);
         if (WeatherType.isRainy(cloudRegion.getCloudTypeId())) {
-            SeasonTimeHelper.onRainStarted(level, cloudRegion);
+            SeasonTimeHelper.onRainStarted(level, regionId(cloudRegion));
         }
     }
 
@@ -95,7 +95,13 @@ public final class AtmosphereCloudRegionTracker {
         }
         CLOUD_REGIONS.remove(cloudRegion);
         if (WeatherType.isRainy(cloudRegion.getCloudTypeId())) {
-            SeasonTimeHelper.onRainEnded(level, cloudRegion);
+            SeasonTimeHelper.onRainEnded(level, regionId(cloudRegion));
         }
+    }
+
+    private static int regionId(CloudRegion cloudRegion) {
+        return cloudRegion instanceof net.Gabou.projectatmosphere.util.ICloudRegionId id
+                ? id.projectatmosphere$getId()
+                : -1;
     }
 }

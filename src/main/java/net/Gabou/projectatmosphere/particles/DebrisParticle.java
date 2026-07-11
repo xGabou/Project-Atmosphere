@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.particles;
 
-import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
@@ -8,13 +7,11 @@ import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.particle.TextureSheetParticle;
 
-import java.lang.ref.WeakReference;
-
 /**
  * Particle representing debris swirling around a tornado.
  */
 public class DebrisParticle extends TextureSheetParticle {
-    private final WeakReference<TornadoInstance> tornadoRef;
+    private final DebrisOrbitSource orbitSource;
     private final double radius;
     private final double baseY;
     private final float angularSpeed;
@@ -23,10 +20,10 @@ public class DebrisParticle extends TextureSheetParticle {
     private final int band;
     private final float startAngle;
 
-    protected DebrisParticle(ClientLevel level, TornadoInstance tornado, double radius, double height, float angularSpeed,
+    protected DebrisParticle(ClientLevel level, DebrisOrbitSource orbitSource, double radius, double height, float angularSpeed,
                              float verticalDrift, float radialJitter, int band) {
-        super(level, tornado.getRenderPosition(1.0F).x, tornado.getRenderBottomY(1.0F) + height, tornado.getRenderPosition(1.0F).z, 0, 0, 0);
-        this.tornadoRef = new WeakReference<>(tornado);
+        super(level, orbitSource.renderPosition(1.0F).x, orbitSource.renderBottomY(1.0F) + height, orbitSource.renderPosition(1.0F).z, 0, 0, 0);
+        this.orbitSource = orbitSource;
         this.radius = radius;
         this.baseY = height;
         this.angularSpeed = angularSpeed;
@@ -56,13 +53,12 @@ public class DebrisParticle extends TextureSheetParticle {
 
     @Override
     public void tick() {
-        TornadoInstance tornado = tornadoRef.get();
-        if (tornado == null) {
+        if (orbitSource == null || !orbitSource.isAlive()) {
             remove();
             return;
         }
-        var renderPos = tornado.getRenderPosition(1.0F);
-        float renderBottomY = tornado.getRenderBottomY(1.0F);
+        var renderPos = orbitSource.renderPosition(1.0F);
+        float renderBottomY = orbitSource.renderBottomY(1.0F);
         float lifeProgress = this.lifetime <= 0 ? 1.0F : (float) this.age / (float) this.lifetime;
         float bandSpinBoost = switch (this.band) {
             case 0 -> 1.25F;
@@ -70,8 +66,8 @@ public class DebrisParticle extends TextureSheetParticle {
             default -> 1.05F;
         };
         float angle = startAngle
-                + tornado.getTwist() * 96.0F * bandSpinBoost
-                + (tornado.getLifetimeSeconds() * 20 + this.age) * angularSpeed;
+                + orbitSource.twist() * 96.0F * bandSpinBoost
+                + (orbitSource.lifetimeSeconds() * 20 + this.age) * angularSpeed;
         double rad = Math.toRadians(angle);
         double rise = this.baseY + this.age * this.verticalDrift + switch (this.band) {
             case 0 -> Math.sin((this.age + this.startAngle) * 0.10F) * 0.24D;
@@ -116,7 +112,7 @@ public class DebrisParticle extends TextureSheetParticle {
         public Particle createParticle(DebrisParticleData data, ClientLevel level, double x, double y, double z, double vx, double vy, double vz) {
             DebrisParticle particle = new DebrisParticle(
                     level,
-                    data.tornado(),
+                    data.orbitSource(),
                     data.radius(),
                     data.height(),
                     data.angularSpeed(),

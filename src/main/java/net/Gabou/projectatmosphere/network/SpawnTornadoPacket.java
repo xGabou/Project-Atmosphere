@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.network.NetworkEvent;
@@ -67,7 +66,16 @@ public class SpawnTornadoPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            TornadoManager.spawnClient(id, pos, radius, new WindVector(speed, angle, gust), bottomY, height);
+            SevereWeatherClientPacketHandlers.spawnTornado(
+                    new SevereWeatherClientPacketHandlers.TornadoSpawn(
+                            id,
+                            pos,
+                            radius,
+                            new WindVector(speed, angle, gust),
+                            bottomY,
+                            height
+                    )
+            );
         });
         ctx.get().setPacketHandled(true);
     }

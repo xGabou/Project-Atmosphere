@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.client.render;
 import dev.nonamecrackers2.simpleclouds.common.config.SimpleCloudsConfig;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
+import net.Gabou.projectatmosphere.particles.DebrisOrbitSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -95,6 +96,32 @@ public final class TornadoClientEffects {
 
     private static void spawnBand(ClientLevel level, TornadoInstance tornado, int count, double maxRadius, double maxHeight,
                                   float angularSpeed, float verticalDrift, float radialJitter, int band) {
+        DebrisOrbitSource orbitSource = new DebrisOrbitSource() {
+            @Override
+            public Vec3 renderPosition(float partialTick) {
+                return tornado.getRenderPosition(partialTick);
+            }
+
+            @Override
+            public float renderBottomY(float partialTick) {
+                return tornado.getRenderBottomY(partialTick);
+            }
+
+            @Override
+            public float twist() {
+                return tornado.getTwist();
+            }
+
+            @Override
+            public float lifetimeSeconds() {
+                return tornado.getLifetimeSeconds();
+            }
+
+            @Override
+            public boolean isAlive() {
+                return !tornado.isDead();
+            }
+        };
         for (int i = 0; i < count; i++) {
             double radius = Math.sqrt(level.random.nextDouble()) * Math.max(0.6D, maxRadius);
             double height = level.random.nextDouble() * Math.max(1.0D, maxHeight);
@@ -103,7 +130,7 @@ public final class TornadoClientEffects {
             float localRadialJitter = radialJitter * (0.65F + level.random.nextFloat() * 0.70F);
 
             level.addParticle(
-                    new DebrisParticleData(tornado, radius, height, localAngularSpeed, localVerticalDrift, localRadialJitter, band),
+                    new DebrisParticleData(orbitSource, radius, height, localAngularSpeed, localVerticalDrift, localRadialJitter, band),
                     tornado.getRenderPosition(1.0F).x,
                     tornado.getRenderBottomY(1.0F),
                     tornado.getRenderPosition(1.0F).z,

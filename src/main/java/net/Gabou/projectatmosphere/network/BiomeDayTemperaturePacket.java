@@ -1,12 +1,11 @@
 package net.Gabou.projectatmosphere.network;
 
-import net.Gabou.projectatmosphere.client.ClientSyncLock;
-import net.Gabou.projectatmosphere.client.loading.ClientForecastLoadingWorkQueue;
-import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
-import net.Gabou.projectatmosphere.client.loading.ForecastLoadingState;
+import net.Gabou.projectatmosphere.client.ClientPacketHandlers;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -57,16 +56,10 @@ public class BiomeDayTemperaturePacket {
      */
     public static void handle(BiomeDayTemperaturePacket msg, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            int profileCount = msg.temperatureDayMap.size();
-            ClientSyncLock.setReadyForLocalPlayer(false);
-            ForecastLoadingState.update(
-                    ForecastLoadingStage.RECEIVING_FORECAST_DATA,
-                    null,
-                    profileCount > 0 ? profileCount + " biome profiles received" : "Forecast snapshot received",
-                    0.5F,
-                    "biome_day_temperature_received"
+            DistExecutor.unsafeRunWhenOn(
+                    Dist.CLIENT,
+                    () -> () -> ClientPacketHandlers.handleBiomeDayTemperatures(msg.temperatureDayMap)
             );
-            ClientForecastLoadingWorkQueue.queueForecastSnapshot(msg.temperatureDayMap, "biome_day_temperature_packet");
         });
         ctx.get().setPacketHandled(true);
     }

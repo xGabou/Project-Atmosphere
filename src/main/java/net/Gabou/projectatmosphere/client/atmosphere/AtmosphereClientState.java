@@ -1,10 +1,9 @@
 package net.Gabou.projectatmosphere.client.atmosphere;
 
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
 import net.Gabou.projectatmosphere.client.fog.FogBiomeClassifier;
 import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.clouds.service.OptionalCloudQueries;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -126,7 +125,7 @@ public final class AtmosphereClientState {
     private static float estimateFallbackCloudCover(ClientLevel level, BlockPos pos, float fallbackRain) {
         try {
             boolean b = AtmosphereCloudServices.isSimpleCloudsLoaded() ?
-                    SimpleCloudsCompat.isCloudAtPos(level,pos) :
+                    OptionalCloudQueries.isCloudAt(level, pos) :
                     WeatherCloudQueries.getCloudRegionAt(level, pos) != null;
 
             return b ? Math.max(0.65F, fallbackRain)

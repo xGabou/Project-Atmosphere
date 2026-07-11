@@ -1,11 +1,9 @@
 package net.Gabou.projectatmosphere.modules.weather;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.clouds.service.OptionalCloudQueries;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -77,15 +75,6 @@ public final class StormSeverityScale {
     }
 
     public static int sampleCloudLevel(ServerLevel level, BlockPos pos) {
-        int strongest = MIN_LEVEL;
-        for (CloudRegion region : CloudManager.get(level).getClouds()) {
-            double dx = region.getWorldX() - pos.getX();
-            double dz = region.getWorldZ() - pos.getZ();
-            double radius = region.getRadius();
-            if (dx * dx + dz * dz <= radius * radius) {
-                strongest = Math.max(strongest, CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId()));
-            }
-        }
-        return clamp(strongest);
+        return clamp(OptionalCloudQueries.sampleSeverity(level, pos));
     }
 }

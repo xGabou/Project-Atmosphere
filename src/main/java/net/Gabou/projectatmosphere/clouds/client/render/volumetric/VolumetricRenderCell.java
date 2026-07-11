@@ -3,7 +3,11 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.CloudletLayout;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.Locale;
 
 /**
  * Minimal render-side view of one cloud cell for weather-map splatting and
@@ -21,6 +25,13 @@ public record VolumetricRenderCell(
         float density,
         float edgeSoftness,
         float energy,
+        int cloudProfile,
+        int morphologyFamily,
+        float verticalDevelopment,
+        float humidity,
+        float anvilStrength,
+        float precipitationIntensity,
+        float lifecycleStage,
         float seed01,
         float funnelStrength,
         float funnelGroundY,
@@ -38,6 +49,15 @@ public record VolumetricRenderCell(
                 cell.density(),
                 cell.edgeSoftness(),
                 cell.energy(),
+                profileFor(cell.classification()),
+                morphologyFor(cell.classification()).ordinal(),
+                Mth.clamp(cell.verticalExtentRatio(), 0.0F, 1.0F),
+                cell.density(),
+                cell.classification() == net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification.CUMULONIMBUS
+                        ? cell.energy() : 0.0F,
+                cell.classification() == net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification.CUMULONIMBUS
+                        ? cell.energy() : 0.0F,
+                lifecycleFor(cell.phase()),
                 (cell.seed() & 0xFFFFL) / 65535.0F,
                 cell.funnelStrength(),
                 cell.funnelGroundY(),
@@ -59,6 +79,13 @@ public record VolumetricRenderCell(
                 Math.min(1.0F, effectiveDensity * (0.55F + 0.45F * effectiveCoverage) * Math.max(0.4F, snapshot.hydrationProgress())),
                 1.0F - effectiveCoverage * 0.6F,
                 snapshot.stormPotential(),
+                profileFor(snapshot),
+                snapshot.morphologyFamily().ordinal(),
+                snapshot.verticalDevelopment(),
+                snapshot.humidityInfluence(),
+                snapshot.anvilStrength(),
+                snapshot.precipitationIntensity(),
+                snapshot.lifecycleStage(),
                 (snapshot.seed() & 0xFFFFL) / 65535.0F,
                 0.0F,
                 0.0F,
@@ -96,10 +123,84 @@ public record VolumetricRenderCell(
                 effectiveDensity,
                 0.42F,
                 snapshot.stormPotential(),
+                profileFor(snapshot),
+                snapshot.morphologyFamily().ordinal(),
+                snapshot.verticalDevelopment(),
+                snapshot.humidityInfluence(),
+                snapshot.anvilStrength(),
+                snapshot.precipitationIntensity(),
+                snapshot.lifecycleStage(),
                 (seed & 0xFFFFL) / 65535.0F,
                 0.0F,
                 0.0F,
                 0.0F
         );
+    }
+
+    private static int profileFor(String cloudTypeId, CloudMorphologyFamily morphology) {
+        String id = cloudTypeId == null ? "" : cloudTypeId.toLowerCase(Locale.ROOT);
+        if (id.contains("supercell") || id.contains("hurricane")
+                || morphology == CloudMorphologyFamily.SPIRAL_STORM) {
+            return 7;
+        }
+        if (id.contains("cumulonimbus") || morphology == CloudMorphologyFamily.STORM_ANVIL) {
+            return 4;
+        }
+        if (id.contains("nimbostratus")) {
+            return 5;
+        }
+        if (id.contains("stratocumulus") || morphology == CloudMorphologyFamily.CELLULAR_SHEET) {
+            return 2;
+        }
+        if (id.contains("stratus") || morphology == CloudMorphologyFamily.SHEET) {
+            return 1;
+        }
+        if (id.contains("cirrus") || morphology == CloudMorphologyFamily.FILAMENT) {
+            return 6;
+        }
+        if (id.contains("cumulus") || morphology == CloudMorphologyFamily.PUFF
+                || morphology == CloudMorphologyFamily.TOWER) {
+            return 3;
+        }
+        return 0;
+    }
+
+    /** Returns the stable shader profile encoded for one canonical field snapshot. */
+    public static int profileFor(CloudFieldSnapshot snapshot) {
+        return profileFor(snapshot.cloudTypeId(), snapshot.morphologyFamily());
+    }
+
+    private static int profileFor(net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification classification) {
+        return switch (classification) {
+            case STRATUS -> 1;
+            case STRATOCUMULUS -> 2;
+            case CUMULUS_HUMILIS, CUMULUS_MEDIOCRIS, CUMULUS_CONGESTUS -> 3;
+            case CUMULONIMBUS -> 4;
+            case CIRRIFORM -> 6;
+            case UNCLASSIFIED -> 0;
+        };
+    }
+
+    private static CloudMorphologyFamily morphologyFor(
+            net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification classification
+    ) {
+        return switch (classification) {
+            case STRATUS -> CloudMorphologyFamily.SHEET;
+            case STRATOCUMULUS -> CloudMorphologyFamily.CELLULAR_SHEET;
+            case CUMULUS_CONGESTUS -> CloudMorphologyFamily.TOWER;
+            case CUMULONIMBUS -> CloudMorphologyFamily.STORM_ANVIL;
+            case CIRRIFORM -> CloudMorphologyFamily.FILAMENT;
+            case CUMULUS_HUMILIS, CUMULUS_MEDIOCRIS, UNCLASSIFIED -> CloudMorphologyFamily.PUFF;
+        };
+    }
+
+    private static float lifecycleFor(
+            net.Gabou.projectatmosphere.clouds.cell.CloudCellLifecyclePhase phase
+    ) {
+        return switch (phase) {
+            case FORMING -> 0.20F;
+            case MATURE -> 0.50F;
+            case DISSIPATING -> 0.85F;
+        };
     }
 }

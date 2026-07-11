@@ -3,7 +3,6 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.util.Mth;
 import org.lwjgl.opengl.GL20;
@@ -24,9 +23,17 @@ public final class CloudWeatherMapRenderer {
     private static final float[] posRadiusArray = new float[MAX_CELLS * 4];
     private static final float[] shapeArray = new float[MAX_CELLS * 4];
     private static final float[] mediaArray = new float[MAX_CELLS * 4];
+    private static final float[] morphologyArray = new float[MAX_CELLS * 4];
+    private static final float[] dynamicsArray = new float[MAX_CELLS * 4];
 
     private static double lastOriginX;
     private static double lastOriginZ;
+    private static long lastInputSignature = Long.MIN_VALUE;
+    private static int lastWeatherTextureId = -1;
+    private static int lastMorphologyTextureId = -1;
+    private static Result lastResult = Result.EMPTY;
+    private static long cacheHits;
+    private static long cacheMisses;
 
     private CloudWeatherMapRenderer() {
     }
@@ -83,6 +90,17 @@ public final class CloudWeatherMapRenderer {
         return lastOriginZ;
     }
 
+    public static String cacheStatus() {
+        return "weatherMapCacheHits=" + cacheHits + " misses=" + cacheMisses;
+    }
+
+    public static void invalidateCache() {
+        lastInputSignature = Long.MIN_VALUE;
+        lastWeatherTextureId = -1;
+        lastMorphologyTextureId = -1;
+        lastResult = Result.EMPTY;
+    }
+
     /**
      * Renders the weather map for this frame.
      *
@@ -110,11 +128,13 @@ public final class CloudWeatherMapRenderer {
             int mapSize
     ) {
         ShaderInstance shader = VolumetricCloudShaders.splatShader();
-        if (shader == null) {
+        ShaderInstance morphologyShader = VolumetricCloudShaders.morphologySplatShader();
+        if (shader == null || morphologyShader == null) {
             return Result.EMPTY;
         }
         RenderTarget target = VolumetricCloudRenderTargets.prepareWeatherTarget(mapSize);
-        if (target == null) {
+        RenderTarget morphologyTarget = VolumetricCloudRenderTargets.prepareMorphologyTarget(mapSize);
+        if (target == null || morphologyTarget == null) {
             return Result.EMPTY;
         }
 
@@ -177,6 +197,14 @@ public final class CloudWeatherMapRenderer {
             float projectedRadiusTexels = averageRadiusWorld / Math.max(texelSize, 0.001F);
             float adaptiveScale = adaptiveFootprintScale(projectedRadiusTexels, adaptiveFootprint);
             mediaArray[base + 3] = adaptiveScale;
+            morphologyArray[base] = cell.cloudProfile();
+            morphologyArray[base + 1] = cell.morphologyFamily();
+            morphologyArray[base + 2] = cell.verticalDevelopment();
+            morphologyArray[base + 3] = cell.humidity();
+            dynamicsArray[base] = cell.anvilStrength();
+            dynamicsArray[base + 1] = cell.precipitationIntensity();
+            dynamicsArray[base + 2] = cell.lifecycleStage();
+            dynamicsArray[base + 3] = 0.0F;
             if (Float.isFinite(projectedRadiusTexels)) {
                 float effectiveRadiusTexels = projectedRadiusTexels * adaptiveScale * manualCoverageScale;
                 minAdaptiveScale = Math.min(minAdaptiveScale, adaptiveScale);
@@ -203,6 +231,31 @@ public final class CloudWeatherMapRenderer {
                         maxEffectiveRadiusTexels
                 );
 
+        long inputSignature = inputSignature(
+                originX,
+                originZ,
+                slabBase,
+                slabTop,
+                count,
+                effectiveRegional,
+                regionalEnergy,
+                includeRegionalLayer,
+                worldTime,
+                mapSize,
+                manualCoverageScale,
+                adaptiveFootprint
+        );
+        int weatherTextureId = target.getColorTextureId();
+        int morphologyTextureId = morphologyTarget.getColorTextureId();
+        if (inputSignature == lastInputSignature
+                && weatherTextureId == lastWeatherTextureId
+                && morphologyTextureId == lastMorphologyTextureId
+                && lastResult.rendered()) {
+            cacheHits++;
+            return lastResult;
+        }
+        cacheMisses++;
+
         VolumetricCloudRenderTargets.clearAndBind(target);
         RenderSystem.disableBlend();
         RenderSystem.disableDepthTest();
@@ -223,14 +276,35 @@ public final class CloudWeatherMapRenderer {
         shader.safeGetUniform("WorldTime").set(worldTime);
         shader.safeGetUniform("CellCount").set(count);
         shader.apply();
-        uploadCellArrays(shader, count);
+        uploadCellArrays(shader, false);
         try {
             FullscreenQuad.draw(shader);
         } finally {
             shader.clear();
-            CloudRenderStateGuard.restoreAfterCloudPass();
         }
-        return new Result(true, originX, originZ, slabBase, slabTop, count, footprintStats);
+
+        VolumetricCloudRenderTargets.clearAndBind(morphologyTarget);
+        RenderSystem.setShader(() -> morphologyShader);
+        morphologyShader.safeGetUniform("WeatherOrigin").set((float) originX, (float) originZ);
+        morphologyShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
+        morphologyShader.safeGetUniform("RegionalCoverage").set(effectiveRegional);
+        morphologyShader.safeGetUniform("RegionalEnergy").set(Mth.clamp(regionalEnergy, 0.0F, 1.0F));
+        morphologyShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
+        morphologyShader.safeGetUniform("WorldTime").set(worldTime);
+        morphologyShader.safeGetUniform("CellCount").set(count);
+        morphologyShader.apply();
+        uploadCellArrays(morphologyShader, true);
+        try {
+            FullscreenQuad.draw(morphologyShader);
+        } finally {
+            morphologyShader.clear();
+        }
+        Result result = new Result(true, originX, originZ, slabBase, slabTop, count, footprintStats);
+        lastInputSignature = inputSignature;
+        lastWeatherTextureId = weatherTextureId;
+        lastMorphologyTextureId = morphologyTextureId;
+        lastResult = result;
+        return result;
     }
 
     static float adaptiveFootprintScale(float projectedRadiusTexels, boolean enabled) {
@@ -249,15 +323,18 @@ public final class CloudWeatherMapRenderer {
      * Uploads the per-cell arrays directly; the vanilla uniform system only
      * supports vec4-sized uniforms, so array uniforms go through raw GL.
      */
-    private static void uploadCellArrays(ShaderInstance shader, int count) {
+    private static void uploadCellArrays(ShaderInstance shader, boolean includeMorphology) {
         int program = shader.getId();
-        int safeCount = Math.max(1, Math.min(count, MAX_CELLS));
-        uploadVec4Array(program, "CellPosRadius", posRadiusArray, safeCount);
-        uploadVec4Array(program, "CellShape", shapeArray, safeCount);
-        uploadVec4Array(program, "CellMedia", mediaArray, safeCount);
+        uploadVec4Array(program, "CellPosRadius", posRadiusArray);
+        uploadVec4Array(program, "CellShape", shapeArray);
+        uploadVec4Array(program, "CellMedia", mediaArray);
+        if (includeMorphology) {
+            uploadVec4Array(program, "CellMorphology", morphologyArray);
+        }
+        uploadVec4Array(program, "CellDynamics", dynamicsArray);
     }
 
-    private static void uploadVec4Array(int program, String name, float[] values, int vec4Count) {
+    private static void uploadVec4Array(int program, String name, float[] values) {
         int location = GL20.glGetUniformLocation(program, name);
         if (location < 0) {
             location = GL20.glGetUniformLocation(program, name + "[0]");
@@ -265,9 +342,62 @@ public final class CloudWeatherMapRenderer {
         if (location < 0) {
             return;
         }
-        // Upload only the used prefix of the array.
-        float[] slice = new float[vec4Count * 4];
-        System.arraycopy(values, 0, slice, 0, slice.length);
-        GL20.glUniform4fv(location, slice);
+        // The shader gates access with CellCount. Uploading the preallocated
+        // backing array avoids five per-frame slice allocations.
+        GL20.glUniform4fv(location, values);
+    }
+
+    private static long inputSignature(
+            double originX,
+            double originZ,
+            float slabBase,
+            float slabTop,
+            int count,
+            float regionalCoverage,
+            float regionalEnergy,
+            boolean includeRegionalLayer,
+            float worldTime,
+            int mapSize,
+            float coverageScale,
+            boolean adaptiveFootprint
+    ) {
+        long hash = 0xcbf29ce484222325L;
+        hash = mix(hash, quantize(originX, 1.0D));
+        hash = mix(hash, quantize(originZ, 1.0D));
+        hash = mix(hash, quantize(slabBase, 8.0D));
+        hash = mix(hash, quantize(slabTop, 8.0D));
+        hash = mix(hash, count);
+        hash = mix(hash, mapSize);
+        hash = mix(hash, quantize(regionalCoverage, 512.0D));
+        hash = mix(hash, quantize(regionalEnergy, 512.0D));
+        hash = mix(hash, quantize(coverageScale, 512.0D));
+        hash = mix(hash, includeRegionalLayer ? 1L : 0L);
+        hash = mix(hash, adaptiveFootprint ? 1L : 0L);
+        if (includeRegionalLayer && regionalCoverage > 0.01F) {
+            // The broad regional sheet is animated; two-tick cadence keeps it
+            // moving while avoiding a full map rebuild every rendered frame.
+            hash = mix(hash, (long) Math.floor(worldTime * 0.5F));
+        }
+        for (int i = 0; i < count * 4; i++) {
+            double positionScale = (i & 3) < 2 ? 2.0D : 8.0D;
+            hash = mix(hash, quantize(posRadiusArray[i], positionScale));
+            hash = mix(hash, quantize(shapeArray[i], 1024.0D));
+            hash = mix(hash, quantize(mediaArray[i], 1024.0D));
+            hash = mix(hash, quantize(morphologyArray[i], 1024.0D));
+            hash = mix(hash, quantize(dynamicsArray[i], 1024.0D));
+        }
+        return hash;
+    }
+
+    private static long quantize(double value, double scale) {
+        if (!Double.isFinite(value)) {
+            return 0L;
+        }
+        return Math.round(value * scale);
+    }
+
+    private static long mix(long hash, long value) {
+        long mixed = hash ^ value;
+        return mixed * 0x100000001b3L;
     }
 }

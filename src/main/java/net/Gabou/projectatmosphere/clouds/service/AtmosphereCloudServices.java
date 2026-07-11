@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.service;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsAtmosphereCloudService;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraftforge.fml.ModList;
 
@@ -45,10 +44,29 @@ public final class AtmosphereCloudServices {
         }
         if (isSimpleCloudsLoaded()) {
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; using Simple Clouds cloud service.");
-            return new SimpleCloudsAtmosphereCloudService();
+            return createOptionalService(
+                    "net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsAtmosphereCloudService"
+            );
         }
 
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds absent; using native PA cloud service.");
         return new NativeAtmosphereCloudService();
+    }
+
+    private static AtmosphereCloudService createOptionalService(String className) {
+        try {
+            Class<?> serviceClass = Class.forName(className, true, AtmosphereCloudServices.class.getClassLoader());
+            if (!AtmosphereCloudService.class.isAssignableFrom(serviceClass)) {
+                throw new IllegalStateException(className + " does not implement AtmosphereCloudService");
+            }
+            return (AtmosphereCloudService) serviceClass.getConstructor().newInstance();
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            ProjectAtmosphere.LOGGER.error(
+                    "[Atmosphere] Optional cloud backend {} failed to initialize; its visual renderer remains owner but PA integration is disabled.",
+                    className,
+                    exception
+            );
+            return new DisabledAtmosphereCloudService();
+        }
     }
 }

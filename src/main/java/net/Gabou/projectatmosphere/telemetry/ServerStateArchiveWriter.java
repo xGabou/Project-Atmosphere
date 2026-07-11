@@ -5,6 +5,8 @@ import com.google.gson.GsonBuilder;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationSavedData;
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationState;
+import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
+import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
@@ -20,15 +22,10 @@ import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
 import net.Gabou.projectatmosphere.modules.atmosphere.WeakLowManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.WeakLowState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneInstance;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.storm.GlobalStormHistoryData;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoSnapshot;
+import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.modules.weather.ServerWeatherStateResolver;
 import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
 import net.Gabou.projectatmosphere.modules.weathercell.WeatherCellManager;
@@ -82,8 +79,10 @@ public final class ServerStateArchiveWriter {
         List<AtmosphereRegionExport> atmosphereRegions = captureAtmosphereRegions(primaryLevel, gameTime);
         List<CycloneExport> cyclones = captureCyclones();
         List<WeakLowExport> weakLows = captureWeakLows();
-        List<TornadoExport> tornadoes = captureTornadoes();
-        List<HurricaneExport> hurricanes = captureHurricanes();
+        List<TornadoExport> tornadoes = new ArrayList<>(captureNativeTornadoes(primaryLevel));
+        tornadoes.addAll(SevereWeatherArchiveBridge.captureTornadoes());
+        tornadoes.sort(Comparator.comparing(TornadoExport::id));
+        List<HurricaneExport> hurricanes = SevereWeatherArchiveBridge.captureHurricanes();
         List<RawNbtSnapshot> globalSnapshots = captureGlobalSnapshots(primaryLevel);
 
         ServerManifest manifest = new ServerManifest(
@@ -299,66 +298,48 @@ public final class ServerStateArchiveWriter {
                 .toList();
     }
 
-    private static List<TornadoExport> captureTornadoes() {
+    private static List<TornadoExport> captureNativeTornadoes(ServerLevel level) {
+        if (level == null) {
+            return List.of();
+        }
         List<TornadoExport> out = new ArrayList<>();
-        for (TornadoInstance tornado : TornadoManager.getActiveTornadoes()) {
-            if (tornado == null) {
+        for (CloudCell cell : CloudCellSimulationManager.getInstance().nativeTornadoCells(level)) {
+            if (cell == null || cell.funnelStrength() <= 0.001F) {
                 continue;
             }
-            TornadoSnapshot snapshot = tornado.snapshot();
+            float windSpeed = (float) Math.hypot(cell.wind().x(), cell.wind().z());
+            float windAngle = (float) Math.atan2(cell.wind().z(), cell.wind().x());
+            float funnelRadius = Math.max(10.0F, cell.radiusMinor() * 0.16F);
+            float visualHeight = Math.max(1.0F, cell.baseY() + 4.0F - cell.funnelGroundY());
+            CompoundTag tag = new CompoundTag();
+            tag.putString("backend", "pa_native_cloud_cell");
+            tag.putUUID("cellId", cell.id());
+            tag.putString("dimension", cell.dimensionId());
+            tag.putString("classification", cell.classification().name());
+            tag.putString("phase", cell.phase().name());
+            tag.putFloat("funnelStrength", cell.funnelStrength());
+            tag.putFloat("energy", cell.energy());
+            tag.putLong("ageTicks", cell.ageTicks());
             out.add(new TornadoExport(
-                    snapshot.id().toString(),
-                    snapshot.position().x,
-                    snapshot.position().y,
-                    snapshot.position().z,
-                    snapshot.radius(),
-                    snapshot.visualBottomY(),
-                    snapshot.visualHeight(),
-                    snapshot.windSpeed(),
-                    snapshot.windAngle(),
-                    snapshot.windGust(),
-                    snapshot.normalizedIntensity(),
-                    snapshot.stormLevel(),
-                    snapshot.recentDebrisScore(),
-                    snapshot.formationProgress(),
-                    snapshot.phase().name(),
-                    tornado.toPersistentTag().toString()
+                    cell.id().toString(),
+                    cell.x(),
+                    cell.funnelGroundY(),
+                    cell.z(),
+                    funnelRadius,
+                    cell.funnelGroundY(),
+                    visualHeight,
+                    windSpeed,
+                    windAngle,
+                    0.0F,
+                    cell.funnelStrength(),
+                    StormSeverityScale.fromNormalized(Math.max(cell.energy(), cell.funnelStrength())),
+                    0.0F,
+                    cell.funnelStrength(),
+                    cell.phase().name(),
+                    tag.toString()
             ));
         }
         out.sort(Comparator.comparing(TornadoExport::id));
-        return out;
-    }
-
-    private static List<HurricaneExport> captureHurricanes() {
-        List<HurricaneExport> out = new ArrayList<>();
-        for (HurricaneInstance hurricane : HurricaneManager.getActiveHurricanes()) {
-            if (hurricane == null) {
-                continue;
-            }
-            HurricaneRenderSnapshot snapshot = hurricane.createRenderSnapshot();
-            out.add(new HurricaneExport(
-                    snapshot.id().toString(),
-                    snapshot.centerX(),
-                    snapshot.centerZ(),
-                    snapshot.anchorY(),
-                    snapshot.coreRadius(),
-                    snapshot.stormExtentRadius(),
-                    snapshot.eyeRadius(),
-                    snapshot.edgeFade(),
-                    snapshot.bandCount(),
-                    snapshot.bandWidth(),
-                    snapshot.spiralTightness(),
-                    snapshot.rotationPhase(),
-                    snapshot.rotationSpeed(),
-                    snapshot.transitionStart(),
-                    snapshot.transitionEnd(),
-                    snapshot.normalizedIntensity(),
-                    snapshot.cloudTypeId().toString(),
-                    snapshot.ageTicks(),
-                    hurricane.toPersistentTag().toString()
-            ));
-        }
-        out.sort(Comparator.comparing(HurricaneExport::id));
         return out;
     }
 

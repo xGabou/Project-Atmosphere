@@ -13,9 +13,7 @@ import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.event.EventHandler;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphereStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.weathercell.WeatherCellManager;
 import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
@@ -67,9 +65,7 @@ public class AtmosphereManager {
 
     public static void onServerStopping(ServerLevel world) {
         ForecastOrchestrator.onServerStop(world);
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            HurricaneManager.clearHurricanes(world);
-        }
+        AtmosphereCloudServices.get().clearSevereWeather(world);
         resetRuntimeState();
         AtmosphereCloudServices.get().onServerStopping(world);
 
@@ -120,12 +116,7 @@ public class AtmosphereManager {
         AsyncAtmosphereService.runWeather(() -> {
             EventHandler.onRegenerate();
             AtmosphereCloudServices.get().clearForRegeneration(world);
-            if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-                world.getServer().execute(() -> {
-                    TornadoManager.clearTornadoes();
-                    HurricaneManager.clearHurricanes(world);
-                });
-            }
+            world.getServer().execute(() -> AtmosphereCloudServices.get().clearSevereWeather(world));
             ForecastOrchestrator.clearAndRegenerate(world);
         });
 
@@ -146,10 +137,7 @@ public class AtmosphereManager {
         if (!ForecastOrchestrator.isRegenerating()) {
             ForecastOrchestrator.tick(level);
             SnowstormManager.tick(level);
-            if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-                TornadoManager.tick(level);
-                HurricaneManager.tick(level);
-            }
+            AtmosphereCloudServices.get().tickSevereWeather(level);
         } else {
             // Still advance orchestrator's internal timing (e.g., tornado check scheduling) safely
             ForecastOrchestrator.tick(level);
@@ -215,10 +203,7 @@ public class AtmosphereManager {
             CloudRegionSyncManager.syncPlayer(player);
             CloudCellSimulationManager.getInstance().syncPlayer(player);
         }
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            TornadoManager.syncToPlayer(player);
-            HurricaneManager.syncToPlayer(player);
-        }
+        AtmosphereCloudServices.get().syncSevereWeather(player);
     }
 
 }

@@ -57,7 +57,7 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "simpleclouds"
 mandatory = false
-versionRange = "[0.7.3,)"
+versionRange = "[0.7.3,0.7.4)"
 ordering = "AFTER"
 side = "BOTH"
 

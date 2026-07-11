@@ -22,10 +22,13 @@ uniform int CellCount;
 // CellPosRadius[i] = (worldX, worldZ, radiusMajor, radiusMinor)
 // CellShape[i]     = (orientationRadians, base01, top01, edgeSoftness)
 // CellMedia[i]     = (density, energy, seed01, adaptiveFootprintScale)
+// CellMorphology[i]= (typeProfile, morphologyFamily, verticalDevelopment, humidity)
+// CellDynamics[i]  = (anvilStrength, precipitationIntensity, lifecycleStage, reserved)
 const int MAX_CELLS = 96;
 uniform vec4 CellPosRadius[MAX_CELLS];
 uniform vec4 CellShape[MAX_CELLS];
 uniform vec4 CellMedia[MAX_CELLS];
+uniform vec4 CellDynamics[MAX_CELLS];
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -80,6 +83,7 @@ void main() {
         vec4 posRadius = CellPosRadius[i];
         vec4 shape = CellShape[i];
         vec4 media = CellMedia[i];
+        vec4 dynamics = CellDynamics[i];
         float footprintScale = max(media.w, 0.001) * max(WeatherCoverageScale, 0.001);
         vec2 scaledRadius = max(posRadius.zw * footprintScale, vec2(1.0));
         vec2 delta = warpedXZ - posRadius.xy;
@@ -109,7 +113,14 @@ void main() {
 
         float edgeStart = mix(0.78, 0.42, saturate(shape.w));
         float footprint = 1.0 - smoothstep(edgeStart, 1.0, r);
-        float cellCoverage = footprint * saturate(media.x);
+        // Lifecycle is continuous: forming cells condense, mature cells keep
+        // their full mass and dissipating cells erode without a hard pop.
+        float lifecycle = saturate(dynamics.z);
+        float lifecycleEnvelope = lifecycle < 0.5
+            ? mix(0.30, 1.0, lifecycle * 2.0)
+            : mix(1.0, 0.30, (lifecycle - 0.5) * 2.0);
+        float precipitationPacking = 1.0 + saturate(dynamics.y) * 0.16;
+        float cellCoverage = footprint * saturate(media.x) * lifecycleEnvelope * precipitationPacking;
         if (cellCoverage <= 0.002) {
             continue;
         }
@@ -130,7 +141,7 @@ void main() {
         float edgeDrop = edge01 * cellSpan * 0.42;
         baseAccum += (shape.y + edgeLift) * weight;
         topAccum += (shape.z - edgeDrop) * weight;
-        energyAccum += media.y * weight;
+        energyAccum += max(media.y, max(dynamics.x * 0.85, dynamics.y * 0.72)) * weight;
         weightAccum += weight;
     }
 

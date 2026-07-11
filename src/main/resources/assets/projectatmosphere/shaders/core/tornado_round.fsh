@@ -23,9 +23,7 @@ uniform vec3 VolumeMax;
 uniform float CloudScale;
 uniform float RenderQuality;
 uniform int UseSecondaryDepthSampler;
-uniform int StormCount;
 uniform int DebugMode;
-uniform int DebugSelectedStorm;
 uniform int DebugFreeze;
 uniform int DistantHorizonsDepthMode;
 uniform int DeferSceneDepthReject;
@@ -763,7 +761,7 @@ void main() {
                 float upperStrength = saturate(storm.upper);
                 alpha = saturate(alpha * (1.0 + upperStrength * 0.32));
                 float bodyDark = mix(0.055, 0.21, saturate(storm.material));
-                vec3 cloudBase = vec3(bodyDark);
+                vec3 cloudBase = CloudColor.rgb * bodyDark;
                 vec3 dustCol = vec3(0.20, 0.125, 0.071);
                 float dustTint = saturate(pow(storm.dust, 0.55)) * (1.0 - saturate(storm.material * 0.45));
                 vec3 localColor = mix(cloudBase, dustCol, dustTint);

@@ -11,10 +11,14 @@ import net.minecraft.world.phys.Vec2;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Field;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 public final class HurricaneSemantics {
     private static final float MIN_COVERAGE = 0.02F;
     private static final float OUTER_RAIN_FLOOR = 0.58F;
     private static final Field CLOUD_MANAGER_LEVEL_FIELD = projectatmosphere$initCloudManagerLevelField();
+    private static final Map<UUID, CloudRegion> CLIENT_RESERVATION_REGIONS = new LinkedHashMap<>();
 
     private HurricaneSemantics() {
     }
@@ -89,10 +93,26 @@ public final class HurricaneSemantics {
         }
         for (HurricaneRenderSnapshot snapshot : ClientHurricaneStateCache.getSemanticSnapshots()) {
             if (intersectsReservation(snapshot, worldX, worldZ, 0.0D)) {
-                return ClientHurricaneStateCache.getReservationRegion(snapshot);
+                return getClientReservationRegion(snapshot);
             }
         }
         return null;
+    }
+
+    private static CloudRegion getClientReservationRegion(HurricaneRenderSnapshot snapshot) {
+        CLIENT_RESERVATION_REGIONS.keySet().retainAll(
+                ClientHurricaneStateCache.getSemanticSnapshots().stream()
+                        .map(HurricaneRenderSnapshot::id)
+                        .collect(java.util.stream.Collectors.toSet())
+        );
+        CloudRegion region = CLIENT_RESERVATION_REGIONS.get(snapshot.id());
+        if (region == null) {
+            region = createReservationRegion(snapshot);
+            CLIENT_RESERVATION_REGIONS.put(snapshot.id(), region);
+        } else {
+            updateReservationRegion(region, snapshot);
+        }
+        return region;
     }
 
     public static CloudRegion createReservationRegion(HurricaneInstance hurricane) {

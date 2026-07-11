@@ -1,10 +1,8 @@
 package net.Gabou.projectatmosphere.seasons;
 
-import com.Gabou.sereneseasonsplus.util.EnvironmentHelper;
 import glitchcore.event.EventManager;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.fml.ModList;
 import sereneseasons.api.season.Season;
 import sereneseasons.api.season.SeasonChangedEvent;
 
@@ -27,8 +25,11 @@ public final class SereneSeasonsEventBridge {
                     AtmosphereManager.onSeasonChange(serverLevel);
                     Season.SubSeason oldSeason = event.getPrevSeason();
                     Season.SubSeason newSeason = event.getNewSeason();
-                    if (newSeason != oldSeason && isSereneSeasonsPlusLoaded()) {
-                        EnvironmentHelper.onSeasonChange(serverLevel, !areAdjacent(oldSeason, newSeason, Season.SubSeason.values().length));
+                    if (newSeason != oldSeason) {
+                        SereneSeasonsPlusIntegration.onSeasonChanged(
+                                serverLevel,
+                                !areAdjacent(oldSeason, newSeason, Season.SubSeason.values().length)
+                        );
                     }
                 }
             }
@@ -41,8 +42,8 @@ public final class SereneSeasonsEventBridge {
                     Season.TropicalSeason oldSeason = event.getPrevSeason();
                     Season.TropicalSeason newSeason = event.getNewSeason();
                     boolean skippedAdjacentSeason = !areAdjacent(oldSeason, newSeason, Season.TropicalSeason.values().length);
-                    if (newSeason != oldSeason && isSereneSeasonsPlusLoaded()) {
-                        EnvironmentHelper.onSeasonChange(serverLevel, skippedAdjacentSeason);
+                    if (newSeason != oldSeason) {
+                        SereneSeasonsPlusIntegration.onSeasonChanged(serverLevel, skippedAdjacentSeason);
                     }
                 }
             }
@@ -59,7 +60,4 @@ public final class SereneSeasonsEventBridge {
      *
      * @return true si le compat SSP est disponible
      */
-    private static boolean isSereneSeasonsPlusLoaded() {
-        return ModList.get().isLoaded(SERENE_SEASONS_PLUS_MOD_ID);
-    }
 }

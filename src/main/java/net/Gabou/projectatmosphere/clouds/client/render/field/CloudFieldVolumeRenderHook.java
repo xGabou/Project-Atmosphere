@@ -4,7 +4,12 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
-import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
+import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
+import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame;
+import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthResolver;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CameraCloudDensityTracker;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.ClientCloudVisualDensity;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -27,7 +32,7 @@ public final class CloudFieldVolumeRenderHook {
 
         // The PA-native volumetric pipeline owns cloud visuals when active;
         // this legacy per-field renderer stays dormant as its fallback.
-        if (VolumetricCloudRenderHook.isActive()) {
+        if (!ClientCloudRenderOwnership.ownsFieldFallbackPass(Minecraft.getInstance().level)) {
             return;
         }
 
@@ -57,6 +62,8 @@ public final class CloudFieldVolumeRenderHook {
             return;
         }
         if (cachedSnapshots <= 0) {
+            ClientCloudVisualDensity.clear();
+            CameraCloudDensityTracker.update(0.0F);
             CloudFieldVolumeRenderConfig.recordStats(CloudFieldVolumeRenderStats.idle(
                     true,
                     CloudFieldVolumeShaders.isReady(),
@@ -70,12 +77,13 @@ public final class CloudFieldVolumeRenderHook {
 
         boolean pushed = false;
         PoseStack poseStack = event.getPoseStack();
-        try {
+        try (CloudRenderStateGuard.State ignored = CloudRenderStateGuard.capture()) {
             Vec3 cameraPosition = event.getCamera().getPosition();
             RenderTarget mainTarget = minecraft.getMainRenderTarget();
+            SceneDepthFrame sceneDepth = SceneDepthResolver.resolve(mainTarget);
             RenderTarget outputTarget = mainTarget;
             boolean downscaleApplied = false;
-            int sceneDepthTextureId = mainTarget == null ? 0 : mainTarget.getDepthTextureId();
+            int sceneDepthTextureId = sceneDepth.valid() ? sceneDepth.textureId() : 0;
             float resolutionScale = CloudFieldVolumeRenderConfig.resolutionScale();
             boolean debugMode = CloudFieldVolumeRenderConfig.mode() != CloudFieldVolumeRenderMode.NORMAL;
             boolean inspectComposite = CloudFieldVolumeRenderConfig.compositeDebugMode()
@@ -89,7 +97,7 @@ public final class CloudFieldVolumeRenderHook {
                     CloudFieldRenderTargetManager.clearAndBind(cloudTarget);
                 }
             } else if (mainTarget != null) {
-                mainTarget.bindWrite(true);
+                CloudRenderStateGuard.bindCapturedDrawFramebuffer();
             }
 
             CloudFieldRendererInput input = ClientCloudFieldCache.createRendererInput(
@@ -111,17 +119,28 @@ public final class CloudFieldVolumeRenderHook {
                     sceneDepthTextureId,
                     downscaleApplied
             );
-            if (downscaleApplied && mainTarget != null && outputTarget != null && stats.renderedFields() > 0) {
-                boolean composited = CloudFieldCompositeRenderer.composite(
+            boolean outputDisplayed = stats.renderedFields() > 0;
+            if (downscaleApplied && mainTarget != null && outputTarget != null && outputDisplayed) {
+                outputDisplayed = CloudFieldCompositeRenderer.composite(
                         outputTarget,
                         mainTarget,
-                        CloudFieldVolumeRenderConfig.compositeDebugMode()
+                        CloudFieldVolumeRenderConfig.compositeDebugMode(),
+                        true,
+                        sceneDepth
                 );
-                if (!composited) {
-                    mainTarget.bindWrite(true);
-                }
-            } else if (mainTarget != null) {
-                mainTarget.bindWrite(true);
+            }
+            if (outputDisplayed) {
+                ClientCloudVisualDensity.publishFieldFallback(
+                        level.dimension().location().toString(),
+                        input.fields(),
+                        level.getGameTime()
+                );
+                CameraCloudDensityTracker.update(ClientCloudVisualDensity.densityAt(
+                        level.dimension().location().toString(), cameraPosition
+                ));
+            } else {
+                ClientCloudVisualDensity.clear();
+                CameraCloudDensityTracker.update(0.0F);
             }
             CloudFieldVolumeRenderConfig.recordPipelineDiagnostics(
                     CloudFieldRenderTargetManager.diagnostics(mainTarget),
@@ -131,11 +150,8 @@ public final class CloudFieldVolumeRenderHook {
             );
             CloudFieldVolumeRenderConfig.recordStats(stats);
         } catch (Throwable throwable) {
-            CloudFieldVolumeRenderer.restoreRenderState();
-            CloudFieldCompositeRenderer.restoreRenderState();
-            if (minecraft.getMainRenderTarget() != null) {
-                minecraft.getMainRenderTarget().bindWrite(true);
-            }
+            ClientCloudVisualDensity.clear();
+            CameraCloudDensityTracker.update(0.0F);
             CloudFieldVolumeRenderConfig.recordRenderException(throwable, cachedSnapshots);
         } finally {
             if (pushed) {

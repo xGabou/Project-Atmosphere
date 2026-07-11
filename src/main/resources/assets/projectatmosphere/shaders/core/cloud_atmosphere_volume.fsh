@@ -7,9 +7,11 @@
 // temporal reprojection, and an analytic tornado funnel slot.
 
 uniform sampler2D WeatherMapSampler;
+uniform sampler2D MorphologyMapSampler;
 uniform sampler2D BlueNoiseSampler;
 uniform sampler2D SceneDepthSampler;
 uniform sampler2D HistorySampler;
+uniform sampler2D HistoryDepthSampler;
 uniform sampler3D BaseNoiseSampler;   // bound manually (3D)
 uniform sampler3D DetailNoiseSampler; // bound manually (3D)
 
@@ -23,7 +25,6 @@ uniform mat4 InvViewRotMat;
 uniform mat4 PrevViewProjMat; // maps current-camera-relative offsets to prev clip
 
 uniform vec3 CameraPos;
-uniform vec2 OutputSize;
 
 uniform vec2 WeatherOrigin;
 uniform float WeatherExtent;
@@ -84,6 +85,36 @@ float remap(float value, float low1, float high1, float low2, float high2) {
     return low2 + (value - low1) * (high2 - low2) / max(high1 - low1, 0.0001);
 }
 
+vec3 lowFrequencyDomainWarp(vec3 worldPos) {
+    return vec3(
+        sin(dot(worldPos, vec3(0.00173, 0.00091, -0.00127)) + 1.7),
+        sin(dot(worldPos, vec3(-0.00111, 0.00149, 0.00083)) - 2.3),
+        sin(dot(worldPos, vec3(0.00079, -0.00131, 0.00191)) + 4.1)
+    );
+}
+
+vec3 baseNoiseDomain(vec3 worldPos, float scale) {
+    // Orthonormal-ish rotation removes alignment with world axes. The slow
+    // incommensurate warp prevents the texture's repeat period from lining up
+    // at the same world interval without another 3D texture sample.
+    vec3 rotated = vec3(
+        dot(worldPos, vec3(0.8138, 0.2962, -0.5000)),
+        dot(worldPos, vec3(-0.1401, 0.9408, 0.3085)),
+        dot(worldPos, vec3(0.5630, -0.1677, 0.8090))
+    );
+    return rotated * scale + lowFrequencyDomainWarp(worldPos) * 0.31;
+}
+
+vec3 detailNoiseDomain(vec3 worldPos) {
+    vec3 rotated = vec3(
+        dot(worldPos, vec3(0.7071, -0.4082, 0.5774)),
+        dot(worldPos, vec3(0.7071, 0.4082, -0.5774)),
+        dot(worldPos, vec3(0.0000, 0.8165, 0.5774))
+    );
+    vec3 animation = vec3(WorldTime * 0.0006, WorldTime * 0.0002, -WorldTime * 0.0004);
+    return rotated * 0.022 + lowFrequencyDomainWarp(worldPos * 1.731) * 0.43 + animation;
+}
+
 // ---------------------------------------------------------------------------
 // Weather + density field
 // ---------------------------------------------------------------------------
@@ -99,6 +130,18 @@ vec4 sampleWeather(vec2 worldXZ) {
     weather.r *= edgeFade;
     weather.a *= edgeFade;
     return weather;
+}
+
+vec4 sampleMorphology(vec2 worldXZ) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        return vec4(0.0);
+    }
+    return texture(MorphologyMapSampler, uv);
+}
+
+float profileWeight(float profile, float expected) {
+    return 1.0 - smoothstep(0.20, 0.90, abs(profile - expected));
 }
 
 float pretestWeatherCoverage(vec2 worldXZ) {
@@ -124,9 +167,25 @@ float pretestWeatherCoverage(vec2 worldXZ) {
     return bestCoverage;
 }
 
-float heightGradient(float h01, float energy) {
-    float base = smoothstep(0.0, 0.10, h01);
-    float topStart = 0.62 + energy * 0.22;
+float heightGradient(float h01, float energy, float profile, float verticalDevelopment) {
+    float stratus = profileWeight(profile, 1.0);
+    float stratocumulus = profileWeight(profile, 2.0);
+    float cumulus = profileWeight(profile, 3.0);
+    float cumulonimbus = profileWeight(profile, 4.0);
+    float nimbostratus = profileWeight(profile, 5.0);
+    float cirrus = profileWeight(profile, 6.0);
+    float supercell = profileWeight(profile, 7.0);
+    float sheet = max(stratus, max(stratocumulus, nimbostratus));
+    float deepConvection = max(cumulonimbus, supercell);
+
+    float baseSoftness = mix(0.10, 0.045, deepConvection * verticalDevelopment);
+    baseSoftness = mix(baseSoftness, 0.16, cirrus);
+    float base = smoothstep(0.0, baseSoftness, h01);
+    float topStart = 0.62 + energy * 0.18;
+    topStart = mix(topStart, 0.70, sheet);
+    topStart = mix(topStart, 0.80 + verticalDevelopment * 0.12, deepConvection);
+    topStart = mix(topStart, 0.52, cirrus);
+    topStart = mix(topStart, 0.66 + verticalDevelopment * 0.10, cumulus);
     float top = 1.0 - smoothstep(topStart, 1.0, h01);
     return saturate(base * top);
 }
@@ -185,11 +244,25 @@ float funnelBaseLowering(vec2 worldXZ, vec4 A, vec4 B) {
 
 float cloudDensity(vec3 p, float mipBias, bool useDetail, bool nearCamera) {
     vec4 weather = sampleWeather(p.xz);
+    vec4 morphology = sampleMorphology(p.xz);
     // Weather-map coverage already includes the cloudlet density. Its normal
     // spawned-field range is roughly 0.08..0.35; treating 0.92 as the full
     // point erased those clouds before the raymarch ever saw them.
     float coverage = smoothstep(0.012, 0.42, saturate(weather.r * CoverageMul));
     float energy = weather.a;
+    float profile = morphology.r * 7.0;
+    float verticalDevelopment = morphology.g;
+    float humidity = morphology.b;
+    float precipitation = morphology.a;
+    float stratusProfile = profileWeight(profile, 1.0);
+    float stratocumulusProfile = profileWeight(profile, 2.0);
+    float cumulusProfile = profileWeight(profile, 3.0);
+    float cumulonimbusProfile = profileWeight(profile, 4.0);
+    float nimbostratusProfile = profileWeight(profile, 5.0);
+    float cirrusProfile = profileWeight(profile, 6.0);
+    float supercellProfile = profileWeight(profile, 7.0);
+    float sheetProfile = max(stratusProfile, max(stratocumulusProfile, nimbostratusProfile));
+    float stormProfile = max(cumulonimbusProfile, supercellProfile);
 
     float funnel = 0.0;
     float baseLower = 0.0;
@@ -214,11 +287,26 @@ float cloudDensity(vec3 p, float mipBias, bool useDetail, bool nearCamera) {
 
     float cloud = 0.0;
     if (h01 > -0.02 && h01 < 1.02 && coverage > 0.008) {
-        float hg = heightGradient(saturate(h01), energy);
+        float hg = heightGradient(saturate(h01), energy, profile, verticalDevelopment);
 
-        // Anvil: energetic cells spread coverage near the top.
-        float anvil = smoothstep(0.68, 0.95, saturate(h01)) * energy * 0.30;
-        float coverageMod = saturate(coverage * (1.08 + anvil));
+        // Only storm-anvil/supercell profiles spread at the upper levels.
+        // Neighbor taps expand the high cloud horizontally without widening
+        // the base, which the old single extruded footprint could not do.
+        float anvil = smoothstep(0.64, 0.94, saturate(h01))
+            * stormProfile * energy * (0.22 + verticalDevelopment * 0.46);
+        float anvilCoverage = coverage;
+        if (anvil > 0.002) {
+            float spread = mix(18.0, 92.0, saturate(energy * verticalDevelopment));
+            anvilCoverage = max(anvilCoverage, smoothstep(0.012, 0.42,
+                sampleWeather(p.xz + vec2(spread, 0.0)).r * CoverageMul));
+            anvilCoverage = max(anvilCoverage, smoothstep(0.012, 0.42,
+                sampleWeather(p.xz - vec2(spread, 0.0)).r * CoverageMul));
+            anvilCoverage = max(anvilCoverage, smoothstep(0.012, 0.42,
+                sampleWeather(p.xz + vec2(0.0, spread * 0.72)).r * CoverageMul));
+            anvilCoverage = max(anvilCoverage, smoothstep(0.012, 0.42,
+                sampleWeather(p.xz - vec2(0.0, spread * 0.72)).r * CoverageMul));
+        }
+        float coverageMod = saturate(mix(coverage, anvilCoverage, anvil) * (1.04 + anvil * 0.36));
 
         vec3 wind = WindVec * WorldTime;
         vec3 samplePos = p + vec3(wind.x, 0.0, wind.z);
@@ -228,31 +316,51 @@ float cloudDensity(vec3 p, float mipBias, bool useDetail, bool nearCamera) {
         // Cloudlets are tens to low hundreds of blocks wide. The old 0.0016
         // scale sampled an almost constant value across an entire cloudlet,
         // producing one smooth oval instead of separate billows.
-        vec4 baseNoise = texture(BaseNoiseSampler, samplePos * 0.0052, mipBias);
+        float baseNoiseScale = 0.0052;
+        baseNoiseScale = mix(baseNoiseScale, 0.0031, sheetProfile);
+        baseNoiseScale = mix(baseNoiseScale, 0.0085, cirrusProfile);
+        baseNoiseScale = mix(baseNoiseScale, 0.0046, stormProfile);
+        vec4 baseNoise = texture(BaseNoiseSampler, baseNoiseDomain(samplePos, baseNoiseScale), mipBias);
         float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
         float baseShape = remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0);
         baseShape *= hg;
         float openSkyBreakup = mix(0.76, 0.30, coverageMod);
+        openSkyBreakup = mix(openSkyBreakup, mix(0.36, 0.20, humidity), sheetProfile);
+        openSkyBreakup = mix(openSkyBreakup, 0.55, cirrusProfile);
+        openSkyBreakup = mix(openSkyBreakup, 0.27, stormProfile * verticalDevelopment);
         cloud = remap(baseShape, openSkyBreakup, 1.0, 0.0, 1.0) * coverageMod;
 
         if (cloud > 0.003 && useDetail) {
-            vec3 detailPos = samplePos * 0.022 + vec3(WorldTime * 0.0006, WorldTime * 0.0002, -WorldTime * 0.0004);
+            vec3 detailPos = detailNoiseDomain(samplePos);
             // Cheap curl-ish churn: offset detail lookup by low-freq noise.
             detailPos += (baseNoise.gbr - 0.5) * 0.18;
             vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
             float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
             if (nearCamera && DetailQuality >= 2) {
-                vec4 fine = texture(DetailNoiseSampler, detailPos * 2.71, mipBias);
+                vec4 fine = texture(
+                    DetailNoiseSampler,
+                    detailPos * 2.71 + vec3(0.173, -0.291, 0.417),
+                    mipBias
+                );
                 detailFbm = detailFbm * 0.72 + (fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125) * 0.28;
             }
             // Wispy erosion near base, billowy rounding near top.
             float hfMod = mix(detailFbm, 1.0 - detailFbm, saturate(h01 * 4.0));
             float erosion = mix(0.28, 0.48, energy);
+            erosion = mix(erosion, 0.20, sheetProfile);
+            erosion = mix(erosion, 0.60, cirrusProfile);
+            erosion = mix(erosion, 0.42, stormProfile);
             cloud = remap(cloud, hfMod * erosion, 1.0, 0.0, 1.0);
         }
 
         // Storm cells hold more condensed water low in the cloud.
         cloud *= mix(1.0, 1.35, energy * (1.0 - saturate(h01)) * 0.6);
+        cloud *= mix(0.88, 1.10, humidity);
+        cloud *= 1.0 + precipitation * (1.0 - saturate(h01)) * 0.32;
+        // Cumulus stays broken and rounded; nimbostratus holds a continuous,
+        // precipitation-heavy lower deck.
+        cloud *= mix(1.0, mix(0.92, 1.08, hg), cumulusProfile * (1.0 - stormProfile));
+        cloud *= mix(1.0, 1.12, nimbostratusProfile * precipitation);
         cloud *= smoothstep(0.012, 0.095, coverage);
     }
 
@@ -260,7 +368,7 @@ float cloudDensity(vec3 p, float mipBias, bool useDetail, bool nearCamera) {
     if (funnel > 0.001) {
         // Smooth union so the funnel inherits the cloud material seamlessly.
         vec3 funnelNoisePos = p * 0.010 + vec3(0.0, -WorldTime * 0.004, 0.0);
-        float funnelNoise = texture(BaseNoiseSampler, funnelNoisePos).g;
+        float funnelNoise = texture(BaseNoiseSampler, baseNoiseDomain(funnelNoisePos, 1.0)).g;
         float funnelDensity = funnel * mix(0.7, 1.15, funnelNoise) * DensityMul * 1.6;
         density = density + funnelDensity - density * funnelDensity * 0.5;
     }
@@ -511,6 +619,8 @@ void main() {
     vec3 relRepresentative = rayDir * representativeT;
 
     vec4 result = vec4(accumulated, alpha);
+    float resultDepth = depthAt(relRepresentative);
+    float resultDepthDerivative = fwidth(resultDepth);
 
     // Temporal reprojection: reproject the representative cloud point into the
     // previous frame and blend history when it lands on-screen. History is
@@ -525,6 +635,25 @@ void main() {
             vec2 prevUv = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
             if (prevUv.x > 0.001 && prevUv.x < 0.999 && prevUv.y > 0.001 && prevUv.y < 0.999) {
                 vec4 history = texture(HistorySampler, prevUv);
+                float historyDepth = texture(HistoryDepthSampler, prevUv).r;
+                float depthTolerance = max(0.00035, resultDepthDerivative * 6.0);
+                float depthConfidence = 1.0 - smoothstep(
+                    depthTolerance,
+                    depthTolerance * 12.0,
+                    abs(historyDepth - resultDepth)
+                );
+                if (historyDepth >= 0.99999 || resultDepth >= 0.99999) {
+                    depthConfidence = 0.0;
+                }
+                // Alpha stores one minus transmittance. Keep jitter-scale
+                // differences, but reject history when a cloud appears,
+                // disappears or the camera crosses its boundary.
+                float transmittanceDelta = abs(history.a - result.a);
+                float transmittanceConfidence = 1.0 - smoothstep(
+                    0.045,
+                    0.22,
+                    transmittanceDelta
+                );
                 history = clamp(history, result - 0.25, result + 0.25);
                 // Fade history out near the screen border: reprojection there
                 // samples clamp-to-edge stretched texels during camera turns,
@@ -534,7 +663,11 @@ void main() {
                     min(prevUv.y, 1.0 - prevUv.y)
                 );
                 float edgeFade = smoothstep(0.0, 0.04, borderDistance);
-                result = mix(result, history, HistoryBlend * edgeFade);
+                float historyWeight = HistoryBlend
+                    * edgeFade
+                    * depthConfidence
+                    * transmittanceConfidence;
+                result = mix(result, history, historyWeight);
             }
         }
     }
@@ -548,6 +681,6 @@ void main() {
         return;
     }
 
-    gl_FragDepth = depthAt(relRepresentative);
+    gl_FragDepth = resultDepth;
     fragColor = result;
 }

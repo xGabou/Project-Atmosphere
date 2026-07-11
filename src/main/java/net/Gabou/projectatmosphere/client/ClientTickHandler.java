@@ -4,19 +4,14 @@ import net.Gabou.projectatmosphere.async.PoolType;
 import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.client.fog.AtmosphereFogState;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
-import net.Gabou.projectatmosphere.client.render.TornadoClientEffects;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsClientHooks;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoInstance;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
-import net.Gabou.projectatmosphere.client.sound.TornadoAudioClient;
 import net.Gabou.projectatmosphere.client.sound.WeatherAudioClient;
 import net.Gabou.projectatmosphere.modules.wind.WindMath;
 import net.Gabou.projectatmosphere.registry.ModParticles;
-import net.Gabou.projectatmosphere.tools.debug.SimpleCloudsRenderDiagnostics;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkyEffectController;
 import net.Gabou.projectatmosphere.client.render.sky.SkyEffectState;
@@ -31,9 +26,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 @OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
@@ -42,8 +35,6 @@ public class ClientTickHandler {
     private static RandomSource random;
 
     private static int tickCounter = 0;
-    private static final Set<TornadoInstance> prevTornadoes = new HashSet<>();
-
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
@@ -54,18 +45,15 @@ public class ClientTickHandler {
         }
         if (mc.level == null) {
             if (simpleCloudsLoaded) {
-                TornadoManager.clearClientTornadoes();
+                SimpleCloudsClientHooks.clearTornadoes();
             }
-            TornadoAudioClient.stopAll();
             WeatherAudioClient.stopAll();
-            prevTornadoes.clear();
             return;
         }
         if (mc.isPaused()) return;
 
         if (simpleCloudsLoaded) {
-            TornadoManager.tick(mc.level);
-            syncTornadoAudio(new HashSet<>(TornadoManager.getClientTornadoes()));
+            SimpleCloudsClientHooks.tickTornadoes(mc.level, tickCounter);
         }
         if (!ClientSyncLock.isReady()) return;
 
@@ -77,17 +65,10 @@ public class ClientTickHandler {
         tickCounter++;
         AtmosphereSkyEffectController.tick(mc);
 
-        if (mc.level != null && simpleCloudsLoaded) {
-            Set<TornadoInstance> current = new HashSet<>(TornadoManager.getClientTornadoes());
-            for (TornadoInstance tornado : current) {
-                TornadoClientEffects.tickTornadoDust(tornado, mc.level, tickCounter);
-            }
-        }
-
         if (tickCounter % 40 == 0) {
             if (mc.player != null) {
                 if (mc.level != null && simpleCloudsLoaded) {
-                    SimpleCloudsCompat.logDiagnostic(mc.player.getX(),mc.player.getZ(),mc.level);
+                    SimpleCloudsClientHooks.logCloudDiagnostic(mc.player.getX(), mc.player.getZ(), mc.level);
                 }
 
                 // snapshot
@@ -143,19 +124,6 @@ public class ClientTickHandler {
 
     public static SeasonStage getCurrentSeason(ClientLevel level, BlockPos pos) {
         return SeasonTimeHelper.stage(level);
-    }
-
-    private static void syncTornadoAudio(Set<TornadoInstance> current) {
-        for (TornadoInstance tornado : current) {
-            TornadoAudioClient.ensure(tornado, 0.85f, 384.0f);
-        }
-        for (TornadoInstance tornado : prevTornadoes) {
-            if (!current.contains(tornado)) {
-                TornadoAudioClient.stop(tornado);
-            }
-        }
-        prevTornadoes.clear();
-        prevTornadoes.addAll(current);
     }
 
     public record WindSpawnData(BlockPos pos,

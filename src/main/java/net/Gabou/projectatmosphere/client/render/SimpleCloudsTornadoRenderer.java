@@ -346,7 +346,6 @@ public final class SimpleCloudsTornadoRenderer {
                 this.setProxyCullState(cameraPos, tornado);
                 this.applyStormUniforms(shader, tornado);
                 shader.safeGetUniform("DebugMode").set(shaderMode.shaderValue());
-                shader.safeGetUniform("DebugSelectedStorm").set(debugMode == TornadoRenderDebugState.Mode.OFF ? -1 : 0);
                 shader.safeGetUniform("DebugFreeze").set(TornadoRenderDebugState.isFreezeEnabled() ? 1 : 0);
                 shader.safeGetUniform("VolumeMin").set(
                         (float) tornado.boundsMinCloud().x,
@@ -538,7 +537,6 @@ public final class SimpleCloudsTornadoRenderer {
         stormShapes[0] = tornado.shape();
         stormProgress[0] = tornado.touchdownProgress();
 
-        shader.safeGetUniform("StormCount").set(1);
         shader.safeGetUniform("StormPositions").set(stormPositions);
         shader.safeGetUniform("StormHeights").set(stormHeights);
         shader.safeGetUniform("StormWidths").set(stormWidths);

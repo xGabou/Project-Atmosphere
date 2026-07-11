@@ -4,6 +4,8 @@ import net.Gabou.projectatmosphere.clouds.field.CloudFieldHydrationState;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.CloudLodBand;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -24,6 +26,7 @@ import java.util.function.Supplier;
 public final class SyncCloudFieldsPacket {
     private static final int VERSION_MARKER = -1;
     private static final int VERSION_SOURCE_KIND = 2;
+    private static final int VERSION_MORPHOLOGY = 3;
 
     private final List<CloudFieldSnapshot> fields;
 
@@ -52,7 +55,7 @@ public final class SyncCloudFieldsPacket {
 
     public void encode(FriendlyByteBuf buffer) {
         buffer.writeVarInt(VERSION_MARKER);
-        buffer.writeVarInt(VERSION_SOURCE_KIND);
+        buffer.writeVarInt(VERSION_MORPHOLOGY);
         buffer.writeVarInt(fields.size());
         for (CloudFieldSnapshot snapshot : fields) {
             encodeSnapshot(buffer, snapshot);
@@ -71,7 +74,7 @@ public final class SyncCloudFieldsPacket {
         context.setPacketHandled(true);
     }
 
-    private static void encodeSnapshot(FriendlyByteBuf buffer, CloudFieldSnapshot snapshot) {
+    static void encodeSnapshot(FriendlyByteBuf buffer, CloudFieldSnapshot snapshot) {
         buffer.writeUUID(snapshot.fieldId());
         buffer.writeLong(snapshot.seed());
         buffer.writeUtf(snapshot.dimensionId());
@@ -88,6 +91,10 @@ public final class SyncCloudFieldsPacket {
         writeVec(buffer, snapshot.windVector());
         buffer.writeFloat(snapshot.verticalDevelopment());
         buffer.writeFloat(snapshot.stormPotential());
+        buffer.writeUtf(snapshot.cloudTypeId());
+        buffer.writeEnum(snapshot.morphologyFamily());
+        buffer.writeFloat(snapshot.anvilStrength());
+        buffer.writeFloat(snapshot.precipitationIntensity());
         buffer.writeEnum(snapshot.sourceKind());
         buffer.writeEnum(snapshot.lodBand());
         buffer.writeEnum(snapshot.previousLodBand());
@@ -100,7 +107,7 @@ public final class SyncCloudFieldsPacket {
         buffer.writeLong(snapshot.worldTime());
     }
 
-    private static CloudFieldSnapshot decodeSnapshot(FriendlyByteBuf buffer, int version) {
+    static CloudFieldSnapshot decodeSnapshot(FriendlyByteBuf buffer, int version) {
         UUID fieldId = buffer.readUUID();
         long seed = buffer.readLong();
         String dimensionId = buffer.readUtf();
@@ -117,6 +124,14 @@ public final class SyncCloudFieldsPacket {
         Vec3 wind = readVec(buffer);
         float verticalDevelopment = buffer.readFloat();
         float stormPotential = buffer.readFloat();
+        String cloudTypeId = version >= VERSION_MORPHOLOGY
+                ? buffer.readUtf()
+                : CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
+        CloudMorphologyFamily morphologyFamily = version >= VERSION_MORPHOLOGY
+                ? buffer.readEnum(CloudMorphologyFamily.class)
+                : CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily();
+        float anvilStrength = version >= VERSION_MORPHOLOGY ? buffer.readFloat() : 0.0F;
+        float precipitationIntensity = version >= VERSION_MORPHOLOGY ? buffer.readFloat() : 0.0F;
         CloudFieldSourceKind sourceKind = version >= VERSION_SOURCE_KIND
                 ? buffer.readEnum(CloudFieldSourceKind.class)
                 : CloudFieldSourceKind.UNKNOWN;
@@ -147,6 +162,10 @@ public final class SyncCloudFieldsPacket {
                 wind,
                 verticalDevelopment,
                 stormPotential,
+                cloudTypeId,
+                morphologyFamily,
+                anvilStrength,
+                precipitationIntensity,
                 sourceKind,
                 lodBand,
                 previousLodBand,

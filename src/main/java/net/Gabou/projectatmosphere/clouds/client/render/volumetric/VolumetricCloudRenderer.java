@@ -5,7 +5,7 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
+import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -30,6 +30,7 @@ public final class VolumetricCloudRenderer {
     private static long frameIndex;
     private static volatile float lastGpuMilliseconds = -1.0F;
     private static volatile boolean lastHistoryValid;
+    private static volatile float lastHistoryConfidence;
 
     private VolumetricCloudRenderer() {
     }
@@ -48,9 +49,23 @@ public final class VolumetricCloudRenderer {
         VolumetricCloudRenderTargets.invalidateHistory();
     }
 
+    /** Clears timing and temporal state owned by the native volumetric pass. */
+    public static void shutdown() {
+        invalidateHistory();
+        GOVERNOR.reset();
+        GPU_TIMER.close();
+        lastGpuMilliseconds = -1.0F;
+        lastHistoryValid = false;
+        lastHistoryConfidence = 0.0F;
+    }
+
     /** Whether the last raymarch consumed temporal history (for status/logs). */
     public static boolean lastHistoryValid() {
         return lastHistoryValid;
+    }
+
+    public static float lastHistoryConfidence() {
+        return lastHistoryConfidence;
     }
 
     /**
@@ -85,6 +100,7 @@ public final class VolumetricCloudRenderer {
      */
     public static boolean render(
             RenderTarget mainTarget,
+            SceneDepthFrame sceneDepth,
             CloudWeatherMapRenderer.Result weather,
             VolumetricCloudLighting.Frame lighting,
             Matrix4f projection,
@@ -113,10 +129,22 @@ public final class VolumetricCloudRenderer {
         lastGpuMilliseconds = GPU_TIMER.getLastMilliseconds();
         float stepScale = GOVERNOR.update(lastGpuMilliseconds);
 
-        // Camera cuts (teleports) poison reprojection; detect and reset.
-        if (hasPrevFrame && prevCameraPos.distance(cameraPos) > 24.0F) {
-            invalidateHistory();
+        // Camera cuts and rapid turns poison reprojection. Gentle movement
+        // scales history confidence continuously instead of toggling it.
+        float historyConfidence = 1.0F;
+        if (hasPrevFrame) {
+            float cameraDistance = prevCameraPos.distance(cameraPos);
+            float rotationDelta = rotationDelta(prevViewRot, viewRotation);
+            if (cameraDistance > 24.0F || rotationDelta > 0.22F) {
+                invalidateHistory();
+                historyConfidence = 0.0F;
+            } else {
+                historyConfidence *= 1.0F - smoothstep(4.0F, 24.0F, cameraDistance);
+                historyConfidence *= 1.0F - smoothstep(0.025F, 0.22F, rotationDelta);
+            }
         }
+        float cameraCloudDensity = CameraCloudDensityTracker.smoothedCameraDensity();
+        historyConfidence *= 1.0F - smoothstep(0.04F, 0.48F, cameraCloudDensity);
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         RenderTarget historyTarget = VolumetricCloudRenderTargets.historyCloudTarget();
@@ -130,6 +158,7 @@ public final class VolumetricCloudRenderer {
                 && historyTarget != null
                 && VolumetricCloudRenderTargets.isHistoryValid();
         lastHistoryValid = historyValid;
+        lastHistoryConfidence = historyValid ? historyConfidence : 0.0F;
 
         Matrix4f invProj = new Matrix4f(projection).invert();
         Matrix4f invViewRot = new Matrix4f(viewRotation).invert();
@@ -142,6 +171,10 @@ public final class VolumetricCloudRenderer {
                 );
 
         RenderTarget weatherTarget = VolumetricCloudRenderTargets.prepareWeatherTarget(profile.weatherMapSize());
+        RenderTarget morphologyTarget = VolumetricCloudRenderTargets.prepareMorphologyTarget(profile.weatherMapSize());
+        if (weatherTarget == null || morphologyTarget == null) {
+            return false;
+        }
 
         VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
         RenderSystem.disableBlend();
@@ -152,9 +185,12 @@ public final class VolumetricCloudRenderer {
         RenderSystem.setShader(() -> shader);
 
         shader.setSampler("WeatherMapSampler", weatherTarget.getColorTextureId());
+        shader.setSampler("MorphologyMapSampler", morphologyTarget.getColorTextureId());
         shader.setSampler("BlueNoiseSampler", CloudNoiseTextureManager.blueNoiseTextureId());
-        shader.setSampler("SceneDepthSampler", Math.max(0, mainTarget.getDepthTextureId()));
+        SceneDepthFrame safeSceneDepth = sceneDepth == null ? SceneDepthFrame.INVALID : sceneDepth;
+        shader.setSampler("SceneDepthSampler", safeSceneDepth.valid() ? safeSceneDepth.textureId() : 0);
         shader.setSampler("HistorySampler", historyValid ? historyTarget.getColorTextureId() : 0);
+        shader.setSampler("HistoryDepthSampler", historyValid ? historyTarget.getDepthTextureId() : 0);
 
         shader.safeGetUniform("CloudProjMat").set(projection);
         shader.safeGetUniform("ViewRotMat").set(viewRotation);
@@ -162,7 +198,6 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("InvViewRotMat").set(invViewRot);
         shader.safeGetUniform("PrevViewProjMat").set(prevViewProj);
         shader.safeGetUniform("CameraPos").set(cameraPos.x, cameraPos.y, cameraPos.z);
-        shader.safeGetUniform("OutputSize").set((float) cloudTarget.width, (float) cloudTarget.height);
         shader.safeGetUniform("WeatherOrigin").set((float) weather.originX(), (float) weather.originZ());
         shader.safeGetUniform("WeatherExtent").set(CloudWeatherMapRenderer.WEATHER_EXTENT);
         shader.safeGetUniform("SlabBaseY").set(weather.slabBaseY());
@@ -187,13 +222,15 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("DetailQuality").set(profile.detailQuality());
         shader.safeGetUniform("StepScale").set(stepScale);
         shader.safeGetUniform("MaxRenderDistance").set(Math.max(300.0F, maxRenderDistance));
-        shader.safeGetUniform("UseSceneDepth").set(sceneRayLimitEnabled && mainTarget.getDepthTextureId() > 0 ? 1 : 0);
+        shader.safeGetUniform("UseSceneDepth").set(sceneRayLimitEnabled && safeSceneDepth.valid() ? 1 : 0);
         shader.safeGetUniform("CoveragePretestEnabled").set(VolumetricCloudDebugConfig.coveragePretestEnabled() ? 1 : 0);
         shader.safeGetUniform("CoveragePretestSamples").set(VolumetricCloudDebugConfig.coveragePretestSamples());
         shader.safeGetUniform("CoveragePretestThreshold").set(VolumetricCloudDebugConfig.coveragePretestThreshold());
         shader.safeGetUniform("CoveragePretestDilation").set(VolumetricCloudDebugConfig.coveragePretestDilation());
         shader.safeGetUniform("HistoryValid").set(historyValid ? 1 : 0);
-        shader.safeGetUniform("HistoryBlend").set(historyValid ? safeTuning.historyBlend() : 0.0F);
+        shader.safeGetUniform("HistoryBlend").set(
+                historyValid ? safeTuning.historyBlend() * historyConfidence : 0.0F
+        );
         shader.safeGetUniform("DensityMul").set(safeTuning.densityMul());
         shader.safeGetUniform("CoverageMul").set(safeTuning.coverageMul());
         shader.safeGetUniform("ExtinctionScale").set(safeTuning.extinctionScale());
@@ -213,7 +250,6 @@ public final class VolumetricCloudRenderer {
             GPU_TIMER.end();
             unbind3dNoise();
             shader.clear();
-            CloudRenderStateGuard.restoreAfterCloudPass(mainTarget);
         }
 
         prevProj.set(projection);
@@ -222,6 +258,24 @@ public final class VolumetricCloudRenderer {
         hasPrevFrame = true;
         frameIndex++;
         return true;
+    }
+
+    private static float rotationDelta(Matrix4f previous, Matrix4f current) {
+        float max = 0.0F;
+        max = Math.max(max, Math.abs(previous.m00() - current.m00()));
+        max = Math.max(max, Math.abs(previous.m01() - current.m01()));
+        max = Math.max(max, Math.abs(previous.m02() - current.m02()));
+        max = Math.max(max, Math.abs(previous.m10() - current.m10()));
+        max = Math.max(max, Math.abs(previous.m11() - current.m11()));
+        max = Math.max(max, Math.abs(previous.m12() - current.m12()));
+        max = Math.max(max, Math.abs(previous.m20() - current.m20()));
+        max = Math.max(max, Math.abs(previous.m21() - current.m21()));
+        return Math.max(max, Math.abs(previous.m22() - current.m22()));
+    }
+
+    private static float smoothstep(float edge0, float edge1, float value) {
+        float t = Math.max(0.0F, Math.min(1.0F, (value - edge0) / Math.max(0.000001F, edge1 - edge0)));
+        return t * t * (3.0F - 2.0F * t);
     }
 
     /** Marks the just-rendered target as history for the next frame. */

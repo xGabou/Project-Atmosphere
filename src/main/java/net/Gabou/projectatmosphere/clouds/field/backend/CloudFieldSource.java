@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.field.backend;
 
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.world.phys.Vec3;
 
@@ -80,6 +81,19 @@ public record CloudFieldSource(
 
     public float effectiveCoverage() {
         return clamp01(coverage * growth * (1.0F - decay));
+    }
+
+    public CloudMorphologyFamily resolvedMorphologyFamily() {
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
+        return CloudMorphologyFamily.byId(morphologyFamily, definition.getMorphologyFamily());
+    }
+
+    public float anvilStrength() {
+        return CloudTypeRegistry.getOrDefault(cloudTypeId).getVisualProfile().getAnvilStrength();
+    }
+
+    public float precipitationIntensity() {
+        return CloudTypeRegistry.getOrDefault(cloudTypeId).getVisualProfile().getPrecipitationCoreStrength();
     }
 
     private static Vec3 sanitize(Vec3 value) {

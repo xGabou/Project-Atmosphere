@@ -484,4 +484,19 @@ public class SimpleCloudsCompat {
     public static boolean isCloudAtPos(Level level, BlockPos pos) {
         return CloudManager.get(level).getCloudGenerator().getCloudAtWorldPosition(pos.getX() + 0.5F, pos.getZ() + 0.5F) !=null;
     }
+
+    /** Samples Simple Clouds severity behind the optional service boundary. */
+    public static int sampleSeverityAt(ServerLevel level, BlockPos pos) {
+        int strongest = 1;
+        for (CloudRegion region : CloudManager.get(level).getClouds()) {
+            double dx = region.getWorldX() - pos.getX();
+            double dz = region.getWorldZ() - pos.getZ();
+            double radius = region.getRadius();
+            if (dx * dx + dz * dz <= radius * radius) {
+                strongest = Math.max(strongest,
+                        CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId()));
+            }
+        }
+        return strongest;
+    }
 }

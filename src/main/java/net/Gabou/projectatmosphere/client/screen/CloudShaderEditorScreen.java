@@ -104,7 +104,7 @@ public final class CloudShaderEditorScreen extends Screen {
 
         guiGraphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xC0101010);
         guiGraphics.drawString(this.font, "Cloud Shader Editor", panelX + 8, panelY + 8, 0xFFFFFF, false);
-        guiGraphics.drawString(this.font, "Editing: cloud_volume.fsh", panelX + 8, panelY + 20, 0xB0FFFFFF, false);
+        guiGraphics.drawString(this.font, "Editing: cloud_atmosphere_volume.fsh", panelX + 8, panelY + 20, 0xB0FFFFFF, false);
         guiGraphics.drawString(this.font, this.statusMessage, panelX + 8, panelY + 32, 0xB0FFFFFF, false);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);

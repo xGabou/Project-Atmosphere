@@ -5,9 +5,7 @@ import dev.nonamecrackers2.simpleclouds.client.renderer.WorldEffects;
 import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import net.Gabou.projectatmosphere.clouds.backend.CloudBackendResolver;
-import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
@@ -105,17 +103,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
     }
 
     private static boolean shouldApply(ClientLevel level) {
-        if (level == null) {
-            return false;
-        }
-        try {
-            if (AtmoCommonConfig.CLOUD_VOLUMETRIC_RENDERER_ENABLED.get()
-                    && AtmoCommonConfig.CLOUD_FIELD_RENDERER_ENABLED.get()) {
-                return false;
-            }
-        } catch (IllegalStateException ignored) {
-            return false;
-        }
-        return CloudBackendResolver.resolve(level) == CloudVisualBackend.SIMPLE_CLOUDS;
+        return ClientCloudRenderOwnership.resolve(level)
+                == ClientCloudRenderOwnership.Owner.SIMPLE_CLOUDS;
     }
 }

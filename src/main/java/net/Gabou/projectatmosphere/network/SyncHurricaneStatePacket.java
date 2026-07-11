@@ -1,10 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
-import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
@@ -46,9 +43,7 @@ public class SyncHurricaneStatePacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientHurricaneStateCache.applySnapshots(this.snapshots))
-        );
+        ctx.get().enqueueWork(() -> SevereWeatherClientPacketHandlers.syncHurricanes(this.snapshots));
         ctx.get().setPacketHandled(true);
     }
 }

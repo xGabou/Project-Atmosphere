@@ -123,6 +123,33 @@ public final class CloudGpuTimer {
         return pending;
     }
 
+    /** Releases timestamp-query objects so a renderer reload cannot leak GL names. */
+    public void close() {
+        if (!RenderSystem.isOnRenderThreadOrInit()) {
+            throw new IllegalStateException("CloudGpuTimer.close must run on the render thread");
+        }
+        for (int i = 0; i < QUERY_PAIR_COUNT; i++) {
+            if (startQueries[i] != 0) {
+                GL15.glDeleteQueries(startQueries[i]);
+                startQueries[i] = 0;
+            }
+            if (endQueries[i] != 0) {
+                GL15.glDeleteQueries(endQueries[i]);
+                endQueries[i] = 0;
+            }
+            inFlight[i] = false;
+            submittedFrames[i] = 0L;
+        }
+        nextIndex = 0;
+        activeIndex = -1;
+        frameSerial = 0L;
+        lastResultFrame = -1L;
+        active = false;
+        supported = true;
+        hasResult = false;
+        lastMilliseconds = 0.0F;
+    }
+
     private void ensureQueries() {
         if (startQueries[0] != 0 && endQueries[0] != 0) {
             return;

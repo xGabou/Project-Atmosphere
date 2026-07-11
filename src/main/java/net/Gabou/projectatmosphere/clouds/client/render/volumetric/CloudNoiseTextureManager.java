@@ -26,6 +26,7 @@ public final class CloudNoiseTextureManager {
 
     private static volatile boolean bakeStarted;
     private static volatile boolean bakeFailed;
+    private static volatile long bakeGeneration;
     private static volatile byte[] basePixels;
     private static volatile byte[] detailPixels;
     private static volatile byte[] bluePixels;
@@ -52,7 +53,8 @@ public final class CloudNoiseTextureManager {
         }
         if (!bakeStarted) {
             bakeStarted = true;
-            Thread worker = new Thread(CloudNoiseTextureManager::bakeAll, "PA-CloudNoiseBake");
+            long generation = ++bakeGeneration;
+            Thread worker = new Thread(() -> bakeAll(generation), "PA-CloudNoiseBake");
             worker.setDaemon(true);
             worker.start();
             return false;
@@ -110,27 +112,48 @@ public final class CloudNoiseTextureManager {
             GL11.glDeleteTextures(blueNoiseTextureId);
             blueNoiseTextureId = -1;
         }
+        // Drop any stale CPU payload too. A resource reload after a completed
+        // upload otherwise leaves bakeStarted true with no data to upload.
+        bakeGeneration++;
+        bakeStarted = false;
+        bakeFailed = false;
+        basePixels = null;
+        detailPixels = null;
+        bluePixels = null;
     }
 
     // -----------------------------------------------------------------
     // CPU bake
     // -----------------------------------------------------------------
 
-    private static void bakeAll() {
+    private static void bakeAll(long generation) {
         try {
             long startedAt = System.nanoTime();
             byte[] base = new byte[BASE_SIZE * BASE_SIZE * BASE_SIZE * 4];
             IntStream.range(0, BASE_SIZE).parallel().forEach(z -> bakeBaseSlice(base, z));
+            if (generation != bakeGeneration) {
+                return;
+            }
             basePixels = base;
 
             byte[] detail = new byte[DETAIL_SIZE * DETAIL_SIZE * DETAIL_SIZE * 4];
             IntStream.range(0, DETAIL_SIZE).parallel().forEach(z -> bakeDetailSlice(detail, z));
+            if (generation != bakeGeneration) {
+                return;
+            }
             detailPixels = detail;
 
-            bluePixels = bakeBlueNoise(BLUE_SIZE);
+            byte[] blue = bakeBlueNoise(BLUE_SIZE);
+            if (generation != bakeGeneration) {
+                return;
+            }
+            bluePixels = blue;
             long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000L;
             ProjectAtmosphere.LOGGER.info("[VolumetricClouds] noise bake finished in {} ms", elapsedMs);
         } catch (Throwable throwable) {
+            if (generation != bakeGeneration) {
+                return;
+            }
             bakeFailed = true;
             ProjectAtmosphere.LOGGER.error("[VolumetricClouds] noise bake failed", throwable);
         }

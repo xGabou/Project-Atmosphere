@@ -6,8 +6,6 @@ import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.UnitFormatter;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -30,8 +28,8 @@ public final class CommandStatusService {
         float pressure = ForecastOrchestrator.getCurrentPressure(level, pos, tick);
         var wind = ForecastOrchestrator.getWind(pos, tick);
         var phase = ForecastOrchestrator.getWeatherPhase(level, net.Gabou.projectatmosphere.util.RegionInstanceKey.from(pos), tick);
-        int tornadoes = TornadoManager.getActiveTornadoes().size();
-        int hurricanes = HurricaneManager.getActiveHurricanes().size();
+        int tornadoes = AtmosphereCloudServices.get().activeTornadoCount();
+        int hurricanes = AtmosphereCloudServices.get().activeHurricaneCount();
         boolean simpleClouds = AtmosphereCloudServices.isSimpleCloudsLoaded();
 
         PaCommandMessages.success(

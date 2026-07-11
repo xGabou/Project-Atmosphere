@@ -19,6 +19,8 @@ import java.io.IOException;
 public final class VolumetricCloudShaders {
     private static final ResourceLocation SPLAT_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_splat");
+    private static final ResourceLocation MORPHOLOGY_SPLAT_ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_morphology");
     private static final ResourceLocation VOLUME_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_atmosphere_volume");
     private static final ResourceLocation SHADOW_MAP_ID =
@@ -27,6 +29,7 @@ public final class VolumetricCloudShaders {
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_shadow_apply");
 
     private static ShaderInstance splatShader;
+    private static ShaderInstance morphologySplatShader;
     private static ShaderInstance volumeShader;
     private static ShaderInstance shadowMapShader;
     private static ShaderInstance shadowApplyShader;
@@ -38,6 +41,9 @@ public final class VolumetricCloudShaders {
     public static void onRegisterShaders(RegisterShadersEvent event) throws IOException {
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> splatShader = loaded);
+        event.registerShader(new ShaderInstance(
+                        event.getResourceProvider(), MORPHOLOGY_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
+                loaded -> morphologySplatShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), VOLUME_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> volumeShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADOW_MAP_ID, DefaultVertexFormat.POSITION_TEX),
@@ -58,6 +64,10 @@ public final class VolumetricCloudShaders {
         return volumeShader;
     }
 
+    public static ShaderInstance morphologySplatShader() {
+        return morphologySplatShader;
+    }
+
     public static ShaderInstance shadowMapShader() {
         return shadowMapShader;
     }
@@ -67,6 +77,6 @@ public final class VolumetricCloudShaders {
     }
 
     public static boolean isReady() {
-        return splatShader != null && volumeShader != null;
+        return splatShader != null && morphologySplatShader != null && volumeShader != null;
     }
 }

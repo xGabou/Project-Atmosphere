@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.seasons;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -77,20 +76,24 @@ public final class SeasonTimeHelper {
         }
     }
 
-    public static void onRainStarted(ServerLevel level, CloudRegion cloudRegion) {
+    public static void onRainStarted(ServerLevel level, int externalCloudRegionId) {
         try {
-            DELEGATE.get().onRainStarted(level, cloudRegion);
+            DELEGATE.get().onRainStarted(level, externalCloudRegionId);
         } catch (Exception e) {
             LOGGER.warn("Season delegate failed while handling rain start.", e);
         }
     }
 
-    public static void onRainEnded(ServerLevel level, CloudRegion cloudRegion) {
+    public static void onRainEnded(ServerLevel level, int externalCloudRegionId) {
         try {
-            DELEGATE.get().onRainEnded(level, cloudRegion);
+            DELEGATE.get().onRainEnded(level, externalCloudRegionId);
         } catch (Exception e) {
             LOGGER.warn("Season delegate failed while handling rain end.", e);
         }
+    }
+
+    public static void useNeutralDelegate() {
+        setDelegate(new NeutralDelegate());
     }
 
     private static final class NeutralDelegate implements SeasonTimeDelegate {

@@ -1,7 +1,5 @@
 package net.Gabou.projectatmosphere.modules.snowstorm;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.modules.weather.SnowTier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -21,8 +19,8 @@ public class SnowstormManager {
     private static final List<SnowStorm> affectedRegions = new ArrayList<>();
 
 
-    public static void startSnowstorm(int intensity,CloudRegion region) {
-        affectedRegions.add(new SnowStorm(intensity,region));
+    public static void startSnowstorm(int intensity, double centerX, double centerZ, double radius) {
+        affectedRegions.add(new SnowStorm(intensity, centerX, centerZ, radius));
 
     }
 
@@ -32,18 +30,16 @@ public class SnowstormManager {
 
     public static int getSnowStormIntensity(ChunkPos pos)
     {
-        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(),pos.getMinBlockZ(),16);
         return affectedRegions.stream()
-                .filter(storm -> storm.getCloudRegion().intersects(region))
+                .filter(storm -> storm.intersects(pos))
                 .mapToInt(SnowStorm::getIntensity)
                 .max()
                 .orElse(0);
     }
 
     public static SnowTier getSnowTier(ChunkPos pos) {
-        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(), pos.getMinBlockZ(), 16);
         return affectedRegions.stream()
-                .filter(storm -> storm.getCloudRegion().intersects(region))
+                .filter(storm -> storm.intersects(pos))
                 .map(SnowStorm::getTier)
                 .max(java.util.Comparator.comparingInt(Enum::ordinal))
                 .orElse(SnowTier.NONE);
@@ -51,15 +47,14 @@ public class SnowstormManager {
 
 
     public static boolean isSnowStormAt(ChunkPos pos){
-        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(),pos.getMinBlockZ(),16);
-        return affectedRegions.stream().anyMatch(storm -> storm.getCloudRegion().intersects(region));
+        return affectedRegions.stream().anyMatch(storm -> storm.intersects(pos));
     }
 
     public static void tick(ServerLevel level) {
         for (SnowStorm snow : affectedRegions) {
             for (ServerPlayer player : level.players()) {
                 BlockPos pos = player.blockPosition();
-                if (snow.getCloudRegion().intersects(new SpawnRegion(pos.getX(), pos.getY(), 5)))
+                if (snow.intersects(pos.getX() - 5.0D, pos.getZ() - 5.0D, pos.getX() + 5.0D, pos.getZ() + 5.0D))
                     applyEffects(player, snow);
 
             }

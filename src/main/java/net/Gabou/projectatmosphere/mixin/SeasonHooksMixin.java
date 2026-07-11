@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.mixin;
 
-import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -47,9 +46,11 @@ public class SeasonHooksMixin {
                 if (level instanceof Level clientLevel) {
                     var biomeKey = clientLevel.getBiome(pos).unwrapKey().orElse(null);
                     if (biomeKey != null) {
-                        boolean freezing = BiomeClientTemperatureCache.isFreezing(biomeKey.location(), clientLevel);
-                        cir.setReturnValue(!freezing);
-                        cir.cancel();
+                        Boolean freezing = queryClientFreezing(biomeKey.location(), clientLevel);
+                        if (freezing != null) {
+                            cir.setReturnValue(!freezing);
+                            cir.cancel();
+                        }
                     }
                 }
             } catch (Throwable ignored) {
@@ -59,5 +60,17 @@ public class SeasonHooksMixin {
 
 
         // Otherwise let the original logic proceed (warm enough)
+    }
+
+    private static Boolean queryClientFreezing(net.minecraft.resources.ResourceLocation biomeId, Level level) {
+        String className = "net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache";
+        try {
+            Class<?> cacheClass = Class.forName(className, true, SeasonHooksMixin.class.getClassLoader());
+            return (Boolean) cacheClass
+                    .getMethod("isFreezing", net.minecraft.resources.ResourceLocation.class, Level.class)
+                    .invoke(null, biomeId, level);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            return null;
+        }
     }
 }

@@ -5,6 +5,7 @@ import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
 import dev.nonamecrackers2.simpleclouds.client.renderer.pipeline.DefaultPipeline;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.client.render.SimpleCloudsHurricaneRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -35,11 +36,14 @@ public abstract class DefaultPipelineHurricaneMixin {
 
         float[] cloudColor = renderer.getCloudColor(partialTick);
         mc.getProfiler().push("projectatmosphere_hurricane_opaque");
-        SimpleCloudsHurricaneRenderer.INSTANCE.prepareFrame(level, partialTick);
-        SimpleCloudsHurricaneRenderer.INSTANCE.renderOpaque(
-                renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2]
-        );
-        mc.getProfiler().pop();
+        try (CloudRenderStateGuard.State ignored = CloudRenderStateGuard.capture()) {
+            SimpleCloudsHurricaneRenderer.INSTANCE.prepareFrame(level, partialTick);
+            SimpleCloudsHurricaneRenderer.INSTANCE.renderOpaque(
+                    renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2]
+            );
+        } finally {
+            mc.getProfiler().pop();
+        }
     }
 
     @Inject(
@@ -62,12 +66,15 @@ public abstract class DefaultPipelineHurricaneMixin {
 
         float[] cloudColor = renderer.getCloudColor(partialTick);
         mc.getProfiler().push("projectatmosphere_hurricane_transparency");
-        SimpleCloudsHurricaneRenderer.INSTANCE.prepareFrame(level, partialTick);
-        renderer.copyDepthFromCloudsToTransparency();
-        renderer.getCloudTransparencyTarget().bindWrite(false);
-        SimpleCloudsHurricaneRenderer.INSTANCE.renderTransparency(
-                renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2]
-        );
-        mc.getProfiler().pop();
+        try (CloudRenderStateGuard.State ignored = CloudRenderStateGuard.capture()) {
+            SimpleCloudsHurricaneRenderer.INSTANCE.prepareFrame(level, partialTick);
+            renderer.copyDepthFromCloudsToTransparency();
+            renderer.getCloudTransparencyTarget().bindWrite(false);
+            SimpleCloudsHurricaneRenderer.INSTANCE.renderTransparency(
+                    renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2]
+            );
+        } finally {
+            mc.getProfiler().pop();
+        }
     }
 }

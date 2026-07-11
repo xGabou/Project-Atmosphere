@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.modules.weather;
 
-import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
 import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
@@ -23,21 +22,6 @@ public final class WeatherSampler {
     // ---------------------------------------------------------------------
     // Region sampling
     // ---------------------------------------------------------------------
-    public static Map<RegionInstanceKey, Integer> sampleRegionsInRegion(SpawnRegion region, ServerLevel level) {
-        Map<RegionInstanceKey, Integer> weights = new HashMap<>();
-
-        int baseX = region.x() << 4;
-        int baseZ = region.z() << 4;
-
-        for (int dx = 0; dx < 16; dx += 4) {
-            for (int dz = 0; dz < 16; dz += 4) {
-                BlockPos pos = new BlockPos(baseX + dx, level.getSeaLevel(), baseZ + dz);
-                weights.merge(RegionInstanceKey.from(pos), 1, Integer::sum);
-            }
-        }
-        return weights;
-    }
-
     public static Map<RegionInstanceKey, Integer> sampleRegionsInArea(int centerX, int centerZ, int radius, ServerLevel level) {
         Map<RegionInstanceKey, Integer> result = new HashMap<>();
         int step = 24;

@@ -1,5 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Objects;
@@ -25,6 +28,10 @@ public record CloudFieldSnapshot(
         Vec3 windVector,
         float verticalDevelopment,
         float stormPotential,
+        String cloudTypeId,
+        CloudMorphologyFamily morphologyFamily,
+        float anvilStrength,
+        float precipitationIntensity,
         CloudFieldSourceKind sourceKind,
         CloudLodBand lodBand,
         CloudLodBand previousLodBand,
@@ -53,6 +60,13 @@ public record CloudFieldSnapshot(
         windVector = windVector == null ? Vec3.ZERO : windVector;
         verticalDevelopment = clamp01(verticalDevelopment);
         stormPotential = clamp01(stormPotential);
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
+        cloudTypeId = definition.getId();
+        morphologyFamily = morphologyFamily == null
+                ? definition.getMorphologyFamily()
+                : morphologyFamily;
+        anvilStrength = clamp01(anvilStrength);
+        precipitationIntensity = clamp01(precipitationIntensity);
         sourceKind = sourceKind == null ? CloudFieldSourceKind.UNKNOWN : sourceKind;
         lodBand = lodBand == null ? CloudLodBand.DYNAMIC : lodBand;
         previousLodBand = previousLodBand == null ? lodBand : previousLodBand;
@@ -90,6 +104,14 @@ public record CloudFieldSnapshot(
 
     public boolean isHydratedEnoughForCloudlets() {
         return hydrationProgress > 0.001F && dynamicCloudletCount() > 0;
+    }
+
+    /** 0 forming, 0.5 mature, 1 dissipating; consumed as continuous GPU metadata. */
+    public float lifecycleStage() {
+        if (decay > 0.001F) {
+            return 0.5F + decay * 0.5F;
+        }
+        return growth < 0.999F ? growth * 0.5F : 0.5F;
     }
 
     private static float clamp01(float value) {

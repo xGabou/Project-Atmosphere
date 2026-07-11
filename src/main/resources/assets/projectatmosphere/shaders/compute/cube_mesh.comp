@@ -182,6 +182,10 @@ uniform int TotalCloudHurricanes;
 uniform vec4 CloudTornadoData0[16];
 uniform vec4 CloudTornadoData1[16];
 
+float projectatmosphere_lodSlice() {
+        return float(clamp(LodLevel, 0, max(TotalLodLevels - 1, 0)));
+}
+
 #if FIXED_SECTION_SIZE == 1
 //Offset in number of mesh elements
 uniform int OpaqueMeshDataOffset;
@@ -271,7 +275,7 @@ bool isPosValid(float x, float y, float z, int nx, int nz)
 {
 #if TYPE == 0
         vec2 texelCoord = gl_GlobalInvocationID.xz + RegionSampleOffset + vec2(nx, nz);
-    vec4 info = texture(RegionsSampler, vec3(texelCoord / RegionsTexSize, float(LodLevel)));
+    vec4 info = texture(RegionsSampler, vec3(texelCoord / RegionsTexSize, projectatmosphere_lodSlice()));
     uint regionId = uint(info.r);
     LayerGroup group = layerGroupings.data[regionId];
     float fade = -5.0 * pow(1.0 - info.g, 10.0);
@@ -407,7 +411,7 @@ void main()
     
 #if TYPE == 0
 	vec2 texelCoord = gl_GlobalInvocationID.xz + RegionSampleOffset;
-    vec4 info = texture(RegionsSampler, vec3(texelCoord / RegionsTexSize, float(LodLevel)));
+    vec4 info = texture(RegionsSampler, vec3(texelCoord / RegionsTexSize, projectatmosphere_lodSlice()));
     uint regionId = uint(info.r);
     LayerGroup group = layerGroupings.data[regionId];
     float fade = -5.0 * pow(1.0 - info.g, 10.0);

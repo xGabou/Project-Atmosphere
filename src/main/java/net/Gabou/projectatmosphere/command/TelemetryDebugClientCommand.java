@@ -8,11 +8,9 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudFieldCache;
 import net.Gabou.projectatmosphere.clouds.client.ClientCloudRegionDataCache;
-import net.Gabou.projectatmosphere.clouds.client.CloudRenderController;
-import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderConfig;
-import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderFallbackState;
+import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderDebugMode;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeDebugMode;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderConfig;
@@ -78,23 +76,16 @@ public class TelemetryDebugClientCommand {
                                         .executes(ctx -> {
                                             int cachedRegions = ClientCloudRegionDataCache.getCurrentRegions().size();
                                             int cachedFields = ClientCloudFieldCache.getCurrentSnapshots().size();
-                                            int currentSnapshots = CloudRenderStateHolder.getInstance().getCurrentSnapshots().size();
-                                            int renderableSnapshots = CloudRenderController.getRenderableLiveSnapshots().size();
                                             boolean hasDebugSnapshot = CloudRenderStateHolder.getInstance().hasDebugSnapshot();
-                                            CloudRenderFallbackState.FailureStatus fallbackStatus = CloudRenderFallbackState.getStatus();
+                                            ClientCloudRenderOwnership.Owner owner = ClientCloudRenderOwnership.resolve(
+                                                    Minecraft.getInstance().level);
 
                                             StringBuilder message = new StringBuilder("Cloud client status")
                                                     .append("\ncacheRegions=").append(cachedRegions)
                                                     .append("\ncacheCloudFields=").append(cachedFields)
-                                                    .append("\ncurrentSnapshots=").append(currentSnapshots)
-                                                    .append("\nrenderableLiveSnapshots=").append(renderableSnapshots)
                                                     .append("\ndebugSnapshot=").append(hasDebugSnapshot)
-                                                    .append("\nfallbackActive=").append(fallbackStatus.active());
-
-                                            if (fallbackStatus.active()) {
-                                                message.append("\nfallbackTitle=").append(fallbackStatus.title())
-                                                        .append("\nfallbackDetail=").append(fallbackStatus.detail());
-                                            }
+                                                    .append("\ncloudOwner=").append(owner)
+                                                    .append("\nvolumetric=").append(VolumetricCloudRenderHook.status());
 
                                             if (cachedRegions > 0) {
                                                 CloudRegionRenderData data = ClientCloudRegionDataCache.getCurrentRegions().get(0);
@@ -112,30 +103,6 @@ public class TelemetryDebugClientCommand {
                                                         .append(String.format(java.util.Locale.ROOT, "%.1f/%.1f", data.getBaseY(), data.getTopY()))
                                                         .append(" center=")
                                                         .append(String.format(java.util.Locale.ROOT, "%.1f %.1f %.1f", data.getCenter().x(), data.getCenter().y(), data.getCenter().z()));
-                                            }
-
-                                            if (currentSnapshots > 0) {
-                                                CloudRenderSnapshot snapshot = CloudRenderStateHolder.getInstance().getCurrentSnapshots().get(0);
-                                                message.append("\nfirstSnapshot=")
-                                                        .append(snapshot.getDimension())
-                                                        .append(" enabled=")
-                                                        .append(snapshot.isEnabled())
-                                                        .append(" radius=")
-                                                        .append(String.format(java.util.Locale.ROOT, "%.1f", snapshot.getRegionRadius()))
-                                                        .append(" age=")
-                                                        .append(snapshot.getAgeTicks())
-                                                        .append("/")
-                                                        .append(snapshot.getLifetimeTicks());
-                                                message.append(" type=")
-                                                        .append(snapshot.getCloudTypeId())
-                                                        .append(" tower=")
-                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getTowerStrength()))
-                                                        .append(" anvil=")
-                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getAnvilStrength()))
-                                                        .append(" vertical=")
-                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getVerticalThickness()))
-                                                        .append(" squash=")
-                                                        .append(String.format(java.util.Locale.ROOT, "%.2f", snapshot.getHeightSquash()));
                                             }
 
                                             ctx.getSource().sendSuccess(() -> Component.literal(message.toString()), false);

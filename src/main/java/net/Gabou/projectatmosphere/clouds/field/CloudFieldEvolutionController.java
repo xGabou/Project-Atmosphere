@@ -100,6 +100,14 @@ public final class CloudFieldEvolutionController {
                         config.verticalDevelopmentPerTick() * ticks
                 ),
                 approach(currentField.stormPotential(), resolvedTarget.stormPotential(), stormRate * ticks),
+                resolvedTarget.cloudTypeId(),
+                resolvedTarget.morphologyFamily(),
+                approach(currentField.anvilStrength(), resolvedTarget.anvilStrength(), stormRate * ticks),
+                approach(
+                        currentField.precipitationIntensity(),
+                        resolvedTarget.precipitationIntensity(),
+                        stormRate * ticks
+                ),
                 cloudletCount,
                 ageTicks,
                 lifetimeTicks

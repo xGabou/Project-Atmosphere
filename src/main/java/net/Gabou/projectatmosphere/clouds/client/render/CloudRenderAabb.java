@@ -1,7 +1,5 @@
 package net.Gabou.projectatmosphere.clouds.client.render;
 
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.clouds.client.CloudRenderFrameContext;
 import net.Gabou.projectatmosphere.clouds.client.CloudRenderSnapshot;
 import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.minecraft.util.Mth;
@@ -9,12 +7,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Locale;
-
 public final class CloudRenderAabb {
-    private static final int LOG_INTERVAL_TICKS = 20;
-    private static long lastWireframeLoggedWorldTime = Long.MIN_VALUE;
-    private static long lastShaderUploadLoggedWorldTime = Long.MIN_VALUE;
     private static volatile CloudRenderSnapshot debugWireframeSnapshot;
 
     private CloudRenderAabb() {
@@ -61,76 +54,9 @@ public final class CloudRenderAabb {
         return debugWireframeSnapshot;
     }
 
-    public static void logOneCloud(@NotNull CloudRenderFrameContext frameContext, @Nullable CloudRenderSnapshot snapshot) {
-        if (!CloudRenderDebugMode.current().isActive()) {
-            return;
-        }
-
-        long worldTime = frameContext.getWorldTime();
-        if (worldTime == lastWireframeLoggedWorldTime || worldTime % LOG_INTERVAL_TICKS != 0L) {
-            return;
-        }
-
-        lastWireframeLoggedWorldTime = worldTime;
-        Bounds bounds = compute(snapshot);
-        if (bounds == null) {
-            ProjectAtmosphere.LOGGER.info("[CloudAABB] source=wireframe worldTime={} cloud=none", worldTime);
-            return;
-        }
-
-        logBounds("wireframe", frameContext, bounds);
-    }
-
-    public static void logShaderUpload(
-            @NotNull CloudRenderFrameContext frameContext,
-            @Nullable Bounds bounds
-    ) {
-        if (!CloudRenderDebugMode.current().isActive()) {
-            return;
-        }
-
-        long worldTime = frameContext.getWorldTime();
-        if (worldTime == lastShaderUploadLoggedWorldTime || worldTime % LOG_INTERVAL_TICKS != 0L) {
-            return;
-        }
-
-        lastShaderUploadLoggedWorldTime = worldTime;
-        if (bounds == null) {
-            ProjectAtmosphere.LOGGER.info("[CloudAABB] source=shaderUpload worldTime={} cloud=none", worldTime);
-            return;
-        }
-
-        logBounds("shaderUpload", frameContext, bounds);
-    }
-
-    private static void logBounds(@NotNull String source, @NotNull CloudRenderFrameContext frameContext, @NotNull Bounds bounds) {
-        ProjectAtmosphere.LOGGER.info(
-                "[CloudAABB] source={} worldTime={} mode={} center={} radius={} baseY={} topY={} min={} max={} volumeRadius={} paddingY={}",
-                source,
-                frameContext.getWorldTime(),
-                CloudRenderDebugMode.current().serializedName(),
-                format(bounds.center()),
-                fmt(bounds.regionRadius()),
-                fmt(bounds.baseY()),
-                fmt(bounds.topY()),
-                format(bounds.min()),
-                format(bounds.max()),
-                fmt(bounds.volumeRadius()),
-                fmt(bounds.volumePaddingY())
-        );
-    }
-
     private static float smoothStep(float edge0, float edge1, float value) {
         float t = Mth.clamp((value - edge0) / Math.max(edge1 - edge0, 0.0001F), 0.0F, 1.0F);
         return t * t * (3.0F - 2.0F * t);
-    }
-
-    private static String format(Vec3 value) {
-        return fmt((float) value.x()) + "," + fmt((float) value.y()) + "," + fmt((float) value.z());
-    }
-
-    private static String fmt(float value) {
-        return String.format(Locale.ROOT, "%.6f", value);
     }
 
     public record Bounds(

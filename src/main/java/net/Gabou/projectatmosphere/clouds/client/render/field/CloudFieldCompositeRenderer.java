@@ -10,8 +10,10 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
+import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame;
 import net.minecraft.client.renderer.ShaderInstance;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 /** Depth-aware upsample and scene composite for the CloudField target. */
 public final class CloudFieldCompositeRenderer {
@@ -26,7 +28,7 @@ public final class CloudFieldCompositeRenderer {
             RenderTarget destination,
             CloudFieldCompositeDebugMode requestedMode
     ) {
-        return composite(source, destination, requestedMode, true);
+        return composite(source, destination, requestedMode, true, SceneDepthFrame.INVALID);
     }
 
     public static boolean composite(
@@ -34,6 +36,16 @@ public final class CloudFieldCompositeRenderer {
             RenderTarget destination,
             CloudFieldCompositeDebugMode requestedMode,
             boolean depthAwareComposite
+    ) {
+        return composite(source, destination, requestedMode, depthAwareComposite, SceneDepthFrame.INVALID);
+    }
+
+    public static boolean composite(
+            RenderTarget source,
+            RenderTarget destination,
+            CloudFieldCompositeDebugMode requestedMode,
+            boolean depthAwareComposite,
+            SceneDepthFrame sceneDepth
     ) {
         ShaderInstance shader = CloudFieldVolumeShaders.getCompositeShader();
         if (source == null || destination == null || shader == null || source.getDepthTextureId() <= 0) {
@@ -49,17 +61,32 @@ public final class CloudFieldCompositeRenderer {
                 : requestedMode;
         GPU_TIMER.poll();
         RenderSystem.disableScissor();
-        destination.bindWrite(true);
+        if (!CloudRenderStateGuard.bindCapturedDrawFramebuffer()) {
+            destination.bindWrite(true);
+        }
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
-        RenderSystem.disableDepthTest();
+        if (depthAwareComposite && mode == CloudFieldCompositeDebugMode.FINAL) {
+            // The fixed-function test is a safe final line of defence even if
+            // a detached scene texture cannot be supplied.
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthFunc(GL11.GL_LEQUAL);
+        } else {
+            RenderSystem.disableDepthTest();
+        }
         RenderSystem.depthMask(false);
         RenderSystem.setShader(() -> shader);
         shader.setSampler("CloudColorSampler", source.getColorTextureId());
         shader.setSampler("CloudDepthSampler", source.getDepthTextureId());
+        SceneDepthFrame safeSceneDepth = sceneDepth == null ? SceneDepthFrame.INVALID : sceneDepth;
+        boolean guidedUpsampling = depthAwareComposite
+                && safeSceneDepth.valid()
+                && safeSceneDepth.detached();
+        shader.setSampler("SceneDepthSampler", guidedUpsampling ? safeSceneDepth.textureId() : 0);
         shader.safeGetUniform("CompositeMode").set(mode.shaderId());
         shader.safeGetUniform("DepthCompositeEnabled").set(depthAwareComposite ? 1 : 0);
+        shader.safeGetUniform("SceneDepthValid").set(guidedUpsampling ? 1 : 0);
         shader.apply();
 
         GPU_TIMER.begin();
@@ -70,7 +97,6 @@ public final class CloudFieldCompositeRenderer {
         } finally {
             GPU_TIMER.end();
             shader.clear();
-            restoreRenderState();
         }
         return true;
     }
@@ -88,11 +114,8 @@ public final class CloudFieldCompositeRenderer {
                 + " pendingCompositeQueries=" + GPU_TIMER.getPendingQueries();
     }
 
-    public static void restoreRenderState() {
-        CloudRenderStateGuard.restoreAfterCloudPass();
-    }
-
     public static void shutdown() {
+        GPU_TIMER.close();
         if (fullscreenQuad != null) {
             fullscreenQuad.close();
             fullscreenQuad = null;

@@ -14,9 +14,11 @@
   ],
   "samplers": [
     { "name": "WeatherMapSampler" },
+    { "name": "MorphologyMapSampler" },
     { "name": "BlueNoiseSampler" },
     { "name": "SceneDepthSampler" },
-    { "name": "HistorySampler" }
+    { "name": "HistorySampler" },
+    { "name": "HistoryDepthSampler" }
   ],
   "uniforms": [
     { "name": "CloudProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
@@ -25,7 +27,6 @@
     { "name": "InvViewRotMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
     { "name": "PrevViewProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
     { "name": "CameraPos", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
-    { "name": "OutputSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
     { "name": "WeatherOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
     { "name": "WeatherExtent", "type": "float", "count": 1, "values": [ 4096.0 ] },
     { "name": "SlabBaseY", "type": "float", "count": 1, "values": [ 120.0 ] },

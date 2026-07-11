@@ -1,6 +1,9 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsTornadoServerHooks;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -16,18 +19,24 @@ import net.minecraft.world.phys.Vec3;
 public final class TornadoSpawner {
     private TornadoSpawner() {}
 
-    public static void spawn(RegionInstanceKey key, ServerLevel level, float intensity) {
+    public static boolean spawn(RegionInstanceKey key, ServerLevel level, float intensity) {
         BlockPos center = pickSpawnPosNear(key, level, AtmoCommonConfig.TORNADO_BASE_SPAWN_RADIUS_M.get().floatValue());
-        spawnInternal(center, WindVectorApi.getSurface(key, level.getGameTime()), level,
+        return spawnInternal(center, WindVectorApi.getSurface(key, level.getGameTime()), level,
                 StormSeverityScale.resolve(level, key, level.getGameTime()), intensity);
     }
 
-    private static void spawnInternal(BlockPos center, WindVectorApi.WindSample wind, ServerLevel level, int stormLevel, float intensity) {
+    private static boolean spawnInternal(BlockPos center, WindVectorApi.WindSample wind, ServerLevel level, int stormLevel, float intensity) {
         float radius = 5f + 18f * intensity + stormLevel * 1.5F;
         net.Gabou.projectatmosphere.modules.core.WindVector w =
                 net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(wind.speedMps(),
                         (float) Math.toRadians(wind.directionDeg()));
-        TornadoManager.spawnServer(level, Vec3.atCenterOf(center), radius, w, stormLevel);
+        Vec3 position = Vec3.atCenterOf(center);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return SimpleCloudsTornadoServerHooks.spawn(level, position, radius, w, stormLevel);
+        }
+        return CloudCellSimulationManager.getInstance().activateNativeTornado(
+                level, position, radius, w, stormLevel
+        );
     }
 
     private static BlockPos pickSpawnPosNear(RegionInstanceKey key, ServerLevel level, float radius) {

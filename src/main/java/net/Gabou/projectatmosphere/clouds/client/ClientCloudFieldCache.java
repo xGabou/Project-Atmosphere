@@ -12,6 +12,8 @@ import net.minecraft.world.phys.Vec3;
 import java.util.Collection;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -70,6 +72,47 @@ public final class ClientCloudFieldCache {
                 }
             }
         }
+    }
+
+    public static synchronized void applyDelta(
+            Collection<CloudFieldSnapshot> updated,
+            Collection<UUID> removed
+    ) {
+        Map<UUID, CloudFieldSnapshot> next = new LinkedHashMap<>();
+        for (CloudFieldSnapshot snapshot : currentSnapshots) {
+            if (snapshot != null) {
+                next.put(snapshot.fieldId(), snapshot);
+            }
+        }
+        if (removed != null) {
+            for (UUID id : removed) {
+                if (id == null) {
+                    continue;
+                }
+                next.remove(id);
+                PresentationTrack track = PRESENTATION_TRACKS.get(id);
+                if (track != null) {
+                    track.markMissing();
+                }
+            }
+        }
+        long packetWorldTime = latestPacketWorldTime;
+        if (updated != null) {
+            for (CloudFieldSnapshot snapshot : updated) {
+                if (snapshot == null) {
+                    continue;
+                }
+                next.put(snapshot.fieldId(), snapshot);
+                packetWorldTime = Math.max(packetWorldTime, snapshot.worldTime());
+                PRESENTATION_TRACKS.compute(snapshot.fieldId(), (id, track) -> {
+                    PresentationTrack safeTrack = track == null ? new PresentationTrack() : track;
+                    safeTrack.push(snapshot);
+                    return safeTrack;
+                });
+            }
+        }
+        currentSnapshots = List.copyOf(next.values());
+        latestPacketWorldTime = packetWorldTime;
     }
 
     public static void clear() {
@@ -170,6 +213,10 @@ public final class ClientCloudFieldCache {
                 snapshot.windVector(),
                 snapshot.verticalDevelopment(),
                 snapshot.stormPotential(),
+                snapshot.cloudTypeId(),
+                snapshot.morphologyFamily(),
+                snapshot.anvilStrength(),
+                snapshot.precipitationIntensity(),
                 snapshot.sourceKind(),
                 runtime.currentLodBand(),
                 runtime.previousLodBand(),
@@ -202,6 +249,10 @@ public final class ClientCloudFieldCache {
                 snapshot.windVector(),
                 snapshot.verticalDevelopment(),
                 snapshot.stormPotential(),
+                snapshot.cloudTypeId(),
+                snapshot.morphologyFamily(),
+                snapshot.anvilStrength(),
+                snapshot.precipitationIntensity(),
                 snapshot.targetCloudletCount(),
                 snapshot.fieldAgeTicks(),
                 snapshot.lifetimeTicks()
@@ -234,6 +285,8 @@ public final class ClientCloudFieldCache {
                 lerp(older.windVector(), newer.windVector(), smoothT),
                 lerp(older.verticalDevelopment(), newer.verticalDevelopment(), smoothT),
                 lerp(older.stormPotential(), newer.stormPotential(), smoothT),
+                lerp(older.anvilStrength(), newer.anvilStrength(), smoothT),
+                lerp(older.precipitationIntensity(), newer.precipitationIntensity(), smoothT),
                 lerp(older.hydrationProgress(), newer.hydrationProgress(), smoothT),
                 Math.max(older.targetCloudletCount(), newer.targetCloudletCount()),
                 Math.round(lerp(older.activeCloudletCount(), newer.activeCloudletCount(), smoothT)),
@@ -267,6 +320,8 @@ public final class ClientCloudFieldCache {
                 snapshot.windVector(),
                 snapshot.verticalDevelopment(),
                 snapshot.stormPotential(),
+                snapshot.anvilStrength(),
+                snapshot.precipitationIntensity(),
                 snapshot.hydrationProgress(),
                 snapshot.targetCloudletCount(),
                 snapshot.activeCloudletCount(),
@@ -316,6 +371,8 @@ public final class ClientCloudFieldCache {
             Vec3 wind,
             float verticalDevelopment,
             float stormPotential,
+            float anvilStrength,
+            float precipitationIntensity,
             float hydrationProgress,
             int targetCloudletCount,
             int activeCloudletCount,
@@ -343,6 +400,10 @@ public final class ClientCloudFieldCache {
                 wind,
                 verticalDevelopment,
                 stormPotential,
+                base.cloudTypeId(),
+                base.morphologyFamily(),
+                anvilStrength,
+                precipitationIntensity,
                 base.sourceKind(),
                 base.lodBand(),
                 base.previousLodBand(),
@@ -456,6 +517,8 @@ public final class ClientCloudFieldCache {
                     base.windVector(),
                     base.verticalDevelopment(),
                     base.stormPotential(),
+                    base.anvilStrength(),
+                    base.precipitationIntensity(),
                     base.hydrationProgress(),
                     base.targetCloudletCount(),
                     base.activeCloudletCount(),

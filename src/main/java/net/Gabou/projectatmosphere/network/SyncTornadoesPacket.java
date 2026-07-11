@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.network;
 
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoSnapshot;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -44,7 +43,7 @@ public class SyncTornadoesPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> TornadoManager.applyClientSnapshots(this.snapshots));
+        ctx.get().enqueueWork(() -> SevereWeatherClientPacketHandlers.syncTornadoes(this.snapshots));
         ctx.get().setPacketHandled(true);
     }
 }

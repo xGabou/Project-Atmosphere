@@ -50,7 +50,13 @@ public final class CloudCellClassifier {
 
     /** Tornado eligibility gate for the phase-8 hooks (native backend). */
     public static boolean isTornadoEligible(CloudCell cell) {
-        return cell.classification() == CloudCellClassification.CUMULONIMBUS
+        return isTornadoEligible(cell, cell == null ? CloudCellClassification.UNCLASSIFIED : cell.classification());
+    }
+
+    /** Evaluates eligibility against an explicit freshly-derived classification. */
+    public static boolean isTornadoEligible(CloudCell cell, CloudCellClassification classification) {
+        return cell != null
+                && classification == CloudCellClassification.CUMULONIMBUS
                 && cell.energy() > 0.75F
                 && cell.rotation() > 0.55F
                 && cell.phase() != net.Gabou.projectatmosphere.clouds.cell.CloudCellLifecyclePhase.DISSIPATING;

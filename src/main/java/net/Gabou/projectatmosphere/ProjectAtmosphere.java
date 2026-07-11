@@ -3,6 +3,8 @@ package net.Gabou.projectatmosphere;
 
 
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
+import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
+import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDataReloadListener;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.registry.*;
@@ -11,9 +13,6 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.seasons.SeasonBootstrap;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.TickCounter;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.locale.Language;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,7 +30,8 @@ import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
@@ -39,7 +39,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.event.*;
 
-import java.util.Map;
 import java.util.Objects;
 
 @Mod(ProjectAtmosphere.MODID)
@@ -72,9 +71,7 @@ public class ProjectAtmosphere {
         NetworkHandler.init();
 
         modEventBus.addListener(this::setup);
-        modEventBus.addListener((FMLClientSetupEvent event) -> {
-            clientSetup(event,context);
-        });
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> ProjectAtmosphere::registerClientBootstrap);
 
         
         MinecraftForge.EVENT_BUS.register(TemperatureTickHandler.class);
@@ -128,6 +125,8 @@ public class ProjectAtmosphere {
     @SubscribeEvent
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            CloudFieldSyncManager.forgetPlayer(player.getUUID());
+            CloudCellSimulationManager.getInstance().forgetPlayer(player.getUUID());
             ServerLevel world = Objects.requireNonNull(player.getServer()).getLevel(ServerLevel.OVERWORLD);
             if (world != null) {
                 AtmosphereManager.onPlayerLogout(world, player);
@@ -170,19 +169,14 @@ public class ProjectAtmosphere {
     }
 
 
-    @SuppressWarnings("removal")
-    private void clientSetup(final FMLClientSetupEvent event, FMLJavaModLoadingContext context) {
-        event.enqueueWork(() -> {
-            if(ProjectAtmosphere.DEBUG_MODE)
-                LOGGER.info("Setting up Project Atmosphere (Client)");
-            ClientOnlyRegistrar.registerClient(MinecraftForge.EVENT_BUS,context);
-            Map<String, String> translations = Language.getInstance().getLanguageData();
-            translations.put("sandstorm.debug.blocked", "Nothing to report. Stay alert.");
-            ItemBlockRenderTypes.setRenderLayer(ModBlocks.BAROMETER_BLOCK.get(), RenderType.translucent());
-            ItemBlockRenderTypes.setRenderLayer(ModBlocks.THERMOMETER_BLOCK.get(), RenderType.translucent());
-
-
-        });
+    private static void registerClientBootstrap() {
+        String className = "net.Gabou.projectatmosphere.registry.ClientBootstrap";
+        try {
+            Class<?> bootstrap = Class.forName(className, true, ProjectAtmosphere.class.getClassLoader());
+            bootstrap.getMethod("register").invoke(null);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            throw new IllegalStateException("Project Atmosphere client bootstrap failed", exception);
+        }
     }
 
     @SubscribeEvent
@@ -262,7 +256,17 @@ public class ProjectAtmosphere {
 
         
         public static SystemProfile create(boolean isClient) {
-            return isClient ? new ClientSystemProfile() : new ServerSystemProfile();
+            if (!isClient) {
+                return new ServerSystemProfile();
+            }
+            String className = "net.Gabou.projectatmosphere.ClientSystemProfile";
+            try {
+                Class<?> profileClass = Class.forName(className, true, ProjectAtmosphere.class.getClassLoader());
+                return (SystemProfile) profileClass.getConstructor().newInstance();
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                LOGGER.warn("Client GPU profile unavailable; using the server-safe profile.", exception);
+                return new ServerSystemProfile();
+            }
         }
     }
 }

@@ -28,6 +28,7 @@ public record CloudFieldUpdatePlan(
         boolean decayChanged,
         boolean verticalDevelopmentChanged,
         boolean stormPotentialChanged,
+        boolean morphologyChanged,
         boolean cloudletCountChanged,
         CloudField desiredField
 ) {
@@ -68,6 +69,7 @@ public record CloudFieldUpdatePlan(
                     true,
                     true,
                     true,
+                    true,
                     desired
             );
         }
@@ -90,6 +92,10 @@ public record CloudFieldUpdatePlan(
                 !sameFloat(existing.decay(), desired.decay()),
                 !sameFloat(existing.verticalDevelopment(), desired.verticalDevelopment()),
                 !sameFloat(existing.stormPotential(), desired.stormPotential()),
+                !existing.cloudTypeId().equals(desired.cloudTypeId())
+                        || existing.morphologyFamily() != desired.morphologyFamily()
+                        || !sameFloat(existing.anvilStrength(), desired.anvilStrength())
+                        || !sameFloat(existing.precipitationIntensity(), desired.precipitationIntensity()),
                 existing.cloudletCount() != desired.cloudletCount(),
                 desired
         );
@@ -125,6 +131,10 @@ public record CloudFieldUpdatePlan(
                 !sameFloat(existing.decay(), source.decay()),
                 !sameFloat(existing.verticalDevelopment(), source.verticalDevelopment()),
                 !sameFloat(existing.stormPotential(), source.stormPotential()),
+                !existing.cloudTypeId().equals(source.cloudTypeId())
+                        || existing.morphologyFamily() != source.resolvedMorphologyFamily()
+                        || !sameFloat(existing.anvilStrength(), source.anvilStrength())
+                        || !sameFloat(existing.precipitationIntensity(), source.precipitationIntensity()),
                 existing.cloudletCount() != fieldFactory.cloudletCountFor(source),
                 existing
         );
@@ -137,6 +147,7 @@ public record CloudFieldUpdatePlan(
                 fieldId,
                 false,
                 existingFieldPresent,
+                false,
                 false,
                 false,
                 false,
@@ -167,6 +178,7 @@ public record CloudFieldUpdatePlan(
                 || decayChanged
                 || verticalDevelopmentChanged
                 || stormPotentialChanged
+                || morphologyChanged
                 || cloudletCountChanged;
     }
 

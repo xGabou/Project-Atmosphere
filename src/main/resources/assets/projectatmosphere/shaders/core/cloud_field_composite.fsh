@@ -2,8 +2,10 @@
 
 uniform sampler2D CloudColorSampler;
 uniform sampler2D CloudDepthSampler;
+uniform sampler2D SceneDepthSampler;
 uniform int CompositeMode;
 uniform int DepthCompositeEnabled;
+uniform int SceneDepthValid;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -49,16 +51,33 @@ void main() {
     bool pairedPresent = false;
     float selectedDepth = 1.0;
     float selectedScore = -1.0;
+    float sceneDepth = 1.0;
+    float sceneDepthBias = 0.00002;
+
+    if (SceneDepthValid != 0) {
+        ivec2 sceneSize = textureSize(SceneDepthSampler, 0);
+        if (sceneSize.x > 0 && sceneSize.y > 0) {
+            ivec2 sceneCoord = clampCoord(ivec2(texCoord * vec2(sceneSize)), sceneSize);
+            sceneDepth = texelFetch(SceneDepthSampler, sceneCoord, 0).r;
+            float sceneRight = texelFetch(SceneDepthSampler, clampCoord(sceneCoord + ivec2(1, 0), sceneSize), 0).r;
+            float sceneUp = texelFetch(SceneDepthSampler, clampCoord(sceneCoord + ivec2(0, 1), sceneSize), 0).r;
+            float depthGradient = max(abs(sceneDepth - sceneRight), abs(sceneDepth - sceneUp));
+            sceneDepthBias += min(depthGradient * 0.25, 0.00035);
+        }
+    }
 
     for (int i = 0; i < 4; i++) {
         colors[i] = texelFetch(CloudColorSampler, coords[i], 0);
         depths[i] = texelFetch(CloudDepthSampler, coords[i], 0).r;
         bool hasColor = colors[i].a > ALPHA_EPSILON;
         bool hasDepth = depths[i] < 1.0;
+        bool visibleAgainstScene = SceneDepthValid == 0
+            || sceneDepth >= 0.99999
+            || depths[i] <= sceneDepth + sceneDepthBias;
         colorPresent = colorPresent || hasColor;
         depthPresent = depthPresent || hasDepth;
-        pairedPresent = pairedPresent || (hasColor && hasDepth);
-        if (hasColor && hasDepth) {
+        pairedPresent = pairedPresent || (hasColor && hasDepth && visibleAgainstScene);
+        if (hasColor && hasDepth && visibleAgainstScene) {
             float score = weights[i] * colors[i].a;
             if (score > selectedScore) {
                 selectedScore = score;
@@ -117,7 +136,10 @@ void main() {
     float acceptedWeight = 0.0;
     float depthTolerance = max(0.00002, (1.0 - selectedDepth) * 0.08);
     for (int i = 0; i < 4; i++) {
-        bool paired = colors[i].a > ALPHA_EPSILON && depths[i] < 1.0;
+        bool visibleAgainstScene = SceneDepthValid == 0
+            || sceneDepth >= 0.99999
+            || depths[i] <= sceneDepth + sceneDepthBias;
+        bool paired = colors[i].a > ALPHA_EPSILON && depths[i] < 1.0 && visibleAgainstScene;
         bool sameSurface = abs(depths[i] - selectedDepth) <= depthTolerance;
         if (paired && sameSurface) {
             accumulated += colors[i] * weights[i];

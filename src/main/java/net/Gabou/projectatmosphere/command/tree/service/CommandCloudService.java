@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.command.tree.service;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
 import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldBackendBridge;
@@ -14,7 +13,6 @@ import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
@@ -86,8 +84,7 @@ public final class CommandCloudService {
                 );
 
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
-            if (region == null) {
+            if (!AtmosphereCloudServices.get().spawnExternalCloud(level, cloudId, regionKey, wind)) {
                 source.sendFailure(Component.literal("Failed to create Simple Clouds cloud '" + cloudId + "'."));
                 return 0;
             }
@@ -433,8 +430,7 @@ public final class CommandCloudService {
                 net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(1.0F, 0.0F);
 
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
-            if (region == null) {
+            if (!AtmosphereCloudServices.get().spawnExternalCloud(level, cloudId, regionKey, wind)) {
                 return false;
             }
         } else if (spawnNativeCloud(level, pos, cloudId) == null) {

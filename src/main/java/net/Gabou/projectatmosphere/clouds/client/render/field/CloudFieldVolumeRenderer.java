@@ -37,6 +37,10 @@ public final class CloudFieldVolumeRenderer {
     private CloudFieldVolumeRenderer() {
     }
 
+    public static void shutdown() {
+        GPU_TIMER.close();
+    }
+
     /**
      * Renders all valid CloudField snapshots for the current client dimension.
      *
@@ -72,10 +76,9 @@ public final class CloudFieldVolumeRenderer {
 
         Stats stats = new Stats(dimensionId, input.worldTime(), cachedSnapshots, input.fields().size(), mode, filter);
         RenderTarget target = outputTarget == null ? Minecraft.getInstance().getMainRenderTarget() : outputTarget;
-        // Sampling main depth is safe only while drawing into the dedicated
-        // downscaled target. Native rendering relies on framebuffer depth and
-        // avoids sampling an attached texture.
-        boolean sceneDepthClip = !debugMode && downscaleApplied && sceneDepthTextureId > 0;
+        // The hook supplies a detached copy, so scene clipping is safe for
+        // both direct and downscaled targets without framebuffer feedback.
+        boolean sceneDepthClip = !debugMode && sceneDepthTextureId > 0;
         boolean compositeOcclusion = !debugMode && downscaleApplied;
         stats.recordTarget(target, downscaleApplied, sceneDepthClip, compositeOcclusion);
         List<FieldDraw> candidates = new ArrayList<>();
@@ -158,7 +161,9 @@ public final class CloudFieldVolumeRenderer {
         try {
             Matrix4f modelViewMat = poseStack.last().pose();
             if (target != null) {
-                target.bindWrite(true);
+                if (downscaleApplied || !CloudRenderStateGuard.bindCapturedDrawFramebuffer()) {
+                    target.bindWrite(true);
+                }
             }
             RenderSystem.disableScissor();
             RenderSystem.colorMask(true, true, true, true);
@@ -207,7 +212,7 @@ public final class CloudFieldVolumeRenderer {
                 stats.recordGpuTimer(GPU_TIMER);
             }
         } finally {
-            restoreRenderState();
+            // The owning hook restores the caller state after composition.
         }
 
         return stats.toRenderStats();
@@ -217,10 +222,6 @@ public final class CloudFieldVolumeRenderer {
      * Restores the render state touched by the CloudField volume pass. The hook
      * also calls this defensively when it catches a render exception.
      */
-    public static void restoreRenderState() {
-        CloudRenderStateGuard.restoreAfterCloudPass();
-    }
-
     private static boolean dimensionMatches(CloudFieldSnapshot snapshot, String dimensionId) {
         if (dimensionId == null || dimensionId.isBlank()) {
             return true;
@@ -233,11 +234,13 @@ public final class CloudFieldVolumeRenderer {
         float radius = Math.max(1.0F, snapshot.radius());
         float baseY = snapshot.baseY();
         float topY = Math.max(baseY + 1.0F, snapshot.topY());
-        float horizontalPadding = Math.max(2.0F, radius * 0.06F);
+        float anvilExtent = Math.max(snapshot.anvilStrength(), snapshot.stormPotential());
+        float horizontalRadius = radius * (1.0F + anvilExtent * 0.36F);
+        float horizontalPadding = Math.max(2.0F, horizontalRadius * 0.06F);
         float verticalPadding = Math.max(2.0F, (topY - baseY) * 0.06F);
         return new Bounds(
-                new Vec3(center.x() - radius - horizontalPadding, baseY - verticalPadding, center.z() - radius - horizontalPadding),
-                new Vec3(center.x() + radius + horizontalPadding, topY + verticalPadding, center.z() + radius + horizontalPadding)
+                new Vec3(center.x() - horizontalRadius - horizontalPadding, baseY - verticalPadding, center.z() - horizontalRadius - horizontalPadding),
+                new Vec3(center.x() + horizontalRadius + horizontalPadding, topY + verticalPadding, center.z() + horizontalRadius + horizontalPadding)
         );
     }
 
