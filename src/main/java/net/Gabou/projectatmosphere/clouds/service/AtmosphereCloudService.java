@@ -116,6 +116,19 @@ public interface AtmosphereCloudService {
         return 0;
     }
 
+    /** Initializes forecast-driven cloud state owned by this backend. */
+    default void initializeForecastClouds(ServerLevel level) {
+    }
+
+    /** Advances forecast-driven cloud state owned by this backend. */
+    default void updateForecastClouds(ServerLevel level) {
+    }
+
+    /** Tests whether this backend owns an active tornado near the supplied position. */
+    default boolean hasActiveTornadoNear(ServerLevel level, BlockPos pos, double radius) {
+        return false;
+    }
+
     default void loadSevereWeather(
             ServerLevel level,
             List<CompoundTag> tornadoes,

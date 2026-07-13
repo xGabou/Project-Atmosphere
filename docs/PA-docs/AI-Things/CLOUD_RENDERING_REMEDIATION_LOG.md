@@ -63,29 +63,33 @@ validation; items explicitly marked "in-game pending" still require a client run
 
 ## Iteration 7 - weather map cache
 
-- Planned attempt: reuse the primary and morphology maps while camera-snapped origin
-  and quantized cloud/weather inputs remain unchanged. Regional animated layers must
-  still invalidate periodically, and target recreation must always invalidate.
-- Expected validation: compilation, resource processing, cache diagnostics, then
-  in-game comparison for motion stepping or stale weather.
+- Attempt: reuse the primary and morphology maps while the camera-snapped origin and
+  quantized cloud/weather fingerprints remain unchanged. Animated regional inputs
+  invalidate on their bounded cadence, and target recreation invalidates both maps.
+- Result: compilation, resource processing and real shader registration passed. The
+  cache no longer redraws unchanged maps every frame. Motion stepping and stale-map
+  perception remain part of the in-game visual matrix.
 
 ## Iteration 8 - temporal history validation
 
-- Planned attempt: compare reprojected cloud depth and transmittance against the
+- Attempt: compare reprojected cloud depth and transmittance against the
   current raymarch, reduce CPU history confidence during rapid camera motion and
   while the camera is inside cloud, and reject invalid history on target/world/backend
   transitions through the existing lifecycle hooks.
-- Expected validation: shader registration/resource checks and an in-game camera-cut,
-  silhouette reveal, cloud-entry and resolution-change matrix.
+- Result: the temporal shader contract compiled on the active OpenGL driver and all
+  lifecycle invalidations compile and execute through client startup. Camera cuts,
+  silhouette reveals, cloud entry and resolution changes still require world-level
+  visual validation.
 
 ## Iteration 9 - noise-domain repetition
 
-- Planned attempt: rotate the world-stable 3D sampling domains and apply a slow,
+- Attempt: rotate the world-stable 3D sampling domains and apply a slow,
   incommensurate analytic domain warp before the existing multi-frequency texture
   lookup. This keeps the existing texture sizes and sample count while breaking the
   obvious axis-aligned repeat period.
-- Expected validation: shader resource checks, then long-distance flyover screenshots
-  with history disabled/enabled to distinguish spatial repetition from temporal noise.
+- Result: the updated shader compiled in both native and Simple Clouds client runs.
+  Long-distance flyover captures with history disabled/enabled remain necessary to
+  quantify residual spatial repetition.
 
 ## Iteration 10 - runtime shader registration
 
@@ -131,3 +135,42 @@ validation; items explicitly marked "in-game pending" still require a client run
   to clamp the LOD texture slice. The conditional `FadeStart`/`FadeEnd` warnings match
   the upstream 0.7.3 preprocessor contract for variants that compile those uniforms
   out and are not treated as a PA shader failure.
+- Follow-up: consume `TotalLodLevels`, remove optimized-out PA hurricane/tornado
+  uniforms from both JSON and GLSL contracts, specialize the hurricane eye-mask CPU
+  upload, and use the live cloud color in the tornado material.
+- Final result: the exact 0.7.3 client again reached the menu, every PA shader loaded,
+  and Simple Clouds logged `Finished initialization`. No PA shader uniform warning,
+  mixin exception or optional-integration linkage error remained. Only the documented
+  upstream Simple Clouds `FadeStart`/`FadeEnd`, `ColorModulator` and storm-fog warnings
+  remain.
+
+## Iteration 13 - late optional-dependency paths
+
+- Static follow-up found that the delayed tornado scheduler and storm siren could
+  still resolve the Simple Clouds tornado implementation after an otherwise clean
+  native startup. Forecast cloud initialization/update also referenced the optional
+  implementation directly behind a branch.
+- Correction: route forecast hooks, active-tornado counts and tornado proximity
+  through `AtmosphereCloudService`; count native funnels from
+  `CloudCellSimulationManager`; remove the unused Simple-Clouds-only wind model and
+  obsolete command classes; move client-level lookup into the reflectively loaded
+  Simple Clouds client integration.
+- Result: `compileJava` passed. A clean native dedicated world reached
+  `Done (22.057s)`, selected the native service and completed forecast generation. A
+  separate clean Simple Clouds world reached `Done (24.552s)`, selected the optional
+  service and completed forecast generation. Neither run produced a linkage, client
+  class-resolution or PA initialization error.
+
+## Iteration 14 - final static and build validation
+
+- `gradle build --no-daemon` completed successfully, including compilation,
+  resource processing, reobfuscation and the Gradle test task. No JUnit suites are
+  currently discovered, so runtime smoke tests remain the effective integration
+  coverage.
+- All 13 Project Atmosphere shader JSON contracts parse, all 42 configured mixin
+  classes exist, the mixin minimum version is 0.8.5, and `git diff --check` reports no
+  whitespace error.
+- The optional-dependency scan finds no direct Oculus, Iris or Distant Horizons Java
+  type. Remaining Simple Clouds types are confined to mixin-plugin-guarded classes,
+  reflectively loaded compatibility/backend implementations and their private support
+  classes. No validation client or server process was left running.

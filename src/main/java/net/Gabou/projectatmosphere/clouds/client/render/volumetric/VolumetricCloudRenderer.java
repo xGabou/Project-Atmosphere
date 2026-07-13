@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
 import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame;
@@ -31,6 +32,9 @@ public final class VolumetricCloudRenderer {
     private static volatile float lastGpuMilliseconds = -1.0F;
     private static volatile boolean lastHistoryValid;
     private static volatile float lastHistoryConfidence;
+    private static volatile float lastResolutionScale = 1.0F;
+    private static boolean denseCameraResolution;
+    private static int fragmentTextureUnits = -1;
 
     private VolumetricCloudRenderer() {
     }
@@ -41,6 +45,10 @@ public final class VolumetricCloudRenderer {
 
     public static float governorStepScale() {
         return GOVERNOR.stepScale();
+    }
+
+    public static float lastResolutionScale() {
+        return lastResolutionScale;
     }
 
     public static void invalidateHistory() {
@@ -57,6 +65,8 @@ public final class VolumetricCloudRenderer {
         lastGpuMilliseconds = -1.0F;
         lastHistoryValid = false;
         lastHistoryConfidence = 0.0F;
+        lastResolutionScale = 1.0F;
+        denseCameraResolution = false;
     }
 
     /** Whether the last raymarch consumed temporal history (for status/logs). */
@@ -114,6 +124,9 @@ public final class VolumetricCloudRenderer {
             Tuning tuning,
             boolean sceneRayLimitEnabled
     ) {
+        if (!hasTextureUnitCapacity()) {
+            return false;
+        }
         ShaderInstance shader = VolumetricCloudShaders.volumeShader();
         if (shader == null || mainTarget == null || !weather.rendered()) {
             return false;
@@ -121,7 +134,23 @@ public final class VolumetricCloudRenderer {
         if (!CloudNoiseTextureManager.ensureReady()) {
             return false;
         }
-        if (!VolumetricCloudRenderTargets.prepareCloudTargets(mainTarget, profile.resolutionScale())) {
+        float cameraCloudDensity = CameraCloudDensityTracker.smoothedCameraDensity();
+        // ULTRA's 0.75 target exceeds one million fragments at 1080p. Dense
+        // whiteout cannot resolve that extra sampling, so use 0.50 only while
+        // the canonical camera density confirms an interior view. Hysteresis
+        // prevents repeated target rebuilds at the cloud boundary.
+        if (denseCameraResolution) {
+            if (cameraCloudDensity < 0.04F) {
+                denseCameraResolution = false;
+            }
+        } else if (cameraCloudDensity > 0.12F) {
+            denseCameraResolution = true;
+        }
+        float resolutionScale = denseCameraResolution
+                ? Math.min(profile.resolutionScale(), 0.50F)
+                : profile.resolutionScale();
+        lastResolutionScale = resolutionScale;
+        if (!VolumetricCloudRenderTargets.prepareCloudTargets(mainTarget, resolutionScale)) {
             return false;
         }
 
@@ -143,7 +172,6 @@ public final class VolumetricCloudRenderer {
                 historyConfidence *= 1.0F - smoothstep(0.025F, 0.22F, rotationDelta);
             }
         }
-        float cameraCloudDensity = CameraCloudDensityTracker.smoothedCameraDensity();
         historyConfidence *= 1.0F - smoothstep(0.04F, 0.48F, cameraCloudDensity);
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
@@ -172,7 +200,15 @@ public final class VolumetricCloudRenderer {
 
         RenderTarget weatherTarget = VolumetricCloudRenderTargets.prepareWeatherTarget(profile.weatherMapSize());
         RenderTarget morphologyTarget = VolumetricCloudRenderTargets.prepareMorphologyTarget(profile.weatherMapSize());
-        if (weatherTarget == null || morphologyTarget == null) {
+        RenderTarget stormStructureTarget =
+                VolumetricCloudRenderTargets.prepareStormStructureTarget(profile.weatherMapSize());
+        RenderTarget stormLayerHeightTarget =
+                VolumetricCloudRenderTargets.prepareStormLayerHeightTarget(profile.weatherMapSize());
+        RenderTarget stormTowerTarget =
+                VolumetricCloudRenderTargets.prepareStormTowerTarget(profile.weatherMapSize());
+        if (weatherTarget == null || morphologyTarget == null
+                || stormStructureTarget == null || stormLayerHeightTarget == null
+                || stormTowerTarget == null) {
             return false;
         }
 
@@ -186,6 +222,9 @@ public final class VolumetricCloudRenderer {
 
         shader.setSampler("WeatherMapSampler", weatherTarget.getColorTextureId());
         shader.setSampler("MorphologyMapSampler", morphologyTarget.getColorTextureId());
+        shader.setSampler("StormStructureMapSampler", stormStructureTarget.getColorTextureId());
+        shader.setSampler("StormLayerHeightMapSampler", stormLayerHeightTarget.getColorTextureId());
+        shader.setSampler("StormTowerMapSampler", stormTowerTarget.getColorTextureId());
         shader.setSampler("BlueNoiseSampler", CloudNoiseTextureManager.blueNoiseTextureId());
         SceneDepthFrame safeSceneDepth = sceneDepth == null ? SceneDepthFrame.INVALID : sceneDepth;
         shader.setSampler("SceneDepthSampler", safeSceneDepth.valid() ? safeSceneDepth.textureId() : 0);
@@ -198,10 +237,12 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("InvViewRotMat").set(invViewRot);
         shader.safeGetUniform("PrevViewProjMat").set(prevViewProj);
         shader.safeGetUniform("CameraPos").set(cameraPos.x, cameraPos.y, cameraPos.z);
+        shader.safeGetUniform("CameraCloudDensity").set(cameraCloudDensity);
         shader.safeGetUniform("WeatherOrigin").set((float) weather.originX(), (float) weather.originZ());
         shader.safeGetUniform("WeatherExtent").set(CloudWeatherMapRenderer.WEATHER_EXTENT);
         shader.safeGetUniform("SlabBaseY").set(weather.slabBaseY());
         shader.safeGetUniform("SlabTopY").set(weather.slabTopY());
+        shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
         Vector3f lightDir = lighting.lightDirection();
         Vector3f lightColor = lighting.lightColor();
         Vector3f ambientTop = lighting.ambientTop();
@@ -293,9 +334,26 @@ public final class VolumetricCloudRenderer {
      */
     private static void bind3dNoise(ShaderInstance shader) {
         int program = shader.getId();
-        bind3dSampler(program, "BaseNoiseSampler", 8, CloudNoiseTextureManager.baseTextureId());
-        bind3dSampler(program, "DetailNoiseSampler", 9, CloudNoiseTextureManager.detailTextureId());
+        bind3dSampler(program, "BaseNoiseSampler", 9, CloudNoiseTextureManager.baseTextureId());
+        bind3dSampler(program, "DetailNoiseSampler", 10, CloudNoiseTextureManager.detailTextureId());
         GlStateManager._activeTexture(GL13.GL_TEXTURE0);
+    }
+
+    private static boolean hasTextureUnitCapacity() {
+        if (fragmentTextureUnits < 0) {
+            fragmentTextureUnits = GL11.glGetInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS);
+            ProjectAtmosphere.LOGGER.info(
+                    "[VolumetricClouds] fragment texture units available={} required=11",
+                    fragmentTextureUnits
+            );
+            if (fragmentTextureUnits < 11) {
+                ProjectAtmosphere.LOGGER.error(
+                        "[VolumetricClouds] native renderer requires 11 fragment texture units but only {} are available",
+                        fragmentTextureUnits
+                );
+            }
+        }
+        return fragmentTextureUnits >= 11;
     }
 
     private static void bind3dSampler(int program, String name, int unit, int textureId) {
@@ -309,9 +367,9 @@ public final class VolumetricCloudRenderer {
     }
 
     private static void unbind3dNoise() {
-        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + 8);
-        GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + 9);
+        GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + 10);
         GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0);
     }

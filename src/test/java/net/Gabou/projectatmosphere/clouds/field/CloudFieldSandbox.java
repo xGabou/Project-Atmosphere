@@ -19,6 +19,12 @@ public final class CloudFieldSandbox {
     }
 
     public static void main(String[] args) throws IOException {
+        var validationIssues = CloudFieldValidation.runSelfCheck();
+        if (!validationIssues.isEmpty()) {
+            throw new IllegalStateException("CloudField self-check failed: " + String.join("; ", validationIssues));
+        }
+        System.out.println("CloudField self-check passed.");
+
         Path output = Path.of("build", "cloud-field-sandbox", "cloud-formation-lab.html");
         Files.createDirectories(output.getParent());
         Files.writeString(output, html(), StandardCharsets.UTF_8);

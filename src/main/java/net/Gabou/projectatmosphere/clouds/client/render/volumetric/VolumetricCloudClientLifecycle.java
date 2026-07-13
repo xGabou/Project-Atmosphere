@@ -88,7 +88,10 @@ public final class VolumetricCloudClientLifecycle {
         ClientCloudVisualDensity.clear();
         CameraCloudDensityTracker.reset();
         runOnRenderThread(() -> {
-            releaseRenderResources(true);
+            // Procedural noise is independent of resource-pack contents. Keep
+            // it resident across F3+T; rebuilding 8 MiB of 3D noise here is
+            // unnecessary and used to expose the upload to atlas unpack state.
+            releaseRenderResources(false);
             ProjectAtmosphere.LOGGER.info("[VolumetricClouds] cleared render resources after resource reload");
         });
     }

@@ -8,7 +8,6 @@ import net.Gabou.projectatmosphere.client.loading.IntegratedForecastLoadingBridg
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateSavedData;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler;
-import net.Gabou.projectatmosphere.modules.atmosphere.CloudManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
@@ -582,9 +581,7 @@ public class ForecastOrchestrator {
         OceanBasinManager.update(level, activeRegions);
         CycloneManager.update(level);
         WindVector.update(level);
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            CloudManager.update(level);
-        }
+        AtmosphereCloudServices.get().updateForecastClouds(level);
         WindEngine.tick(level, activeRegions);
 
         long now = level.getGameTime();
@@ -655,9 +652,7 @@ public class ForecastOrchestrator {
 
     private static void initializeDynamicSystems(ServerLevel level) {
         AtmosphericStateRegistry.rebuildNeighbors();
-        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            CloudManager.initialize(level);
-        }
+        AtmosphereCloudServices.get().initializeForecastClouds(level);
         WeakLowManager.initialize(level);
         CycloneManager.initialize(level);
         OceanBasinManager.initialize(level);

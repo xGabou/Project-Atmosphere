@@ -1,9 +1,12 @@
 package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.platform.GlStateManager;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL21;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -65,10 +68,18 @@ public final class CloudNoiseTextureManager {
         if (base == null || detail == null || blue == null) {
             return false;
         }
+        int uploadedBase = -1;
+        int uploadedDetail = -1;
+        int uploadedBlue = -1;
         try {
-            baseTextureId = upload3d(base, BASE_SIZE);
-            detailTextureId = upload3d(detail, DETAIL_SIZE);
-            blueNoiseTextureId = upload2d(blue, BLUE_SIZE);
+            uploadedBase = upload3d(base, BASE_SIZE);
+            uploadedDetail = upload3d(detail, DETAIL_SIZE);
+            uploadedBlue = upload2d(blue, BLUE_SIZE);
+            // Publish the set atomically. A partial upload must never be
+            // mistaken for a complete sampler set on the following frame.
+            baseTextureId = uploadedBase;
+            detailTextureId = uploadedDetail;
+            blueNoiseTextureId = uploadedBlue;
             basePixels = null;
             detailPixels = null;
             bluePixels = null;
@@ -77,6 +88,12 @@ public final class CloudNoiseTextureManager {
                     baseTextureId, detailTextureId, blueNoiseTextureId);
             return true;
         } catch (Throwable throwable) {
+            deleteTexture(uploadedBase);
+            deleteTexture(uploadedDetail);
+            deleteTexture(uploadedBlue);
+            baseTextureId = -1;
+            detailTextureId = -1;
+            blueNoiseTextureId = -1;
             bakeFailed = true;
             ProjectAtmosphere.LOGGER.error("[VolumetricClouds] noise texture upload failed", throwable);
             return false;
@@ -100,18 +117,12 @@ public final class CloudNoiseTextureManager {
     }
 
     public static void shutdown() {
-        if (baseTextureId > 0) {
-            GL11.glDeleteTextures(baseTextureId);
-            baseTextureId = -1;
-        }
-        if (detailTextureId > 0) {
-            GL11.glDeleteTextures(detailTextureId);
-            detailTextureId = -1;
-        }
-        if (blueNoiseTextureId > 0) {
-            GL11.glDeleteTextures(blueNoiseTextureId);
-            blueNoiseTextureId = -1;
-        }
+        deleteTexture(baseTextureId);
+        deleteTexture(detailTextureId);
+        deleteTexture(blueNoiseTextureId);
+        baseTextureId = -1;
+        detailTextureId = -1;
+        blueNoiseTextureId = -1;
         // Drop any stale CPU payload too. A resource reload after a completed
         // upload otherwise leaves bakeStarted true with no data to upload.
         bakeGeneration++;
@@ -396,41 +407,129 @@ public final class CloudNoiseTextureManager {
     // -----------------------------------------------------------------
 
     private static int upload3d(byte[] pixels, int size) {
+        requirePixelLength(pixels, (long) size * size * size * 4L, "3D");
+        int previousTexture = GL11.glGetInteger(GL12.GL_TEXTURE_BINDING_3D);
         int textureId = GL11.glGenTextures();
-        GL11.glBindTexture(GL12.GL_TEXTURE_3D, textureId);
-        GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-        GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-        GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
-        GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
-        GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL11.GL_REPEAT);
-        ByteBuffer buffer = MemoryUtil.memAlloc(pixels.length);
+        boolean uploaded = false;
         try {
-            buffer.put(pixels).flip();
-            GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL11.GL_RGBA8, size, size, size, 0,
-                    GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+            try (PixelUnpackState ignored = PixelUnpackState.beginTightCpuUpload()) {
+                GL11.glBindTexture(GL12.GL_TEXTURE_3D, textureId);
+                GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+                GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+                GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
+                GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
+                GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL11.GL_REPEAT);
+                ByteBuffer buffer = MemoryUtil.memAlloc(pixels.length);
+                try {
+                    buffer.put(pixels).flip();
+                    GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL11.GL_RGBA8, size, size, size, 0,
+                            GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+                } finally {
+                    MemoryUtil.memFree(buffer);
+                }
+                uploaded = true;
+            }
         } finally {
-            MemoryUtil.memFree(buffer);
+            GL11.glBindTexture(GL12.GL_TEXTURE_3D, previousTexture);
+            if (!uploaded) {
+                deleteTexture(textureId);
+            }
         }
-        GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);
         return textureId;
     }
 
     private static int upload2d(byte[] pixels, int size) {
+        requirePixelLength(pixels, (long) size * size * 4L, "2D");
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
         int textureId = GL11.glGenTextures();
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
-        ByteBuffer buffer = MemoryUtil.memAlloc(pixels.length);
+        boolean uploaded = false;
         try {
-            buffer.put(pixels).flip();
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, size, size, 0,
-                    GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+            try (PixelUnpackState ignored = PixelUnpackState.beginTightCpuUpload()) {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
+                ByteBuffer buffer = MemoryUtil.memAlloc(pixels.length);
+                try {
+                    buffer.put(pixels).flip();
+                    GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, size, size, 0,
+                            GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+                } finally {
+                    MemoryUtil.memFree(buffer);
+                }
+                uploaded = true;
+            }
         } finally {
-            MemoryUtil.memFree(buffer);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, previousTexture);
+            if (!uploaded) {
+                deleteTexture(textureId);
+            }
         }
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         return textureId;
+    }
+
+    private static void requirePixelLength(byte[] pixels, long expectedLength, String dimension) {
+        if (pixels == null || expectedLength != pixels.length) {
+            throw new IllegalArgumentException(
+                    dimension + " noise upload expected " + expectedLength
+                            + " RGBA bytes, got " + (pixels == null ? "null" : pixels.length));
+        }
+    }
+
+    private static void deleteTexture(int textureId) {
+        if (textureId > 0) {
+            // Keep Mojang's tracked 2D binding cache coherent as well as
+            // deleting the GL name. The same API safely deletes 3D names.
+            GlStateManager._deleteTexture(textureId);
+        }
+    }
+
+    /**
+     * NativeImage uploads intentionally leave pixel-unpack parameters set for
+     * their source sub-rectangle. A following glTexImage3D would apply those
+     * row/skip values to our tightly packed buffer and may read beyond it.
+     * A bound pixel-unpack buffer is even more dangerous because the direct
+     * buffer address is then interpreted by OpenGL as a PBO byte offset.
+     */
+    private record PixelUnpackState(
+            int buffer,
+            int alignment,
+            int rowLength,
+            int imageHeight,
+            int skipPixels,
+            int skipRows,
+            int skipImages
+    ) implements AutoCloseable {
+        private static PixelUnpackState beginTightCpuUpload() {
+            PixelUnpackState state = new PixelUnpackState(
+                    GL11.glGetInteger(GL21.GL_PIXEL_UNPACK_BUFFER_BINDING),
+                    GL11.glGetInteger(GL11.GL_UNPACK_ALIGNMENT),
+                    GL11.glGetInteger(GL11.GL_UNPACK_ROW_LENGTH),
+                    GL11.glGetInteger(GL12.GL_UNPACK_IMAGE_HEIGHT),
+                    GL11.glGetInteger(GL11.GL_UNPACK_SKIP_PIXELS),
+                    GL11.glGetInteger(GL11.GL_UNPACK_SKIP_ROWS),
+                    GL11.glGetInteger(GL12.GL_UNPACK_SKIP_IMAGES)
+            );
+            GL15.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+            GL11.glPixelStorei(GL12.GL_UNPACK_IMAGE_HEIGHT, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
+            GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_IMAGES, 0);
+            return state;
+        }
+
+        @Override
+        public void close() {
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, alignment);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, rowLength);
+            GL11.glPixelStorei(GL12.GL_UNPACK_IMAGE_HEIGHT, imageHeight);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, skipPixels);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, skipRows);
+            GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_IMAGES, skipImages);
+            GL15.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, buffer);
+        }
     }
 }

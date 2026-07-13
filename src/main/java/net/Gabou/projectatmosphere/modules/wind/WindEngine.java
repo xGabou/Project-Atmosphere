@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
@@ -11,7 +10,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -108,14 +106,6 @@ public final class WindEngine {
             return WindVector.fromBase(0f, 0f);
         }
         return LowWindModel.sample(forecast, runtime, worldTime, stormChance);
-    }
-
-
-    public static TornadoWindModel.TornadoForces getCurrentTornadoForce(Vec3 position) {
-        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            return null;
-        }
-        return TornadoWindModel.compute(position);
     }
 
     private static CompoundTag saveRegionKey(RegionInstanceKey key) {

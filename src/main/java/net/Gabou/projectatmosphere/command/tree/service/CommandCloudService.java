@@ -48,7 +48,8 @@ public final class CommandCloudService {
             Map.entry("tsegrus", "cumulonimbus_calvus"),
             Map.entry("dense_tsegrus", "cumulonimbus_capillatus"),
             Map.entry("stronger_stratus", "nimbostratus"),
-            Map.entry("severe_nimbostratus", "nimbostratus")
+            Map.entry("severe_nimbostratus", "nimbostratus"),
+            Map.entry("cirrus_fibratus", "cirrus")
     );
 
     private CommandCloudService() {

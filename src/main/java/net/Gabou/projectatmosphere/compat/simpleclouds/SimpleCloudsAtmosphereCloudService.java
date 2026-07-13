@@ -127,6 +127,29 @@ public final class SimpleCloudsAtmosphereCloudService implements AtmosphereCloud
     }
 
     @Override
+    public void initializeForecastClouds(ServerLevel level) {
+        net.Gabou.projectatmosphere.modules.atmosphere.CloudManager.initialize(level);
+    }
+
+    @Override
+    public void updateForecastClouds(ServerLevel level) {
+        net.Gabou.projectatmosphere.modules.atmosphere.CloudManager.update(level);
+    }
+
+    @Override
+    public boolean hasActiveTornadoNear(ServerLevel level, BlockPos pos, double radius) {
+        if (level == null || pos == null || radius <= 0.0D) {
+            return false;
+        }
+        double radiusSq = radius * radius;
+        return TornadoManager.getActiveTornadoes().stream().anyMatch(tornado -> {
+            double dx = tornado.position.x - pos.getX();
+            double dz = tornado.position.z - pos.getZ();
+            return dx * dx + dz * dz <= radiusSq;
+        });
+    }
+
+    @Override
     public void loadSevereWeather(
             ServerLevel level,
             List<net.minecraft.nbt.CompoundTag> tornadoes,

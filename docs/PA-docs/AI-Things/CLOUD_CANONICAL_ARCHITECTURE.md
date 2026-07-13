@@ -60,9 +60,14 @@ could describe different weather at the same position.
 
 ## Transitional limitations
 
-- The field type/morphology contract still needs to be propagated through
-  `CloudField`, `CloudFieldSnapshot`, packet encoding and the volumetric weather map.
-- Server density currently evaluates reconciled cells rather than the exact cloudlet
-  envelope used by the GPU.
+- Cloud type, vertical development, morphology family, anvil, precipitation and
+  lifecycle now propagate through `CloudField`, `CloudFieldSnapshot`, packet encoding,
+  the morphology weather map and both native render paths.
+- Server density and severe-weather eligibility still evaluate reconciled cells
+  rather than the exact deterministic cloudlet envelope used by the GPU. Client
+  whiteout uses the representation that actually completed composition.
+- Scene depth copies the active Forge read/draw target and exposes a provider contract,
+  but projection-aware merging with a separate Distant Horizons depth space still
+  needs a validated runtime adapter for the exact installed DH/Iris/Oculus versions.
 - Hurricane/Simple Clouds integrations keep their own renderer-specific structures;
   they are adapters, not additional Project Atmosphere weather truth.

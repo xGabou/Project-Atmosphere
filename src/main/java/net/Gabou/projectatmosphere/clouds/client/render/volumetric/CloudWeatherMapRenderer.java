@@ -31,6 +31,9 @@ public final class CloudWeatherMapRenderer {
     private static long lastInputSignature = Long.MIN_VALUE;
     private static int lastWeatherTextureId = -1;
     private static int lastMorphologyTextureId = -1;
+    private static int lastStormStructureTextureId = -1;
+    private static int lastStormLayerHeightTextureId = -1;
+    private static int lastStormTowerTextureId = -1;
     private static Result lastResult = Result.EMPTY;
     private static long cacheHits;
     private static long cacheMisses;
@@ -45,6 +48,7 @@ public final class CloudWeatherMapRenderer {
             float slabBaseY,
             float slabTopY,
             int cellCount,
+            float maxPrecipitation,
             FootprintStats footprintStats
     ) {
         public static final Result EMPTY = new Result(
@@ -54,6 +58,7 @@ public final class CloudWeatherMapRenderer {
                 120.0F,
                 320.0F,
                 0,
+                0.0F,
                 FootprintStats.unknown()
         );
     }
@@ -98,6 +103,9 @@ public final class CloudWeatherMapRenderer {
         lastInputSignature = Long.MIN_VALUE;
         lastWeatherTextureId = -1;
         lastMorphologyTextureId = -1;
+        lastStormStructureTextureId = -1;
+        lastStormLayerHeightTextureId = -1;
+        lastStormTowerTextureId = -1;
         lastResult = Result.EMPTY;
     }
 
@@ -129,12 +137,21 @@ public final class CloudWeatherMapRenderer {
     ) {
         ShaderInstance shader = VolumetricCloudShaders.splatShader();
         ShaderInstance morphologyShader = VolumetricCloudShaders.morphologySplatShader();
-        if (shader == null || morphologyShader == null) {
+        ShaderInstance stormStructureShader = VolumetricCloudShaders.stormStructureSplatShader();
+        ShaderInstance stormHeightShader = VolumetricCloudShaders.stormHeightSplatShader();
+        if (shader == null || morphologyShader == null
+                || stormStructureShader == null || stormHeightShader == null) {
             return Result.EMPTY;
         }
         RenderTarget target = VolumetricCloudRenderTargets.prepareWeatherTarget(mapSize);
         RenderTarget morphologyTarget = VolumetricCloudRenderTargets.prepareMorphologyTarget(mapSize);
-        if (target == null || morphologyTarget == null) {
+        RenderTarget stormStructureTarget = VolumetricCloudRenderTargets.prepareStormStructureTarget(mapSize);
+        RenderTarget stormLayerHeightTarget =
+                VolumetricCloudRenderTargets.prepareStormLayerHeightTarget(mapSize);
+        RenderTarget stormTowerTarget = VolumetricCloudRenderTargets.prepareStormTowerTarget(mapSize);
+        if (target == null || morphologyTarget == null
+                || stormStructureTarget == null || stormLayerHeightTarget == null
+                || stormTowerTarget == null) {
             return Result.EMPTY;
         }
 
@@ -149,6 +166,7 @@ public final class CloudWeatherMapRenderer {
         float effectiveRegional = includeRegionalLayer ? Mth.clamp(regionalCoverage, 0.0F, 1.0F) : 0.0F;
         float slabBase = Float.MAX_VALUE;
         float slabTop = -Float.MAX_VALUE;
+        float maxPrecipitation = 0.0F;
         int count = 0;
         for (VolumetricRenderCell cell : cells) {
             if (cell == null || count >= MAX_CELLS) {
@@ -156,6 +174,7 @@ public final class CloudWeatherMapRenderer {
             }
             slabBase = Math.min(slabBase, cell.baseY());
             slabTop = Math.max(slabTop, cell.topY());
+            maxPrecipitation = Math.max(maxPrecipitation, cell.precipitationIntensity());
             count++;
         }
         if (effectiveRegional > 0.01F || count == 0) {
@@ -175,6 +194,7 @@ public final class CloudWeatherMapRenderer {
         float maxEffectiveRadiusTexels = Float.NEGATIVE_INFINITY;
         float totalEffectiveRadiusTexels = 0.0F;
         int footprintSamples = 0;
+        boolean hasSevereStructures = false;
 
         count = 0;
         for (VolumetricRenderCell cell : cells) {
@@ -198,13 +218,31 @@ public final class CloudWeatherMapRenderer {
             float adaptiveScale = adaptiveFootprintScale(projectedRadiusTexels, adaptiveFootprint);
             mediaArray[base + 3] = adaptiveScale;
             morphologyArray[base] = cell.cloudProfile();
-            morphologyArray[base + 1] = cell.morphologyFamily();
+            // Profile already identifies the shader family. Use the second
+            // channel for the data-driven material darkness that was
+            // previously dropped before reaching the GPU.
+            morphologyArray[base + 1] = cell.materialDarkness();
             morphologyArray[base + 2] = cell.verticalDevelopment();
             morphologyArray[base + 3] = cell.humidity();
             dynamicsArray[base] = cell.anvilStrength();
             dynamicsArray[base + 1] = cell.precipitationIntensity();
-            dynamicsArray[base + 2] = cell.lifecycleStage();
-            dynamicsArray[base + 3] = 0.0F;
+            // Negative [-2,-1] values tag the field-level carrier while still
+            // retaining the full [0,1] lifecycle value. The splat shader uses
+            // that tag only to stabilize base/top; coverage remains unchanged.
+            dynamicsArray[base + 2] = cell.macroCarrier()
+                    ? -1.0F - cell.lifecycleStage()
+                    : cell.lifecycleStage();
+            // The primary splat shader does not receive CellMorphology. Pack
+            // the integer profile plus a 1/16 role fraction in the formerly
+            // reserved dynamics slot. Full-precision uniforms preserve both,
+            // and this avoids another array/texture solely for envelope roles.
+            dynamicsArray[base + 3] = cell.cloudProfile()
+                    + cell.envelopeRole().gpuId() / 16.0F;
+            if ((cell.cloudProfile() == 4 || cell.cloudProfile() == 7)
+                    && cell.envelopeRole().gpuId() >= VolumetricRenderCell.EnvelopeRole.BASE.gpuId()
+                    && cell.envelopeRole().gpuId() <= VolumetricRenderCell.EnvelopeRole.ANVIL.gpuId()) {
+                hasSevereStructures = true;
+            }
             if (Float.isFinite(projectedRadiusTexels)) {
                 float effectiveRadiusTexels = projectedRadiusTexels * adaptiveScale * manualCoverageScale;
                 minAdaptiveScale = Math.min(minAdaptiveScale, adaptiveScale);
@@ -243,13 +281,20 @@ public final class CloudWeatherMapRenderer {
                 worldTime,
                 mapSize,
                 manualCoverageScale,
-                adaptiveFootprint
+                adaptiveFootprint,
+                VolumetricCloudDebugConfig.sentinelHeightsEnabled()
         );
         int weatherTextureId = target.getColorTextureId();
         int morphologyTextureId = morphologyTarget.getColorTextureId();
+        int stormStructureTextureId = stormStructureTarget.getColorTextureId();
+        int stormLayerHeightTextureId = stormLayerHeightTarget.getColorTextureId();
+        int stormTowerTextureId = stormTowerTarget.getColorTextureId();
         if (inputSignature == lastInputSignature
                 && weatherTextureId == lastWeatherTextureId
                 && morphologyTextureId == lastMorphologyTextureId
+                && stormStructureTextureId == lastStormStructureTextureId
+                && stormLayerHeightTextureId == lastStormLayerHeightTextureId
+                && stormTowerTextureId == lastStormTowerTextureId
                 && lastResult.rendered()) {
             cacheHits++;
             return lastResult;
@@ -299,10 +344,81 @@ public final class CloudWeatherMapRenderer {
         } finally {
             morphologyShader.clear();
         }
-        Result result = new Result(true, originX, originZ, slabBase, slabTop, count, footprintStats);
+
+        // Preserve all four overlapping severe-cloud roles instead of the one
+        // categorical winner stored by the morphology map. Empty/non-severe
+        // scenes only clear the cached target and skip the third fullscreen
+        // shader pass entirely.
+        VolumetricCloudRenderTargets.clearAndBind(stormStructureTarget);
+        if (hasSevereStructures) {
+            RenderSystem.setShader(() -> stormStructureShader);
+            stormStructureShader.safeGetUniform("WeatherOrigin").set((float) originX, (float) originZ);
+            stormStructureShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
+            stormStructureShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
+            stormStructureShader.safeGetUniform("CellCount").set(count);
+            stormStructureShader.apply();
+            uploadCellArrays(stormStructureShader, false);
+            try {
+                FullscreenQuad.draw(stormStructureShader);
+            } finally {
+                stormStructureShader.clear();
+            }
+        }
+
+        VolumetricCloudRenderTargets.clearAndBind(stormLayerHeightTarget);
+        if (hasSevereStructures) {
+            RenderSystem.setShader(() -> stormHeightShader);
+            stormHeightShader.safeGetUniform("WeatherOrigin").set((float) originX, (float) originZ);
+            stormHeightShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
+            stormHeightShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
+            stormHeightShader.safeGetUniform("CellCount").set(count);
+            stormHeightShader.safeGetUniform("OutputMode").set(0);
+            stormHeightShader.apply();
+            uploadCellArrays(stormHeightShader, false);
+            try {
+                FullscreenQuad.draw(stormHeightShader);
+            } finally {
+                stormHeightShader.clear();
+            }
+        }
+
+        // Reuse the endpoint shader in TOWER mode. CORE and TOWER used to
+        // compete for the same argmax, discarding all secondary convection at
+        // each texel before the raymarch. This target preserves an independent
+        // support/base/top interval without duplicating the shader program.
+        VolumetricCloudRenderTargets.clearAndBind(stormTowerTarget);
+        if (hasSevereStructures) {
+            RenderSystem.setShader(() -> stormHeightShader);
+            stormHeightShader.safeGetUniform("WeatherOrigin").set((float) originX, (float) originZ);
+            stormHeightShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
+            stormHeightShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
+            stormHeightShader.safeGetUniform("CellCount").set(count);
+            stormHeightShader.safeGetUniform("OutputMode").set(1);
+            stormHeightShader.apply();
+            uploadCellArrays(stormHeightShader, false);
+            try {
+                FullscreenQuad.draw(stormHeightShader);
+            } finally {
+                stormHeightShader.clear();
+            }
+        }
+
+        Result result = new Result(
+                true,
+                originX,
+                originZ,
+                slabBase,
+                slabTop,
+                count,
+                maxPrecipitation,
+                footprintStats
+        );
         lastInputSignature = inputSignature;
         lastWeatherTextureId = weatherTextureId;
         lastMorphologyTextureId = morphologyTextureId;
+        lastStormStructureTextureId = stormStructureTextureId;
+        lastStormLayerHeightTextureId = stormLayerHeightTextureId;
+        lastStormTowerTextureId = stormTowerTextureId;
         lastResult = result;
         return result;
     }
@@ -359,7 +475,8 @@ public final class CloudWeatherMapRenderer {
             float worldTime,
             int mapSize,
             float coverageScale,
-            boolean adaptiveFootprint
+            boolean adaptiveFootprint,
+            boolean sentinelHeights
     ) {
         long hash = 0xcbf29ce484222325L;
         hash = mix(hash, quantize(originX, 1.0D));
@@ -373,6 +490,7 @@ public final class CloudWeatherMapRenderer {
         hash = mix(hash, quantize(coverageScale, 512.0D));
         hash = mix(hash, includeRegionalLayer ? 1L : 0L);
         hash = mix(hash, adaptiveFootprint ? 1L : 0L);
+        hash = mix(hash, sentinelHeights ? 1L : 0L);
         if (includeRegionalLayer && regionalCoverage > 0.01F) {
             // The broad regional sheet is animated; two-tick cadence keeps it
             // moving while avoiding a full map rebuild every rendered frame.

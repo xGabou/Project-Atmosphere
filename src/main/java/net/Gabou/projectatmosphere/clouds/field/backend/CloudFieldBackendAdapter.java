@@ -56,6 +56,12 @@ public final class CloudFieldBackendAdapter {
                 region.getDecay(),
                 verticalDevelopment(region.getRadius(), region.getBaseY(), region.getTopY(), cloudTypeId, morphologyFamily),
                 stormPotential(cloudTypeId, morphologyFamily),
+                derivedPrecipitation(
+                        cloudTypeId,
+                        region.getDensity(),
+                        region.getCoverage(),
+                        stormPotential(cloudTypeId, morphologyFamily)
+                ),
                 seedFrom(region.getCloudSeed(), region.getRegionId()),
                 region.getAgeTicks(),
                 region.getLifetimeTicks(),
@@ -107,6 +113,12 @@ public final class CloudFieldBackendAdapter {
                 cluster.getDecay(),
                 verticalDevelopment(cluster.getRadius(), cluster.getBaseY(), cluster.getTopY(), cloudTypeId, morphologyFamily),
                 stormPotential(cloudTypeId, morphologyFamily),
+                derivedPrecipitation(
+                        cloudTypeId,
+                        cluster.getDensity(),
+                        cluster.getCoverage(),
+                        stormPotential(cloudTypeId, morphologyFamily)
+                ),
                 seedFrom(cluster.getCloudSeed(), cluster.getClusterId()),
                 cluster.getAgeTicks(),
                 cluster.getLifetimeTicks(),
@@ -160,6 +172,7 @@ public final class CloudFieldBackendAdapter {
                         verticalDevelopment(data.getRadius(), data.getBaseY(), data.getTopY(), cloudTypeId, morphologyFamily)
                 ),
                 Math.max(data.getLightningInfluence(), stormPotential(cloudTypeId, morphologyFamily)),
+                precipitationFrom(data),
                 seedFrom(data.getCloudSeed(), data.getClusterId()),
                 data.getAgeTicks(),
                 data.getLifetimeTicks(),
@@ -202,6 +215,12 @@ public final class CloudFieldBackendAdapter {
                 0.0F,
                 verticalDevelopment((float) snapshot.radius(), baseY, topY, cloudTypeId, morphologyFamily),
                 (float) snapshot.stormStrength(),
+                derivedPrecipitation(
+                        cloudTypeId,
+                        (float) snapshot.density(),
+                        (float) snapshot.coverage(),
+                        (float) snapshot.stormStrength()
+                ),
                 seedFrom(0, sourceId),
                 0L,
                 0L,
@@ -240,6 +259,7 @@ public final class CloudFieldBackendAdapter {
                 0.0F,
                 verticalDevelopment(radius, baseY, topY, null, null),
                 0.0F,
+                0.0F,
                 seed,
                 0L,
                 0L,
@@ -276,6 +296,31 @@ public final class CloudFieldBackendAdapter {
             return 0.45F;
         }
         return 0.0F;
+    }
+
+    private static float precipitationFrom(CloudRegionRenderData data) {
+        float tierIntensity = data.getPrecipitationTier().getRepresentativeIntensity();
+        if (tierIntensity <= 0.02F) {
+            return 0.0F;
+        }
+        float coreStrength = clamp01(data.getPrecipitationCoreStrength());
+        return clamp01(tierIntensity * (0.55F + coreStrength * 0.45F));
+    }
+
+    private static float derivedPrecipitation(
+            String cloudTypeId,
+            float density,
+            float coverage,
+            float stormPotential
+    ) {
+        if (!CloudTypeRegistry.isPrecipitatingCloud(cloudTypeId)) {
+            return 0.0F;
+        }
+        float typeCore = CloudTypeRegistry.getOrDefault(cloudTypeId)
+                .getVisualProfile()
+                .getPrecipitationCoreStrength();
+        float support = clamp01(density * 0.45F + coverage * 0.35F + stormPotential * 0.20F);
+        return clamp01(typeCore * support);
     }
 
     private static long seedFrom(int cloudSeed, UUID fallbackId) {

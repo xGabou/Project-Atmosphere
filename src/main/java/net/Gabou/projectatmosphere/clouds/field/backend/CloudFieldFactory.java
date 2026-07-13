@@ -100,6 +100,7 @@ public final class CloudFieldFactory {
                 field.decay(),
                 field.verticalDevelopment(),
                 field.stormPotential(),
+                field.precipitationIntensity(),
                 field.seed(),
                 field.ageTicks(),
                 field.lifetimeTicks(),

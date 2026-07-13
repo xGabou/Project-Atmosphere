@@ -21,6 +21,10 @@ public final class VolumetricCloudShaders {
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_splat");
     private static final ResourceLocation MORPHOLOGY_SPLAT_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_morphology");
+    private static final ResourceLocation STORM_STRUCTURE_SPLAT_ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_storm_structure");
+    private static final ResourceLocation STORM_HEIGHT_SPLAT_ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_storm_heights");
     private static final ResourceLocation VOLUME_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_atmosphere_volume");
     private static final ResourceLocation SHADOW_MAP_ID =
@@ -30,6 +34,8 @@ public final class VolumetricCloudShaders {
 
     private static ShaderInstance splatShader;
     private static ShaderInstance morphologySplatShader;
+    private static ShaderInstance stormStructureSplatShader;
+    private static ShaderInstance stormHeightSplatShader;
     private static ShaderInstance volumeShader;
     private static ShaderInstance shadowMapShader;
     private static ShaderInstance shadowApplyShader;
@@ -44,6 +50,12 @@ public final class VolumetricCloudShaders {
         event.registerShader(new ShaderInstance(
                         event.getResourceProvider(), MORPHOLOGY_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> morphologySplatShader = loaded);
+        event.registerShader(new ShaderInstance(
+                        event.getResourceProvider(), STORM_STRUCTURE_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
+                loaded -> stormStructureSplatShader = loaded);
+        event.registerShader(new ShaderInstance(
+                         event.getResourceProvider(), STORM_HEIGHT_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
+                loaded -> stormHeightSplatShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), VOLUME_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> volumeShader = loaded);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), SHADOW_MAP_ID, DefaultVertexFormat.POSITION_TEX),
@@ -68,6 +80,14 @@ public final class VolumetricCloudShaders {
         return morphologySplatShader;
     }
 
+    public static ShaderInstance stormStructureSplatShader() {
+        return stormStructureSplatShader;
+    }
+
+    public static ShaderInstance stormHeightSplatShader() {
+        return stormHeightSplatShader;
+    }
+
     public static ShaderInstance shadowMapShader() {
         return shadowMapShader;
     }
@@ -77,6 +97,10 @@ public final class VolumetricCloudShaders {
     }
 
     public static boolean isReady() {
-        return splatShader != null && morphologySplatShader != null && volumeShader != null;
+        return splatShader != null
+                && morphologySplatShader != null
+                && stormStructureSplatShader != null
+                && stormHeightSplatShader != null
+                && volumeShader != null;
     }
 }

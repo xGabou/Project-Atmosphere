@@ -292,6 +292,7 @@ public final class CloudFieldBackendSourceCollector {
                 0.0F,
                 verticalDevelopment,
                 storm,
+                Mth.clamp(storm * humidity * 0.65F, 0.0F, 1.0F),
                 seedFrom(sourceId),
                 0L,
                 20L * 60L * 10L,

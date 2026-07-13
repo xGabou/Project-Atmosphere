@@ -22,7 +22,8 @@ public final class CloudTypeRegistry {
 
     private static final String[] THUNDER_CLOUD_IDS = {
             "cumulonimbus_calvus",
-            "cumulonimbus_capillatus"
+            "cumulonimbus_capillatus",
+            "supercell"
     };
 
     private static final Set<String> PRECIPITATING_CLOUD_IDS = Set.of(
@@ -31,7 +32,8 @@ public final class CloudTypeRegistry {
             RAIN_CLOUD_IDS[2],
             RAIN_CLOUD_IDS[3],
             THUNDER_CLOUD_IDS[0],
-            THUNDER_CLOUD_IDS[1]
+            THUNDER_CLOUD_IDS[1],
+            THUNDER_CLOUD_IDS[2]
     );
 
     private static final Map<String, CloudTypeDefinition> BUILT_IN_TYPES = new LinkedHashMap<>();
@@ -106,6 +108,16 @@ public final class CloudTypeRegistry {
                 CloudFamily.CUMULONIMBUS,
                 CloudMorphologyFamily.STORM_ANVIL,
                 new CloudVisualProfile(2.78F, 0.70F, 0.46F, 0.12F, 0.74F, 0.011F, 0.140F, 0.184F, 1.48F, 1.22F, 0.30F, 1.00F, 0.88F, 0.48F),
+                stormReady(),
+                new CloudEvolutionRules(List.of())
+        ));
+
+        register(new CloudTypeDefinition(
+                "supercell",
+                "Supercell",
+                CloudFamily.CUMULONIMBUS,
+                CloudMorphologyFamily.SPIRAL_STORM,
+                new CloudVisualProfile(3.20F, 0.78F, 0.52F, 0.10F, 0.86F, 0.010F, 0.145F, 0.190F, 1.68F, 1.30F, 0.24F, 1.00F, 1.00F, 0.74F),
                 stormReady(),
                 new CloudEvolutionRules(List.of())
         ));

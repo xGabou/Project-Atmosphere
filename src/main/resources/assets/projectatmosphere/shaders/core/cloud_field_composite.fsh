@@ -53,6 +53,7 @@ void main() {
     float selectedScore = -1.0;
     float sceneDepth = 1.0;
     float sceneDepthBias = 0.00002;
+    bool opaqueVolumeNeighborhood = true;
 
     if (SceneDepthValid != 0) {
         ivec2 sceneSize = textureSize(SceneDepthSampler, 0);
@@ -74,6 +75,11 @@ void main() {
         bool visibleAgainstScene = SceneDepthValid == 0
             || sceneDepth >= 0.99999
             || depths[i] <= sceneDepth + sceneDepthBias;
+        opaqueVolumeNeighborhood = opaqueVolumeNeighborhood
+            && hasColor
+            && hasDepth
+            && visibleAgainstScene
+            && colors[i].a >= 0.18;
         colorPresent = colorPresent || hasColor;
         depthPresent = depthPresent || hasDepth;
         pairedPresent = pairedPresent || (hasColor && hasDepth && visibleAgainstScene);
@@ -141,7 +147,7 @@ void main() {
             || depths[i] <= sceneDepth + sceneDepthBias;
         bool paired = colors[i].a > ALPHA_EPSILON && depths[i] < 1.0 && visibleAgainstScene;
         bool sameSurface = abs(depths[i] - selectedDepth) <= depthTolerance;
-        if (paired && sameSurface) {
+        if (paired && (sameSurface || opaqueVolumeNeighborhood)) {
             accumulated += colors[i] * weights[i];
             acceptedWeight += weights[i];
         }
@@ -155,8 +161,11 @@ void main() {
     if (acceptedWeight <= 0.0001 || accumulated.a <= ALPHA_EPSILON) {
         discard;
     }
-    accumulated /= acceptedWeight;
-    vec3 straightColor = accumulated.rgb / accumulated.a;
+    // Keep the absolute bilinear weights. Renormalizing only the accepted
+    // opaque neighbours expands one low-resolution edge texel to full alpha,
+    // producing a bright halo. RGB is premultiplied, so only the final colour
+    // conversion divides by the weighted alpha.
+    vec3 straightColor = accumulated.rgb / max(accumulated.a, ALPHA_EPSILON);
     fragColor = vec4(straightColor, clamp(accumulated.a, 0.0, 1.0));
     if (CompositeMode == 0) {
         gl_FragDepth = selectedDepth;

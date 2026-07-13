@@ -151,8 +151,19 @@ public final class VolumetricCloudRenderHook {
         CloudletAllocationPlan cloudletPlan = allocateFieldCloudlets(fieldSnapshots, dimensionId, cameraPos);
         List<VolumetricCloudFrameDiagnostics.FieldInfo> fieldDiagnostics =
                 buildFieldDiagnostics(fieldSnapshots, dimensionId, cloudletPlan);
+        // Every visible field contributes one low-frequency macro envelope
+        // before detail cloudlets consume the remaining slots. This preserves
+        // mass through FAR_PROCEDURAL/HAZE and keeps a budget change from
+        // deleting the entire cloud silhouette.
         for (CloudFieldSnapshot snapshot : cloudletPlan.orderedFields()) {
-            addFieldRenderCells(snapshot, cloudletPlan.acceptedFor(snapshot.fieldId()), renderCells);
+            addFieldMacroCell(
+                    snapshot,
+                    cloudletPlan.acceptedFor(snapshot.fieldId()),
+                    renderCells
+            );
+        }
+        for (CloudFieldSnapshot snapshot : cloudletPlan.orderedFields()) {
+            addFieldCloudletCells(snapshot, cloudletPlan.acceptedFor(snapshot.fieldId()), renderCells);
         }
 
         String renderSource = renderCells.isEmpty() ? "none" : "fields";
@@ -402,6 +413,12 @@ public final class VolumetricCloudRenderHook {
                 + " historyValid=" + VolumetricCloudRenderer.lastHistoryValid()
                 + " historyConfidence=" + String.format(
                         Locale.ROOT, "%.2f", VolumetricCloudRenderer.lastHistoryConfidence())
+                + " cameraDensity=" + String.format(
+                        Locale.ROOT, "%.3f", CameraCloudDensityTracker.smoothedCameraDensity())
+                + " governorScale=" + String.format(
+                        Locale.ROOT, "%.3f", VolumetricCloudRenderer.governorStepScale())
+                + " resolutionScale=" + String.format(
+                        Locale.ROOT, "%.3f", VolumetricCloudRenderer.lastResolutionScale())
                 + " tuning[" + tuning.summary() + "]"
                 + " regionalCoverage=" + String.format(java.util.Locale.ROOT, "%.3f", regionalCoverage)
                 + " cloudCover=" + String.format(java.util.Locale.ROOT, "%.3f", atmosphere.cloudCover())
@@ -435,7 +452,19 @@ public final class VolumetricCloudRenderHook {
         return String.format(java.util.Locale.ROOT, "(%.2f,%.2f,%.2f)", v.x, v.y, v.z);
     }
 
-    private static void addFieldRenderCells(
+    private static void addFieldMacroCell(
+            CloudFieldSnapshot snapshot,
+            int acceptedDetailCount,
+            List<VolumetricRenderCell> renderCells
+    ) {
+        if (snapshot == null || !snapshot.hasVisibleClouds()
+                || renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
+            return;
+        }
+        renderCells.add(VolumetricRenderCell.fromFieldSnapshot(snapshot, acceptedDetailCount));
+    }
+
+    private static void addFieldCloudletCells(
             CloudFieldSnapshot snapshot,
             int cloudletCount,
             List<VolumetricRenderCell> renderCells
@@ -482,11 +511,8 @@ public final class VolumetricCloudRenderHook {
             String dimensionId,
             Vec3 cameraPos
     ) {
-        int budget = Math.max(0, Math.min(
-                CloudWeatherMapRenderer.MAX_CELLS,
-                CloudFieldVolumeRenderConfig.cloudletBudget()
-        ));
         List<CloudletCandidate> candidates = new ArrayList<>();
+        List<CloudFieldSnapshot> visibleSnapshots = new ArrayList<>();
         Map<UUID, Integer> requestedByField = new HashMap<>();
         int visibleFields = 0;
         long totalRequested = 0L;
@@ -497,6 +523,7 @@ public final class VolumetricCloudRenderHook {
                 continue;
             }
             visibleFields++;
+            visibleSnapshots.add(snapshot);
             int requested = requestedCloudletCount(snapshot);
             requestedByField.put(snapshot.fieldId(), requested);
             totalRequested += requested;
@@ -508,6 +535,17 @@ public final class VolumetricCloudRenderHook {
                 ));
             }
         }
+
+        // One macro envelope is emitted before detail cloudlets for every
+        // visible field that can fit in the weather map. Reserve those slots
+        // up front so an allocation reported as accepted is never silently
+        // truncated later by MAX_CELLS.
+        int macroSlots = Math.min(visibleFields, CloudWeatherMapRenderer.MAX_CELLS);
+        int detailCapacity = Math.max(0, CloudWeatherMapRenderer.MAX_CELLS - macroSlots);
+        int budget = Math.max(0, Math.min(
+                detailCapacity,
+                CloudFieldVolumeRenderConfig.cloudletBudget()
+        ));
 
         candidates.sort(Comparator
                 .comparingDouble(CloudletCandidate::priority).reversed()
@@ -562,9 +600,10 @@ public final class VolumetricCloudRenderHook {
         previousCloudletAllocations = Map.copyOf(acceptedByField);
         lastCloudletBudgetStats = stats;
 
-        List<CloudFieldSnapshot> orderedFields = candidates.stream()
-                .map(CloudletCandidate::snapshot)
-                .toList();
+        visibleSnapshots.sort(Comparator
+                .comparingDouble((CloudFieldSnapshot snapshot) -> cloudletPriority(snapshot, cameraPos)).reversed()
+                .thenComparing(CloudFieldSnapshot::fieldId));
+        List<CloudFieldSnapshot> orderedFields = List.copyOf(visibleSnapshots);
         return new CloudletAllocationPlan(
                 orderedFields,
                 Map.copyOf(requestedByField),

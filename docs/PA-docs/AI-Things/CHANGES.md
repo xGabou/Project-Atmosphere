@@ -615,3 +615,55 @@ This file records functionality additions/removals made during development sessi
 - Restored the Tornado-branch hurricane render stack: `HurricaneShaders`, `SimpleCloudsHurricaneRenderer`, the hurricane mixin hooks, and the `hurricane_*` shader assets.
 - Added compatibility accessors on `HurricaneInstance` and `HurricaneManager` so the restored branch renderer can consume the current hurricane state model without changing the existing sync path.
 - Added a targeted Simple Clouds 0.7.4 compatibility cap for lightning SSBO buffering on low-binding GPUs and moved Project Atmosphere's `CloudStorms` SSBO onto binding 0 there, preventing reload crashes without disabling tornado/hurricane cloud shaping.
+## Unreleased - Cloud renderer remediation (2026-07-11)
+
+- Centralized cloud-pass ownership so Project Atmosphere cancels Simple Clouds opaque
+  or transparent passes only when an active PA renderer actually replaces them.
+- Isolated optional Simple Clouds and season integrations behind guarded services,
+  reflection boundaries and the mixin plugin; native and Simple Clouds dedicated
+  servers now both complete startup on separate clean worlds.
+- Reworked render-state preservation to restore incoming read/draw framebuffers,
+  viewport, depth, blend, culling, program and texture state instead of forcing the
+  vanilla main target after PA passes.
+- Added detached active-framebuffer depth resolution, diagnostics and depth-guided
+  low-resolution composition; removed attached-depth feedback from hurricane and
+  ground-shadow passes.
+- Made the last successfully composited CloudField/CloudCell representation canonical
+  for camera density, whiteout and in-cloud fog, and invalidated histories/caches on
+  world, dimension, backend, resize, reload and shutdown transitions.
+- Added strict deterministic cloudlet budgeting, field-to-cell reconciliation,
+  morphology/type transport to the GPU, real atmospheric wind and native CloudCell
+  tornado activation/lifecycle/physics.
+- Fixed datapack cloud-evolution rule merge/replace/fallback behavior and restored
+  detached-depth terrain cloud shadows.
+- Added weather/morphology map caching, temporal depth/transmittance validation,
+  rotated domain-warped noise, spatial interest filtering and delta field packets;
+  the network protocol is now stable at version 10 regardless of optional mods.
+- Removed the unregistered legacy cloud renderer stack, obsolete pipeline adapters,
+  unused shaders/uniforms/SSBO scaffolding, inactive mixins, stale debug commands and
+  unclosed GPU diagnostic resources.
+- Validated all PA shaders on the real OpenGL loader, all configured mixin class files,
+  the exact Simple Clouds 0.7.3 client contract, and native/Simple Clouds dedicated
+  server startup. Fabulous, shader-pack and Distant Horizons world rendering remain
+  explicit manual test targets.
+
+## Unreleased - Native cloud visual morphology (2026-07-11)
+
+- Replaced the shared native CloudField disk layout with deterministic family
+  structures for puff, tower, anvil storm, sheet, cellular sheet, cirrus filament
+  and rotating supercell clouds, including wind-aligned anvils and filaments.
+- Added one low-frequency macro envelope per visible field so far LODs preserve a
+  continuous mass, while reserving those envelopes inside the strict 96-cell GPU
+  capacity before allocating detail cloudlets.
+- Split the weather-map and raymarch density profiles into distinct stratus,
+  stratocumulus, cumulus, cumulonimbus, nimbostratus, cirrus and supercell shapes;
+  profile ids are selected categorically instead of averaged at overlaps.
+- Reworked edge erosion, protected macro cores, wind-coherent noise, local storm
+  absorption, internal lighting and silver lining, and added precipitation-driven
+  rain shafts/virga beneath native storm clouds.
+- Added a native `supercell` cloud definition and a `cirrus_fibratus` command alias.
+  A client smoke test without Simple Clouds loaded the shaders, spawned the native
+  supercell and completed depth-aware raymarch composition without a render error.
+- Aligned stable convective cloudlet ids across cumulus, tower and storm layouts to
+  reduce morphology-transition popping, and made the standalone CloudField lab fail
+  fast when its deterministic layout self-check reports an issue.

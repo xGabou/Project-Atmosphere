@@ -27,6 +27,7 @@ public record CloudFieldSource(
         float decay,
         float verticalDevelopment,
         float stormPotential,
+        float precipitationIntensity,
         long seed,
         long ageTicks,
         long lifetimeTicks,
@@ -56,6 +57,7 @@ public record CloudFieldSource(
         decay = clamp01(decay);
         verticalDevelopment = clamp01(verticalDevelopment);
         stormPotential = clamp01(stormPotential);
+        precipitationIntensity = clamp01(precipitationIntensity);
         ageTicks = Math.max(0L, ageTicks);
         lifetimeTicks = Math.max(0L, lifetimeTicks);
         cloudletCountHint = Math.max(0, cloudletCountHint);
@@ -90,10 +92,6 @@ public record CloudFieldSource(
 
     public float anvilStrength() {
         return CloudTypeRegistry.getOrDefault(cloudTypeId).getVisualProfile().getAnvilStrength();
-    }
-
-    public float precipitationIntensity() {
-        return CloudTypeRegistry.getOrDefault(cloudTypeId).getVisualProfile().getPrecipitationCoreStrength();
     }
 
     private static Vec3 sanitize(Vec3 value) {

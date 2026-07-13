@@ -148,16 +148,7 @@ public class StormSirenBlock extends Block {
     }
 
     private static boolean isTornadoNearby(ServerLevel level, BlockPos pos) {
-        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            return false;
-        }
-        double radiusSq = TORNADO_WARNING_RADIUS * TORNADO_WARNING_RADIUS;
-        return net.Gabou.projectatmosphere.modules.tornado.TornadoManager.getActiveTornadoes().stream()
-                .anyMatch(tornado -> {
-                    double dx = tornado.position.x - pos.getX();
-                    double dz = tornado.position.z - pos.getZ();
-                    return dx * dx + dz * dz <= radiusSq;
-                });
+        return AtmosphereCloudServices.get().hasActiveTornadoNear(level, pos, TORNADO_WARNING_RADIUS);
     }
 
     private static boolean isSevereStormNearby(ServerLevel level, BlockPos pos) {

@@ -3,7 +3,11 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.CloudletLayout;
+import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
+import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.clouds.type.CloudVisualProfile;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 
@@ -29,13 +33,16 @@ public record VolumetricRenderCell(
         int morphologyFamily,
         float verticalDevelopment,
         float humidity,
+        float materialDarkness,
         float anvilStrength,
         float precipitationIntensity,
         float lifecycleStage,
         float seed01,
         float funnelStrength,
         float funnelGroundY,
-        float rotation
+        float rotation,
+        boolean macroCarrier,
+        EnvelopeRole envelopeRole
 ) {
     public static VolumetricRenderCell fromCell(CloudCell cell) {
         return new VolumetricRenderCell(
@@ -53,6 +60,7 @@ public record VolumetricRenderCell(
                 morphologyFor(cell.classification()).ordinal(),
                 Mth.clamp(cell.verticalExtentRatio(), 0.0F, 1.0F),
                 cell.density(),
+                materialDarknessFor(cell.classification()),
                 cell.classification() == net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification.CUMULONIMBUS
                         ? cell.energy() : 0.0F,
                 cell.classification() == net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification.CUMULONIMBUS
@@ -61,35 +69,103 @@ public record VolumetricRenderCell(
                 (cell.seed() & 0xFFFFL) / 65535.0F,
                 cell.funnelStrength(),
                 cell.funnelGroundY(),
-                cell.rotation()
+                cell.rotation(),
+                true,
+                EnvelopeRole.MACRO
         );
     }
 
     public static VolumetricRenderCell fromFieldSnapshot(CloudFieldSnapshot snapshot) {
+        return fromFieldSnapshot(snapshot, 0);
+    }
+
+    /**
+     * Builds the field-scale fallback envelope. Once at least three detail
+     * cloudlets actually survived the current frame budget, the macro becomes
+     * an invisible carrier instead of a second giant visible ellipse. Using
+     * the accepted count (not the requested LOD count) keeps budget pressure
+     * from making the whole cloud disappear.
+     */
+    public static VolumetricRenderCell fromFieldSnapshot(
+            CloudFieldSnapshot snapshot,
+            int acceptedDetailCount
+    ) {
+        CloudMorphologyFamily morphology = snapshot.morphologyFamily();
         float effectiveDensity = snapshot.effectiveDensity();
         float effectiveCoverage = snapshot.effectiveCoverage();
+        float radiusScale = switch (morphology) {
+            case PUFF -> 0.58F;
+            case TOWER -> 0.60F;
+            case STORM_ANVIL -> 0.96F;
+            case SHEET -> 0.92F;
+            case CELLULAR_SHEET -> 0.78F;
+            case FILAMENT -> 0.88F;
+            case SPIRAL_STORM -> 1.00F;
+            case DEBUG -> 0.58F;
+        };
+        float aspect = switch (morphology) {
+            case PUFF -> 0.84F;
+            case TOWER -> 0.72F;
+            case STORM_ANVIL -> 0.82F;
+            case SHEET -> 0.90F;
+            case CELLULAR_SHEET -> 0.84F;
+            case FILAMENT -> 0.14F;
+            case SPIRAL_STORM -> 0.76F;
+            case DEBUG -> 0.82F;
+        };
+        boolean identifiableDetail = acceptedDetailCount >= 3
+                && snapshot.hydrationProgress() > 0.02F;
+        float macroDensityScale = switch (morphology) {
+            case PUFF -> identifiableDetail ? 0.36F : 0.58F;
+            case TOWER -> identifiableDetail ? 0.48F : 0.70F;
+            case STORM_ANVIL -> identifiableDetail ? 0.24F : 0.80F;
+            case SHEET -> "nimbostratus".equals(snapshot.cloudTypeId())
+                    ? (identifiableDetail ? 0.40F : 0.72F)
+                    : (identifiableDetail ? 0.24F : 0.52F);
+            case CELLULAR_SHEET -> identifiableDetail ? 0.32F : 0.60F;
+            case FILAMENT -> identifiableDetail ? 0.72F : 0.84F;
+            case SPIRAL_STORM -> identifiableDetail ? 0.26F : 0.86F;
+            case DEBUG -> identifiableDetail ? 0.38F : 0.56F;
+        };
+        float edgeSoftness = switch (morphology) {
+            case PUFF -> 0.44F;
+            case TOWER -> 0.34F;
+            case STORM_ANVIL -> 0.30F;
+            case SHEET -> 0.56F;
+            case CELLULAR_SHEET -> 0.44F;
+            case FILAMENT -> 0.68F;
+            case SPIRAL_STORM -> 0.28F;
+            case DEBUG -> 0.44F;
+        };
+        float orientation = orientationFor(snapshot, morphology, (snapshot.seed() % 628L) * 0.01F);
+        float radiusMajor = Math.max(4.0F, snapshot.radius() * radiusScale);
         return new VolumetricRenderCell(
                 snapshot.center().x(),
                 snapshot.center().z(),
                 snapshot.baseY(),
                 snapshot.topY(),
-                Math.max(4.0F, snapshot.radius()),
-                Math.max(4.0F, snapshot.radius() * 0.82F),
-                (snapshot.seed() % 628L) * 0.01F,
-                Math.min(1.0F, effectiveDensity * (0.55F + 0.45F * effectiveCoverage) * Math.max(0.4F, snapshot.hydrationProgress())),
-                1.0F - effectiveCoverage * 0.6F,
+                radiusMajor,
+                Math.max(3.0F, radiusMajor * aspect),
+                orientation,
+                Math.min(1.0F, effectiveDensity * macroDensityScale
+                        * (0.64F + 0.36F * effectiveCoverage)
+                        * Math.max(0.4F, snapshot.hydrationProgress())),
+                edgeSoftness,
                 snapshot.stormPotential(),
                 profileFor(snapshot),
-                snapshot.morphologyFamily().ordinal(),
+                morphology.ordinal(),
                 snapshot.verticalDevelopment(),
                 snapshot.humidityInfluence(),
+                materialDarknessFor(snapshot.cloudTypeId()),
                 snapshot.anvilStrength(),
                 snapshot.precipitationIntensity(),
                 snapshot.lifecycleStage(),
                 (snapshot.seed() & 0xFFFFL) / 65535.0F,
                 0.0F,
                 0.0F,
-                0.0F
+                0.0F,
+                true,
+                identifiableDetail ? EnvelopeRole.CARRIER_ONLY : EnvelopeRole.MACRO
         );
     }
 
@@ -98,43 +174,141 @@ public record VolumetricRenderCell(
             CloudletLayout.Cloudlet cloudlet
     ) {
         Vec3 center = cloudlet.worldCenter(snapshot);
-        // Modest expansion: enough for neighboring cloudlets to overlap into
-        // one mass, not so much that they merge into a giant flat card.
-        float radius = Math.max(6.0F, cloudlet.horizontalRadius() * 1.22F);
-        float verticalRadius = radius * Math.max(0.65F, cloudlet.verticalScale() * 1.08F);
-        float baseY = Math.max(snapshot.baseY(), (float) center.y() - verticalRadius * 0.82F);
-        float topY = Math.min(snapshot.topY(), (float) center.y() + verticalRadius * 0.98F);
-        if (topY <= baseY + 1.0F) {
-            topY = Math.min(snapshot.topY(), baseY + Math.max(2.0F, verticalRadius));
+        CloudMorphologyFamily morphology = snapshot.morphologyFamily();
+        float radiusExpansion = switch (morphology) {
+            case PUFF -> 1.10F;
+            case TOWER -> 1.08F;
+            case STORM_ANVIL -> 1.10F;
+            case SHEET -> 1.12F;
+            case CELLULAR_SHEET -> 1.16F;
+            case FILAMENT -> 1.22F;
+            case SPIRAL_STORM -> 1.12F;
+            case DEBUG -> 1.08F;
+        };
+        float radius = Math.max(5.0F, cloudlet.horizontalRadius() * radiusExpansion);
+        float fieldSpan = Math.max(2.0F, snapshot.topY() - snapshot.baseY());
+        float cellSpan = Math.max(2.0F, fieldSpan * cloudlet.verticalScale());
+        float baseY = (float) center.y() - cellSpan * 0.5F;
+        float topY = baseY + cellSpan;
+        if (baseY < snapshot.baseY()) {
+            topY += snapshot.baseY() - baseY;
+            baseY = snapshot.baseY();
         }
+        if (topY > snapshot.topY()) {
+            baseY -= topY - snapshot.topY();
+            topY = snapshot.topY();
+        }
+        baseY = Math.max(snapshot.baseY(), baseY);
+        topY = Math.max(baseY + 1.0F, Math.min(snapshot.topY(), topY));
 
         long seed = cloudlet.id().mixedSeed(snapshot.seed());
+        float familyDensityScale = switch (morphology) {
+            case PUFF -> 0.92F;
+            case TOWER -> 1.02F;
+            case STORM_ANVIL -> 1.08F;
+            case SHEET -> "nimbostratus".equals(snapshot.cloudTypeId()) ? 0.94F : 0.68F;
+            case CELLULAR_SHEET -> 0.82F;
+            case FILAMENT -> 1.00F;
+            case SPIRAL_STORM -> 1.12F;
+            case DEBUG -> 0.90F;
+        };
         float effectiveDensity = Math.min(1.0F,
                 snapshot.effectiveDensity() * cloudlet.densityScale()
-                        * (0.88F + 0.48F * cloudlet.coverageWeight()) * 1.28F);
+                        * (0.12F + 0.88F * cloudlet.coverageWeight())
+                        * familyDensityScale);
+        float edgeSoftness = switch (cloudlet.role()) {
+            case CORE -> morphology == CloudMorphologyFamily.SPIRAL_STORM
+                    || morphology == CloudMorphologyFamily.STORM_ANVIL ? 0.44F : 0.26F;
+            case LOBE -> 0.38F;
+            case BASE -> morphology == CloudMorphologyFamily.SPIRAL_STORM
+                    || morphology == CloudMorphologyFamily.STORM_ANVIL ? 0.40F : 0.30F;
+            case TOWER -> morphology == CloudMorphologyFamily.SPIRAL_STORM
+                    || morphology == CloudMorphologyFamily.STORM_ANVIL ? 0.38F : 0.24F;
+            case ANVIL -> 0.54F;
+            case SHEET_TILE -> "nimbostratus".equals(snapshot.cloudTypeId()) ? 0.46F : 0.56F;
+            case FILAMENT -> 0.68F;
+        };
         return new VolumetricRenderCell(
                 center.x(),
                 center.z(),
                 baseY,
                 topY,
                 radius,
-                Math.max(5.0F, radius * 0.78F),
-                (seed & 0x3FFL) * 0.006135923F,
+                Math.max(2.0F, radius * cloudlet.horizontalAspect()),
+                cloudlet.orientationRadians(),
                 effectiveDensity,
-                0.42F,
+                edgeSoftness,
                 snapshot.stormPotential(),
                 profileFor(snapshot),
                 snapshot.morphologyFamily().ordinal(),
                 snapshot.verticalDevelopment(),
                 snapshot.humidityInfluence(),
+                materialDarknessFor(snapshot.cloudTypeId()),
                 snapshot.anvilStrength(),
                 snapshot.precipitationIntensity(),
                 snapshot.lifecycleStage(),
                 (seed & 0xFFFFL) / 65535.0F,
                 0.0F,
                 0.0F,
-                0.0F
+                morphology == CloudMorphologyFamily.SPIRAL_STORM
+                        ? snapshot.stormPotential() * 0.04F
+                        : 0.0F,
+                false,
+                EnvelopeRole.fromCloudletRole(cloudlet.role())
         );
+    }
+
+    /**
+     * Compact role retained until the cached weather-map pass.  Coverage can
+     * still use a smooth union, while severe base/top construction knows which
+     * stamps may connect the low base to the high anvil.
+     */
+    public enum EnvelopeRole {
+        DETAIL(0),
+        MACRO(1),
+        BASE(2),
+        CORE(3),
+        TOWER(4),
+        ANVIL(5),
+        CARRIER_ONLY(6);
+
+        private final int gpuId;
+
+        EnvelopeRole(int gpuId) {
+            this.gpuId = gpuId;
+        }
+
+        public int gpuId() {
+            return this.gpuId;
+        }
+
+        private static EnvelopeRole fromCloudletRole(CloudletLayout.CloudletRole role) {
+            return switch (role) {
+                case BASE -> BASE;
+                case CORE -> CORE;
+                case TOWER -> TOWER;
+                case ANVIL -> ANVIL;
+                case LOBE, SHEET_TILE, FILAMENT -> DETAIL;
+            };
+        }
+    }
+
+    private static float orientationFor(
+            CloudFieldSnapshot snapshot,
+            CloudMorphologyFamily morphology,
+            float fallback
+    ) {
+        if (morphology != CloudMorphologyFamily.FILAMENT
+                && morphology != CloudMorphologyFamily.STORM_ANVIL
+                && morphology != CloudMorphologyFamily.SPIRAL_STORM
+                && morphology != CloudMorphologyFamily.SHEET) {
+            return fallback;
+        }
+        Vec3 wind = snapshot.windVector();
+        if (wind.horizontalDistanceSqr() <= 1.0E-8D) {
+            return fallback;
+        }
+        return (float) Math.atan2(wind.z(), wind.x());
     }
 
     private static int profileFor(String cloudTypeId, CloudMorphologyFamily morphology) {
@@ -168,6 +342,33 @@ public record VolumetricRenderCell(
     /** Returns the stable shader profile encoded for one canonical field snapshot. */
     public static int profileFor(CloudFieldSnapshot snapshot) {
         return profileFor(snapshot.cloudTypeId(), snapshot.morphologyFamily());
+    }
+
+    private static float materialDarknessFor(String cloudTypeId) {
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
+        CloudMaterialProfile material = definition.getMaterialProfile();
+        CloudVisualProfile visual = definition.getVisualProfile();
+        return Mth.clamp(Math.max(
+                visual.getBaseDarkness(),
+                Math.max(
+                        material.getDarkness(),
+                        Math.max(material.getUndersideDarkness(), material.getStormCoreDarkening())
+                )
+        ), 0.0F, 1.0F);
+    }
+
+    private static float materialDarknessFor(
+            net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification classification
+    ) {
+        return switch (classification) {
+            case STRATUS -> 0.38F;
+            case STRATOCUMULUS -> 0.30F;
+            case CUMULUS_HUMILIS, CUMULUS_MEDIOCRIS -> 0.20F;
+            case CUMULUS_CONGESTUS -> 0.36F;
+            case CUMULONIMBUS -> 0.78F;
+            case CIRRIFORM -> 0.08F;
+            case UNCLASSIFIED -> 0.12F;
+        };
     }
 
     private static int profileFor(net.Gabou.projectatmosphere.clouds.cell.CloudCellClassification classification) {

@@ -11,7 +11,10 @@ public final class VolumetricCloudDebugConfig {
     private static volatile boolean coveragePretestEnabled = true;
     private static volatile boolean adaptiveWeatherFootprintEnabled = true;
     private static volatile boolean historyEnabled = true;
-    private static volatile boolean sentinelHeightsEnabled = true;
+    // Fixed empty-map base/top sentinels bleed into cloud fringes through the
+    // weather map's linear filter. Keep the legacy behaviour as an A/B switch,
+    // but use real fringe heights in the production path.
+    private static volatile boolean sentinelHeightsEnabled;
     private static volatile boolean fullResolutionEnabled;
     private static volatile float weatherCoverageScale = 1.0F;
     private static volatile int coveragePretestSamples = 6;

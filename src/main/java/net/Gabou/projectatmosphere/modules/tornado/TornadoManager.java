@@ -19,7 +19,6 @@ import net.Gabou.projectatmosphere.network.SyncTornadoesPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.client.Minecraft;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -50,12 +49,12 @@ public class TornadoManager {
     private static float shaderTime = 0.0F;
 
     @OnlyIn(Dist.CLIENT)
-    public static void spawnClient(UUID id, Vec3 pos, float radius, WindVector wind, float bottomY, float height) {
+    public static void spawnClient(Level level, UUID id, Vec3 pos, float radius, WindVector wind, float bottomY, float height) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
             clearClientTornadoes();
             return;
         }
-        applyClientSnapshot(new TornadoSnapshot(
+        applyClientSnapshot(level, new TornadoSnapshot(
                 id,
                 new Vec3(pos.x, bottomY, pos.z),
                 radius,
@@ -277,32 +276,30 @@ public class TornadoManager {
     }
 
     @OnlyIn(Dist.CLIENT)
-    public static void applyClientSnapshots(List<TornadoSnapshot> snapshots) {
+    public static void applyClientSnapshots(Level level, List<TornadoSnapshot> snapshots) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
             clearClientTornadoes();
             return;
         }
         List<TornadoInstance> next = new ArrayList<>(snapshots.size());
         for (TornadoSnapshot snapshot : snapshots) {
-            next.add(createOrUpdateClientTornado(snapshot));
+            next.add(createOrUpdateClientTornado(level, snapshot));
         }
         CLIENT_TORNADOES.clear();
         CLIENT_TORNADOES.addAll(next);
-        //TornadoClientSnapshotLogger.log("sync", snapshots, TornadoManager::findClient);
     }
 
     @OnlyIn(Dist.CLIENT)
-    private static void applyClientSnapshot(TornadoSnapshot snapshot) {
-        TornadoInstance tornado = createOrUpdateClientTornado(snapshot);
+    private static void applyClientSnapshot(Level level, TornadoSnapshot snapshot) {
+        TornadoInstance tornado = createOrUpdateClientTornado(level, snapshot);
         if (!CLIENT_TORNADOES.contains(tornado)) {
             CLIENT_TORNADOES.add(tornado);
         }
-        //TornadoClientSnapshotLogger.log("spawn", List.of(snapshot), TornadoManager::findClient);
     }
 
-    private static TornadoInstance createOrUpdateClientTornado(TornadoSnapshot snapshot) {
+    private static TornadoInstance createOrUpdateClientTornado(Level level, TornadoSnapshot snapshot) {
         TornadoInstance existing = findClient(snapshot.id());
-        CloudRegion cloud = findClientCloud(snapshot.position(), snapshot.radius());
+        CloudRegion cloud = findClientCloud(level, snapshot.position(), snapshot.radius());
         if (existing == null) {
             existing = new TornadoInstance(
                     snapshot.id(),
@@ -332,8 +329,7 @@ public class TornadoManager {
 
     @OnlyIn(Dist.CLIENT)
     @Nullable
-    private static CloudRegion findClientCloud(Vec3 pos, float radius) {
-        Level level = Minecraft.getInstance().level;
+    private static CloudRegion findClientCloud(Level level, Vec3 pos, float radius) {
         if (level == null) {
             return null;
         }

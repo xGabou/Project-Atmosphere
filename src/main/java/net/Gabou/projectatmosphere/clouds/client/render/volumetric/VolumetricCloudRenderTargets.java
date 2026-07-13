@@ -18,6 +18,9 @@ import org.lwjgl.opengl.GL30;
 public final class VolumetricCloudRenderTargets {
     private static RenderTarget weatherTarget;
     private static RenderTarget morphologyTarget;
+    private static RenderTarget stormStructureTarget;
+    private static RenderTarget stormLayerHeightTarget;
+    private static RenderTarget stormTowerTarget;
     private static RenderTarget shadowTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
     private static int currentIndex;
@@ -69,12 +72,80 @@ public final class VolumetricCloudRenderTargets {
         return morphologyTarget;
     }
 
+    /**
+     * Severe BASE plus combined convective support and their first endpoints.
+     * The paired height target completes convection and stores ANVIL support.
+     */
+    public static RenderTarget prepareStormStructureTarget(int size) {
+        if (stormStructureTarget == null || stormStructureTarget.width != size) {
+            if (stormStructureTarget != null) {
+                stormStructureTarget.destroyBuffers();
+            }
+            stormStructureTarget = new TextureTarget(size, size, false, Minecraft.ON_OSX);
+            stormStructureTarget.setFilterMode(GL11.GL_LINEAR);
+            configureClamp(stormStructureTarget.getColorTextureId());
+            upgradeColorToRgba16f(stormStructureTarget.getColorTextureId(), size, size);
+            stormStructureTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        }
+        return stormStructureTarget;
+    }
+
+    /**
+     * Premultiplied severe-layer endpoints. Half-float precision is required
+     * because the raymarch divides filtered encoded heights by filtered role
+     * support near layer edges.
+     */
+    public static RenderTarget prepareStormLayerHeightTarget(int size) {
+        if (stormLayerHeightTarget == null || stormLayerHeightTarget.width != size) {
+            if (stormLayerHeightTarget != null) {
+                stormLayerHeightTarget.destroyBuffers();
+            }
+            stormLayerHeightTarget = new TextureTarget(size, size, false, Minecraft.ON_OSX);
+            stormLayerHeightTarget.setFilterMode(GL11.GL_LINEAR);
+            configureClamp(stormLayerHeightTarget.getColorTextureId());
+            upgradeColorToRgba16f(stormLayerHeightTarget.getColorTextureId(), size, size);
+            stormLayerHeightTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        }
+        return stormLayerHeightTarget;
+    }
+
+    /**
+     * Independent severe TOWER support and endpoints. Keeping this interval
+     * separate prevents the primary CORE and secondary towers from erasing one
+     * another in the weather-map argmax.
+     */
+    public static RenderTarget prepareStormTowerTarget(int size) {
+        if (stormTowerTarget == null || stormTowerTarget.width != size) {
+            if (stormTowerTarget != null) {
+                stormTowerTarget.destroyBuffers();
+            }
+            stormTowerTarget = new TextureTarget(size, size, false, Minecraft.ON_OSX);
+            stormTowerTarget.setFilterMode(GL11.GL_LINEAR);
+            configureClamp(stormTowerTarget.getColorTextureId());
+            upgradeColorToRgba16f(stormTowerTarget.getColorTextureId(), size, size);
+            stormTowerTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        }
+        return stormTowerTarget;
+    }
+
     public static RenderTarget weatherTargetOrNull() {
         return weatherTarget;
     }
 
     public static RenderTarget morphologyTargetOrNull() {
         return morphologyTarget;
+    }
+
+    public static RenderTarget stormStructureTargetOrNull() {
+        return stormStructureTarget;
+    }
+
+    public static RenderTarget stormLayerHeightTargetOrNull() {
+        return stormLayerHeightTarget;
+    }
+
+    public static RenderTarget stormTowerTargetOrNull() {
+        return stormTowerTarget;
     }
 
     /**
@@ -159,6 +230,18 @@ public final class VolumetricCloudRenderTargets {
         if (morphologyTarget != null) {
             morphologyTarget.destroyBuffers();
             morphologyTarget = null;
+        }
+        if (stormStructureTarget != null) {
+            stormStructureTarget.destroyBuffers();
+            stormStructureTarget = null;
+        }
+        if (stormLayerHeightTarget != null) {
+            stormLayerHeightTarget.destroyBuffers();
+            stormLayerHeightTarget = null;
+        }
+        if (stormTowerTarget != null) {
+            stormTowerTarget.destroyBuffers();
+            stormTowerTarget = null;
         }
         if (shadowTarget != null) {
             shadowTarget.destroyBuffers();
