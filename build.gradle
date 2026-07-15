@@ -263,6 +263,49 @@ tasks.register('cloudFieldSandbox', JavaExec) {
     workingDir = project.rootDir
 }
 
+tasks.register('materialAdvectionSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs deterministic native-cloud material advection checks without launching Minecraft.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.MaterialAdvectionSandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('cloudRegionMotionSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs deterministic authoritative native-cloud group-motion checks without launching Minecraft.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.simulation.CloudRegionMotionSandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('cloudMorphologyTopologySandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Reports deterministic source-table metrics for native structured tower morphology.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.simulation.CloudMorphologyTopologySandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('volumetricStabilityDiagnosticsSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs deterministic CPU checks for native-cloud stability diagnostics and composite emulation.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricStabilityDiagnosticsSandbox'
+    workingDir = project.rootDir
+}
+
+tasks.named('check').configure {
+    dependsOn 'materialAdvectionSandbox'
+    dependsOn 'cloudRegionMotionSandbox'
+    dependsOn 'cloudMorphologyTopologySandbox'
+    dependsOn 'volumetricStabilityDiagnosticsSandbox'
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs += [

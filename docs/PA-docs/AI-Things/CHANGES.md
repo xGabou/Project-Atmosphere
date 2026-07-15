@@ -1,4 +1,38 @@
 # Project Atmosphere — Developer Change Log
+
+- Added an on-demand, fence-gated native volumetric stability diagnostic. It
+  records the existing raymarch color/depth output, reproduces the production
+  depth-guided composite on a worker thread, and reports stable-input hashes,
+  temporal churn, selected-neighbour changes, reconstruction-grid gradients,
+  history rejection states, and premultiplied-alpha/depth pairing without
+  drawing a second cloud pass or blocking the render thread.
+- Made rejected stability pairs attributable instead of opaque: requested
+  captures now retain component hashes for current matrices, active previous
+  transforms, camera/density, weather uniforms, lighting, advection, quality
+  and funnels, and print the exact groups that changed. Previous-frame matrix
+  and material-delta inputs are excluded when temporal history is disabled,
+  matching the shader branch that cannot consume them; ordinary rendering does
+  not allocate these diagnostic component records.
+- Split temporal stability reporting into strict controlled pairs and explicitly
+  labelled observational pairs. The observational signature still requires the
+  same weather maps, camera/matrices, lighting, quality, depth source, targets
+  and render modes, including the resolved wind vector, while allowing only
+  FrameIndex, WorldTime and history colour/depth sampler contents to vary for
+  numerical CURRENT-versus-FINAL A/Bs. Active-union alpha RMS is sample-weighted
+  so empty sky cannot dilute instability inside the cloud footprint.
+- Fixed native visual-wind ownership so an existing PA field or cell with a
+  legitimate zero/cancelled wind remains authoritative. Regional forecast wind
+  is now used only when no rendered field or cell source exists, preventing a
+  frozen cloud's material and rain direction from changing independently.
+- Split native raymarch blue-noise phasing into a stable spatial phase for
+  exterior material search and an animated phase only after a material bracket
+  is confirmed. This prevents thin silhouette pixels from alternating between
+  coarse-search hits and misses while retaining temporal sub-step integration.
+- Made the smoothed native camera-density tracker settle to canonical zero after
+  an exact-clear sample has decayed far below every whiteout, resolution,
+  history-confidence and shader threshold. This preserves the visible release
+  while preventing an endless tail of changing subnormal values from being
+  uploaded to the GPU or invalidating otherwise controlled diagnostics.
 This file records functionality additions/removals made during development sessions, annotated with the current version from `gradle.properties` at the time of change.
 
 ## Unreleased - Dynamic volumetric cloud system (0.9.1.1-alpha)
@@ -667,3 +701,8 @@ This file records functionality additions/removals made during development sessi
 - Aligned stable convective cloudlet ids across cumulus, tower and storm layouts to
   reduce morphology-transition popping, and made the standalone CloudField lab fail
   fast when its deterministic layout self-check reports an issue.
+- Fixed authoritative native morphology groups collapsing at atmospheric region
+  boundaries: sibling lobes now share one source-region wind delta instead of
+  independently sampling discontinuous regional winds. Added a deterministic
+  convergent-boundary sandbox and targeted runtime offset/hash diagnostics; the
+  native 30-second boundary A/B retained all twelve UUID-relative offsets.

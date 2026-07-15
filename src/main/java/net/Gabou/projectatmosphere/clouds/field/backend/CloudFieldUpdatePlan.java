@@ -94,6 +94,7 @@ public record CloudFieldUpdatePlan(
                 !sameFloat(existing.stormPotential(), desired.stormPotential()),
                 !existing.cloudTypeId().equals(desired.cloudTypeId())
                         || existing.morphologyFamily() != desired.morphologyFamily()
+                        || !existing.morphologyMembership().equals(desired.morphologyMembership())
                         || !sameFloat(existing.anvilStrength(), desired.anvilStrength())
                         || !sameFloat(existing.precipitationIntensity(), desired.precipitationIntensity()),
                 existing.cloudletCount() != desired.cloudletCount(),
@@ -133,6 +134,9 @@ public record CloudFieldUpdatePlan(
                 !sameFloat(existing.stormPotential(), source.stormPotential()),
                 !existing.cloudTypeId().equals(source.cloudTypeId())
                         || existing.morphologyFamily() != source.resolvedMorphologyFamily()
+                        || !existing.morphologyMembership().equals(
+                            source.morphologyMembership().withFallbackGroup(existing.fieldId())
+                        )
                         || !sameFloat(existing.anvilStrength(), source.anvilStrength())
                         || !sameFloat(existing.precipitationIntensity(), source.precipitationIntensity()),
                 existing.cloudletCount() != fieldFactory.cloudletCountFor(source),

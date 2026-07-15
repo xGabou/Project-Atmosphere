@@ -30,6 +30,7 @@ public record CloudFieldSnapshot(
         float stormPotential,
         String cloudTypeId,
         CloudMorphologyFamily morphologyFamily,
+        CloudMorphologyMembership morphologyMembership,
         float anvilStrength,
         float precipitationIntensity,
         CloudFieldSourceKind sourceKind,
@@ -65,6 +66,9 @@ public record CloudFieldSnapshot(
         morphologyFamily = morphologyFamily == null
                 ? definition.getMorphologyFamily()
                 : morphologyFamily;
+        morphologyMembership = (morphologyMembership == null
+                ? CloudMorphologyMembership.ungrouped()
+                : morphologyMembership).withFallbackGroup(fieldId);
         anvilStrength = clamp01(anvilStrength);
         precipitationIntensity = clamp01(precipitationIntensity);
         sourceKind = sourceKind == null ? CloudFieldSourceKind.UNKNOWN : sourceKind;
@@ -80,6 +84,78 @@ public record CloudFieldSnapshot(
         cameraPosition = cameraPosition == null ? Vec3.ZERO : cameraPosition;
     }
 
+    /** Backward-compatible construction for snapshots without grouped lobes. */
+    public CloudFieldSnapshot(
+            UUID fieldId,
+            long seed,
+            String dimensionId,
+            Vec3 center,
+            Vec3 previousCenter,
+            float radius,
+            float baseY,
+            float topY,
+            float density,
+            float coverage,
+            float growth,
+            float decay,
+            float humidityInfluence,
+            Vec3 windVector,
+            float verticalDevelopment,
+            float stormPotential,
+            String cloudTypeId,
+            CloudMorphologyFamily morphologyFamily,
+            float anvilStrength,
+            float precipitationIntensity,
+            CloudFieldSourceKind sourceKind,
+            CloudLodBand lodBand,
+            CloudLodBand previousLodBand,
+            CloudFieldHydrationState hydrationState,
+            float hydrationProgress,
+            int targetCloudletCount,
+            int activeCloudletCount,
+            long fieldAgeTicks,
+            long lifetimeTicks,
+            long worldTime,
+            float partialTick,
+            Vec3 cameraPosition
+    ) {
+        this(
+                fieldId,
+                seed,
+                dimensionId,
+                center,
+                previousCenter,
+                radius,
+                baseY,
+                topY,
+                density,
+                coverage,
+                growth,
+                decay,
+                humidityInfluence,
+                windVector,
+                verticalDevelopment,
+                stormPotential,
+                cloudTypeId,
+                morphologyFamily,
+                CloudMorphologyMembership.single(fieldId),
+                anvilStrength,
+                precipitationIntensity,
+                sourceKind,
+                lodBand,
+                previousLodBand,
+                hydrationState,
+                hydrationProgress,
+                targetCloudletCount,
+                activeCloudletCount,
+                fieldAgeTicks,
+                lifetimeTicks,
+                worldTime,
+                partialTick,
+                cameraPosition
+        );
+    }
+
     public int dynamicCloudletCount() {
         if (!lodBand.hasIdentifiableCloudlets()) {
             return 0;
@@ -88,11 +164,28 @@ public record CloudFieldSnapshot(
     }
 
     public float effectiveDensity() {
+        // PA cluster/region sources already integrate growth and decay into
+        // their authoritative density every server tick. Reapplying the
+        // lifecycle envelope here made a freshly spawned native lobe start
+        // near zero even though its simulation state deliberately starts at
+        // 82% of mature density, then forced its silhouette through every
+        // erosion threshold for 30 seconds.
+        if (hasAuthoritativeLifecycleScalars()) {
+            return clamp01(density);
+        }
         return clamp01(density * growth * (1.0F - decay));
     }
 
     public float effectiveCoverage() {
+        if (hasAuthoritativeLifecycleScalars()) {
+            return clamp01(coverage);
+        }
         return clamp01(coverage * growth * (1.0F - decay));
+    }
+
+    private boolean hasAuthoritativeLifecycleScalars() {
+        return sourceKind == CloudFieldSourceKind.PA_CLUSTER
+                || sourceKind == CloudFieldSourceKind.PA_REGION;
     }
 
     public boolean hasVisibleClouds() {
@@ -112,6 +205,16 @@ public record CloudFieldSnapshot(
             return 0.5F + decay * 0.5F;
         }
         return growth < 0.999F ? growth * 0.5F : 0.5F;
+    }
+
+    /**
+     * Lifecycle value consumed by weather-map shaders. Authoritative PA
+     * sources have already integrated formation and dissipation into their
+     * scalar state; presenting them as mature prevents the shader from
+     * multiplying either phase a second time.
+     */
+    public float visualLifecycleStage() {
+        return hasAuthoritativeLifecycleScalars() ? 0.5F : lifecycleStage();
     }
 
     private static float clamp01(float value) {

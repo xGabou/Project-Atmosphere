@@ -8,9 +8,15 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 public final class VolumetricCloudDebugConfig {
     private static volatile boolean depthCompositeEnabled = true;
     private static volatile boolean sceneRayLimitEnabled = true;
-    private static volatile boolean coveragePretestEnabled = true;
+    // Uniform ray probes can miss narrow world-space cloud footprints and cut
+    // complete horizontal bands from an otherwise valid volume. Keep the A/B
+    // diagnostic available, but default to the correctness-preserving path
+    // until a conservative occupancy structure replaces the probe heuristic.
+    private static volatile boolean coveragePretestEnabled = false;
     private static volatile boolean adaptiveWeatherFootprintEnabled = true;
     private static volatile boolean historyEnabled = true;
+    private static volatile VolumetricCloudRaymarchDebugView raymarchDebugView =
+            VolumetricCloudRaymarchDebugView.FINAL;
     // Fixed empty-map base/top sentinels bleed into cloud fringes through the
     // weather map's linear filter. Keep the legacy behaviour as an A/B switch,
     // but use real fringe heights in the production path.
@@ -72,6 +78,16 @@ public final class VolumetricCloudDebugConfig {
         historyEnabled = enabled;
     }
 
+    public static VolumetricCloudRaymarchDebugView raymarchDebugView() {
+        return raymarchDebugView;
+    }
+
+    public static void setRaymarchDebugView(VolumetricCloudRaymarchDebugView view) {
+        raymarchDebugView = view == null
+                ? VolumetricCloudRaymarchDebugView.FINAL
+                : view;
+    }
+
     public static boolean sentinelHeightsEnabled() {
         return sentinelHeightsEnabled;
     }
@@ -129,6 +145,7 @@ public final class VolumetricCloudDebugConfig {
                 + "\ncoveragePretestDilation=" + coveragePretestDilation
                 + "\nadaptiveWeatherFootprint=" + (adaptiveWeatherFootprintEnabled ? "on" : "off")
                 + "\nhistory=" + (historyEnabled ? "on" : "off")
+                + "\nraymarchView=" + raymarchDebugView.serializedName()
                 + "\nsentinelHeights=" + (sentinelHeightsEnabled ? "on" : "off")
                 + "\nfullres=" + (fullResolutionEnabled ? "on" : "off")
                 + "\nweatherCoverageScale=" + weatherCoverageScale;

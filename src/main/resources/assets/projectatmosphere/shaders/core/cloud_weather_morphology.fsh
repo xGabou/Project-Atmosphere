@@ -62,7 +62,6 @@ void main() {
         fbm2(worldXZ * 0.010 + vec2(3.7, 9.1)),
         fbm2(worldXZ * 0.010 + vec2(-7.3, 1.9))
     ) - 0.5;
-    vec2 warpedXZ = worldXZ + warp * 42.0;
 
     vec3 traitsAccum = vec3(0.0);
     float weightAccum = 0.0;
@@ -91,7 +90,9 @@ void main() {
 
         float footprintScale = max(media.w, 0.001) * max(WeatherCoverageScale, 0.001);
         vec2 scaledRadius = max(posRadius.zw * footprintScale, vec2(1.0));
-        vec2 delta = warpedXZ - posRadius.xy;
+        // Keep categorical morphology aligned with the analytic coverage map.
+        // Warp is reserved for bounded contour detail below.
+        vec2 delta = worldXZ - posRadius.xy;
         float maxRadius = max(scaledRadius.x, scaledRadius.y) * 1.45;
         if (dot(delta, delta) > maxRadius * maxRadius) {
             continue;
@@ -110,7 +111,7 @@ void main() {
         float lobeStrength = 1.0;
         lobeStrength = mix(lobeStrength, 0.20, sheet);
         lobeStrength = mix(lobeStrength, 0.72, stratocumulus);
-        lobeStrength = mix(lobeStrength, 1.08, cumulus);
+        lobeStrength = mix(lobeStrength, 0.22, cumulus);
         lobeStrength = mix(lobeStrength, 0.76, storm);
         lobeStrength = mix(lobeStrength, 0.34, cirrus);
         float lobes = 1.0

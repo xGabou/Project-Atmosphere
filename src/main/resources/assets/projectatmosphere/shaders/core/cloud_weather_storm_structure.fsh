@@ -54,7 +54,6 @@ void main() {
         fbm2(worldXZ * 0.010 + vec2(3.7, 9.1)),
         fbm2(worldXZ * 0.010 + vec2(-7.3, 1.9))
     ) - 0.5;
-    vec2 warpedXZ = worldXZ + warp * 42.0;
 
     float baseSupport = 0.0;
     float baseBestSupport = 0.0;
@@ -82,7 +81,7 @@ void main() {
         float footprintScale = max(media.w, 0.001)
             * max(WeatherCoverageScale, 0.001);
         vec2 scaledRadius = max(posRadius.zw * footprintScale, vec2(1.0));
-        vec2 delta = warpedXZ - posRadius.xy;
+        vec2 delta = worldXZ - posRadius.xy;
         float maxRadius = max(scaledRadius.x, scaledRadius.y) * 1.45;
         if (dot(delta, delta) > maxRadius * maxRadius) {
             continue;

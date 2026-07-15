@@ -10,14 +10,71 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
  * Family-specific cloud morphology generators.
  */
 final class CloudMorphologyGenerators {
+    private static final int STRUCTURED_TOWER_COUNT = 12;
+    private static final float[] STRUCTURED_TOWER_ANGLES = {
+            0.0F, 8.0F, 137.0F, 263.0F,
+            68.0F, 196.0F, 319.0F,
+            31.0F, 166.0F, 330.0F,
+            92.0F, 227.0F
+    };
+    private static final float[] STRUCTURED_TOWER_RADIAL = {
+            0.00F, 0.40F, 0.46F, 0.36F,
+            0.38F, 0.30F, 0.44F,
+            0.34F, 0.43F, 0.33F,
+            0.34F, 0.32F
+    };
+    private static final float[] STRUCTURED_TOWER_HEIGHT = {
+            0.00F, 0.04F, 0.05F, 0.03F,
+            0.20F, 0.23F, 0.21F,
+            0.38F, 0.42F, 0.39F,
+            0.56F, 0.59F
+    };
+    private static final float[] STRUCTURED_TOWER_RADIUS = {
+            0.96F, 0.88F, 0.82F, 0.94F,
+            0.92F, 0.78F, 0.90F,
+            0.86F, 0.72F, 0.88F,
+            0.86F, 0.80F
+    };
+    private static final float[] STRUCTURED_TOWER_LOWER = {
+            1.00F, 1.00F, 1.00F, 1.00F,
+            1.02F, 1.00F, 1.02F,
+            1.04F, 1.02F, 1.04F,
+            1.06F, 1.06F
+    };
+    private static final float[] STRUCTURED_TOWER_UPPER = {
+            0.84F, 0.84F, 0.86F, 0.82F,
+            0.98F, 1.00F, 0.96F,
+            1.00F, 1.02F, 0.98F,
+            1.04F, 1.02F
+    };
 
     private CloudMorphologyGenerators() {
+    }
+
+    /** Read-only access to the exact deterministic tower table for diagnostics. */
+    static StructuredTowerTopology structuredTowerTopology() {
+        return new StructuredTowerTopology(
+                immutableValues(STRUCTURED_TOWER_ANGLES),
+                immutableValues(STRUCTURED_TOWER_RADIAL),
+                immutableValues(STRUCTURED_TOWER_HEIGHT),
+                immutableValues(STRUCTURED_TOWER_RADIUS)
+        );
+    }
+
+    private static List<Float> immutableValues(float[] values) {
+        List<Float> copy = new ArrayList<>(values.length);
+        for (float value : values) {
+            copy.add(value);
+        }
+        return List.copyOf(copy);
     }
 
     static @NotNull SpawnPlan createSpawnPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {
@@ -64,19 +121,48 @@ final class CloudMorphologyGenerators {
             int clusterIndex,
             @NotNull RandomSource random
     ) {
-        applyToCluster(cluster, definition);
+        CloudMorphologyFamily family = plan.family();
+        if (family != CloudMorphologyFamily.PUFF && family != CloudMorphologyFamily.TOWER) {
+            applyToCluster(cluster, definition);
+        } else {
+            cluster.setMorphologyFamily(family);
+        }
 
-        float radiusJitter = 0.92F + random.nextFloat() * 0.16F;
-        float finalRadius = Math.max(6.0F, cluster.getRadius() * scale * radiusJitter);
-        if (plan.family() == CloudMorphologyFamily.FILAMENT) {
+        float radiusJitter = family == CloudMorphologyFamily.TOWER
+                ? 0.96F + random.nextFloat() * 0.08F
+                : 0.92F + random.nextFloat() * 0.16F;
+        float tier = family == CloudMorphologyFamily.TOWER
+                ? towerTier(clusterIndex, plan.clusterCount())
+                : morphologyTier(clusterIndex, plan.clusterCount());
+        float lobeScale = family == CloudMorphologyFamily.TOWER
+                ? towerRadiusScale(clusterIndex, plan.clusterCount(), tier)
+                : 1.0F;
+        float stableScale = family == CloudMorphologyFamily.TOWER
+                ? Mth.lerp(
+                    Mth.clamp((scale - 0.72F) / 0.42F, 0.0F, 1.0F),
+                    0.96F,
+                    1.04F
+                )
+                : scale;
+        // Start from the plan radius. Secondary clusters were already created
+        // with radius*scale; multiplying cluster.getRadius() by scale here
+        // applied that scale twice and made upper tower lobes needle-thin.
+        float finalRadius = Math.max(6.0F, plan.radius() * stableScale * lobeScale * radiusJitter);
+        if (family == CloudMorphologyFamily.FILAMENT) {
             finalRadius = Math.max(5.0F, finalRadius * (0.42F + random.nextFloat() * 0.20F));
-        } else if (plan.family() == CloudMorphologyFamily.CELLULAR_SHEET) {
+        } else if (family == CloudMorphologyFamily.CELLULAR_SHEET) {
             finalRadius = Math.max(10.0F, finalRadius * (0.52F + random.nextFloat() * 0.24F));
         }
 
         float finalDensity = Mth.clamp(plan.density() * (0.90F + random.nextFloat() * 0.18F), 0.0F, 1.0F);
         float finalCoverage = Mth.clamp(plan.coverage() * (0.88F + random.nextFloat() * 0.20F), 0.0F, 1.0F);
-        float initialRadius = Math.max(6.0F, finalRadius * 0.72F);
+        // Convective silhouettes must be recognizable and stable immediately.
+        // Their previous 72% horizontal birth size was paired with full final
+        // height, making a young lobe look like a tall extrusion for 30 seconds.
+        float birthRadiusScale = family == CloudMorphologyFamily.TOWER
+                ? 0.94F
+                : family == CloudMorphologyFamily.PUFF ? 0.90F : 0.72F;
+        float initialRadius = Math.max(6.0F, finalRadius * birthRadiusScale);
         float initialDensity = Mth.clamp(finalDensity * 0.82F, 0.0F, 1.0F);
         float initialCoverage = Mth.clamp(finalCoverage * 0.82F, 0.0F, 1.0F);
 
@@ -87,11 +173,10 @@ final class CloudMorphologyGenerators {
         cluster.setCoverage(initialCoverage);
         cluster.setEdgeSoftness(Mth.clamp(plan.edgeSoftness() * (0.88F + random.nextFloat() * 0.24F), 0.02F, 0.95F));
 
-        if (plan.family() == CloudMorphologyFamily.TOWER && clusterIndex > 0) {
-            float lift = Math.min(0.45F, clusterIndex * 0.06F);
-            cluster.setVerticalBounds(cluster.getBaseY() + lift * plan.baseDrop(), cluster.getTopY() + lift * plan.topRise());
+        if (family == CloudMorphologyFamily.PUFF || family == CloudMorphologyFamily.TOWER) {
+            applyConvectiveLobeEnvelope(cluster, plan, finalRadius, clusterIndex);
         }
-        if (plan.family() == CloudMorphologyFamily.STORM_ANVIL && clusterIndex > plan.clusterCount() / 2) {
+        if (family == CloudMorphologyFamily.STORM_ANVIL && clusterIndex > plan.clusterCount() / 2) {
             cluster.setVerticalBounds(cluster.getBaseY() + plan.baseDrop() * 0.38F, cluster.getTopY() + plan.topRise() * 0.22F);
             float anvilRadius = cluster.getRadius() * 1.24F;
             cluster.setRadius(anvilRadius);
@@ -133,15 +218,55 @@ final class CloudMorphologyGenerators {
         double centerY = cluster.getCenter().y();
         float existingRadius = Math.max(1.0F, cluster.getRadius());
         float mergeBoost = 1.0F + cluster.getMergePressure() * 0.18F;
-        float targetRadius = Math.max(shape.getBaseRadius() * radiusMultiplier(family), existingRadius * mergeBoost);
+        int morphologyIndex = cluster.getMorphologyIndex();
+        int morphologyCount = cluster.getMorphologyCount();
+        float tier = family == CloudMorphologyFamily.TOWER
+                ? towerTier(morphologyIndex, morphologyCount)
+                : morphologyTier(morphologyIndex, morphologyCount);
+        float lobeScale = family == CloudMorphologyFamily.TOWER
+                ? towerRadiusScale(morphologyIndex, morphologyCount, tier)
+                : 1.0F;
+        float targetRadius = Math.max(shape.getBaseRadius() * radiusMultiplier(family) * lobeScale, existingRadius * mergeBoost);
         float targetBaseY = (float) centerY - shape.getBaseOffset() * baseMultiplier(family);
         float targetTopY = (float) centerY + shape.getTopOffset() * topMultiplier(family) + cluster.getMergePressure() * 12.0F;
 
         cluster.setMorphologyFamily(family);
-        cluster.setVerticalBounds(
-                Math.min(cluster.getBaseY(), targetBaseY),
-                Math.max(cluster.getTopY(), targetTopY)
-        );
+        if (family == CloudMorphologyFamily.PUFF || family == CloudMorphologyFamily.TOWER) {
+            boolean structuredTower = family == CloudMorphologyFamily.TOWER
+                    && morphologyCount == STRUCTURED_TOWER_COUNT;
+            float lowerExtent = structuredTower
+                    ? targetRadius * STRUCTURED_TOWER_LOWER[morphologyIndex]
+                    : family == CloudMorphologyFamily.TOWER && morphologyIndex > 0
+                    ? targetRadius * Mth.lerp(tier, 0.68F, 0.56F)
+                    : Math.min(shape.getBaseOffset() * baseMultiplier(family), targetRadius * 0.48F);
+            float upperExtent = structuredTower
+                    ? targetRadius * STRUCTURED_TOWER_UPPER[morphologyIndex]
+                    : family == CloudMorphologyFamily.TOWER
+                    ? targetRadius * Mth.lerp(tier, 1.04F, 0.90F)
+                        + shape.getTopOffset() * topMultiplier(family) * tier * 0.10F
+                    : targetRadius * 0.84F;
+            float localBaseY = (float) centerY - lowerExtent;
+            if (family == CloudMorphologyFamily.TOWER) {
+                float groupOriginY = (float) centerY
+                        - tier * shape.getTopOffset() * topMultiplier(family)
+                        * (structuredTower ? 1.0F : 0.60F);
+                float groupBaseY = groupOriginY - shape.getBaseOffset() * 0.78F;
+                int shoulderCount = Math.min(3, Math.max(1, morphologyCount - 1));
+                // The primary and the three broad shoulders share one
+                // condensation level. Retargeting used to raise only the
+                // primary after spawn, carving the dark arch seen from the
+                // side even though the freshly generated envelope was flat.
+                localBaseY = morphologyIndex >= 0 && morphologyIndex <= shoulderCount
+                        ? groupBaseY
+                        : Math.max(groupBaseY, localBaseY);
+            }
+            cluster.setVerticalBounds(localBaseY, (float) centerY + upperExtent);
+        } else {
+            cluster.setVerticalBounds(
+                    Math.min(cluster.getBaseY(), targetBaseY),
+                    Math.max(cluster.getTopY(), targetTopY)
+            );
+        }
         cluster.setGrowthTargets(
                 Math.max(existingRadius, targetRadius),
                 Mth.clamp(coverageFor(family, visual, shape), 0.0F, 1.0F),
@@ -167,7 +292,11 @@ final class CloudMorphologyGenerators {
         CloudShapeProfile shape = definition.getShapeProfile();
         CloudVisualProfile visual = definition.getVisualProfile();
         float radius = shape.getBaseRadius() * 0.86F;
-        return plan(definition, random, 4, 7, radius, radius * 1.18F,
+        // Fixed four-stage topology: four base lobes, three core lobes, three
+        // towers and two laterally separated crowns. No single primitive owns
+        // the apex, so the source geometry cannot collapse into a needle.
+        return plan(definition, random, STRUCTURED_TOWER_COUNT, STRUCTURED_TOWER_COUNT,
+                radius, radius * 1.18F,
                 shape.getBaseOffset() * 0.78F, shape.getTopOffset() * 1.34F,
                 0.50F + visual.getDensityMultiplier() * 0.25F,
                 0.48F + visual.getCoverageMultiplier() * 0.24F,
@@ -262,7 +391,8 @@ final class CloudMorphologyGenerators {
                 Math.max(4.0F, topRise),
                 Mth.clamp(density, 0.10F, 0.98F),
                 Mth.clamp(coverage, 0.12F, 0.98F),
-                Mth.clamp(edgeSoftness, 0.04F, 0.92F)
+                Mth.clamp(edgeSoftness, 0.04F, 0.92F),
+                random.nextFloat() * (float) (Math.PI * 2.0D)
         );
     }
 
@@ -273,10 +403,159 @@ final class CloudMorphologyGenerators {
     }
 
     private static Vec3 towerCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
-        float angle = (float) (random.nextFloat() * Math.PI * 2.0D);
-        float distance = plan.radius() * (0.10F + random.nextFloat() * 0.32F);
-        float tier = (float) clusterIndex / Math.max(1.0F, plan.clusterCount() - 1.0F);
-        return origin.add(Math.cos(angle) * distance, tier * plan.topRise() * 0.38F, Math.sin(angle) * distance);
+        if (plan.clusterCount() == STRUCTURED_TOWER_COUNT) {
+            int index = Mth.clamp(clusterIndex, 0, STRUCTURED_TOWER_COUNT - 1);
+            float angle = plan.orientationRadians()
+                    + (float) Math.toRadians(STRUCTURED_TOWER_ANGLES[index])
+                    + (random.nextFloat() - 0.5F) * 0.08F;
+            float distance = plan.radius() * Mth.clamp(
+                    STRUCTURED_TOWER_RADIAL[index]
+                            + (random.nextFloat() - 0.5F) * 0.03F,
+                    0.0F,
+                    0.60F
+            );
+            float height = plan.topRise() * Mth.clamp(
+                    STRUCTURED_TOWER_HEIGHT[index]
+                            + (random.nextFloat() - 0.5F) * 0.02F,
+                    0.0F,
+                    0.78F
+            );
+            return origin.add(Math.cos(angle) * distance, height, Math.sin(angle) * distance);
+        }
+
+        int siblingCount = Math.max(1, plan.clusterCount() - 1);
+        int shoulderCount = Math.min(3, siblingCount);
+        boolean shoulder = clusterIndex <= shoulderCount;
+        float tier = towerTier(clusterIndex, plan.clusterCount());
+        float angle;
+        float radialScale;
+        if (shoulder) {
+            float shoulderT = (float) (clusterIndex - 1)
+                    / (float) Math.max(1, shoulderCount - 1);
+            // Three broad, similarly high shoulders establish the compact
+            // condensation base. A monotonic golden-angle helix gave the
+            // whole cloud one diagonal rock-like ridge instead.
+            angle = (clusterIndex - 1)
+                    * ((float) (Math.PI * 2.0D) / shoulderCount)
+                    + (random.nextFloat() - 0.5F) * 0.18F;
+            radialScale = Mth.lerp(shoulderT, 0.52F, 0.44F);
+        } else {
+            int upperIndex = clusterIndex - shoulderCount - 1;
+            float upperT = Mth.clamp((tier - 0.46F) / 0.36F, 0.0F, 1.0F);
+            // Paired crown lobes form successive cauliflower tiers. Their
+            // footprint converges toward the updraft without becoming a
+            // single central needle.
+            angle = upperIndex * 2.399963F + 0.82F
+                    + (random.nextFloat() - 0.5F) * 0.20F;
+            radialScale = Mth.lerp(upperT, 0.30F, 0.08F);
+        }
+        float distance = plan.radius() * radialScale
+                * (0.90F + random.nextFloat() * 0.20F);
+        // Broad, overlapping cauliflower lobes climb through the column. Their
+        // local bounds are assigned separately; this Y is the actual lobe
+        // centre and is no longer discarded by the renderer projection.
+        return origin.add(Math.cos(angle) * distance, tier * plan.topRise() * 0.60F, Math.sin(angle) * distance);
+    }
+
+    private static void applyConvectiveLobeEnvelope(
+            CloudClusterState cluster,
+            SpawnPlan plan,
+            float finalRadius,
+            int clusterIndex
+    ) {
+        float tier = plan.family() == CloudMorphologyFamily.TOWER
+                ? towerTier(clusterIndex, plan.clusterCount())
+                : morphologyTier(clusterIndex, plan.clusterCount());
+        float centerY = (float) cluster.getCenter().y();
+        if (plan.family() == CloudMorphologyFamily.PUFF) {
+            float lowerExtent = Math.min(plan.baseDrop(), finalRadius * 0.46F);
+            float upperExtent = finalRadius * Mth.lerp(tier, 0.86F, 0.72F);
+            cluster.setVerticalBounds(centerY - lowerExtent, centerY + upperExtent);
+            return;
+        }
+
+        // Reconstruct the group's condensation level from the deterministic
+        // tier lift, then prevent higher lobes from protruding below it. The
+        // primary owns the coherent flat base; progressively smaller lobes
+        // overlap it and build the rounded tower above.
+        boolean structuredTower = plan.family() == CloudMorphologyFamily.TOWER
+                && plan.clusterCount() == STRUCTURED_TOWER_COUNT;
+        float groupOriginY = centerY - tier * plan.topRise()
+                * (structuredTower ? 1.0F : 0.60F);
+        float groupBaseY = groupOriginY - plan.baseDrop();
+        float lowerExtent = structuredTower
+                ? finalRadius * STRUCTURED_TOWER_LOWER[clusterIndex]
+                : clusterIndex == 0
+                ? plan.baseDrop()
+                : finalRadius * Mth.lerp(tier, 0.68F, 0.56F);
+        // Smaller upper-tier lobes still need successively higher supported
+        // crowns. The old shrinking multiplier nearly cancelled the centre-Y
+        // rise, leaving every tier at the same top and rebuilding one dome.
+        float upperExtent = structuredTower
+                ? finalRadius * STRUCTURED_TOWER_UPPER[clusterIndex]
+                : finalRadius * Mth.lerp(tier, 1.04F, 0.90F)
+                    + plan.topRise() * tier * 0.10F;
+        int shoulderCount = Math.min(3, Math.max(1, plan.clusterCount() - 1));
+        float localBaseY = clusterIndex > 0 && clusterIndex <= shoulderCount
+                ? groupBaseY
+                : Math.max(groupBaseY, centerY - lowerExtent);
+        float localTopY = centerY + upperExtent;
+        cluster.setVerticalBounds(localBaseY, Math.max(localBaseY + 4.0F, localTopY));
+    }
+
+    private static float morphologyTier(int clusterIndex, int clusterCount) {
+        return Mth.clamp(
+                (float) Math.max(0, clusterIndex) / (float) Math.max(1, clusterCount - 1),
+                0.0F,
+                1.0F
+        );
+    }
+
+    private static float towerTier(int clusterIndex, int clusterCount) {
+        if (clusterCount == STRUCTURED_TOWER_COUNT) {
+            return STRUCTURED_TOWER_HEIGHT[Mth.clamp(
+                    clusterIndex,
+                    0,
+                    STRUCTURED_TOWER_COUNT - 1
+            )];
+        }
+        if (clusterIndex <= 0) {
+            return 0.0F;
+        }
+        int siblingCount = Math.max(1, clusterCount - 1);
+        int shoulderCount = Math.min(3, siblingCount);
+        if (clusterIndex <= shoulderCount) {
+            float shoulderT = (float) (clusterIndex - 1)
+                    / (float) Math.max(1, shoulderCount - 1);
+            return Mth.lerp(shoulderT, 0.18F, 0.30F);
+        }
+
+        int upperIndex = clusterIndex - shoulderCount - 1;
+        int upperCount = Math.max(1, siblingCount - shoulderCount);
+        int bandCount = Math.max(1, (upperCount + 1) / 2);
+        int band = upperIndex / 2;
+        float bandT = (float) band / (float) Math.max(1, bandCount - 1);
+        float pairedOffset = (upperIndex & 1) == 0 ? 0.0F : 0.025F;
+        return Mth.clamp(Mth.lerp(bandT, 0.46F, 0.78F) + pairedOffset, 0.0F, 0.82F);
+    }
+
+    private static float towerRadiusScale(int clusterIndex, int clusterCount, float tier) {
+        if (clusterCount == STRUCTURED_TOWER_COUNT) {
+            return STRUCTURED_TOWER_RADIUS[Mth.clamp(
+                    clusterIndex,
+                    0,
+                    STRUCTURED_TOWER_COUNT - 1
+            )];
+        }
+        return clusterIndex == 0 ? 1.0F : Mth.lerp(tier, 0.82F, 0.44F);
+    }
+
+    record StructuredTowerTopology(
+            List<Float> angles,
+            List<Float> radial,
+            List<Float> heights,
+            List<Float> radii
+    ) {
     }
 
     private static Vec3 stormCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
@@ -388,7 +667,8 @@ final class CloudMorphologyGenerators {
             float topRise,
             float density,
             float coverage,
-            float edgeSoftness
+            float edgeSoftness,
+            float orientationRadians
     ) {
     }
 }

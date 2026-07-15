@@ -13,6 +13,12 @@ import java.util.List;
  * the raymarched volume becomes opaque.
  */
 public final class CameraCloudDensityTracker {
+    /**
+     * Far below the first visual consumer threshold (0.03). Once an exact-clear
+     * sample has released this far, retaining an exponentially decaying residue
+     * only uploads denormal values and prevents stable-frame comparisons.
+     */
+    private static final float CLEAR_SETTLE_EPSILON = 1.0e-4F;
     private static volatile float smoothedDensity;
     private static volatile long lastUpdateNanos;
 
@@ -40,7 +46,8 @@ public final class CameraCloudDensityTracker {
         // leaving it clears smoothly.
         float rate = raw > smoothedDensity ? 6.0F : 2.5F;
         float blend = 1.0F - (float) Math.exp(-rate * deltaSeconds);
-        smoothedDensity = Mth.lerp(blend, smoothedDensity, raw);
+        float next = Mth.lerp(blend, smoothedDensity, raw);
+        smoothedDensity = settleExactClear(raw, next);
     }
 
     /** Smoothed in-cloud density at the camera, 0..1. */
@@ -51,5 +58,27 @@ public final class CameraCloudDensityTracker {
     public static void reset() {
         smoothedDensity = 0.0F;
         lastUpdateNanos = 0L;
+    }
+
+    static void selfCheckExactClearSettlement() {
+        float below = settleExactClear(0.0F, CLEAR_SETTLE_EPSILON * 0.5F);
+        float capturedSubnormal = settleExactClear(0.0F, Float.intBitsToFloat(0x3a));
+        float above = settleExactClear(0.0F, CLEAR_SETTLE_EPSILON * 2.0F);
+        float nonClear = settleExactClear(CLEAR_SETTLE_EPSILON * 0.5F,
+                CLEAR_SETTLE_EPSILON * 0.5F);
+        if (Float.floatToRawIntBits(below) != Float.floatToRawIntBits(0.0F)
+                || Float.floatToRawIntBits(capturedSubnormal) != Float.floatToRawIntBits(0.0F)) {
+            throw new IllegalStateException("exact-clear release did not settle to canonical zero");
+        }
+        if (above == 0.0F) {
+            throw new IllegalStateException("exact-clear release truncated above its settle epsilon");
+        }
+        if (nonClear == 0.0F) {
+            throw new IllegalStateException("non-zero raw camera density was incorrectly cleared");
+        }
+    }
+
+    private static float settleExactClear(float raw, float next) {
+        return raw == 0.0F && next <= CLEAR_SETTLE_EPSILON ? 0.0F : next;
     }
 }

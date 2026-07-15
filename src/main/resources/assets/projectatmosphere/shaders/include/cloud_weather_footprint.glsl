@@ -88,3 +88,42 @@ vec2 paSevereCurvedLayerRange(
     float curvedTop = layerTop - span * topDrop * curve;
     return vec2(curvedBase, max(curvedTop, curvedBase + 0.001));
 }
+
+// Profile-3 lobes are true convective domes. CROWN deliberately has its own
+// role (7): reusing severe ANVIL role 5 would flatten it into a thin lens.
+vec2 paCumulusCurvedLayerRange(
+        int role,
+        float layerBase,
+        float layerTop,
+        float radial) {
+    float span = max(layerTop - layerBase, 0.001);
+    float radial01 = clamp(radial, 0.0, 1.0);
+    float baseLift = 0.025;
+    float topDrop = 0.58;
+    float curvePower = 1.45;
+
+    if (role == 2) {
+        // Primary and shoulder lobes share a coherent condensation base while
+        // their upper surfaces remain rounded.
+        baseLift = 0.025;
+        topDrop = 0.48;
+        curvePower = 1.55;
+    } else if (role == 3) {
+        baseLift = 0.09;
+        topDrop = 0.58;
+        curvePower = 1.38;
+    } else if (role == 4) {
+        baseLift = 0.13;
+        topDrop = 0.64;
+        curvePower = 1.24;
+    } else if (role == 7) {
+        baseLift = 0.18;
+        topDrop = 0.68;
+        curvePower = 1.08;
+    }
+
+    float curve = pow(radial01, curvePower);
+    float curvedBase = layerBase + span * baseLift * curve;
+    float curvedTop = layerTop - span * topDrop * curve;
+    return vec2(curvedBase, max(curvedTop, curvedBase + 0.001));
+}

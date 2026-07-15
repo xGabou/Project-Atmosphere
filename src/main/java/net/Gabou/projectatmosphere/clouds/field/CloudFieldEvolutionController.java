@@ -102,6 +102,7 @@ public final class CloudFieldEvolutionController {
                 approach(currentField.stormPotential(), resolvedTarget.stormPotential(), stormRate * ticks),
                 resolvedTarget.cloudTypeId(),
                 resolvedTarget.morphologyFamily(),
+                currentField.morphologyMembership(),
                 approach(currentField.anvilStrength(), resolvedTarget.anvilStrength(), stormRate * ticks),
                 approach(
                         currentField.precipitationIntensity(),

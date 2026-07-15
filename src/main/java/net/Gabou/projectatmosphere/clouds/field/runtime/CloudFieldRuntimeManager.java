@@ -432,14 +432,14 @@ public final class CloudFieldRuntimeManager {
         ));
         lines.add(String.format(
                 Locale.ROOT,
-                "collector playerBlock=%s dimension=%s sampledRegions=%d activeRegions=%d sampledPaClusters=%d activeClusters=%d regionSources=%d weatherSampledRegions=%d weatherNoCloudRegion=%d weatherFallbackCandidates=%d weatherFallbackCreated=%d finalCollectedSources=%d",
+                "collector playerBlock=%s dimension=%s sampledRegions=%d activeRegions=%d sampledPaClusters=%d activeClusters=%d paClusterSources=%d weatherSampledRegions=%d weatherNoCloudRegion=%d weatherFallbackCandidates=%d weatherFallbackCreated=%d finalCollectedSources=%d",
                 collectorDebug.playerBlockPosition(),
                 collectorDebug.dimensionId(),
                 collectorDebug.sampledRegionCount(),
                 collectorDebug.activeRegionCount(),
                 collectorDebug.sampledPaClusterCount(),
                 collectorDebug.activeClusterCount(),
-                collectorDebug.regionSourceCount(),
+                collectorDebug.paClusterSourceCount(),
                 collectorDebug.sampledWeatherRegionCount(),
                 collectorDebug.weatherRegionsWithoutCloudRegion(),
                 collectorDebug.weatherFallbackCandidateCount(),

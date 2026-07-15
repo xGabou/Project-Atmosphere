@@ -69,13 +69,14 @@ void main() {
     vec2 worldXZ = WeatherOrigin + texCoord * WeatherExtent;
     float slabSpan = max(SlabTopY - SlabBaseY, 1.0);
 
-    // World-anchored domain warp: silhouettes stay glued to world space and
-    // translate coherently as cells drift, instead of noise "swimming".
+    // Stable world-space signal for boundary detail only. The macro footprint
+    // itself must remain the analytic per-cell ellipse: the former fixed
+    // 42-block displacement could exceed a young lobe's complete radius and
+    // split or stretch its silhouette into fins.
     vec2 warp = vec2(
         fbm2(worldXZ * 0.010 + vec2(3.7, 9.1)),
         fbm2(worldXZ * 0.010 + vec2(-7.3, 1.9))
     ) - 0.5;
-    vec2 warpedXZ = worldXZ + warp * 42.0;
 
     float coverage = 0.0;
     float baseAccum = 0.0;
@@ -90,8 +91,11 @@ void main() {
     float carrierSupport = 0.0;
     float carrierBase = 1.0;
     float carrierTop = 0.0;
-    float cumulusBaseAccum = 0.0;
-    float cumulusTopAccum = 0.0;
+    float cumulusBaseMin = 1.0;
+    float cumulusTopMax = 0.0;
+    float cumulusDominantWeight = -1.0;
+    float cumulusDominantBase = 1.0;
+    float cumulusDominantTop = 0.0;
     float cumulusEnergyAccum = 0.0;
     float cumulusWeightAccum = 0.0;
     float stratusSurfaceWeight = 0.0;
@@ -173,7 +177,7 @@ void main() {
         }
         float footprintScale = max(media.w, 0.001) * max(WeatherCoverageScale, 0.001);
         vec2 scaledRadius = max(posRadius.zw * footprintScale, vec2(1.0));
-        vec2 delta = warpedXZ - posRadius.xy;
+        vec2 delta = worldXZ - posRadius.xy;
         float maxRadius = max(scaledRadius.x, scaledRadius.y) * 1.45;
         if (dot(delta, delta) > maxRadius * maxRadius) {
             continue;
@@ -195,7 +199,10 @@ void main() {
         float lobeStrength = 1.0;
         lobeStrength = mix(lobeStrength, 0.20, sheet);
         lobeStrength = mix(lobeStrength, 0.72, stratocumulus);
-        lobeStrength = mix(lobeStrength, 1.08, cumulus);
+        // Authoritative PA clusters already are the cumulus lobes. Strong
+        // per-primitive harmonics added a second synthetic topology and formed
+        // symmetric triangular fins when viewed from above.
+        lobeStrength = mix(lobeStrength, 0.22, cumulus);
         lobeStrength = mix(lobeStrength, 0.76, storm);
         lobeStrength = mix(lobeStrength, 0.34, cirrus);
         float lobes = 1.0
@@ -295,25 +302,14 @@ void main() {
         float edgeLift = edge01 * cellSpan * baseCollapse;
         float edgeDrop = edge01 * cellSpan * topCollapse;
         if (cumulus > 0.5) {
-            // footprint is flat throughout the opaque interior, so edge01 only
-            // curves the final fade ring. Use the already distorted local
-            // radius to form a real dome across the whole PUFF cloudlet while
-            // preserving its characteristically level condensation base.
-            float radial01 = saturate(r);
-            float baseEdge = smoothstep(0.72, 1.0, radial01);
-            float radialDome = pow(radial01, 1.60);
-            float roleTopCollapse = 0.46;
-            if (envelopeRole == 2) {
-                roleTopCollapse = 0.28;
-            } else if (envelopeRole == 3) {
-                roleTopCollapse = 0.50;
-            } else if (envelopeRole == 4) {
-                roleTopCollapse = 0.62;
-            } else if (envelopeRole == 1 || envelopeRole == 6) {
-                roleTopCollapse = 0.40;
-            }
-            edgeLift = cellSpan * 0.025 * baseEdge;
-            edgeDrop = cellSpan * roleTopCollapse * radialDome;
+            vec2 curvedRange = paCumulusCurvedLayerRange(
+                envelopeRole,
+                shape.y,
+                shape.z,
+                r
+            );
+            edgeLift = curvedRange.x - shape.y;
+            edgeDrop = shape.z - curvedRange.y;
         }
         float localBase = shape.y + edgeLift;
         float localTop = shape.z - edgeDrop;
@@ -333,8 +329,28 @@ void main() {
         if (cumulus > 0.5) {
             float cumulusWeight = cellCoverage
                 * cellCoverage * cellCoverage;
-            cumulusBaseAccum += localBase * cumulusWeight;
-            cumulusTopAccum += localTop * cumulusWeight;
+            if (cumulusWeight > cumulusDominantWeight) {
+                cumulusDominantWeight = cumulusWeight;
+                cumulusDominantBase = localBase;
+                cumulusDominantTop = localTop;
+            }
+            // Collapse each interval toward its centre in the weak footprint
+            // fringe before taking extrema. Strong lobe cores retain their
+            // real bounds; a barely-covered high lobe cannot raise a needle.
+            float footprintCore = smoothstep(0.08, 0.46, footprint);
+            float massGate = smoothstep(0.002, 0.025, saturate(cellCoverage));
+            float unionSupport = footprintCore * massGate;
+            if (unionSupport > 0.001) {
+                // Collapse weak candidates toward neutral extrema, not toward
+                // the opposite endpoint of their own interval. A faint upper
+                // lobe fringe previously retained its already-high base and
+                // could raise the global crown when a different lobe supplied
+                // the global union blend.
+                float supportedBase = mix(1.0, localBase, unionSupport);
+                float supportedTop = mix(0.0, localTop, unionSupport);
+                cumulusBaseMin = min(cumulusBaseMin, supportedBase);
+                cumulusTopMax = max(cumulusTopMax, supportedTop);
+            }
             cumulusEnergyAccum += max(
                 media.y,
                 max(dynamics.x * 0.85, dynamics.y * 0.72)
@@ -410,10 +426,10 @@ void main() {
         && dominantCategoryProfile < 3.5
         && cumulusWeightAccum > 0.0;
     float base01 = clamp(useCumulusEnvelope
-        ? cumulusBaseAccum / cumulusWeightAccum
+        ? min(cumulusDominantBase, cumulusBaseMin)
         : baseAccum / weightAccum, 0.0, 1.0);
     float top01 = clamp(useCumulusEnvelope
-        ? cumulusTopAccum / cumulusWeightAccum
+        ? max(cumulusDominantTop, cumulusTopMax)
         : topAccum / weightAccum, 0.0, 1.0);
     bool useStratusSurface = dominantCategoryProfile > 0.5
         && dominantCategoryProfile < 1.5

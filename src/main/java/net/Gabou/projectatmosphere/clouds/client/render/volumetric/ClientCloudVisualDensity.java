@@ -143,21 +143,19 @@ public final class ClientCloudVisualDensity {
             edgeFade = smoothstep(0.0F, 0.055F, edgeDistance);
         }
 
-        double warpedX = x;
-        double warpedZ = z;
-        if (frame.weatherMapModel()) {
-            float warpX = fbm2((float) x * 0.010F + 3.7F, (float) z * 0.010F + 9.1F) - 0.5F;
-            float warpZ = fbm2((float) x * 0.010F - 7.3F, (float) z * 0.010F + 1.9F) - 0.5F;
-            warpedX += warpX * 42.0F;
-            warpedZ += warpZ * 42.0F;
-        }
-
         float slabSpan = Math.max(frame.slabTopY() - frame.slabBaseY(), 1.0F);
         float coverage = 0.0F;
         float baseAccum = 0.0F;
         float topAccum = 0.0F;
         float energyAccum = 0.0F;
         float weightAccum = 0.0F;
+        float cumulusBaseMin = 1.0F;
+        float cumulusTopMax = 0.0F;
+        float cumulusDominantWeight = -1.0F;
+        float cumulusDominantBase = 1.0F;
+        float cumulusDominantTop = 0.0F;
+        float cumulusEnergyAccum = 0.0F;
+        float cumulusWeightAccum = 0.0F;
         float stratusSurfaceWeight = 0.0F;
         float stratusSurfaceBaseAccum = 0.0F;
         float stratusSurfaceTopAccum = 0.0F;
@@ -221,8 +219,11 @@ public final class ClientCloudVisualDensity {
             }
             float radiusMajor = Math.max(cell.radiusMajor() * footprintScale, 1.0F);
             float radiusMinor = Math.max(cell.radiusMinor() * footprintScale, 1.0F);
-            double dx = warpedX - cell.x();
-            double dz = warpedZ - cell.z();
+            // Match the GPU's analytic macro footprint. The former CPU-only
+            // 42-block warp made whiteout/fog disagree with the cloud mass
+            // actually rendered on screen.
+            double dx = x - cell.x();
+            double dz = z - cell.z();
             float cos = (float) Math.cos(-cell.orientationRadians());
             float sin = (float) Math.sin(-cell.orientationRadians());
             float localX = (float) (dx * cos - dz * sin) / radiusMajor;
@@ -234,7 +235,7 @@ public final class ClientCloudVisualDensity {
                     ? switch (profile) {
                         case 1, 5 -> 0.20F;
                         case 2 -> 0.72F;
-                        case 3 -> 1.08F;
+                        case 3 -> 0.22F;
                         case 4, 7 -> 0.76F;
                         case 6 -> 0.34F;
                         default -> 1.0F;
@@ -338,10 +339,37 @@ public final class ClientCloudVisualDensity {
                 float baseEdge = smoothstep(0.72F, 1.0F, radial01);
                 float radialDome = (float) Math.pow(radial01, 1.60D);
                 localBase = base01 + cellSpan * 0.025F * baseEdge;
-                localTop = top01 - cellSpan * 0.46F * radialDome;
+                float roleTopCollapse = switch (cell.envelopeRole()) {
+                    case BASE -> 0.28F;
+                    case CORE -> 0.50F;
+                    case TOWER -> 0.62F;
+                    case MACRO -> 0.70F;
+                    case CARRIER_ONLY -> 0.40F;
+                    default -> 0.46F;
+                };
+                localTop = top01 - cellSpan * roleTopCollapse * radialDome;
             }
             if (envelopeOnly) {
                 continue;
+            }
+            if (frame.weatherMapModel() && profile == 3) {
+                float cumulusWeight = cellCoverage * cellCoverage * cellCoverage;
+                if (cumulusWeight > cumulusDominantWeight) {
+                    cumulusDominantWeight = cumulusWeight;
+                    cumulusDominantBase = localBase;
+                    cumulusDominantTop = localTop;
+                }
+                float footprintCore = smoothstep(0.08F, 0.46F, footprint);
+                float massGate = smoothstep(0.002F, 0.025F, clamp01(cellCoverage));
+                float unionSupport = footprintCore * massGate;
+                if (unionSupport > 0.001F) {
+                    float supportedBase = Mth.lerp(unionSupport, 1.0F, localBase);
+                    float supportedTop = Mth.lerp(unionSupport, 0.0F, localTop);
+                    cumulusBaseMin = Math.min(cumulusBaseMin, supportedBase);
+                    cumulusTopMax = Math.max(cumulusTopMax, supportedTop);
+                }
+                cumulusEnergyAccum += clamp01(cell.energy()) * cumulusWeight;
+                cumulusWeightAccum += cumulusWeight;
             }
             baseAccum += localBase * weight;
             topAccum += localTop * weight;
@@ -377,8 +405,18 @@ public final class ClientCloudVisualDensity {
         if (weightAccum <= 0.0F || coverage <= 0.002F) {
             return 0.0F;
         }
-        float base01 = clamp01(baseAccum / weightAccum);
-        float top01 = clamp01(topAccum / weightAccum);
+        boolean useCumulusEnvelope = frame.weatherMapModel()
+                && dominantCategoryProfile == 3
+                && cumulusWeightAccum > 0.0F;
+        float base01;
+        float top01;
+        if (useCumulusEnvelope) {
+            base01 = clamp01(Math.min(cumulusDominantBase, cumulusBaseMin));
+            top01 = clamp01(Math.max(cumulusDominantTop, cumulusTopMax));
+        } else {
+            base01 = clamp01(baseAccum / weightAccum);
+            top01 = clamp01(topAccum / weightAccum);
+        }
         if (frame.weatherMapModel() && dominantCategoryProfile == 1
                 && stratusSurfaceWeight > 0.0F) {
             float surfaceInfluence = smoothstep(0.02F, 0.25F, stratusSurfaceWeight);
@@ -401,7 +439,9 @@ public final class ClientCloudVisualDensity {
             return 0.0F;
         }
         float normalizedCoverage = smoothstep(0.012F, 0.42F, clamp01(coverage * frame.coverageMul()));
-        float energy = clamp01(energyAccum / weightAccum);
+        float energy = clamp01(useCumulusEnvelope
+                ? cumulusEnergyAccum / cumulusWeightAccum
+                : energyAccum / weightAccum);
         float clampedHeight = clamp01(h01);
         boolean renderedStratus = frame.weatherMapModel() && dominantCategoryProfile == 1;
         float envelopeCoverage = renderedStratus

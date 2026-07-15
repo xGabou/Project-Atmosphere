@@ -54,6 +54,9 @@ public final class CloudClusterState {
     private static final String TAG_CLOUD_TYPE_ID = "CloudTypeId";
     private static final String TAG_PREVIOUS_CLOUD_TYPE_ID = "PreviousCloudTypeId";
     private static final String TAG_MORPHOLOGY_FAMILY = "MorphologyFamily";
+    private static final String TAG_MORPHOLOGY_GROUP_ID = "MorphologyGroupId";
+    private static final String TAG_MORPHOLOGY_INDEX = "MorphologyIndex";
+    private static final String TAG_MORPHOLOGY_COUNT = "MorphologyCount";
     private static final String TAG_CLOUD_TYPE_TICKS = "CloudTypeTicks";
     private static final String TAG_CLOUD_SEED = "CloudSeed";
 
@@ -94,6 +97,9 @@ public final class CloudClusterState {
     private String cloudTypeId;
     private String previousCloudTypeId;
     private CloudMorphologyFamily morphologyFamily;
+    private UUID morphologyGroupId;
+    private int morphologyIndex;
+    private int morphologyCount;
     private int cloudTypeTicks;
     private int cloudSeed;
 
@@ -134,6 +140,9 @@ public final class CloudClusterState {
         this.cloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.previousCloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.morphologyFamily = CloudTypeRegistry.getOrDefault(CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID).getMorphologyFamily();
+        this.morphologyGroupId = clusterId;
+        this.morphologyIndex = 0;
+        this.morphologyCount = 1;
         this.cloudTypeTicks = 0;
         this.cloudSeed = createRandomCloudSeed();
         this.active = true;
@@ -398,6 +407,37 @@ public final class CloudClusterState {
                 : morphologyFamily;
     }
 
+    /**
+     * Identifies the persistent set of lobes produced by one morphology spawn.
+     * Sibling lobes may overlap for smooth visual union, but must not absorb one
+     * another or the intended cauliflower topology is destroyed.
+     */
+    public UUID getMorphologyGroupId() {
+        return morphologyGroupId;
+    }
+
+    public int getMorphologyIndex() {
+        return morphologyIndex;
+    }
+
+    public int getMorphologyCount() {
+        return morphologyCount;
+    }
+
+    public void setMorphologyMembership(UUID groupId, int index, int count) {
+        morphologyGroupId = Objects.requireNonNull(groupId, "groupId");
+        morphologyCount = Math.max(1, count);
+        morphologyIndex = Math.max(0, Math.min(index, morphologyCount - 1));
+    }
+
+    public boolean isMorphologySibling(@Nullable CloudClusterState other) {
+        return other != null
+                && other != this
+                && morphologyCount > 1
+                && other.morphologyCount > 1
+                && morphologyGroupId.equals(other.morphologyGroupId);
+    }
+
     public int getCloudTypeTicks() {
         return cloudTypeTicks;
     }
@@ -521,6 +561,9 @@ public final class CloudClusterState {
         tag.putString(TAG_CLOUD_TYPE_ID, cloudTypeId);
         tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, previousCloudTypeId);
         tag.putString(TAG_MORPHOLOGY_FAMILY, morphologyFamily.name());
+        tag.putUUID(TAG_MORPHOLOGY_GROUP_ID, morphologyGroupId);
+        tag.putInt(TAG_MORPHOLOGY_INDEX, morphologyIndex);
+        tag.putInt(TAG_MORPHOLOGY_COUNT, morphologyCount);
         tag.putInt(TAG_CLOUD_TYPE_TICKS, cloudTypeTicks);
         tag.putInt(TAG_CLOUD_SEED, cloudSeed);
 
@@ -594,6 +637,15 @@ public final class CloudClusterState {
         CloudMorphologyFamily morphologyFamily = tag.contains(TAG_MORPHOLOGY_FAMILY, Tag.TAG_STRING)
                 ? CloudMorphologyFamily.byId(tag.getString(TAG_MORPHOLOGY_FAMILY), CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily())
                 : CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily();
+        UUID morphologyGroupId = tag.hasUUID(TAG_MORPHOLOGY_GROUP_ID)
+                ? tag.getUUID(TAG_MORPHOLOGY_GROUP_ID)
+                : clusterId;
+        int morphologyCount = tag.contains(TAG_MORPHOLOGY_COUNT, Tag.TAG_INT)
+                ? Math.max(1, tag.getInt(TAG_MORPHOLOGY_COUNT))
+                : 1;
+        int morphologyIndex = tag.contains(TAG_MORPHOLOGY_INDEX, Tag.TAG_INT)
+                ? tag.getInt(TAG_MORPHOLOGY_INDEX)
+                : 0;
         int cloudTypeTicks = tag.contains(TAG_CLOUD_TYPE_TICKS) ? tag.getInt(TAG_CLOUD_TYPE_TICKS) : 0;
         int cloudSeed = tag.contains(TAG_CLOUD_SEED) ? tag.getInt(TAG_CLOUD_SEED) : deriveCloudSeed(clusterId);
 
@@ -625,6 +677,7 @@ public final class CloudClusterState {
         state.setCloudTypeId(cloudTypeId);
         state.setPreviousCloudTypeId(previousCloudTypeId);
         state.setMorphologyFamily(morphologyFamily);
+        state.setMorphologyMembership(morphologyGroupId, morphologyIndex, morphologyCount);
         state.setCloudTypeTicks(cloudTypeTicks);
         state.setCloudSeed(cloudSeed);
 

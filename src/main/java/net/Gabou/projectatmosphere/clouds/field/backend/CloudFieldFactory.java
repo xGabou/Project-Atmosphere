@@ -39,6 +39,7 @@ public final class CloudFieldFactory {
                 source.stormPotential(),
                 source.cloudTypeId(),
                 source.resolvedMorphologyFamily(),
+                source.morphologyMembership().withFallbackGroup(fieldIdFor(source)),
                 source.anvilStrength(),
                 source.precipitationIntensity(),
                 cloudletCountFor(source),
@@ -54,12 +55,21 @@ public final class CloudFieldFactory {
 
     public UUID fieldIdFor(CloudFieldSource source) {
         Objects.requireNonNull(source, "source");
-        String identity = source.stableKey() + ":seed=" + source.seed();
+        String identity = source.stableKey();
+        if (source.sourceType() != CloudFieldSourceType.PA_CLUSTER) {
+            identity += ":seed=" + source.seed();
+        }
         return UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8));
     }
 
     public int cloudletCountFor(CloudFieldSource source) {
         Objects.requireNonNull(source, "source");
+        // PA clusters already are the authoritative morphology lobes. Generating
+        // another layout inside each one duplicates geometry and reintroduces
+        // the former needle/base-shelf topology.
+        if (source.sourceType() == CloudFieldSourceType.PA_CLUSTER) {
+            return 0;
+        }
         if (source.cloudletCountHint() > 0) {
             return Math.min(MAX_DERIVED_CLOUDLETS, source.cloudletCountHint());
         }
@@ -107,6 +117,7 @@ public final class CloudFieldFactory {
                 field.cloudletCount(),
                 field.cloudTypeId(),
                 field.morphologyFamily().name(),
+                field.morphologyMembership(),
                 !field.isExpired()
         );
     }

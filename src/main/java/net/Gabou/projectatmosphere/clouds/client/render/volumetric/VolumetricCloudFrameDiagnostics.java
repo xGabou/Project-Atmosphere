@@ -34,7 +34,11 @@ public final class VolumetricCloudFrameDiagnostics {
     }
 
     public static String formattedLatest() {
-        return latest.format();
+        return latest.format()
+                + "\n\nCumulus diagnostic status=" + CumulusStageMapDiagnostics.status()
+                + "\n" + CumulusStageMapDiagnostics.formattedLatest()
+                + "\n\n" + VolumetricStabilityDiagnostics.formattedLatest()
+                + "\n" + CloudWeatherMapRenderer.diagnosticSignatureStatus();
     }
 
     public static boolean isFrameLogEnabled() {
@@ -67,6 +71,84 @@ public final class VolumetricCloudFrameDiagnostics {
         latest = snapshot.withWeatherTextureStats(stats);
     }
 
+    public static String requestCumulusStageCapture() {
+        return CumulusStageMapDiagnostics.requestCapture();
+    }
+
+    public static void pollCumulusStageCapture() {
+        CumulusStageMapDiagnostics.poll();
+    }
+
+    public static void tryDispatchCumulusStageCapture(
+            CloudWeatherMapRenderer.Result weather,
+            long frameIndex,
+            long gameTime,
+            String roleSummary,
+            float coverageMultiplier
+    ) {
+        if (weather == null || !weather.rendered()) {
+            return;
+        }
+        CumulusStageMapDiagnostics.tryDispatch(
+                VolumetricCloudRenderTargets.cumulusStageSupportTargetOrNull(),
+                VolumetricCloudRenderTargets.cumulusStageBaseTargetOrNull(),
+                VolumetricCloudRenderTargets.cumulusStageTopTargetOrNull(),
+                weather.slabBaseY(),
+                weather.slabTopY(),
+                weather.originX(),
+                weather.originZ(),
+                CloudWeatherMapRenderer.WEATHER_EXTENT,
+                frameIndex,
+                gameTime,
+                CloudWeatherMapRenderer.lastInputSignatureForDiagnostics(),
+                roleSummary,
+                CloudWeatherMapRenderer.diagnosticSignatureStatus(),
+                coverageMultiplier
+        );
+    }
+
+    public static void shutdownCumulusStageCapture() {
+        CumulusStageMapDiagnostics.shutdown();
+    }
+
+    public static String requestStabilityCapture(int frames) {
+        return VolumetricStabilityDiagnostics.requestCapture(frames);
+    }
+
+    public static void pollStabilityCapture() {
+        VolumetricStabilityDiagnostics.poll();
+    }
+
+    public static void tryDispatchStabilityCapture(
+            RenderTarget cloudTarget,
+            net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame sceneDepth,
+            long hookFrameIndex,
+            long gameTime,
+            float partialTick,
+            long weatherInputSignature,
+            String qualityName,
+            VolumetricCloudRenderer.LastDrawInputs raymarchInputs,
+            net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer.LastDrawInputs compositeInputs,
+            boolean composited
+    ) {
+        VolumetricStabilityDiagnostics.tryDispatch(
+                cloudTarget,
+                sceneDepth,
+                hookFrameIndex,
+                gameTime,
+                partialTick,
+                weatherInputSignature,
+                qualityName,
+                raymarchInputs,
+                compositeInputs,
+                composited
+        );
+    }
+
+    public static void shutdownStabilityCapture() {
+        VolumetricStabilityDiagnostics.shutdown();
+    }
+
     public static String targetSize(RenderTarget target) {
         if (target == null) {
             return "unknown";
@@ -79,7 +161,10 @@ public final class VolumetricCloudFrameDiagnostics {
 
     public static CellInfo cellInfo(int index, VolumetricRenderCell cell) {
         if (cell == null) {
-            return new CellInfo(index, 0.0D, 0.0D, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
+            return new CellInfo(
+                    index, 0.0D, 0.0D, 0.0F, 0.0F, 0.0F, 0.0F,
+                    0.0F, 0, "unknown", 0.0F, 0.0F
+            );
         }
         return new CellInfo(
                 index,
@@ -89,7 +174,11 @@ public final class VolumetricCloudFrameDiagnostics {
                 cell.topY(),
                 cell.radiusMajor(),
                 cell.radiusMinor(),
-                cell.density()
+                cell.density(),
+                cell.cloudProfile(),
+                cell.envelopeRole().name().toLowerCase(Locale.ROOT),
+                cell.verticalDevelopment(),
+                cell.precipitationIntensity()
         );
     }
 
@@ -176,13 +265,22 @@ public final class VolumetricCloudFrameDiagnostics {
             return FieldInfo.unknown("null_snapshot");
         }
         Vec3 center = snapshot.center();
+        Vec3 wind = snapshot.windVector();
         float radius = snapshot.radius();
         return new FieldInfo(
                 snapshot.fieldId(),
                 snapshot.sourceKind().serializedName(),
+                snapshot.morphologyMembership().groupId(),
+                snapshot.morphologyMembership().memberIndex(),
+                snapshot.morphologyMembership().memberCount(),
+                snapshot.morphologyFamily().name().toLowerCase(Locale.ROOT),
+                snapshot.morphologyMembership().stageFor(snapshot.morphologyFamily())
+                        .name().toLowerCase(Locale.ROOT),
                 center.x(),
                 center.y(),
                 center.z(),
+                wind.x(),
+                wind.z(),
                 radius,
                 snapshot.baseY(),
                 snapshot.topY(),
@@ -432,9 +530,16 @@ public final class VolumetricCloudFrameDiagnostics {
     public record FieldInfo(
             UUID fieldId,
             String sourceKind,
+            UUID morphologyGroupId,
+            int morphologyIndex,
+            int morphologyCount,
+            String morphologyFamily,
+            String morphologyStage,
             double centerX,
             double centerY,
             double centerZ,
+            double windX,
+            double windZ,
             float radius,
             float baseY,
             float topY,
@@ -454,6 +559,9 @@ public final class VolumetricCloudFrameDiagnostics {
     ) {
         public FieldInfo {
             sourceKind = safe(sourceKind);
+            morphologyGroupId = morphologyGroupId == null ? new UUID(0L, 0L) : morphologyGroupId;
+            morphologyFamily = safe(morphologyFamily);
+            morphologyStage = safe(morphologyStage);
             skipReason = safe(skipReason);
         }
 
@@ -461,6 +569,13 @@ public final class VolumetricCloudFrameDiagnostics {
             return new FieldInfo(
                     new UUID(0L, 0L),
                     "unknown",
+                    new UUID(0L, 0L),
+                    0,
+                    1,
+                    "unknown",
+                    "unknown",
+                    0.0D,
+                    0.0D,
                     0.0D,
                     0.0D,
                     0.0D,
@@ -486,7 +601,11 @@ public final class VolumetricCloudFrameDiagnostics {
         String shortLine() {
             return shortId(fieldId)
                     + " source=" + sourceKind
+                    + " morphology=" + morphologyFamily + "/" + morphologyStage
+                    + " group=" + shortId(morphologyGroupId)
+                    + " member=" + morphologyIndex + "/" + morphologyCount
                     + " center=" + fmt(centerX) + "," + fmt(centerY) + "," + fmt(centerZ)
+                    + " windXZ=" + fmt(windX) + "," + fmt(windZ)
                     + " radius=" + fmt(radius)
                     + " baseTop=" + fmt(baseY) + ".." + fmt(topY)
                     + " xz=[" + fmt(minX) + ".." + fmt(maxX) + "," + fmt(minZ) + ".." + fmt(maxZ) + "]"
@@ -510,14 +629,26 @@ public final class VolumetricCloudFrameDiagnostics {
             float topY,
             float radiusMajor,
             float radiusMinor,
-            float density
+            float density,
+            int cloudProfile,
+            String envelopeRole,
+            float verticalDevelopment,
+            float precipitation
     ) {
+        public CellInfo {
+            envelopeRole = safe(envelopeRole);
+        }
+
         String shortLine() {
             return "#" + index
                     + " center=" + fmt(x) + "," + fmt((baseY + topY) * 0.5F) + "," + fmt(z)
                     + " radius=" + fmt(radiusMajor) + "/" + fmt(radiusMinor)
                     + " baseTop=" + fmt(baseY) + ".." + fmt(topY)
                     + " density=" + fmt(density)
+                    + " profile=" + cloudProfile
+                    + " role=" + envelopeRole
+                    + " vertical=" + fmt(verticalDevelopment)
+                    + " precipitation=" + fmt(precipitation)
                     + " coverage=unknown";
         }
     }
@@ -790,9 +921,13 @@ public final class VolumetricCloudFrameDiagnostics {
         int width = target.width;
         int height = target.height;
         ByteBuffer pixels = BufferUtils.createByteBuffer(width * height * 4);
-        RenderSystem.bindTexture(target.getColorTextureId());
-        GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
-        RenderSystem.bindTexture(0);
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(target.getColorTextureId());
+            GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
 
         float slabSpan = slabTopY - slabBaseY;
         int activeTexels = 0;

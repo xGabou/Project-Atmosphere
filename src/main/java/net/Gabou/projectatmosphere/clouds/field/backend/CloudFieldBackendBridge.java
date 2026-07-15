@@ -204,7 +204,11 @@ public final class CloudFieldBackendBridge {
                 if (!sourceFieldIds.contains(field.fieldId())) {
                     int missingTicks = store.markSourceMissing(field.fieldId());
                     missingSourceFields++;
-                    if (missingTicks >= store.missingSourceGraceTicks() && store.removeField(field.fieldId()).isPresent()) {
+                    CloudFieldSource missingSource = store.getTargetSource(field.fieldId()).orElse(null);
+                    int removalThreshold = isNativeProjectionSource(missingSource)
+                            ? 1
+                            : store.missingSourceGraceTicks();
+                    if (missingTicks >= removalThreshold && store.removeField(field.fieldId()).isPresent()) {
                         removed++;
                         removals.add(CloudFieldRemovalDebugInfo.of(
                                 field,
@@ -364,6 +368,12 @@ public final class CloudFieldBackendBridge {
         if (newSource == null) {
             return false;
         }
+        if (newSource.sourceType() == CloudFieldSourceType.PA_CLUSTER
+                || (oldSource != null && oldSource.sourceType() == CloudFieldSourceType.PA_CLUSTER)) {
+            // Cluster UUID identity is canonical. Nearby lobes in one cloud are
+            // intentional and must never be rebound or suppressed as duplicates.
+            return false;
+        }
         if (oldSource == null) {
             return newSource.sourceType() != CloudFieldSourceType.MANUAL_DEBUG;
         }
@@ -379,6 +389,14 @@ public final class CloudFieldBackendBridge {
             return false;
         }
         return true;
+    }
+
+    private static boolean isNativeProjectionSource(CloudFieldSource source) {
+        if (source == null) {
+            return false;
+        }
+        return source.sourceType() == CloudFieldSourceType.PA_CLUSTER
+                || source.sourceType() == CloudFieldSourceType.PA_REGION;
     }
 
     private static double rebindDistanceThreshold(CloudField field, CloudFieldSource source) {

@@ -12,6 +12,9 @@
 
 uniform sampler2D WeatherMapSampler;
 uniform sampler2D MorphologyMapSampler;
+uniform sampler2D CumulusStageSupportMapSampler;
+uniform sampler2D CumulusStageBaseMapSampler;
+uniform sampler2D CumulusStageTopMapSampler;
 uniform sampler2D StormStructureMapSampler;
 uniform sampler2D StormLayerHeightMapSampler;
 uniform sampler2D StormTowerMapSampler;
@@ -48,7 +51,9 @@ uniform float SunsetStrength;
 uniform float NightFactor;
 uniform float StormDarkening;
 
-uniform vec3 WindVec;      // blocks per tick, horizontal drift for detail
+uniform vec3 WindVec;      // direction/anisotropy only; never absolute-time translation
+uniform vec2 MaterialOffset;     // integrated displacement of the presented volume
+uniform vec2 MaterialFrameDelta; // current minus previous production-frame offset
 uniform float WorldTime;   // world time in ticks (with partial)
 uniform float FrameIndex;
 
@@ -66,6 +71,7 @@ uniform float CoveragePretestThreshold;
 uniform int CoveragePretestDilation;
 uniform int HistoryValid;
 uniform float HistoryBlend;
+uniform int DebugView;
 
 uniform float DensityMul;
 uniform float CoverageMul;
@@ -150,7 +156,7 @@ float stratusHorizontalMaterialSignal(
             + morphology.b * 0.12
     );
     vec3 samplePos = p;
-    samplePos.xz -= WindVec.xz * WorldTime * (1.0 + saturate(h01) * 0.30);
+    samplePos.xz -= MaterialOffset;
     vec4 baseNoise = texture(
         BaseNoiseSampler,
         baseNoiseDomain(samplePos, 0.0031),
@@ -275,6 +281,36 @@ vec4 sampleMorphology(vec2 worldXZ) {
     return morphology;
 }
 
+vec4 sampleCumulusStageSupports(vec2 worldXZ) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        return vec4(0.0);
+    }
+    vec4 stages = texture(CumulusStageSupportMapSampler, uv);
+    float edgeDistance = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    return stages * smoothstep(0.0, 0.055, edgeDistance);
+}
+
+vec4 sampleCumulusStageBases(vec2 worldXZ) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        return vec4(0.0);
+    }
+    vec4 stages = texture(CumulusStageBaseMapSampler, uv);
+    float edgeDistance = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    return stages * smoothstep(0.0, 0.055, edgeDistance);
+}
+
+vec4 sampleCumulusStageTops(vec2 worldXZ) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        return vec4(0.0);
+    }
+    vec4 stages = texture(CumulusStageTopMapSampler, uv);
+    float edgeDistance = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    return stages * smoothstep(0.0, 0.055, edgeDistance);
+}
+
 vec4 sampleStormStructure(vec2 worldXZ) {
     vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
@@ -392,24 +428,23 @@ float familyMacroShape(
         // own the shape; low-frequency 3-D noise only modulates condensate.
         // The previous height-dependent noise threshold turned isolated high
         // noise columns into narrow needles above an otherwise broad cumulus.
-        float topEdge = mix(0.76, 0.90, verticalDevelopment);
-        float crown = smoothstep(0.36, 0.94, h);
-        float supportThreshold = mix(0.07, 0.38, crown * crown);
-        float supportBody = smoothstep(
-            supportThreshold,
-            supportThreshold + 0.24,
-            footprintCoverage
-        );
+        float topEdge = mix(0.82, 0.94, verticalDevelopment);
+        // The splat now preserves the dominant local interval plus only
+        // strongly-supported sibling extrema. Applying another height-driven
+        // footprint threshold here turned that already-shaped envelope into a
+        // single cone/teardrop. Keep only a height-independent boundary gate;
+        // the local base/top map owns the actual cauliflower crown.
+        float supportBody = smoothstep(0.035, 0.20, footprintCoverage);
         float materialSignal = baseCarrier * 0.46
             + lowFbm * 0.28
             + condensate * 0.14
             + coverage * 0.12;
         float material = mix(
-            0.74,
+            0.66,
             1.0,
             smoothstep(0.18, 0.78, materialSignal)
         );
-        return verticalBand(h, 0.018, topEdge)
+        return verticalBand(h, 0.055, topEdge)
             * supportBody
             * material;
     }
@@ -527,6 +562,59 @@ float familyMacroShape(
         lowFbm * 0.40 + footprintCoverage * 0.24 + directionalCarrier * 0.38)
         * mix(0.78, 1.16, verticalDevelopment);
     return max(tower, anvil);
+}
+
+float cumulusStructureShape(
+        vec4 encodedSupports,
+        vec4 encodedBases,
+        vec4 encodedTops,
+        float sampleY,
+        float slabSpan,
+        float condensate,
+        float baseCarrier,
+        float lowFbm) {
+    vec4 rawSupport = max(encodedSupports, vec4(0.0));
+    vec4 base01 = encodedBases / max(rawSupport, vec4(0.001));
+    vec4 top01 = encodedTops / max(rawSupport, vec4(0.001));
+    vec4 stageBaseY = vec4(SlabBaseY) + clamp(base01, 0.0, 1.0) * slabSpan;
+    vec4 stageTopY = vec4(SlabBaseY) + clamp(top01, 0.0, 1.0) * slabSpan;
+    stageTopY = max(stageTopY, stageBaseY + vec4(1.0));
+
+    vec4 support = smoothstep(
+        vec4(0.012),
+        vec4(0.36),
+        clamp(rawSupport * CoverageMul, 0.0, 1.0)
+    );
+
+    vec4 h = (vec4(sampleY) - stageBaseY) / max(stageTopY - stageBaseY, vec4(1.0));
+    float macroSignal = baseCarrier * 0.48 + lowFbm * 0.34 + condensate * 0.18;
+    float billowTexture = smoothstep(0.18, 0.78, macroSignal);
+
+    // BASE owns the coherent condensation floor, but its curved endpoint map
+    // still produces several broad lower lobes instead of a rectangular slab.
+    float baseMaterial = mix(0.78, 1.0, billowTexture);
+    float baseMass = verticalBand(h.r, 0.028, 0.94)
+        * support.r * baseMaterial;
+
+    // Higher stages remain real overlapping domes. Noise only modulates their
+    // condensate; it cannot erase the analytic morphology or create columns.
+    float coreMaterial = mix(0.72, 1.0, billowTexture);
+    float towerMaterial = mix(0.69, 1.0,
+        smoothstep(0.16, 0.76, baseCarrier * 0.54 + lowFbm * 0.34 + condensate * 0.12));
+    float crownMaterial = mix(0.66, 1.0,
+        smoothstep(0.14, 0.74, baseCarrier * 0.58 + lowFbm * 0.32 + condensate * 0.10));
+    float coreMass = verticalBand(h.g, 0.035, 0.94)
+        * support.g * coreMaterial;
+    float towerMass = verticalBand(h.b, 0.045, 0.93)
+        * support.b * towerMaterial;
+    float crownMass = verticalBand(h.a, 0.055, 0.91)
+        * support.a * crownMaterial;
+
+    // Bounded probabilistic union preserves each stage boundary while joining
+    // genuine overlaps. It never invents density where every stage is empty.
+    float lowerUnion = baseMass + coreMass - baseMass * coreMass;
+    float upperUnion = towerMass + crownMass - towerMass * crownMass;
+    return saturate(lowerUnion + upperUnion - lowerUnion * upperUnion);
 }
 
 float stormStructureShape(
@@ -901,8 +989,26 @@ float cloudDensity(
     float layerSpan = max(topY - baseY, 2.0);
     float h01 = (p.y - baseY) / layerSpan;
 
-    // The exact severe maps are irrelevant to all other families. Keep both
-    // fetches behind this spatially coherent branch.
+    bool precipitationCandidate = includePrecipitation
+        && MaxPrecipitation > 0.02
+        && p.y < SlabBaseY + 48.0;
+    if (coverage <= 0.008 && funnel <= 0.001 && !precipitationCandidate) {
+        return 0.0;
+    }
+
+    // Structured maps are family-specific and are fetched only after the
+    // cheap weather rejection. This prevents empty samples from paying six
+    // additional texture reads.
+    bool cumulusProfile = profileId == 3;
+    vec4 cumulusStageSupports = cumulusProfile
+        ? sampleCumulusStageSupports(p.xz)
+        : vec4(0.0);
+    vec4 cumulusStageBases = cumulusProfile
+        ? sampleCumulusStageBases(p.xz)
+        : vec4(0.0);
+    vec4 cumulusStageTops = cumulusProfile
+        ? sampleCumulusStageTops(p.xz)
+        : vec4(0.0);
     vec4 stormStructure = stormProfile
         ? sampleStormStructure(p.xz)
         : vec4(0.0);
@@ -913,27 +1019,36 @@ float cloudDensity(
         ? sampleStormTowers(p.xz)
         : vec4(0.0);
 
-    bool precipitationCandidate = includePrecipitation
-        && MaxPrecipitation > 0.02
-        && p.y < SlabBaseY + 48.0;
-    if (coverage <= 0.008 && funnel <= 0.001 && !precipitationCandidate) {
-        return 0.0;
-    }
+    float cumulusRolePresence = max(
+        max(cumulusStageSupports.r, cumulusStageSupports.g),
+        max(cumulusStageSupports.b, cumulusStageSupports.a)
+    );
+    float cumulusHeightPresence = max(
+        max(max(cumulusStageBases.r, cumulusStageBases.g),
+            max(cumulusStageBases.b, cumulusStageBases.a)),
+        max(max(cumulusStageTops.r, cumulusStageTops.g),
+            max(cumulusStageTops.b, cumulusStageTops.a))
+    );
+    bool useCumulusStructure = cumulusProfile
+        && cumulusRolePresence > 0.004
+        && cumulusHeightPresence > 0.0001;
 
     float cloud = 0.0;
-    if (h01 > -0.02 && h01 < 1.02 && coverage > 0.008) {
+    bool insideShapeBounds = useCumulusStructure
+        ? p.y > SlabBaseY - 2.0 && p.y < SlabTopY + 2.0
+        : h01 > -0.02 && h01 < 1.02;
+    if (insideShapeBounds && coverage > 0.008) {
         float anvil = stormProfile
             ? smoothstep(0.62, 0.94, saturate(h01))
                 * energy * (0.20 + verticalDevelopment * 0.42)
             : 0.0;
         float coverageMod = saturate(coverage * (1.02 + anvil * 0.30));
 
-        // Sampling p - velocity*time makes the procedural material advect in
-        // the same positive direction as the field envelope. The old plus
-        // sign moved the texture against its cloud and the second time-only
-        // detail animation amplified that sliding.
+        // The offset is integrated from UUID-matched presented positions on
+        // the CPU. It therefore freezes with the visible envelope and cannot
+        // retroactively jump when the instantaneous wind changes.
         vec3 samplePos = p;
-        samplePos.xz -= WindVec.xz * WorldTime * (1.0 + saturate(h01) * 0.30);
+        samplePos.xz -= MaterialOffset;
 
         // Cloudlets are tens to low hundreds of blocks wide. The old 0.0016
         // scale sampled an almost constant value across an entire cloudlet,
@@ -973,7 +1088,18 @@ float cloudDensity(
         bool useStormStructure = stormProfile
             && rolePresence > 0.004
             && layerHeightPresence > 0.0001;
-        float macroShape = useStormStructure
+        float macroShape = useCumulusStructure
+            ? cumulusStructureShape(
+                cumulusStageSupports,
+                cumulusStageBases,
+                cumulusStageTops,
+                p.y,
+                slabSpan,
+                condensate,
+                baseCarrier,
+                lowFbm
+            )
+            : useStormStructure
             ? stormStructureShape(
                 profileId,
                 stormStructure,
@@ -1005,7 +1131,7 @@ float cloudDensity(
         // Role supports already contain footprint-weighted density. Avoid
         // squaring them through the globally unioned weather coverage while
         // retaining a soft envelope gate at map fringes.
-        float envelopeCoverage = useStormStructure
+        float envelopeCoverage = (useStormStructure || useCumulusStructure)
             ? mix(0.72, 1.0, coverageMod)
             : coverageMod;
         if (!useStormStructure && profileId == 1) {
@@ -1032,7 +1158,7 @@ float cloudDensity(
                 );
                 detailFbm = detailFbm * 0.72 + (fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125) * 0.28;
             }
-            float erosion = 0.26;
+            float erosion = profileId == 3 ? 0.14 : 0.26;
             if (profileId == 1 || profileId == 5) {
                 erosion = 0.10;
             } else if (profileId == 2) {
@@ -1043,12 +1169,17 @@ float cloudDensity(
                 erosion = 0.06;
             }
             // Noise adds detail at exposed edges instead of drilling holes
-            // through the protected meteorological core.
+            // through the protected meteorological core. Non-cirrus families
+            // use bounded multiplicative modulation so a low detail texel can
+            // never cut a complete cross-section from a valid macro lobe.
             float edgeExposure = 1.0 - smoothstep(0.26, 0.72, cloud);
             if (profileId == 6) {
                 edgeExposure = 1.0;
+                cloud = max(cloud - (1.0 - detailFbm) * erosion, 0.0);
+            } else {
+                float edgeRetention = 1.0 - (1.0 - detailFbm) * erosion * edgeExposure;
+                cloud *= clamp(edgeRetention, 0.68, 1.0);
             }
-            cloud = max(cloud - (1.0 - detailFbm) * erosion * edgeExposure, 0.0);
         }
 
         // Storm cells hold more condensed water low in the cloud.
@@ -1369,28 +1500,56 @@ void main() {
         return;
     }
 
-    // Blue-noise jitter, animated by golden-ratio frame offset for temporal
-    // integration.
+    // Keep material search on one screen-spatial blue-noise phase. Animating
+    // the complete coarse-search lattice made thin silhouette pixels alternate
+    // between a hit and a miss; history cannot integrate a miss because there
+    // is no representative point to reproject. Once a deterministic search has
+    // confirmed a clear/material bracket, animate only the sub-step integration
+    // phase so temporal history still accumulates finer samples.
     ivec2 blueSize = textureSize(BlueNoiseSampler, 0);
-    vec2 blueUv = (gl_FragCoord.xy + vec2(FrameIndex * 17.0, FrameIndex * 29.0)) / vec2(blueSize);
-    float blue = fract(texture(BlueNoiseSampler, blueUv).r + FrameIndex * 0.61803398875);
+    vec2 searchBlueUv = gl_FragCoord.xy / vec2(blueSize);
+    float searchBlue = texture(BlueNoiseSampler, searchBlueUv).r;
+    float jitterFrame = HistoryValid == 1 && HistoryBlend > 0.001
+        ? FrameIndex
+        : 0.0;
+    vec2 integrationBlueUv = (
+        gl_FragCoord.xy + vec2(jitterFrame * 17.0, jitterFrame * 29.0)
+    ) / vec2(blueSize);
+    float integrationBlue = fract(
+        texture(BlueNoiseSampler, integrationBlueUv).r
+            + jitterFrame * 0.61803398875
+    );
 
     int stepBudget = int(float(clamp(RaymarchSteps, 8, MAX_STEPS)) * clamp(StepScale, 0.4, 1.0));
     stepBudget = clamp(stepBudget, 8, MAX_STEPS);
     float span = t1 - t0;
     float baseStep = span / float(stepBudget);
-    // Distance-based growth: far samples take larger strides.
-    float fineStep = max(baseStep * 0.5, 2.0);
-    float coarseStep = fineStep * 3.0;
+    // Surface resolution must be expressed in world units. Deriving the fine
+    // step from the complete ray span made a horizontal Ultra ray use roughly
+    // 10-block samples while a vertical ray used 2-block samples, producing a
+    // view-angle-locked stippled band. Preserve the legacy in-cloud stride for
+    // whiteout cost, but give every exterior view a quality-scaled world-space
+    // surface step.
+    float legacyFineStep = max(baseStep * 0.5, 2.0);
+    float qualityStride = sqrt(96.0 / float(stepBudget));
+    float exteriorFineStep = clamp(2.5 * qualityStride, 2.5, 8.0);
+    float fineStep = cameraInsideCloud ? legacyFineStep : exteriorFineStep;
+    float coarseStep = max(baseStep * 1.5, fineStep * 3.0);
+    float coarseStepCap = min(112.0, fineStep * 16.0);
 
     float cosTheta = dot(rayDir, LightDir);
 
-    float originJitterDistance = paRayOriginJitterDistance(
-        fineStep,
-        cameraStartsInsideSlab,
-        cameraInsideCloud
+    float originJitterDistance = min(
+        paRayOriginJitterDistance(
+            fineStep,
+            cameraStartsInsideSlab,
+            cameraInsideCloud
+        ),
+        span
     );
-    float t = t0 + blue * originJitterDistance;
+    float t = t0 + searchBlue * originJitterDistance;
+    float lastClearT = t0;
+    bool hasClearBracket = true;
     float transmittance = 1.0;
     vec3 accumulated = vec3(0.0);
     float weightedT = 0.0;
@@ -1410,9 +1569,26 @@ void main() {
         }
         bool fine = sinceHit < 6;
         float distanceGrowth = 1.0 + (t / max(MaxRenderDistance, 1.0)) * 2.2;
-        float stepLength = (fine ? fineStep : coarseStep) * distanceGrowth;
+        float stepLength = fine
+            ? fineStep * (cameraInsideCloud ? distanceGrowth : 1.0)
+            : min(coarseStep * distanceGrowth, coarseStepCap);
+        // Never integrate optical depth past the scene/slab ray endpoint.
+        stepLength = min(stepLength, t1 - t);
 
         vec3 p = CameraPos + rayDir * t;
+        // Empty exterior coarse samples need only the weather occupancy fetch.
+        // This offsets the extra surface samples without reviving the old
+        // non-conservative whole-ray coverage pretest.
+        if (!fine && FunnelCount == 0 && MaxPrecipitation <= 0.02) {
+            float coverageSignal = sampleWeather(p.xz).r * CoverageMul;
+            if (coverageSignal <= 0.001) {
+                lastClearT = t;
+                hasClearBracket = true;
+                sinceHit++;
+                t += stepLength;
+                continue;
+            }
+        }
         // The second near-camera detail octave cannot be resolved through a
         // dense whiteout and doubles its 3-D detail fetches. Keep it unchanged
         // for every exterior view and omit it only when the canonical camera
@@ -1430,11 +1606,33 @@ void main() {
                 && MaxPrecipitation > 0.02
                 && p.y < baseY;
             if (!fine && !precipitationSample) {
-                // Entered cloud with a coarse stride: back up and resolve fine.
-                // Clamp to the ray entry point: for an in-cloud camera t0 is
-                // zero, and the first coarse hit previously stepped behind the
-                // camera, corrupting representative depth and reprojection.
-                t = max(t0, t - stepLength * 0.6);
+                // Resolve the actual clear/material bracket instead of an
+                // arbitrary 60% rewind. Four bisections localize an exterior
+                // Ultra surface to at most one 2.5-block fine step because the
+                // coarse stride is capped at sixteen fine steps.
+                float bracketLow = hasClearBracket
+                    ? lastClearT
+                    : max(t0, t - stepLength);
+                float bracketHigh = t;
+                for (int refinement = 0; refinement < 4; refinement++) {
+                    float bracketMid = 0.5 * (bracketLow + bracketHigh);
+                    vec3 bracketPos = CameraPos + rayDir * bracketMid;
+                    bool bracketNearCamera = bracketMid < 220.0 && !cameraInsideCloud;
+                    float bracketDensity = cloudDensity(
+                        bracketPos,
+                        0.0,
+                        DetailQuality > 0,
+                        bracketNearCamera,
+                        false
+                    );
+                    if (bracketDensity > 0.0008) {
+                        bracketHigh = bracketMid;
+                    } else {
+                        bracketLow = bracketMid;
+                    }
+                }
+                lastClearT = bracketLow;
+                t = mix(bracketLow, bracketHigh, integrationBlue);
                 sinceHit = 0;
                 continue;
             }
@@ -1613,6 +1811,8 @@ void main() {
 
             transmittance *= stepTrans;
         } else {
+            lastClearT = t;
+            hasClearBracket = true;
             sinceHit++;
         }
         t += stepLength;
@@ -1651,6 +1851,29 @@ void main() {
     float resultDepth = currentCloudHit ? depthAt(relRepresentative) : 1.0;
     float resultDepthDerivative = currentCloudHit ? fwidth(resultDepth) : 0.0;
 
+    vec4 currentResult = result;
+    vec4 diagnosticHistory = vec4(0.0);
+    float diagnosticHistoryDepth = 1.0;
+    float diagnosticHistoryWeight = 0.0;
+    float diagnosticCurrentDepthConfidence = 0.0;
+    float diagnosticPreviousDepthConfidence = 0.0;
+    // 0.25 unavailable, 0.50 invalid/off-screen projection,
+    // 0.75 missing depth and 1.00 both comparisons evaluated.
+    float diagnosticDepthSpaceStatus = HistoryValid == 1 ? 0.50 : 0.25;
+    // 1 unavailable, 2 off-screen/invalid projection, 3 missing depth,
+    // 4 depth mismatch, 5 transmittance mismatch, 6 accepted,
+    // 7 stale screen-space history on a current miss, 8 empty current/history.
+    float diagnosticHistoryState = HistoryValid == 1 ? 2.0 : 1.0;
+
+    // When the current ray misses, a stationary screen-space history sample is
+    // still useful to reveal stale cloud pixels that ordinary hit-only
+    // reprojection would hide from the rejection diagnostic.
+    if (HistoryValid == 1 && !currentCloudHit) {
+        diagnosticHistory = texture(HistorySampler, texCoord);
+        diagnosticHistoryDepth = texture(HistoryDepthSampler, texCoord).r;
+        diagnosticHistoryState = diagnosticHistory.a > 0.002 ? 7.0 : 8.0;
+    }
+
     // Temporal reprojection: reproject the representative cloud point into the
     // previous frame and blend history when it lands on-screen. History is
     // CLAMPED to the current result +- a margin instead of confidence-rejected:
@@ -1658,13 +1881,17 @@ void main() {
     // the jitter noise is (noise -> alpha delta -> rejection -> permanent
     // grain), while clamping bounds any ghost to a few frames and still
     // integrates the dither everywhere.
-    if (currentCloudHit && HistoryValid == 1 && HistoryBlend > 0.001) {
-        vec4 prevClip = PrevViewProjMat * vec4(relRepresentative, 1.0);
+    if (currentCloudHit && HistoryValid == 1 && (DebugView != 0 || HistoryBlend > 0.001)) {
+        vec3 previousMaterialPoint = relRepresentative
+            - vec3(MaterialFrameDelta.x, 0.0, MaterialFrameDelta.y);
+        vec4 prevClip = PrevViewProjMat * vec4(previousMaterialPoint, 1.0);
         if (prevClip.w > 0.0001) {
             vec2 prevUv = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
             if (prevUv.x > 0.001 && prevUv.x < 0.999 && prevUv.y > 0.001 && prevUv.y < 0.999) {
                 vec4 history = texture(HistorySampler, prevUv);
                 float historyDepth = texture(HistoryDepthSampler, prevUv).r;
+                diagnosticHistory = history;
+                diagnosticHistoryDepth = historyDepth;
                 float depthTolerance = max(0.00035, resultDepthDerivative * 6.0);
                 float depthConfidence = 1.0 - smoothstep(
                     depthTolerance,
@@ -1673,6 +1900,30 @@ void main() {
                 );
                 if (historyDepth >= 0.99999 || resultDepth >= 0.99999) {
                     depthConfidence = 0.0;
+                }
+                if (DebugView == 4) {
+                    float expectedPreviousNdcDepth = prevClip.z
+                        / max(abs(prevClip.w), 0.00001);
+                    if (expectedPreviousNdcDepth >= -1.0
+                            && expectedPreviousNdcDepth <= 1.0) {
+                        float expectedPreviousDepth = expectedPreviousNdcDepth * 0.5 + 0.5;
+                        float previousDepthConfidence = 1.0 - smoothstep(
+                            depthTolerance,
+                            depthTolerance * 12.0,
+                            abs(historyDepth - expectedPreviousDepth)
+                        );
+                        if (historyDepth >= 0.99999 || expectedPreviousDepth >= 0.99999) {
+                            previousDepthConfidence = 0.0;
+                        }
+                        diagnosticCurrentDepthConfidence = depthConfidence;
+                        diagnosticPreviousDepthConfidence = previousDepthConfidence;
+                        diagnosticDepthSpaceStatus =
+                            historyDepth >= 0.99999
+                                || resultDepth >= 0.99999
+                                || expectedPreviousDepth >= 0.99999
+                            ? 0.75
+                            : 1.0;
+                    }
                 }
                 // Alpha stores one minus transmittance. Keep jitter-scale
                 // differences, but reject history when a cloud appears,
@@ -1696,9 +1947,67 @@ void main() {
                     * edgeFade
                     * depthConfidence
                     * transmittanceConfidence;
-                result = mix(result, history, historyWeight);
+                diagnosticHistoryWeight = historyWeight;
+                if (historyDepth >= 0.99999 || resultDepth >= 0.99999) {
+                    diagnosticHistoryState = 3.0;
+                } else if (depthConfidence < 0.5) {
+                    diagnosticHistoryState = 4.0;
+                } else if (transmittanceConfidence < 0.5) {
+                    diagnosticHistoryState = 5.0;
+                } else {
+                    diagnosticHistoryState = 6.0;
+                }
+                if (DebugView == 0) {
+                    result = mix(result, history, historyWeight);
+                }
             }
         }
+    }
+
+    if (DebugView == 1) {
+        result = currentResult;
+    } else if (DebugView == 2) {
+        result = diagnosticHistory;
+        resultDepth = diagnosticHistoryDepth;
+    } else if (DebugView == 3) {
+        vec3 diagnosticColor = vec3(0.12, 0.22, 0.92);
+        if (diagnosticHistoryState > 1.5 && diagnosticHistoryState < 2.5) {
+            diagnosticColor = vec3(0.92, 0.12, 0.82);
+        } else if (diagnosticHistoryState > 2.5 && diagnosticHistoryState < 3.5) {
+            diagnosticColor = vec3(0.95, 0.58, 0.08);
+        } else if (diagnosticHistoryState > 3.5 && diagnosticHistoryState < 4.5) {
+            diagnosticColor = vec3(0.95, 0.16, 0.10);
+        } else if (diagnosticHistoryState > 4.5 && diagnosticHistoryState < 5.5) {
+            diagnosticColor = vec3(0.10, 0.78, 0.92);
+        } else if (diagnosticHistoryState > 5.5) {
+            diagnosticColor = diagnosticHistoryState < 6.5
+                ? mix(
+                    vec3(0.78, 0.82, 0.16),
+                    vec3(0.12, 0.92, 0.24),
+                    saturate(diagnosticHistoryWeight)
+                )
+                : (diagnosticHistoryState < 7.5
+                    ? vec3(1.0, 1.0, 1.0)
+                    : vec3(0.08, 0.08, 0.08));
+        }
+        bool diagnosticVisible = currentCloudHit || diagnosticHistoryState == 7.0;
+        result = diagnosticVisible ? vec4(diagnosticColor, 1.0) : vec4(0.0);
+        if (!currentCloudHit && diagnosticHistoryState == 7.0) {
+            resultDepth = diagnosticHistoryDepth;
+        }
+    } else if (DebugView == 4) {
+        // The production path above continues to consume depthConfidence based
+        // on resultDepth. This view only exposes an A/B against the depth of the
+        // same representative point in the previous projection. Encoding the
+        // continuous confidences avoids inferring the culprit from colours.
+        result = currentCloudHit
+            ? vec4(
+                diagnosticCurrentDepthConfidence,
+                diagnosticPreviousDepthConfidence,
+                diagnosticDepthSpaceStatus,
+                1.0
+            )
+            : vec4(0.0);
     }
 
     if (result.a < 0.002) {

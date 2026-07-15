@@ -215,6 +215,7 @@ public final class ClientCloudFieldCache {
                 snapshot.stormPotential(),
                 snapshot.cloudTypeId(),
                 snapshot.morphologyFamily(),
+                snapshot.morphologyMembership(),
                 snapshot.anvilStrength(),
                 snapshot.precipitationIntensity(),
                 snapshot.sourceKind(),
@@ -251,6 +252,7 @@ public final class ClientCloudFieldCache {
                 snapshot.stormPotential(),
                 snapshot.cloudTypeId(),
                 snapshot.morphologyFamily(),
+                snapshot.morphologyMembership(),
                 snapshot.anvilStrength(),
                 snapshot.precipitationIntensity(),
                 snapshot.targetCloudletCount(),
@@ -269,7 +271,11 @@ public final class ClientCloudFieldCache {
         double span = Math.max(1.0D, newer.worldTime() - older.worldTime());
         float t = (float) clamp01((targetTime - older.worldTime()) / span);
         float smoothT = t * t * (3.0F - 2.0F * t);
-        Vec3 center = interpolateCenter(older, newer, smoothT, span);
+        // Snapshot centres are authoritative positions, not shape parameters.
+        // Linear time interpolation preserves their measured velocity and can
+        // never leave the segment between them. Applying wind tangents here
+        // made equal frozen endpoints trace a Hermite loop away and back.
+        Vec3 center = interpolateCenter(older, newer, t);
         return copySnapshot(
                 newer,
                 center,
@@ -298,13 +304,18 @@ public final class ClientCloudFieldCache {
     }
 
     private static CloudFieldSnapshot extrapolateSnapshot(
+            CloudFieldSnapshot older,
             CloudFieldSnapshot snapshot,
             double targetTime,
             Vec3 cameraPosition,
             float fade
     ) {
         double deltaTicks = Math.max(0.0D, Math.min(EXTRAPOLATION_LIMIT_TICKS, targetTime - snapshot.worldTime()));
-        Vec3 center = snapshot.center().add(snapshot.windVector().scale(deltaTicks));
+        // Extrapolate the motion actually observed in authoritative centres.
+        // Atmospheric wind remains available to animate cloud material, but
+        // it must not move a frozen centre between identical server packets.
+        Vec3 observedVelocity = observedSnapshotVelocity(older, snapshot);
+        Vec3 center = snapshot.center().add(observedVelocity.scale(deltaTicks));
         return copySnapshot(
                 snapshot,
                 center,
@@ -332,7 +343,7 @@ public final class ClientCloudFieldCache {
         );
     }
 
-    private static Vec3 interpolateCenter(CloudFieldSnapshot older, CloudFieldSnapshot newer, float t, double span) {
+    private static Vec3 interpolateCenter(CloudFieldSnapshot older, CloudFieldSnapshot newer, float t) {
         double discontinuityThreshold = Math.max(
                 DISCONTINUITY_MIN_BLOCKS,
                 Math.max(older.radius(), newer.radius()) * 2.0D
@@ -341,19 +352,29 @@ public final class ClientCloudFieldCache {
         if (delta.length() > discontinuityThreshold) {
             return older.center().add(delta.scale(t));
         }
+        return older.center().add(delta.scale(t));
+    }
 
-        Vec3 m0 = older.windVector().scale(span);
-        Vec3 m1 = newer.windVector().scale(span);
-        float t2 = t * t;
-        float t3 = t2 * t;
-        double h00 = 2.0D * t3 - 3.0D * t2 + 1.0D;
-        double h10 = t3 - 2.0D * t2 + t;
-        double h01 = -2.0D * t3 + 3.0D * t2;
-        double h11 = t3 - t2;
-        return older.center().scale(h00)
-                .add(m0.scale(h10))
-                .add(newer.center().scale(h01))
-                .add(m1.scale(h11));
+    private static Vec3 observedSnapshotVelocity(
+            CloudFieldSnapshot older,
+            CloudFieldSnapshot newer
+    ) {
+        if (older == null || newer == null) {
+            return Vec3.ZERO;
+        }
+        double span = newer.worldTime() - older.worldTime();
+        if (!Double.isFinite(span) || span <= 0.0D) {
+            return Vec3.ZERO;
+        }
+        Vec3 delta = newer.center().subtract(older.center());
+        double discontinuityThreshold = Math.max(
+                DISCONTINUITY_MIN_BLOCKS,
+                Math.max(older.radius(), newer.radius()) * 2.0D
+        );
+        if (delta.length() > discontinuityThreshold) {
+            return Vec3.ZERO;
+        }
+        return delta.scale(1.0D / span);
     }
 
     private static CloudFieldSnapshot copySnapshot(
@@ -402,6 +423,7 @@ public final class ClientCloudFieldCache {
                 stormPotential,
                 base.cloudTypeId(),
                 base.morphologyFamily(),
+                base.morphologyMembership(),
                 anvilStrength,
                 precipitationIntensity,
                 base.sourceKind(),
@@ -499,7 +521,7 @@ public final class ClientCloudFieldCache {
                 return interpolateSnapshot(older, newer, targetTime, cameraPosition, fade);
             }
             if (targetTime > newer.worldTime()) {
-                return extrapolateSnapshot(newer, targetTime, cameraPosition, fade);
+                return extrapolateSnapshot(older, newer, targetTime, cameraPosition, fade);
             }
             CloudFieldSnapshot base = older != null && targetTime < newer.worldTime() ? older : newer;
             return copySnapshot(

@@ -1,7 +1,6 @@
 #version 150
 
 #moj_import <projectatmosphere:cloud_weather_footprint.glsl>
-#moj_import <projectatmosphere:cloud_storm_tower_winner_blend.glsl>
 
 // Severe endpoint map (RGBA16F, premultiplied endpoints).
 // OutputMode 0: R = CORE top * support; GBA = ANVIL support/base/top.
@@ -55,15 +54,11 @@ void main() {
         fbm2(worldXZ * 0.010 + vec2(3.7, 9.1)),
         fbm2(worldXZ * 0.010 + vec2(-7.3, 1.9))
     ) - 0.5;
-    vec2 warpedXZ = worldXZ + warp * 42.0;
 
     float convectiveSupport = 0.0;
     float convectiveBestSupport = 0.0;
     float convectiveBase = 0.0;
     float convectiveTop = 0.0;
-    float convectiveSecondSupport = 0.0;
-    float convectiveSecondBase = 0.0;
-    float convectiveSecondTop = 0.0;
     float anvilSupport = 0.0;
     float anvilBestSupport = 0.0;
     float anvilBase = 0.0;
@@ -91,7 +86,7 @@ void main() {
         float footprintScale = max(media.w, 0.001)
             * max(WeatherCoverageScale, 0.001);
         vec2 scaledRadius = max(posRadius.zw * footprintScale, vec2(1.0));
-        vec2 delta = warpedXZ - posRadius.xy;
+        vec2 delta = worldXZ - posRadius.xy;
         float maxRadius = max(scaledRadius.x, scaledRadius.y) * 1.45;
         if (dot(delta, delta) > maxRadius * maxRadius) {
             continue;
@@ -143,17 +138,10 @@ void main() {
             }
         } else if (towerOutput) {
             if (support > convectiveBestSupport) {
-                convectiveSecondSupport = convectiveBestSupport;
-                convectiveSecondBase = convectiveBase;
-                convectiveSecondTop = convectiveTop;
                 convectiveBestSupport = support;
                 convectiveSupport = support;
                 convectiveBase = localBase;
                 convectiveTop = localTop;
-            } else if (support > convectiveSecondSupport) {
-                convectiveSecondSupport = support;
-                convectiveSecondBase = localBase;
-                convectiveSecondTop = localTop;
             }
         } else {
             if (support > convectiveBestSupport) {
@@ -165,21 +153,11 @@ void main() {
         }
     }
 
-    vec2 convectiveRange = vec2(convectiveBase, convectiveTop);
-    if (OutputMode != 0) {
-        convectiveRange = paBlendStormTowerWinnerRanges(
-            convectiveBestSupport,
-            convectiveRange,
-            convectiveSecondSupport,
-            vec2(convectiveSecondBase, convectiveSecondTop)
-        );
-    }
-
     fragColor = OutputMode != 0
         ? vec4(
             convectiveSupport,
-            convectiveRange.x * convectiveSupport,
-            convectiveRange.y * convectiveSupport,
+            convectiveBase * convectiveSupport,
+            convectiveTop * convectiveSupport,
             0.0
         )
         : vec4(

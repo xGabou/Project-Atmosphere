@@ -30,6 +30,7 @@ public record CloudField(
         float stormPotential,
         String cloudTypeId,
         CloudMorphologyFamily morphologyFamily,
+        CloudMorphologyMembership morphologyMembership,
         float anvilStrength,
         float precipitationIntensity,
         int cloudletCount,
@@ -55,11 +56,66 @@ public record CloudField(
         morphologyFamily = morphologyFamily == null
                 ? definition.getMorphologyFamily()
                 : morphologyFamily;
+        morphologyMembership = (morphologyMembership == null
+                ? CloudMorphologyMembership.ungrouped()
+                : morphologyMembership).withFallbackGroup(fieldId);
         anvilStrength = clamp01(anvilStrength);
         precipitationIntensity = clamp01(precipitationIntensity);
         cloudletCount = Math.max(0, cloudletCount);
         ageTicks = Math.max(0L, ageTicks);
         lifetimeTicks = Math.max(0L, lifetimeTicks);
+    }
+
+    /** Backward-compatible construction for independent/non-canonical fields. */
+    public CloudField(
+            UUID fieldId,
+            long seed,
+            String dimensionId,
+            Vec3 center,
+            float radius,
+            float baseY,
+            float topY,
+            float density,
+            float coverage,
+            float growth,
+            float decay,
+            float humidityInfluence,
+            Vec3 windVector,
+            float verticalDevelopment,
+            float stormPotential,
+            String cloudTypeId,
+            CloudMorphologyFamily morphologyFamily,
+            float anvilStrength,
+            float precipitationIntensity,
+            int cloudletCount,
+            long ageTicks,
+            long lifetimeTicks
+    ) {
+        this(
+                fieldId,
+                seed,
+                dimensionId,
+                center,
+                radius,
+                baseY,
+                topY,
+                density,
+                coverage,
+                growth,
+                decay,
+                humidityInfluence,
+                windVector,
+                verticalDevelopment,
+                stormPotential,
+                cloudTypeId,
+                morphologyFamily,
+                CloudMorphologyMembership.single(fieldId),
+                anvilStrength,
+                precipitationIntensity,
+                cloudletCount,
+                ageTicks,
+                lifetimeTicks
+        );
     }
 
     public CloudField movedByWind(float ticks) {
@@ -86,6 +142,7 @@ public record CloudField(
                 stormPotential,
                 cloudTypeId,
                 morphologyFamily,
+                morphologyMembership,
                 anvilStrength,
                 precipitationIntensity,
                 cloudletCount,
@@ -113,6 +170,7 @@ public record CloudField(
                 stormPotential,
                 cloudTypeId,
                 morphologyFamily,
+                morphologyMembership,
                 anvilStrength,
                 precipitationIntensity,
                 cloudletCount,
@@ -140,6 +198,7 @@ public record CloudField(
                 stormPotential,
                 cloudTypeId,
                 morphologyFamily,
+                morphologyMembership,
                 anvilStrength,
                 precipitationIntensity,
                 newCloudletCount,

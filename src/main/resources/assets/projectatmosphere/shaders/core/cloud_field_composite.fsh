@@ -49,8 +49,10 @@ void main() {
     bool colorPresent = false;
     bool depthPresent = false;
     bool pairedPresent = false;
+    bool sceneRejected = false;
     float selectedDepth = 1.0;
     float selectedScore = -1.0;
+    int selectedIndex = -1;
     float sceneDepth = 1.0;
     float sceneDepthBias = 0.00002;
     bool opaqueVolumeNeighborhood = true;
@@ -75,6 +77,7 @@ void main() {
         bool visibleAgainstScene = SceneDepthValid == 0
             || sceneDepth >= 0.99999
             || depths[i] <= sceneDepth + sceneDepthBias;
+        sceneRejected = sceneRejected || (hasColor && hasDepth && !visibleAgainstScene);
         opaqueVolumeNeighborhood = opaqueVolumeNeighborhood
             && hasColor
             && hasDepth
@@ -88,12 +91,14 @@ void main() {
             if (score > selectedScore) {
                 selectedScore = score;
                 selectedDepth = depths[i];
+                selectedIndex = i;
             }
         }
     }
 
     if (CompositeMode == 1) {
-        vec4 rawColor = texture(CloudColorSampler, texCoord);
+        ivec2 rawCoord = clampCoord(ivec2(texCoord * vec2(sourceSize)), sourceSize);
+        vec4 rawColor = texelFetch(CloudColorSampler, rawCoord, 0);
         if (rawColor.a <= ALPHA_EPSILON) {
             discard;
         }
@@ -103,11 +108,35 @@ void main() {
     }
 
     if (CompositeMode == 4) {
-        vec4 rawColor = texture(CloudColorSampler, texCoord);
+        ivec2 rawCoord = clampCoord(ivec2(texCoord * vec2(sourceSize)), sourceSize);
+        vec4 rawColor = texelFetch(CloudColorSampler, rawCoord, 0);
         if (rawColor.a <= ALPHA_EPSILON) {
             discard;
         }
         fragColor = vec4(vec3(clamp(rawColor.a, 0.0, 1.0)), 1.0);
+        return;
+    }
+
+    if (CompositeMode == 2) {
+        ivec2 rawCoord = clampCoord(ivec2(texCoord * vec2(depthSize)), depthSize);
+        float rawDepth = texelFetch(CloudDepthSampler, rawCoord, 0).r;
+        if (rawDepth >= 1.0) {
+            discard;
+        }
+        fragColor = vec4(depthDebugColor(rawDepth), 1.0);
+        return;
+    }
+
+    if (CompositeMode == 7) {
+        if (!colorPresent && !depthPresent) {
+            discard;
+        }
+        vec3 rejectionColor = sceneRejected
+            ? vec3(0.96, 0.12, 0.08)
+            : (pairedPresent
+                ? vec3(0.12, 0.88, 0.24)
+                : vec3(0.12, 0.34, 1.0));
+        fragColor = vec4(rejectionColor, 1.0);
         return;
     }
 
@@ -153,8 +182,15 @@ void main() {
         }
     }
 
-    if (CompositeMode == 2) {
-        fragColor = vec4(depthDebugColor(selectedDepth), 1.0);
+    if (CompositeMode == 6) {
+        vec3 neighbourColor = selectedIndex == 0
+            ? vec3(1.0, 0.18, 0.12)
+            : (selectedIndex == 1
+                ? vec3(0.16, 0.92, 0.22)
+                : (selectedIndex == 2
+                    ? vec3(0.12, 0.34, 1.0)
+                    : vec3(0.96, 0.20, 0.92)));
+        fragColor = vec4(neighbourColor, 1.0);
         return;
     }
 
@@ -167,7 +203,7 @@ void main() {
     // conversion divides by the weighted alpha.
     vec3 straightColor = accumulated.rgb / max(accumulated.a, ALPHA_EPSILON);
     fragColor = vec4(straightColor, clamp(accumulated.a, 0.0, 1.0));
-    if (CompositeMode == 0) {
+    if (CompositeMode == 0 || CompositeMode == 5) {
         gl_FragDepth = selectedDepth;
     }
 }

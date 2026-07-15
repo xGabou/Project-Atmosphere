@@ -59,6 +59,7 @@ public final class CloudFieldSnapshotFactory {
                 field.stormPotential(),
                 field.cloudTypeId(),
                 field.morphologyFamily(),
+                field.morphologyMembership(),
                 field.anvilStrength(),
                 field.precipitationIntensity(),
                 sourceKind,

@@ -10,7 +10,10 @@ public enum CloudFieldCompositeDebugMode {
     COLOR(1, "color"),
     DEPTH(2, "depth"),
     ALIGNMENT(3, "alignment"),
-    ALPHA(4, "alpha");
+    ALPHA(4, "alpha"),
+    SPATIAL(5, "spatial"),
+    SELECTED_NEIGHBOR(6, "selected_neighbor"),
+    SCENE_REJECTION(7, "scene_rejection");
 
     private final int shaderId;
     private final String serializedName;

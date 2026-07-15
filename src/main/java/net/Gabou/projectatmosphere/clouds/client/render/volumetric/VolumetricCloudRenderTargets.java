@@ -18,6 +18,9 @@ import org.lwjgl.opengl.GL30;
 public final class VolumetricCloudRenderTargets {
     private static RenderTarget weatherTarget;
     private static RenderTarget morphologyTarget;
+    private static RenderTarget cumulusStageSupportTarget;
+    private static RenderTarget cumulusStageBaseTarget;
+    private static RenderTarget cumulusStageTopTarget;
     private static RenderTarget stormStructureTarget;
     private static RenderTarget stormLayerHeightTarget;
     private static RenderTarget stormTowerTarget;
@@ -70,6 +73,39 @@ public final class VolumetricCloudRenderTargets {
             morphologyTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
         }
         return morphologyTarget;
+    }
+
+    /** Independent BASE/CORE/TOWER/CROWN supports for native profile-3 clouds. */
+    public static RenderTarget prepareCumulusStageSupportTarget(int size) {
+        if (cumulusStageSupportTarget == null || cumulusStageSupportTarget.width != size) {
+            if (cumulusStageSupportTarget != null) {
+                cumulusStageSupportTarget.destroyBuffers();
+            }
+            cumulusStageSupportTarget = createHalfFloatMap(size);
+        }
+        return cumulusStageSupportTarget;
+    }
+
+    /** Premultiplied BASE/CORE/TOWER/CROWN lower endpoints. */
+    public static RenderTarget prepareCumulusStageBaseTarget(int size) {
+        if (cumulusStageBaseTarget == null || cumulusStageBaseTarget.width != size) {
+            if (cumulusStageBaseTarget != null) {
+                cumulusStageBaseTarget.destroyBuffers();
+            }
+            cumulusStageBaseTarget = createHalfFloatMap(size);
+        }
+        return cumulusStageBaseTarget;
+    }
+
+    /** Premultiplied BASE/CORE/TOWER/CROWN upper endpoints. */
+    public static RenderTarget prepareCumulusStageTopTarget(int size) {
+        if (cumulusStageTopTarget == null || cumulusStageTopTarget.width != size) {
+            if (cumulusStageTopTarget != null) {
+                cumulusStageTopTarget.destroyBuffers();
+            }
+            cumulusStageTopTarget = createHalfFloatMap(size);
+        }
+        return cumulusStageTopTarget;
     }
 
     /**
@@ -134,6 +170,18 @@ public final class VolumetricCloudRenderTargets {
 
     public static RenderTarget morphologyTargetOrNull() {
         return morphologyTarget;
+    }
+
+    public static RenderTarget cumulusStageSupportTargetOrNull() {
+        return cumulusStageSupportTarget;
+    }
+
+    public static RenderTarget cumulusStageBaseTargetOrNull() {
+        return cumulusStageBaseTarget;
+    }
+
+    public static RenderTarget cumulusStageTopTargetOrNull() {
+        return cumulusStageTopTarget;
     }
 
     public static RenderTarget stormStructureTargetOrNull() {
@@ -231,6 +279,18 @@ public final class VolumetricCloudRenderTargets {
             morphologyTarget.destroyBuffers();
             morphologyTarget = null;
         }
+        if (cumulusStageSupportTarget != null) {
+            cumulusStageSupportTarget.destroyBuffers();
+            cumulusStageSupportTarget = null;
+        }
+        if (cumulusStageBaseTarget != null) {
+            cumulusStageBaseTarget.destroyBuffers();
+            cumulusStageBaseTarget = null;
+        }
+        if (cumulusStageTopTarget != null) {
+            cumulusStageTopTarget.destroyBuffers();
+            cumulusStageTopTarget = null;
+        }
         if (stormStructureTarget != null) {
             stormStructureTarget.destroyBuffers();
             stormStructureTarget = null;
@@ -260,6 +320,15 @@ public final class VolumetricCloudRenderTargets {
         historyValid = false;
     }
 
+    private static RenderTarget createHalfFloatMap(int size) {
+        RenderTarget target = new TextureTarget(size, size, false, Minecraft.ON_OSX);
+        target.setFilterMode(GL11.GL_LINEAR);
+        configureClamp(target.getColorTextureId());
+        upgradeColorToRgba16f(target.getColorTextureId(), size, size);
+        target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        return target;
+    }
+
     /**
      * Re-specs a TextureTarget's RGBA8 color texture as RGBA16F. The cloud
      * buffers hold premultiplied color that the composite divides by alpha;
@@ -271,40 +340,52 @@ public final class VolumetricCloudRenderTargets {
         if (textureId <= 0) {
             return;
         }
-        RenderSystem.bindTexture(textureId);
-        GlStateManager._texImage2D(
-                GL11.GL_TEXTURE_2D,
-                0,
-                GL30.GL_RGBA16F,
-                width,
-                height,
-                0,
-                GL11.GL_RGBA,
-                GL30.GL_HALF_FLOAT,
-                null
-        );
-        RenderSystem.bindTexture(0);
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(textureId);
+            GlStateManager._texImage2D(
+                    GL11.GL_TEXTURE_2D,
+                    0,
+                    GL30.GL_RGBA16F,
+                    width,
+                    height,
+                    0,
+                    GL11.GL_RGBA,
+                    GL30.GL_HALF_FLOAT,
+                    null
+            );
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
     }
 
     private static void configureClamp(int textureId) {
         if (textureId <= 0) {
             return;
         }
-        RenderSystem.bindTexture(textureId);
-        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
-        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-        RenderSystem.bindTexture(0);
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(textureId);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
     }
 
     private static void configureDepth(int textureId) {
         if (textureId <= 0) {
             return;
         }
-        RenderSystem.bindTexture(textureId);
-        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
-        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
-        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-        RenderSystem.bindTexture(0);
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(textureId);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
     }
 }

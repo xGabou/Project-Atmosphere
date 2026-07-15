@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.field.backend;
 
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendBridgeSnapshot;
+import net.Gabou.projectatmosphere.clouds.field.CloudMorphologyMembership;
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
@@ -98,7 +99,7 @@ public final class CloudFieldBackendAdapter {
         String cloudTypeId = cluster.getCloudTypeId();
         String morphologyFamily = cluster.getMorphologyFamily().name();
         return new CloudFieldSource(
-                region.getRegionId() + "/" + cluster.getClusterId(),
+                cluster.getClusterId().toString(),
                 CloudFieldSourceType.PA_CLUSTER,
                 cluster.getDimension().location().toString(),
                 cluster.getCenter(),
@@ -125,6 +126,11 @@ public final class CloudFieldBackendAdapter {
                 0,
                 cloudTypeId,
                 morphologyFamily,
+                new CloudMorphologyMembership(
+                        cluster.getMorphologyGroupId(),
+                        cluster.getMorphologyIndex(),
+                        cluster.getMorphologyCount()
+                ),
                 cluster.isActive()
         );
     }

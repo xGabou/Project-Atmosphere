@@ -181,6 +181,10 @@ public final class CloudFieldSyncManager {
         hash = mix(hash, quantize(snapshot.stormPotential(), 1024.0D));
         hash = mix(hash, snapshot.cloudTypeId().hashCode());
         hash = mix(hash, snapshot.morphologyFamily().ordinal());
+        hash = mix(hash, snapshot.morphologyMembership().groupId().getMostSignificantBits());
+        hash = mix(hash, snapshot.morphologyMembership().groupId().getLeastSignificantBits());
+        hash = mix(hash, snapshot.morphologyMembership().memberIndex());
+        hash = mix(hash, snapshot.morphologyMembership().memberCount());
         hash = mix(hash, quantize(snapshot.anvilStrength(), 1024.0D));
         hash = mix(hash, quantize(snapshot.precipitationIntensity(), 1024.0D));
         hash = mix(hash, snapshot.targetCloudletCount());

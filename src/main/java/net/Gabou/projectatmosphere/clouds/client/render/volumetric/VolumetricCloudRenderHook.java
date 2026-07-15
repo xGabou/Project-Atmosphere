@@ -56,6 +56,8 @@ public final class VolumetricCloudRenderHook {
     private static String lastLoggedStatusKind = "";
     private static Map<UUID, Integer> previousCloudletAllocations = Map.of();
     private static volatile CloudletBudgetStats lastCloudletBudgetStats = CloudletBudgetStats.empty();
+    private static final VolumetricMaterialAdvectionTracker MATERIAL_ADVECTION =
+            new VolumetricMaterialAdvectionTracker();
 
     private VolumetricCloudRenderHook() {
     }
@@ -100,7 +102,14 @@ public final class VolumetricCloudRenderHook {
             CameraCloudDensityTracker.reset();
             previousCloudletAllocations = Map.of();
             lastCloudletBudgetStats = CloudletBudgetStats.empty();
+            MATERIAL_ADVECTION.reset();
+            VolumetricMaterialDomainDiagnostics.reset();
         }
+    }
+
+    static void resetMaterialAdvection() {
+        MATERIAL_ADVECTION.reset();
+        VolumetricMaterialDomainDiagnostics.reset();
     }
 
     @SubscribeEvent
@@ -108,6 +117,8 @@ public final class VolumetricCloudRenderHook {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
             return;
         }
+        VolumetricCloudFrameDiagnostics.pollCumulusStageCapture();
+        VolumetricCloudFrameDiagnostics.pollStabilityCapture();
         if (!isActive() || !VolumetricCloudShaders.isReady()) {
             return;
         }
@@ -144,25 +155,30 @@ public final class VolumetricCloudRenderHook {
         // simulation so manual cloud spawns render the cloud the user asked
         // for instead of unrelated background cells.
         List<CloudCell> presentedCells = ClientCloudCellCache.presentCells(dimensionId, gameTime, partialTick);
+        List<CloudCell> renderedCellSources = new ArrayList<>();
         List<VolumetricRenderCell> renderCells = new ArrayList<>();
         CloudFieldRendererInput input = ClientCloudFieldCache.createRendererInput(cameraPos, gameTime, partialTick);
         List<CloudFieldSnapshot> fieldSnapshots = new ArrayList<>(input.fields());
         fieldSnapshots.sort(Comparator.comparingDouble(snapshot -> snapshot.center().distanceToSqr(cameraPos)));
         CloudletAllocationPlan cloudletPlan = allocateFieldCloudlets(fieldSnapshots, dimensionId, cameraPos);
+        List<CloudFieldSnapshot> renderedFieldSources = cloudletPlan.orderedFields().subList(
+                0,
+                Math.min(cloudletPlan.orderedFields().size(), CloudWeatherMapRenderer.MAX_CELLS)
+        );
         List<VolumetricCloudFrameDiagnostics.FieldInfo> fieldDiagnostics =
                 buildFieldDiagnostics(fieldSnapshots, dimensionId, cloudletPlan);
         // Every visible field contributes one low-frequency macro envelope
         // before detail cloudlets consume the remaining slots. This preserves
         // mass through FAR_PROCEDURAL/HAZE and keeps a budget change from
         // deleting the entire cloud silhouette.
-        for (CloudFieldSnapshot snapshot : cloudletPlan.orderedFields()) {
+        for (CloudFieldSnapshot snapshot : renderedFieldSources) {
             addFieldMacroCell(
                     snapshot,
                     cloudletPlan.acceptedFor(snapshot.fieldId()),
                     renderCells
             );
         }
-        for (CloudFieldSnapshot snapshot : cloudletPlan.orderedFields()) {
+        for (CloudFieldSnapshot snapshot : renderedFieldSources) {
             addFieldCloudletCells(snapshot, cloudletPlan.acceptedFor(snapshot.fieldId()), renderCells);
         }
 
@@ -178,6 +194,7 @@ public final class VolumetricCloudRenderHook {
                 }
                 if (cell.isVisuallyRelevant()) {
                     renderCells.add(VolumetricRenderCell.fromCell(cell));
+                    renderedCellSources.add(cell);
                 }
             }
             renderSource = renderCells.isEmpty() ? "none" : "cells";
@@ -208,6 +225,8 @@ public final class VolumetricCloudRenderHook {
             CloudShadowMapAccess.clear();
             ClientCloudVisualDensity.clear();
             CameraCloudDensityTracker.update(0.0F);
+            MATERIAL_ADVECTION.suspend();
+            VolumetricMaterialDomainDiagnostics.reset();
             return;
         }
 
@@ -297,10 +316,25 @@ public final class VolumetricCloudRenderHook {
 
         // 5. Raymarch with temporal reprojection.
         Vector3f windVec = resolveVisualWind(
-                renderingFields ? fieldSnapshots : List.of(),
-                renderingFields ? List.of() : presentedCells,
+                renderingFields ? renderedFieldSources : List.of(),
+                renderingFields ? List.of() : renderedCellSources,
                 cameraPos,
                 gameTime
+        );
+        double renderTime = gameTime + partialTick;
+        VolumetricMaterialAdvectionTracker.Frame materialAdvection = renderingFields
+                ? MATERIAL_ADVECTION.updateFields(dimensionId, renderTime, renderedFieldSources)
+                : (!renderedCellSources.isEmpty()
+                        ? MATERIAL_ADVECTION.updateCells(dimensionId, renderTime, renderedCellSources)
+                        : MATERIAL_ADVECTION.updateRegional(dimensionId, renderTime, windVec));
+        if (materialAdvection.discontinuity()) {
+            VolumetricCloudRenderer.invalidateHistory();
+        }
+        VolumetricMaterialDomainDiagnostics.observe(
+                renderingFields ? renderedFieldSources : List.of(),
+                renderingFields ? List.of() : renderedCellSources,
+                windVec,
+                worldTimeTicks
         );
         VolumetricCloudRenderer.FunnelUniforms funnels = buildFunnels(presentedCells, cameraPos);
         VolumetricCloudRenderer.Tuning tuning = renderingFields
@@ -316,6 +350,7 @@ public final class VolumetricCloudRenderHook {
                 cameraPosF,
                 worldTimeTicks,
                 windVec,
+                materialAdvection,
                 profile,
                 Math.max(300.0F, AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get()),
                 funnels,
@@ -362,6 +397,18 @@ public final class VolumetricCloudRenderHook {
             CameraCloudDensityTracker.update(0.0F);
         }
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
+        VolumetricCloudFrameDiagnostics.tryDispatchStabilityCapture(
+                cloudTarget,
+                sceneDepth,
+                frameCounter,
+                gameTime,
+                partialTick,
+                CloudWeatherMapRenderer.lastInputSignatureForDiagnostics(),
+                configuredQuality.name(),
+                VolumetricCloudRenderer.lastDrawInputs(),
+                CloudFieldCompositeRenderer.lastDrawInputs(),
+                composited
+        );
         VolumetricCloudRenderer.finishFrame();
         recordFrameDiagnostics(
                 frameCounter,
@@ -377,6 +424,13 @@ public final class VolumetricCloudRenderHook {
                 fieldDiagnostics,
                 renderCells,
                 composited
+        );
+        VolumetricCloudFrameDiagnostics.tryDispatchCumulusStageCapture(
+                weather,
+                frameCounter,
+                gameTime,
+                summarizeCumulusEnvelopeRoles(renderCells),
+                tuning.coverageMul()
         );
 
         // 7. GPU analytics (Medium+ with GL 4.3): measure per-cell footprints
@@ -395,6 +449,7 @@ public final class VolumetricCloudRenderHook {
                 + " syncedCells=" + presentedCells.size()
                 + " syncedFields=" + fieldSnapshots.size()
                 + " weatherCells=" + weather.cellCount()
+                + " roles[" + summarizeEnvelopeRoles(renderCells) + "]"
                 + " cloudlets[" + cloudletPlan.stats().summary() + "]"
                 + " regionalSource=" + (renderingFields
                         ? "disabled_for_fields"
@@ -430,7 +485,59 @@ public final class VolumetricCloudRenderHook {
                 + " ambBot=" + format(lighting.ambientBottom())
                 + " composited=" + composited
                 + " funnels=" + funnels.count()
+                + " " + VolumetricMaterialDomainDiagnostics.status()
+                + " " + materialAdvection.summary()
                 + " gpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds());
+    }
+
+    private static String summarizeEnvelopeRoles(List<VolumetricRenderCell> renderCells) {
+        int base = 0;
+        int core = 0;
+        int tower = 0;
+        int crown = 0;
+        int other = 0;
+        for (VolumetricRenderCell cell : renderCells) {
+            switch (cell.envelopeRole()) {
+                case BASE -> base++;
+                case CORE -> core++;
+                case TOWER -> tower++;
+                case CROWN -> crown++;
+                default -> other++;
+            }
+        }
+        return "base=" + base
+                + ",core=" + core
+                + ",tower=" + tower
+                + ",crown=" + crown
+                + ",other=" + other;
+    }
+
+    /** Mirrors the exact first-96/profile-3 filter used by the cumulus splat. */
+    private static String summarizeCumulusEnvelopeRoles(List<VolumetricRenderCell> renderCells) {
+        int base = 0;
+        int core = 0;
+        int tower = 0;
+        int crown = 0;
+        int other = 0;
+        int count = Math.min(renderCells.size(), CloudWeatherMapRenderer.MAX_CELLS);
+        for (int i = 0; i < count; i++) {
+            VolumetricRenderCell cell = renderCells.get(i);
+            if (cell.cloudProfile() != 3) {
+                continue;
+            }
+            switch (cell.envelopeRole()) {
+                case BASE -> base++;
+                case CORE -> core++;
+                case TOWER -> tower++;
+                case CROWN -> crown++;
+                default -> other++;
+            }
+        }
+        return "base=" + base
+                + ",core=" + core
+                + ",tower=" + tower
+                + ",crown=" + crown
+                + ",other=" + other;
     }
 
     /**
@@ -469,7 +576,8 @@ public final class VolumetricCloudRenderHook {
             int cloudletCount,
             List<VolumetricRenderCell> renderCells
     ) {
-        if (snapshot == null || cloudletCount <= 0
+        if (snapshot == null || snapshot.sourceKind() == CloudFieldSourceKind.PA_CLUSTER
+                || cloudletCount <= 0
                 || renderCells.size() >= CloudWeatherMapRenderer.MAX_CELLS) {
             return;
         }
@@ -490,7 +598,8 @@ public final class VolumetricCloudRenderHook {
      * targetCloudletCount is a hydration target, not permission to bypass LOD.
      */
     private static int requestedCloudletCount(CloudFieldSnapshot snapshot) {
-        if (snapshot == null || !snapshot.hasVisibleClouds()) {
+        if (snapshot == null || !snapshot.hasVisibleClouds()
+                || snapshot.sourceKind() == CloudFieldSourceKind.PA_CLUSTER) {
             return 0;
         }
         return Math.min(
@@ -899,13 +1008,15 @@ public final class VolumetricCloudRenderHook {
             Vec3 cameraPos,
             long gameTime
     ) {
-        Vector3f fieldWind = averageFieldWind(fields);
-        if (fieldWind.lengthSquared() > 1.0E-8F) {
-            return fieldWind;
+        // Source ownership, not vector magnitude, selects the wind domain. A
+        // rendered field can legitimately be calm (or several field vectors
+        // can cancel); replacing that exact zero with forecast wind makes the
+        // material/rain direction move while the authoritative cloud is frozen.
+        if (fields != null && !fields.isEmpty()) {
+            return averageFieldWind(fields);
         }
-        Vector3f cellWind = averageCellWind(cells);
-        if (cellWind.lengthSquared() > 1.0E-8F) {
-            return cellWind;
+        if (cells != null && !cells.isEmpty()) {
+            return averageCellWind(cells);
         }
         // Regional-only sheets have no field/cell to average. Use the same
         // synchronized forecast vector that drives server cloud motion.

@@ -21,6 +21,8 @@ public final class VolumetricCloudShaders {
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_splat");
     private static final ResourceLocation MORPHOLOGY_SPLAT_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_morphology");
+    private static final ResourceLocation CUMULUS_LAYER_SPLAT_ID =
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_cumulus_layers");
     private static final ResourceLocation STORM_STRUCTURE_SPLAT_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_weather_storm_structure");
     private static final ResourceLocation STORM_HEIGHT_SPLAT_ID =
@@ -34,6 +36,7 @@ public final class VolumetricCloudShaders {
 
     private static ShaderInstance splatShader;
     private static ShaderInstance morphologySplatShader;
+    private static ShaderInstance cumulusLayerSplatShader;
     private static ShaderInstance stormStructureSplatShader;
     private static ShaderInstance stormHeightSplatShader;
     private static ShaderInstance volumeShader;
@@ -51,6 +54,9 @@ public final class VolumetricCloudShaders {
                         event.getResourceProvider(), MORPHOLOGY_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> morphologySplatShader = loaded);
         event.registerShader(new ShaderInstance(
+                        event.getResourceProvider(), CUMULUS_LAYER_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
+                loaded -> cumulusLayerSplatShader = loaded);
+        event.registerShader(new ShaderInstance(
                         event.getResourceProvider(), STORM_STRUCTURE_SPLAT_ID, DefaultVertexFormat.POSITION_TEX),
                 loaded -> stormStructureSplatShader = loaded);
         event.registerShader(new ShaderInstance(
@@ -64,6 +70,7 @@ public final class VolumetricCloudShaders {
                 loaded -> shadowApplyShader = loaded);
         // Reloaded programs render into fresh state; stale history would blend
         // pre-reload frames into the new output.
+        net.Gabou.projectatmosphere.clouds.client.render.volumetric.CloudWeatherMapRenderer.invalidateCache();
         net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderer.invalidateHistory();
         ProjectAtmosphere.LOGGER.info("[VolumetricClouds] shader programs registered");
     }
@@ -78,6 +85,10 @@ public final class VolumetricCloudShaders {
 
     public static ShaderInstance morphologySplatShader() {
         return morphologySplatShader;
+    }
+
+    public static ShaderInstance cumulusLayerSplatShader() {
+        return cumulusLayerSplatShader;
     }
 
     public static ShaderInstance stormStructureSplatShader() {
@@ -99,6 +110,7 @@ public final class VolumetricCloudShaders {
     public static boolean isReady() {
         return splatShader != null
                 && morphologySplatShader != null
+                && cumulusLayerSplatShader != null
                 && stormStructureSplatShader != null
                 && stormHeightSplatShader != null
                 && volumeShader != null;

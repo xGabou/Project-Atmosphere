@@ -18,7 +18,11 @@ import java.nio.ByteBuffer;
 
 /** Exact capture/restore guard for PA cloud passes. */
 public final class CloudRenderStateGuard {
-    private static final int MAX_TEXTURE_UNIT = 11;
+    // Minecraft 1.20.1 tracks exactly twelve texture units in GlStateManager.
+    // The volume program additionally binds its two 3D noise textures through
+    // raw OpenGL on units 12 and 13, which must never enter that fixed cache.
+    private static final int MAX_TRACKED_TEXTURE_UNIT = 11;
+    private static final int MAX_TEXTURE_UNIT = 13;
     private static final int INDEXED_BLEND_TARGETS = 2;
     private static final ThreadLocal<State> CURRENT = new ThreadLocal<>();
 
@@ -150,11 +154,11 @@ public final class CloudRenderStateGuard {
             this.shaderColor = RenderSystem.getShaderColor().clone();
             this.activeTexture = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
             for (int unit = 0; unit <= MAX_TEXTURE_UNIT; unit++) {
-                GlStateManager._activeTexture(GL13.GL_TEXTURE0 + unit);
+                activateTextureUnit(unit);
                 texture2d[unit] = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
                 texture3d[unit] = GL11.glGetInteger(GL12.GL_TEXTURE_BINDING_3D);
             }
-            GlStateManager._activeTexture(activeTexture);
+            restoreActiveTexture(activeTexture);
             this.program = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
             this.shader = RenderSystem.getShader();
             this.vertexArray = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
@@ -209,11 +213,15 @@ public final class CloudRenderStateGuard {
             RenderSystem.setShaderColor(shaderColor[0], shaderColor[1], shaderColor[2], shaderColor[3]);
 
             for (int unit = 0; unit <= MAX_TEXTURE_UNIT; unit++) {
-                GlStateManager._activeTexture(GL13.GL_TEXTURE0 + unit);
-                GlStateManager._bindTexture(texture2d[unit]);
+                activateTextureUnit(unit);
+                if (unit <= MAX_TRACKED_TEXTURE_UNIT) {
+                    GlStateManager._bindTexture(texture2d[unit]);
+                } else {
+                    GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture2d[unit]);
+                }
                 GL11.glBindTexture(GL12.GL_TEXTURE_3D, texture3d[unit]);
             }
-            GlStateManager._activeTexture(activeTexture);
+            restoreActiveTexture(activeTexture);
 
             RenderSystem.setShader(() -> shader);
             GlStateManager._glUseProgram(program);
@@ -224,6 +232,27 @@ public final class CloudRenderStateGuard {
             // Invalidate that cache so the next vanilla shader reapplies it.
             BlendModeAccessor.projectatmosphere$setLastApplied(null);
             CURRENT.set(previous);
+        }
+
+        private static void activateTextureUnit(int unit) {
+            int texture = GL13.GL_TEXTURE0 + unit;
+            if (unit <= MAX_TRACKED_TEXTURE_UNIT) {
+                GlStateManager._activeTexture(texture);
+            } else {
+                GL13.glActiveTexture(texture);
+            }
+        }
+
+        private static void restoreActiveTexture(int texture) {
+            int unit = texture - GL13.GL_TEXTURE0;
+            if (unit >= 0 && unit <= MAX_TRACKED_TEXTURE_UNIT) {
+                GlStateManager._activeTexture(texture);
+                return;
+            }
+            // Keep Minecraft's cache on a representable unit while restoring
+            // the exact raw GL active unit supplied by an external pipeline.
+            GlStateManager._activeTexture(GL13.GL_TEXTURE0);
+            GL13.glActiveTexture(texture);
         }
 
         private static void setEnabled(int capability, boolean enabled) {

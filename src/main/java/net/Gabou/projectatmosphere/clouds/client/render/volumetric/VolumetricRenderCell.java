@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
+import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
 import net.Gabou.projectatmosphere.clouds.field.CloudletLayout;
 import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
@@ -90,6 +91,9 @@ public record VolumetricRenderCell(
             CloudFieldSnapshot snapshot,
             int acceptedDetailCount
     ) {
+        if (snapshot.sourceKind() == CloudFieldSourceKind.PA_CLUSTER) {
+            return fromCanonicalClusterSnapshot(snapshot);
+        }
         CloudMorphologyFamily morphology = snapshot.morphologyFamily();
         float effectiveDensity = snapshot.effectiveDensity();
         float effectiveCoverage = snapshot.effectiveCoverage();
@@ -159,13 +163,100 @@ public record VolumetricRenderCell(
                 materialDarknessFor(snapshot.cloudTypeId()),
                 snapshot.anvilStrength(),
                 snapshot.precipitationIntensity(),
-                snapshot.lifecycleStage(),
+                snapshot.visualLifecycleStage(),
                 (snapshot.seed() & 0xFFFFL) / 65535.0F,
                 0.0F,
                 0.0F,
                 0.0F,
                 true,
                 identifiableDetail ? EnvelopeRole.CARRIER_ONLY : EnvelopeRole.MACRO
+        );
+    }
+
+    /**
+     * Projects one authoritative PA simulation cluster directly into one GPU
+     * footprint. No second cloudlet hierarchy or LOD-dependent topology is
+     * introduced here: neighbouring clusters are already the stable lobes of
+     * the meteorological cloud group.
+     */
+    private static VolumetricRenderCell fromCanonicalClusterSnapshot(CloudFieldSnapshot snapshot) {
+        CloudMorphologyFamily morphology = snapshot.morphologyFamily();
+        EnvelopeRole canonicalRole = switch (snapshot.morphologyMembership().stageFor(morphology)) {
+            case BASE -> EnvelopeRole.BASE;
+            case CORE -> EnvelopeRole.CORE;
+            case TOWER -> EnvelopeRole.TOWER;
+            case CROWN -> EnvelopeRole.CROWN;
+            case MACRO -> EnvelopeRole.MACRO;
+        };
+        float radiusScale = switch (morphology) {
+            case PUFF -> 0.96F;
+            case TOWER -> 0.92F;
+            case STORM_ANVIL -> 0.98F;
+            case SHEET -> 1.06F;
+            case CELLULAR_SHEET -> 0.96F;
+            case FILAMENT -> 1.04F;
+            case SPIRAL_STORM -> 1.00F;
+            case DEBUG -> 0.96F;
+        };
+        float aspect = switch (morphology) {
+            case PUFF -> 0.90F;
+            case TOWER -> 0.86F;
+            case STORM_ANVIL -> 0.82F;
+            case SHEET -> 0.70F;
+            case CELLULAR_SHEET -> 0.82F;
+            case FILAMENT -> 0.20F;
+            case SPIRAL_STORM -> 0.80F;
+            case DEBUG -> 0.88F;
+        };
+        float densityScale = switch (morphology) {
+            case FILAMENT -> 0.74F;
+            case SHEET -> 0.88F;
+            case CELLULAR_SHEET -> 0.86F;
+            case STORM_ANVIL, SPIRAL_STORM -> 0.98F;
+            default -> 0.94F;
+        };
+        float edgeSoftness = switch (morphology) {
+            case PUFF -> 0.38F;
+            case TOWER -> 0.30F;
+            case STORM_ANVIL -> 0.28F;
+            case SHEET -> 0.54F;
+            case CELLULAR_SHEET -> 0.42F;
+            case FILAMENT -> 0.66F;
+            case SPIRAL_STORM -> 0.26F;
+            case DEBUG -> 0.40F;
+        };
+        float radiusMajor = Math.max(4.0F, snapshot.radius() * radiusScale);
+        float effectiveDensity = Math.min(1.0F,
+                snapshot.effectiveDensity()
+                        * densityScale
+                        * (0.78F + snapshot.effectiveCoverage() * 0.22F));
+        return new VolumetricRenderCell(
+                snapshot.center().x(),
+                snapshot.center().z(),
+                snapshot.baseY(),
+                snapshot.topY(),
+                radiusMajor,
+                Math.max(3.0F, radiusMajor * aspect),
+                orientationFor(snapshot, morphology, (snapshot.seed() % 628L) * 0.01F),
+                effectiveDensity,
+                edgeSoftness,
+                snapshot.stormPotential(),
+                profileFor(snapshot),
+                morphology.ordinal(),
+                snapshot.verticalDevelopment(),
+                snapshot.humidityInfluence(),
+                materialDarknessFor(snapshot.cloudTypeId()),
+                snapshot.anvilStrength(),
+                snapshot.precipitationIntensity(),
+                snapshot.visualLifecycleStage(),
+                (snapshot.seed() & 0xFFFFL) / 65535.0F,
+                0.0F,
+                0.0F,
+                morphology == CloudMorphologyFamily.SPIRAL_STORM
+                        ? snapshot.stormPotential() * 0.04F
+                        : 0.0F,
+                false,
+                canonicalRole
         );
     }
 
@@ -246,7 +337,7 @@ public record VolumetricRenderCell(
                 materialDarknessFor(snapshot.cloudTypeId()),
                 snapshot.anvilStrength(),
                 snapshot.precipitationIntensity(),
-                snapshot.lifecycleStage(),
+                snapshot.visualLifecycleStage(),
                 (seed & 0xFFFFL) / 65535.0F,
                 0.0F,
                 0.0F,
@@ -270,7 +361,8 @@ public record VolumetricRenderCell(
         CORE(3),
         TOWER(4),
         ANVIL(5),
-        CARRIER_ONLY(6);
+        CARRIER_ONLY(6),
+        CROWN(7);
 
         private final int gpuId;
 

@@ -24,6 +24,7 @@ import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricClo
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudDebugConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRaymarchDebugView;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
 import net.Gabou.projectatmosphere.tools.debug.WorldSpaceDebugCubeRenderer;
@@ -125,6 +126,15 @@ public class TelemetryDebugClientCommand {
                         .executes(ctx -> sendVolumetricStatus(ctx.getSource())))
                 .then(Commands.literal("diagnostics")
                         .executes(ctx -> sendVolumetricDiagnostics(ctx.getSource()))
+                        .then(Commands.literal("cumulus")
+                                .executes(ctx -> requestVolumetricCumulusDiagnostics(ctx.getSource())))
+                        .then(Commands.literal("stability")
+                                .executes(ctx -> requestVolumetricStabilityDiagnostics(ctx.getSource(), 8))
+                                .then(Commands.argument("frames", IntegerArgumentType.integer(2, 32))
+                                        .executes(ctx -> requestVolumetricStabilityDiagnostics(
+                                                ctx.getSource(),
+                                                IntegerArgumentType.getInteger(ctx, "frames")
+                                        ))))
                         .then(Commands.literal("log")
                                 .executes(ctx -> sendVolumetricDiagnosticsLogStatus(ctx.getSource()))
                                 .then(Commands.literal("on")
@@ -163,6 +173,7 @@ public class TelemetryDebugClientCommand {
                                         .executes(ctx -> setVolumetricHistory(ctx.getSource(), true)))
                                 .then(Commands.literal("off")
                                         .executes(ctx -> setVolumetricHistory(ctx.getSource(), false))))
+                        .then(buildVolumetricRaymarchViewCommand())
                         .then(Commands.literal("sentinelHeights")
                                 .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
                                 .then(Commands.literal("on")
@@ -217,11 +228,32 @@ public class TelemetryDebugClientCommand {
     }
 
     private static int sendVolumetricDiagnostics(CommandSourceStack source) {
-        VolumetricCloudFrameDiagnostics.captureLatestWeatherTextureStats();
         source.sendSuccess(
                 () -> Component.literal(VolumetricCloudFrameDiagnostics.formattedLatest()),
                 false);
         return 1;
+    }
+
+    private static int requestVolumetricCumulusDiagnostics(CommandSourceStack source) {
+        String result = VolumetricCloudFrameDiagnostics.requestCumulusStageCapture();
+        source.sendSuccess(
+                () -> Component.literal("Cumulus stage-map capture " + result
+                        + ". The transfer is fence-gated; results are written to latest.log "
+                        + "and exposed by /pa system volumetric diagnostics."),
+                false
+        );
+        return result.startsWith("requested") ? 1 : 0;
+    }
+
+    private static int requestVolumetricStabilityDiagnostics(CommandSourceStack source, int frames) {
+        String result = VolumetricCloudFrameDiagnostics.requestStabilityCapture(frames);
+        source.sendSuccess(
+                () -> Component.literal("Volumetric stability capture " + result
+                        + ". Existing raymarch/composite modes are measured through a fence-gated PBO; "
+                        + "the numerical report is written to latest.log and exposed by diagnostics."),
+                false
+        );
+        return result.startsWith("requested") ? 1 : 0;
     }
 
     private static int sendVolumetricDebugStatus(CommandSourceStack source) {
@@ -283,6 +315,36 @@ public class TelemetryDebugClientCommand {
         source.sendSuccess(
                 () -> Component.literal("Volumetric cloud debug history " + (enabled ? "on" : "off")),
                 false);
+        return 1;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildVolumetricRaymarchViewCommand() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("view")
+                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()));
+        for (VolumetricCloudRaymarchDebugView view : VolumetricCloudRaymarchDebugView.values()) {
+            root.then(Commands.literal(view.serializedName())
+                    .executes(ctx -> setVolumetricRaymarchView(ctx.getSource(), view)));
+        }
+        return root;
+    }
+
+    private static int setVolumetricRaymarchView(
+            CommandSourceStack source,
+            VolumetricCloudRaymarchDebugView view
+    ) {
+        VolumetricCloudRaymarchDebugView previous = VolumetricCloudDebugConfig.raymarchDebugView();
+        VolumetricCloudDebugConfig.setRaymarchDebugView(view);
+        // Diagnostic views overwrite the current target but deliberately keep
+        // the last production target frozen. Invalidate only when returning to
+        // production so a stale diagnostic interval can never be blended.
+        if (view == VolumetricCloudRaymarchDebugView.FINAL
+                && previous != VolumetricCloudRaymarchDebugView.FINAL) {
+            VolumetricCloudRenderer.invalidateHistory();
+        }
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud raymarch view " + view.serializedName()),
+                false
+        );
         return 1;
     }
 
@@ -570,7 +632,8 @@ public class TelemetryDebugClientCommand {
         source.sendSuccess(
                 () -> Component.literal("CloudField composite mode="
                         + CloudFieldVolumeRenderConfig.compositeDebugMode().serializedName()
-                        + "\ncommand=/pa cloud render composite <final|color|depth|alignment|alpha>"),
+                        + "\ncommand=/pa cloud render composite "
+                        + "<final|color|depth|alignment|alpha|spatial|selected_neighbor|scene_rejection>"),
                 false
         );
         return 1;

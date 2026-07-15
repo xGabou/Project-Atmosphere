@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.clouds.field.backend;
 
+import net.Gabou.projectatmosphere.clouds.field.CloudMorphologyMembership;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
@@ -34,6 +35,7 @@ public record CloudFieldSource(
         int cloudletCountHint,
         String cloudTypeId,
         String morphologyFamily,
+        CloudMorphologyMembership morphologyMembership,
         boolean active
 ) {
     public CloudFieldSource {
@@ -63,6 +65,63 @@ public record CloudFieldSource(
         cloudletCountHint = Math.max(0, cloudletCountHint);
         cloudTypeId = normalizeCloudType(cloudTypeId);
         morphologyFamily = normalizeMorphology(morphologyFamily, cloudTypeId);
+        morphologyMembership = morphologyMembership == null
+                ? CloudMorphologyMembership.ungrouped()
+                : morphologyMembership;
+    }
+
+    /** Backward-compatible construction for sources without canonical lobes. */
+    public CloudFieldSource(
+            String sourceId,
+            CloudFieldSourceType sourceType,
+            String dimensionId,
+            Vec3 center,
+            float radius,
+            float baseY,
+            float topY,
+            float density,
+            float coverage,
+            float humidityInfluence,
+            Vec3 wind,
+            float growth,
+            float decay,
+            float verticalDevelopment,
+            float stormPotential,
+            float precipitationIntensity,
+            long seed,
+            long ageTicks,
+            long lifetimeTicks,
+            int cloudletCountHint,
+            String cloudTypeId,
+            String morphologyFamily,
+            boolean active
+    ) {
+        this(
+                sourceId,
+                sourceType,
+                dimensionId,
+                center,
+                radius,
+                baseY,
+                topY,
+                density,
+                coverage,
+                humidityInfluence,
+                wind,
+                growth,
+                decay,
+                verticalDevelopment,
+                stormPotential,
+                precipitationIntensity,
+                seed,
+                ageTicks,
+                lifetimeTicks,
+                cloudletCountHint,
+                cloudTypeId,
+                morphologyFamily,
+                CloudMorphologyMembership.ungrouped(),
+                active
+        );
     }
 
     public boolean isUsable() {

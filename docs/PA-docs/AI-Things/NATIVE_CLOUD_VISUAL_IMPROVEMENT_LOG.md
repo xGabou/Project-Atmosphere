@@ -3556,3 +3556,2227 @@ launch.
   unchanged but make endpoint selection continuous when the best and runner-up
   TOWER supports are nearly tied and vertically overlap. This targets the
   confirmed winner-switch discontinuity rather than another optical-edge tweak.
+
+## Iteration 119 - top-two TOWER endpoint blend rejected; terraces unchanged
+
+- The candidate retained the strongest TOWER support as the output opacity but
+  blended its vertical endpoints toward a runner-up only when both candidates
+  overlapped and their supports were close. The implementation added no pass,
+  sampler, target, allocation or raymarch sample; its only cost was a small
+  amount of weather-map ALU on cache misses.
+- Compilation, resource processing, CloudField sandbox, tests and packaging
+  passed for build/runtime hash
+  `DD732AC736987F8D10259DDF609308B476923BE2261CE763C3C8D5E2AE3ABA93`.
+  The native-only runtime contained no Simple Clouds, CrackersLib, Oculus or
+  Iris. Both candidate and resource-pack control shaders registered without a
+  shader error.
+- The only valid causal bracket is
+  `build/visual-test/severe-tower-winner-blend-exact-ab-as/01-candidate-blended-winner-far-clientcenter.png`,
+  `02-control-hard-winner-far-screen.png` and
+  `03-candidate-blended-winner-far-screen.png`. The older `ar` directory and the
+  `04/05` close captures are excluded because their pose or cloud lifetime was
+  not comparable. Terrain and sun alignment is exactly zero pixels in the valid
+  bracket.
+- Personal inspection finds the same narrow severe column, stacked ellipsoidal
+  lobes, broad horizontal terraces, hard dark base and thin analytic anvil in
+  all three frames. The endpoint blend is not a recognizable visual correction.
+- Registered measurements confirm that result. At the dense `alpha >= 0.40`
+  mask, global areas are `24414 / 24459 / 24531` pixels for candidate-1,
+  hard-winner control and candidate-2: the control residual versus interpolated
+  candidates is only `-0.08%`. Crown, shoulder and core residuals are
+  `+0.46% / -0.31% / +0.42%`. Strong horizontal-edge fractions are
+  `52.63% / 52.88% / 52.96%`; the control residual is only `+0.06` percentage
+  point and changes direction at a stronger threshold. No run-length or contour
+  metric shows a robust reduction of the terraces.
+- Large differences below the base are dominated by precipitation motion:
+  control faint-mask base area is `+36.4%` and dense rain area is `+202.6%`
+  versus the temporal interpolation, while rain moves substantially between the
+  two candidate controls. Those values are not assigned causally to endpoint
+  selection.
+- The top-two blend is therefore rejected as a demonstrated visual improvement
+  with confidence `0.85`. It must not remain in production merely because it is
+  mathematically continuous. The next source correction must target the actual
+  macro geometry/density construction.
+- Production was restored to the original single strongest TOWER endpoint and
+  the now-unreferenced winner-blend include was removed. With JDK 17 and Gradle
+  8.10, `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and
+  `build` all passed; the only output was the pre-existing deprecation/mixin
+  warning set.
+
+## Iteration 120 - expanded visual baseline from the native severe captures
+
+- Review of the current in-game native-only captures establishes stricter
+  blocking criteria. The visible cloud has an implausibly tall and narrow
+  central spike, flat horizontal/diagonal fins, stacked stretched volumes and a
+  nearly black lower slab with a hard boundary. Other views can collapse toward
+  a diffuse horizontal smear rather than preserving one recognizable cumulus
+  morphology.
+- The captures also show screen-coherent square clusters, stippling and broken
+  fragments along high-contrast boundaries. These are now treated separately
+  from the already accepted exterior jitter correction: raw low-resolution,
+  spatial-upscale, temporal-history and final-composite stages must be isolated
+  before assigning a root cause.
+- The observed runtime motion is reported as wave-like internal density and
+  rapidly changing edges while the macro cloud remains approximately fixed.
+  This is a user-observed temporal defect, not something proven by one still
+  frame. Weather-map fingerprints, cloudlet identities, world-space noise
+  domains, history acceptance and snapped origins must be instrumented before
+  claiming a cause.
+- Rain is visibly present beyond the displayed dense cloud footprint and the
+  streak presentation itself may be too sparse, long and wind-slanted. Gameplay
+  precipitation coverage and visual rain rendering are separate investigations;
+  neither will be considered fixed solely by enlarging the cloud.
+- Acceptance now requires the same native cloud viewed from below, side, above,
+  close and medium range, plus stationary and lateral-motion sequences and rain
+  start/end. A successful result must remove the needle, fins, black slab,
+  obvious reconstruction blocks and rapid silhouette reshaping while retaining
+  stable lobe structure and spatially aligned precipitation.
+
+## Iteration 121 - stage isolation proves the malformed source volume
+
+- The baseline defects were traced before another visual correction. A native
+  region currently aggregates the positions, radius and vertical bounds of all
+  of its simulated clusters into one `CloudField`, keeps the family of only the
+  primary cluster, and then generates a second deterministic `CloudletLayout`
+  inside that aggregate envelope. For a TOWER-family field the generated core
+  spans `90%` of the already amplified regional height at only `28%` of the
+  regional radius, while the generated BASE spans `24%` of the height at `46%`
+  of the radius. This is a direct source for the observed needle and shelf; it
+  must be corrected in the source geometry rather than blurred in composition.
+- The LOD path also changes topology at `acceptedDetailCount >= 3`: below that
+  threshold the aggregate macro ellipse remains visible, whereas at or above it
+  the macro becomes carrier-only and the regenerated cloudlets define the
+  silhouette. This explains a deterministic tower-to-smear/popping risk.
+- Temporary runtime views now isolate actual nearest low-resolution colour,
+  alpha and cloud depth; spatial-only upscale; selected 2x2 neighbour; scene
+  rejection; current raymarch; frozen valid history; and temporal rejection.
+  The temporal views never enter the production ping-pong history. Entering a
+  diagnostic preserves the last valid production history, diagnostic frames do
+  not swap targets or advance the production reprojection matrices, and
+  returning to final invalidates the stale interval. Current-miss pixels with
+  surviving screen-space history are explicitly visible in the rejection mask.
+- The scene-rejection view is evaluated before the normal no-neighbour discard,
+  so it can expose a full four-neighbour rejection rather than only partial
+  cases. Raw colour/alpha/depth views use `texelFetch`, not the former linear
+  sampler that could conceal the low-resolution grid.
+- With JDK 17 and Gradle 8.10, `compileJava`, `processResources`,
+  `cloudFieldSandbox`, `test` and `build` all passed. The only output was the
+  pre-existing deprecation/mixin warning set. The exact built and deployed JAR
+  SHA-256 was
+  `F21AC58727A827D9E115506C34263FB92FB3F9B4E31250CE0793A7B310CA4DDA`.
+- The JAR was run in a production Forge 47.4.20 instance containing only PA,
+  Architectury, Gaboulibs and Cool Rain. Simple Clouds, CrackersLib, Oculus and
+  Iris were absent. The log selected the native PA service, registered every PA
+  shader, and reported a valid detached `1280x720` vanilla-main scene depth.
+- A frozen `cumulus_congestus` TOWER field was captured from one fixed pose in
+  `build/visual-test/iteration-121-stage-isolation/`. Its generated field used a
+  roughly `70.2` block radius, renderer slab `236.0..468.7`, 26 accepted
+  cloudlets and 27 weather-map cells. Personal inspection of final, raw colour,
+  raw alpha and raw cloud-depth captures shows the same four disconnected
+  analytic structures: a narrow bright cap, a broad dark shelf, a second thin
+  shelf and two long tapered vertical legs. Large clear gaps separate them. The
+  result resembles stacked props rather than a cauliflower cumulus.
+- The malformed topology is already present in raw low-resolution colour,
+  alpha and representative cloud depth (`05..07`). It remains in spatial-only
+  current output (`08`) and in full-resolution output with temporal history
+  disabled (`13..15`). Consequently neither temporal reprojection nor the final
+  depth-guided composite creates the needle, shelves or disconnected legs.
+  This is direct runtime confirmation of a source-layout/density failure.
+- Raw alpha is nearly opaque throughout each detached analytic piece and drops
+  sharply across the gaps. Raw depth contains the same disjoint intervals.
+  Therefore the black shelf is not merely straight-versus-premultiplied-alpha
+  confusion, and the gaps are not solely lighting. The geometry supplied to the
+  raymarch has disjoint vertical roles before composition.
+- The selected-neighbour view (`11`) exposes a regular RGB subpixel/checker
+  pattern across every cloud edge, while history rejection (`10`) changes state
+  sharply over significant portions of the lower legs. These diagnostics
+  confirm that the 2x2 winner and binary history acceptance can amplify screen
+  grain, but their effect is secondary to the already malformed source volume.
+  Scene depth rejects none of the sky-only cloud body (`12`), as expected.
+- The exact full-resolution, history-off, frozen-pose images at `t=0` and
+  `t=30s` (`14` and `15`) preserve the same silhouette and lobe locations. The
+  deterministic cloudlet layout does not regenerate during this controlled
+  freeze. Reported wave-like motion in normal play must therefore be isolated
+  from live advection/material time and temporal reconstruction; it is not
+  attributed to layout regeneration by this test.
+- Lighting is independently unacceptable in the diagnostic baseline: the cap
+  clips close to white while the two legs and shelf approach black, with long
+  internal streaks. Full resolution and history-off do not restore tonal detail.
+- The world was exited through Minecraft's **Save and Quit to Title** path and
+  the client was closed before source modification. The next correction will
+  replace the aggregate-region/second-layout geometry with a canonical
+  cluster-derived render primitive before changing reconstruction, erosion or
+  lighting.
+
+## Iteration 122 - direct cluster projection exposes destructive simulation merge and banded density
+
+- The first canonical-cluster candidate was built and deployed as exact SHA-256
+  `81CB6DE8A334257F991F1498BCEC721318F6C49841E04CDF8FF7EB0EB64C94E2`.
+  `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed before deployment. The production Forge 47.4.20 instance contained
+  only PA, Architectury, Gaboulibs and Cool Rain; Simple Clouds, CrackersLib,
+  Oculus, Iris and Distant Horizons were absent.
+- The renderer no longer generated a second `CloudletLayout`: the live status
+  reported `requested=0`, `accepted=0`, `remaining=64`. Immediately after
+  spawning `cumulus_congestus`, five PA cluster fields and five render cells
+  were visible. Within a few ticks the server retained one cluster, the
+  collector reported `sampledPaClusters=1`, and four field IDs were removed as
+  `MISSING_SOURCE_GRACE_EXPIRED`. This is direct runtime confirmation that
+  `CloudRegionMergeController.mergeWithinRegion()` is destroying the generated
+  multi-lobe TOWER morphology before rendering.
+- The retained cluster at the first list sample had centre roughly
+  `(6.3, 285.8, -8.3)`, radius `29.2`, and was nevertheless rendered in the
+  global `236.0..476.4` slab. The direct render-cell projection uses the whole
+  merged base/top interval and does not use the cluster centre Y to preserve its
+  original vertical tier. The resulting aspect is still an extremely tall,
+  narrow primitive.
+- Personal in-game inspection from below, close side, medium side and above is
+  recorded in the runtime screenshots at `17.59.23`, `17.59.27`, `17.59.30`
+  and `17.59.34`. The direct-below view is an almost uniformly dark bilobed
+  footprint. The side views are a rocket-like column with a pointed white cap,
+  crushed dark lower section and two complete horizontal gaps. The top view is
+  only a small soft bilobed patch. It is not a recognizable cumulus from any
+  tested angle.
+- The same medium-side silhouette and both gaps are present in raymarch debug
+  view `current` (`18.00.38`) at full resolution with temporal history disabled.
+  Therefore the vertical splits, needle and tonal crushing are generated by
+  current-frame geometry/density/light evaluation before temporal reprojection
+  and before low-resolution composition. Reconstruction work must remain
+  secondary until this source defect is removed.
+- The canonical-cluster change did remove the old 27-cell second-layout path,
+  but it is not accepted as a visual correction by itself. The next correction
+  must preserve the generated lobe set as one cloud entity instead of merging
+  sibling lobes, retain each lobe's own centre and vertical extent, and prevent
+  a regular TOWER cloud from being evaluated through disjoint role bands.
+- The client was closed through `WM_CLOSE`; Minecraft disconnected the
+  integrated client, shut down PA worker pools, saved all three dimensions and
+  logged `Stopping!` before the Java process exited. No source correction was
+  started while the client was running.
+
+## Iteration 123 - coverage pretest is the confirmed source of the horizontal gaps
+
+- The exact Iteration 122 JAR was relaunched without a source change. A fresh
+  `cumulus_congestus` again collapsed from its initial sibling set to one TOWER
+  cluster. The camera, noon lighting, full-resolution current-frame view and
+  disabled temporal history matched the preceding side test.
+- With the six-sample coverage pretest disabled at runtime, the two complete
+  horizontal gaps disappeared. The captured current raymarch at `18.06.01`
+  contains one continuous volume from base to crown. It remains a very tall,
+  narrow, pointed column, proving independently that the simulation/morphology
+  defect remains while the sliced gaps do not originate in `familyMacroShape()`
+  or temporal reconstruction.
+- Re-enabling the pretest with its maximum exposed count of 16 samples did not
+  make it conservative. The `18.06.44` capture still has several thin complete
+  horizontal cuts through the same column. The uniform probes cover the entire
+  slab/render-distance ray interval; a narrow cloud footprint can lie between
+  probes, especially for near-horizontal views.
+- The measured full-resolution GPU query for this deliberately pathological
+  side view was approximately `0.55..0.61 ms` with 16-sample pretest and
+  `1.15..1.57 ms` with it disabled. This is not a final performance comparison,
+  because the current single needle has an unrepresentative footprint and the
+  diagnostic uses full resolution, but it confirms that simply disabling the
+  optimization has a real cost.
+- Correctness takes priority: the current pretest cannot remain enabled by
+  default while it has false negatives. It will be disabled in the production
+  default until a conservative occupancy structure or bounded-ray test can
+  prove that clear-ray rejection never removes cloud pixels. Increasing the
+  existing uniform sample count is rejected as a fix.
+- The client was again closed through `WM_CLOSE`; the integrated server saved
+  all dimensions and terminated PA workers before process exit. Source work may
+  now resume.
+
+## Iteration 124 - persistent local lobes remove the needle, but the result remains cuboid
+
+- The candidate preserves one stable morphology-group identifier plus lobe
+  index/count in every spawned cluster, skips destructive absorption between
+  siblings, removes the secondary-radius double scale, assigns PUFF/TOWER
+  bounds locally around each lobe centre, and raises TOWER centres through the
+  column. The fixed 42-block warp was removed from the analytic coverage,
+  morphology and severe-support footprints. Detail erosion is now bounded and
+  multiplicative for non-cirrus material. The known false-negative coverage
+  pretest defaults off.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed with the existing warning set. The exact built and deployed native-only
+  JAR SHA-256 was
+  `99EC31E64367D45D5B8A20D0FB0A64C911DA7929A559787B175C84E4DDB56DA8`.
+- The Forge 47.4.20 client loaded only PA, Architectury, Gaboulibs and Cool Rain;
+  Simple Clouds and the other optional visual backends were absent. All PA
+  shaders registered and the native service was selected. A freshly cleared and
+  spawned `cumulus_congestus` retained all four generated clusters for the full
+  observation instead of collapsing. The direct renderer stayed at four cells
+  and zero derived cloudlets. Its global slab was approximately `236.0..368.1`,
+  versus the approximately 222-block malformed merged interval in Iteration 122.
+- Personal inspection is recorded in `build/visual-test/iter124/`: medium side,
+  close side, raw current colour, raw alpha, below, above and a repeated close
+  side pose after well over 30 seconds. The vertical needle and complete
+  horizontal density cuts are gone. The silhouette and lobe placement remain
+  stable at the repeated frozen pose, so sibling identity is now persistent.
+- This candidate is still rejected visually. From the side it is a nearly
+  rectangular dark body with a few pointed white peaks; it is not a cauliflower
+  cumulus. From above, two symmetric triangular fins remain. Their direct code
+  correlate is the strong per-primitive angular harmonic deformation in the
+  weather maps; it is now redundant because the authoritative cluster set
+  already supplies separate lobes. From below, two broad masses connect through
+  a narrow waist instead of forming one compact base.
+- The close-side stippled horizontal transition is present in raw current colour
+  but not in raw alpha. It is therefore a radiance/sampling defect, not a missing
+  density band and not temporal reconstruction. Alpha is nearly saturated over
+  most of the cuboid, while noon colour clips the upper half close to white and
+  pushes the lower half toward dark gray. Full-resolution history-off GPU query
+  samples at the final fixed pose were about `1.10..1.47 ms`; these are diagnostic
+  samples, not the final quality-profile comparison.
+- The client was closed through `WM_CLOSE`; Minecraft logged `Stopping!`, shut
+  down all PA pools and saved every dimension before the Java process exited.
+  The next source correction may now reduce the redundant angular fins, replace
+  the cuboid TOWER height response with overlapping local domes, and isolate the
+  horizon-linked radiance discontinuity without changing reconstruction first.
+
+## Iteration 125 - fin suppression exposes destructive height averaging
+
+- This shape-only candidate increased the TOWER layout to six-to-eight balanced
+  golden-angle siblings, spread the lower shoulders while converging the upper
+  tiers, reduced the now-redundant per-primitive cumulus angular harmonic, and
+  replaced the cuboid TOWER vertical threshold with a gradual full-height crown
+  taper. No light, reconstruction, history or precipitation parameter changed.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed with the existing warning set. The exact built and deployed native-only
+  JAR SHA-256 was
+  `8A1DE5C60AD84DF68C23D0BD9B8082D3FD4A1515F1EBC224315657D0B2B484B0`.
+- The Forge 47.4.20 client again contained only PA, Architectury, Gaboulibs and
+  Cool Rain. A fresh frozen `cumulus_congestus` retained six stable sibling
+  clusters for the whole observation. The direct renderer reported six fields,
+  six weather cells, zero derived cloudlets and a slab of approximately
+  `236.0..366.5`.
+- Personal inspection is recorded in `build/visual-test/iter125/`: close side,
+  close above, below, and the repeated close-side pose after more than four
+  minutes. The triangular fins and sharp wings from Iteration 124 are gone, and
+  no vertical needle or complete density cut returned. The frozen outline did
+  not regenerate during the observation.
+- This candidate is still rejected visually. The side silhouette is one smooth
+  helmet or dome rather than several cauliflower lobes, the top view is an
+  almost circular white disc, and the bottom view is an overly uniform round
+  footprint. The weather-height splat currently divides the sum of local base
+  and top heights by total coverage weight. Overlapping lower and upper
+  siblings are consequently collapsed to their weighted mean instead of
+  preserving supported local maxima/minima; the runtime result matches that
+  destructive aggregation.
+- The former hard black rectangular shelf is no longer present, but the lower
+  half remains too dark and the edge remains visibly stippled. The same
+  horizon-linked bright/dark transition is still present even though only
+  shape parameters changed. This further isolates it from the removed angular
+  fins and from temporal history; lighting/sampling remains a separate defect.
+- Full-resolution, history-disabled GPU query samples at the observed side pose
+  were approximately `1.0..1.5 ms`. These diagnostic values are comparable to
+  Iteration 124 but are not a complete quality-profile benchmark.
+- The client was closed through `WM_CLOSE`; Minecraft logged `Stopping!`, shut
+  down the weather, storm and client pools, and saved all dimensions before the
+  Java process exited. The next source correction will replace destructive
+  weighted height averaging with a support-guarded smooth union of sibling
+  envelopes before any lighting correction is attempted.
+
+## Iteration 126 - smooth interval union restores shoulders but remains monolithic
+
+- This candidate replaced the destructive cumulus base/top mean with a
+  coverage-cubed, log-sum-exp smooth minimum/maximum blended back into the mean.
+  It also widened deterministic TOWER offsets from `0.28R..0.10R` to
+  `0.58R..0.18R`, made canonical MACRO tops return farther toward the local
+  centre, and mirrored the GPU footprint, harmonic, role taper and cumulus
+  envelope in `ClientCloudVisualDensity`. The CPU-only 42-block footprint warp
+  was removed so whiteout/fog no longer sample a displaced obsolete shape.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  all passed. The exact built and deployed native-only JAR SHA-256 was
+  `84CE06F2DED45CECBDCE4C95C5C70EAFB84D8D6DD3AAE5B3B4717C090024D3FE`.
+  The client loaded PA, Architectury, Gaboulibs and Cool Rain only and selected
+  the native PA service; all cloud shaders loaded without an error.
+- A fresh frozen `cumulus_congestus` retained seven canonical sibling fields
+  and seven weather cells with zero derived cloudlets. The observed slab was
+  approximately `236.0..363.8`. Field evolution diagnostics showed distinct
+  stable centres, radii and local intervals rather than a server-side merge;
+  examples included lower lobes around `base=242, top=314..324` and higher
+  lobes around `base=269..300, top=333..351`.
+- Personal inspection is recorded in `build/visual-test/iter126/`: side after
+  more than 30 seconds, above, below and raw alpha. No vertical needle, complete
+  horizontal density cut or old flat triangular wing returned. The side now
+  exposes several broad shoulders and the top is no longer a perfect disc.
+- This candidate is still rejected. The side resembles a ridged rock with one
+  sloping crown rather than rounded cauliflower lobes; the top resolves mainly
+  two heart-shaped lobes; the underside is a cluster of very dark, oversized
+  masses. Raw alpha is almost fully saturated inside one continuous polygonal
+  volume and contains only minor crown relief. Thus the interval union restores
+  some real cluster geometry but the single RGBA weather envelope plus saturated
+  union coverage and the subsequent coverage-based TOWER taper still destroy
+  too much lobe identity.
+- The horizon-linked stippled radiance transition and vertical light streaks
+  remain. A separate shader audit tied this to the full-ray-length step size:
+  near-horizontal rays use approximately 10-block fine steps and a full-step
+  animated origin jitter, while the coarse hit rewinds only 60% of a step. The
+  raw-alpha core stays saturated across the transition, confirming again that
+  this is a current-frame light/sampling defect rather than reconstruction.
+- Full-resolution, history-disabled raymarch queries were roughly `1.0..1.6 ms`
+  above/side and `1.6..2.0 ms` below for this seven-field diagnostic. The added
+  exponential weather-envelope reduction did not create an obvious raymarch
+  regression, but its weather-map ALU cost and the remaining shape do not
+  justify retaining it without another comparison.
+- The client was closed through `WM_CLOSE`; Minecraft logged `Stopping!`, shut
+  down all PA worker pools and saved all dimensions. The next iteration will
+  use a support-guarded bounded union and reduce the second coverage taper so
+  the local top envelope, rather than saturated union coverage, owns the crown.
+  The ray-entry bracket/step defect will then be corrected and measured as a
+  separate sampling change.
+
+## Iteration 127 - bounded union and tiered layout regress to a solid dome
+
+- This candidate removed the exponential height reduction in favour of a
+  support-guarded bounded min/max, generated eight-to-ten deterministic TOWER
+  clusters as three low shoulders plus paired crown tiers, and lowered the
+  secondary crown coverage threshold from `0.045..0.34` to `0.025..0.10` so
+  local top heights were intended to own the silhouette. The CPU visual-density
+  query received the identical bounded envelope.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed with only the existing warnings. The exact built/deployed JAR SHA-256
+  was `49881A1CA5CE983BBE22FABB2B4A709B3AB6925C26C40E2EC975D650AEBE8527`.
+  The native-only client loaded all shaders and selected native PA without a
+  Simple Clouds installation.
+- A newly cleared and spawned field retained ten canonical sibling clusters,
+  ten weather cells and no derived cloudlets. The slab was approximately
+  `236.0..358.8`; the fixed side pose used full resolution, history off and the
+  current-frame raymarch. Captures are under `build/visual-test/iter127/`.
+- Personal inspection rejects this candidate. From the side, the crown is one
+  smooth dome over two dark bottom notches. From above, it is an almost perfect
+  pale disc. From below, it is a broad dark block with long nearly vertical
+  walls and only shallow edge scallops. Raw alpha is saturated throughout the
+  same monolithic dome and also exposes a small detached sliver at the right
+  edge. The relaxed crown threshold therefore allowed unioned coverage to fill
+  the lobe group instead of exposing cauliflower detail.
+- Runtime field data also found that random secondary scale and radius jitter
+  can still invert the intended tier hierarchy. In this field, visible samples
+  included radii `39.9`, `45.1`, `28.5`, `50.7`, `45.4` across increasing
+  tiers. This comes from the `0.72..1.14` spawn scale compounded with the
+  existing `0.92..1.08` jitter and is large enough for a higher lobe to engulf
+  a lower neighbour despite deterministic tier positions.
+- The raymarch query remained about `0.95..1.52 ms` at the tested full-resolution
+  exterior poses; no useful performance conclusion offsets the visual
+  regression. Lighting remained unchanged and the familiar stippled
+  horizon transition is still visible.
+- The client was closed through `WM_CLOSE`; Minecraft saved all dimensions and
+  terminated every PA pool. The relaxed secondary coverage threshold will not
+  be retained. The next candidate will restore the prior crown gate, compress
+  TOWER-only scale/jitter so radii decrease predictably, and increase the
+  separation of supported crown tops without allowing a thin top primitive.
+
+## Iteration 128 - stable nine-lobe hierarchy removes the old needle but forms a pointed arch
+
+- This candidate fixed the TOWER topology at nine canonical lobes (one core,
+  three shoulders, two lower-crown lobes, two upper-crown lobes and one cap),
+  compressed TOWER-only spawn scale and radius jitter to approximately four
+  percent, used the same deterministic tiers during retargeting, restored the
+  stricter crown support gate, and assigned a shared condensation base to the
+  three shoulders. No lighting, temporal reconstruction or precipitation code
+  changed in this iteration.
+- After a forced recompilation repaired the partial class output left by an
+  interrupted Gradle process, `compileJava`, `processResources`,
+  `cloudFieldSandbox`, `test` and `build` all passed. The sandbox self-check
+  passed and the exact built/deployed native-only JAR SHA-256 was
+  `A495B10803EF523828F5BA48DA1D2437780ED3A5FB7BBC10FD7FD9C8BDD2D6FE`.
+  The Forge 47.4.20 instance again contained only PA, Architectury, Gaboulibs
+  and Cool Rain; its log explicitly selected the native PA service and all
+  relevant shaders loaded.
+- A freshly cleared, frozen `cumulus_congestus` retained exactly nine canonical
+  fields and nine weather cells, with zero derived cloudlets. The field centre
+  was approximately `(-1.3, 283.9, -217.6)`, its reported group radius was
+  `69.6`, and the render slab was approximately `236.0..365.1`. The radius
+  hierarchy was materially better controlled: the core was about `55.3`, the
+  lower shoulders about `39.3..42.9`, and the displayed upper sample about
+  `36.0`, rather than the large random inversions in Iteration 127.
+- Personal inspection is recorded in `build/visual-test/iter128/`: below,
+  medium side, above, close side after more than 30 seconds, and raw composite
+  alpha. The old thin vertical needle, triangular horizontal fins and black
+  rectangular bottom shelf did not return. From below, the footprint now
+  contains several connected rounded masses instead of a cuboid.
+- This candidate is nevertheless rejected. The stable side view is a pointed
+  teardrop or heart with one triangular crown and a large dark arch cut out of
+  its underside, not a cauliflower cumulus. The top remains one small pale
+  blob. Raw alpha contains the same pointed, almost fully opaque silhouette and
+  underside arch, proving that this macro defect already exists in the current
+  volumetric density and is not introduced by final compositing.
+- Code review found two remaining envelope defects consistent with that image.
+  Retargeting shares `groupBaseY` with shoulder indices 1..3 but not with the
+  primary index 0, so the core base can be raised after spawning. In addition,
+  weak extrema candidates collapse toward the opposite endpoint of their own
+  high local interval; a weak upper fringe can therefore still raise the global
+  top when another lobe supplies the global union blend. The GPU weather splat
+  and CPU visual-density query mirror this flaw exactly.
+- The familiar horizontal stippled light band crosses the side silhouette in
+  both final colour and alpha-edge diagnostics. Full-resolution, history-off
+  exterior queries were approximately `1.6..2.3 ms` around the initial below
+  pose; these remain diagnostic samples rather than a quality-profile
+  benchmark. The separately verified full-ray-derived fine step is still the
+  direct cause of the view-angle-dependent band and must be corrected before
+  judging lighting contrast.
+- The next correction will give the primary and shoulders the same retargeted
+  base, use neutral bounded extrema candidates in both GPU and CPU paths, and
+  replace the horizon-dependent exterior fine step and arbitrary hit rewind
+  with a world-space fine step plus a bracketed entry. The client must be
+  closed cleanly and this entry committed before those source edits begin.
+
+## Iteration 129 - stable ray entry removes the screen-space band but exposes a monolithic cone
+
+- This candidate gave the primary TOWER lobe and the three shoulders the same
+  retargeted condensation base, made weak envelope extrema collapse to neutral
+  candidates in both the weather-map shader and `ClientCloudVisualDensity`,
+  removed the second height-dependent TOWER coverage cone, and replaced the
+  view-length-derived exterior step with a bounded world-space step. The coarse
+  traversal now records a real last-clear/first-hit bracket and bisects it four
+  times. With temporal history disabled, the diagnostic jitter is fixed rather
+  than advancing every frame. No lighting or precipitation parameter changed.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed. The sandbox self-check passed and the exact built/deployed native-only
+  JAR SHA-256 was
+  `F19546D766BD6C513E095508D1BDC49C6A3ED32BAB4833C09BE16414C0F9B0C0`.
+  Forge loaded PA, Architectury, Gaboulibs and Cool Rain without Simple Clouds;
+  the native PA service and all volumetric shaders initialized successfully.
+- The same frozen `cumulus_congestus` from Iteration 128 initially retained nine
+  canonical fields and nine weather cells, zero derived cloudlets, and the same
+  approximately `236.0..365.1` slab. Personal inspection is recorded under
+  `build/visual-test/iter129/`. The clean stable side frame no longer contains
+  the former horizon-linked stippled band or coarse square grid. Raw alpha also
+  shows that the deep bottom arch became much shallower. Full-resolution,
+  history-disabled exterior GPU query samples were mostly about `1.24..1.71 ms`
+  at the initial side pose, with later mostly empty views lower; this is a
+  diagnostic comparison, not a completed quality-profile benchmark.
+- This candidate remains rejected. The stable side silhouette is a clean but
+  fundamentally wrong teardrop/cone, with nearly saturated raw alpha and no
+  distinct cauliflower crown. The ray-entry correction therefore fixes the
+  screen-space band without fixing macro morphology. Code and runtime-data
+  comparison confirm why: all nine canonical cluster snapshots become
+  `EnvelopeRole.MACRO`; morphology group/index/tier identity is discarded by
+  the `CloudField` snapshot path, then nine local volumes are reduced to one
+  RGBA coverage/base/top/energy envelope. A single `h01` profile cannot recover
+  the original vertical lobes afterward.
+- The attempted high view is not accepted as visual evidence. Teleporting to
+  `Y=480` removed the fields from the client render set; moving back to `Y=400`
+  and `Y=360` did not repopulate them, and `/pa cloud list` reported no saved
+  cloud regions. The small white square in `above.png` is therefore not treated
+  as a cloud capture. This also prevents a valid same-field underside capture
+  for this iteration and will be kept separate from the morphology verdict.
+- Minecraft was closed with `WM_CLOSE`; it logged `Stopping!`, terminated all
+  three PA worker pools, saved overworld, Nether and End chunks, and the Java
+  process exited normally. The next source correction may now preserve explicit
+  morphology-stage membership through the canonical field/snapshot/network
+  path and encode separate base/core/tower/crown supports instead of trying to
+  tune the already-collapsed envelope.
+
+## Iteration 130 - stage identity survives, but the first four-stage union becomes a tiered stack
+
+- This candidate preserved a canonical morphology-group UUID, member index and
+  member count from `CloudClusterState` through field snapshots and network
+  packets, bumped the PA protocol to version 11, assigned a fixed twelve-lobe
+  TOWER layout (four BASE, three CORE, three TOWER and two CROWN lobes), and
+  encoded those stages in three dedicated RGBA16F support/base/top weather
+  maps. The volume shader reconstructed the four stage intervals rather than
+  using the old single collapsed `h01` envelope. A runtime role summary was
+  added solely to prove that the topology arriving at the renderer is stable.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed. The sandbox self-check passed and the exact built/deployed native-only
+  JAR SHA-256 was
+  `C25BBBA297D5004EF196A2F08A1437E91580EB43925821C3C7B49B5FDD9EFDBC`.
+  The Forge 47.4.20 instance contained only PA, Architectury, Gaboulibs and Cool
+  Rain. Forge selected the native PA service, registered the new shaders, found
+  32 fragment texture units against 14 required, and reported no shader compile
+  or link failure.
+- A fresh frozen noon `cumulus_congestus` retained exactly twelve canonical
+  fields and twelve render cells. Runtime repeatedly reported
+  `roles[base=4,core=3,tower=3,crown=2,other=0]`, zero derived cloudlets and the
+  same `234.8..386.2` render slab. The field centre was approximately
+  `(-0.8, 294.1, -218.2)` with a 68.7-block group radius. Thus the former loss
+  of morphology-stage identity is confirmed fixed in the running client.
+- Personal visual inspection is recorded in `build/visual-test/iter130/`.
+  `side-initial.png` shows that the old single cone/apex was replaced, but the
+  new silhouette is an obvious vertical stack of horizontal discs. The closer
+  `side-close-final.png` exposes separated base, core, tower and crown shelves,
+  very dark/grainy lower cutouts and bright banded caps. Raw
+  `side-close-alpha.png` contains the same horizontal separations and saturated
+  tier shapes, proving that this regression exists in the reconstructed density
+  field before final colour composition.
+- This candidate is rejected. The separate stage maps correctly reveal the
+  source lobes, but their independently curved vertical intervals do not retain
+  enough overlap at the sampled horizontal footprint. The probabilistic union
+  cannot bridge genuinely empty gaps, so the stage boundaries become visible
+  rings. The visual result is still not a believable cauliflower cumulus and
+  the lower mass still has coarse dark voids. This must be corrected in the
+  source envelopes and stage reconstruction, not hidden with blur.
+- Full-resolution, history-disabled exterior GPU queries were about
+  `2.1..3.5 ms` at the tested medium/close side poses, with an initial transient
+  near `5.1 ms`. The 4/3/3/2 role counts remained unchanged for more than three
+  minutes; however movement freeze does not freeze lifecycle/coverage, so this
+  is topology-stability evidence rather than a pixel-identical temporal A/B.
+- Minecraft was closed through `WM_CLOSE`; it logged `Stopping!`, terminated
+  all PA pools, saved overworld, Nether and End chunks, and the Java process
+  exited. The next correction may now overlap the canonical source envelopes,
+  remove the four visible material shelves and restore the OpenGL texture-unit
+  guard through units 12 and 13 before another runtime test.
+
+## Iteration 131 - rejected before visual capture: Minecraft texture-state cache overflow
+
+- This candidate widened and vertically overlapped the upper lobes of the
+  twelve-member template and attempted to extend `CloudRenderStateGuard` from
+  texture unit 11 through PA's manually bound noise units 12 and 13. The full
+  Gradle validation passed and the exact built/deployed JAR SHA-256 was
+  `6E43AAF593FCA40DB9C5741755E1A4F0A0FD0393AC89595215C2B5E9FA0ED5E1`.
+- The runtime test is rejected before morphology evaluation. Minecraft 1.20.1
+  loaded the shaders and entered the native-only world, but the first state
+  restore threw `ArrayIndexOutOfBoundsException: Index 12 out of bounds for
+  length 12` in `GlStateManager._bindTexture`, called from
+  `CloudRenderStateGuard.State.close`. Minecraft's tracked texture cache has
+  slots only for units 0..11; using its cached bind helper on raw PA units
+  12/13 also left subsequent vignette and GUI texture binds in the invalid
+  active-unit state.
+- No screenshot from this launch is accepted and the overlapped morphology has
+  not yet been visually judged. The crash report is direct proof that units
+  12/13 must be captured/restored with raw `glActiveTexture/glBindTexture`,
+  while only 0..11 may pass through Minecraft's `GlStateManager` cache. The
+  process exited after Forge stopped the integrated server and saved all
+  dimensions. This state-path correction is required before relaunching the
+  same visual candidate.
+
+## Iteration 132 - real lobe overlap removes detached shelves but exposes a stable symmetric cone
+
+- This relaunch retained the widened/overlapped twelve-lobe source envelope
+  from the failed Iteration 131, but restored units 0..11 through Minecraft's
+  tracked `GlStateManager` cache and units 12/13 through raw OpenGL only. The
+  full Gradle validation passed and the exact built/deployed JAR SHA-256 was
+  `C4143EEB8B02743DD4F9F2805A4E7947D35C6794FF8FAC780871C76ED6C15ED8`.
+- Forge entered the same native-only world without a render exception, loaded
+  all PA shaders and repeatedly rendered twelve fields with the exact
+  `base=4,core=3,tower=3,crown=2` role distribution. A fresh frozen
+  `cumulus_congestus` centred near `(-0.8, 285.2, -350.8)` used a
+  `234.8..374.0` slab. Its sampled source intervals now genuinely overlap: for
+  example a lower lobe reached about `242.6..301.4`, a middle lobe
+  `274.7..344.8`, and upper lobes about `292.4..360.8` and `299.9..362.0`.
+- Personal captures are in `build/visual-test/iter131/` (the directory name
+  predates the failed-launch split). Compared with Iteration 130,
+  `side-close-alpha.png` is now one connected mass rather than four detached
+  horizontal bands. This confirms that correcting the physical interval
+  overlap fixed the shelf separation without blur. The former long needle and
+  flat diagonal fins also remain absent.
+- This candidate is still rejected. `side-close-final.png` and
+  `side-orthogonal-final.png` show a highly symmetric conical or fir-tree
+  silhouette. From one axis the two crown lobes form two sharp peaks; from the
+  orthogonal axis they align into one pointed apex. The nearly linear curved
+  top profiles and monotonically shrinking, centrally converging stage
+  footprints are therefore still exposing the generator hierarchy instead of
+  producing irregular cauliflower lobes. The underside also retains coarse
+  dark fragments and the interior lighting remains horizontally banded.
+- `stability-t0.png` and `stability-t30.png` were captured from the exact same
+  full-resolution, history-disabled pose after thirty seconds without camera
+  movement. Apart from the first frame's chat overlay, the visible silhouette
+  and internal bands remain practically unchanged. Runtime role counts also
+  stayed 4/3/3/2. This rejects rapid topology/noise regeneration as the cause
+  of the current cone in the frozen test; the defect is the stable morphology
+  itself.
+- Full-resolution exterior GPU samples were commonly about `2.6..3.6 ms` at
+  the close/orthogonal poses. Minecraft was closed through `WM_CLOSE`, all PA
+  pools terminated, every dimension was saved and the process exited. The next
+  source correction may now use three non-collinear crown lobes, a less
+  symmetric horizontal layout and parabolic rather than nearly linear dome
+  endpoints, while preserving the proven interval overlap.
+
+## Iteration 133 - fence-gated stage-map evidence isolates stable winner seams
+
+- No morphology, density, lighting or precipitation parameter changed in this
+  iteration. It added an explicit
+  `/pa system volumetric diagnostics cumulus` capture which transfers the
+  RGBA16F cumulus support/base/top maps through one pixel-pack buffer, polls a
+  GPU fence without waiting, copies the buffer only after it is signalled, and
+  performs the numerical analysis off the render thread. The capture restores
+  the active texture, texture binding, pixel-pack buffer and pixel-pack state;
+  the PBO/fence are also connected to client resource shutdown. Ordinary
+  diagnostics no longer perform an implicit synchronous texture readback.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed. The sandbox self-check passed and the exact built/deployed native-only
+  JAR SHA-256 was
+  `7E076E5DAC9B9A7E1AC8D2F0CE9D079E8F392BB033BEF96EB5EEB2F39AE87C8D`.
+  Forge 47.4.20 loaded only PA, Architectury, Gaboulibs and Cool Rain, selected
+  the native PA service, registered all volumetric shaders and rendered the
+  persisted Iteration 132 cloud with twelve fields and the unchanged
+  `base=4,core=3,tower=3,crown=2` roles.
+- The first real GPU capture at game time 137841 used the exact weather-map
+  cache signature `1ac96ed6a00c6dfd`, a `512x512` map over 4096 blocks and the
+  same `234.844..373.988` slab. Its stage maps quantify the discontinuities
+  previously inferred from source data: BASE had 148/302 neighbour pairs over
+  a four-block endpoint jump (49.0%, maximum top jump 16.33 blocks); CORE had
+  149/207 (72.0%, maximum base/top 7.31/19.42); TOWER had 108/142 (76.1%,
+  13.16/22.22); and CROWN had 69/88 (78.4%, 13.02/19.53). The TOWER-to-CROWN
+  overlap also contained four positive gaps, averaging 6.08 and reaching 8.64
+  blocks. These values prove that abrupt stage endpoints exist in the actual
+  rasterized textures before raymarch lighting or final reconstruction.
+- Four captures covering 864 game ticks (43.2 seconds) retained the identical
+  input signature and identical full-map hashes:
+  support `81d9b859fc8d8325`, base `fe6b227900c08325`, top
+  `3d472ea10a2c4325`. Weather-map misses stayed at 119 while cache hits advanced.
+  This rules out weather-map regeneration, changing membership and unstable
+  splat data as the cause of the frozen cloud's bands or silhouette changes.
+- An independent calculation against the exact persisted NBT and Iteration 132
+  JAR also measured the source topology rather than judging screenshots. Stage
+  reach decreases almost linearly with height (BASE/CORE/TOWER/CROWN
+  `69.42/55.33/44.36/41.03` blocks, regression `R^2=0.9396`), so the cone is
+  explicitly encoded. The two crown centres are separated by 22.88 blocks at
+  179.24 degrees, proving why one view yields a single apex and the orthogonal
+  view yields two horns. More importantly, the shader's one-winner-per-role
+  selection produces continuous-domain endpoint changes up to about 32 blocks;
+  the GPU capture above confirms that these survive rasterization as 13--22
+  block neighbour jumps.
+- This diagnostic baseline is accepted. It falsifies temporal regeneration as
+  the primary culprit and identifies the first correction boundary: replace
+  the discontinuous single-winner stage endpoint selection with a continuous,
+  support-consistent reconstruction and verify that the measured jumps fall
+  before changing topology, crown curves, lighting or blur. Minecraft was then
+  unfrozen and closed through `WM_CLOSE`; it logged `Stopping!`, terminated all
+  PA pools, saved overworld, Nether and End, and the Java process exited.
+
+## Iteration 134 - hardened readback exposes a client-presentation signature cycle
+
+- This iteration still changed no cloud morphology, material, lighting or
+  precipitation parameter. A read-only review of the Iteration 133 tool found
+  that `GL_WAIT_FAILED` could leave its PBO permanently busy, a failed
+  `glUnmapBuffer` was ignored, exceptional paths did not guarantee an unmap,
+  and the raw support threshold did not account for the renderer's
+  `CoverageMul`. These defects were corrected before using the tool for a
+  source A/B. Pixel-pack byte swapping and transfer GL errors are now guarded,
+  the diagnostic applies the raymarch's one-block minimum thickness, reports
+  invalid/inverted endpoints, and limits its role summary to the first 96
+  profile-3 cells actually eligible for the cumulus shader.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  passed. The exact built/deployed native-only JAR SHA-256 was
+  `B593E4A6B6C8DE1A70C9E041675C9B95CC7144A0C9D48FDDA0FF34E83EB7E9DC`.
+  Forge again selected native PA without Simple Clouds and rendered twelve
+  fields with roles `4/3/3/2`; the hardened PBO capture completed twice without
+  a GL, fence, map or unmap failure.
+- With `CoverageMul=1.25`, the true raw visibility threshold is 0.0096 (logged
+  as 0.010), not 0.012. The corrected baseline still finds the same defect:
+  BASE 47.9%, CORE 75.2%, TOWER 76.2% and CROWN 72.3% of compared active
+  neighbour pairs exceed a four-block endpoint delta. Maximum base/top deltas
+  remain `1.39/16.08`, `7.68/20.13`, `11.77/21.63` and `9.68/15.97` blocks.
+  Every stage reports zero invalid and zero inverted endpoints, ruling malformed
+  encoded values out while retaining the winner-boundary discontinuity.
+- A new, separate stability fact emerged from the logs. Immediately after the
+  server command froze movement, capture signatures and all three map hashes
+  followed A -> B -> A over roughly 49 seconds:
+  `5b2afce1e9dbf72e` / `7572d36ff3f86a69` /
+  `5b2afce1e9dbf72e`. The A support/base/top hashes were exactly
+  `9b5696087c2c4325/0f280c8fbb908325/c5d31eabe37a6325`; the B hashes were
+  `67c0f77998948325/7937ebd6dc742325/9e38560863c74325`. Map misses rose from
+  455 to 493 despite a stationary camera and frozen server movement. The
+  source `FieldInfo` centres and bounds remained identical in the later frame,
+  so this is not evidence of the generator rebuilding the twelve-lobe topology.
+- The Iteration 133 long-term stable capture began from an already settled
+  presentation state; Iteration 134 proves that an immediate post-freeze A/B is
+  invalid because a client-side interpolated/media input still changes. Before
+  the endpoint-blend correction, the input signature must be split into domain,
+  position/radius, shape/height, media, morphology and dynamics hashes to name
+  the changing channel. The frozen setting was intentionally left enabled
+  across shutdown so the next launch starts from the same server-side state.
+  Minecraft closed through `WM_CLOSE`, terminated all PA pools, saved all
+  dimensions and exited normally.
+
+## Iteration 135 - component counters prove that only presented X/Z oscillate
+
+- No rendering formula changed. `CloudWeatherMapRenderer` split its exact
+  quantized cache key into domain, position/radius, shape/height, media,
+  morphology and dynamics hashes, then counted transitions independently for
+  every vec4 slot. The normal five-second status remains concise; the expanded
+  breakdown is emitted only by explicit diagnostics. The full Gradle group
+  (`compileJava`, resources, sandbox, tests and build) passed, and the deployed
+  native-only JAR SHA-256 was
+  `6EAF10BB8492D4A68F8054891F16800ACB00F2894281390E30DC379A290A87A3`.
+- The first counter sample included startup's temporary autonomous-cell path
+  and the switch to twelve fields, so it was not used causally. During the next
+  settled 30-second window, with a stationary camera, frozen server movement,
+  twelve fields and unchanged `4/3/3/2` roles, weather-map misses increased by
+  18. Only two counters advanced: position X from 23 to 31 and position Z from
+  41 to 63. Radius-major/minor stayed 12/12; all four shape slots, all media
+  slots, all morphology slots and all dynamics slots remained unchanged.
+  Domain, current component hashes and the final full texture hashes also
+  returned to their original A values.
+- This names the temporal culprit without visual inference. In
+  `ClientCloudFieldCache.PresentationTrack.present`, a delayed frame beyond the
+  newest snapshot calls `extrapolateSnapshot`, which adds
+  `snapshot.windVector() * deltaTicks` to the centre. A subsequent frozen packet
+  publishes the same authoritative centre again, producing forward motion then
+  reset. The interpolation path can reinforce the loop because
+  `interpolateCenter` uses non-zero wind tangents even when older and newer
+  centres are identical; equal endpoints with equal non-zero Hermite tangents
+  mathematically leave and return to the endpoint. The measured X/Z-only
+  transitions are the exact signature of these two paths.
+- The next correction is deliberately outside the shader: interpolate
+  authoritative snapshot centres without overshoot and extrapolate from the
+  velocity actually observed between the two latest centres. When movement is
+  frozen, observed velocity is zero; when it is active, it represents the
+  server's real displacement. Success requires zero new X/Z component
+  transitions and zero weather-map misses over a settled frozen 30-second
+  window. Minecraft closed normally through `WM_CLOSE`; all pools terminated
+  and all dimensions were saved. The freeze setting remains enabled for the
+  controlled before/after test.
+
+## Iteration 136 - authoritative-centre presentation removes the frozen A/B cycle
+
+- `ClientCloudFieldCache.PresentationTrack` now treats a field centre as an
+  authoritative position rather than using atmospheric wind as a position
+  tangent. Snapshot-to-snapshot centres are interpolated linearly, which cannot
+  overshoot equal endpoints. Extrapolation uses the displacement observed
+  between the two latest authoritative snapshots; missing, discontinuous or
+  zero-duration pairs resolve to zero velocity. Atmospheric wind remains in the
+  snapshot for internal cloud animation and was not repurposed or discarded.
+- `compileJava`, `processResources`, `cloudFieldSandbox`, `test` and `build`
+  all passed. The exact native-only JAR SHA-256 was
+  `4F65A2376DC8B2D7B52C15C6C90DDF800CE7AB2D45636C12EFE2CABC101F9345`.
+  Forge loaded PA without Simple Clouds and a new frozen
+  `cumulus_congestus` produced twelve fields with the required
+  `base=4,core=3,tower=3,crown=2` distribution. The command reported an
+  atmospheric wind of 11.8 m/s SSW; the frozen snapshots themselves exposed
+  `windXZ=0,0`, so this run validates the stationary-authority case, not active
+  moving-field extrapolation.
+- The first capture after spawning was correctly rejected as a stability
+  witness: lifecycle/density and one radius were still settling, producing 22
+  additional weather-map misses. Once settled, capture 2 at game time 149910
+  and capture 3 at 151011 were separated by 1101 ticks (about 55 seconds).
+  Across that window weather-map misses stayed exactly at 8128 while hits rose
+  from 67746 to 117225. Every transition counter stayed identical, including
+  position/radius `106/106/347/310`; domain, position, shape, media,
+  morphology and dynamics component hashes were unchanged.
+- The actual GPU textures were also bit-stable across the same window. Both
+  captures retained input signature `d8ac76af16b79ed8` and support/base/top
+  hashes
+  `c00daa8149086325/d48d1bc25fd70325/9a0ff6e41775a325`.
+  This satisfies the frozen before/after criterion and removes the measured
+  client-presentation wave source instead of masking it in the shader.
+- The morphology defect remains deliberately untouched. On the settled map,
+  endpoint jumps above four blocks still affect 45.2% of BASE neighbours,
+  73.5% of CORE, 74.8% of TOWER and 73.2% of CROWN, with maximum top jumps of
+  13.04, 33.21, 27.91 and 22.88 blocks respectively. These stable values define
+  the next controlled A/B: change only the discontinuous per-stage endpoint
+  winner while preserving the maximum support field. Minecraft then closed
+  through `WM_CLOSE`, logged `Stopping!`, terminated all three PA pools, saved
+  all dimensions and exited normally.
+
+## Iteration 137 - endpoint blending confirms the seam cause but fails strict support isolation
+
+- This candidate changed only the profile-3 stage-map aggregation. It retained
+  the maximum lobe support and replaced the base/top endpoint of the single
+  winning lobe with a continuous `support^8` weighted endpoint. A candidate at
+  half the dominant support therefore contributes about 0.39%, while two
+  equal-support lobes blend continuously across their former winner boundary.
+  No layout, vertical profile, density, noise, lighting or reconstruction code
+  changed.
+- The complete Gradle group passed and the exact deployed JAR SHA-256 was
+  `D028135384222C11DDFEFA6541BB2DC21EE5620A50E54DEA195047A91876308F`.
+  Forge loaded the native-only backend and compiled/registered all volumetric
+  shaders. The persisted frozen field had the exact Iteration 136 input
+  signature `d8ac76af16b79ed8`, component hashes, twelve cells and `4/3/3/2`
+  role distribution.
+- The causal prediction was partly confirmed. Compared with the exact settled
+  Iteration 136 map, maximum top-neighbour jumps fell from
+  `13.04/33.21/27.91/22.88` to `8.43/18.08/19.44/16.94` blocks for
+  BASE/CORE/TOWER/CROWN. The fraction above four blocks also fell from
+  `45.2/73.5/74.8/73.2%` to `38.6/66.8/70.6/70.1%`. All stages retained zero
+  invalid and zero inverted endpoints. Continuous endpoint aggregation is
+  therefore acting on the measured defect rather than merely changing colour
+  or blur.
+- This candidate is not yet accepted as a controlled isolation. Although
+  active texel counts, support means/maxima and centroids remained equal at the
+  reported precision, the support hash changed from
+  `c00daa8149086325` to `a782a312ae3a6325`. The source input was bit-identical,
+  and support was intended to be unchanged. The implementation had replaced
+  the historical conditional winner assignment with GLSL `max`; the next
+  candidate must restore the exact conditional support path while retaining
+  endpoint accumulation, then repeat the same hash test. Minecraft was closed
+  normally through `WM_CLOSE`; all pools terminated and all dimensions were
+  saved before the next source edit.
+
+## Iteration 138 - historical support branch disproves the `max` lowering hypothesis
+
+- The endpoint blend remained identical, but its support assignment was changed
+  back to the exact historical `if (support > bestSupport[channel])` branch.
+  This was a targeted falsification of the Iteration 137 hypothesis that GLSL
+  `max` alone had changed support bits.
+- The complete Gradle group passed. Build and deployed JAR hashes matched at
+  `6434B6C6DDDF9B114C781F2992E12988EC90BA361F112D57CB02A17F73C303CF`.
+  Forge loaded the native-only backend, registered the shader and rendered the
+  same frozen source signature `d8ac76af16b79ed8` with the same component
+  hashes and `4/3/3/2` role distribution.
+- The result exactly matched Iteration 137, including support/base/top hashes
+  `a782a312ae3a6325/3e8c590976a82325/ba38349068352325`, every active texel
+  count, endpoint statistic and neighbour-jump metric. The `max` instruction
+  hypothesis is therefore rejected.
+- The remaining full-float support hash difference cannot yet be classified as
+  a semantic footprint change. The current hash includes every IEEE float bit,
+  while reported support means/maxima have only three decimal places. Adding
+  endpoint arithmetic can change driver optimisation and last-bit rounding even
+  when the mathematical maximum is unchanged. The next diagnostic must report
+  a quantised support hash and higher-precision support sums. It will capture the
+  exact original winner shader and the blended shader against the same frozen
+  input before this candidate is accepted or rejected. Minecraft closed through
+  `WM_CLOSE`; all pools terminated and all dimensions were saved.
+
+## Iteration 139 - exact winner rollback proves the support hash change was not caused by blending
+
+- The cumulus layer shader was restored exactly to its pre-blend single-winner
+  implementation. Independently, the read-only diagnostic gained Q10/Q12
+  quantised support hashes and nine-decimal stage support sums. This run is the
+  controlled original-shader side of the comparison; no rendered formula other
+  than the explicit rollback was present.
+- The full Gradle group passed. The deployed native-only JAR SHA-256 was
+  `3D926D07B480B9466D66A3BEA8120CB80B0D124DDF645677E2A091FF9A610873`.
+  Forge loaded the same frozen input signature `d8ac76af16b79ed8`, component
+  hashes and `4/3/3/2` roles, then completed the fence-gated readback without a
+  GL failure.
+- Contrary to the earlier assumption, the exact historical shader produced raw
+  support hash `a782a312ae3a6325`, precisely the same hash produced by both
+  Iteration 137 and 138 blended shaders. The original-shader Q10/Q12 reference
+  is `c36e5b5c79b054e7/7787a2ad5bfbffd8`; stage support sums are
+  `121.626342773`, `76.221084595`, `50.304656982` and `31.342514038`.
+- This rollback falsifies endpoint accumulation as the cause of the earlier
+  `c00d...` versus `a782...` cross-session discrepancy. Its exact origin remains
+  unconfirmed and is not being presented as fact, but the controlled old/new
+  builds now agree on every raw support bit. The endpoint blend can be reapplied
+  and judged against the explicit Q10/Q12 and support-sum reference above.
+  Minecraft closed normally; all pools terminated and all dimensions were
+  saved before the next shader edit.
+
+## Iteration 140 - controlled `support^8` endpoint blend is bit-isolated from footprint support
+
+- The continuous endpoint blend from Iterations 137/138 was reapplied without
+  any other rendered-formula change, now alongside the strengthened diagnostic.
+  The full Gradle group passed and the exact deployed native-only JAR SHA-256
+  was `DC04561E2173DAEEF25F134195CF55430C4FA70F0F429CDDBA9FB62CFF5E21E5`.
+  Forge loaded all shaders and rendered the same frozen input signature and
+  `4/3/3/2` stage layout.
+- Support isolation is now proven at every recorded level. Original and blended
+  shaders both produced raw support hash `a782a312ae3a6325`, Q10/Q12 hashes
+  `c36e5b5c79b054e7/7787a2ad5bfbffd8`, active texel counts
+  `206/140/93/57`, and stage sums `121.626342773`, `76.221084595`,
+  `50.304656982`, `31.342514038`. Thus the macro footprint and coverage are
+  bit-identical; only base/top maps differ.
+- Against the exact original shader, BASE jump pairs fell from 170/376 to
+  145/376 and maximum top jump from 13.07 to 8.43 blocks. CORE fell from
+  186/253 to 169/253 and 33.21 to 18.08. TOWER fell from 122/163 to 115/163
+  and 27.91 to 19.44. CROWN fell from 71/97 to 68/97 and 22.88 to 16.94.
+  No stage gained invalid or inverted endpoints. This accepts continuous
+  endpoint aggregation as a root-cause correction, not a footprint blur.
+- The eighth-power selector is still too close to a hard winner for the upper
+  stages: 66.8--70.6% of compared neighbours remain above the four-block
+  threshold. The next controlled candidate will use fourth-power weighting.
+  A half-strength lobe then contributes 6.25%, still favouring the dominant
+  lobe but broadening the continuity zone. Support hashes/sums must remain
+  exactly unchanged. Minecraft closed normally and saved every dimension.
+
+## Iteration 141 - `support^4` widens continuity without changing the footprint
+
+- Only the endpoint weighting exponent changed from eight to four. The maximum
+  support calculation, lobe layout and every downstream density/lighting path
+  remained untouched. The full Gradle group passed and the exact deployed JAR
+  SHA-256 was
+  `CF0254640B8D4925ADB9D921D58A6FE61F35EE1564A82BF113BE4A8284B33926`.
+  Forge compiled the shader and rendered the same frozen source signature with
+  the unchanged `4/3/3/2` roles.
+- Footprint isolation remained exact: raw support hash
+  `a782a312ae3a6325`, Q10/Q12
+  `c36e5b5c79b054e7/7787a2ad5bfbffd8`, all active counts and all four
+  nine-decimal support sums match the historical shader and the eighth-power
+  candidate bit for bit.
+- Relative to `support^8`, neighbour pairs above four blocks changed from
+  `145/169/115/68` to `131/164/109/68` for BASE/CORE/TOWER/CROWN. Maximum top
+  jumps changed from `8.43/18.08/19.44/16.94` to
+  `8.43/14.42/15.07/16.15`. No invalid or inverted endpoint appeared.
+  Fourth-power weighting is retained as the better measured continuity result.
+- The remaining `>4` count is not treated as a discontinuity count. It also
+  includes legitimate continuous curvature sampled eight blocks apart; chasing
+  it toward zero by lowering the exponent again would be an unmeasured blur.
+  The stable macro topology is now the next named defect: its stage radius
+  decreases almost linearly with height (`R^2=0.9396`) and its two opposed crown
+  lobes encode the cone/twin-horn silhouette. That generator path will be
+  inspected and changed independently. Minecraft closed through `WM_CLOSE`,
+  all pools terminated and all dimensions were saved.
+
+## Iteration 142 - frozen-envelope logs isolate an absolute-time material drift
+
+- This iteration deliberately made no rendered-formula change. The persisted
+  twelve-member tower was unfrozen briefly, then frozen again, so its presented
+  centres could become stationary while its snapshots retained non-zero wind.
+  At game time `159778`, all twelve fields still reported either approximately
+  `(0.12,-0.21)` or `(-0.22,0.23)` blocks/tick. The exact resolved uniform is
+  not yet printed by the current diagnostic, so its weighted value is not being
+  inferred from those rounded per-field values.
+- Two general diagnostics were captured at wall-clock `22:20:24` and
+  `22:21:14`, 50 seconds apart (`gameTime 159778 -> 160161`). Every presented
+  centre was identical to the displayed precision across the interval. For
+  example member 0 stayed at `(-0.14,256.00,-487.19)`, member 1 at
+  `(-9.49,260.96,-517.78)`, and the three tower members stayed at
+  `(-3.72,304.04,-503.39)`, `(8.45,309.19,-479.73)` and
+  `(-8.08,305.34,-478.75)`. Thus neither cloudlet regeneration nor continuing
+  presentation movement can explain material motion during this frozen window.
+  The field lifecycle did continue to decay; that independently explains the
+  falling density and eventual `no_clouds` status and is not being conflated
+  with horizontal domain motion.
+- Direct source tracing identifies a separate time-varying path after the
+  stable weather maps: both stratus and the main density function execute
+  `samplePos.xz -= WindVec.xz * WorldTime * (1 + 0.30 * h01)` in
+  `cloud_atmosphere_volume.fsh`. `WindVec` is an instantaneous weighted field
+  velocity, while `WorldTime` is absolute time. A freeze stops the centres but
+  does not clear their velocities. More generally, changing the instantaneous
+  velocity changes the historical displacement retroactively by
+  `WorldTime * deltaWind`. The weather/stage-map hashes cannot expose this
+  path because their native-field input signature contains neither this
+  raymarch uniform nor the raymarch time.
+- This is a causal diagnosis, not yet an accepted correction. Before replacing
+  the formula, the next source-only step will add a six-decimal diagnostic for
+  the exact resolved `WindVec`, the presented centroid delta, the legacy
+  `WindVec * WorldTime` offset and its frame-to-frame slip. The same
+  unfreeze/freeze reproduction must show a stationary envelope and a changing
+  legacy offset in `latest.log`. Only then will advection be changed to a
+  lifecycle-managed integrated displacement tied to the actually presented
+  field movement. Minecraft closed normally through `WM_CLOSE`, logged
+  `Stopping!`, terminated all three PA pools and saved every dimension.
+- The diagnostic-only implementation then passed `compileJava`,
+  `processResources`, `cloudFieldSandbox`, `test` and `build`; the sandbox
+  self-check passed. The exact built and deployed native-only JAR SHA-256 was
+  `31BA412CAA79614A091A1B8EE3D7CD7B2C5505F37D5287F0A75FE19F7036FB6A`.
+  No shader, uniform value or rendered formula changed in this build.
+- A fresh `cumulus_congestus` was spawned while movement was enabled, allowed
+  to move, then frozen. Once presentation settled, the log repeatedly measured
+  `dCentroid=(0.000000,0.000000)`. Over one 20.031-tick window, a resolved-wind
+  change of only `(0.000040,-0.000044)` produced
+  `dLegacy=(5.970947,-6.675781)` blocks and a matching stationary-envelope
+  `slip=(5.970947,-6.675781)`; the isolated absolute-time amplification term
+  was `(6.473257,-7.120067)` blocks. Subsequent tiny wind changes produced
+  7--9-block slips per roughly 20 ticks while the centroid remained exactly
+  fixed.
+- After the resolved wind itself stabilized at
+  `(-0.024065,0.021066)` blocks/tick, two further 20-tick windows still measured
+  approximately `dLegacy=(-0.481,0.421)` with zero centroid displacement and
+  zero `WorldTime * deltaWind`. This independently proves both terms of the
+  defect: ordinary `wind * deltaTime` slides material through a frozen
+  envelope, while `WorldTime * deltaWind` causes the much larger phase jumps.
+  The correction may therefore remove the absolute-time formula without an
+  artistic A/B or blur experiment. The diagnostic centroid itself will not be
+  reused as the production integrator: production must average displacement of
+  UUID-matched fields so an entering or leaving field cannot move the material
+  domain. The client again closed normally and saved all dimensions before the
+  corrective edit.
+
+## Iteration 143 - UUID-matched material advection removes the measured drift
+
+- The two absolute-time translations in the stratus and main-density paths
+  were replaced by one lifecycle-managed `MaterialOffset`. Its increment is
+  the weighted mean displacement of UUID-matched members that were actually
+  selected for rendering; newly entered and removed members cannot translate
+  the domain. The matching pass also reports per-member residual RMS/max, and
+  loss of source identity or a dimension discontinuity invalidates temporal
+  history. Regional-only rendering integrates velocity over frame delta rather
+  than multiplying an instantaneous velocity by absolute world time.
+- Temporal reprojection now subtracts the corresponding
+  `MaterialFrameDelta`, so a material sample follows the same integrated
+  displacement in the previous frame. Two independent read-only reviews
+  confirmed the offset sign, reprojection sign, matrix convention, uniform
+  declarations/uploads, lifecycle invalidation and absence of any remaining
+  `WindVec * WorldTime` translation. One pre-existing temporal-depth-space
+  mismatch remains separately identified; it does not invalidate this
+  advection A/B and was deliberately not mixed into this correction.
+- `compileJava processResources testClasses materialAdvectionSandbox` passed,
+  including rigid shuffled UUID motion, a 600-frame frozen invariant,
+  membership churn, divergent motion residuals, dimension reset, regional
+  delta-time integration at a large absolute time, and a shader source guard.
+  The complete `compileJava processResources cloudFieldSandbox test build`
+  group also passed. JSON parsing and the uniform/source static checks passed.
+  The exact built and deployed native-only JAR SHA-256 was
+  `8419564301021F70F2F02259A01586ADB98B5393D504974C7B827001F0556E91`.
+- Forge loaded the native backend with Simple Clouds absent, registered the
+  volumetric shaders, baked all noise textures and rendered the newly spawned
+  twelve-member `cumulus_congestus` with the expected `4/3/3/2` roles. During
+  live movement the actual tracker followed only presented member motion. Its
+  observed residual maximum stayed between roughly 0.004 and 0.049 block,
+  while the counterfactual legacy offset jumped by thousands of blocks when
+  the resolved wind changed. For example, one logged window measured
+  `dCentroid=(0.102701,-0.555283)`, legacy slip
+  `(6118.383627,-12466.813858)`, but actual per-frame material delta only
+  `(0.001022,-0.003168)` with `residualMax=0.014027`.
+- After `/pa cloud freeze true` settled, seven consecutive five-second status
+  windows retained all twelve UUID matches, no entries/leaves/rejections,
+  `dCentroid=(0,0)`, `MaterialOffset=(1.704292,-11.796872)`, zero actual delta,
+  and `residualRms=residualMax=0`. Over the same windows the retained
+  counterfactual formula continued to slip by approximately
+  `(0.438,-0.783)` block per 20 ticks despite the stationary envelope. This is
+  the predicted discriminating result: the production material domain is now
+  bit-stable under freeze while the diagnosed legacy path would not be.
+- This accepts the material-advection correction on numerical runtime
+  evidence. It does not claim the macro silhouette, reconstruction or rain
+  footprint are fixed. Minecraft closed through `WM_CLOSE` at `22:44:50`,
+  logged `Stopping!`, terminated all three PA pools, saved overworld, Nether
+  and End, and exited normally before the next source change.
+
+## Iteration 144 - frozen fresh-spawn logs isolate the staged cone topology
+
+- No source or JAR changed in this diagnostic iteration; the deployed hash
+  remained `8419564301021F70F2F02259A01586ADB98B5393D504974C7B827001F0556E91`.
+  The first persisted tower inspected was almost collinear in X/Z after about
+  2,000 simulation ticks. `/pa cloud evolution` showed that its persistent
+  `CloudField` centres already exactly matched their live backend targets, so
+  the network, client interpolation and renderer were excluded as the place
+  where that particular alignment was introduced. Its historical cause is not
+  yet confirmed and is not being conflated with initial morphology.
+- To remove age and motion from the topology test, all clouds were cleared,
+  movement was frozen before spawn, and a new `cumulus_congestus` was created
+  and synchronised. Its twelve authoritative fields had zero velocity and the
+  expected full two-dimensional layout immediately: four BASE, three CORE,
+  three TOWER and two CROWN members. For example, relative to the primary near
+  `(-1,-695)`, the three shoulders occupied approximately
+  `(23.8,-16.5)`, `(2.4,28.4)` and `(-27.1,-14.3)` blocks. This rejects an
+  initial angle-decoding or coordinate-unit collapse.
+- The fresh layout instead reproduces the generator tables' staged taper. The
+  theoretical lobe-radius scale has correlation `-0.9811` with height
+  (`R^2=0.9625`). Excluding the zero-radius primary, centre radial distance has
+  correlation `-0.9406` with height (`R^2=0.8847`). Mean radius scale falls
+  `0.925 -> 0.817 -> 0.717 -> 0.610` from BASE through CROWN, while mean radial
+  scale falls `0.390 -> 0.340 -> 0.247 -> 0.220`. Thus both the lobe size and
+  its distance from the updraft contract together; this is a measured cone,
+  not a shader-name inference.
+- A fence-gated GPU capture of exactly that frozen fresh spawn confirmed the
+  taper survived all CPU/GPU transforms. Active stage areas were
+  `196/132/105/62` texels, so successive upper/lower area ratios were
+  `0.673/0.795/0.590`. CROWN was the most anisotropic stage with
+  `sigmaMajorMinor=19.428/12.821`, consistent with the two opposed crown
+  members, and three TOWER-to-CROWN texels had vertical gaps up to 10.427
+  blocks. The support/base/top hashes were
+  `285bc5c4bde00325/42e9fdae3c23e325/9ade5dead3728325`; these and the complete
+  stage statistics are the numerical baseline for the next isolated topology
+  A/B.
+- The next candidate may therefore change only the deterministic angles,
+  radial offsets and lobe-radius scales. Heights, lower/upper envelopes,
+  `4/3/3/2` membership, density, noise, lighting, reconstruction and the
+  accepted `support^4` endpoint blend must remain unchanged. Acceptance
+  requires reduced height/radius and height/radial correlation, no opposed
+  two-lobe apex, a less severe CROWN area collapse, no new invalid/inverted
+  endpoints, and unchanged temporal/material invariants. Minecraft closed via
+  `WM_CLOSE` at `22:52:20`, terminated all three PA pools and saved every
+  dimension before the edit.
+
+## Iteration 145 - authoritative per-lobe wind collapses morphology at a region boundary
+
+- No source, shader or JAR changed in this diagnostic iteration; the deployed
+  native-only hash remained
+  `8419564301021F70F2F02259A01586ADB98B5393D504974C7B827001F0556E91`.
+  A new twelve-member `cumulus_congestus` was created with movement frozen,
+  synchronised, and captured at game time `169126`. Its authoritative/client
+  centres still reproduced the fresh two-dimensional layout: X ranged from
+  `-28.05` to `+22.76`, Z from `-715.37` to `-666.60`, and the similarity fit
+  to the deterministic generator table was `R^2=0.998970` with `0.627` block
+  RMS error. This is the pre-motion control, not a visual inference.
+- Movement was then enabled for 30 seconds, disabled again, and the same UUIDs
+  were captured at game time `169960`. All twelve retained their morphology
+  group and member indices, but eleven centres rounded to `X=-0.00` and the
+  remaining centre to `X=+0.01`. Their renderer cells copied those values
+  exactly. `/pa cloud evolution` also reported every persistent field centre
+  equal to its live backend target. The destructive deformation therefore
+  exists in the authoritative `CloudClusterState` before field adaptation,
+  packets, client interpolation, weather-map construction or raymarching.
+- Source tracing explains the exact boundary. `CloudRegionMotionController`
+  iterates clusters separately and calls `resolveWindVelocity` at each lobe's
+  current centre. This cloud straddled the X=0 boundary between forecast
+  regions `(-1,-1)` and `(0,-1)`. Their resolved winds were respectively
+  approximately `(+0.019376,-0.034671)` and
+  `(-0.121184,+0.127653)` blocks/tick: both X components advect their local
+  lobes toward the same discontinuity. Once a member crosses, its independently
+  sampled velocity reverses, trapping/oscillating the sibling geometry near
+  X=0 and destroying all relative offsets. Saved authoritative NBT from an
+  older occurrence independently contained the same collapse, including
+  member centres and velocities on opposite sides of the boundary.
+- `CloudRegionMergeController` excludes morphology siblings, and the complete
+  downstream path preserves the supplied coordinates. Absorption, morphology
+  decoding, coordinate units, shader union and reconstruction are therefore
+  ruled out as causes of this measured 30-second collapse. They may still have
+  separate defects, but changing them cannot repair this server-side topology
+  loss.
+- The next isolated correction will advect a morphology group as one rigid
+  body. Every active sibling must receive the exact same per-tick delta from a
+  stable group anchor; standalone clusters keep their existing behaviour. A
+  deterministic invariant will compare UUID-relative offsets before and after
+  motion and log the group ID, anchor/source region, sampled wind, boundary
+  state and maximum relative-offset drift. Merely sampling the raw wind at a
+  centroid exactly on the discontinuity is not accepted, because that could
+  translate the whole group back and forth. Source-region semantics and tick
+  order will be verified before choosing the stable anchor.
+- Minecraft closed through `WM_CLOSE` at `22:58:30`, logged `Stopping!`, saved
+  overworld, Nether and End, reported all dimensions saved, and exited normally
+  before the corrective edit.
+
+## Iteration 146 - first rigid-motion sandbox run exposes a missing Minecraft bootstrap
+
+- The isolated corrective implementation groups active multi-member clusters by
+  persistent `morphologyGroupId`, resolves one velocity from the owning
+  `CloudRegionState.sourceRegionKey`, and applies that exact delta to every
+  member. Legacy states without a source latch one fallback region instead of
+  resampling across a discontinuity. Standalone single-member clusters retain
+  their previous local-region lookup. A boundary-only runtime diagnostic records
+  sampled region, occupied-region count, relative-offset hash and maximum drift.
+- `compileJava` and `testClasses` passed. The first
+  `cloudRegionMotionSandbox` launch failed before reaching a movement assertion:
+  constructing `Level.OVERWORLD` outside a launched server triggered
+  `IllegalArgumentException: Not bootstrapped` from Minecraft's registry
+  initialisation. This is a test-harness bootstrap defect, not an accepted or
+  rejected movement result.
+- The exact Forge 47.4.20 mapped Minecraft 1.20.1 source was inspected at
+  `forge-1.20.1-47.4.20_mapped_official_1.20.1-sources.jar` rather than assuming
+  the API. `net.minecraft.server.Bootstrap` declares
+  `public static void bootStrap()`. The next change will call that verified
+  bootstrap once at sandbox startup, then rerun the same assertions without
+  changing the production motion formula.
+
+## Iteration 147 - registry bootstrap requires the detected 1.20.1 game version
+
+- Adding the verified `Bootstrap.bootStrap()` call advanced the standalone
+  harness into vanilla registry initialisation, but it again failed before any
+  motion assertion. `DataFixers` raised `IllegalStateException: Game version
+  not set` while `ComposterBlock.bootStrap()` initialised item/entity data.
+- The exact mapped Forge 47.4.20 source for
+  `net.minecraft.SharedConstants` was inspected. It exposes
+  `public static void tryDetectVersion()`, which installs
+  `DetectedVersion.tryDetectVersion()` only when no current version exists.
+  The next harness-only change will call this verified method before
+  `Bootstrap.bootStrap()`. The production controller remains unchanged between
+  these two harness attempts.
+
+## Iteration 148 - Forge network bootstrap is not a valid standalone motion harness
+
+- Calling `SharedConstants.tryDetectVersion()` resolved the version failure,
+  but Forge 47.4.20's patched `Bootstrap.bootStrap()` then invoked
+  `NetworkHooks.init()`. The standalone `JavaExec` has no fully launched FML
+  event environment, so event-list construction failed with
+  `NoSuchMethodException: NetworkEvent.<init>()`. Movement assertions again did
+  not execute.
+- This rules out full Minecraft bootstrap as an appropriate unit boundary for
+  the server motion contract. The next change will extract the production
+  velocity plan into package-private pure data: persistent cluster/group UUIDs,
+  centres, region keys and resolved `Vec3` deltas. The live controller will
+  consume that exact plan to mutate `CloudClusterState`; the sandbox will test
+  the same planner without loading `Level`, registries or Forge networking.
+  This changes the harness boundary only, not the chosen source-region motion
+  rule.
+
+## Iteration 149 - pure production motion plan preserves offsets across the convergent boundary
+
+- The live controller now builds and consumes a package-private pure motion
+  plan. Each active multi-member `morphologyGroupId` performs exactly one
+  canonical source-region velocity lookup and receives one common delta;
+  standalone clusters still resolve their own local region. A legacy group
+  with neither source nor current key derives one arithmetic-group anchor and
+  latches that key once.
+- `compileJava`, `testClasses` and `cloudRegionMotionSandbox` passed. The
+  sandbox ran the explicit convergent-boundary counterexample for 400 ticks:
+  members began on both sides of X=0, the negative region supplied
+  `(+1.0,-0.25)` while the positive region supplied `(-5.0,+0.75)`, and the
+  source was the negative region. Exactly 400 resolver calls occurred for 400
+  group ticks, the primary translated from X=-25 to X=375, and all UUID-relative
+  offsets remained exactly equal at zero tolerance. Thus the planner cannot
+  reproduce the old per-lobe convergence.
+- Separate assertions confirmed that two standalone clusters still sampled
+  their respective local regions, and that a legacy two-member group latched
+  the negative fallback region before crossing X=0. No Minecraft bootstrap,
+  registry or Forge network environment is now required by this deterministic
+  contract test.
+- This is not yet runtime acceptance. The next steps are an independent source
+  review, the complete Gradle validation group, deployment of the resulting
+  hash, and repetition of the exact fresh-spawn/freeze/30-second A/B. Runtime
+  acceptance requires stable relative offsets and matching boundary diagnostic
+  hashes in `latest.log`; compilation alone is insufficient.
+- The complete `compileJava processResources cloudFieldSandbox test build`
+  group then passed. It executed the CloudField, material-advection and new
+  cloud-region-motion sandboxes; both Java compilation and resource processing
+  completed without new errors. The resulting native-only JAR SHA-256 is
+  `615C7EAE3027972D9D55473EDE8B9355B089FF245D4E86366AABC4637FFD60B9`.
+- An independent read-only review found no blocker for the runtime A/B and
+  confirmed that standalone clusters retain their local-region sampling. It
+  also identified limits that remain explicit: the sandbox does not execute
+  `CloudClusterState` setters, the boundary hash is intra-tick rather than a
+  retained cumulative baseline, source-region wind intentionally postpones a
+  future long-distance transition policy, and the planner allocates more than
+  the old loop. These are reasons to require runtime UUID comparison and later
+  profiling, not reasons to alter this isolated correction before testing it.
+
+## Iteration 150 - native runtime A/B accepts rigid morphology motion
+
+- The exact deployed native-only JAR hash was
+  `615C7EAE3027972D9D55473EDE8B9355B089FF245D4E86366AABC4637FFD60B9`.
+  The instance contained PA, Architectury, Cool Rain and Gaboulibs only; no
+  Simple Clouds, CrackersLib, Oculus, Iris or Distant Horizons JAR was present.
+  Forge 47.4.20 loaded the volumetric shaders and completed the native noise
+  bake without a new mixin, shader or startup error.
+- With movement frozen before spawn, a new twelve-member
+  `cumulus_congestus` group `8dcf33d3...` was captured at game time `172373`.
+  It straddled the exact problematic boundary with X centres from `-27.63` to
+  `+25.32`, retained all `4/3/3/2` BASE/CORE/TOWER/CROWN roles, and declared
+  source `region[-1,-1]@2000`. This was a fresh control; the previously
+  collapsed saved group was cleared.
+- Movement ran for 30.839 wall-clock seconds and was frozen again before the
+  second capture at game time `173513`. All twelve UUIDs remained present.
+  Their logged mean translation was `(36.567500,25.745000)` blocks. After
+  removing that common translation, residual RMS was `0.006614378` block and
+  residual maximum `0.009013878` block, both bounded by the diagnostic's
+  two-decimal centre output. The horizontal PCA eigenvalue ratio remained
+  `1.172279 -> 1.172027`. In contrast, the unchanged old-JAR control in
+  Iteration 145 had moved every X centre to approximately zero over the same
+  interval.
+- Boundary diagnostics during live motion independently recorded a single
+  sampled region, two occupied regions, identical quantised relative-offset
+  hashes `3bdd3c8fd5a84936 -> 3bdd3c8fd5a84936`, and
+  `maxOffsetDrift=0.000000000`. `/pa cloud evolution` after the run again
+  showed each persistent field equal to its live backend target, and renderer
+  cells copied the translated two-dimensional centres rather than a collapsed
+  line.
+- The authoritative deformation cause and correction are therefore accepted
+  on runtime log evidence. This does not accept the initial staged cone table,
+  reconstruction, lighting or rain alignment. A future long-distance regional
+  wind-transition policy must be continuous and separately measured; the
+  current correction deliberately retains source-region wind because no such
+  API exists and the raw current-region selector is discontinuous.
+- Minecraft closed through `WM_CLOSE` at `23:19:31`, logged `Stopping!`, saved
+  overworld, Nether and End, reported all dimensions saved, and exited normally
+  before the next source edit.
+
+## Iteration 151 - source-table sandbox reproduces the frozen cone baseline exactly
+
+- No morphology value changed in this diagnostic step. A read-only accessor and
+  standalone topology reporter were added around the exact four structured
+  TOWER arrays consumed by `towerCell`, `towerTier` and `towerRadiusScale`.
+  `compileJava`, `testClasses` and `cloudMorphologyTopologySandbox` passed.
+- The reporter independently reproduced the Iteration 144 calculations from
+  source: height/radius `R^2=0.962537`, height/radial-distance
+  `R^2=0.884712` (primary excluded), and a `180.000` degree separation between
+  the two crown lobes. Stage mean radius scales were
+  `0.925000/0.816667/0.716667/0.610000`; stage mean radial scales were
+  `0.390000/0.340000/0.246667/0.220000`.
+- This establishes one repeatable numerical oracle for the initial cone: both
+  lobe size and centre distance contract almost monotonically with height, and
+  the apex is an opposed pair. The next isolated A/B may change only angles,
+  radial scales and radius scales. Height, lower/upper envelopes, stage count,
+  density, noise, lighting, reconstruction and the accepted rigid motion remain
+  fixed. Acceptance first requires materially lower correlations and no
+  180-degree crown; GPU stage maps must then confirm the upper support no longer
+  collapses as severely.
+
+## Iteration 152 - isolated tower table removes the double source-space taper
+
+- Only the deterministic structured TOWER angle, radial and radius arrays
+  changed. Heights, lower/upper envelopes, member/stage count, all random-jitter
+  amplitudes, field adaptation, shaders, density, lighting, reconstruction and
+  rigid group motion remained untouched.
+- `compileJava`, `testClasses`, `cloudMorphologyTopologySandbox` and
+  `cloudRegionMotionSandbox` passed. Height/radius `R^2` fell from
+  `0.962537` to `0.271449`; height/radial `R^2` fell from `0.884712` to
+  `0.223182`. Crown separation changed from an exactly opposed `180` degrees
+  to `135` degrees. Stage mean radius scales are now
+  `0.900000/0.866667/0.820000/0.830000`, so CROWN is no longer the smallest
+  stage, and radial means are `0.305000/0.373333/0.366667/0.330000` rather
+  than a monotonic contraction.
+- The accepted rigid-motion sandbox still passed, proving this table-only A/B
+  did not disturb the x=0 correction. These source metrics accept the candidate
+  for GPU testing, not yet for final rendering. The next harness-only change
+  will turn the measured limits into regression assertions and wire the
+  topology reporter into `check`; then a fresh frozen spawn must be captured
+  through the actual weather/stage-map pipeline.
+- Regression limits now enforce both correlations at or below `0.40`, crown
+  separation between `90` and `155` degrees, and CROWN mean radius at least 95%
+  of TOWER mean radius. The complete
+  `compileJava processResources cloudFieldSandbox test build` group passed and
+  executed all three native cloud sandboxes. The candidate JAR SHA-256 is
+  `FEDA249F1FC82793B3B039F622FADAA5CB01EBF11D93908755191DFA51EDC88A`.
+
+## Iteration 153 - GPU stage maps accept the topology and localise the remaining waves downstream
+
+- The exact deployed native-only candidate was
+  `FEDA249F1FC82793B3B039F622FADAA5CB01EBF11D93908755191DFA51EDC88A`.
+  The instance again contained PA, Architectury, Cool Rain and Gaboulibs only;
+  startup explicitly selected the native PA service, loaded every volumetric
+  shader and completed the noise bake without a new shader, mixin or startup
+  error.
+- All old cloud regions were cleared, movement was frozen before creation, and
+  a fresh `cumulus_congestus` was synchronised. The production renderer received
+  exactly twelve fields with the expected `4/3/3/2`
+  BASE/CORE/TOWER/CROWN roles. The first asynchronous, fence-gated GPU capture
+  reported no invalid or inverted vertical endpoint and no gap between any
+  adjacent stage.
+- Compared with the unchanged old-table frozen baseline from Iteration 144,
+  BASE/CORE/TOWER/CROWN active areas changed from `196/132/105/62` texels to
+  `170/152/130/107` during the growth phase. The consecutive upper/lower area
+  ratios improved from `0.673/0.795/0.590` to
+  `0.894/0.855/0.823`. Most importantly, TOWER-to-CROWN gaps fell from three
+  texels (`4.839%`, maximum gap `10.427` blocks) to zero. Crown covariance
+  became `26.052/18.041` rather than the former `19.428/12.821`; the upper
+  support therefore no longer collapses into the old narrow opposed apex.
+- A second capture after lifecycle growth reached its plateau produced active
+  areas `187/174/150/125` and ratios `0.930/0.862/0.833`, again with zero
+  inter-stage gaps and zero invalid endpoints. This accepts the isolated table
+  correction through the actual generator -> field -> packet -> render-cell ->
+  shader -> GPU texture path. It does not claim that final raymarched lighting
+  or reconstruction is visually accepted.
+- The first and second captures had different complete input signatures while
+  the new cloud grew (`57b41fefe1157c3d -> 1a2005a4cbc7b450`), and support
+  increased from roughly `0.09` mean to `0.54`. `/pa cloud list` reported
+  `typeTicks=812`, `growth=1.00` and stable centres; this is expected lifecycle
+  ramp-up because `/pa cloud freeze true` freezes translation, not simulation.
+  It must not be mistaken for cloudlet regeneration.
+- The decisive stability control repeated the capture about 70 seconds later,
+  after coverage plateaued at `0.786`. Captures 2 and 3 were bit-for-bit equal:
+  complete input signature `1a2005a4cbc7b450`, all six component signatures,
+  support/base/top hashes
+  `9017b68c1c266325/97d8cab9bd9de325/aa6d29e6b2f08325`, every stage statistic
+  and every pair statistic. Weather-map misses stayed exactly `5433` while hits
+  rose from `8012` to `31111`. Field statistics simultaneously reported twelve
+  unchanged sources and no creation, update, removal, duplicate or rejection.
+- Therefore the reported rapid wave-like motion and square edge instability do
+  not originate in post-growth cloudlet layout, field transport or weather-map
+  regeneration. They are now localised downstream to volume sampling,
+  per-frame jitter/history or low-resolution reconstruction. The next change
+  will instrument numerical per-stage frame deltas at raw raymarch, temporal
+  history and final composite boundaries before changing any density, noise or
+  reconstruction formula.
+- One separate cache-key defect is confirmed by source inspection: the domain
+  hash includes `regionalEnergy` even when `includeRegionalLayer` is false, so
+  an invisible regional value can trigger needless field-map rebuilds. It did
+  not affect the plateau control (no new misses), and it will not be mixed into
+  the downstream stability diagnostic until its actual cost/impact is measured.
+- The test cloud was cleared, movement was restored to its persisted active
+  state, and Minecraft closed through `WM_CLOSE` at `23:29:41`. The client
+  logged `Stopping!`, saved overworld, Nether and End, reported all dimensions
+  saved and exited before source editing resumed.
+
+## Iteration 154 - authoritative PA lifecycle is no longer applied twice
+
+- The capture sequence established two temporal regimes rather than one vague
+  instability. During the first 30 seconds, `CloudRegionLifecycleController`
+  integrated growth directly into authoritative cluster radius, coverage and
+  density. The PA cluster adapter copied those already-integrated scalars into
+  `CloudField`, but `CloudFieldSnapshot.effectiveDensity()` and
+  `effectiveCoverage()` multiplied them by `growth * (1-decay)` a second time.
+  This is why the first GPU capture began near zero support even though the
+  morphology generator deliberately starts TOWER lobes at 94% final radius and
+  82% final coverage/density.
+- The double envelope is quantitatively tied to the observed early waves:
+  capture 1 at roughly +11 seconds had BASE support mean/max `0.089/0.113`;
+  capture 2 after the 600-tick growth interval had `0.539/0.707`. Between them
+  the cache recorded 3,576 additional weather-map misses, including thousands
+  of media/lifecycle changes. The changing support repeatedly crossed density
+  and erosion thresholds even though lobe centres were fixed. Capture 3 then
+  proved the post-growth map stable.
+- `CloudFieldSnapshot` now recognises `PA_CLUSTER` and `PA_REGION` as sources
+  whose lifecycle scalars are already authoritative and returns their stored
+  density/coverage directly. Growth and decay metadata remain present for
+  `lifecycleStage()` and diagnostics. Manual, summary and unknown/derived fields
+  keep the previous `density|coverage * growth * (1-decay)` behaviour.
+- `CloudFieldValidation` now enforces both sides of that contract using the same
+  projected field: a PA cluster snapshot with non-trivial growth/decay must
+  preserve its authoritative scalars, while an UNKNOWN snapshot must retain the
+  derived lifecycle envelope. `compileJava`, `cloudFieldSandbox` and `test` all
+  passed; the sandbox reported `CloudField self-check passed`. Existing mixin
+  and deprecation warnings were unchanged.
+- Runtime acceptance remains required. The next native JAR test must capture a
+  fresh cloud before and after the 30-second mark and verify that initial GPU
+  support begins close to the generator's 82% birth values, changes smoothly by
+  only the intended residual amount, and does not regress lifecycle or decay.
+  Post-growth crawling is a separate question and is not attributed to this
+  correction.
+
+## Iteration 155 - runtime A/B finds one remaining shader-side lifecycle envelope
+
+- The complete build passed `compileJava`, `processResources`,
+  `cloudFieldSandbox`, `test`, `cloudMorphologyTopologySandbox`,
+  `cloudRegionMotionSandbox`, `materialAdvectionSandbox` and `build`. The
+  deployed native-only JAR SHA-256 was
+  `BF8D25A2AB6BC29B65B453DF80FF9EF947CFB97F426A129BAB94AE8084AFF175`.
+  Startup selected native PA, loaded the shaders and baked noise successfully.
+- A fresh `cumulus_congestus` was spawned after movement was frozen. Capture 1
+  occurred about seven seconds later. Removing the snapshot-side growth
+  multiplication raised BASE support mean/max from the old comparable
+  `0.089/0.113` to `0.229/0.292`, so the correction is active in the real
+  packet/render path and materially reduces the near-zero birth state.
+- Capture 2 used the same fixed group after `growth=1.00` and reported BASE
+  support mean/max `0.571/0.730`. Early-to-mature support sum was
+  `38.898300171/104.532379150`, only 37.2%, despite generator birth
+  density/coverage being 82% of final. The group retained all twelve roles and
+  both captures had valid endpoints; this deficit is not a missing member or
+  failed sync.
+- Source inspection after that measured residual found the exact second
+  multiplier. `cloud_weather_splat.fsh`,
+  `cloud_weather_morphology.fsh` and
+  `cloud_weather_cumulus_layers.fsh` all decode the authoritative growth value
+  from `CellDynamics.z` and apply another lifecycle envelope from `0.30` at
+  birth to `1.00` at maturity. The server has already integrated growth into
+  the PA cluster radius/density/coverage, so native PA fields still receive a
+  duplicate visual growth envelope in every map consumed by the raymarch.
+- Decay cannot simply be discarded: authoritative server integration retains
+  about 35% of density/coverage at the terminal tick before removal. The next
+  isolated correction will therefore distinguish formation from dissipation:
+  authoritative PA snapshots use their already-grown density/coverage without
+  a shader formation envelope, but retain one explicit `(1-decay)` fade to
+  zero. Their GPU lifecycle stage will be mature (`0.5`) so the three map
+  shaders do not apply a third envelope. Derived sources retain the existing
+  bidirectional lifecycle semantics.
+- The cloud was cleared, movement was restored and Minecraft closed through
+  `WM_CLOSE` at `23:38:51`; `Stopping!` and all-dimensions-saved were confirmed
+  before the next edit.
+
+## Iteration 156 - authoritative formation is bypassed in all three GPU maps
+
+- The Iteration 155 residual is now corrected at the CPU/GPU contract rather
+  than by tuning a shader threshold. `CloudFieldSnapshot.effectiveDensity()`
+  and `effectiveCoverage()` preserve the already-integrated PA cluster/region
+  formation state and apply only one explicit `(1-decay)` terminal fade. This
+  retains a continuous removal phase instead of making a mature field pop when
+  the server reaches its terminal lifecycle tick.
+- A new `visualLifecycleStage()` distinguishes authoritative PA projections
+  from derived fields. PA cluster and PA region snapshots expose the mature
+  stage `0.5` to the weather-map shaders, so the existing lifecycle envelope in
+  `cloud_weather_splat.fsh`, `cloud_weather_morphology.fsh` and
+  `cloud_weather_cumulus_layers.fsh` evaluates to one. Derived/UNKNOWN fields
+  continue to expose their real lifecycle stage and retain the former
+  formation/dissipation behaviour.
+- Every native render-cell projection now uploads `visualLifecycleStage()`;
+  no shader formula or morphology/noise/lighting/reconstruction parameter was
+  changed in this isolation step. `CloudFieldValidation` asserts both sides of
+  the contract: authoritative PA scalars receive exactly one decay fade and a
+  mature GPU stage, while derived scalars retain `growth * (1-decay)` and their
+  real lifecycle stage.
+- `compileJava`, `cloudFieldSandbox` and `test` passed, and the sandbox reported
+  `CloudField self-check passed`. This source result is not runtime acceptance.
+  The next A/B must use one fresh frozen twelve-lobe group and compare the early
+  and mature GPU support hashes/statistics. It will be accepted only if the
+  large 37.2% early/mature deficit is removed without missing members, invalid
+  endpoints or a new shader/cache failure.
+
+## Iteration 157 - runtime logs accept the single authoritative lifecycle
+
+- The full validation group passed `compileJava`, `processResources`,
+  `cloudFieldSandbox`, `test`, `cloudMorphologyTopologySandbox`,
+  `cloudRegionMotionSandbox`, `materialAdvectionSandbox` and `build`. The exact
+  deployed native-only JAR SHA-256 was
+  `AC08AEC7062DDCFFF0DDE4513238F796B42FC19C8B7B2F91918A9A3C74CB4529`.
+  The instance contained PA, Architectury, Cool Rain and Gaboulibs only. Forge
+  selected the native PA service, registered the volumetric shaders and baked
+  all three noise textures without a new startup, mixin or shader error.
+- Movement was frozen before a fresh twelve-member `cumulus_congestus` group
+  `a2689fec...` was created. The early server snapshot at `typeTicks=173`
+  reported `growth=0.29`, density `0.78` and coverage `0.68`. The asynchronous
+  GPU capture retained all `4/3/3/2` BASE/CORE/TOWER/CROWN members and produced
+  support sums `91.2800/87.5124/77.1534/61.2837`. Mean/max support was already
+  `0.563/0.716`, `0.554/0.718`, `0.563/0.733`, `0.538/0.726` respectively.
+- At `typeTicks=1269`, the same UUID reached `growth=1.00`, density `0.80` and
+  coverage `0.70`. Its mature support sums were
+  `98.7871/94.9761/83.8365/66.9660`. Early support was therefore
+  `92.4%/92.1%/92.0%/91.5%` of mature support across the four stages. Before
+  the correction, the comparable BASE support was only 37.2% of mature. The
+  remaining small difference now agrees with the authoritative generator's
+  deliberately smaller birth radius/density/coverage rather than a second
+  shader lifecycle envelope.
+- Both captures had zero invalid/inverted endpoints and zero gaps for every
+  adjacent stage pair. Active areas changed only from `162/158/137/114` to
+  `178/171/147/119`; no lobe disappeared. This rules out missing sync or stage
+  decode as an explanation for the measured lifecycle delta.
+- A third capture at `typeTicks=2618`, approximately 68 seconds after the first
+  mature capture, was bit-for-bit equal to capture 2: complete input signature
+  `bb82ae274e57abfa`, every component signature, support/base/top hashes
+  `330d6f1abdb8a325/abcef0a3b11f2325/f1d2e0c044a4e325`, support Q10/Q12 hashes
+  and every stage statistic matched. Weather-map misses remained exactly
+  `2073` while hits rose from `14946` to `33375`.
+- The duplicate lifecycle application is accepted as fixed through the actual
+  server -> packet -> field -> render-cell -> shader -> GPU-map path. It also
+  proves that any post-maturity crawling or square reconstruction artifact is
+  downstream of the stable weather/stage maps. No density, erosion, temporal
+  or composite formula will be changed until the next diagnostic measures raw
+  raymarch, temporal output and reconstruction separately.
+- The test group was cleared, movement was restored, and Minecraft closed via
+  `WM_CLOSE` at `23:47:53`. `Stopping!`, overworld/Nether/End saves and
+  `All dimensions are saved` were confirmed before the next source edit.
+
+## Iteration 158 - rewind finds that the correct decay contract had already existed
+
+- Before beginning downstream temporal instrumentation, the complete
+  lifecycle sequence was retraced from the journal and current source. This
+  found a regression in the reasoning, not a new visual hypothesis. Iteration
+  154 already returned authoritative PA density/coverage directly. Iteration
+  155 correctly proved that a separate shader-side formation envelope remained.
+  Iteration 156 then retained the direct-growth rule and neutralised the shader
+  envelope, but incorrectly added `(1-decay)` back to the snapshot.
+- The erroneous premise in Iteration 155 was that server integration leaves
+  approximately 35% at the terminal tick. That considered only the instantaneous
+  factor `1 - 0.65 * decay`. In production,
+  `CloudRegionLifecycleController.integrateGrowth()` feeds the previously faded
+  density/coverage back into an 8% smoothing recurrence and multiplies the
+  result by that factor on every one of the 600 decay ticks. The stored PA
+  scalar is therefore already the dissipating scalar.
+- A direct reproduction of the unchanged production recurrence with target and
+  initial density `0.8` gives stored density approximately `0.454` at
+  `decay=0.10`, `0.236` at `0.25`, `0.108` at `0.50`, `0.059` at `0.75`,
+  `0.042` at `0.90` and `0.027` on the last visible tick. The current snapshot
+  then reduces those again to approximately `0.409`, `0.177`, `0.054`, `0.015`,
+  `0.004` and near zero. This is a confirmed double decay.
+- Historical runtime notes independently agree with the recurrence: frozen
+  fields previously showed their authoritative coverage falling toward zero
+  and eventually reached `no_clouds` without a renderer-side lifecycle being
+  required. The server removes inactive clusters at the lifetime boundary, one
+  tick after the last already-small visible scalar.
+- Iteration 157 remains valid evidence for formation only: all its samples had
+  `decay=0.00`, and the early/mature support ratios prove the duplicate growth
+  envelopes are gone. It did not and could not accept dissipation. The correct
+  combined contract is the direct authoritative scalar from Iteration 154 plus
+  the mature GPU lifecycle stage from Iteration 156. Derived/UNKNOWN fields
+  retain their own `growth * (1-decay)` envelope.
+- The next isolated source correction will restore that previously established
+  direct PA scalar invariant and update the self-check accordingly. No shader,
+  morphology, density, noise, temporal or reconstruction formula is part of
+  this correction.
+- The direct scalar contract is now restored: authoritative PA snapshots return
+  stored density/coverage, while `visualLifecycleStage()` remains fixed at the
+  shader's mature value. The non-zero-decay self-check again expects the stored
+  `0.72/0.68` scalars exactly; derived/UNKNOWN snapshots still expect
+  `growth * (1-decay)`. `compileJava`, `cloudFieldSandbox` and `test` passed,
+  with `CloudField self-check passed`; existing mixin/deprecation warnings were
+  unchanged.
+- The complete `build` then passed all tests plus the topology, rigid-motion and
+  material-advection sandboxes. `processResources`, reobfuscation and packaging
+  also passed; `git diff --check` found no whitespace error. The resulting JAR
+  SHA-256 is
+  `73464E60C55363BA6E2581B3E72D82935FDFC4E3B77DD572FB1C24E5093CEFB3`.
+
+## Iteration 159 - rewind preserves earlier reconstruction fixes and reuses existing diagnostics
+
+- The earlier visual/remediation journal was reread before designing a new
+  pipeline diagnostic. Several requested fixes already exist and must not be
+  reimplemented: Iteration 10 retained absolute bilinear weights at accepted
+  low-resolution neighbours, assigns depth one to empty rays and rejects their
+  temporal history; the current shaders still contain those exact contracts.
+- Existing debug modes also already cover most requested isolation views.
+  `cloud_field_composite.fsh` exposes raw colour, raw alpha, raw cloud depth,
+  paired depth/colour alignment, selected upscale neighbour and scene-depth
+  rejection. `cloud_atmosphere_volume.fsh` exposes current raymarch, sampled
+  history and per-pixel history rejection state. Adding duplicate visual modes
+  would create more code without identifying a culprit.
+- Prior full-resolution/history-off A/Bs established only that the old severe
+  tower seams and density checker pattern survived both switches. They do not
+  prove the current post-topology square-edge report is absent, but they do rule
+  out blindly reverting the accepted composite weighting or simply disabling
+  history as a general morphology fix.
+- The next diagnostic will therefore read the already-existing boundaries
+  numerically. It must associate frame-to-frame hashes/deltas with stable input,
+  camera, material-offset and weather-map signatures and separately report raw
+  raymarch, temporal output/history and selected-neighbour reconstruction. No
+  temporal or upscale formula changes are authorised until those logs identify
+  which boundary introduces the instability.
+
+## Iteration 160 - rewind localises what is already fixed before new instrumentation
+
+- The investigation history was retraced again before changing renderer code.
+  This found two previously measured temporal defects that are already fixed in
+  the current tree and must not be rediscovered through shader tuning. Iterations
+  135--136 proved that Hermite wind tangents plus wind extrapolation made frozen
+  authoritative centres move forward and reset; current
+  `ClientCloudFieldCache.PresentationTrack` uses non-overshooting authoritative
+  centre presentation. Iterations 142--143 proved that
+  `WindVec * WorldTime` moved the material domain through a stationary envelope;
+  current production uses UUID-matched `MaterialOffset` and
+  `MaterialFrameDelta`, with a deterministic sandbox guarding the old formula.
+- The present plateau captures independently retain bit-identical weather and
+  cumulus-stage maps, zero material motion under freeze, and stable topology.
+  Therefore another position interpolator, noise-time removal, blur, history
+  disable, or morphology multiplier would be a blind duplicate rather than a
+  causal correction.
+- Source review also reconfirmed a separate, still-open contract noted in
+  Iteration 143: temporal reprojection samples depth at the reprojected previous
+  UV but compares it directly with the current frame's projected cloud depth.
+  That is a coordinate-space mismatch, but source proof alone does not establish
+  its contribution to the reported blocks or edge churn. The existing
+  `HISTORY_REJECTION` view exposes the relevant per-pixel states and will be
+  measured before that equation changes.
+- The next source group is diagnostic only. It will asynchronously read the
+  existing low-resolution raymarch colour/depth target and the already-composited
+  main colour target through a fence-gated PBO. Reports will include exact
+  weather, camera/matrix, material, lighting, target, quality, debug-mode and
+  history metadata; quantised hashes; colour/depth pairing; premultiplied-alpha
+  violations; frame-to-frame alpha/luminance/depth deltas; macro versus
+  high-frequency churn; reconstruction-grid gradients; and the history-rejection
+  state histogram. Readback and analysis are explicitly on-demand and must never
+  block the render thread.
+- No rendered formula, shader parameter, density profile, light response,
+  precipitation footprint, temporal weight or composite selection rule is
+  authorised in this instrumentation group. The diagnostic must compile, pass a
+  deterministic CPU sandbox, restore all touched pixel-pack/texture state, close
+  every PBO/fence on lifecycle reset, and produce runtime logs before a visual
+  correction is considered.
+
+## Iteration 161 - first diagnostic compile exposes a self-check accessor typo
+
+- The diagnostic-only implementation added one on-demand PBO transfer for the
+  existing cloud RGBA16F target, cloud depth and detached scene depth. Its worker
+  analysis emulates the current production composite, records stable/dynamic
+  signatures and hashes, and measures raw/reconstructed deltas without another
+  draw. A deterministic sandbox supplies an identical pair and one known alpha
+  perturbation.
+- The first `compileJava testClasses volumetricStabilityDiagnosticsSandbox`
+  attempt failed before packaging. Six errors all came from the same mechanical
+  typo in that sandbox path: `FrameDigest` owns its `PairStats` through
+  `summary().pair()`, while the assertions called a nonexistent direct
+  `pair()` accessor. No rendering API, shader signature or production equation
+  failed compilation.
+- The next isolated correction changes only those six accessor chains to
+  `summary().pair()` and repeats the identical Gradle group. No diagnostic
+  metric or rendered behavior is being adjusted in response to this failure.
+- The repeated group passed: `compileJava`, `testClasses` and
+  `volumetricStabilityDiagnosticsSandbox` completed successfully, and the
+  sandbox reported `Volumetric stability diagnostics self-check passed` for an
+  identical raw/reconstructed pair plus a known alpha perturbation. The only
+  compiler output was the repository's existing mixin/deprecation warnings.
+- This is programmatic acceptance of the CPU analyzer only. PBO format,
+  detached-scene-depth transfer, fence lifecycle, shader/CPU composite parity
+  and runtime cost still require a native client run. A separate read-only code
+  review is in progress before packaging so defects in the diagnostic cannot be
+  misreported as cloud instability.
+
+## Iteration 162 - rewind rejects the first stability probe before runtime use
+
+- The complete investigation sequence was retraced before deploying the new
+  diagnostic. This reconfirmed that the authoritative lifecycle, rigid group
+  motion, material advection and stable weather/stage maps have already been
+  corrected and measured. No morphology, density, erosion, lighting, temporal
+  or composite equation will be changed until a downstream boundary is
+  identified numerically.
+- A read-only line-by-line review found that the first stability probe could not
+  yet support that attribution. Its comparison signature excluded `WorldTime`
+  even though precipitation and funnel density consume it, omitted several
+  effective shader uniforms, and reread camera density after the hook had
+  already updated the tracker. Its material-frame delta was likewise taken from
+  the advection tracker rather than the exact value uploaded by the renderer.
+- The CPU reconstruction always assumed the FINAL depth-guided branch, accepted
+  scene depth that production rejects when it is attached, and used the main
+  target dimensions instead of Forge's captured framebuffer viewport. It also
+  measured premultiplied RGB as reconstructed straight luminance. These are
+  confirmed diagnostic parity defects, not cloud-rendering defects.
+- Acquisition was additionally gated on completion of the previous full-frame
+  CPU analysis, so nominal frame pairs could be separated by an unknown number
+  of rendered frames. At high resolution, retained input/output arrays could
+  exceed 250 MiB. Finally, a run with zero comparable pairs was formatted with
+  zero RMS values, which could be mistaken for perfect stability.
+- The next correction remains instrumentation-only. The renderer will publish
+  an immutable snapshot of the exact draw inputs; the diagnostic will record
+  Forge's captured viewport/FBO and the effective composite branch, distinguish
+  a full input signature from a deliberately FrameIndex-excluded comparison
+  signature, report temporal gaps, enforce a memory/resolution ceiling, use
+  straight reconstructed luminance and mark zero-comparable-pair runs
+  inconclusive. A bounded capture pipeline is required before runtime A/Bs.
+- That instrumentation hardening is now implemented without changing a render
+  equation. `VolumetricCloudRenderer.LastDrawInputs` fingerprints the exact 46
+  non-sampler uniforms at upload time, including previous-frame matrices,
+  camera density, material delta, precipitation, pretest controls and funnel
+  payload. Its comparison fingerprint excludes FrameIndex and excludes
+  WorldTime only when both precipitation and funnel branches are provably
+  inactive. `CloudFieldCompositeRenderer.LastDrawInputs` records the effective
+  mode, depth flags, detached depth provenance, Forge FBO and viewport.
+- Acquisition now reserves a bounded batch of PBOs, dispatches the requested
+  frames on consecutive hooks, and delays mapping/CPU analysis until the batch
+  is complete. The batch is rejected above 128 MiB instead of risking an
+  unbounded 4K heap/VRAM spike. Every fence and buffer is released on failure or
+  lifecycle shutdown, and allocation errors are checked immediately.
+- CPU emulation now follows the actually drawn FINAL/SPATIAL branch: plain
+  bilinear when depth composite is disabled, depth-guided neighbour selection
+  plus the final fixed `GL_LEQUAL` test when detached depth is available, and
+  explicitly unavailable when a debug branch or unattached destination depth
+  cannot be reproduced. Reconstructed luminance divides premultiplied RGB by
+  alpha exactly like the shader. Scene-depth content changes and frame gaps make
+  a pair incomparable; a run with no comparable pair reports `n/a` and
+  `inconclusive_no_comparable_pairs`.
+- `compileJava`, `testClasses` and
+  `volumetricStabilityDiagnosticsSandbox` passed. The sandbox now covers exact
+  depth rejection, the depth-off bilinear branch, premultiplied-to-straight
+  luminance, rejection of non-consecutive captures, a known raw/reconstructed
+  alpha change, and the zero-comparable-pair report. Existing mixin and
+  deprecation warnings are unchanged. Runtime PBO/fence behaviour and the
+  actual A/B attribution remain unaccepted until the native client logs them.
+- The complete validation group then passed `compileJava`,
+  `processResources`, `cloudFieldSandbox`, `test` and `build`. Through `check`,
+  the structured-topology, rigid-motion, material-advection and stability
+  sandboxes all passed; reobfuscation and packaging also completed. The fresh
+  JAR SHA-256 is
+  `173459F0652370D7F7C0BDDD46763F8DE540745AE7B7FF1E15EDA2E688E51F68`.
+  `git diff --check` reports no whitespace error (only the worktree's existing
+  LF-to-CRLF notices). The native visual instance still contains the older
+  `AC08AEC...` JAR and must receive this exact fresh artifact before any runtime
+  result is accepted.
+
+## Iteration 163 - runtime A/B localises stationary churn to the history-enabled jitter path
+
+- The hardened diagnostic JAR was deployed to the native-only instance and its
+  SHA-256 was rechecked as
+  `173459F0652370D7F7C0BDDD46763F8DE540745AE7B7FF1E15EDA2E688E51F68`.
+  The instance contained PA, Architectury, Cool Rain and Gaboulibs only; startup
+  selected the native PA backend and produced no new mixin or shader error.
+- The first history-off run used a frozen, mature twelve-member
+  `cumulus_congestus`. Across eight consecutive hooks, weather, scene depth,
+  low-resolution colour/alpha/depth/macro hashes and reconstructed
+  alpha/selected-neighbour hashes were unchanged. These hashes are quantised,
+  so this proves stability to at least `1/4095` for colour/alpha and `1/65535`
+  for depth rather than literal float bit equality. The weather map remained
+  `989f8661e2cc479f`, the scene-depth hash remained
+  `71663704a0f55325`, and the material offset/delta remained fixed.
+- That first region then reached its normal lifetime boundary. The command
+  `/pa cloud freeze true` was confirmed to pause drift only, not lifecycle;
+  its disappearance after roughly 12000 ticks is therefore expected and is
+  not a renderer regression. A new group `e6d91681...` was created. Its list
+  entry reported twelve clusters, `growth=1.00`, `decay=0.00`, density `0.79`
+  and coverage `0.71`. The player was explicitly verified as
+  `playerGameType=3` at `[0.5,330.0,-399.5]`; renderer status retained
+  `camY=331.6`, removing the falling-camera confound from the first setup.
+- Runs 2 and 3 measured that same camera/cloud with history enabled. The weather
+  hash (`98e3cbe691a1ac3f`), scene-depth hash, material offset/delta, quality,
+  viewport and step scale stayed fixed. In production `FINAL`, all eight
+  colour/alpha/depth/macro and reconstructed hashes differed and active
+  low-resolution pixels ranged from 2056 to 2070. In `CURRENT`, the same
+  hashes also differed on every frame and active pixels ranged from 2048 to
+  2058. Source inspection ties this branch to `jitterFrame=FrameIndex` only
+  when history is valid; the current ray origin is then displaced by up to the
+  2.5-block exterior fine step.
+- Run 4 measured the frozen production history through
+  `HISTORY_REJECTION`. Summed over eight frames, 16018 current cloud hits were
+  accepted, 414 had missing history depth, 366 failed transmittance confidence,
+  zero failed the depth-confidence threshold and 128 stale-history pixels
+  occurred on current misses. Thus 95.4% of current material hits accepted
+  history; widespread rejection is not the cause of the stationary churn.
+  This stationary test does not validate camera-motion depth reprojection.
+- Run 5 disabled history again without changing the second cloud or camera.
+  All eight frames retained exactly the same quantised alpha, depth, macro,
+  reconstructed-alpha and selected-neighbour hashes, with exactly 2053 active
+  pixels each time. The quantised colour hash alternated between two values
+  while `WorldTime` and resolved visual wind remained live, so colour stability
+  is not yet accepted as a controlled result. Alpha/silhouette stability is
+  nevertheless isolated to the history-off branch on the same geometry.
+- Formal pair counts remained zero because the renderer correctly includes
+  `WorldTime` when `maxPrecipitation` is about `0.0728`, and the resolved visual
+  wind also changes despite frozen field drift. The changing hashes in the
+  history-on runs therefore establish an observational A/B, not a controlled
+  RMS value. The next change remains diagnostic-only: report observational
+  frame deltas separately from strict controlled deltas, so `CURRENT` and
+  `FINAL` variance reduction can be compared numerically without weakening the
+  input signature. No jitter amplitude, history blend, depth equation,
+  morphology, lighting or composite formula is changed yet.
+- The client was saved and closed through a PID-targeted `WM_CLOSE`. `Stopping!`,
+  overworld/Nether/End saves and `All dimensions are saved` were confirmed.
+
+## Iteration 164 - strict and observational temporal metrics are separated
+
+- The first runtime batch correctly refused every strict pair because
+  `WorldTime` can animate precipitation and `WindVec` changed. Hash differences
+  alone cannot quantify whether FINAL history reduces CURRENT jitter, and
+  weakening the existing comparison signature would mislabel uncontrolled
+  frames as controlled.
+- `VolumetricCloudRenderer.LastDrawInputs` now publishes a third, explicit
+  observation signature. It retains projection/view/previous-view matrices,
+  camera, weather domain and slab, weather precipitation strength, lighting,
+  material offset/delta, quality and step budget, scene-depth controls, history
+  state/blend, debug mode, tuning and funnel payload. It excludes only
+  `FrameIndex`, `WorldTime` and `WindVec`; texture-history content is necessarily
+  dynamic and is called out in the report.
+- `VolumetricStabilityDiagnostics` preserves the original strict `pair` result
+  and adds `observedPair` rather than reusing or weakening it. Observational
+  deltas still require consecutive hook/shader frames, identical observation
+  signatures, equal buffer dimensions and stable scene-depth contents. Reports
+  now aggregate strict and observational raw/reconstructed alpha RMS separately
+  and print an explicit non-controlled caveat.
+- The deterministic self-check now proves: identical strict/observational pairs
+  remain zero; a known alpha perturbation crosses both the raw and reconstructed
+  boundaries; skipped frames invalidate both paths; and a changed strict
+  signature with an unchanged observation signature yields zero strict pairs,
+  one labelled observational pair and retains the
+  `inconclusive_no_comparable_pairs` strict conclusion.
+- `compileJava`, `testClasses` and
+  `volumetricStabilityDiagnosticsSandbox` passed. The complete group then passed
+  `compileJava`, `processResources`, `cloudFieldSandbox`, `test`, every sandbox
+  reached through `check`, reobfuscation, packaging and `build`. Existing mixin
+  and deprecation warnings were unchanged.
+- A separate read-only call trace confirmed why frozen PA fields still uploaded
+  changing visual wind. `resolveVisualWind()` falls through to regional
+  `ForecastOrchestrator` wind whenever the average field wind equals zero,
+  despite its own contract reserving that fallback for the absence of fields
+  and cells. The twelve frozen PA_CLUSTER members all carried exact zero wind,
+  while runtime uniforms remained non-zero and variable. The next isolated
+  production correction will preserve exact zero as authoritative whenever a
+  field or cell source exists; regional fallback will remain only for truly
+  empty source lists.
+- The approximately `0.073` precipitation on `cumulus_congestus` is not a random
+  leak: the registry explicitly classifies congestus as precipitating and the
+  backend derives its low intensity from density, coverage and storm potential.
+  That value will not be removed. It animates rain-shaft noise and prevents
+  WorldTime from being excluded from strict comparisons, so a non-precipitating
+  cumulus will be used for the fully controlled temporal run.
+
+## Iteration 165 - authoritative calm wind and footprint-weighted stability telemetry
+
+- The source of the changing wind uniform from Iteration 163 was confirmed in
+  `VolumetricCloudRenderHook.resolveVisualWind()`. The old branch accepted an
+  averaged field/cell wind only when its vector magnitude was non-zero. A real
+  calm field, or several authoritative vectors that cancel, therefore fell
+  through to live regional forecast wind. This contradicted the method's own
+  contract and made a frozen field's material/rain direction change while its
+  geometry stayed fixed.
+- Wind selection now follows source ownership rather than magnitude. A non-empty
+  rendered field list always supplies the average field wind, including exact
+  zero; cells do the same when fields are absent. Regional forecast wind remains
+  the fallback only when neither rendered fields nor rendered cells exist. This
+  is an isolated production correction; precipitation, morphology, density,
+  erosion, lighting, temporal and composite equations remain unchanged.
+- The observational uniform signature was tightened after read-only review.
+  It now controls `WindVec` and excludes only `FrameIndex` and `WorldTime` from
+  scalar uniforms. Reports state separately that the changing history colour
+  and depth sampler contents cannot be fingerprinted; other sampler contents
+  are assumed immutable during a capture.
+- Raw and reconstructed alpha deltas now include an active-union RMS over pixels
+  where either frame exceeds alpha `0.002`. Aggregate values are sample-weighted
+  across that union, so roughly 2,000 cloud pixels cannot be diluted by more
+  than 500,000 empty target pixels or by an empty-sky pair. The report includes
+  the contributing sample count. Self-checks cover identical and perturbed
+  active unions, independent rejection of a changed observation signature, and
+  `n/a` active-union output for an empty sky.
+- A separate backend-contract review found no native-test confound: ownership is
+  exclusive, native hooks/whiteout/density are registered only without Simple
+  Clouds, and the existing native instance contains only Project Atmosphere,
+  Architectury, Cool Rain and Gaboulibs. The generic atmospheric fog handler is
+  not a second cloud backend.
+- Targeted `compileJava`, `testClasses` and
+  `volumetricStabilityDiagnosticsSandbox` passed after the telemetry changes.
+  The complete required group then passed `compileJava`, `processResources`,
+  `cloudFieldSandbox`, `test`, every sandbox reached by `check`, reobfuscation,
+  packaging and `build`. Existing mixin/deprecation warnings are unchanged.
+  `git diff --check` reports no whitespace errors (only existing LF-to-CRLF
+  notices). The fresh JAR SHA-256 is
+  `32272445186258D02872A57416DDE27A7C2A4D6C972E48E05EC14C3E54AE29C7`.
+- Runtime acceptance is deliberately still open. The native instance still has
+  the older `173459F...` artifact. The next run must deploy the exact new hash,
+  use a non-precipitating `cumulus_humilis`, prove `WindVec=0` remains stable,
+  and collect controlled CURRENT/FINAL/history-off active-union RMS. No global
+  keyboard automation will be used; commands will go only through the verified
+  PID/window-targeted Win32 helper.
+
+## Iteration 166 - controlled GPU A/B identifies animated search-phase misses
+
+- The exact `32272445186258D02872A57416DDE27A7C2A4D6C972E48E05EC14C3E54AE29C7`
+  JAR was deployed and re-hashed in the native-only instance. Startup contained
+  Project Atmosphere, Architectury, Cool Rain and Gaboulibs only, selected the
+  native PA service, registered the volumetric shaders and reported no new
+  shader/mixin failure. Every command was sent to Minecraft PID `30512` through
+  the verified window-targeted `PostMessage` helper; no global keyboard input
+  was used.
+- The old restored congestus immediately uploaded exact zero field wind, then a
+  controlled non-precipitating `cumulus_humilis` was created after movement was
+  frozen. Its single saved group had three clusters, `growth=1.00`,
+  `decay=0.00`, density `0.58`, coverage `0.59` and `maxPrecipitation=0`. The
+  spectator camera remained at `[0.5,270.0,-299.5]`; noon and weather cycles
+  were disabled. Across all captures the weather fingerprint stayed
+  `66f6b054a9d2372d`, `WindVec`, material offset and material delta stayed exact
+  zero, scene depth stayed `vanilla_main`, and `worldTimeAffectsDensity=false`.
+  This accepts the Iteration 165 wind-ownership correction at runtime.
+- A requested 16-frame Ultra capture was safely refused by the existing memory
+  guard because its `140544000` bytes exceed the `134217728`-byte limit. The
+  otherwise identical A/B therefore used eight frames. This is a diagnostic
+  capacity result, not a renderer failure.
+- With history OFF, every comparable raw and reconstructed alpha metric was
+  exactly zero, including active-union RMS (`0/4470` raw samples and `0/8796`
+  reconstructed samples). Six pairs were accepted; one pair was conservatively
+  excluded when the comparison signature changed once. The output itself did
+  not change on any accepted pair. The exact scalar responsible for that one
+  signature transition remains unassigned and is not treated as stability.
+- With history ON and raymarch view CURRENT, all seven pairs were controlled.
+  Raw active-union alpha RMS was `0.11004368` (per-pair max `0.12621419`, 5267
+  samples); depth-guided reconstruction reduced it only to `0.06909902` (max
+  `0.08466210`, 10404 samples). With production FINAL, all seven pairs were
+  again controlled, but the corresponding values were `0.11246244` and
+  `0.07040040`. Temporal accumulation therefore does not attenuate the measured
+  stationary silhouette churn; FINAL is effectively as unstable as CURRENT.
+- HISTORY_REJECTION localised why. Across eight frames, 5899 current cloud hits
+  accepted history, 82 had no matching history depth, zero failed depth
+  confidence, zero failed transmittance confidence, and 77 pixels contained
+  screen-space cloud history while the current jittered ray missed. Only about
+  6..14 binary miss pixels per frame are enough to dominate the active-union
+  RMS because the production history branch is entered only when
+  `currentCloudHit` is true. On a current miss it writes empty output and never
+  gives history a chance to integrate the edge.
+- Source tracing connects those misses to the sampling phase, not cloud data.
+  `jitterFrame=FrameIndex` animates the full exterior `fineStep` origin offset;
+  the coarse search can therefore step over a thin edge on one frame and hit it
+  on the next. The four-step bracket refinement runs only after a coarse sample
+  already found material, so it cannot recover a completely skipped lobe.
+  Weather topology, density coordinates and history acceptance stayed stable.
+- Simply freezing all blue noise or retaining screen-space history on every miss
+  is rejected as the next action: the former would regress the accepted
+  Iteration 116 spatial de-correlation, while the latter can ghost during camera
+  movement. The next isolated candidate will split the phase: a static
+  screen-spatial full-step blue phase controls exterior material search, while
+  the animated phase is used only inside an already-confirmed clear/material
+  bracket for sub-step integration. No morphology, density, erosion, lighting,
+  step count, history confidence or composite formula will change in that A/B.
+- Minecraft was closed through a PID-targeted `WM_CLOSE`. `Stopping!`, player
+  save, world save and `All dimensions are saved` were confirmed before source
+  editing.
+
+## Iteration 167 - static search phase candidate prepared for exact replay
+
+- The isolated candidate changes only blue-noise phase ownership in
+  `cloud_atmosphere_volume.fsh`. `searchBlue` is sampled from the original
+  per-pixel blue-noise texture without a frame offset and controls the complete
+  exterior origin phase. `integrationBlue` retains the existing FrameIndex
+  offset/golden-ratio sequence and is consumed only after a deterministic coarse
+  hit has established a clear/material bracket. History-off behavior is
+  unchanged because both phases reduce to the same frame-zero sample there.
+- This retains the full-step spatial de-correlation accepted in Iteration 116;
+  it does not blur density, shrink the jitter distance, invent a history pixel
+  on a miss or add a raymarch step. The causal prediction is narrow: history-on
+  CURRENT/HISTORY_REJECTION occupancy churn must collapse while stable scene,
+  weather, wind and performance remain unchanged. Interior radiance may still
+  vary from animated integration and should then be reduced by FINAL history.
+- The full required validation group passed `compileJava`, `processResources`,
+  `cloudFieldSandbox`, `test`, all topology/motion/material/stability sandboxes,
+  reobfuscation, packaging and `build`. `git diff --check` reports no whitespace
+  errors, only the existing line-ending notices. The candidate JAR SHA-256 is
+  `6E58D5E5336F5C725CF7835618FBF2320ACD4E918991F8C5DBD55236DF6E4BFA`.
+  GLSL compilation and the predicted runtime delta were still unaccepted at
+  this point, pending the native replay recorded below.
+- The exact candidate hash was then deployed to the native-only instance and
+  re-hashed before launch. Project Atmosphere selected its native service with
+  Simple Clouds absent; the volume/composite programs and noise textures loaded,
+  detached `vanilla_main` depth remained valid, and no PA shader, OpenGL or mixin
+  error appeared. Commands were sent only to Minecraft PID `19268` through the
+  window-targeted `PostMessage` helper.
+- The restored baseline group reached the end of its saved lifecycle before the
+  replay. It was not silently reused as an empty-sky sample. A fresh isolated
+  `cumulus_humilis` was spawned at the origin and the spectator camera returned
+  to `[0.5,270.0,-299.5]`. The replacement matured to `growth=1.00`,
+  `decay=0.00`, density `0.58`, coverage `0.60`, five clusters and
+  `maxPrecipitation=0`. This differs from Iteration 166's three-cluster group,
+  so absolute GPU time and footprint size are not claimed as an exact scene A/B.
+  The controlled renderer inputs did match the intended test contract: noon,
+  camera density zero, Ultra `960x540` target into `1280x720`, weather fingerprint
+  `7c82ae1fc62b2d9a`, zero uploaded wind, zero material offset/delta, detached
+  `vanilla_main` depth and `worldTimeAffectsDensity=false`.
+- The history-off control produced identical colour, alpha, cloud-depth, macro
+  and reconstructed hashes in all eight captures. Its opaque comparison hash
+  changed every frame despite the bit-identical outputs, so the diagnostic
+  conservatively reported zero comparable pairs rather than inventing a metric.
+  This exposes a separate observability gap: future reports need per-component
+  signature deltas instead of one unlabelled hash. It is not counted as renderer
+  instability or as proof that an unknown input was harmless.
+- The causal HISTORY_REJECTION prediction passed. Across eight frames the new
+  candidate recorded 9,255 current hits that accepted history, three missing
+  history-depth samples, zero depth mismatches, zero transmittance mismatches and
+  only one stale screen-space history pixel on a current miss. Iteration 166 had
+  5,899 accepted hits, 82 missing depths and 77 stale current-miss pixels. The
+  active footprint itself stayed within 1,156..1,158 low-resolution pixels. This
+  localises the improvement to deterministic exterior occupancy rather than a
+  blurred or reduced cloud.
+- Production FINAL also passed once the fresh field and history had settled.
+  Six consecutive controlled pairs measured raw active-union alpha RMS
+  `0.00046817` (max `0.00054946`, 6,942 samples) and reconstructed active-union
+  alpha RMS `0.00205809` (max `0.00494417`, 13,434 samples). One final pair was
+  conservatively excluded when the comparison signature changed. The prior
+  three-cluster baseline measured `0.11246244` raw and `0.07040040`
+  reconstructed. Because the replacement field is not geometrically identical,
+  these ratios are supporting evidence rather than an exact performance-style
+  A/B; the rejection-state collapse is the direct causal acceptance criterion.
+- Runtime volume GPU samples were approximately `0.66 ms` for the five-field
+  candidate versus roughly `0.57 ms` for the earlier three-field baseline. The
+  scenes differ and the candidate adds one blue-noise texture lookup, so no
+  statistically valid performance delta is claimed. A moving-camera/ghosting
+  validation and close-range visual confirmation remain open. Minecraft was
+  closed through PID-targeted `WM_CLOSE`; `Stopping!`, player/world saves and
+  `All dimensions are saved` were confirmed before further editing.
+
+## Iteration 168 - rejected-pair signatures made causally attributable
+
+- The Iteration 167 history-off replay produced bit-identical colour, alpha,
+  cloud-depth, macro and reconstructed hashes while its aggregate ray-uniform
+  comparison signature changed. Two independent read-only traces localised the
+  opaque delta to `LastDrawInputs.comparisonUniformSignature()`: the aggregate
+  always included `PrevViewProjMat` and `MaterialFrameDelta` even when
+  `HistoryValid=0`, although the shader cannot consume either inactive input.
+  The aggregate also offered no field-level evidence when any genuinely active
+  value changed. No morphology or shader equation was changed on this basis.
+- The strict and observational signatures now include previous view-projection
+  and per-frame material delta only when temporal history is active. The exact
+  audit signature still records them unconditionally. This is a diagnostic
+  contract correction, not a relaxation of renderer controls: current camera
+  matrices, camera position/density, weather uniforms, every lighting input,
+  resolved wind, material offset, quality flags and funnel data remain hashed.
+- On-demand captures now retain separate component signatures for projection,
+  view rotation, both inverse matrices, active previous view-projection,
+  camera position/density, weather uniforms, individual lighting groups, wind,
+  material offset/delta, quality flags and funnels. An incomparable pair reports
+  the exact changed names and before/after hashes instead of only
+  `controlled_input_changed`. The detailed record is created only while a
+  requested batch still needs frames; ordinary gameplay keeps the shared empty
+  record and gains no per-frame diagnostic allocation.
+- Branch self-checks prove that different previous matrices/material deltas
+  collapse to the same inactive signature and remain distinguishable when
+  history is active. Targeted `compileJava`, `testClasses` and
+  `volumetricStabilityDiagnosticsSandbox` passed, including the existing
+  reconstruction, memory-guard and controlled/observational comparison checks.
+  `git diff --check` reports no whitespace errors, only the repository's
+  existing LF-to-CRLF notices.
+- Runtime attribution is deliberately pending. The next native replay will use
+  a frozen non-precipitating cloud and history off to prove whether the prior
+  false invalidations disappear or, if an active value still changes, print its
+  exact component. Only after that logged result will the moving-camera
+  previous-depth-space hypothesis be instrumented. Visual validation will use
+  60--120-block side views plus close under/inside views; the 300-block camera
+  remains a numerical stability rig only.
+- The complete required validation subsequently passed `compileJava`,
+  `processResources`, `cloudFieldSandbox`, `test`, topology, regional-motion,
+  material-advection and volumetric-stability sandboxes, reobfuscation,
+  packaging and `build`. The packaged JAR SHA-256 is
+  `A0D5BBB98299A282F119B3AA4DBF52F6628182E49FCDEB7B3676E46C702F822E`.
+  An independent read-only review found no blocking constructor, publication,
+  branch or allocation defect. It did identify non-blocking future hardening:
+  attribute independent scene-depth-size changes, mirror the exact
+  history-weight/debug predicate when history is valid, and broaden the
+  attribution self-test. None affects the planned history-off replay, so they
+  are recorded rather than mixed into the candidate before runtime evidence.
+
+## Iteration 169 - runtime attribution identifies a subnormal camera-density tail
+
+- The exact diagnostic JAR
+  `A0D5BBB98299A282F119B3AA4DBF52F6628182E49FCDEB7B3676E46C702F822E`
+  was deployed and re-hashed in the native-only instance. Forge loaded Project
+  Atmosphere, Architectury, Cool Rain and Gaboulibs only, selected the native PA
+  service with Simple Clouds absent, compiled the volumetric programs, baked all
+  three noise textures and resolved detached `vanilla_main` depth without a new
+  shader, OpenGL or mixin error. Commands targeted Minecraft PID `15192` only.
+- The first setup was rejected from the logs: `/weather clear` was intercepted
+  as a PA clear-cloud spawn and created a `vapor_cluster` around the camera,
+  forcing `cameraDensity=1` and the dense-camera 0.50 target. Both saved regions
+  and nine runtime fields were cleared. A single `cumulus_humilis` was then
+  spawned at the origin, movement frozen, and the spectator camera returned to
+  `[0.5,270.0,-299.5]`. The accepted field had four clusters centred near
+  `[8.4,255.4,13.5]`, radius about `63`, zero precipitation and exact zero
+  visual wind/material offset/delta. Ultra rendered `960x540` into `1280x720`.
+- In the eight-frame history-off capture, weather
+  (`4e58b78f88651790`), current matrices, camera position, lighting, advection,
+  quality, funnels, composite inputs and scene depth stayed fixed. Every frame
+  had identical low-resolution colour/alpha/depth/macro hashes
+  (`7d48c4f202ff3e48/d630b8397e459827/d28cf8cf9c6e31d0/8ed5c20f998467c5`),
+  exactly 853 paired active pixels, and identical reconstructed alpha/selected
+  hashes (`5b1651341427d559/8030c7129f43ac96`). The rendered result was therefore
+  stationary, but all seven pairs were correctly refused as uncontrolled.
+- Component attribution names the sole changing input:
+  `CameraCloudDensity`. Its raw float bits stepped through positive subnormal
+  values such as `0x3a -> 0x39 -> 0x37 ...`, although decimal status rounded it
+  to `0.000`. The camera was more than 300 blocks from a roughly 63-block field,
+  so `ClientCloudVisualDensity.densityAt()` returns exact zero; the residue came
+  from the earlier inside-cloud sample. `CameraCloudDensityTracker.update()`
+  applies an exponential release and never settles an exact-zero target, so the
+  state eventually decays one subnormal representation at a time.
+- This residue is below every production decision boundary: whiteout starts at
+  `0.03`, dense-target release and history-confidence attenuation at `0.04`,
+  and the shader's inside-cloud branch at `0.08`. It cannot explain the visible
+  cloud instability and did not change a captured pixel, but it prevents a
+  genuinely controlled diagnostic and needlessly uploads denormals. The root
+  correction will make an exact-zero raw target settle to exact zero once the
+  smoothed release is far below all observable thresholds, with a deterministic
+  regression test. It will not remove smoothing at a real cloud boundary.
+- Minecraft was closed through PID-targeted `WM_CLOSE`; `Stopping!`, player and
+  world saves, all three dimensions and `All dimensions are saved` were
+  confirmed before source editing.
+- The isolated tracker candidate retains the original fast-attack/slow-release
+  interpolation, then canonicalises only an exact-zero raw target whose released
+  value is at or below `1e-4`. A non-zero raw sample, even below that epsilon,
+  is explicitly retained; the diagnostic signature is not weakened. The
+  sandbox checks canonical `+0`, the exact runtime `0x3a` subnormal, retention
+  above the settle threshold and retention of a small non-zero raw sample.
+- Targeted compilation and the volumetric-stability sandbox passed, followed by
+  the complete required `compileJava processResources cloudFieldSandbox test
+  build` group. Topology, motion, material-advection and stability sandboxes,
+  reobfuscation and packaging all passed; existing warnings are unchanged and
+  `git diff --check` is clean apart from line-ending notices. Candidate JAR
+  SHA-256: `09C45AB4790A2F29958BBA19FF3B69AC2ECF740D2A85FA14497CAF7EE3A5AF88`.
+  Runtime acceptance used the same history-off numerical replay described below.
+- The exact candidate JAR was deployed and re-hashed in the native-only instance,
+  then launched as Minecraft PID `54896`. Project Atmosphere selected its native
+  backend with Simple Clouds absent; the volume, composite, noise and detached
+  `vanilla_main` depth resources loaded without a PA shader, OpenGL or mixin
+  error. The saved mature `cumulus_humilis` retained UUID
+  `765fffdf-44e5-4159-97f0-33c2cd2bfd2b`, four clusters, centre approximately
+  `[8.4,255.4,13.5]`, radius `65.9`, density `0.56`, coverage `0.60`, full
+  growth and zero precipitation.
+- The camera was first placed inside the field, where runtime telemetry proved
+  `cameraDensity=1.000` and the intended dense-camera resolution scale `0.50`.
+  It was then moved to `[0.5,270.0,-299.5]` and allowed nine seconds to release.
+  Telemetry reached canonical `cameraDensity=0.000` and the normal `0.75`
+  resolution scale, exercising the actual non-zero-to-clear path rather than a
+  process-start zero.
+- The subsequent eight-frame capture produced seven controlled, reconstructed
+  and observed pairs. The comparison signature remained
+  `e6fdd0b2d3fc9f1b`, the ray-comparable signature remained
+  `7665afccf92290bd`, the camera-density component remained
+  `fdea163b9834838e`, and the weather fingerprint remained
+  `4e58b78f88651790`. Every low-resolution colour, alpha, depth and macro hash
+  was stable. Raw alpha RMS, raw active-union alpha RMS, reconstructed alpha RMS
+  and reconstructed active-union alpha RMS were all exactly `0`; the active
+  sample counts were `5,978` raw and `11,550` reconstructed. This causally
+  accepts the exact-zero settling fix and restores controlled stationary tests;
+  it does not claim a visual morphology improvement.
+- Minecraft PID `54896` was closed through targeted `WM_CLOSE`. `Stopping!`,
+  player/world saves, all dimensions and `All dimensions are saved` were
+  confirmed. The next isolated investigation is the moving-camera temporal
+  depth-space comparison; no production depth equation has yet been changed.
+
+## Iteration 170 - instrument the temporal depth-space mismatch before correcting it
+
+- The rewind found this defect was already isolated in Iterations 143 and 160,
+  but deliberately left unfixed until a moving-camera measurement existed.
+  `cloud_atmosphere_volume.fsh` samples `HistoryDepthSampler` at the reprojected
+  previous-frame coordinate `prevUv`, then compares that stored previous-frame
+  depth with `resultDepth` produced by `depthAt(relRepresentative)` through the
+  current `CloudProjMat * ViewRotMat`. Source inspection therefore proves a
+  coordinate-space mismatch; it does not yet prove how many live pixels it
+  falsely accepts or rejects.
+- The next candidate is diagnostic only. A `history_depth_space` raymarch view
+  will evaluate the unchanged production comparison and, beside it, the
+  previous-projection reference derived directly from the same `prevClip.z/w`
+  that produced `prevUv`. Both paths will use the same existing tolerance so
+  this A/B changes only the depth coordinate space. It will encode and log eight
+  mutually exclusive states: history unavailable, projection off-screen,
+  missing depth, both tests reject, current-space rejects/previous-space accepts,
+  current-space accepts/previous-space rejects, both accept, and no current hit.
+- This instrumentation will not alter `depthConfidence`, history weight,
+  temporal blending, raymarch density, reconstruction or production output.
+  The existing diagnostic-view contract freezes the last production target and
+  its matching previous projection/camera/material state, so camera movement can
+  be measured against a coherent history frame. Movement will be delivered only
+  to the verified Minecraft PID/HWND through `PostMessage`; global keyboard
+  injection and `SendKeys` remain prohibited.
+- The diagnostic implementation exposes continuous current-space and
+  previous-space confidence in the low-resolution target, plus explicit status
+  values for unavailable, off-screen and missing-depth cases. CPU analysis
+  reports named accept/reject combinations, confidence means/deltas and an
+  aggregate independent of frame-pair comparability. A synthetic eight-pixel
+  fixture covers every category, including the exact `0.5` acceptance boundary.
+  Targeted `compileJava`, `processResources`, `testClasses` and
+  `volumetricStabilityDiagnosticsSandbox` passed. The sandbox explicitly
+  accepted the new decoder; runtime GLSL compilation and moving-camera counts
+  remain pending.
+- The complete required `compileJava processResources cloudFieldSandbox test
+  build` group also passed, including topology, regional-motion,
+  material-advection and volumetric-stability sandboxes, reobfuscation and
+  packaging. `git diff --check` reports no whitespace error, only the existing
+  line-ending notices. The diagnostic JAR SHA-256 is
+  `FE1AAD54FE9920772C77DD33FED091E23AD4EA7C7FBB682455BA933CA76133F8`.
+- A read-only implementation review found no Java/GLSL wiring blocker, but it
+  identified two diagnostic-precision issues to correct before runtime. The
+  production depth confidence is a continuous weight, so the report must call
+  its `0.5` split “below/at-least-half” rather than imply a hard production
+  accept/reject. The reprojected Z coordinate also needs an explicit NDC range
+  check so a point outside the previous clip volume is not counted as an
+  evaluated candidate after clamping. The review also noted pre-existing
+  screen-space history reads on current misses in `FINAL`; that performance
+  issue is recorded but will not be mixed into this causal depth experiment.

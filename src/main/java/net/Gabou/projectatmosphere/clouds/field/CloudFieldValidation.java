@@ -1,5 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldFactory;
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSource;
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSourceType;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.minecraft.world.phys.Vec3;
 
@@ -94,6 +97,7 @@ public final class CloudFieldValidation {
             issues.add("different cloudlet ids produced identical layout");
         }
         validateMorphologyLayouts(issues, snapshotFactory, context);
+        validateCanonicalClusterProjection(issues);
 
         CloudField movedField = field.withCenter(
                 new Vec3(25.0D, field.center().y(), -10.0D),
@@ -159,6 +163,134 @@ public final class CloudFieldValidation {
         issues.addAll(validate(snapshot));
         issues.addAll(validate(runtime));
         return List.copyOf(issues);
+    }
+
+    private static void validateCanonicalClusterProjection(List<String> issues) {
+        CloudFieldFactory factory = new CloudFieldFactory();
+        CloudFieldSource first = sampleClusterSource(0x1234L);
+        CloudFieldSource reseeded = sampleClusterSource(0x5678L);
+        if (factory.cloudletCountFor(first) != 0) {
+            issues.add("PA_CLUSTER source generated a duplicate CloudletLayout budget");
+        }
+        if (!factory.fieldIdFor(first).equals(factory.fieldIdFor(reseeded))) {
+            issues.add("PA_CLUSTER identity changed when only its material seed changed");
+        }
+        CloudField projected = factory.create(first).orElse(null);
+        if (projected == null || projected.cloudletCount() != 0) {
+            issues.add("PA_CLUSTER did not produce one direct zero-cloudlet field projection");
+            return;
+        }
+        if (!projected.morphologyMembership().equals(first.morphologyMembership())) {
+            issues.add("PA_CLUSTER projection discarded canonical morphology membership");
+        }
+        if (!projected.withCenter(projected.center().add(1.0D, 0.0D, 0.0D), 1L)
+                .morphologyMembership().equals(first.morphologyMembership())
+                || !projected.withScalars(0.5F, 0.5F, 1.0F, 0.0F)
+                .morphologyMembership().equals(first.morphologyMembership())
+                || !projected.withCloudletCount(0)
+                .morphologyMembership().equals(first.morphologyMembership())) {
+            issues.add("CloudField copy helper changed canonical morphology membership");
+        }
+        CloudField lifecycleProbe = projected.withScalars(0.72F, 0.68F, 0.35F, 0.20F);
+        CloudFieldSnapshotFactory snapshotFactory = new CloudFieldSnapshotFactory();
+        CloudFieldTickContext snapshotContext = CloudFieldTickContext.of(Vec3.ZERO, 200L, 1.0F);
+        CloudFieldSnapshot authoritativeSnapshot = snapshotFactory.create(
+                lifecycleProbe,
+                null,
+                snapshotContext,
+                CloudFieldSourceKind.PA_CLUSTER
+        );
+        float expectedAuthoritativeDensity = lifecycleProbe.density();
+        float expectedAuthoritativeCoverage = lifecycleProbe.coverage();
+        if (Math.abs(authoritativeSnapshot.effectiveDensity() - expectedAuthoritativeDensity) > 0.000001F
+                || Math.abs(authoritativeSnapshot.effectiveCoverage() - expectedAuthoritativeCoverage) > 0.000001F) {
+            issues.add("PA_CLUSTER snapshot applied its authoritative lifecycle scalars twice");
+        }
+        if (Math.abs(authoritativeSnapshot.visualLifecycleStage() - 0.5F) > 0.000001F) {
+            issues.add("PA_CLUSTER snapshot exposed an already-integrated lifecycle envelope to the GPU");
+        }
+        CloudFieldSnapshot derivedSnapshot = snapshotFactory.create(
+                lifecycleProbe,
+                null,
+                snapshotContext,
+                CloudFieldSourceKind.UNKNOWN
+        );
+        float expectedDerivedDensity = lifecycleProbe.density()
+                * lifecycleProbe.growth() * (1.0F - lifecycleProbe.decay());
+        float expectedDerivedCoverage = lifecycleProbe.coverage()
+                * lifecycleProbe.growth() * (1.0F - lifecycleProbe.decay());
+        if (Math.abs(derivedSnapshot.effectiveDensity() - expectedDerivedDensity) > 0.000001F
+                || Math.abs(derivedSnapshot.effectiveCoverage() - expectedDerivedCoverage) > 0.000001F) {
+            issues.add("derived CloudField snapshot lost its lifecycle envelope");
+        }
+        if (Math.abs(derivedSnapshot.visualLifecycleStage() - derivedSnapshot.lifecycleStage()) > 0.000001F) {
+            issues.add("derived CloudField snapshot lost its shader lifecycle stage");
+        }
+        validateStructuredTowerStages(issues);
+        CloudFieldLifecycleController controller = CloudFieldLifecycleController.defaultController();
+        CloudField stale = projected.withCenter(projected.center().add(32.0D, 0.0D, -12.0D), 9_999L);
+        CloudFieldLifecycleController.TickResult result = controller.tick(
+                stale,
+                null,
+                CloudFieldTickContext.of(Vec3.ZERO, 200L, 1.0F),
+                first,
+                0
+        );
+        if (!sameVec(result.field().center(), first.center())
+                || result.field().ageTicks() != first.ageTicks()
+                || result.field().seed() != first.seed()
+                || !result.field().morphologyMembership().equals(first.morphologyMembership())) {
+            issues.add("PA_CLUSTER lifecycle applied a second simulation instead of exact projection");
+        }
+    }
+
+    private static void validateStructuredTowerStages(List<String> issues) {
+        UUID groupId = new UUID(0x143L, 0x12L);
+        int[] counts = new int[CloudMorphologyMembership.Stage.values().length];
+        for (int index = 0; index < 12; index++) {
+            CloudMorphologyMembership membership = new CloudMorphologyMembership(groupId, index, 12);
+            counts[membership.stageFor(CloudMorphologyFamily.TOWER).ordinal()]++;
+        }
+        if (counts[CloudMorphologyMembership.Stage.BASE.ordinal()] != 4
+                || counts[CloudMorphologyMembership.Stage.CORE.ordinal()] != 3
+                || counts[CloudMorphologyMembership.Stage.TOWER.ordinal()] != 3
+                || counts[CloudMorphologyMembership.Stage.CROWN.ordinal()] != 2) {
+            issues.add("structured TOWER membership did not resolve to 4/3/3/2 stages");
+        }
+        CloudMorphologyMembership legacyCap = new CloudMorphologyMembership(groupId, 8, 9);
+        if (legacyCap.stageFor(CloudMorphologyFamily.TOWER)
+                != CloudMorphologyMembership.Stage.CROWN) {
+            issues.add("legacy nine-lobe TOWER cap lost its CROWN fallback");
+        }
+    }
+
+    private static CloudFieldSource sampleClusterSource(long seed) {
+        return new CloudFieldSource(
+                "00000000-0000-0000-0000-000000000143",
+                CloudFieldSourceType.PA_CLUSTER,
+                "minecraft:overworld",
+                new Vec3(24.0D, 220.0D, -16.0D),
+                48.0F,
+                180.0F,
+                292.0F,
+                0.72F,
+                0.68F,
+                0.70F,
+                new Vec3(0.08D, 0.0D, -0.03D),
+                1.0F,
+                0.0F,
+                0.82F,
+                0.35F,
+                0.0F,
+                seed,
+                120L,
+                12_000L,
+                64,
+                "cumulus_congestus",
+                "tower",
+                new CloudMorphologyMembership(new UUID(0x143L, 0x12L), 7, 12),
+                true
+        );
     }
 
     private static CloudField sampleField(Vec3 center) {

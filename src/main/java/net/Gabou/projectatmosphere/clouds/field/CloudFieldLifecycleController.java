@@ -1,6 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
 import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSource;
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSourceType;
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldFactory;
 
 import java.util.Objects;
 
@@ -10,6 +12,7 @@ import java.util.Objects;
  * this controller keeps LOD classification and runtime hydration wiring.
  */
 public final class CloudFieldLifecycleController {
+    private static final CloudFieldFactory CANONICAL_FIELD_FACTORY = new CloudFieldFactory();
     private final CloudFieldDistanceClassifier distanceClassifier;
     private final CloudFieldHydrationController hydrationController;
     private final CloudFieldTargetResolver targetResolver;
@@ -86,6 +89,29 @@ public final class CloudFieldLifecycleController {
         CloudFieldTickContext tickContext = context == null
                 ? CloudFieldTickContext.of(field.center(), 0L, 0.0F)
                 : context;
+
+        if (source != null
+                && source.sourceType() == CloudFieldSourceType.PA_CLUSTER
+                && source.isUsable()
+                && missingSourceTicks <= 0) {
+            CloudField projected = CANONICAL_FIELD_FACTORY.create(source).orElse(field);
+            CloudFieldDistanceClassifier classifier = tickContext.distanceClassifier() == null
+                    ? distanceClassifier
+                    : tickContext.distanceClassifier();
+            CloudLodBand lodBand = classifier.classify(projected, tickContext.cameraPosition());
+            CloudFieldRuntimeState prior = runtimeState == null
+                    ? CloudFieldRuntimeState.initial(projected, lodBand, tickContext.worldTime())
+                    : runtimeState;
+            CloudFieldRuntimeState updatedRuntime = hydrationController.update(
+                    projected,
+                    prior,
+                    lodBand,
+                    tickContext.worldTime(),
+                    tickContext.deltaTicks(),
+                    field.center()
+            );
+            return new TickResult(projected, updatedRuntime);
+        }
 
         CloudFieldTarget target = targetResolver.resolve(field, source, missingSourceTicks);
         CloudField advancedField = evolutionController.evolve(field, target, tickContext);

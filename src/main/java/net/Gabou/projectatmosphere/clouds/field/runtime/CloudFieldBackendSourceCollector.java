@@ -66,7 +66,7 @@ public final class CloudFieldBackendSourceCollector {
 
         int sampledClusterCount = 0;
         int activeClusterCountTotal = 0;
-        int regionSourceCount = 0;
+        int paClusterSourceCount = 0;
         int rejectedCandidates = 0;
         int rejectedNoRegionState = 0;
         int rejectedNoAtmosphereState = 0;
@@ -81,7 +81,9 @@ public final class CloudFieldBackendSourceCollector {
         int rejectedOther = 0;
         int weatherRegionsWithoutCloudRegion = 0;
 
-        for (CloudRegionState region : activeRegions) {
+        List<CloudRegionState> orderedActiveRegions = new ArrayList<>(activeRegions);
+        orderedActiveRegions.sort(Comparator.comparing(CloudRegionState::getRegionId));
+        for (CloudRegionState region : orderedActiveRegions) {
             if (region == null) {
                 rejectedCandidates++;
                 rejectedOther++;
@@ -98,7 +100,9 @@ public final class CloudFieldBackendSourceCollector {
                 continue;
             }
 
-            for (CloudClusterState cluster : region.getClusters()) {
+            List<CloudClusterState> orderedClusters = new ArrayList<>(region.getClusters());
+            orderedClusters.sort(Comparator.comparing(CloudClusterState::getClusterId));
+            for (CloudClusterState cluster : orderedClusters) {
                 sampledClusterCount++;
                 if (cluster == null || !cluster.isActive()) {
                     rejectedCandidates++;
@@ -111,21 +115,20 @@ public final class CloudFieldBackendSourceCollector {
                     continue;
                 }
                 activeClusterCountTotal++;
-            }
-
-            CloudFieldSource source = adapter.fromRegion(region);
-            if (source.isUsable()) {
-                sources.add(source);
-                regionSourceCount++;
-            } else {
-                rejectedCandidates++;
-                rejectedOther++;
+                CloudFieldSource source = adapter.fromCluster(region, cluster);
+                if (source.isUsable()) {
+                    sources.add(source);
+                    paClusterSourceCount++;
+                } else {
+                    rejectedCandidates++;
+                    rejectedOther++;
+                }
             }
         }
 
         int weatherFallbackCandidates = 0;
         int weatherFallbackCreated = 0;
-        if (regionSourceCount == 0) {
+        if (paClusterSourceCount == 0) {
             for (RegionInstanceKey key : sampledKeys.stream().sorted(regionKeyComparator()).toList()) {
                 if (weatherFallbackCreated >= MAX_WEATHER_SUMMARY_SOURCES) {
                     break;
@@ -197,7 +200,7 @@ public final class CloudFieldBackendSourceCollector {
                 activeRegions.size(),
                 sampledClusterCount,
                 activeClusterCountTotal,
-                regionSourceCount,
+                paClusterSourceCount,
                 sampledKeys.size(),
                 weatherRegionsWithoutCloudRegion,
                 weatherFallbackCandidates,
@@ -372,7 +375,7 @@ public final class CloudFieldBackendSourceCollector {
             int activeRegionCount,
             int sampledPaClusterCount,
             int activeClusterCount,
-            int regionSourceCount,
+            int paClusterSourceCount,
             int sampledWeatherRegionCount,
             int weatherRegionsWithoutCloudRegion,
             int weatherFallbackCandidateCount,

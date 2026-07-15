@@ -106,6 +106,7 @@ public final class VolumetricCloudClientLifecycle {
     public static void onBackendChanged() {
         ClientCloudVisualDensity.clear();
         CameraCloudDensityTracker.reset();
+        VolumetricCloudRenderHook.resetMaterialAdvection();
         runOnRenderThread(() -> releaseRenderResources(false));
     }
 
@@ -115,6 +116,7 @@ public final class VolumetricCloudClientLifecycle {
     }
 
     private static void clearClientCaches() {
+        VolumetricCloudRenderHook.resetMaterialAdvection();
         ClientCloudRenderOwnership.reset();
         ClientCloudCellCache.clear();
         ClientCloudFieldCache.clear();
@@ -137,6 +139,8 @@ public final class VolumetricCloudClientLifecycle {
         FullscreenQuad.shutdown();
         SceneDepthResolver.shutdown();
         CloudCellAnalyticsPass.shutdown();
+        VolumetricCloudFrameDiagnostics.shutdownCumulusStageCapture();
+        VolumetricCloudFrameDiagnostics.shutdownStabilityCapture();
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
             SimpleCloudsClientHooks.releaseRenderResources();
         }
