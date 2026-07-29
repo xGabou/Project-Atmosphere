@@ -29,6 +29,7 @@ public final class SyncCloudFieldsPacket {
     private static final int VERSION_SOURCE_KIND = 2;
     private static final int VERSION_MORPHOLOGY = 3;
     private static final int VERSION_MORPHOLOGY_MEMBERSHIP = 4;
+    private static final int VERSION_MORPHOLOGY_LAYOUT = 5;
 
     private final List<CloudFieldSnapshot> fields;
 
@@ -57,7 +58,7 @@ public final class SyncCloudFieldsPacket {
 
     public void encode(FriendlyByteBuf buffer) {
         buffer.writeVarInt(VERSION_MARKER);
-        buffer.writeVarInt(VERSION_MORPHOLOGY_MEMBERSHIP);
+        buffer.writeVarInt(VERSION_MORPHOLOGY_LAYOUT);
         buffer.writeVarInt(fields.size());
         for (CloudFieldSnapshot snapshot : fields) {
             encodeSnapshot(buffer, snapshot);
@@ -98,6 +99,8 @@ public final class SyncCloudFieldsPacket {
         buffer.writeUUID(snapshot.morphologyMembership().groupId());
         buffer.writeVarInt(snapshot.morphologyMembership().memberIndex());
         buffer.writeVarInt(snapshot.morphologyMembership().memberCount());
+        buffer.writeVarInt(snapshot.morphologyMembership().layoutVersion());
+        buffer.writeEnum(snapshot.morphologyMembership().memberTier());
         buffer.writeFloat(snapshot.anvilStrength());
         buffer.writeFloat(snapshot.precipitationIntensity());
         buffer.writeEnum(snapshot.sourceKind());
@@ -135,13 +138,24 @@ public final class SyncCloudFieldsPacket {
         CloudMorphologyFamily morphologyFamily = version >= VERSION_MORPHOLOGY
                 ? buffer.readEnum(CloudMorphologyFamily.class)
                 : CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily();
-        CloudMorphologyMembership morphologyMembership = version >= VERSION_MORPHOLOGY_MEMBERSHIP
-                ? new CloudMorphologyMembership(
+        CloudMorphologyMembership morphologyMembership;
+        if (version >= VERSION_MORPHOLOGY_LAYOUT) {
+            morphologyMembership = new CloudMorphologyMembership(
+                    buffer.readUUID(),
+                    buffer.readVarInt(),
+                    buffer.readVarInt(),
+                    buffer.readVarInt(),
+                    buffer.readEnum(net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier.class)
+            );
+        } else if (version >= VERSION_MORPHOLOGY_MEMBERSHIP) {
+            morphologyMembership = new CloudMorphologyMembership(
                     buffer.readUUID(),
                     buffer.readVarInt(),
                     buffer.readVarInt()
-                )
-                : CloudMorphologyMembership.single(fieldId);
+            );
+        } else {
+            morphologyMembership = CloudMorphologyMembership.single(fieldId);
+        }
         float anvilStrength = version >= VERSION_MORPHOLOGY ? buffer.readFloat() : 0.0F;
         float precipitationIntensity = version >= VERSION_MORPHOLOGY ? buffer.readFloat() : 0.0F;
         CloudFieldSourceKind sourceKind = version >= VERSION_SOURCE_KIND

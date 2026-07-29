@@ -1,9 +1,13 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
+import io.netty.buffer.Unpooled;
 import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldFactory;
 import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSource;
 import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldSourceType;
+import net.Gabou.projectatmosphere.clouds.field.network.SyncCloudFieldsPacket;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -86,6 +90,7 @@ public final class CloudFieldValidation {
         );
         CloudFieldTickContext context = CloudFieldTickContext.of(new Vec3(0.0D, 128.0D, 0.0D), 100L, 1.0F);
         CloudFieldSnapshot snapshot = snapshotFactory.create(field, runtime, context);
+        validateMorphologyPacketRoundTrip(issues, snapshot);
 
         CloudletLayout.Cloudlet id3A = CloudletLayout.generate(snapshot, CloudletId.of(3));
         CloudletLayout.Cloudlet id3B = CloudletLayout.generate(snapshot, CloudletId.of(3));
@@ -227,6 +232,7 @@ public final class CloudFieldValidation {
             issues.add("derived CloudField snapshot lost its shader lifecycle stage");
         }
         validateStructuredTowerStages(issues);
+        validateStructuredPuffStages(issues);
         CloudFieldLifecycleController controller = CloudFieldLifecycleController.defaultController();
         CloudField stale = projected.withCenter(projected.center().add(32.0D, 0.0D, -12.0D), 9_999L);
         CloudFieldLifecycleController.TickResult result = controller.tick(
@@ -261,6 +267,78 @@ public final class CloudFieldValidation {
         if (legacyCap.stageFor(CloudMorphologyFamily.TOWER)
                 != CloudMorphologyMembership.Stage.CROWN) {
             issues.add("legacy nine-lobe TOWER cap lost its CROWN fallback");
+        }
+    }
+
+    private static void validateStructuredPuffStages(List<String> issues) {
+        UUID groupId = new UUID(0x143L, 0x50FFL);
+        int[] counts = new int[CloudMorphologyMembership.Stage.values().length];
+        for (int index = 0; index < 5; index++) {
+            CloudMorphologyMembership membership = new CloudMorphologyMembership(groupId, index, 5);
+            counts[membership.stageFor(CloudMorphologyFamily.PUFF).ordinal()]++;
+        }
+        if (counts[CloudMorphologyMembership.Stage.BASE.ordinal()] != 5
+                || counts[CloudMorphologyMembership.Stage.CORE.ordinal()] != 0
+                || counts[CloudMorphologyMembership.Stage.CROWN.ordinal()] != 0
+                || counts[CloudMorphologyMembership.Stage.TOWER.ordinal()] != 0
+                || counts[CloudMorphologyMembership.Stage.MACRO.ordinal()] != 0) {
+            issues.add("grouped PUFF membership did not preserve all five sibling lobes in one stage");
+        }
+        CloudMorphologyMembership twoLobePuff = new CloudMorphologyMembership(groupId, 1, 2);
+        if (twoLobePuff.stageFor(CloudMorphologyFamily.PUFF)
+                != CloudMorphologyMembership.Stage.MACRO) {
+            issues.add("two-lobe PUFF fallback no longer uses the stable macro path");
+        }
+
+        CloudMorphologyMemberTier[] expected = {
+                CloudMorphologyMemberTier.BASE,
+                CloudMorphologyMemberTier.BASE,
+                CloudMorphologyMemberTier.BASE,
+                CloudMorphologyMemberTier.BASE,
+                CloudMorphologyMemberTier.MIDDLE,
+                CloudMorphologyMemberTier.MIDDLE,
+                CloudMorphologyMemberTier.CROWN
+        };
+        for (int index = 0; index < expected.length; index++) {
+            CloudMorphologyMembership versioned = new CloudMorphologyMembership(
+                    groupId,
+                    index,
+                    expected.length,
+                    1,
+                    expected[index]
+            );
+            if (versioned.layoutVersion() != 1 || versioned.memberTier() != expected[index]) {
+                issues.add("versioned PUFF tier was not retained at index " + index);
+            }
+        }
+        CloudMorphologyMembership legacy = new CloudMorphologyMembership(
+                groupId,
+                6,
+                7,
+                0,
+                CloudMorphologyMemberTier.CROWN
+        );
+        if (legacy.memberTier() != CloudMorphologyMemberTier.UNKNOWN) {
+            issues.add("legacy PUFF membership invented a semantic tier");
+        }
+    }
+
+    private static void validateMorphologyPacketRoundTrip(
+            List<String> issues,
+            CloudFieldSnapshot snapshot
+    ) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            SyncCloudFieldsPacket original = new SyncCloudFieldsPacket(List.of(snapshot));
+            original.encode(buffer);
+            SyncCloudFieldsPacket decoded = SyncCloudFieldsPacket.decode(buffer);
+            if (decoded.fields().size() != 1
+                    || !decoded.fields().get(0).morphologyMembership()
+                    .equals(snapshot.morphologyMembership())) {
+                issues.add("versioned morphology membership changed during packet round-trip");
+            }
+        } finally {
+            buffer.release();
         }
     }
 
@@ -310,8 +388,18 @@ public final class CloudFieldValidation {
         boolean filament = morphology == CloudMorphologyFamily.FILAMENT;
         float baseY = filament ? 280.0F : (sheet ? 150.0F : 120.0F);
         float topY = filament ? 310.0F : (sheet ? 188.0F : (storm ? 360.0F : (tower ? 270.0F : 220.0F)));
+        UUID fieldId = new UUID(0L, 0x143L + morphology.ordinal());
+        CloudMorphologyMembership membership = morphology == CloudMorphologyFamily.PUFF
+                ? new CloudMorphologyMembership(
+                fieldId,
+                0,
+                7,
+                1,
+                CloudMorphologyMemberTier.BASE
+        )
+                : CloudMorphologyMembership.single(fieldId);
         return new CloudField(
-                new UUID(0L, 0x143L + morphology.ordinal()),
+                fieldId,
                 987654321L,
                 "minecraft:overworld",
                 center,
@@ -328,6 +416,7 @@ public final class CloudFieldValidation {
                 storm ? 0.95F : 0.20F,
                 cloudTypeId,
                 morphology,
+                membership,
                 storm ? 0.88F : 0.0F,
                 storm || "nimbostratus".equals(cloudTypeId) ? 0.82F : 0.0F,
                 32,

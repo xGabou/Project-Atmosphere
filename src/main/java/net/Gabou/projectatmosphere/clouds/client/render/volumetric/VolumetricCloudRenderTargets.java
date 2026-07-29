@@ -24,6 +24,7 @@ public final class VolumetricCloudRenderTargets {
     private static RenderTarget stormStructureTarget;
     private static RenderTarget stormLayerHeightTarget;
     private static RenderTarget stormTowerTarget;
+    private static RenderTarget puffCandidateTarget;
     private static RenderTarget shadowTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
     private static int currentIndex;
@@ -73,6 +74,20 @@ public final class VolumetricCloudRenderTargets {
             morphologyTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
         }
         return morphologyTarget;
+    }
+
+    /** Eight packed native-PUFF descriptor indices per conservative world tile. */
+    public static RenderTarget preparePuffCandidateTarget() {
+        int size = PuffLobeSpatialIndex.GRID_SIZE;
+        if (puffCandidateTarget == null || puffCandidateTarget.width != size) {
+            if (puffCandidateTarget != null) {
+                puffCandidateTarget.destroyBuffers();
+            }
+            puffCandidateTarget = createHalfFloatMap(size);
+            // Packed integer digits must never interpolate across tile edges.
+            puffCandidateTarget.setFilterMode(GL11.GL_NEAREST);
+        }
+        return puffCandidateTarget;
     }
 
     /** Independent BASE/CORE/TOWER/CROWN supports for native profile-3 clouds. */
@@ -196,6 +211,10 @@ public final class VolumetricCloudRenderTargets {
         return stormTowerTarget;
     }
 
+    public static RenderTarget puffCandidateTargetOrNull() {
+        return puffCandidateTarget;
+    }
+
     /**
      * Prepares the pair of raymarch targets at the requested scale of the main
      * target. Invalidate history on any resize.
@@ -302,6 +321,10 @@ public final class VolumetricCloudRenderTargets {
         if (stormTowerTarget != null) {
             stormTowerTarget.destroyBuffers();
             stormTowerTarget = null;
+        }
+        if (puffCandidateTarget != null) {
+            puffCandidateTarget.destroyBuffers();
+            puffCandidateTarget = null;
         }
         if (shadowTarget != null) {
             shadowTarget.destroyBuffers();

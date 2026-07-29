@@ -12,6 +12,7 @@ import net.Gabou.projectatmosphere.clouds.client.CloudRenderStateHolder;
 import net.Gabou.projectatmosphere.clouds.client.debug.field.CloudFieldDebugRenderConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderDebugMode;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudRenderStateGuard;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeDebugMode;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeRenderFilter;
@@ -20,11 +21,16 @@ import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeTu
 import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldVolumeTuneTarget;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CloudWeatherMapRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.PuffLobeSpatialIndex;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudFrameDiagnostics;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudDebugConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderer;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRaymarchDebugView;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricPuffShapeMode;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricPuffDensityStage;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricPuffTierFilter;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.telemetry.TelemetryExportService;
 import net.Gabou.projectatmosphere.tools.debug.WorldSpaceDebugCubeRenderer;
@@ -135,6 +141,10 @@ public class TelemetryDebugClientCommand {
                                                 ctx.getSource(),
                                                 IntegerArgumentType.getInteger(ctx, "frames")
                                         ))))
+                        .then(Commands.literal("puffIndex")
+                                .executes(ctx -> verifyVolumetricPuffIndex(ctx.getSource())))
+                        .then(Commands.literal("renderState")
+                                .executes(ctx -> verifyVolumetricRenderState(ctx.getSource())))
                         .then(Commands.literal("log")
                                 .executes(ctx -> sendVolumetricDiagnosticsLogStatus(ctx.getSource()))
                                 .then(Commands.literal("on")
@@ -167,13 +177,36 @@ public class TelemetryDebugClientCommand {
                                         .executes(ctx -> setVolumetricAdaptiveWeatherFootprint(ctx.getSource(), true)))
                                 .then(Commands.literal("off")
                                         .executes(ctx -> setVolumetricAdaptiveWeatherFootprint(ctx.getSource(), false))))
-                        .then(Commands.literal("history")
+                        .then(Commands.literal("structuredPuff")
                                 .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
                                 .then(Commands.literal("on")
-                                        .executes(ctx -> setVolumetricHistory(ctx.getSource(), true)))
+                                        .executes(ctx -> setVolumetricStructuredPuff(ctx.getSource(), true)))
                                 .then(Commands.literal("off")
-                                        .executes(ctx -> setVolumetricHistory(ctx.getSource(), false))))
-                        .then(buildVolumetricRaymarchViewCommand())
+                                        .executes(ctx -> setVolumetricStructuredPuff(ctx.getSource(), false))))
+                         .then(Commands.literal("directPuff")
+                                 .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                 .then(Commands.literal("on")
+                                         .executes(ctx -> setVolumetricPuffShapeMode(
+                                                 ctx.getSource(), VolumetricPuffShapeMode.HYBRID)))
+                                 .then(Commands.literal("off")
+                                         .executes(ctx -> setVolumetricPuffShapeMode(
+                                                 ctx.getSource(), VolumetricPuffShapeMode.FALLBACK_ONLY)))
+                                 .then(Commands.literal("only")
+                                         .executes(ctx -> setVolumetricPuffShapeMode(
+                                                 ctx.getSource(), VolumetricPuffShapeMode.DIRECT_ONLY))))
+                        .then(buildVolumetricPuffDensityCommand())
+                        .then(buildVolumetricPuffTierFilterCommand())
+                         .then(Commands.literal("history")
+                                 .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                 .then(Commands.literal("on")
+                                         .executes(ctx -> setVolumetricHistory(ctx.getSource(), true)))
+                                 .then(Commands.literal("off")
+                                         .executes(ctx -> setVolumetricHistory(ctx.getSource(), false))))
+                        .then(Commands.literal("governor")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("reset")
+                                        .executes(ctx -> resetVolumetricGovernor(ctx.getSource()))))
+                         .then(buildVolumetricRaymarchViewCommand())
                         .then(Commands.literal("sentinelHeights")
                                 .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
                                 .then(Commands.literal("on")
@@ -256,6 +289,25 @@ public class TelemetryDebugClientCommand {
         return result.startsWith("requested") ? 1 : 0;
     }
 
+    private static int verifyVolumetricPuffIndex(CommandSourceStack source) {
+        String result = PuffLobeSpatialIndex.verifyCurrentRepresentation();
+        source.sendSuccess(
+                () -> Component.literal("PUFF index verification written to latest.log\n" + result),
+                false
+        );
+        return result.startsWith("unavailable") ? 0 : 1;
+    }
+
+    private static int verifyVolumetricRenderState(CommandSourceStack source) {
+        String result = CloudRenderStateGuard.verifyTextureStateRoundTrip();
+        ProjectAtmosphere.LOGGER.info("[VolumetricClouds] render-state probe {}", result);
+        source.sendSuccess(
+                () -> Component.literal("Volumetric render-state probe " + result),
+                false
+        );
+        return result.startsWith("passed") ? 1 : 0;
+    }
+
     private static int sendVolumetricDebugStatus(CommandSourceStack source) {
         source.sendSuccess(
                 () -> Component.literal("Volumetric cloud debug\n" + VolumetricCloudDebugConfig.status()),
@@ -315,6 +367,89 @@ public class TelemetryDebugClientCommand {
         source.sendSuccess(
                 () -> Component.literal("Volumetric cloud debug history " + (enabled ? "on" : "off")),
                 false);
+        return 1;
+    }
+
+    private static int setVolumetricStructuredPuff(CommandSourceStack source, boolean enabled) {
+        VolumetricCloudDebugConfig.setStructuredPuffEnabled(enabled);
+        CloudWeatherMapRenderer.invalidateCache();
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug structuredPuff "
+                        + (enabled ? "on" : "off")),
+                false);
+        return 1;
+    }
+
+    private static int setVolumetricPuffShapeMode(
+            CommandSourceStack source,
+            VolumetricPuffShapeMode mode
+    ) {
+        VolumetricCloudDebugConfig.setPuffShapeMode(mode);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug puffShape " + mode.serializedName()),
+                false);
+        return 1;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildVolumetricPuffDensityCommand() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("puffDensity")
+                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()));
+        for (VolumetricPuffDensityStage stage : VolumetricPuffDensityStage.values()) {
+            root.then(Commands.literal(stage.serializedName())
+                    .executes(ctx -> setVolumetricPuffDensityStage(ctx.getSource(), stage)));
+        }
+        return root;
+    }
+
+    private static int setVolumetricPuffDensityStage(
+            CommandSourceStack source,
+            VolumetricPuffDensityStage stage
+    ) {
+        if (stage.isDiagnostic() && !PuffLobeSpatialIndex.directRepresentationComplete()) {
+            source.sendFailure(Component.literal(
+                    "Cannot select puffDensity " + stage.serializedName()
+                            + ": direct PUFF representation is incomplete. "
+                            + PuffLobeSpatialIndex.status()
+            ));
+            return 0;
+        }
+        // Diagnostic stages are interpreted as direct-only by the central
+        // effective-mode contract. Do not mutate the user's requested shape
+        // mode: returning to FINAL must restore it automatically.
+        VolumetricCloudDebugConfig.setPuffDensityStage(stage);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Volumetric cloud debug puffDensity " + stage.serializedName()
+                                + (stage.isDiagnostic() ? " (direct-only, complete)" : "")
+                ),
+                false
+        );
+        return 1;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> buildVolumetricPuffTierFilterCommand() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("puffTier")
+                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()));
+        for (VolumetricPuffTierFilter filter : VolumetricPuffTierFilter.values()) {
+            root.then(Commands.literal(filter.serializedName())
+                    .executes(ctx -> setVolumetricPuffTierFilter(ctx.getSource(), filter)));
+        }
+        return root;
+    }
+
+    private static int setVolumetricPuffTierFilter(
+            CommandSourceStack source,
+            VolumetricPuffTierFilter filter
+    ) {
+        VolumetricCloudDebugConfig.setPuffTierFilter(filter);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud debug puffTier " + filter.serializedName()),
+                false
+        );
         return 1;
     }
 
@@ -425,6 +560,17 @@ public class TelemetryDebugClientCommand {
                 () -> Component.literal("Volumetric cloud pipeline runtime switch: " + (enabled ? "on" : "off")
                         + (enabled ? "" : " (legacy CloudField volume renderer takes over next frame)")),
                 false);
+        return 1;
+    }
+
+    private static int resetVolumetricGovernor(CommandSourceStack source) {
+        VolumetricCloudRenderer.resetGovernor();
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("Volumetric cloud governor reset; scale="
+                        + VolumetricCloudRenderer.governorStepScale()),
+                false
+        );
         return 1;
     }
 

@@ -3,9 +3,11 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSourceKind;
+import net.Gabou.projectatmosphere.clouds.field.CloudMorphologyMembership;
 import net.Gabou.projectatmosphere.clouds.field.CloudletLayout;
 import net.Gabou.projectatmosphere.clouds.type.CloudMaterialProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.clouds.type.CloudVisualProfile;
@@ -43,6 +45,7 @@ public record VolumetricRenderCell(
         float funnelGroundY,
         float rotation,
         boolean macroCarrier,
+        CloudMorphologyMemberTier puffTier,
         EnvelopeRole envelopeRole
 ) {
     public static VolumetricRenderCell fromCell(CloudCell cell) {
@@ -72,6 +75,7 @@ public record VolumetricRenderCell(
                 cell.funnelGroundY(),
                 cell.rotation(),
                 true,
+                CloudMorphologyMemberTier.UNKNOWN,
                 EnvelopeRole.MACRO
         );
     }
@@ -169,6 +173,7 @@ public record VolumetricRenderCell(
                 0.0F,
                 0.0F,
                 true,
+                CloudMorphologyMemberTier.UNKNOWN,
                 identifiableDetail ? EnvelopeRole.CARRIER_ONLY : EnvelopeRole.MACRO
         );
     }
@@ -181,7 +186,18 @@ public record VolumetricRenderCell(
      */
     private static VolumetricRenderCell fromCanonicalClusterSnapshot(CloudFieldSnapshot snapshot) {
         CloudMorphologyFamily morphology = snapshot.morphologyFamily();
-        EnvelopeRole canonicalRole = switch (snapshot.morphologyMembership().stageFor(morphology)) {
+        CloudMorphologyMembership membership = snapshot.morphologyMembership();
+        CloudMorphologyMemberTier puffTier = morphology == CloudMorphologyFamily.PUFF
+                && membership.layoutVersion() > 0
+                ? membership.memberTier()
+                : CloudMorphologyMemberTier.UNKNOWN;
+        CloudMorphologyMembership.Stage stage =
+                membership.stageFor(morphology);
+        if (morphology == CloudMorphologyFamily.PUFF
+                && !VolumetricCloudDebugConfig.structuredPuffEnabled()) {
+            stage = CloudMorphologyMembership.Stage.MACRO;
+        }
+        EnvelopeRole canonicalRole = switch (stage) {
             case BASE -> EnvelopeRole.BASE;
             case CORE -> EnvelopeRole.CORE;
             case TOWER -> EnvelopeRole.TOWER;
@@ -256,6 +272,7 @@ public record VolumetricRenderCell(
                         ? snapshot.stormPotential() * 0.04F
                         : 0.0F,
                 false,
+                puffTier,
                 canonicalRole
         );
     }
@@ -345,8 +362,22 @@ public record VolumetricRenderCell(
                         ? snapshot.stormPotential() * 0.04F
                         : 0.0F,
                 false,
+                puffTierFromCloudletRole(cloudlet.role()),
                 EnvelopeRole.fromCloudletRole(cloudlet.role())
         );
+    }
+
+    private static CloudMorphologyMemberTier puffTierFromCloudletRole(
+            CloudletLayout.CloudletRole role
+    ) {
+        if (role == null) {
+            return CloudMorphologyMemberTier.UNKNOWN;
+        }
+        return switch (role) {
+            case BASE -> CloudMorphologyMemberTier.BASE;
+            case CORE, LOBE, SHEET_TILE, FILAMENT -> CloudMorphologyMemberTier.MIDDLE;
+            case TOWER, ANVIL -> CloudMorphologyMemberTier.CROWN;
+        };
     }
 
     /**

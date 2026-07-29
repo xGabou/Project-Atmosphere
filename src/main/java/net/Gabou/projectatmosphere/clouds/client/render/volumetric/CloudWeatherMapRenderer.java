@@ -56,6 +56,7 @@ public final class CloudWeatherMapRenderer {
     private static int lastStormStructureTextureId = -1;
     private static int lastStormLayerHeightTextureId = -1;
     private static int lastStormTowerTextureId = -1;
+    private static int lastPuffCandidateTextureId = -1;
     private static Result lastResult = Result.EMPTY;
     private static long cacheHits;
     private static long cacheMisses;
@@ -160,6 +161,8 @@ public final class CloudWeatherMapRenderer {
         lastStormStructureTextureId = -1;
         lastStormLayerHeightTextureId = -1;
         lastStormTowerTextureId = -1;
+        lastPuffCandidateTextureId = -1;
+        PuffLobeSpatialIndex.invalidate();
         lastResult = Result.EMPTY;
     }
 
@@ -210,11 +213,12 @@ public final class CloudWeatherMapRenderer {
         RenderTarget stormLayerHeightTarget =
                 VolumetricCloudRenderTargets.prepareStormLayerHeightTarget(mapSize);
         RenderTarget stormTowerTarget = VolumetricCloudRenderTargets.prepareStormTowerTarget(mapSize);
+        RenderTarget puffCandidateTarget = VolumetricCloudRenderTargets.preparePuffCandidateTarget();
         if (target == null || morphologyTarget == null
                 || cumulusStageSupportTarget == null || cumulusStageBaseTarget == null
-                || cumulusStageTopTarget == null
-                || stormStructureTarget == null || stormLayerHeightTarget == null
-                || stormTowerTarget == null) {
+                 || cumulusStageTopTarget == null
+                 || stormStructureTarget == null || stormLayerHeightTarget == null
+                 || stormTowerTarget == null || puffCandidateTarget == null) {
             return Result.EMPTY;
         }
 
@@ -341,6 +345,7 @@ public final class CloudWeatherMapRenderer {
                 );
 
         long inputSignature = inputSignature(
+                cells,
                 originX,
                 originZ,
                 slabBase,
@@ -363,6 +368,7 @@ public final class CloudWeatherMapRenderer {
         int stormStructureTextureId = stormStructureTarget.getColorTextureId();
         int stormLayerHeightTextureId = stormLayerHeightTarget.getColorTextureId();
         int stormTowerTextureId = stormTowerTarget.getColorTextureId();
+        int puffCandidateTextureId = puffCandidateTarget.getColorTextureId();
         if (inputSignature == lastInputSignature
                 && weatherTextureId == lastWeatherTextureId
                 && morphologyTextureId == lastMorphologyTextureId
@@ -372,11 +378,23 @@ public final class CloudWeatherMapRenderer {
                 && stormStructureTextureId == lastStormStructureTextureId
                 && stormLayerHeightTextureId == lastStormLayerHeightTextureId
                 && stormTowerTextureId == lastStormTowerTextureId
+                && puffCandidateTextureId == lastPuffCandidateTextureId
                 && lastResult.rendered()) {
             cacheHits++;
             return lastResult;
         }
         cacheMisses++;
+        // The descriptor arrays and candidate grid are one representation.
+        // Refresh them only together; a cache hit keeps the exact pair used by
+        // the cached weather map instead of uploading new descriptors through
+        // an older, quantized tile grid.
+        PuffLobeSpatialIndex.updateDescriptors(cells);
+        PuffLobeSpatialIndex.rebuildIfNeeded(
+                puffCandidateTarget,
+                originX,
+                originZ,
+                WEATHER_EXTENT
+        );
 
         VolumetricCloudRenderTargets.clearAndBind(target);
         RenderSystem.disableBlend();
@@ -530,6 +548,7 @@ public final class CloudWeatherMapRenderer {
         lastStormStructureTextureId = stormStructureTextureId;
         lastStormLayerHeightTextureId = stormLayerHeightTextureId;
         lastStormTowerTextureId = stormTowerTextureId;
+        lastPuffCandidateTextureId = puffCandidateTextureId;
         lastResult = result;
         return result;
     }
@@ -604,6 +623,7 @@ public final class CloudWeatherMapRenderer {
     }
 
     private static long inputSignature(
+            List<VolumetricRenderCell> cells,
             double originX,
             double originZ,
             float slabBase,
@@ -669,6 +689,18 @@ public final class CloudWeatherMapRenderer {
             hash = mix(hash, mediaValue);
             hash = mix(hash, morphologyValue);
             hash = mix(hash, dynamicsValue);
+        }
+        // PUFF tier is deliberately transported outside CellMorphology so it
+        // cannot reactivate the legacy structured-stage path. It still owns
+        // direct descriptor geometry, therefore a tier-only network update
+        // must invalidate the cached descriptor/candidate pair.
+        for (int i = 0; i < count; i++) {
+            VolumetricRenderCell cell = cells.get(i);
+            long puffTierValue = cell.puffTier() == null
+                    ? 3L
+                    : cell.puffTier().gpuId();
+            morphologyHash = mix(morphologyHash, puffTierValue);
+            hash = mix(hash, puffTierValue);
         }
         if (lastDomainSignature != Long.MIN_VALUE && lastDomainSignature != domainHash) {
             domainSignatureChanges++;

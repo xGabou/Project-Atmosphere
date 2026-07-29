@@ -483,9 +483,10 @@ public final class VolumetricCloudRenderHook {
                 + " lightColor=" + format(lighting.lightColor())
                 + " ambTop=" + format(lighting.ambientTop())
                 + " ambBot=" + format(lighting.ambientBottom())
-                + " composited=" + composited
-                + " funnels=" + funnels.count()
-                + " " + VolumetricMaterialDomainDiagnostics.status()
+                 + " composited=" + composited
+                 + " funnels=" + funnels.count()
+                 + " " + PuffLobeSpatialIndex.status()
+                 + " " + VolumetricMaterialDomainDiagnostics.status()
                 + " " + materialAdvection.summary()
                 + " gpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds());
     }

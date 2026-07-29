@@ -35,6 +35,7 @@ public final class VolumetricStabilityDiagnostics {
     private static final int MAX_FRAMES = 32;
     private static final float COLOR_ALPHA_EPSILON = 0.001F;
     private static final float ACTIVE_ALPHA_EPSILON = 0.002F;
+    private static final float LIGHT_PHASE_CORE_ALPHA_EPSILON = 0.05F;
     private static final int MACRO_GRID_SIZE = 16;
     private static final long MAX_CAPTURE_BATCH_BYTES = 128L * 1024L * 1024L;
     private static final long FNV_OFFSET = 0xcbf29ce484222325L;
@@ -401,6 +402,7 @@ public final class VolumetricStabilityDiagnostics {
     static void selfCheck() {
         CameraCloudDensityTracker.selfCheckExactClearSettlement();
         VolumetricCloudRenderer.LastDrawInputs.selfCheckUniformComponentBranching();
+        selfCheckMorphologyCategoryEncoding();
         float[][] depthSpaceFixturePixels = {
                 {0.0F, 0.0F, 0.0F, 0.0F},
                 {0.0F, 0.0F, 0.25F, 1.0F},
@@ -431,6 +433,80 @@ public final class VolumetricStabilityDiagnostics {
                 || Math.abs(depthSpaceStats.maxConfidenceDelta() - 0.60D) > 0.000001D
                 || !depthSpaceStats.format().contains("currentBelowHalfPreviousAtLeastHalf=1")) {
             throw new IllegalStateException("temporal depth-space diagnostic classification failed");
+        }
+        float[] lightingFixture = new float[3 * 3 * 4];
+        float[] lightingSignal = {
+                0.00F, 0.10F, 0.40F,
+                0.20F, 0.50F, 0.55F,
+                0.90F, 0.70F, 1.00F
+        };
+        for (int pixel = 0; pixel < lightingSignal.length; pixel++) {
+            float signal = lightingSignal[pixel];
+            int base = pixel * 4;
+            lightingFixture[base] = signal;
+            lightingFixture[base + 1] = 1.0F - signal;
+            lightingFixture[base + 2] = signal;
+            lightingFixture[base + 3] = 1.0F;
+        }
+        LightingComponentStats lightingStats = analyzeLightingComponents(lightingFixture, 3, 3);
+        if (lightingStats.activePixels() != 9
+                || lightingStats.horizontalPairs() != 6
+                || lightingStats.verticalPairs() != 6
+                || Math.abs(lightingStats.pixelCorrelationOcclusionRadiance() - 1.0D) > 0.000001D
+                || Math.abs(lightingStats.pixelCorrelationHeightRadiance() + 1.0D) > 0.000001D
+                || Math.abs(lightingStats.horizontalCorrelationOcclusionRadiance() - 1.0D) > 0.000001D
+                || Math.abs(lightingStats.horizontalCorrelationHeightRadiance() + 1.0D) > 0.000001D
+                || Math.abs(lightingStats.verticalCorrelationOcclusionRadiance() - 1.0D) > 0.000001D
+                || Math.abs(lightingStats.verticalCorrelationHeightRadiance() + 1.0D) > 0.000001D) {
+            throw new IllegalStateException("lighting-component correlation diagnostic failed");
+        }
+        float[] lightPhaseFixture = new float[3 * 3 * 4];
+        float[] lightPhaseSignal = {
+                0.0F, 0.2F, 0.3F,
+                0.4F, 0.5F, 0.6F,
+                0.7F, 0.8F, 0.9F
+        };
+        float phaseAlpha = 0.4F;
+        for (int pixel = 0; pixel < lightPhaseSignal.length; pixel++) {
+            float endpoint = lightPhaseSignal[pixel];
+            float midpoint = endpoint * 0.5F;
+            int base = pixel * 4;
+            lightPhaseFixture[base] = endpoint * phaseAlpha;
+            lightPhaseFixture[base + 1] = midpoint * phaseAlpha;
+            lightPhaseFixture[base + 2] = Math.abs(endpoint - midpoint) * phaseAlpha;
+            lightPhaseFixture[base + 3] = phaseAlpha;
+        }
+        LightMarchPhaseStats lightPhaseStats = analyzeLightMarchPhase(lightPhaseFixture, 3, 3);
+        double expectedEndpointMean = 4.4D / 9.0D;
+        double expectedDeltaMean = expectedEndpointMean * 0.5D;
+        double expectedDeltaRms = Math.sqrt((2.84D / 9.0D) * 0.25D);
+        if (lightPhaseStats.activePixels() != 9
+                || lightPhaseStats.corePixels() != 9
+                || lightPhaseStats.shellPixels() != 0
+                || lightPhaseStats.horizontalPairs() != 6
+                || lightPhaseStats.verticalPairs() != 6
+                || Math.abs(lightPhaseStats.meanEndpoint() - expectedEndpointMean) > 0.000001D
+                || Math.abs(lightPhaseStats.meanMidpoint() - expectedDeltaMean) > 0.000001D
+                || Math.abs(lightPhaseStats.meanDelta() - expectedDeltaMean) > 0.000001D
+                || Math.abs(lightPhaseStats.meanAbsDelta() - expectedDeltaMean) > 0.000001D
+                || Math.abs(lightPhaseStats.rmsDelta() - expectedDeltaRms) > 0.000001D
+                || Math.abs(lightPhaseStats.maxAbsDelta() - 0.45D) > 0.000001D
+                || lightPhaseStats.deltaAbove002() != 8
+                || lightPhaseStats.deltaAbove01() != 8
+                || lightPhaseStats.deltaAbove05() != 8
+                || lightPhaseStats.meanExportedDeltaError() > 0.000001D
+                || lightPhaseStats.maxExportedDeltaError() > 0.000001D
+                || Math.abs(lightPhaseStats.horizontalCorrelationEndpointMidpoint() - 1.0D) > 0.000001D
+                || Math.abs(lightPhaseStats.verticalCorrelationEndpointMidpoint() - 1.0D) > 0.000001D) {
+            throw new IllegalStateException("light-march phase diagnostic failed");
+        }
+        LightMarchPhaseStats emptyLightPhase = analyzeLightMarchPhase(new float[4], 1, 1);
+        if (emptyLightPhase.activePixels() != 0
+                || emptyLightPhase.verticalPairs() != 0
+                || emptyLightPhase.deltaAbove002() != 0
+                || emptyLightPhase.deltaAbove01() != 0
+                || emptyLightPhase.deltaAbove05() != 0) {
+            throw new IllegalStateException("empty light-march phase diagnostic failed");
         }
         int lowWidth = 4;
         int lowHeight = 4;
@@ -637,6 +713,37 @@ public final class VolumetricStabilityDiagnostics {
         }
     }
 
+    /**
+     * Mirrors the shader's category packing through the exact RGBA8 storage
+     * used by Minecraft 1.20.1 RenderTarget. Both common fixed-point conversion
+     * bounds must preserve all 64 valid codes while normalized zero stays empty.
+     */
+    private static void selfCheckMorphologyCategoryEncoding() {
+        final float categoryScale = 64.0F;
+        if (0.0F > 0.5F / categoryScale) {
+            throw new IllegalStateException("empty morphology category was classified as valid");
+        }
+        for (int code = 0; code < 64; code++) {
+            float encoded = (code + 1.0F) / categoryScale;
+            int[] rgba8Candidates = {
+                    (int) Math.floor(encoded * 255.0F),
+                    Math.round(encoded * 255.0F)
+            };
+            for (int rgba8 : rgba8Candidates) {
+                float sampled = rgba8 / 255.0F;
+                boolean valid = sampled > 0.5F / categoryScale;
+                int packed = Math.round(sampled * categoryScale);
+                int decoded = Math.max(packed - 1, 0);
+                if (!valid || decoded != code) {
+                    throw new IllegalStateException(
+                            "RGBA8 morphology category round-trip failed: code=" + code
+                                    + " byte=" + rgba8 + " decoded=" + decoded
+                    );
+                }
+            }
+        }
+    }
+
     private static void collectCompletedAnalysis() {
         if (pendingAnalysis == null || !pendingAnalysis.isDone()) {
             return;
@@ -755,6 +862,28 @@ public final class VolumetricStabilityDiagnostics {
                 == VolumetricCloudRaymarchDebugView.HISTORY_DEPTH_SPACE
                 ? classifyDepthSpaceStates(color, lowPixels)
                 : DepthSpaceStats.EMPTY;
+        LightingComponentStats lighting = metadata.raymarchView()
+                == VolumetricCloudRaymarchDebugView.LIGHTING_COMPONENTS
+                ? analyzeLightingComponents(color, layout.lowWidth(), layout.lowHeight())
+                : LightingComponentStats.EMPTY;
+        LightMarchPhaseStats lightPhase = metadata.raymarchView()
+                == VolumetricCloudRaymarchDebugView.LIGHT_MARCH_PHASE
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.LIGHT_MARCH_CAP
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.LIGHT_MARCH_REFINED
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.LIGHT_MARCH_DETAIL
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.PUFF_LOCAL_HEIGHT
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.PRIMARY_QUADRATURE
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_STEP_QUADRATURE
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.DRY_BASE_RAIN
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.MISSED_FINE_MATERIAL
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.ACCEPTED_FINE_QUADRATURE
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_STEP_MIDPOINT
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_STEP_ALPHA
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_DENSITY_QUADRATURE
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_LIGHTING_QUADRATURE
+                || metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_WEIGHTED_SOURCE
+                ? analyzeLightMarchPhase(color, layout.lowWidth(), layout.lowHeight())
+                : LightMarchPhaseStats.EMPTY;
 
         PairStats pair = baseline == null
                 ? PairStats.firstFrame()
@@ -801,6 +930,8 @@ public final class VolumetricStabilityDiagnostics {
                 composite.summary(),
                 history,
                 depthSpace,
+                lighting,
+                lightPhase,
                 pair,
                 observedPair
         );
@@ -1638,6 +1769,257 @@ public final class VolumetricStabilityDiagnostics {
         );
     }
 
+    private static LightingComponentStats analyzeLightingComponents(
+            float[] color,
+            int width,
+            int height
+    ) {
+        int pixels = Math.multiplyExact(width, height);
+        if (color.length != pixels * 4) {
+            throw new IllegalArgumentException("lighting-component buffer size mismatch");
+        }
+
+        CorrelationAccumulator pixelOcclusionRadiance = new CorrelationAccumulator();
+        CorrelationAccumulator pixelHeightRadiance = new CorrelationAccumulator();
+        CorrelationAccumulator horizontalOcclusionRadiance = new CorrelationAccumulator();
+        CorrelationAccumulator horizontalHeightRadiance = new CorrelationAccumulator();
+        CorrelationAccumulator verticalOcclusionRadiance = new CorrelationAccumulator();
+        CorrelationAccumulator verticalHeightRadiance = new CorrelationAccumulator();
+        double occlusionSum = 0.0D;
+        double heightSum = 0.0D;
+        double radianceSum = 0.0D;
+        double horizontalOcclusionAbs = 0.0D;
+        double horizontalHeightAbs = 0.0D;
+        double horizontalRadianceAbs = 0.0D;
+        double verticalOcclusionAbs = 0.0D;
+        double verticalHeightAbs = 0.0D;
+        double verticalRadianceAbs = 0.0D;
+        int activePixels = 0;
+        int horizontalPairs = 0;
+        int verticalPairs = 0;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = y * width + x;
+                if (!lightingPixelActive(color, pixel)) {
+                    continue;
+                }
+                double occlusion = lightingChannel(color, pixel, 0);
+                double ambientHeight = lightingChannel(color, pixel, 1);
+                double radiance = lightingChannel(color, pixel, 2);
+                activePixels++;
+                occlusionSum += occlusion;
+                heightSum += ambientHeight;
+                radianceSum += radiance;
+                pixelOcclusionRadiance.add(occlusion, radiance);
+                pixelHeightRadiance.add(ambientHeight, radiance);
+
+                if (x + 1 < width && lightingPixelActive(color, pixel + 1)) {
+                    double dOcclusion = lightingChannel(color, pixel + 1, 0) - occlusion;
+                    double dHeight = lightingChannel(color, pixel + 1, 1) - ambientHeight;
+                    double dRadiance = lightingChannel(color, pixel + 1, 2) - radiance;
+                    horizontalPairs++;
+                    horizontalOcclusionAbs += Math.abs(dOcclusion);
+                    horizontalHeightAbs += Math.abs(dHeight);
+                    horizontalRadianceAbs += Math.abs(dRadiance);
+                    horizontalOcclusionRadiance.add(dOcclusion, dRadiance);
+                    horizontalHeightRadiance.add(dHeight, dRadiance);
+                }
+                if (y + 1 < height && lightingPixelActive(color, pixel + width)) {
+                    double dOcclusion = lightingChannel(color, pixel + width, 0) - occlusion;
+                    double dHeight = lightingChannel(color, pixel + width, 1) - ambientHeight;
+                    double dRadiance = lightingChannel(color, pixel + width, 2) - radiance;
+                    verticalPairs++;
+                    verticalOcclusionAbs += Math.abs(dOcclusion);
+                    verticalHeightAbs += Math.abs(dHeight);
+                    verticalRadianceAbs += Math.abs(dRadiance);
+                    verticalOcclusionRadiance.add(dOcclusion, dRadiance);
+                    verticalHeightRadiance.add(dHeight, dRadiance);
+                }
+            }
+        }
+
+        if (activePixels == 0) {
+            return new LightingComponentStats(
+                    0, 0, 0,
+                    0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D
+            );
+        }
+        double activeDivisor = activePixels;
+        double horizontalDivisor = Math.max(1, horizontalPairs);
+        double verticalDivisor = Math.max(1, verticalPairs);
+        return new LightingComponentStats(
+                activePixels,
+                horizontalPairs,
+                verticalPairs,
+                occlusionSum / activeDivisor,
+                heightSum / activeDivisor,
+                radianceSum / activeDivisor,
+                pixelOcclusionRadiance.correlation(),
+                pixelHeightRadiance.correlation(),
+                horizontalOcclusionAbs / horizontalDivisor,
+                horizontalHeightAbs / horizontalDivisor,
+                horizontalRadianceAbs / horizontalDivisor,
+                horizontalOcclusionRadiance.correlation(),
+                horizontalHeightRadiance.correlation(),
+                verticalOcclusionAbs / verticalDivisor,
+                verticalHeightAbs / verticalDivisor,
+                verticalRadianceAbs / verticalDivisor,
+                verticalOcclusionRadiance.correlation(),
+                verticalHeightRadiance.correlation()
+        );
+    }
+
+    private static boolean lightingPixelActive(float[] color, int pixel) {
+        return finiteOrZero(color[pixel * 4 + 3]) > ACTIVE_ALPHA_EPSILON;
+    }
+
+    private static double lightingChannel(float[] color, int pixel, int channel) {
+        float alpha = clamp01(finiteOrZero(color[pixel * 4 + 3]));
+        return clamp01(finiteOrZero(color[pixel * 4 + channel])
+                / Math.max(alpha, COLOR_ALPHA_EPSILON));
+    }
+
+    private static LightMarchPhaseStats analyzeLightMarchPhase(
+            float[] color,
+            int width,
+            int height
+    ) {
+        int pixels = Math.multiplyExact(width, height);
+        if (color.length != pixels * 4) {
+            throw new IllegalArgumentException("light-march phase buffer size mismatch");
+        }
+
+        CorrelationAccumulator horizontalEndpointMidpoint = new CorrelationAccumulator();
+        CorrelationAccumulator verticalEndpointMidpoint = new CorrelationAccumulator();
+        double endpointSum = 0.0D;
+        double midpointSum = 0.0D;
+        double deltaSum = 0.0D;
+        double absDeltaSum = 0.0D;
+        double deltaSquareSum = 0.0D;
+        double maxAbsDelta = 0.0D;
+        double exportedDeltaErrorSum = 0.0D;
+        double exportedDeltaErrorMax = 0.0D;
+        double horizontalEndpointAbs = 0.0D;
+        double horizontalMidpointAbs = 0.0D;
+        double horizontalDeltaAbs = 0.0D;
+        double verticalEndpointAbs = 0.0D;
+        double verticalMidpointAbs = 0.0D;
+        double verticalDeltaAbs = 0.0D;
+        int activePixels = 0;
+        int corePixels = 0;
+        int horizontalPairs = 0;
+        int verticalPairs = 0;
+        int deltaAbove002 = 0;
+        int deltaAbove01 = 0;
+        int deltaAbove05 = 0;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = y * width + x;
+                if (!lightingPixelActive(color, pixel)) {
+                    continue;
+                }
+                activePixels++;
+                if (!lightPhasePixelCore(color, pixel)) {
+                    continue;
+                }
+                double endpoint = lightingChannel(color, pixel, 0);
+                double midpoint = lightingChannel(color, pixel, 1);
+                double exportedAbsDelta = lightingChannel(color, pixel, 2);
+                double delta = endpoint - midpoint;
+                double absDelta = Math.abs(delta);
+                double exportedDeltaError = Math.abs(exportedAbsDelta - absDelta);
+                corePixels++;
+                endpointSum += endpoint;
+                midpointSum += midpoint;
+                deltaSum += delta;
+                absDeltaSum += absDelta;
+                deltaSquareSum += delta * delta;
+                maxAbsDelta = Math.max(maxAbsDelta, absDelta);
+                exportedDeltaErrorSum += exportedDeltaError;
+                exportedDeltaErrorMax = Math.max(exportedDeltaErrorMax, exportedDeltaError);
+                if (absDelta > 0.002D) {
+                    deltaAbove002++;
+                }
+                if (absDelta > 0.01D) {
+                    deltaAbove01++;
+                }
+                if (absDelta > 0.05D) {
+                    deltaAbove05++;
+                }
+
+                if (x + 1 < width && lightPhasePixelCore(color, pixel + 1)) {
+                    double nextEndpoint = lightingChannel(color, pixel + 1, 0);
+                    double nextMidpoint = lightingChannel(color, pixel + 1, 1);
+                    double dEndpoint = nextEndpoint - endpoint;
+                    double dMidpoint = nextMidpoint - midpoint;
+                    horizontalPairs++;
+                    horizontalEndpointAbs += Math.abs(dEndpoint);
+                    horizontalMidpointAbs += Math.abs(dMidpoint);
+                    horizontalDeltaAbs += Math.abs(dEndpoint - dMidpoint);
+                    horizontalEndpointMidpoint.add(dEndpoint, dMidpoint);
+                }
+                if (y + 1 < height && lightPhasePixelCore(color, pixel + width)) {
+                    double nextEndpoint = lightingChannel(color, pixel + width, 0);
+                    double nextMidpoint = lightingChannel(color, pixel + width, 1);
+                    double dEndpoint = nextEndpoint - endpoint;
+                    double dMidpoint = nextMidpoint - midpoint;
+                    verticalPairs++;
+                    verticalEndpointAbs += Math.abs(dEndpoint);
+                    verticalMidpointAbs += Math.abs(dMidpoint);
+                    verticalDeltaAbs += Math.abs(dEndpoint - dMidpoint);
+                    verticalEndpointMidpoint.add(dEndpoint, dMidpoint);
+                }
+            }
+        }
+
+        if (activePixels == 0) {
+            return LightMarchPhaseStats.EMPTY;
+        }
+        if (corePixels == 0) {
+            return LightMarchPhaseStats.withEmptyCore(activePixels);
+        }
+        double coreDivisor = corePixels;
+        double horizontalDivisor = Math.max(1, horizontalPairs);
+        double verticalDivisor = Math.max(1, verticalPairs);
+        return new LightMarchPhaseStats(
+                activePixels,
+                corePixels,
+                activePixels - corePixels,
+                horizontalPairs,
+                verticalPairs,
+                endpointSum / coreDivisor,
+                midpointSum / coreDivisor,
+                deltaSum / coreDivisor,
+                absDeltaSum / coreDivisor,
+                Math.sqrt(deltaSquareSum / coreDivisor),
+                maxAbsDelta,
+                deltaAbove002,
+                deltaAbove01,
+                deltaAbove05,
+                exportedDeltaErrorSum / coreDivisor,
+                exportedDeltaErrorMax,
+                horizontalEndpointAbs / horizontalDivisor,
+                horizontalMidpointAbs / horizontalDivisor,
+                horizontalDeltaAbs / horizontalDivisor,
+                verticalEndpointAbs / verticalDivisor,
+                verticalMidpointAbs / verticalDivisor,
+                verticalDeltaAbs / verticalDivisor,
+                horizontalEndpointMidpoint.correlation(),
+                verticalEndpointMidpoint.correlation()
+        );
+    }
+
+    private static boolean lightPhasePixelCore(float[] color, int pixel) {
+        return finiteOrZero(color[pixel * 4 + 3]) >= LIGHT_PHASE_CORE_ALPHA_EPSILON;
+    }
+
     private static String formatReport(long reportRunId, List<FrameSummary> frames) {
         StringBuilder builder = new StringBuilder("Volumetric stability run ")
                 .append(reportRunId)
@@ -2351,6 +2733,8 @@ public final class VolumetricStabilityDiagnostics {
             CompositeSummary composite,
             HistoryHistogram history,
             DepthSpaceStats depthSpace,
+            LightingComponentStats lighting,
+            LightMarchPhaseStats lightPhase,
             PairStats pair,
             PairStats observedPair
     ) {
@@ -2369,8 +2753,92 @@ public final class VolumetricStabilityDiagnostics {
                     + "/" + selectedNeighborHash + " " + composite.format()
                     + (history == HistoryHistogram.EMPTY ? "" : "\nhistoryStates=" + history.format())
                     + (depthSpace == DepthSpaceStats.EMPTY ? "" : "\ndepthSpace=" + depthSpace.format())
+                    + (lighting == LightingComponentStats.EMPTY ? "" : "\nlighting=" + lighting.format())
+                    + formatLightEstimatorPair()
                     + "\npair=" + pair.format()
                     + "\nobservedPair=" + observedPair.format();
+        }
+
+        private String formatLightEstimatorPair() {
+            if (lightPhase == LightMarchPhaseStats.EMPTY) {
+                return "";
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.LIGHT_MARCH_CAP) {
+                return "\nlightCap=" + lightPhase.format("capped", "full");
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.LIGHT_MARCH_REFINED) {
+                return "\nlightRefined=" + lightPhase.format("production", "refined");
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.LIGHT_MARCH_DETAIL) {
+                return "\nlightDetail=" + lightPhase.format("production", "noDetail");
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.PUFF_LOCAL_HEIGHT) {
+                return "\npuffHeight=" + lightPhase.format(
+                        "weatherHeightRadiance",
+                        "localHeightRadiance"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.PRIMARY_QUADRATURE) {
+                return "\nprimaryAcceptedQuadrature=" + lightPhase.format(
+                        "production",
+                        "twoPointAccepted"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_STEP_QUADRATURE) {
+                return "\nfineStepQuadrature=" + lightPhase.format(
+                        "production",
+                        "twoPointAllFine"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.DRY_BASE_RAIN) {
+                return "\ndryBaseRain=" + lightPhase.format(
+                        "production",
+                        "forcedDry"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.MISSED_FINE_MATERIAL) {
+                return "\nmissedFineMaterial=" + lightPhase.format(
+                        "production",
+                        "addClearMidpoints"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.ACCEPTED_FINE_QUADRATURE) {
+                return "\nacceptedFineQuadrature=" + lightPhase.format(
+                        "production",
+                        "twoPointProductionThreshold"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_STEP_MIDPOINT) {
+                return "\nfineStepMidpoint=" + lightPhase.format(
+                        "production",
+                        "onePointMidpoint"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_STEP_ALPHA) {
+                return "\nfineStepAlpha=" + lightPhase.format(
+                        "productionAlpha",
+                        "twoPointAlpha"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_DENSITY_QUADRATURE) {
+                return "\nfineDensityQuadrature=" + lightPhase.format(
+                        "production",
+                        "twoDensityOneLight"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_LIGHTING_QUADRATURE) {
+                return "\nfineLightingQuadrature=" + lightPhase.format(
+                        "production",
+                        "twoLightProductionAlpha"
+                );
+            }
+            if (metadata.raymarchView() == VolumetricCloudRaymarchDebugView.FINE_WEIGHTED_SOURCE) {
+                return "\nfineWeightedSource=" + lightPhase.format(
+                        "production",
+                        "twoDensityWeightedLight"
+                );
+            }
+            return "\nlightPhase=" + lightPhase.format("endpoint", "midpoint");
         }
     }
 
@@ -2614,6 +3082,170 @@ public final class VolumetricStabilityDiagnostics {
                     + "/" + fmt(previousConfidenceSum / divisor)
                     + "/" + fmt(confidenceDeltaSum / divisor)
                     + "/" + fmt(maxConfidenceDelta);
+        }
+    }
+
+    private record LightingComponentStats(
+            int activePixels,
+            int horizontalPairs,
+            int verticalPairs,
+            double meanOcclusion,
+            double meanAmbientHeight,
+            double meanRadianceTone,
+            double pixelCorrelationOcclusionRadiance,
+            double pixelCorrelationHeightRadiance,
+            double horizontalAbsOcclusion,
+            double horizontalAbsHeight,
+            double horizontalAbsRadiance,
+            double horizontalCorrelationOcclusionRadiance,
+            double horizontalCorrelationHeightRadiance,
+            double verticalAbsOcclusion,
+            double verticalAbsHeight,
+            double verticalAbsRadiance,
+            double verticalCorrelationOcclusionRadiance,
+            double verticalCorrelationHeightRadiance
+    ) {
+        private static final LightingComponentStats EMPTY = new LightingComponentStats(
+                0, 0, 0,
+                0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D
+        );
+
+        String format() {
+            return "pixels/hPairs/vPairs=" + activePixels + "/" + horizontalPairs + "/" + verticalPairs
+                    + " mean[occlusion/height/radiance]="
+                    + fmt(meanOcclusion) + "/" + fmt(meanAmbientHeight) + "/" + fmt(meanRadianceTone)
+                    + " pixelCorr[occlusion-radiance/height-radiance]="
+                    + fmt(pixelCorrelationOcclusionRadiance) + "/" + fmt(pixelCorrelationHeightRadiance)
+                    + " hAbs[occlusion/height/radiance]="
+                    + fmt(horizontalAbsOcclusion) + "/" + fmt(horizontalAbsHeight)
+                    + "/" + fmt(horizontalAbsRadiance)
+                    + " hCorr[occlusion-radiance/height-radiance]="
+                    + fmt(horizontalCorrelationOcclusionRadiance)
+                    + "/" + fmt(horizontalCorrelationHeightRadiance)
+                    + " vAbs[occlusion/height/radiance]="
+                    + fmt(verticalAbsOcclusion) + "/" + fmt(verticalAbsHeight)
+                    + "/" + fmt(verticalAbsRadiance)
+                    + " vCorr[occlusion-radiance/height-radiance]="
+                    + fmt(verticalCorrelationOcclusionRadiance)
+                    + "/" + fmt(verticalCorrelationHeightRadiance);
+        }
+    }
+
+    private record LightMarchPhaseStats(
+            int activePixels,
+            int corePixels,
+            int shellPixels,
+            int horizontalPairs,
+            int verticalPairs,
+            double meanEndpoint,
+            double meanMidpoint,
+            double meanDelta,
+            double meanAbsDelta,
+            double rmsDelta,
+            double maxAbsDelta,
+            int deltaAbove002,
+            int deltaAbove01,
+            int deltaAbove05,
+            double meanExportedDeltaError,
+            double maxExportedDeltaError,
+            double horizontalAbsEndpoint,
+            double horizontalAbsMidpoint,
+            double horizontalAbsDelta,
+            double verticalAbsEndpoint,
+            double verticalAbsMidpoint,
+            double verticalAbsDelta,
+            double horizontalCorrelationEndpointMidpoint,
+            double verticalCorrelationEndpointMidpoint
+    ) {
+        private static final LightMarchPhaseStats EMPTY = new LightMarchPhaseStats(
+                0, 0, 0, 0, 0,
+                0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D, 0.0D,
+                0, 0, 0,
+                0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D, 0.0D,
+                0.0D, 0.0D
+        );
+
+        static LightMarchPhaseStats withEmptyCore(int activePixels) {
+            return new LightMarchPhaseStats(
+                    activePixels, 0, activePixels, 0, 0,
+                    0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    0, 0, 0,
+                    0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D
+            );
+        }
+
+        String format(String firstLabel, String secondLabel) {
+            double endpointAnisotropy = horizontalAbsEndpoint > 1.0E-12D
+                    ? verticalAbsEndpoint / horizontalAbsEndpoint : 0.0D;
+            double midpointAnisotropy = horizontalAbsMidpoint > 1.0E-12D
+                    ? verticalAbsMidpoint / horizontalAbsMidpoint : 0.0D;
+            double verticalMidpointEndpointRatio = verticalAbsEndpoint > 1.0E-12D
+                    ? verticalAbsMidpoint / verticalAbsEndpoint : 0.0D;
+            return "pixels[active/core/shell]=" + activePixels + "/" + corePixels + "/" + shellPixels
+                    + " pairs[h/v]=" + horizontalPairs + "/" + verticalPairs
+                    + " mean[" + firstLabel + "/" + secondLabel + "]="
+                    + fmt(meanEndpoint) + "/" + fmt(meanMidpoint)
+                    + " delta[mean/meanAbs/rms/max]="
+                    + fmt(meanDelta) + "/" + fmt(meanAbsDelta)
+                    + "/" + fmt(rmsDelta) + "/" + fmt(maxAbsDelta)
+                    + " delta>.002/.01/.05="
+                    + deltaAbove002 + "/" + deltaAbove01 + "/" + deltaAbove05
+                    + " exportedDeltaError[mean/max]="
+                    + fmt(meanExportedDeltaError) + "/" + fmt(maxExportedDeltaError)
+                    + " hAbs[" + firstLabel + "/" + secondLabel + "/delta]="
+                    + fmt(horizontalAbsEndpoint) + "/" + fmt(horizontalAbsMidpoint)
+                    + "/" + fmt(horizontalAbsDelta)
+                    + " vAbs[" + firstLabel + "/" + secondLabel + "/delta]="
+                    + fmt(verticalAbsEndpoint) + "/" + fmt(verticalAbsMidpoint)
+                    + "/" + fmt(verticalAbsDelta)
+                    + " gradientCorr[" + firstLabel + "-" + secondLabel + " h/v]="
+                    + fmt(horizontalCorrelationEndpointMidpoint)
+                    + "/" + fmt(verticalCorrelationEndpointMidpoint)
+                    + " anisotropy[" + firstLabel + "/" + secondLabel + "]="
+                    + fmt(endpointAnisotropy) + "/" + fmt(midpointAnisotropy)
+                    + " vRatio[" + secondLabel + "/" + firstLabel + "]="
+                    + fmt(verticalMidpointEndpointRatio);
+        }
+    }
+
+    private static final class CorrelationAccumulator {
+        private int count;
+        private double sumX;
+        private double sumY;
+        private double sumXX;
+        private double sumYY;
+        private double sumXY;
+
+        void add(double x, double y) {
+            count++;
+            sumX += x;
+            sumY += y;
+            sumXX += x * x;
+            sumYY += y * y;
+            sumXY += x * y;
+        }
+
+        double correlation() {
+            if (count < 2) {
+                return 0.0D;
+            }
+            double covariance = count * sumXY - sumX * sumY;
+            double varianceX = count * sumXX - sumX * sumX;
+            double varianceY = count * sumYY - sumY * sumY;
+            double denominator = Math.sqrt(Math.max(varianceX * varianceY, 0.0D));
+            return denominator > 1.0E-12D ? covariance / denominator : 0.0D;
         }
     }
 

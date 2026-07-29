@@ -129,7 +129,9 @@ public final class CloudFieldBackendAdapter {
                 new CloudMorphologyMembership(
                         cluster.getMorphologyGroupId(),
                         cluster.getMorphologyIndex(),
-                        cluster.getMorphologyCount()
+                        cluster.getMorphologyCount(),
+                        cluster.getMorphologyLayoutVersion(),
+                        cluster.getMorphologyMemberTier()
                 ),
                 cluster.isActive()
         );

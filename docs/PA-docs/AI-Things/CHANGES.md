@@ -1,5 +1,11 @@
 # Project Atmosphere — Developer Change Log
 
+- Replaced the native PUFF generator's independently random, sometimes
+  disconnected lobe placement with a deterministic open-ring topology. The
+  compact source footprint now guarantees central overlap analytically while
+  retaining distinct asymmetric lobes; the morphology sandbox checks 4,096
+  humilis and mediocris seeds for connectivity, footprint, anisotropy and the
+  existing mediocris evolution-radius coupling.
 - Added an on-demand, fence-gated native volumetric stability diagnostic. It
   records the existing raymarch color/depth output, reproduces the production
   depth-guided composite on a worker thread, and reports stable-input hashes,
@@ -706,3 +712,15 @@ This file records functionality additions/removals made during development sessi
   independently sampling discontinuous regional winds. Added a deterministic
   convergent-boundary sandbox and targeted runtime offset/hash diagnostics; the
   native 30-second boundary A/B retained all twelve UUID-relative offsets.
+- Fixed a second generic density body around native cumulus clouds by reserving
+  morphology code zero for empty texels, preserving valid profile zero, aligning
+  morphology occupancy with the filtered weather map and recovering the strongest
+  valid categorical contributor only at map boundaries. Controlled GPU captures
+  now make final PUFF output bit-identical to the direct source and report zero
+  active morphology-gap pixels.
+- Hardened the native volumetric pass against optional pipelines that leave raw
+  OpenGL texture units or Minecraft's texture-binding cache desynchronized. The
+  guard now preserves units 0–14, reconciles tracked bindings before PA draws,
+  restores the exact incoming raw/cache pair, resets debug state across client
+  lifecycle boundaries, and restores pixel pack/unpack byte-swap state. A live
+  driver probe with distinct 2-D/3-D sentinels verifies the complete round-trip.

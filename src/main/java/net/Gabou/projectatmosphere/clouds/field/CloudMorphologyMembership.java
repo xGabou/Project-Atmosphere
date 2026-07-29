@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.field;
 
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
 
 import java.util.UUID;
 
@@ -13,7 +14,9 @@ import java.util.UUID;
 public record CloudMorphologyMembership(
         UUID groupId,
         int memberIndex,
-        int memberCount
+        int memberCount,
+        int layoutVersion,
+        CloudMorphologyMemberTier memberTier
 ) {
     private static final UUID UNGROUPED_ID = new UUID(0L, 0L);
 
@@ -21,21 +24,39 @@ public record CloudMorphologyMembership(
         groupId = groupId == null ? UNGROUPED_ID : groupId;
         memberCount = Math.max(1, memberCount);
         memberIndex = Math.max(0, Math.min(memberIndex, memberCount - 1));
+        layoutVersion = Math.max(0, layoutVersion);
+        memberTier = memberTier == null ? CloudMorphologyMemberTier.UNKNOWN : memberTier;
+        if (layoutVersion == 0) {
+            memberTier = CloudMorphologyMemberTier.UNKNOWN;
+        }
+    }
+
+    /** Backward-compatible construction for legacy, unversioned layouts. */
+    public CloudMorphologyMembership(UUID groupId, int memberIndex, int memberCount) {
+        this(groupId, memberIndex, memberCount, 0, CloudMorphologyMemberTier.UNKNOWN);
     }
 
     public static CloudMorphologyMembership ungrouped() {
-        return new CloudMorphologyMembership(UNGROUPED_ID, 0, 1);
+        return new CloudMorphologyMembership(UNGROUPED_ID, 0, 1, 0,
+                CloudMorphologyMemberTier.UNKNOWN);
     }
 
     public static CloudMorphologyMembership single(UUID identity) {
-        return new CloudMorphologyMembership(identity, 0, 1);
+        return new CloudMorphologyMembership(identity, 0, 1, 0,
+                CloudMorphologyMemberTier.UNKNOWN);
     }
 
     public CloudMorphologyMembership withFallbackGroup(UUID fallbackGroupId) {
         if (!UNGROUPED_ID.equals(groupId)) {
             return this;
         }
-        return single(fallbackGroupId);
+        return new CloudMorphologyMembership(
+                fallbackGroupId,
+                memberIndex,
+                memberCount,
+                layoutVersion,
+                memberTier
+        );
     }
 
     public boolean isGrouped() {
@@ -43,10 +64,17 @@ public record CloudMorphologyMembership(
     }
 
     /**
-     * Resolves the four independently rendered tiers of the deterministic
-     * native TOWER topology. Other families retain their existing macro path.
+     * Resolves the independently rendered tiers of canonical convective
+     * topology. PUFF indices are lateral sibling identities, not vertical
+     * stages: their generator places every secondary member radially with only
+     * small independent Y jitter. Keep grouped PUFF lobes in one stage channel
+     * so the structured map preserves each local interval without inventing a
+     * BASE/CORE/CROWN stack from index order.
      */
     public Stage stageFor(CloudMorphologyFamily family) {
+        if (family == CloudMorphologyFamily.PUFF && memberCount >= 3) {
+            return Stage.BASE;
+        }
         if (family != CloudMorphologyFamily.TOWER || memberCount <= 1) {
             return Stage.MACRO;
         }

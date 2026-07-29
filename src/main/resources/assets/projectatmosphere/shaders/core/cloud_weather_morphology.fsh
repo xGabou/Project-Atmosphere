@@ -139,14 +139,22 @@ void main() {
         float lifecycleEnvelope = lifecycle < 0.5
             ? mix(0.30, 1.0, lifecycle * 2.0)
             : mix(1.0, 0.30, (lifecycle - 0.5) * 2.0);
-        float coverage = envelopeOnly
+        float categoricalCoverage = envelopeOnly
             ? 0.0
             : footprint * saturate(media.x) * lifecycleEnvelope;
-        if (coverage <= 0.002) {
+        // Match the primary WeatherMap occupancy decision exactly. Rain packs
+        // a small extra horizontal support there; omitting it here left valid
+        // weather texels without a categorical owner.
+        float weatherCoverage = categoricalCoverage
+            * (1.0 + saturate(dynamics.y) * 0.16);
+        if (weatherCoverage <= 0.002) {
             continue;
         }
 
-        float weight = coverage * coverage * coverage;
+        // Category dominance intentionally uses the same un-packed cubic
+        // weight as cloud_weather_splat. Presence is tracked independently
+        // below, so a legitimate fringe weight is never mistaken for empty.
+        float weight = categoricalCoverage * categoricalCoverage * categoricalCoverage;
         float localCondensate = saturate(
             morphology.w * 0.62
                 + max(media.y, max(dynamics.x, dynamics.y)) * 0.38
@@ -184,11 +192,16 @@ void main() {
         }
     }
 
-    vec3 traits = weightAccum > 0.0000005
+    bool hasCategory = dominantWeight >= 0.0;
+    vec3 traits = weightAccum > 0.0
         ? clamp(traitsAccum / weightAccum, 0.0, 1.0)
         : vec3(0.0);
     float categoricalCode = clamp(dominantProfile * 8.0 + dominantRole, 0.0, 63.0);
-    fragColor = weightAccum > 0.0000005
-        ? vec4(categoricalCode / 63.0, traits)
+    // Zero is reserved for an empty texel. All 64 legitimate profile/role
+    // combinations, including profile 0 / role 0, occupy codes 1..64. The
+    // target is RGBA8, whose 256 levels leave almost four byte values per code.
+    float encodedCategory = (categoricalCode + 1.0) / 64.0;
+    fragColor = hasCategory
+        ? vec4(encodedCategory, traits)
         : vec4(0.0);
 }

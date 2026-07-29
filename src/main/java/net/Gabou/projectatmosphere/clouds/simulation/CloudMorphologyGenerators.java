@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.simulation;
 
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
 import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudVisualProfile;
@@ -18,6 +19,10 @@ import java.util.Locale;
  * Family-specific cloud morphology generators.
  */
 final class CloudMorphologyGenerators {
+    private static final float PUFF_GROUP_RADIUS_MULTIPLIER = 1.65F;
+    private static final float PUFF_RADIAL_MIN = 0.30F;
+    private static final float PUFF_RADIAL_MAX = 0.64F;
+    private static final float PUFF_ANGULAR_JITTER_RADIANS = 0.28F;
     private static final int STRUCTURED_TOWER_COUNT = 12;
     private static final float[] STRUCTURED_TOWER_ANGLES = {
             0.0F, 8.0F, 137.0F, 263.0F,
@@ -69,6 +74,16 @@ final class CloudMorphologyGenerators {
         );
     }
 
+    /** Read-only access to the deterministic PUFF placement contract. */
+    static PuffTopologyParameters puffTopologyParameters() {
+        return new PuffTopologyParameters(
+                PUFF_GROUP_RADIUS_MULTIPLIER,
+                PUFF_RADIAL_MIN,
+                PUFF_RADIAL_MAX,
+                PUFF_ANGULAR_JITTER_RADIANS
+        );
+    }
+
     private static List<Float> immutableValues(float[] values) {
         List<Float> copy = new ArrayList<>(values.length);
         for (float value : values) {
@@ -102,7 +117,7 @@ final class CloudMorphologyGenerators {
         }
 
         return switch (plan.family()) {
-            case PUFF -> radialCell(origin, plan, random, 0.22F, 0.86F, 7.0F);
+            case PUFF -> puffCell(origin, plan, clusterIndex, random);
             case TOWER -> towerCell(origin, plan, clusterIndex, random);
             case STORM_ANVIL -> stormCell(origin, plan, clusterIndex, random);
             case SPIRAL_STORM -> spiralCell(origin, plan, clusterIndex, random);
@@ -122,6 +137,10 @@ final class CloudMorphologyGenerators {
             @NotNull RandomSource random
     ) {
         CloudMorphologyFamily family = plan.family();
+        if (family == CloudMorphologyFamily.PUFF && plan.hasHierarchicalPuff()) {
+            tuneHierarchicalPuff(cluster, definition, plan, clusterIndex, random);
+            return;
+        }
         if (family != CloudMorphologyFamily.PUFF && family != CloudMorphologyFamily.TOWER) {
             applyToCluster(cluster, definition);
         } else {
@@ -215,6 +234,13 @@ final class CloudMorphologyGenerators {
         CloudVisualProfile visual = definition.getVisualProfile();
         CloudMorphologyFamily family = definition.getMorphologyFamily();
 
+        if ("cumulus_mediocris".equals(definition.getId())
+                && "cumulus_humilis".equals(cluster.getPreviousCloudTypeId())
+                && cluster.getMorphologyCount() > 1) {
+            retargetPuffPreservingGeometry(cluster, definition);
+            return;
+        }
+
         double centerY = cluster.getCenter().y();
         float existingRadius = Math.max(1.0F, cluster.getRadius());
         float mergeBoost = 1.0F + cluster.getMergePressure() * 0.18F;
@@ -278,14 +304,25 @@ final class CloudMorphologyGenerators {
         CloudShapeProfile shape = definition.getShapeProfile();
         CloudVisualProfile visual = definition.getVisualProfile();
         String id = definition.getId().toLowerCase(Locale.ROOT);
-        int minClusters = id.contains("vapor") ? 2 : id.contains("humilis") ? 3 : 4;
-        int maxClusters = id.contains("vapor") ? 4 : id.contains("humilis") ? 5 : 7;
-        float radius = shape.getBaseRadius() * (id.contains("mediocris") ? 0.98F : 0.82F);
-        return plan(definition, random, minClusters, maxClusters, radius, radius * 2.05F,
+        boolean humilis = "cumulus_humilis".equals(id);
+        boolean mediocris = "cumulus_mediocris".equals(id);
+        // Fair-weather cumulus needs a real hierarchy, not a ring of four
+        // almost full-size cushions. Keep the count deterministic so the
+        // persisted membership layout and render descriptors cannot change
+        // shape when the same field is rebuilt.
+        int minClusters = id.contains("vapor") ? 2 : humilis ? 7 : mediocris ? 8 : 4;
+        int maxClusters = id.contains("vapor") ? 4 : humilis ? 7 : mediocris ? 8 : 7;
+        float radius = shape.getBaseRadius() * (mediocris ? 0.98F : 0.82F);
+        SpawnPlan basePlan = plan(definition, random, minClusters, maxClusters, radius,
+                radius * PUFF_GROUP_RADIUS_MULTIPLIER,
                 shape.getBaseOffset() * 0.95F, shape.getTopOffset(),
                 0.38F + visual.getDensityMultiplier() * 0.25F,
                 0.42F + visual.getCoverageMultiplier() * 0.24F,
                 0.24F + visual.getEdgeErosionStrength() * 0.42F);
+        if (!humilis && !mediocris) {
+            return basePlan;
+        }
+        return basePlan.withPuffLobes(createHierarchicalPuffLobes(basePlan, mediocris, random));
     }
 
     private static SpawnPlan towerPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {
@@ -402,6 +439,38 @@ final class CloudMorphologyGenerators {
         return origin.add(Math.cos(angle) * distance, random.nextFloat() * yJitter - yJitter * 0.5F, Math.sin(angle) * distance);
     }
 
+    /**
+     * Places lateral PUFF siblings on a stable open ring around the canonical
+     * primary. Independent random angles allowed lobes to collect on one side
+     * or separate completely; a count-1 ring made the common three-member case
+     * collinear. Reserving one of count angular slots keeps the footprint
+     * asymmetric but bounded, while every secondary retains a measured overlap
+     * with the primary at its smallest birth radius.
+     */
+    private static Vec3 puffCell(
+            Vec3 origin,
+            SpawnPlan plan,
+            int clusterIndex,
+            RandomSource random
+    ) {
+        PuffLobeSpec spec = plan.puffLobe(clusterIndex);
+        if (spec != null) {
+            return origin.add(spec.offsetX(), spec.offsetY(), spec.offsetZ());
+        }
+        int slot = Mth.clamp(clusterIndex, 1, Math.max(1, plan.clusterCount() - 1));
+        float angularSample = random.nextFloat();
+        float angle = plan.orientationRadians()
+                + slot * ((float) (Math.PI * 2.0D) / Math.max(1, plan.clusterCount()))
+                + (angularSample - 0.5F) * PUFF_ANGULAR_JITTER_RADIANS;
+        float distance = plan.groupRadius()
+                * (PUFF_RADIAL_MIN + random.nextFloat() * (PUFF_RADIAL_MAX - PUFF_RADIAL_MIN));
+        return origin.add(
+                Math.cos(angle) * distance,
+                random.nextFloat() * 7.0F - 3.5F,
+                Math.sin(angle) * distance
+        );
+    }
+
     private static Vec3 towerCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
         if (plan.clusterCount() == STRUCTURED_TOWER_COUNT) {
             int index = Mth.clamp(clusterIndex, 0, STRUCTURED_TOWER_COUNT - 1);
@@ -503,6 +572,312 @@ final class CloudMorphologyGenerators {
         cluster.setVerticalBounds(localBaseY, Math.max(localBaseY + 4.0F, localTopY));
     }
 
+    private static void tuneHierarchicalPuff(
+            CloudClusterState cluster,
+            CloudTypeDefinition definition,
+            SpawnPlan plan,
+            int clusterIndex,
+            RandomSource random
+    ) {
+        PuffLobeSpec spec = plan.puffLobe(clusterIndex);
+        if (spec == null) {
+            throw new IllegalStateException(
+                    "Hierarchical PUFF plan is missing lobe " + clusterIndex
+                            + " of " + plan.clusterCount()
+            );
+        }
+
+        float finalDensity = Mth.clamp(
+                plan.density() * (0.90F + random.nextFloat() * 0.18F),
+                0.0F,
+                1.0F
+        );
+        float finalCoverage = Mth.clamp(
+                plan.coverage() * (0.88F + random.nextFloat() * 0.20F),
+                0.0F,
+                1.0F
+        );
+        // All structured members start at the same near-mature scale. With
+        // the renderer's conservative 0.96*0.90 minor radius this keeps every
+        // anchor/shoulder edge connected at birth instead of popping together
+        // only after growth.
+        float initialRadius = Math.max(6.0F, spec.targetRadius() * 0.96F);
+
+        cluster.setMorphologyFamily(CloudMorphologyFamily.PUFF);
+        cluster.setMorphologyLayout(
+                CloudClusterState.HIERARCHICAL_PUFF_LAYOUT_VERSION,
+                spec.tier()
+        );
+        cluster.setRadius(initialRadius);
+        cluster.setSpawnRadius(initialRadius);
+        cluster.setGrowthTargets(
+                spec.targetRadius(),
+                finalCoverage,
+                finalDensity
+        );
+        cluster.setDensity(Mth.clamp(finalDensity * 0.82F, 0.0F, 1.0F));
+        cluster.setCoverage(Mth.clamp(finalCoverage * 0.82F, 0.0F, 1.0F));
+        cluster.setEdgeSoftness(Mth.clamp(
+                plan.edgeSoftness() * (0.88F + random.nextFloat() * 0.24F),
+                0.02F,
+                0.95F
+        ));
+
+        float groupOriginY = (float) cluster.getCenter().y() - spec.offsetY();
+        cluster.setVerticalBounds(
+                groupOriginY + spec.baseOffsetY(),
+                groupOriginY + spec.topOffsetY()
+        );
+    }
+
+    /**
+     * PUFF membership indices predate hierarchical layouts and are persisted
+     * without a layout version. Preserve the actual stored geometry instead
+     * of reinterpreting an old index as a new base/crown role.
+     */
+    private static void retargetPuffPreservingGeometry(
+            CloudClusterState cluster,
+            CloudTypeDefinition definition
+    ) {
+        CloudShapeProfile shape = definition.getShapeProfile();
+        CloudVisualProfile visual = definition.getVisualProfile();
+
+        cluster.setMorphologyFamily(CloudMorphologyFamily.PUFF);
+        cluster.setGrowthTargets(
+                preservedPuffTargetRadius(cluster.getRadius(), cluster.getTargetRadius()),
+                Mth.clamp(coverageFor(CloudMorphologyFamily.PUFF, visual, shape), 0.0F, 1.0F),
+                Mth.clamp(densityFor(CloudMorphologyFamily.PUFF, visual), 0.0F, 1.0F)
+        );
+        // Centre and vertical bounds are already persisted authoritative lobe
+        // geometry. Keeping them untouched preserves both versioned upper
+        // tiers and legacy lateral groups; radius/media evolve without a role
+        // guess. Versioned membership persists across this transition.
+    }
+
+    /**
+     * Keeps an established PUFF lobe's individual radius target when its type
+     * evolves. This decision is intentionally independent from membership
+     * indices because legacy saves do not carry a morphology layout version.
+     */
+    static float preservedPuffTargetRadius(float currentRadius, float targetRadius) {
+        return Math.max(currentRadius, targetRadius);
+    }
+
+    private static List<PuffLobeSpec> createHierarchicalPuffLobes(
+            SpawnPlan plan,
+            boolean mediocris,
+            RandomSource random
+    ) {
+        // Four compact, vertically credible base billows establish the flat
+        // condensation level. Two parent-relative middle billows and one/two
+        // crowns then form the cauliflower silhouette. Every range below is
+        // constrained against the renderer's 0.96 horizontal radius: no base
+        // primitive is allowed to become the wide, shallow pancake that caused
+        // the rejected pear/shelf capture.
+        int upperCount = mediocris ? 4 : 3;
+        int baseCount = plan.clusterCount() - upperCount;
+        if (baseCount != 4) {
+            throw new IllegalStateException(
+                    "Hierarchical PUFF requires exactly four base lobes: " + plan.clusterCount()
+            );
+        }
+
+        float radius = plan.radius();
+        float condensationBase = -plan.baseDrop();
+        List<PuffLobeSpec> lobes = new ArrayList<>(plan.clusterCount());
+        float anchorRadius = radius * randomRange(
+                random,
+                mediocris ? 0.44F : 0.42F,
+                mediocris ? 0.50F : 0.46F
+        );
+        float anchorHeight = radius * randomRange(
+                random,
+                mediocris ? 0.72F : 0.62F,
+                mediocris ? 0.84F : 0.72F
+        );
+        lobes.add(new PuffLobeSpec(
+                0.0F,
+                0.0F,
+                0.0F,
+                anchorRadius,
+                condensationBase,
+                condensationBase + anchorHeight,
+                CloudMorphologyMemberTier.BASE
+        ));
+
+        int shoulderCount = baseCount - 1;
+        for (int shoulder = 0; shoulder < shoulderCount; shoulder++) {
+            float shoulderRadius = radius * randomRange(
+                    random,
+                    mediocris ? 0.40F : 0.36F,
+                    mediocris ? 0.46F : 0.42F
+            );
+            float angle = plan.orientationRadians()
+                    + shoulder * ((float) (Math.PI * 2.0D) / shoulderCount)
+                    + randomRange(random, -0.06F, 0.06F);
+            // This distance is measured against the actual lobe radii. The
+            // previous 0.54..0.60 range could connect at birth only by
+            // reopening the rejected 0.72-radius shelf. At 0.40..0.44 the
+            // compact BASE roots overlap even on the rendered minor axis.
+            float distance = randomRange(random, 0.40F, 0.44F)
+                    * (anchorRadius + shoulderRadius);
+            float shoulderHeight = radius * randomRange(
+                    random,
+                    mediocris ? 0.64F : 0.56F,
+                    mediocris ? 0.78F : 0.66F
+            );
+            // A sub-two-percent stagger preserves a coherent meteorological
+            // base without synchronising four analytic fade boundaries.
+            float shoulderBase = condensationBase
+                    + radius * randomRange(random, 0.0F, 0.018F);
+            lobes.add(new PuffLobeSpec(
+                    (float) Math.cos(angle) * distance,
+                    0.0F,
+                    (float) Math.sin(angle) * distance,
+                    shoulderRadius,
+                    shoulderBase,
+                    shoulderBase + shoulderHeight,
+                    CloudMorphologyMemberTier.BASE
+            ));
+        }
+
+        int firstSupport = random.nextInt(shoulderCount);
+        float middleTangentSign = random.nextBoolean() ? 1.0F : -1.0F;
+        List<PuffLobeSpec> middleLobes = new ArrayList<>(2);
+        for (int middle = 0; middle < 2; middle++) {
+            int supportIndex = 1 + ((firstSupport + middle) % shoulderCount);
+            PuffLobeSpec middleLobe = createUpperPuffLobe(
+                    lobes.get(supportIndex),
+                    condensationBase,
+                    radius,
+                    random,
+                    0.26F,
+                    0.30F,
+                    mediocris ? 0.36F : 0.32F,
+                    mediocris ? 0.42F : 0.38F,
+                    mediocris ? 0.24F : 0.22F,
+                    mediocris ? 0.32F : 0.30F,
+                    mediocris ? 0.72F : 0.58F,
+                    mediocris ? 0.86F : 0.70F,
+                    0.60F,
+                    CloudMorphologyMemberTier.MIDDLE,
+                    middleTangentSign
+            );
+            middleLobes.add(middleLobe);
+            lobes.add(middleLobe);
+        }
+
+        int crownCount = upperCount - middleLobes.size();
+        float crownTangentSign = random.nextBoolean() ? 1.0F : -1.0F;
+        for (int crown = 0; crown < crownCount; crown++) {
+            PuffLobeSpec crownSupport = middleLobes.get(crown % middleLobes.size());
+            lobes.add(createUpperPuffLobe(
+                    crownSupport,
+                    condensationBase,
+                    radius,
+                    random,
+                    0.32F,
+                    0.37F,
+                    mediocris ? 0.30F : 0.26F,
+                    mediocris ? 0.36F : 0.32F,
+                    mediocris ? 0.56F : 0.45F,
+                    mediocris ? 0.68F : 0.53F,
+                    mediocris ? 0.62F : 0.48F,
+                    mediocris ? 0.76F : 0.58F,
+                    0.55F,
+                    CloudMorphologyMemberTier.CROWN,
+                    crownTangentSign
+            ));
+        }
+        return List.copyOf(lobes);
+    }
+
+    private static PuffLobeSpec createUpperPuffLobe(
+            PuffLobeSpec support,
+            float condensationBase,
+            float nominalRadius,
+            RandomSource random,
+            float minimumSeparationScale,
+            float maximumSeparationScale,
+            float minimumRadiusScale,
+            float maximumRadiusScale,
+            float minimumBaseLift,
+            float maximumBaseLift,
+            float minimumHeight,
+            float maximumHeight,
+            float tangentRatioScale,
+            CloudMorphologyMemberTier tier,
+            float tangentSign
+    ) {
+        float supportLength = Math.max(
+                0.001F,
+                (float) Math.sqrt(support.offsetX() * support.offsetX()
+                        + support.offsetZ() * support.offsetZ())
+        );
+        float radialX = support.offsetX() / supportLength;
+        float radialZ = support.offsetZ() / supportLength;
+        float tangentX = -radialZ;
+        float tangentZ = radialX;
+        float childRadius = nominalRadius
+                * randomRange(random, minimumRadiusScale, maximumRadiusScale);
+        float tangentRatio = tangentSign * randomRange(
+                random,
+                tangentRatioScale * 0.55F,
+                tangentRatioScale
+        );
+        // Keep the fair-weather footprint compact: separation is used mostly
+        // around the parent's tangent, not as a second radial expansion of the
+        // whole meteorological field.
+        float radialWeight = tier == CloudMorphologyMemberTier.MIDDLE ? 0.14F : 0.10F;
+        float directionLength = (float) Math.sqrt(
+                radialWeight * radialWeight + tangentRatio * tangentRatio
+        );
+        float directionX = (radialX * radialWeight + tangentX * tangentRatio)
+                / directionLength;
+        float directionZ = (radialZ * radialWeight + tangentZ * tangentRatio)
+                / directionLength;
+        // The previous nominal-radius shifts placed upper centres only 2.9..4.0
+        // blocks from their parents at runtime. Their support remained almost
+        // completely contained until the parent cap narrowed, so seven valid
+        // descriptors collapsed into three stacked mushrooms. Separation now
+        // scales with both actual lobe radii: the .26..37 ranges expose a real
+        // cauliflower shoulder while the analytic .15-isosurface retains a
+        // multi-block bridge across every generated layout.
+        float separation = (support.targetRadius() + childRadius)
+                * randomRange(random, minimumSeparationScale, maximumSeparationScale);
+        float x = support.offsetX() + directionX * separation;
+        float z = support.offsetZ() + directionZ * separation;
+        float localBase = condensationBase
+                + nominalRadius * randomRange(random, minimumBaseLift, maximumBaseLift);
+        float localTop = localBase
+                + nominalRadius * randomRange(random, minimumHeight, maximumHeight);
+        if (tier == CloudMorphologyMemberTier.CROWN) {
+            // The root is closed by the renderer's structured implicit field.
+            // It must therefore begin far enough inside its authored support
+            // for the parent to remain material until the child opens. The old
+            // condensation-relative base produced two proven mediocris layouts
+            // where one crown had zero carrier corridor to every middle lobe.
+            // Preserve the sampled crown top and radius; only deepen an
+            // unsupported root, without consuming another random value.
+            float supportedBaseCeiling = support.topOffsetY()
+                    - nominalRadius * 0.38F;
+            localBase = Math.min(localBase, supportedBaseCeiling);
+        }
+        return new PuffLobeSpec(
+                x,
+                (localBase + localTop) * 0.5F,
+                z,
+                childRadius,
+                localBase,
+                localTop,
+                tier
+        );
+    }
+
+    private static float randomRange(RandomSource random, float minimum, float maximum) {
+        return Mth.lerp(random.nextFloat(), minimum, maximum);
+    }
+
     private static float morphologyTier(int clusterIndex, int clusterCount) {
         return Mth.clamp(
                 (float) Math.max(0, clusterIndex) / (float) Math.max(1, clusterCount - 1),
@@ -556,6 +931,33 @@ final class CloudMorphologyGenerators {
             List<Float> heights,
             List<Float> radii
     ) {
+    }
+
+    record PuffTopologyParameters(
+            float groupRadiusMultiplier,
+            float radialMinimum,
+            float radialMaximum,
+            float angularJitterRadians
+    ) {
+    }
+
+    record PuffLobeSpec(
+            float offsetX,
+            float offsetY,
+            float offsetZ,
+            float targetRadius,
+            float baseOffsetY,
+            float topOffsetY,
+            CloudMorphologyMemberTier tier
+    ) {
+        PuffLobeSpec {
+            if (!Float.isFinite(offsetX) || !Float.isFinite(offsetY) || !Float.isFinite(offsetZ)
+                    || !Float.isFinite(targetRadius) || targetRadius <= 0.0F
+                    || !Float.isFinite(baseOffsetY) || !Float.isFinite(topOffsetY)
+                    || topOffsetY <= baseOffsetY || tier == null) {
+                throw new IllegalArgumentException("Invalid PUFF lobe specification");
+            }
+        }
     }
 
     private static Vec3 stormCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
@@ -668,7 +1070,68 @@ final class CloudMorphologyGenerators {
             float density,
             float coverage,
             float edgeSoftness,
-            float orientationRadians
+            float orientationRadians,
+            List<PuffLobeSpec> puffLobes
     ) {
+        SpawnPlan(
+                CloudMorphologyFamily family,
+                int clusterCount,
+                float radius,
+                float groupRadius,
+                float baseDrop,
+                float topRise,
+                float density,
+                float coverage,
+                float edgeSoftness,
+                float orientationRadians
+        ) {
+            this(
+                    family,
+                    clusterCount,
+                    radius,
+                    groupRadius,
+                    baseDrop,
+                    topRise,
+                    density,
+                    coverage,
+                    edgeSoftness,
+                    orientationRadians,
+                    List.of()
+            );
+        }
+
+        SpawnPlan {
+            puffLobes = puffLobes == null ? List.of() : List.copyOf(puffLobes);
+            if (!puffLobes.isEmpty() && puffLobes.size() != clusterCount) {
+                throw new IllegalArgumentException(
+                        "PUFF lobe count " + puffLobes.size()
+                                + " does not match cluster count " + clusterCount
+                );
+            }
+        }
+
+        boolean hasHierarchicalPuff() {
+            return !puffLobes.isEmpty();
+        }
+
+        PuffLobeSpec puffLobe(int index) {
+            return index >= 0 && index < puffLobes.size() ? puffLobes.get(index) : null;
+        }
+
+        SpawnPlan withPuffLobes(List<PuffLobeSpec> lobes) {
+            return new SpawnPlan(
+                    family,
+                    clusterCount,
+                    radius,
+                    groupRadius,
+                    baseDrop,
+                    topRise,
+                    density,
+                    coverage,
+                    edgeSoftness,
+                    orientationRadians,
+                    lobes
+            );
+        }
     }
 }

@@ -13,7 +13,10 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class NetworkHandler {
-    private static final String PROTOCOL_VERSION = "11";
+    // CloudField snapshot/delta payload v5 transports versioned PUFF layout
+    // metadata. A protocol-11 peer would otherwise be accepted and decode the
+    // two new fields as the following floats, corrupting the rest of packet.
+    private static final String PROTOCOL_VERSION = "12";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "main"),
             () -> PROTOCOL_VERSION,

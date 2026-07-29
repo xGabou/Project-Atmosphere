@@ -14,6 +14,16 @@ public final class VolumetricCloudDebugConfig {
     // until a conservative occupancy structure replaces the probe heuristic.
     private static volatile boolean coveragePretestEnabled = false;
     private static volatile boolean adaptiveWeatherFootprintEnabled = true;
+    // The structured PUFF height-map experiment is diagnostic-only: at the
+    // current map resolution it creates stepped alpha fins. Production keeps
+    // the stable macro path until that representation is redesigned.
+    private static volatile boolean structuredPuffEnabled = false;
+    // Keep the current production selection as the default while allowing an
+    // explicit direct-only source for causal A/B. This selects one density
+    // source inside the native renderer; it is unrelated to backend ownership.
+    private static volatile VolumetricPuffShapeMode puffShapeMode = VolumetricPuffShapeMode.HYBRID;
+    private static volatile VolumetricPuffDensityStage puffDensityStage = VolumetricPuffDensityStage.FINAL;
+    private static volatile VolumetricPuffTierFilter puffTierFilter = VolumetricPuffTierFilter.ALL;
     private static volatile boolean historyEnabled = true;
     private static volatile VolumetricCloudRaymarchDebugView raymarchDebugView =
             VolumetricCloudRaymarchDebugView.FINAL;
@@ -68,6 +78,48 @@ public final class VolumetricCloudDebugConfig {
 
     public static void setAdaptiveWeatherFootprintEnabled(boolean enabled) {
         adaptiveWeatherFootprintEnabled = enabled;
+    }
+
+    public static boolean structuredPuffEnabled() {
+        return structuredPuffEnabled;
+    }
+
+    public static void setStructuredPuffEnabled(boolean enabled) {
+        structuredPuffEnabled = enabled;
+    }
+
+    public static boolean directPuffEnabled() {
+        return puffShapeMode.usesDirectDescriptors();
+    }
+
+    public static void setDirectPuffEnabled(boolean enabled) {
+        puffShapeMode = enabled
+                ? VolumetricPuffShapeMode.HYBRID
+                : VolumetricPuffShapeMode.FALLBACK_ONLY;
+    }
+
+    public static VolumetricPuffShapeMode puffShapeMode() {
+        return puffShapeMode;
+    }
+
+    public static void setPuffShapeMode(VolumetricPuffShapeMode mode) {
+        puffShapeMode = mode == null ? VolumetricPuffShapeMode.HYBRID : mode;
+    }
+
+    public static VolumetricPuffDensityStage puffDensityStage() {
+        return puffDensityStage;
+    }
+
+    public static void setPuffDensityStage(VolumetricPuffDensityStage stage) {
+        puffDensityStage = stage == null ? VolumetricPuffDensityStage.FINAL : stage;
+    }
+
+    public static VolumetricPuffTierFilter puffTierFilter() {
+        return puffTierFilter;
+    }
+
+    public static void setPuffTierFilter(VolumetricPuffTierFilter filter) {
+        puffTierFilter = filter == null ? VolumetricPuffTierFilter.ALL : filter;
     }
 
     public static boolean historyEnabled() {
@@ -136,6 +188,69 @@ public final class VolumetricCloudDebugConfig {
         coveragePretestDilation = Math.max(0, Math.min(2, dilation));
     }
 
+    /**
+     * Returns every comparison switch to the production baseline. Debug state
+     * is process-static, so session/world/backend transitions must call this
+     * explicitly or one diagnostic can silently contaminate a later world.
+     */
+    public static void resetDefaults() {
+        depthCompositeEnabled = true;
+        sceneRayLimitEnabled = true;
+        coveragePretestEnabled = false;
+        adaptiveWeatherFootprintEnabled = true;
+        structuredPuffEnabled = false;
+        puffShapeMode = VolumetricPuffShapeMode.HYBRID;
+        puffDensityStage = VolumetricPuffDensityStage.FINAL;
+        puffTierFilter = VolumetricPuffTierFilter.ALL;
+        historyEnabled = true;
+        raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
+        sentinelHeightsEnabled = false;
+        fullResolutionEnabled = false;
+        weatherCoverageScale = 1.0F;
+        coveragePretestSamples = 6;
+        coveragePretestThreshold = 0.004F;
+        coveragePretestDilation = 0;
+    }
+
+    /** Pure reset-contract check for the standalone renderer sandbox. */
+    public static void selfCheck() {
+        depthCompositeEnabled = false;
+        sceneRayLimitEnabled = false;
+        coveragePretestEnabled = true;
+        adaptiveWeatherFootprintEnabled = false;
+        structuredPuffEnabled = true;
+        puffShapeMode = VolumetricPuffShapeMode.FALLBACK_ONLY;
+        puffDensityStage = VolumetricPuffDensityStage.ANALYTIC_ALL;
+        puffTierFilter = VolumetricPuffTierFilter.CROWN;
+        historyEnabled = false;
+        raymarchDebugView = VolumetricCloudRaymarchDebugView.CURRENT_ONLY;
+        sentinelHeightsEnabled = true;
+        fullResolutionEnabled = true;
+        weatherCoverageScale = 2.0F;
+        coveragePretestSamples = 12;
+        coveragePretestThreshold = 0.02F;
+        coveragePretestDilation = 2;
+        resetDefaults();
+        if (!depthCompositeEnabled
+                || !sceneRayLimitEnabled
+                || coveragePretestEnabled
+                || !adaptiveWeatherFootprintEnabled
+                || structuredPuffEnabled
+                || puffShapeMode != VolumetricPuffShapeMode.HYBRID
+                || puffDensityStage != VolumetricPuffDensityStage.FINAL
+                || puffTierFilter != VolumetricPuffTierFilter.ALL
+                || !historyEnabled
+                || raymarchDebugView != VolumetricCloudRaymarchDebugView.FINAL
+                || sentinelHeightsEnabled
+                || fullResolutionEnabled
+                || weatherCoverageScale != 1.0F
+                || coveragePretestSamples != 6
+                || coveragePretestThreshold != 0.004F
+                || coveragePretestDilation != 0) {
+            throw new IllegalStateException("volumetric debug defaults did not reset exactly");
+        }
+    }
+
     public static String status() {
         return "depthComposite=" + (depthCompositeEnabled ? "on" : "off")
                 + "\nsceneRayLimit=" + (sceneRayLimitEnabled ? "on" : "off")
@@ -144,6 +259,10 @@ public final class VolumetricCloudDebugConfig {
                 + "\ncoveragePretestThreshold=" + coveragePretestThreshold
                 + "\ncoveragePretestDilation=" + coveragePretestDilation
                 + "\nadaptiveWeatherFootprint=" + (adaptiveWeatherFootprintEnabled ? "on" : "off")
+                + "\nstructuredPuff=" + (structuredPuffEnabled ? "on" : "off")
+                + "\npuffShape=" + puffShapeMode.serializedName()
+                + "\npuffDensity=" + puffDensityStage.serializedName()
+                + "\npuffTier=" + puffTierFilter.serializedName()
                 + "\nhistory=" + (historyEnabled ? "on" : "off")
                 + "\nraymarchView=" + raymarchDebugView.serializedName()
                 + "\nsentinelHeights=" + (sentinelHeightsEnabled ? "on" : "off")

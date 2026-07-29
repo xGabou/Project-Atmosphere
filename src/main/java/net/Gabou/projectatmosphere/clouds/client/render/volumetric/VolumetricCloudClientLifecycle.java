@@ -98,12 +98,14 @@ public final class VolumetricCloudClientLifecycle {
 
     /** Releases all client GL resources when the GameRenderer closes. */
     public static void shutdownClient() {
+        VolumetricCloudDebugConfig.resetDefaults();
         clearClientCaches();
         runOnRenderThread(() -> releaseRenderResources(true));
     }
 
     /** Clears temporal and target state when a configuration/backend switch occurs. */
     public static void onBackendChanged() {
+        VolumetricCloudDebugConfig.resetDefaults();
         ClientCloudVisualDensity.clear();
         CameraCloudDensityTracker.reset();
         VolumetricCloudRenderHook.resetMaterialAdvection();
@@ -111,6 +113,7 @@ public final class VolumetricCloudClientLifecycle {
     }
 
     private static void resetSessionState() {
+        VolumetricCloudDebugConfig.resetDefaults();
         clearClientCaches();
         runOnRenderThread(() -> releaseRenderResources(false));
     }

@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 
 /** Player-interest delta for render-authoritative CloudField snapshots. */
 public final class CloudFieldDeltaPacket {
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
 
     private final List<CloudFieldSnapshot> updated;
     private final List<UUID> removed;

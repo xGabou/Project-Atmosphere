@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.state;
 
 import net.Gabou.projectatmosphere.clouds.type.CloudFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -57,6 +58,8 @@ public final class CloudClusterState {
     private static final String TAG_MORPHOLOGY_GROUP_ID = "MorphologyGroupId";
     private static final String TAG_MORPHOLOGY_INDEX = "MorphologyIndex";
     private static final String TAG_MORPHOLOGY_COUNT = "MorphologyCount";
+    private static final String TAG_MORPHOLOGY_LAYOUT_VERSION = "MorphologyLayoutVersion";
+    private static final String TAG_MORPHOLOGY_MEMBER_TIER = "MorphologyMemberTier";
     private static final String TAG_CLOUD_TYPE_TICKS = "CloudTypeTicks";
     private static final String TAG_CLOUD_SEED = "CloudSeed";
 
@@ -69,6 +72,7 @@ public final class CloudClusterState {
     private static final int DEFAULT_LIFETIME_TICKS = 20 * 60 * 10;
     private static final int TRANSITION_BLEND_TICKS = 20 * 15;
     public static final float RADIUS_CAP = 1400.0F;
+    public static final int HIERARCHICAL_PUFF_LAYOUT_VERSION = 1;
 
     private final UUID clusterId;
     private final ResourceKey<Level> dimension;
@@ -100,6 +104,8 @@ public final class CloudClusterState {
     private UUID morphologyGroupId;
     private int morphologyIndex;
     private int morphologyCount;
+    private int morphologyLayoutVersion;
+    private CloudMorphologyMemberTier morphologyMemberTier;
     private int cloudTypeTicks;
     private int cloudSeed;
 
@@ -143,6 +149,8 @@ public final class CloudClusterState {
         this.morphologyGroupId = clusterId;
         this.morphologyIndex = 0;
         this.morphologyCount = 1;
+        this.morphologyLayoutVersion = 0;
+        this.morphologyMemberTier = CloudMorphologyMemberTier.UNKNOWN;
         this.cloudTypeTicks = 0;
         this.cloudSeed = createRandomCloudSeed();
         this.active = true;
@@ -424,10 +432,48 @@ public final class CloudClusterState {
         return morphologyCount;
     }
 
+    public int getMorphologyLayoutVersion() {
+        return morphologyLayoutVersion;
+    }
+
+    public CloudMorphologyMemberTier getMorphologyMemberTier() {
+        return morphologyMemberTier;
+    }
+
     public void setMorphologyMembership(UUID groupId, int index, int count) {
+        setMorphologyMembership(
+                groupId,
+                index,
+                count,
+                0,
+                CloudMorphologyMemberTier.UNKNOWN
+        );
+    }
+
+    public void setMorphologyMembership(
+            UUID groupId,
+            int index,
+            int count,
+            int layoutVersion,
+            CloudMorphologyMemberTier memberTier
+    ) {
         morphologyGroupId = Objects.requireNonNull(groupId, "groupId");
         morphologyCount = Math.max(1, count);
         morphologyIndex = Math.max(0, Math.min(index, morphologyCount - 1));
+        morphologyLayoutVersion = Math.max(0, layoutVersion);
+        morphologyMemberTier = morphologyLayoutVersion == 0 || memberTier == null
+                ? CloudMorphologyMemberTier.UNKNOWN
+                : memberTier;
+    }
+
+    public void setMorphologyLayout(
+            int layoutVersion,
+            CloudMorphologyMemberTier memberTier
+    ) {
+        morphologyLayoutVersion = Math.max(0, layoutVersion);
+        morphologyMemberTier = morphologyLayoutVersion == 0 || memberTier == null
+                ? CloudMorphologyMemberTier.UNKNOWN
+                : memberTier;
     }
 
     public boolean isMorphologySibling(@Nullable CloudClusterState other) {
@@ -564,6 +610,8 @@ public final class CloudClusterState {
         tag.putUUID(TAG_MORPHOLOGY_GROUP_ID, morphologyGroupId);
         tag.putInt(TAG_MORPHOLOGY_INDEX, morphologyIndex);
         tag.putInt(TAG_MORPHOLOGY_COUNT, morphologyCount);
+        tag.putInt(TAG_MORPHOLOGY_LAYOUT_VERSION, morphologyLayoutVersion);
+        tag.putString(TAG_MORPHOLOGY_MEMBER_TIER, morphologyMemberTier.name());
         tag.putInt(TAG_CLOUD_TYPE_TICKS, cloudTypeTicks);
         tag.putInt(TAG_CLOUD_SEED, cloudSeed);
 
@@ -646,6 +694,13 @@ public final class CloudClusterState {
         int morphologyIndex = tag.contains(TAG_MORPHOLOGY_INDEX, Tag.TAG_INT)
                 ? tag.getInt(TAG_MORPHOLOGY_INDEX)
                 : 0;
+        int morphologyLayoutVersion = tag.contains(TAG_MORPHOLOGY_LAYOUT_VERSION, Tag.TAG_INT)
+                ? Math.max(0, tag.getInt(TAG_MORPHOLOGY_LAYOUT_VERSION))
+                : 0;
+        CloudMorphologyMemberTier morphologyMemberTier = morphologyLayoutVersion > 0
+                && tag.contains(TAG_MORPHOLOGY_MEMBER_TIER, Tag.TAG_STRING)
+                ? CloudMorphologyMemberTier.byId(tag.getString(TAG_MORPHOLOGY_MEMBER_TIER))
+                : CloudMorphologyMemberTier.UNKNOWN;
         int cloudTypeTicks = tag.contains(TAG_CLOUD_TYPE_TICKS) ? tag.getInt(TAG_CLOUD_TYPE_TICKS) : 0;
         int cloudSeed = tag.contains(TAG_CLOUD_SEED) ? tag.getInt(TAG_CLOUD_SEED) : deriveCloudSeed(clusterId);
 
@@ -677,7 +732,13 @@ public final class CloudClusterState {
         state.setCloudTypeId(cloudTypeId);
         state.setPreviousCloudTypeId(previousCloudTypeId);
         state.setMorphologyFamily(morphologyFamily);
-        state.setMorphologyMembership(morphologyGroupId, morphologyIndex, morphologyCount);
+        state.setMorphologyMembership(
+                morphologyGroupId,
+                morphologyIndex,
+                morphologyCount,
+                morphologyLayoutVersion,
+                morphologyMemberTier
+        );
         state.setCloudTypeTicks(cloudTypeTicks);
         state.setCloudSeed(cloudSeed);
 

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.client.render.CloudTextureUnitContract;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudGpuTimer;
 import net.Gabou.projectatmosphere.clouds.client.render.depth.SceneDepthFrame;
@@ -22,9 +23,12 @@ import org.lwjgl.opengl.GL20;
  * governor that scales the step budget under GPU pressure.
  */
 public final class VolumetricCloudRenderer {
-    private static final int BASE_NOISE_TEXTURE_UNIT = 12;
-    private static final int DETAIL_NOISE_TEXTURE_UNIT = 13;
-    private static final int REQUIRED_FRAGMENT_TEXTURE_UNITS = 14;
+    private static final int PUFF_CANDIDATE_TEXTURE_UNIT =
+            CloudTextureUnitContract.PUFF_CANDIDATE_UNIT;
+    private static final int BASE_NOISE_TEXTURE_UNIT = CloudTextureUnitContract.BASE_NOISE_UNIT;
+    private static final int DETAIL_NOISE_TEXTURE_UNIT = CloudTextureUnitContract.DETAIL_NOISE_UNIT;
+    private static final int REQUIRED_FRAGMENT_TEXTURE_UNITS =
+            CloudTextureUnitContract.REQUIRED_FRAGMENT_TEXTURE_UNITS;
     private static final CloudGpuTimer GPU_TIMER = new CloudGpuTimer();
     private static final CloudFrameTimeGovernor GOVERNOR = new CloudFrameTimeGovernor();
 
@@ -239,11 +243,12 @@ public final class VolumetricCloudRenderer {
                 VolumetricCloudRenderTargets.prepareStormLayerHeightTarget(profile.weatherMapSize());
         RenderTarget stormTowerTarget =
                 VolumetricCloudRenderTargets.prepareStormTowerTarget(profile.weatherMapSize());
+        RenderTarget puffCandidateTarget = VolumetricCloudRenderTargets.preparePuffCandidateTarget();
         if (weatherTarget == null || morphologyTarget == null
                 || cumulusStageSupportTarget == null || cumulusStageBaseTarget == null
                 || cumulusStageTopTarget == null
                 || stormStructureTarget == null || stormLayerHeightTarget == null
-                || stormTowerTarget == null) {
+                || stormTowerTarget == null || puffCandidateTarget == null) {
             return false;
         }
 
@@ -281,6 +286,14 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("SlabBaseY").set(weather.slabBaseY());
         shader.safeGetUniform("SlabTopY").set(weather.slabTopY());
         shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
+        shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
+        shader.safeGetUniform("PuffShapeMode").set(PuffLobeSpatialIndex.effectiveShapeMode().shaderId());
+        shader.safeGetUniform("PuffDensityStage").set(
+                VolumetricCloudDebugConfig.puffDensityStage().shaderId()
+        );
+        shader.safeGetUniform("PuffTierFilter").set(
+                VolumetricCloudDebugConfig.puffTierFilter().shaderId()
+        );
         Vector3f lightDir = lighting.lightDirection();
         Vector3f lightColor = lighting.lightColor();
         Vector3f ambientTop = lighting.ambientTop();
@@ -304,6 +317,9 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("ScatterOctaves").set(profile.scatterOctaves());
         shader.safeGetUniform("DetailQuality").set(profile.detailQuality());
         shader.safeGetUniform("StepScale").set(stepScale);
+        shader.safeGetUniform("ExteriorFineStep").set(
+                PuffLobeSpatialIndex.exteriorFineStepWorld(profile.raymarchSteps(), stepScale)
+        );
         float uploadedMaxRenderDistance = Math.max(300.0F, maxRenderDistance);
         boolean uploadedUseSceneDepth = sceneRayLimitEnabled && safeSceneDepth.valid();
         boolean uploadedCoveragePretestEnabled = VolumetricCloudDebugConfig.coveragePretestEnabled();
@@ -334,13 +350,14 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("Funnel1B").set(safeFunnels.f1b());
 
         shader.apply();
-        bind3dNoise(shader);
+        PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+        bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
         GPU_TIMER.begin();
         try {
             FullscreenQuad.draw(shader);
         } finally {
             GPU_TIMER.end();
-            unbind3dNoise();
+            unbindManualTextures();
             shader.clear();
         }
 
@@ -424,11 +441,18 @@ public final class VolumetricCloudRenderer {
     }
 
     /**
-     * The vanilla sampler system only binds 2D textures, so the two 3D noise
-     * textures are bound manually on units above the JSON-declared samplers.
+     * Minecraft 1.20.1's managed shader path has twelve texture-state slots.
+     * The candidate indirection map is therefore bound manually on unit 12,
+     * followed by the two 3-D noise textures on units 13 and 14.
      */
-    private static void bind3dNoise(ShaderInstance shader) {
+    private static void bindManualTextures(ShaderInstance shader, int puffCandidateTextureId) {
         int program = shader.getId();
+        bind2dSampler(
+                program,
+                "PuffCandidateMapSampler",
+                PUFF_CANDIDATE_TEXTURE_UNIT,
+                puffCandidateTextureId
+        );
         bind3dSampler(
                 program,
                 "BaseNoiseSampler",
@@ -473,12 +497,24 @@ public final class VolumetricCloudRenderer {
         GL20.glUniform1i(location, unit);
     }
 
-    private static void unbind3dNoise() {
+    private static void unbindManualTextures() {
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + PUFF_CANDIDATE_TEXTURE_UNIT);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + BASE_NOISE_TEXTURE_UNIT);
         GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + DETAIL_NOISE_TEXTURE_UNIT);
         GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0);
+    }
+
+    private static void bind2dSampler(int program, String name, int unit, int textureId) {
+        int location = GL20.glGetUniformLocation(program, name);
+        if (location < 0 || textureId <= 0) {
+            return;
+        }
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + unit);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        GL20.glUniform1i(location, unit);
     }
 
     /**
@@ -740,6 +776,7 @@ public final class VolumetricCloudRenderer {
             hash = mixFloat(hash, weather.slabBaseY());
             hash = mixFloat(hash, weather.slabTopY());
             hash = mixFloat(hash, weather.maxPrecipitation());
+            hash = mix(hash, PuffLobeSpatialIndex.descriptorSignatureForDiagnostics());
             hash = mixVector(hash, lighting.lightDirection());
             hash = mixVector(hash, lighting.lightColor());
             hash = mixVector(hash, lighting.ambientTop());

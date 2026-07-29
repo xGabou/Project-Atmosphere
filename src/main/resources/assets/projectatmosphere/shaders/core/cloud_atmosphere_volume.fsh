@@ -18,6 +18,7 @@ uniform sampler2D CumulusStageTopMapSampler;
 uniform sampler2D StormStructureMapSampler;
 uniform sampler2D StormLayerHeightMapSampler;
 uniform sampler2D StormTowerMapSampler;
+uniform sampler2D PuffCandidateMapSampler;
 uniform sampler2D BlueNoiseSampler;
 uniform sampler2D SceneDepthSampler;
 uniform sampler2D HistorySampler;
@@ -42,6 +43,17 @@ uniform float WeatherExtent;
 uniform float SlabBaseY;
 uniform float SlabTopY;
 uniform float MaxPrecipitation;
+uniform int PuffLobeCount;
+uniform int PuffShapeMode; // 0=fallback, 1=legacy hybrid, 2=direct-only diagnostic
+uniform int PuffDensityStage; // 0=final, 1=analytic-all, 2=analytic-indexed, 3=envelope, 4=pre-erosion, 7=continuous-all, 12=carrier-billow
+uniform int PuffTierFilter; // -1=all, 0=base, 1=middle, 2=crown, 3=legacy/unknown
+
+const int MAX_PUFF_LOBES = 32;
+const int PUFF_CANDIDATES_PER_TILE = 8;
+const int PUFF_PACK_BASE = 33;
+uniform vec4 PuffPosRadius[MAX_PUFF_LOBES];
+uniform vec4 PuffShape[MAX_PUFF_LOBES];
+uniform vec4 PuffMedia[MAX_PUFF_LOBES];
 
 uniform vec3 LightDir;
 uniform vec3 LightColor;
@@ -62,6 +74,7 @@ uniform int LightSteps;
 uniform int ScatterOctaves;
 uniform int DetailQuality;   // 0 = off, 1 = normal, 2 = extra near-camera octave
 uniform float StepScale;     // frame-time governor multiplier (0.5 .. 1.0)
+uniform float ExteriorFineStep; // CPU-derived exterior surface stride in world blocks
 uniform float MaxRenderDistance;
 
 uniform int UseSceneDepth;
@@ -266,18 +279,61 @@ vec3 stratusSurfaceDifferential(
     return vec3(gradient, curvature) * edgeWeight;
 }
 
+const float MORPHOLOGY_CATEGORY_SCALE = 64.0;
+
+bool hasMorphologyCategory(float encodedCategory) {
+    return encodedCategory > (0.5 / MORPHOLOGY_CATEGORY_SCALE);
+}
+
 vec4 sampleMorphology(vec2 worldXZ) {
     vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         return vec4(0.0);
     }
-    // GBA are continuous traits, but R packs a categorical family + envelope
-    // role. Filtering it would change both profile and role at a one-texel edge,
-    // so fetch only R with nearest semantics.
+    // GBA are continuous traits. R is categorical and cannot be linearly
+    // interpolated, but blindly taking the nearest texel is also wrong: the
+    // linearly filtered WeatherMap can still receive support from another one
+    // of the same four texels when the nearest category is empty. Select the
+    // highest-weight valid categorical contributor from that exact 2x2 filter
+    // footprint instead.
     vec4 morphology = texture(MorphologyMapSampler, uv);
     ivec2 size = textureSize(MorphologyMapSampler, 0);
-    ivec2 coord = clamp(ivec2(floor(uv * vec2(size))), ivec2(0), size - ivec2(1));
-    morphology.r = texelFetch(MorphologyMapSampler, coord, 0).r;
+    ivec2 nearestCoord = clamp(
+        ivec2(floor(uv * vec2(size))),
+        ivec2(0),
+        size - ivec2(1)
+    );
+    float nearestCategory = texelFetch(MorphologyMapSampler, nearestCoord, 0).r;
+    // The nearest texel is also the maximum-weight bilinear contributor. Keep
+    // the common cloud-interior path at one categorical fetch; only an empty
+    // nearest texel needs the boundary recovery below.
+    if (hasMorphologyCategory(nearestCategory)) {
+        morphology.r = nearestCategory;
+        return morphology;
+    }
+    vec2 texelPosition = uv * vec2(size) - vec2(0.5);
+    ivec2 baseCoord = ivec2(floor(texelPosition));
+    vec2 fraction = fract(texelPosition);
+    float selectedCategory = 0.0;
+    float selectedWeight = -1.0;
+    for (int y = 0; y < 2; y++) {
+        float weightY = y == 0 ? 1.0 - fraction.y : fraction.y;
+        for (int x = 0; x < 2; x++) {
+            float weightX = x == 0 ? 1.0 - fraction.x : fraction.x;
+            ivec2 coord = clamp(
+                baseCoord + ivec2(x, y),
+                ivec2(0),
+                size - ivec2(1)
+            );
+            float candidate = texelFetch(MorphologyMapSampler, coord, 0).r;
+            float candidateWeight = weightX * weightY;
+            if (hasMorphologyCategory(candidate) && candidateWeight > selectedWeight) {
+                selectedCategory = candidate;
+                selectedWeight = candidateWeight;
+            }
+        }
+    }
+    morphology.r = selectedCategory;
     return morphology;
 }
 
@@ -341,6 +397,590 @@ vec4 sampleStormTowers(vec2 worldXZ) {
     return towers * smoothstep(0.0, 0.055, edgeDistance);
 }
 
+int decodePuffCandidate(vec4 packedCandidates, int candidateRank) {
+    float packedValue = candidateRank < 2
+        ? packedCandidates.r
+        : (candidateRank < 4
+            ? packedCandidates.g
+            : (candidateRank < 6 ? packedCandidates.b : packedCandidates.a));
+    int encoded = int(floor(packedValue + 0.5));
+    int pairRank = candidateRank - (candidateRank / 2) * 2;
+    int digit = pairRank == 0
+        ? encoded - (encoded / PUFF_PACK_BASE) * PUFF_PACK_BASE
+        : encoded / PUFF_PACK_BASE;
+    return digit - 1;
+}
+
+vec4 puffCandidatesAt(vec2 worldXZ) {
+    if (PuffLobeCount <= 0) {
+        return vec4(0.0);
+    }
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) {
+        return vec4(0.0);
+    }
+    ivec2 size = textureSize(PuffCandidateMapSampler, 0);
+    ivec2 coord = clamp(
+        ivec2(floor(uv * vec2(size))),
+        ivec2(0),
+        size - ivec2(1)
+    );
+    return texelFetch(PuffCandidateMapSampler, coord, 0);
+}
+
+// Evaluates one canonical PUFF member once and exposes both the historical
+// analytic surface and a normalized depth inside its meteorological envelope.
+// The production carrier is built only after all members have been unioned;
+// this prevents each descriptor from remaining visible as a final ellipsoid.
+// x=analytic mass, y=envelope depth, z=weighted envelope depth,
+// w=local descriptor height.
+vec4 directPuffLobeSample(vec3 p, int candidateIndex, out int puffTier) {
+    vec4 posRadius = PuffPosRadius[candidateIndex];
+    vec4 shape = PuffShape[candidateIndex];
+    vec4 media = PuffMedia[candidateIndex];
+    float span = max(shape.z - shape.y, 1.0);
+    float h = (p.y - shape.y) / span;
+    puffTier = int(clamp(floor(media.w + 0.00001), 0.0, 3.0));
+    if (h <= 0.0 || h >= 1.0) {
+        return vec4(0.0);
+    }
+
+    vec2 delta = p.xz - posRadius.xy;
+    float cosO = cos(-shape.x);
+    float sinO = sin(-shape.x);
+    vec2 local = vec2(
+        delta.x * cosO - delta.y * sinO,
+        delta.x * sinO + delta.y * cosO
+    );
+    vec2 radii = max(posRadius.zw, vec2(1.0));
+    float radial = length(local / radii);
+    if (radial >= 1.05) {
+        return vec4(0.0);
+    }
+
+    // A structured cumulus member is one radial/vertical implicit volume.
+    // Runtime tier-isolation proved that evaluating a horizontal profile and
+    // two independent base/top planes exposed 7.4..9.6 block discs at the
+    // roots of MIDDLE/CROWN members. Their roots are already buried inside
+    // parent material, so close only those roots instead of moving the layout.
+    // Member identity, unlike world position, does not drift with the field.
+    // Give adjacent lobes slightly different equator heights so their union
+    // cannot expose one synchronized horizontal shelf from every azimuth.
+    // Descriptor slots are sorted by camera distance on the CPU. Basing the
+    // profile on candidateIndex therefore changed a stationary lobe whenever
+    // the camera reordered the list. PuffMedia.z is the persisted lobe seed.
+    float lobePhase = fract(media.z * 0.754877666 + 0.17320508);
+    // PuffMedia.w packs the persisted layout tier in its integer part and the
+    // former per-lobe verticalDevelopment value in one quarter of its
+    // fractional part. Legacy/unversioned groups use tier 3 and retain the old
+    // generic profile instead of being reinterpreted from their member index.
+    if (PuffTierFilter >= 0 && puffTier != PuffTierFilter) {
+        return vec4(0.0);
+    }
+    float peakHeight;
+    float rootRadius;
+    float equatorRadius;
+    float upperPower;
+    if (puffTier == 0) {
+        // BASE members still keep a coherent lower deck, but the carrier below
+        // decides their visible edge instead of an artificially narrow foot.
+        peakHeight = mix(0.32, 0.38, lobePhase);
+        rootRadius = mix(0.70, 0.76, lobePhase);
+        equatorRadius = mix(0.92, 0.98, lobePhase);
+        upperPower = mix(0.95, 1.15, lobePhase);
+    } else if (puffTier == 1) {
+        peakHeight = mix(0.38, 0.44, lobePhase);
+        rootRadius = 0.0;
+        equatorRadius = mix(0.94, 1.00, lobePhase);
+        upperPower = mix(1.30, 1.55, lobePhase);
+    } else if (puffTier == 2) {
+        peakHeight = mix(0.43, 0.50, lobePhase);
+        rootRadius = 0.0;
+        equatorRadius = mix(0.90, 0.96, lobePhase);
+        upperPower = mix(1.70, 2.00, lobePhase);
+    } else {
+        peakHeight = mix(0.33, 0.43, lobePhase);
+        rootRadius = mix(0.38, 0.46, lobePhase);
+        equatorRadius = 1.0;
+        upperPower = 1.35;
+    }
+    // Analytic geometry must not breathe when the governor changes quality.
+    // Segment/AABB refinement now protects thin support, so fixed world-space
+    // fades are both stable and adequately sampled at every quality level.
+    float desiredBaseFeather = puffTier == 0 ? 5.0 : 4.0;
+    float desiredTopFeather = puffTier == 2 ? 3.5 : 4.0;
+    float featherScale = min(
+        1.0,
+        span * 0.70 / max(0.001, desiredBaseFeather + desiredTopFeather)
+    );
+    float baseFeatherH = desiredBaseFeather * featherScale / span;
+    float lifecycle = saturate(media.y);
+    float lifecycleEnvelope = lifecycle < 0.5
+        ? mix(0.30, 1.0, lifecycle * 2.0)
+        : mix(1.0, 0.30, (lifecycle - 0.5) * 2.0);
+    float materialMass = mix(0.62, 1.0, saturate(shape.w));
+    float envelopeDepth;
+    if (puffTier <= 2) {
+        // BASE retains one softly feathered meteorological condensation plane.
+        // Upper tiers start and end at a point in this implicit coordinate, so
+        // their support radius grows as O(h) and axial density as O(h^2).
+        // There is no non-zero root disc and no independent planar clamp.
+        float rootRatio = puffTier == 0
+            ? rootRadius / max(equatorRadius, 0.001)
+            : 0.0;
+        float verticalAtBase = -sqrt(max(
+            0.0,
+            1.0 - rootRatio * rootRatio
+        ));
+        float verticalCoordinate;
+        if (h <= peakHeight) {
+            verticalCoordinate = mix(
+                verticalAtBase,
+                0.0,
+                smoothstep(0.0, peakHeight, h)
+            );
+        } else {
+            // The tier-specific upperPower was previously assigned above but
+            // ignored here, which gave BASE, MIDDLE and CROWN the same
+            // normalized spherical cap. Preserve the shared peak/top
+            // endpoints while keeping BASE close to the proven spherical
+            // cap and making MIDDLE/CROWN progressively fuller. Using half
+            // this exponent made BASE/MIDDLE exponents smaller than one and
+            // removed the exact upper support needed by mediocris crowns.
+            float upper = saturate(
+                (h - peakHeight) / max(1.0 - peakHeight, 0.001)
+            );
+            float upperProgress = smoothstep(0.0, 1.0, upper);
+            verticalCoordinate = pow(
+                upperProgress,
+                upperPower
+            );
+        }
+        float implicitRadius = length(vec2(
+            radial / max(equatorRadius, 0.001),
+            verticalCoordinate
+        ));
+        envelopeDepth = max(1.0 - implicitRadius, 0.0);
+        if (puffTier == 0) {
+            envelopeDepth *= smoothstep(0.0, baseFeatherH, h);
+        }
+    } else {
+        // Unversioned persisted groups have no authored tier. Preserve their
+        // legacy profile until a save migration can prove a safe role mapping.
+        float radiusAtHeight;
+        if (h <= peakHeight) {
+            radiusAtHeight = mix(
+                rootRadius,
+                equatorRadius,
+                smoothstep(0.0, peakHeight, h)
+            );
+        } else {
+            float upper = saturate((h - peakHeight) / (1.0 - peakHeight));
+            radiusAtHeight = equatorRadius
+                * sqrt(max(0.0, 1.0 - pow(upper, upperPower)));
+        }
+        float radialFeather = mix(0.08, 0.14, saturate(media.x));
+        float outerRadius = max(radiusAtHeight, 0.001);
+        float horizontal = 1.0 - smoothstep(
+            max(0.0, outerRadius - radialFeather),
+            outerRadius,
+            radial
+        );
+        float topFeatherH = desiredTopFeather * featherScale / span;
+        float baseFade = smoothstep(0.0, baseFeatherH, h);
+        float topFade = 1.0 - smoothstep(1.0 - topFeatherH, 1.0, h);
+        envelopeDepth = horizontal * baseFade * topFade;
+    }
+    float analyticMass = envelopeDepth * lifecycleEnvelope * materialMass;
+    return vec4(
+        analyticMass,
+        envelopeDepth,
+        envelopeDepth * lifecycleEnvelope * materialMass,
+        h
+    );
+}
+
+float directPuffLobeShape(vec3 p, int candidateIndex) {
+    int puffTier = 3;
+    return directPuffLobeSample(p, candidateIndex, puffTier).x;
+}
+
+void accumulatePuffShape(inout vec2 accumulated, float candidate) {
+    // Retain the two strongest members. A probabilistic sum grows with every
+    // overlapping descriptor and turned seven valid lobes into one monolith.
+    // Top-two accumulation is order independent and cannot saturate merely
+    // because another weak member exists elsewhere in the hierarchy.
+    float previousMaximum = accumulated.x;
+    accumulated.x = max(previousMaximum, candidate);
+    accumulated.y = max(accumulated.y, min(previousMaximum, candidate));
+}
+
+float resolvePuffShape(vec2 accumulated) {
+    // One lobe remains exact. The second strongest can bridge a seam by at
+    // most 0.0625, while no support is created outside either input.
+    return accumulated.x + 0.25 * accumulated.y * (1.0 - accumulated.x);
+}
+
+// Exhaustive descriptor evaluation is intentionally expensive and is selected
+// only by the diagnostic stage. It proves whether packing/indexing changes the
+// analytic support without introducing WeatherMap occupancy.
+float directPuffShapeAll(vec3 p) {
+    vec2 accumulated = vec2(0.0);
+    for (int candidateIndex = 0;
+            candidateIndex < MAX_PUFF_LOBES;
+            candidateIndex++) {
+        if (candidateIndex >= PuffLobeCount) {
+            break;
+        }
+        accumulatePuffShape(accumulated, directPuffLobeShape(p, candidateIndex));
+    }
+    return resolvePuffShape(accumulated);
+}
+
+// Indexed analytic diagnostic: the candidate map limits each sample to nearby
+// members while preserving the historical analytic response for A/B proof.
+float directPuffShape(
+        vec3 p,
+        out bool indexedTile,
+        out float dominantHeight01) {
+    vec4 candidateTexel = puffCandidatesAt(p.xz);
+    indexedTile = false;
+    dominantHeight01 = 0.0;
+    vec2 accumulated = vec2(0.0);
+    float strongestShape = 0.0;
+    for (int candidateRank = 0;
+            candidateRank < PUFF_CANDIDATES_PER_TILE;
+            candidateRank++) {
+        int candidateIndex = decodePuffCandidate(candidateTexel, candidateRank);
+        if (candidateIndex < 0
+                || candidateIndex >= PuffLobeCount
+                || candidateIndex >= MAX_PUFF_LOBES) {
+            continue;
+        }
+        indexedTile = true;
+        float candidateShape = directPuffLobeShape(p, candidateIndex);
+        if (candidateShape > strongestShape) {
+            strongestShape = candidateShape;
+            vec4 candidateBounds = PuffShape[candidateIndex];
+            dominantHeight01 = saturate(
+                (p.y - candidateBounds.y)
+                    / max(candidateBounds.z - candidateBounds.y, 1.0)
+            );
+        }
+        accumulatePuffShape(accumulated, candidateShape);
+    }
+    return resolvePuffShape(accumulated);
+}
+
+float resolvePuffContinuousField(
+        vec2 envelopeAccumulated,
+        vec2 weightedAccumulated,
+        vec2 baseRootAccumulated,
+        float carrierSignal,
+        float billowSignal,
+        float billowStrength) {
+    float envelope = resolvePuffShape(envelopeAccumulated);
+    if (envelope <= 0.0) {
+        return 0.0;
+    }
+    float weighted = resolvePuffShape(weightedAccumulated);
+    // The second component is now the second-strongest contributor rather
+    // than a probabilistic union. It is the direct, count-independent measure
+    // of a real lobe junction.
+    float overlap = envelopeAccumulated.y;
+    float baseRootOverlap = baseRootAccumulated.y;
+    float materialFactor = saturate(weighted / max(envelope, 0.0001));
+
+    // BaseNoise.G already contains three coherent Worley octaves. Its baked
+    // p05/p95 range is 0.2844/0.6775, so this remap uses the measured signal
+    // instead of an arbitrary threshold. One world-stable carrier is applied
+    // after the union; descriptor IDs and time never enter its domain.
+    float carrier = smoothstep(0.28, 0.68, carrierSignal);
+    float exposedIso = mix(0.34, 0.08, carrier);
+    float coreProtection = smoothstep(0.38, 0.55, envelope);
+    float junctionProtection = smoothstep(0.015, 0.075, overlap);
+    float baseJunctionProtection = smoothstep(
+        0.004,
+        0.016,
+        baseRootOverlap
+    );
+    float protection = max(
+        coreProtection,
+        max(junctionProtection, baseJunctionProtection)
+    );
+    // BaseNoise.B is already present in the same RGBA fetch as the macro G
+    // carrier. Its approximately half-scale cells add medium cauliflower
+    // relief without another texture lookup. The modulation owns only the
+    // exposed shell: core, real lobe junctions and BASE-root corridors all
+    // converge to the same 0.012 protected isovalue. A zero strength remains
+    // bit-for-bit equivalent to the former G-only carrier.
+    float mediumBillow = smoothstep(0.28, 0.68, billowSignal);
+    float billowIso = clamp(
+        exposedIso + (0.5 - mediumBillow) * 0.12 * billowStrength,
+        0.04,
+        0.40
+    );
+    float surfaceIso = mix(billowIso, 0.012, protection);
+    float continuousShape = max(
+        (envelope - surfaceIso) / max(1.0 - surfaceIso, 0.001),
+        0.0
+    );
+    return continuousShape * materialFactor;
+}
+
+void accumulatePuffContinuousSample(
+        inout vec2 envelopeAccumulated,
+        inout vec2 weightedAccumulated,
+        inout vec2 baseRootAccumulated,
+        vec4 lobeSample,
+        int puffTier) {
+    accumulatePuffShape(envelopeAccumulated, lobeSample.y);
+    accumulatePuffShape(weightedAccumulated, lobeSample.z);
+    float baseRootCandidate = puffTier == 0
+        ? lobeSample.y * (1.0 - smoothstep(0.34, 0.55, lobeSample.w))
+        : 0.0;
+    accumulatePuffShape(baseRootAccumulated, baseRootCandidate);
+}
+
+// Exhaustive carrier diagnostic. This deliberately bypasses the candidate
+// texture just like ANALYTIC_ALL so packing can be compared independently.
+float directPuffContinuousShapeAll(
+        vec3 p,
+        float carrierSignal,
+        float billowSignal,
+        float billowStrength) {
+    vec2 envelopeAccumulated = vec2(0.0);
+    vec2 weightedAccumulated = vec2(0.0);
+    vec2 baseRootAccumulated = vec2(0.0);
+    for (int candidateIndex = 0;
+            candidateIndex < MAX_PUFF_LOBES;
+            candidateIndex++) {
+        if (candidateIndex >= PuffLobeCount) {
+            break;
+        }
+        int puffTier = 3;
+        vec4 lobeSample = directPuffLobeSample(p, candidateIndex, puffTier);
+        accumulatePuffContinuousSample(
+            envelopeAccumulated,
+            weightedAccumulated,
+            baseRootAccumulated,
+            lobeSample,
+            puffTier
+        );
+    }
+    return resolvePuffContinuousField(
+        envelopeAccumulated,
+        weightedAccumulated,
+        baseRootAccumulated,
+        carrierSignal,
+        billowSignal,
+        billowStrength
+    );
+}
+
+// Exhaustive raw-envelope control. It retains the exact descriptor profiles
+// and order-independent union, but removes the carrier isovalue, all protection
+// thresholds, lifecycle/material weighting and every noise texture lookup.
+// Comparing this against the constant-carrier cuts identifies whether banding
+// first appears in descriptor geometry or in the carrier transfer function.
+float directPuffEnvelopeShapeAll(vec3 p) {
+    vec2 envelopeAccumulated = vec2(0.0);
+    for (int candidateIndex = 0;
+            candidateIndex < MAX_PUFF_LOBES;
+            candidateIndex++) {
+        if (candidateIndex >= PuffLobeCount) {
+            break;
+        }
+        int puffTier = 3;
+        vec4 lobeSample = directPuffLobeSample(p, candidateIndex, puffTier);
+        accumulatePuffShape(envelopeAccumulated, lobeSample.y);
+    }
+    return resolvePuffShape(envelopeAccumulated);
+}
+
+// Production carrier: candidate selection remains indexed, but the selected
+// descriptors contribute to one continuous field before the surface is cut.
+float directPuffContinuousShape(
+        vec3 p,
+        float carrierSignal,
+        float billowSignal,
+        float billowStrength,
+        out bool indexedTile,
+        out float dominantHeight01) {
+    vec4 candidateTexel = puffCandidatesAt(p.xz);
+    indexedTile = false;
+    dominantHeight01 = 0.0;
+    vec2 envelopeAccumulated = vec2(0.0);
+    vec2 weightedAccumulated = vec2(0.0);
+    vec2 baseRootAccumulated = vec2(0.0);
+    float strongestEnvelope = 0.0;
+    for (int candidateRank = 0;
+            candidateRank < PUFF_CANDIDATES_PER_TILE;
+            candidateRank++) {
+        int candidateIndex = decodePuffCandidate(candidateTexel, candidateRank);
+        if (candidateIndex < 0
+                || candidateIndex >= PuffLobeCount
+                || candidateIndex >= MAX_PUFF_LOBES) {
+            continue;
+        }
+        indexedTile = true;
+        int puffTier = 3;
+        vec4 lobeSample = directPuffLobeSample(p, candidateIndex, puffTier);
+        if (lobeSample.z > strongestEnvelope) {
+            strongestEnvelope = lobeSample.z;
+            dominantHeight01 = lobeSample.w;
+        }
+        accumulatePuffContinuousSample(
+            envelopeAccumulated,
+            weightedAccumulated,
+            baseRootAccumulated,
+            lobeSample,
+            puffTier
+        );
+    }
+    return resolvePuffContinuousField(
+        envelopeAccumulated,
+        weightedAccumulated,
+        baseRootAccumulated,
+        carrierSignal,
+        billowSignal,
+        billowStrength
+    );
+}
+
+bool puffBoundsClipAxis(
+        float origin,
+        float delta,
+        float minimumBound,
+        float maximumBound,
+        inout float segmentMinimum,
+        inout float segmentMaximum) {
+    if (abs(delta) < 0.00001) {
+        return origin >= minimumBound && origin <= maximumBound;
+    }
+    float first = (minimumBound - origin) / delta;
+    float second = (maximumBound - origin) / delta;
+    segmentMinimum = max(segmentMinimum, min(first, second));
+    segmentMaximum = min(segmentMaximum, max(first, second));
+    return segmentMaximum >= segmentMinimum;
+}
+
+// Point-sampled coarse search can jump completely over a compact lobe. Test
+// the whole proposed segment against each descriptor's conservative AABB and
+// switch to fine traversal before advancing through a possible support volume.
+// This preserves long clear-air strides without tying silhouette visibility to
+// the screen-row-dependent ray/slab span.
+bool directPuffSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
+    vec3 delta = segmentEnd - segmentStart;
+    for (int candidateIndex = 0;
+            candidateIndex < MAX_PUFF_LOBES;
+            candidateIndex++) {
+        if (candidateIndex >= PuffLobeCount) {
+            break;
+        }
+        vec4 posRadius = PuffPosRadius[candidateIndex];
+        vec4 shape = PuffShape[candidateIndex];
+        int puffTier = int(clamp(
+            floor(PuffMedia[candidateIndex].w + 0.00001),
+            0.0,
+            3.0
+        ));
+        if (PuffTierFilter >= 0 && puffTier != PuffTierFilter) {
+            continue;
+        }
+        // A rotated ellipse can extend by its major radius on either world
+        // axis. The former X=major/Z=minor box missed valid support whenever
+        // the major axis approached Z. max(major, minor) is a cheap, strictly
+        // conservative bound without per-step trigonometry.
+        float horizontalPadding = max(
+            max(posRadius.z, posRadius.w) * 1.05,
+            1.0
+        );
+        vec3 padding = vec3(horizontalPadding, 0.0, horizontalPadding);
+        vec3 minimumBounds = vec3(
+            posRadius.x - padding.x,
+            shape.y,
+            posRadius.y - padding.z
+        );
+        vec3 maximumBounds = vec3(
+            posRadius.x + padding.x,
+            shape.z,
+            posRadius.y + padding.z
+        );
+        float segmentMinimum = 0.0;
+        float segmentMaximum = 1.0;
+        bool intersects = puffBoundsClipAxis(
+            segmentStart.x, delta.x,
+            minimumBounds.x, maximumBounds.x,
+            segmentMinimum, segmentMaximum
+        );
+        intersects = intersects && puffBoundsClipAxis(
+            segmentStart.y, delta.y,
+            minimumBounds.y, maximumBounds.y,
+            segmentMinimum, segmentMaximum
+        );
+        intersects = intersects && puffBoundsClipAxis(
+            segmentStart.z, delta.z,
+            minimumBounds.z, maximumBounds.z,
+            segmentMinimum, segmentMaximum
+        );
+        if (intersects) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Recovers the dominant descriptor height used to distinguish cloud body from
+// precipitation during the primary march. It deliberately uses the analytic
+// envelope already in registers/textures instead of paying a second 3D carrier
+// lookup for every accepted material sample.
+bool dominantDirectPuffHeightAt(vec3 p, out float localHeight01) {
+    vec4 cumulusStageSupports = sampleCumulusStageSupports(p.xz);
+    vec4 cumulusStageBases = sampleCumulusStageBases(p.xz);
+    vec4 cumulusStageTops = sampleCumulusStageTops(p.xz);
+    float cumulusRolePresence = max(
+        max(cumulusStageSupports.r, cumulusStageSupports.g),
+        max(cumulusStageSupports.b, cumulusStageSupports.a)
+    );
+    float cumulusHeightPresence = max(
+        max(max(cumulusStageBases.r, cumulusStageBases.g),
+            max(cumulusStageBases.b, cumulusStageBases.a)),
+        max(max(cumulusStageTops.r, cumulusStageTops.g),
+            max(cumulusStageTops.b, cumulusStageTops.a))
+    );
+    if (cumulusRolePresence > 0.004
+            && cumulusHeightPresence > 0.0001) {
+        localHeight01 = 0.0;
+        return false;
+    }
+    vec4 candidateTexel = puffCandidatesAt(p.xz);
+    float bestShape = 0.0;
+    float dominantHeight = 0.0;
+    for (int candidateRank = 0;
+            candidateRank < PUFF_CANDIDATES_PER_TILE;
+            candidateRank++) {
+        int candidateIndex = decodePuffCandidate(candidateTexel, candidateRank);
+        if (candidateIndex < 0
+                || candidateIndex >= PuffLobeCount
+                || candidateIndex >= MAX_PUFF_LOBES) {
+            continue;
+        }
+        int puffTier = 3;
+        vec4 lobeSample = directPuffLobeSample(p, candidateIndex, puffTier);
+        if (lobeSample.x > bestShape) {
+            bestShape = lobeSample.x;
+            dominantHeight = lobeSample.w;
+        }
+    }
+    if (bestShape <= 0.0) {
+        localHeight01 = 0.0;
+        return false;
+    }
+    localHeight01 = dominantHeight;
+    return true;
+}
+
 float profileWeight(float profile, float expected) {
     return 1.0 - smoothstep(0.20, 0.90, abs(profile - expected));
 }
@@ -369,7 +1009,12 @@ float pretestWeatherCoverage(vec2 worldXZ) {
 }
 
 int cloudMorphologyCode(vec4 morphology) {
-    return int(clamp(floor(morphology.r * 63.0 + 0.5), 0.0, 63.0));
+    int encodedCode = int(clamp(
+        floor(morphology.r * MORPHOLOGY_CATEGORY_SCALE + 0.5),
+        0.0,
+        MORPHOLOGY_CATEGORY_SCALE
+    ));
+    return max(encodedCode - 1, 0);
 }
 
 int cloudProfileId(vec4 morphology) {
@@ -897,6 +1542,9 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
     vec2 sourceXZ = p.xz - windDir * localFallDistance * 0.14;
     vec4 weather = sampleWeather(sourceXZ);
     vec4 morphology = sampleMorphology(sourceXZ);
+    if (!hasMorphologyCategory(morphology.r)) {
+        return 0.0;
+    }
     float coverage = smoothstep(0.012, 0.42, saturate(weather.r * CoverageMul));
     float precipitation = morphology.a;
     int profileId = cloudProfileId(morphology);
@@ -952,6 +1600,70 @@ float cloudDensity(
         bool useDetail,
         bool nearCamera,
         bool includePrecipitation) {
+    if (PuffDensityStage == 1) {
+        // Pure descriptor geometry: no WeatherMap and no candidate texture.
+        // Empty descriptors render empty instead of silently falling through.
+        float diagnosticPuff = PuffLobeCount > 0 ? directPuffShapeAll(p) : 0.0;
+        return max(diagnosticPuff, 0.0) * 0.88 * DensityMul;
+    }
+    if (PuffDensityStage == 2) {
+        // Adds only candidate packing/indexing to the exhaustive analytic cut.
+        bool diagnosticIndexedTile = false;
+        float diagnosticDominantHeight = 0.0;
+        float diagnosticPuff = PuffLobeCount > 0
+            ? directPuffShape(
+                p,
+                diagnosticIndexedTile,
+                diagnosticDominantHeight
+            )
+            : 0.0;
+        return max(diagnosticPuff, 0.0) * 0.88 * DensityMul;
+    }
+    if (PuffDensityStage == 11) {
+        float diagnosticEnvelope = PuffLobeCount > 0
+            ? directPuffEnvelopeShapeAll(p)
+            : 0.0;
+        return max(diagnosticEnvelope, 0.0) * 0.88 * DensityMul;
+    }
+    if ((PuffDensityStage >= 7 && PuffDensityStage <= 10)
+            || PuffDensityStage == 12) {
+        // Pure exhaustive carrier cuts. Stage 7 uses the production noise;
+        // stages 8/10 use saturated low/high controls and stage 9 uses the
+        // measured median.
+        // These constants isolate carrier-domain variation from descriptor
+        // envelope, ray traversal and alpha integration without changing any
+        // other part of the render path.
+        float diagnosticCarrier = 0.0;
+        float diagnosticBillow = 0.5;
+        float diagnosticBillowStrength = 0.0;
+        if (PuffDensityStage == 7 || PuffDensityStage == 12) {
+            vec3 diagnosticSamplePos = p;
+            diagnosticSamplePos.xz -= MaterialOffset;
+            vec4 diagnosticNoise = texture(
+                BaseNoiseSampler,
+                baseNoiseDomain(diagnosticSamplePos, 0.0032),
+                mipBias
+            );
+            diagnosticCarrier = PuffDensityStage == 12
+                ? 0.4775
+                : diagnosticNoise.g;
+            diagnosticBillow = diagnosticNoise.b;
+            diagnosticBillowStrength = PuffDensityStage == 12 ? 1.0 : 0.0;
+        } else if (PuffDensityStage == 9) {
+            diagnosticCarrier = 0.4775;
+        } else if (PuffDensityStage == 10) {
+            diagnosticCarrier = 1.0;
+        }
+        float diagnosticPuff = PuffLobeCount > 0
+            ? directPuffContinuousShapeAll(
+                p,
+                diagnosticCarrier,
+                diagnosticBillow,
+                diagnosticBillowStrength
+            )
+            : 0.0;
+        return max(diagnosticPuff, 0.0) * 0.88 * DensityMul;
+    }
     vec4 weather = sampleWeather(p.xz);
     vec4 morphology = sampleMorphology(p.xz);
     // Weather-map coverage already includes the cloudlet density. Its normal
@@ -961,6 +1673,16 @@ float cloudDensity(
     float energy = weather.a;
     int profileId = cloudProfileId(morphology);
     int envelopeRole = cloudEnvelopeRole(morphology);
+    // Diagnostic only: after reserving encoded zero for empty, this cut must
+    // render nothing wherever WeatherMap and MorphologyMap ownership agree.
+    // Keeping it available provides a direct GPU regression check for future
+    // changes to either map's footprint rules.
+    bool morphologyCategoryValid = hasMorphologyCategory(morphology.r);
+    bool morphologyCategoryEmpty = !morphologyCategoryValid;
+    bool morphologyGapDiagnostic = PuffDensityStage == 5;
+    if (morphologyGapDiagnostic && !morphologyCategoryEmpty) {
+        return 0.0;
+    }
     bool sheetProfile = profileId == 1 || profileId == 2 || profileId == 5;
     bool stormProfile = profileId == 4 || profileId == 7;
     float coverage = profileId == 6
@@ -1032,12 +1754,19 @@ float cloudDensity(
     bool useCumulusStructure = cumulusProfile
         && cumulusRolePresence > 0.004
         && cumulusHeightPresence > 0.0001;
+    bool directPuffAvailable = cumulusProfile
+        && !useCumulusStructure
+        && PuffLobeCount > 0
+        && PuffShapeMode != 0;
 
     float cloud = 0.0;
-    bool insideShapeBounds = useCumulusStructure
+    // Direct descriptors already carry exact per-lobe Y bounds. The fused
+    // 8-bit WeatherMap interval is a material envelope, not a second geometry
+    // clip; applying it here removed valid analytic crowns and roots.
+    bool insideShapeBounds = useCumulusStructure || directPuffAvailable
         ? p.y > SlabBaseY - 2.0 && p.y < SlabTopY + 2.0
         : h01 > -0.02 && h01 < 1.02;
-    if (insideShapeBounds && coverage > 0.008) {
+    if (insideShapeBounds && coverage > 0.008 && morphologyCategoryValid) {
         float anvil = stormProfile
             ? smoothstep(0.62, 0.94, saturate(h01))
                 * energy * (0.20 + verticalDevelopment * 0.42)
@@ -1053,7 +1782,7 @@ float cloudDensity(
         // Cloudlets are tens to low hundreds of blocks wide. The old 0.0016
         // scale sampled an almost constant value across an entire cloudlet,
         // producing one smooth oval instead of separate billows.
-        float baseNoiseScale = 0.0052;
+        float baseNoiseScale = directPuffAvailable ? 0.0032 : 0.0052;
         if (sheetProfile) {
             baseNoiseScale = profileId == 2 ? 0.0042 : 0.0031;
         } else if (profileId == 6) {
@@ -1088,6 +1817,26 @@ float cloudDensity(
         bool useStormStructure = stormProfile
             && rolePresence > 0.004
             && layerHeightPresence > 0.0001;
+        bool directPuffIndexed = false;
+        float directPuffHeight01 = h01;
+        float directPuff = directPuffAvailable
+            ? directPuffContinuousShape(
+                p,
+                baseNoise.g,
+                baseNoise.b,
+                0.0,
+                directPuffIndexed,
+                directPuffHeight01
+            )
+            : 0.0;
+        // Mode 2 deliberately keeps the analytic source global: a tile with no
+        // candidates contributes zero rather than switching representations at
+        // a 16-block grid boundary. Mode 1 preserves the old path for A/B.
+        bool useDirectPuff = directPuffAvailable
+            && (PuffShapeMode == 2 || directPuffIndexed);
+        if (PuffDensityStage == 6 && !useDirectPuff) {
+            return 0.0;
+        }
         float macroShape = useCumulusStructure
             ? cumulusStructureShape(
                 cumulusStageSupports,
@@ -1115,6 +1864,8 @@ float cloudDensity(
                 lowFbm,
                 directionalCarrier
             )
+            : useDirectPuff
+            ? directPuff
             : familyMacroShape(
                 profileId,
                 envelopeRole,
@@ -1131,7 +1882,7 @@ float cloudDensity(
         // Role supports already contain footprint-weighted density. Avoid
         // squaring them through the globally unioned weather coverage while
         // retaining a soft envelope gate at map fringes.
-        float envelopeCoverage = (useStormStructure || useCumulusStructure)
+        float envelopeCoverage = (useStormStructure || useCumulusStructure || useDirectPuff)
             ? mix(0.72, 1.0, coverageMod)
             : coverageMod;
         if (!useStormStructure && profileId == 1) {
@@ -1144,7 +1895,22 @@ float cloudDensity(
         }
         cloud = macroShape * envelopeCoverage;
 
-        if (cloud > 0.003 && useDetail) {
+        if (PuffDensityStage == 3) {
+            // Preserve all weather-map early rejection, fused height bounds and
+            // coverage gates, but stop before detail erosion/material boosts.
+            if (!useDirectPuff) {
+                return 0.0;
+            }
+            float weatherGate = smoothstep(0.010, 0.080, coverageMod);
+            return max(cloud * weatherGate, 0.0) * 0.88 * DensityMul;
+        }
+
+        bool suppressPuffErosion = PuffDensityStage == 4 && useDirectPuff;
+        bool directPuffCarrierOwnsBoundary = profileId == 3 && useDirectPuff;
+        if (cloud > 0.003
+                && useDetail
+                && !suppressPuffErosion
+                && !directPuffCarrierOwnsBoundary) {
             vec3 detailPos = detailNoiseDomain(samplePos);
             // Cheap curl-ish churn: offset detail lookup by low-freq noise.
             detailPos += (baseNoise.gbr - 0.5) * 0.18;
@@ -1169,9 +1935,7 @@ float cloudDensity(
                 erosion = 0.06;
             }
             // Noise adds detail at exposed edges instead of drilling holes
-            // through the protected meteorological core. Non-cirrus families
-            // use bounded multiplicative modulation so a low detail texel can
-            // never cut a complete cross-section from a valid macro lobe.
+            // through the protected meteorological core.
             float edgeExposure = 1.0 - smoothstep(0.26, 0.72, cloud);
             if (profileId == 6) {
                 edgeExposure = 1.0;
@@ -1183,16 +1947,38 @@ float cloudDensity(
         }
 
         // Storm cells hold more condensed water low in the cloud.
-        cloud *= mix(1.0, 1.18, energy * (1.0 - saturate(h01)) * 0.6);
+        // The direct descriptor owns its exact vertical interval. Reusing the
+        // fused WeatherMap height here introduced a horizontal material kink
+        // even before lighting. Other families retain their legacy height.
+        float materialHeight01 = useDirectPuff
+            ? directPuffHeight01
+            : h01;
+        cloud *= mix(
+            1.0,
+            1.18,
+            energy * (1.0 - saturate(materialHeight01)) * 0.6
+        );
         cloud *= mix(0.90, 1.10, condensate);
-        cloud *= 1.0 + precipitation * (1.0 - saturate(h01)) * 0.32;
+        cloud *= 1.0
+            + precipitation * (1.0 - saturate(materialHeight01)) * 0.32;
         if (profileId == 5) {
             cloud *= 1.0 + precipitation * 0.12;
         }
         cloud *= smoothstep(0.010, 0.080, coverageMod);
+        if (PuffDensityStage == 4) {
+            return useDirectPuff
+                ? max(cloud, 0.0) * 0.88 * DensityMul
+                : 0.0;
+        }
+    }
+
+    if (PuffDensityStage == 3 || PuffDensityStage == 4) {
+        return 0.0;
     }
 
     float rainShaft = includePrecipitation
+        && PuffDensityStage != 5
+        && PuffDensityStage != 6
         ? rainShaftDensityAt(p, mipBias)
         : 0.0;
     float familyDensityScale = 0.88;
@@ -1210,6 +1996,11 @@ float cloudDensity(
         familyDensityScale = 0.74;
     }
     float density = (max(cloud, 0.0) * familyDensityScale + rainShaft) * DensityMul;
+    if (PuffDensityStage == 5 || PuffDensityStage == 6) {
+        // These causal cuts isolate cloud-body sources.  Funnel/rain density is
+        // intentionally excluded even if a future fixture contains either.
+        return max(density, 0.0);
+    }
     if (funnel > 0.001) {
         // Smooth union so the funnel inherits the cloud material seamlessly.
         vec3 funnelNoisePos = p * 0.010 + vec3(0.0, -WorldTime * 0.004, 0.0);
@@ -1290,8 +2081,225 @@ float lightMarchOpticalDepth(
     return opticalDepth;
 }
 
-vec3 sampleLighting(
+// Diagnostic-only paired estimator for DebugView 6. Endpoint and midpoint are
+// sampled in the same loop, with one shared step count/length/growth, lateral
+// offset, mip bias and density options. The production endpoint alone controls
+// the inside-slab early-out, so the A/B always integrates the same segments.
+// Callers skip this estimator for rain and in-cloud shortcuts, where no
+// production exponential cone is evaluated.
+vec2 lightMarchOpticalDepthEndpointMidpoint(
         vec3 p,
+        bool cameraStartsInsideSlab) {
+    int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
+    if (cameraStartsInsideSlab) {
+        steps = min(steps, 4);
+    }
+    float endpointOpticalDepth = 0.0;
+    float midpointOpticalDepth = 0.0;
+    float stepLength = 14.0;
+    vec3 endpoint = p;
+    for (int i = 0; i < MAX_LIGHT_STEPS; i++) {
+        if (i >= steps) {
+            break;
+        }
+        float ang = float(i) * 2.399963;
+        float spread = (float(i) + 0.5) * 0.28;
+        vec3 offset = vec3(
+            cos(ang),
+            0.35 * sin(ang * 1.7),
+            sin(ang)
+        ) * spread * stepLength * 0.24;
+        vec3 midpoint = endpoint + LightDir * (stepLength * 0.5);
+        endpoint += LightDir * stepLength;
+        float endpointDensity = cloudDensity(
+            endpoint + offset,
+            float(i) * 0.6,
+            i < 2,
+            false,
+            false
+        );
+        float midpointDensity = cloudDensity(
+            midpoint + offset,
+            float(i) * 0.6,
+            i < 2,
+            false,
+            false
+        );
+        endpointOpticalDepth += endpointDensity * stepLength;
+        midpointOpticalDepth += midpointDensity * stepLength;
+        if (cameraStartsInsideSlab && endpointOpticalDepth * ExtinctionScale >= 28.0) {
+            break;
+        }
+        stepLength *= 1.42;
+    }
+    return vec2(endpointOpticalDepth, midpointOpticalDepth);
+}
+
+// Diagnostic-only A/B for DebugView 7. The first channel reproduces the
+// production broad-slab cap exactly. The second keeps marching the additional
+// quality-profile taps as though an exterior camera were not classified only
+// by slab altitude. Both channels share every tap through the capped prefix;
+// only the requested continuation belongs exclusively to the full estimate.
+vec2 lightMarchOpticalDepthCappedFull(
+        vec3 p,
+        bool cameraStartsInsideSlab) {
+    int requestedSteps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
+    int cappedSteps = cameraStartsInsideSlab
+        ? min(requestedSteps, 4)
+        : requestedSteps;
+    float cappedOpticalDepth = 0.0;
+    float fullOpticalDepth = 0.0;
+    float stepLength = 14.0;
+    vec3 pos = p;
+    for (int i = 0; i < MAX_LIGHT_STEPS; i++) {
+        if (i >= requestedSteps) {
+            break;
+        }
+        float ang = float(i) * 2.399963;
+        float spread = (float(i) + 0.5) * 0.28;
+        vec3 offset = vec3(
+            cos(ang),
+            0.35 * sin(ang * 1.7),
+            sin(ang)
+        ) * spread * stepLength * 0.24;
+        pos += LightDir * stepLength;
+        float density = cloudDensity(
+            pos + offset,
+            float(i) * 0.6,
+            i < 2,
+            false,
+            false
+        );
+        float segmentOpticalDepth = density * stepLength;
+        fullOpticalDepth += segmentOpticalDepth;
+        if (i < cappedSteps) {
+            cappedOpticalDepth += segmentOpticalDepth;
+        }
+        if (cameraStartsInsideSlab
+                && fullOpticalDepth * ExtinctionScale >= 28.0) {
+            // Preserve the exact production early-out in both estimators. The
+            // only varied factor is therefore the four-tap slab cap.
+            break;
+        }
+        stepLength *= 1.42;
+    }
+    return vec2(cappedOpticalDepth, fullOpticalDepth);
+}
+
+// Diagnostic-only refined reference for DebugView 8. Every production
+// exponential segment keeps its exact bounds, length, mip and detail policy.
+// Two axial samples integrate each segment, while an antithetic pair of cone
+// offsets supplies two independent optical depths. Their radiances are
+// evaluated separately and averaged by the caller to avoid Jensen bias from
+// averaging optical depth before the exponential lighting response.
+vec2 lightMarchOpticalDepthRefinedPair(
+        vec3 p,
+        bool cameraStartsInsideSlab) {
+    int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
+    if (cameraStartsInsideSlab) {
+        steps = min(steps, 4);
+    }
+    float plusOpticalDepth = 0.0;
+    float minusOpticalDepth = 0.0;
+    float stepLength = 14.0;
+    vec3 segmentStart = p;
+    for (int i = 0; i < MAX_LIGHT_STEPS; i++) {
+        if (i >= steps) {
+            break;
+        }
+        float ang = float(i) * 2.399963;
+        float spread = (float(i) + 0.5) * 0.28;
+        vec3 offset = vec3(
+            cos(ang),
+            0.35 * sin(ang * 1.7),
+            sin(ang)
+        ) * spread * stepLength * 0.24;
+        vec3 axialQuarter = segmentStart + LightDir * (stepLength * 0.25);
+        vec3 axialThreeQuarter = segmentStart + LightDir * (stepLength * 0.75);
+        float mipBias = float(i) * 0.6;
+        bool useDetail = i < 2;
+        float plusQuarter = cloudDensity(
+            axialQuarter + offset,
+            mipBias,
+            useDetail,
+            false,
+            false
+        );
+        float plusThreeQuarter = cloudDensity(
+            axialThreeQuarter + offset,
+            mipBias,
+            useDetail,
+            false,
+            false
+        );
+        float minusQuarter = cloudDensity(
+            axialQuarter - offset,
+            mipBias,
+            useDetail,
+            false,
+            false
+        );
+        float minusThreeQuarter = cloudDensity(
+            axialThreeQuarter - offset,
+            mipBias,
+            useDetail,
+            false,
+            false
+        );
+        plusOpticalDepth += 0.5
+            * (plusQuarter + plusThreeQuarter)
+            * stepLength;
+        minusOpticalDepth += 0.5
+            * (minusQuarter + minusThreeQuarter)
+            * stepLength;
+        segmentStart += LightDir * stepLength;
+        stepLength *= 1.42;
+    }
+    return vec2(plusOpticalDepth, minusOpticalDepth);
+}
+
+// Diagnostic-only counterfactual for DebugView 9. It preserves the exact
+// production endpoints, cone offsets, segment lengths, growth, mip bias and
+// slab cap, but disables fine detail in the light cone. On the direct PUFF
+// path this varies only the edge erosion sampled by taps zero and one; primary
+// density, analytic lobe support and all lighting inputs remain production.
+float lightMarchOpticalDepthWithoutDetail(
+        vec3 p,
+        bool cameraStartsInsideSlab) {
+    int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
+    if (cameraStartsInsideSlab) {
+        steps = min(steps, 4);
+    }
+    float opticalDepth = 0.0;
+    float stepLength = 14.0;
+    vec3 pos = p;
+    for (int i = 0; i < MAX_LIGHT_STEPS; i++) {
+        if (i >= steps) {
+            break;
+        }
+        float ang = float(i) * 2.399963;
+        float spread = (float(i) + 0.5) * 0.28;
+        vec3 offset = vec3(
+            cos(ang),
+            0.35 * sin(ang * 1.7),
+            sin(ang)
+        ) * spread * stepLength * 0.24;
+        pos += LightDir * stepLength;
+        float density = cloudDensity(
+            pos + offset,
+            float(i) * 0.6,
+            false,
+            false,
+            false
+        );
+        opticalDepth += density * stepLength;
+        stepLength *= 1.42;
+    }
+    return opticalDepth;
+}
+
+vec3 evaluateLightingFromOpticalDepth(
+        float opticalDepth,
         float localDensity,
         float h01ForAmbient,
         float cosTheta,
@@ -1299,22 +2307,11 @@ vec3 sampleLighting(
         float localStorm,
         float materialDarkness,
         float rainFraction,
-        bool cameraStartsInsideSlab,
-        bool cameraInsideCloud) {
-    // Fine rain streaks do not need a full cloud light cone. Avoid paying the
-    // multi-sample self-shadow march for every precipitation step.
-    float opticalDepth = rainFraction > 0.05
-        ? localDensity * 8.0 * ExtinctionScale
-        : lightMarchOpticalDepth(
-            p,
-            localDensity,
-            cameraStartsInsideSlab,
-            cameraInsideCloud
-        ) * ExtinctionScale;
-
+        out float diagnosticLightOpticalDepth) {
     // Multi-scattering octaves (Hillaire): each octave sees weaker extinction
     // and a flatter phase, which keeps thick storm cores luminous.
     float scatter = 0.0;
+    float scatterWeight = 0.0;
     float a = 1.0;
     float b = 1.0;
     int octaves = clamp(ScatterOctaves, 1, 3);
@@ -1324,9 +2321,14 @@ vec3 sampleLighting(
         }
         float phase = mix(0.0795775, dualLobePhase(cosTheta), a); // isotropic falloff per octave
         scatter += b * phase * exp(-opticalDepth * a);
+        scatterWeight += b;
         a *= 0.42;
         b *= 0.52;
     }
+    // Each HG phase integrates to one over the sphere. The octave weights
+    // must therefore be normalized; otherwise Ultra injects 1.7904 times the
+    // single-scattering energy and changing quality changes exposure.
+    scatter /= max(scatterWeight, 0.0001);
 
     // Beer-powder: dark creases where in-scattering has not built up yet.
     float powder = 1.0 - exp(-localDensity * 24.0);
@@ -1342,6 +2344,7 @@ vec3 sampleLighting(
             * (0.46 + localDensity * 0.72)
     );
     float directTransmission = exp(-opticalDepth);
+    diagnosticLightOpticalDepth = opticalDepth;
     vec3 sunTerm = LightColor * sunTint * scatter * powderTerm * (4.0 * PI);
     sunTerm *= mix(1.0, 0.76, combinedStorm);
     sunTerm *= mix(1.0, mix(0.70, 0.82, combinedStorm), undersideShade);
@@ -1379,6 +2382,268 @@ vec3 sampleLighting(
     // while keeping the final LDR composite bounded.
     float toneExposure = mix(1.30, 1.48, NightFactor);
     return vec3(1.0) - exp(-radiance * toneExposure);
+}
+
+vec3 sampleLighting(
+        vec3 p,
+        float localDensity,
+        float h01ForAmbient,
+        float cosTheta,
+        float distance01,
+        float localStorm,
+        float materialDarkness,
+        float rainFraction,
+        bool cameraStartsInsideSlab,
+        bool cameraInsideCloud,
+        out float diagnosticLightOpticalDepth) {
+    // Fine rain streaks do not need a full cloud light cone. Avoid paying the
+    // multi-sample self-shadow march for every precipitation step.
+    float opticalDepth = rainFraction > 0.05
+        ? localDensity * 8.0 * ExtinctionScale
+        : lightMarchOpticalDepth(
+            p,
+            localDensity,
+            cameraStartsInsideSlab,
+            cameraInsideCloud
+        ) * ExtinctionScale;
+    return evaluateLightingFromOpticalDepth(
+        opticalDepth,
+        localDensity,
+        h01ForAmbient,
+        cosTheta,
+        distance01,
+        localStorm,
+        materialDarkness,
+        rainFraction,
+        diagnosticLightOpticalDepth
+    );
+}
+
+// Diagnostic-only segment-sample integrator for DebugViews 11, 12 and 14-20.
+// The caller owns the segment lattice: this helper neither searches for
+// material nor advances the production ray. It evaluates one stratified sample
+// inside a fine segment and updates an independent Beer/radiance lane. Dense samples must prove that
+// production selected the direct analytic PUFF representation; clear samples
+// are valid zero contributions inside the production-traversed fine segment.
+bool integratePrimaryQuadratureSample(
+        vec3 p,
+        float sampleT,
+        float sampleStepLength,
+        float densityThreshold,
+        float cosTheta,
+        bool nearCamera,
+        bool cameraStartsInsideSlab,
+        bool cameraInsideCloud,
+        inout float quadratureTransmittance,
+        inout vec3 quadratureAccumulated) {
+    float density = cloudDensity(
+        p,
+        0.0,
+        DetailQuality > 0,
+        nearCamera,
+        false
+    );
+    if (density <= densityThreshold) {
+        return true;
+    }
+
+    vec4 weather = sampleWeather(p.xz);
+    vec4 morphology = sampleMorphology(p.xz);
+    int profileId = cloudProfileId(morphology);
+    float ignoredLocalHeight = 0.0;
+    if (profileId != 3
+            || !dominantDirectPuffHeightAt(p, ignoredLocalHeight)) {
+        return false;
+    }
+
+    float slabSpan = max(SlabTopY - SlabBaseY, 1.0);
+    float baseY = SlabBaseY + weather.g * slabSpan;
+    float topY = SlabBaseY + weather.b * slabSpan;
+    float h01 = saturate((p.y - baseY) / max(topY - baseY, 2.0));
+    float materialDarkness = morphology.b;
+    float localStorm = saturate(morphology.a * 0.16);
+    float rainFraction = p.y < baseY
+        ? saturate(0.25 + max(morphology.a, MaxPrecipitation) * 0.75)
+        : 0.0;
+    float ignoredLightOpticalDepth = 0.0;
+    vec3 radiance = sampleLighting(
+        p,
+        density,
+        h01,
+        cosTheta,
+        saturate(sampleT / MaxRenderDistance),
+        localStorm,
+        materialDarkness,
+        rainFraction,
+        cameraStartsInsideSlab,
+        cameraInsideCloud,
+        ignoredLightOpticalDepth
+    );
+    float stepTrans = exp(-density * ExtinctionScale * sampleStepLength);
+    quadratureAccumulated += quadratureTransmittance
+        * radiance
+        * (1.0 - stepTrans);
+    quadratureTransmittance *= stepTrans;
+    return true;
+}
+
+// Alpha-only diagnostic estimator. Unlike the radiance quadrature above, it
+// intentionally needs no WeatherMap profile or dominant-height proof: stages
+// 7..11 bypass those representations by design. The caller supplies two
+// quarter-point samples for the exact same fine segment as production.
+void integratePrimaryAlphaQuadratureSample(
+        vec3 p,
+        float sampleStepLength,
+        bool nearCamera,
+        inout float quadratureTransmittance) {
+    float density = cloudDensity(
+        p,
+        0.0,
+        DetailQuality > 0,
+        nearCamera,
+        false
+    );
+    if (density <= 0.0008) {
+        density = 0.0;
+    }
+    quadratureTransmittance *= exp(
+        -density * ExtinctionScale * sampleStepLength
+    );
+}
+
+// Samples only the primary density term used by the direct-PUFF quadrature
+// diagnostics. Accepted material must still prove that it belongs to the
+// analytic PUFF representation; values rejected by the production threshold
+// become exact zero-density samples.
+bool samplePrimaryQuadratureDensity(
+        vec3 p,
+        float densityThreshold,
+        bool nearCamera,
+        out float density) {
+    density = cloudDensity(
+        p,
+        0.0,
+        DetailQuality > 0,
+        nearCamera,
+        false
+    );
+    if (density <= densityThreshold) {
+        density = 0.0;
+        return true;
+    }
+
+    vec4 morphology = sampleMorphology(p.xz);
+    float ignoredLocalHeight = 0.0;
+    return cloudProfileId(morphology) == 3
+        && dominantDirectPuffHeightAt(p, ignoredLocalHeight);
+}
+
+// Diagnostic-only two-density/one-light estimator. DebugView 18 samples its
+// source once at the segment centre used by DebugView 16. DebugView 20 instead
+// samples it at the Beer-opacity centroid of the two quarter-point densities.
+// Both retain exact two-sample optical depth while paying for one light march.
+bool integratePrimaryDensityQuadratureSegment(
+        vec3 firstP,
+        vec3 midpointP,
+        vec3 secondP,
+        float midpointT,
+        float stepLength,
+        float densityThreshold,
+        float cosTheta,
+        bool nearCamera,
+        bool opacityWeightedSource,
+        bool cameraStartsInsideSlab,
+        bool cameraInsideCloud,
+        inout float quadratureTransmittance,
+        inout vec3 quadratureAccumulated) {
+    float firstDensity = 0.0;
+    float secondDensity = 0.0;
+    bool firstValid = samplePrimaryQuadratureDensity(
+        firstP,
+        densityThreshold,
+        nearCamera,
+        firstDensity
+    );
+    bool secondValid = firstValid && samplePrimaryQuadratureDensity(
+        secondP,
+        densityThreshold,
+        nearCamera,
+        secondDensity
+    );
+    if (!secondValid) {
+        return false;
+    }
+
+    float effectiveDensity = 0.5 * (firstDensity + secondDensity);
+    if (effectiveDensity <= 0.0) {
+        return true;
+    }
+
+    vec3 sourceP = midpointP;
+    float sourceT = midpointT;
+    float sourceDensity = effectiveDensity;
+    if (opacityWeightedSource) {
+        float halfStepLength = stepLength * 0.5;
+        float firstStepTrans = exp(
+            -firstDensity * ExtinctionScale * halfStepLength
+        );
+        float secondStepTrans = exp(
+            -secondDensity * ExtinctionScale * halfStepLength
+        );
+        float firstWeight = 1.0 - firstStepTrans;
+        float secondWeight = firstStepTrans * (1.0 - secondStepTrans);
+        float sourceWeight = max(firstWeight + secondWeight, 0.000001);
+        sourceP = (
+            firstP * firstWeight + secondP * secondWeight
+        ) / sourceWeight;
+        float firstT = midpointT - stepLength * 0.25;
+        float secondT = midpointT + stepLength * 0.25;
+        sourceT = (
+            firstT * firstWeight + secondT * secondWeight
+        ) / sourceWeight;
+        sourceDensity = (
+            firstDensity * firstWeight + secondDensity * secondWeight
+        ) / sourceWeight;
+    }
+
+    vec4 weather = sampleWeather(sourceP.xz);
+    vec4 morphology = sampleMorphology(sourceP.xz);
+    if (cloudProfileId(morphology) != 3) {
+        return false;
+    }
+    float slabSpan = max(SlabTopY - SlabBaseY, 1.0);
+    float baseY = SlabBaseY + weather.g * slabSpan;
+    float topY = SlabBaseY + weather.b * slabSpan;
+    float h01 = saturate(
+        (sourceP.y - baseY) / max(topY - baseY, 2.0)
+    );
+    float materialDarkness = morphology.b;
+    float localStorm = saturate(morphology.a * 0.16);
+    float rainFraction = sourceP.y < baseY
+        ? saturate(0.25 + max(morphology.a, MaxPrecipitation) * 0.75)
+        : 0.0;
+    float ignoredLightOpticalDepth = 0.0;
+    vec3 radiance = sampleLighting(
+        sourceP,
+        sourceDensity,
+        h01,
+        cosTheta,
+        saturate(sourceT / MaxRenderDistance),
+        localStorm,
+        materialDarkness,
+        rainFraction,
+        cameraStartsInsideSlab,
+        cameraInsideCloud,
+        ignoredLightOpticalDepth
+    );
+    float stepTrans = exp(
+        -effectiveDensity * ExtinctionScale * stepLength
+    );
+    quadratureAccumulated += quadratureTransmittance
+        * radiance
+        * (1.0 - stepTrans);
+    quadratureTransmittance *= stepTrans;
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1463,9 +2728,15 @@ void main() {
         return;
     }
 
+    bool analyticPuffDiagnostic = PuffDensityStage == 1
+        || PuffDensityStage == 2
+        || (PuffDensityStage >= 7 && PuffDensityStage <= 12);
+
     // Coverage pre-test: sample the weather map along the ray and skip fully
     // clear rays. This is the biggest saver on clear days.
-    bool anyCoverage = FunnelCount > 0 || CoveragePretestEnabled == 0;
+    bool anyCoverage = analyticPuffDiagnostic
+        || FunnelCount > 0
+        || CoveragePretestEnabled == 0;
     if (!anyCoverage) {
         // When the camera starts inside the slab, uniformly spaced probes can
         // put the first sample hundreds of blocks away and miss the local
@@ -1531,8 +2802,7 @@ void main() {
     // whiteout cost, but give every exterior view a quality-scaled world-space
     // surface step.
     float legacyFineStep = max(baseStep * 0.5, 2.0);
-    float qualityStride = sqrt(96.0 / float(stepBudget));
-    float exteriorFineStep = clamp(2.5 * qualityStride, 2.5, 8.0);
+    float exteriorFineStep = clamp(ExteriorFineStep, 2.5, 8.0);
     float fineStep = cameraInsideCloud ? legacyFineStep : exteriorFineStep;
     float coarseStep = max(baseStep * 1.5, fineStep * 3.0);
     float coarseStepCap = min(112.0, fineStep * 16.0);
@@ -1552,8 +2822,33 @@ void main() {
     bool hasClearBracket = true;
     float transmittance = 1.0;
     vec3 accumulated = vec3(0.0);
+    float primaryQuadratureTransmittance = 1.0;
+    vec3 primaryQuadratureAccumulated = vec3(0.0);
+    bool primaryQuadratureDiagnostic = DebugView == 11
+        || DebugView == 12
+        || DebugView == 14
+        || DebugView == 15
+        || DebugView == 16
+        || DebugView == 17
+        || DebugView == 18
+        || DebugView == 19
+        || DebugView == 20;
+    bool primaryQuadratureDensityStageSupported = PuffDensityStage == 0
+        || (DebugView == 12 && PuffDensityStage == 4)
+        || (DebugView == 17
+            && PuffDensityStage >= 7
+            && PuffDensityStage <= 12);
+    bool primaryQuadratureValid = !primaryQuadratureDiagnostic
+        || (PuffShapeMode == 2
+            && primaryQuadratureDensityStageSupported
+            && PuffLobeCount > 0
+            && FunnelCount == 0
+            && MaxPrecipitation <= 0.02
+            && !cameraInsideCloud);
     float weightedT = 0.0;
     float weightSum = 0.0;
+    float weightedLightOcclusion = 0.0;
+    float weightedAmbientHeight = 0.0;
     int sinceHit = cameraInsideCloud ? 0 : 100;
     bool firstMaterialResolved = false;
     bool firstMaterialIsStratus = false;
@@ -1576,10 +2871,29 @@ void main() {
         stepLength = min(stepLength, t1 - t);
 
         vec3 p = CameraPos + rayDir * t;
+        if (!fine
+                && PuffShapeMode != 0
+                && PuffLobeCount > 0
+                && directPuffSegmentMayIntersect(
+                    p,
+                    CameraPos + rayDir * (t + stepLength)
+                )) {
+            // Switch within this iteration. The former continue consumed one
+            // of the fixed 128 iterations without advancing t; repeated empty
+            // AABB entries could exhaust the march before the ray endpoint.
+            sinceHit = 0;
+            fine = true;
+            stepLength = fineStep
+                * (cameraInsideCloud ? distanceGrowth : 1.0);
+            stepLength = min(stepLength, t1 - t);
+        }
         // Empty exterior coarse samples need only the weather occupancy fetch.
         // This offsets the extra surface samples without reviving the old
         // non-conservative whole-ray coverage pretest.
-        if (!fine && FunnelCount == 0 && MaxPrecipitation <= 0.02) {
+        if (!analyticPuffDiagnostic
+                && !fine
+                && FunnelCount == 0
+                && MaxPrecipitation <= 0.02) {
             float coverageSignal = sampleWeather(p.xz).r * CoverageMul;
             if (coverageSignal <= 0.001) {
                 lastClearT = t;
@@ -1596,15 +2910,127 @@ void main() {
         bool nearCamera = t < 220.0 && !cameraInsideCloud;
         float density = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, true);
 
+        if (DebugView == 17
+                && primaryQuadratureValid
+                && fine) {
+            float halfStepLength = stepLength * 0.5;
+            integratePrimaryAlphaQuadratureSample(
+                CameraPos + rayDir * (t + stepLength * 0.25),
+                halfStepLength,
+                nearCamera,
+                primaryQuadratureTransmittance
+            );
+            integratePrimaryAlphaQuadratureSample(
+                CameraPos + rayDir * (t + stepLength * 0.75),
+                halfStepLength,
+                nearCamera,
+                primaryQuadratureTransmittance
+            );
+        }
+
+        if (primaryQuadratureDiagnostic
+                && primaryQuadratureValid
+                && fine
+                && (DebugView == 12
+                    || (DebugView == 14 && density <= 0.0008)
+                    || ((DebugView == 11 || DebugView == 15)
+                        && density > 0.0008))) {
+            float halfStepLength = stepLength * 0.5;
+            float firstSampleT = t + stepLength * 0.25;
+            float secondSampleT = t + stepLength * 0.75;
+            bool firstSampleValid = integratePrimaryQuadratureSample(
+                CameraPos + rayDir * firstSampleT,
+                firstSampleT,
+                halfStepLength,
+                DebugView == 11 ? 0.0 : 0.0008,
+                cosTheta,
+                nearCamera,
+                cameraStartsInsideSlab,
+                cameraInsideCloud,
+                primaryQuadratureTransmittance,
+                primaryQuadratureAccumulated
+            );
+            bool secondSampleValid = firstSampleValid
+                && integratePrimaryQuadratureSample(
+                    CameraPos + rayDir * secondSampleT,
+                    secondSampleT,
+                    halfStepLength,
+                    DebugView == 11 ? 0.0 : 0.0008,
+                    cosTheta,
+                    nearCamera,
+                    cameraStartsInsideSlab,
+                    cameraInsideCloud,
+                    primaryQuadratureTransmittance,
+                    primaryQuadratureAccumulated
+                );
+            if (!secondSampleValid) {
+                primaryQuadratureValid = false;
+            }
+        }
+
+        if (DebugView == 16
+                && primaryQuadratureValid
+                && fine) {
+            float midpointT = t + stepLength * 0.5;
+            bool midpointValid = integratePrimaryQuadratureSample(
+                CameraPos + rayDir * midpointT,
+                midpointT,
+                stepLength,
+                0.0008,
+                cosTheta,
+                nearCamera,
+                cameraStartsInsideSlab,
+                cameraInsideCloud,
+                primaryQuadratureTransmittance,
+                primaryQuadratureAccumulated
+            );
+            if (!midpointValid) {
+                primaryQuadratureValid = false;
+            }
+        }
+
+        if ((DebugView == 18 || DebugView == 20)
+                && primaryQuadratureValid
+                && fine) {
+            float firstSampleT = t + stepLength * 0.25;
+            float midpointT = t + stepLength * 0.5;
+            float secondSampleT = t + stepLength * 0.75;
+            bool densityQuadratureValid = integratePrimaryDensityQuadratureSegment(
+                CameraPos + rayDir * firstSampleT,
+                CameraPos + rayDir * midpointT,
+                CameraPos + rayDir * secondSampleT,
+                midpointT,
+                stepLength,
+                0.0008,
+                cosTheta,
+                nearCamera,
+                DebugView == 20,
+                cameraStartsInsideSlab,
+                cameraInsideCloud,
+                primaryQuadratureTransmittance,
+                primaryQuadratureAccumulated
+            );
+            if (!densityQuadratureValid) {
+                primaryQuadratureValid = false;
+            }
+        }
+
         if (density > 0.0008) {
             vec4 weather = sampleWeather(p.xz);
             vec4 morphology = sampleMorphology(p.xz);
             float slabSpan = max(SlabTopY - SlabBaseY, 1.0);
             float baseY = SlabBaseY + weather.g * slabSpan;
             float topY = SlabBaseY + weather.b * slabSpan;
+            int profileId = cloudProfileId(morphology);
+            float directPuffHeight01 = 0.0;
+            bool directPuffBody = profileId == 3
+                && PuffDensityStage == 0
+                && PuffShapeMode != 0
+                && dominantDirectPuffHeightAt(p, directPuffHeight01);
             bool precipitationSample = FunnelCount == 0
                 && MaxPrecipitation > 0.02
-                && p.y < baseY;
+                && p.y < baseY
+                && !directPuffBody;
             if (!fine && !precipitationSample) {
                 // Resolve the actual clear/material bracket instead of an
                 // arbitrary 60% rewind. Four bisections localize an exterior
@@ -1641,8 +3067,9 @@ void main() {
             // state here multiplies their cost by the full 180-block depth.
             sinceHit = precipitationSample ? 100 : 0;
 
-            float h01 = saturate((p.y - baseY) / max(topY - baseY, 2.0));
-            int profileId = cloudProfileId(morphology);
+            float h01 = directPuffBody
+                ? directPuffHeight01
+                : saturate((p.y - baseY) / max(topY - baseY, 2.0));
             if (!firstMaterialResolved && !precipitationSample) {
                 firstMaterialResolved = true;
                 firstMaterialIsStratus = profileId == 1;
@@ -1782,12 +3209,26 @@ void main() {
                 localStorm = morphology.a * 0.52;
             }
             localStorm = saturate(localStorm + morphology.a * 0.16);
-            float rainFraction = precipitationSample || p.y < baseY
+            // A direct-PUFF body is cloud material even when the lossy fused
+            // WeatherMap interval puts it below baseY. Classifying that dry
+            // material as 25% rain caused the hard black underside slab.
+            float rainFraction = !directPuffBody
+                    && (precipitationSample || p.y < baseY)
                 ? saturate(0.25 + max(morphology.a, MaxPrecipitation) * 0.75)
                 : 0.0;
 
+            if (primaryQuadratureDiagnostic && primaryQuadratureValid) {
+                float ignoredLocalHeight = 0.0;
+                bool productionSampleIsDirectPuff = profileId == 3
+                    && dominantDirectPuffHeightAt(p, ignoredLocalHeight);
+                if (!productionSampleIsDirectPuff) {
+                    primaryQuadratureValid = false;
+                }
+            }
+
             float extinction = density * ExtinctionScale;
             float stepTrans = exp(-extinction * stepLength);
+            float diagnosticLightOpticalDepth = 0.0;
             vec3 radiance = sampleLighting(
                 p,
                 density,
@@ -1798,8 +3239,74 @@ void main() {
                 materialDarkness,
                 rainFraction,
                 cameraStartsInsideSlab,
-                cameraInsideCloud
+                cameraInsideCloud,
+                diagnosticLightOpticalDepth
             );
+
+            // Pure lighting-position control. B retains production density,
+            // Beer opacity, local morphology scalars, prefix and termination;
+            // only the origin of two half-segment light cones moves to the
+            // quarter points. Updating B with A's exact stepTrans keeps alpha
+            // bit-identical apart from the exported float representation.
+            if (DebugView == 19 && primaryQuadratureValid) {
+                if (fine) {
+                    float firstLightT = t + stepLength * 0.25;
+                    float secondLightT = t + stepLength * 0.75;
+                    float firstIgnoredLightOpticalDepth = 0.0;
+                    float secondIgnoredLightOpticalDepth = 0.0;
+                    vec3 firstLight = sampleLighting(
+                        CameraPos + rayDir * firstLightT,
+                        density,
+                        h01,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        cameraStartsInsideSlab,
+                        cameraInsideCloud,
+                        firstIgnoredLightOpticalDepth
+                    );
+                    vec3 secondLight = sampleLighting(
+                        CameraPos + rayDir * secondLightT,
+                        density,
+                        h01,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        cameraStartsInsideSlab,
+                        cameraInsideCloud,
+                        secondIgnoredLightOpticalDepth
+                    );
+                    float halfStepTrans = exp(
+                        -extinction * stepLength * 0.5
+                    );
+                    float firstHalfWeight = 1.0 - halfStepTrans;
+                    float secondHalfWeight = halfStepTrans - stepTrans;
+                    primaryQuadratureAccumulated += primaryQuadratureTransmittance
+                        * (firstLight * firstHalfWeight
+                            + secondLight * secondHalfWeight);
+                } else {
+                    primaryQuadratureAccumulated += primaryQuadratureTransmittance
+                        * radiance
+                        * (1.0 - stepTrans);
+                }
+                primaryQuadratureTransmittance *= stepTrans;
+            }
+
+            // View 14 preserves every production-accepted segment exactly in
+            // its B lane. Its only additional samples were integrated above,
+            // at the quarter points of fine segments whose production
+            // endpoint was clear. This separates missed inter-endpoint matter
+            // from the estimator replacement performed by Views 11 and 12.
+            if (DebugView == 14 && primaryQuadratureValid) {
+                primaryQuadratureAccumulated += primaryQuadratureTransmittance
+                    * radiance
+                    * (1.0 - stepTrans);
+                primaryQuadratureTransmittance *= stepTrans;
+            }
 
             // Energy-conserving analytic integration over the step.
             vec3 integrated = radiance * (1.0 - stepTrans);
@@ -1808,6 +3315,249 @@ void main() {
             float alphaContribution = transmittance * (1.0 - stepTrans);
             weightedT += t * alphaContribution;
             weightSum += alphaContribution;
+            if (DebugView == 5) {
+                float diagnosticLightOcclusion = 1.0
+                    - exp(-diagnosticLightOpticalDepth);
+                weightedLightOcclusion += saturate(diagnosticLightOcclusion) * alphaContribution;
+                weightedAmbientHeight += saturate(h01) * alphaContribution;
+            } else if (DebugView == 6) {
+                // This view is intentionally unavailable for the rain shortcut
+                // and the analytic in-cloud probe: neither has an endpoint vs
+                // midpoint cone phase. A negative A accumulator marks the
+                // entire pixel as non-conclusive without adding another main
+                // raymarch register.
+                if (rainFraction > 0.05 || cameraInsideCloud) {
+                    weightedLightOcclusion = -1.0;
+                } else if (weightedLightOcclusion >= 0.0) {
+                    vec2 phaseOpticalDepth = lightMarchOpticalDepthEndpointMidpoint(
+                        p,
+                        cameraStartsInsideSlab
+                    ) * ExtinctionScale;
+                    float diagnosticMidpointOcclusion = 0.0;
+                    vec3 midpointRadiance = evaluateLightingFromOpticalDepth(
+                        phaseOpticalDepth.y,
+                        density,
+                        h01,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        diagnosticMidpointOcclusion
+                    );
+                    weightedLightOcclusion += dot(
+                        radiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                    weightedAmbientHeight += dot(
+                        midpointRadiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                }
+            } else if (DebugView == 7) {
+                // A camera can start inside the global slab while remaining in
+                // clear air beside a compact PUFF. Compare the exact production
+                // cap against all quality-profile taps without changing the
+                // primary density, alpha, phase, material or integration.
+                if (rainFraction > 0.05
+                        || cameraInsideCloud
+                        || !cameraStartsInsideSlab
+                        || LightSteps <= 4) {
+                    weightedLightOcclusion = -1.0;
+                } else if (weightedLightOcclusion >= 0.0) {
+                    vec2 capOpticalDepth = lightMarchOpticalDepthCappedFull(
+                        p,
+                        cameraStartsInsideSlab
+                    ) * ExtinctionScale;
+                    float diagnosticFullOcclusion = 0.0;
+                    vec3 fullRadiance = evaluateLightingFromOpticalDepth(
+                        capOpticalDepth.y,
+                        density,
+                        h01,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        diagnosticFullOcclusion
+                    );
+                    weightedLightOcclusion += dot(
+                        radiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                    weightedAmbientHeight += dot(
+                        fullRadiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                }
+            } else if (DebugView == 8) {
+                // Exclude rain/in-cloud shortcuts and any production light path
+                // that reached the exact OD=28 early-out. The remaining pixels
+                // necessarily
+                // consumed every production segment, so A/B differs only in
+                // the spatial quadrature inside those same segments.
+                if (rainFraction > 0.05
+                        || cameraInsideCloud
+                        || (cameraStartsInsideSlab
+                            && diagnosticLightOpticalDepth >= 28.0)) {
+                    weightedLightOcclusion = -1.0;
+                } else if (weightedLightOcclusion >= 0.0) {
+                    vec2 refinedOpticalDepth = lightMarchOpticalDepthRefinedPair(
+                        p,
+                        cameraStartsInsideSlab
+                    ) * ExtinctionScale;
+                    float diagnosticRefinedOcclusion = 0.0;
+                    vec3 refinedPlusRadiance = evaluateLightingFromOpticalDepth(
+                        refinedOpticalDepth.x,
+                        density,
+                        h01,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        diagnosticRefinedOcclusion
+                    );
+                    vec3 refinedMinusRadiance = evaluateLightingFromOpticalDepth(
+                        refinedOpticalDepth.y,
+                        density,
+                        h01,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        diagnosticRefinedOcclusion
+                    );
+                    vec3 refinedRadiance = 0.5
+                        * (refinedPlusRadiance + refinedMinusRadiance);
+                    weightedLightOcclusion += dot(
+                        radiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                    weightedAmbientHeight += dot(
+                        refinedRadiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                }
+            } else if (DebugView == 9) {
+                // Preserve every production segment. Samples whose production
+                // cone reached the conditional OD cutoff are excluded because
+                // the no-detail counterfactual could otherwise integrate a
+                // different segment count.
+                if (rainFraction > 0.05
+                        || cameraInsideCloud
+                        || (cameraStartsInsideSlab
+                            && diagnosticLightOpticalDepth >= 28.0)) {
+                    weightedLightOcclusion = -1.0;
+                } else if (weightedLightOcclusion >= 0.0) {
+                    float noDetailOpticalDepth = lightMarchOpticalDepthWithoutDetail(
+                        p,
+                        cameraStartsInsideSlab
+                    ) * ExtinctionScale;
+                    float diagnosticNoDetailOpticalDepth = 0.0;
+                    vec3 noDetailRadiance = evaluateLightingFromOpticalDepth(
+                        noDetailOpticalDepth,
+                        density,
+                        h01,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        diagnosticNoDetailOpticalDepth
+                    );
+                    weightedLightOcclusion += dot(
+                        radiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                    weightedAmbientHeight += dot(
+                        noDetailRadiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                }
+            } else if (DebugView == 10) {
+                // This counterfactual is meaningful only for a dry, complete
+                // direct-PUFF FINAL sample. It keeps production density, light
+                // optical depth and integration intact and varies solely the
+                // height used by underside/ambient lighting.
+                float localPuffHeight = 0.0;
+                bool localHeightValid = PuffShapeMode == 2
+                    && PuffDensityStage == 0
+                    && profileId == 3
+                    && FunnelCount == 0
+                    && MaxPrecipitation <= 0.02
+                    && rainFraction <= 0.05
+                    && !cameraInsideCloud
+                    && dominantDirectPuffHeightAt(p, localPuffHeight);
+                if (!localHeightValid) {
+                    weightedLightOcclusion = -1.0;
+                } else if (weightedLightOcclusion >= 0.0) {
+                    float diagnosticLocalHeightOpticalDepth = 0.0;
+                    vec3 localHeightRadiance = evaluateLightingFromOpticalDepth(
+                        diagnosticLightOpticalDepth,
+                        density,
+                        localPuffHeight,
+                        cosTheta,
+                        saturate(t / MaxRenderDistance),
+                        localStorm,
+                        materialDarkness,
+                        rainFraction,
+                        diagnosticLocalHeightOpticalDepth
+                    );
+                    weightedLightOcclusion += dot(
+                        radiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                    weightedAmbientHeight += dot(
+                        localHeightRadiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                }
+            } else if (DebugView == 13) {
+                // A dry direct PUFF currently inherits rain shading solely from
+                // p.y < the fused weather-map base, even when the field reports
+                // no precipitation. Keep A exact and remove that classification
+                // as one semantic unit in B; alpha, density and primary weights
+                // remain production values.
+                float ignoredLocalHeight = 0.0;
+                bool dryBaseRainValid = PuffShapeMode == 2
+                    && PuffDensityStage == 0
+                    && profileId == 3
+                    && FunnelCount == 0
+                    && MaxPrecipitation <= 0.02
+                    && !cameraInsideCloud
+                    && dominantDirectPuffHeightAt(p, ignoredLocalHeight);
+                if (!dryBaseRainValid) {
+                    weightedLightOcclusion = -1.0;
+                } else if (weightedLightOcclusion >= 0.0) {
+                    vec3 forcedDryRadiance = radiance;
+                    if (rainFraction > 0.05) {
+                        float forcedDryLightOpticalDepth = 0.0;
+                        forcedDryRadiance = sampleLighting(
+                            p,
+                            density,
+                            h01,
+                            cosTheta,
+                            saturate(t / MaxRenderDistance),
+                            localStorm,
+                            materialDarkness,
+                            0.0,
+                            cameraStartsInsideSlab,
+                            cameraInsideCloud,
+                            forcedDryLightOpticalDepth
+                        );
+                    }
+                    weightedLightOcclusion += dot(
+                        radiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                    weightedAmbientHeight += dot(
+                        forcedDryRadiance,
+                        vec3(0.2126, 0.7152, 0.0722)
+                    ) * alphaContribution;
+                }
+            }
 
             transmittance *= stepTrans;
         } else {
@@ -1850,6 +3600,106 @@ void main() {
     }
     float resultDepth = currentCloudHit ? depthAt(relRepresentative) : 1.0;
     float resultDepthDerivative = currentCloudHit ? fwidth(resultDepth) : 0.0;
+
+    if (DebugView == 5) {
+        if (!currentCloudHit) {
+            gl_FragDepth = 1.0;
+            fragColor = vec4(0.0);
+            return;
+        }
+        float diagnosticWeight = max(weightSum, 0.000001);
+        float meanLightOcclusion = saturate(weightedLightOcclusion / diagnosticWeight);
+        float meanAmbientHeight = saturate(weightedAmbientHeight / diagnosticWeight);
+        float straightLuminance = max(
+            dot(accumulated / max(alpha, 0.0001), vec3(0.2126, 0.7152, 0.0722)),
+            0.0
+        );
+        float radianceTone = saturate(straightLuminance);
+        gl_FragDepth = resultDepth;
+        fragColor = vec4(
+            vec3(meanLightOcclusion, meanAmbientHeight, radianceTone) * alpha,
+            alpha
+        );
+        return;
+    }
+
+    if (DebugView == 17) {
+        float quadratureAlpha = saturate(
+            1.0 - primaryQuadratureTransmittance
+        );
+        if (!currentCloudHit
+                || cameraInsideCloud
+                || !primaryQuadratureValid) {
+            gl_FragDepth = 1.0;
+            fragColor = vec4(0.0);
+            return;
+        }
+        float alphaDelta = abs(alpha - quadratureAlpha);
+        gl_FragDepth = resultDepth;
+        fragColor = vec4(
+            vec3(alpha, quadratureAlpha, alphaDelta) * alpha,
+            alpha
+        );
+        return;
+    }
+
+    if (DebugView == 11
+            || DebugView == 12
+            || DebugView == 14
+            || DebugView == 15
+            || DebugView == 16
+            || DebugView == 18
+            || DebugView == 19
+            || DebugView == 20) {
+        float quadratureAlpha = saturate(
+            1.0 - primaryQuadratureTransmittance
+        );
+        if (!currentCloudHit
+                || cameraInsideCloud
+                || !primaryQuadratureValid) {
+            gl_FragDepth = 1.0;
+            fragColor = vec4(0.0);
+            return;
+        }
+        float productionRadiance = saturate(dot(
+            accumulated / max(alpha, 0.0001),
+            vec3(0.2126, 0.7152, 0.0722)
+        ));
+        float twoPointRadiance = saturate(dot(
+            primaryQuadratureAccumulated / max(quadratureAlpha, 0.0001),
+            vec3(0.2126, 0.7152, 0.0722)
+        ));
+        float estimatorDelta = abs(productionRadiance - twoPointRadiance);
+        gl_FragDepth = resultDepth;
+        fragColor = vec4(
+            vec3(productionRadiance, twoPointRadiance, estimatorDelta) * alpha,
+            alpha
+        );
+        return;
+    }
+
+    if (DebugView == 6
+            || DebugView == 7
+            || DebugView == 8
+            || DebugView == 9
+            || DebugView == 10
+            || DebugView == 13) {
+        if (!currentCloudHit || cameraInsideCloud || weightedLightOcclusion < 0.0) {
+            gl_FragDepth = 1.0;
+            fragColor = vec4(0.0);
+            return;
+        }
+        float diagnosticWeight = max(weightSum, 0.000001);
+        float firstRadiance = saturate(weightedLightOcclusion / diagnosticWeight);
+        float secondRadiance = saturate(weightedAmbientHeight / diagnosticWeight);
+        float estimatorDelta = abs(firstRadiance - secondRadiance);
+        gl_FragDepth = resultDepth;
+        fragColor = vec4(
+            vec3(firstRadiance, secondRadiance, estimatorDelta) * alpha,
+            alpha
+        );
+        return;
+    }
 
     vec4 currentResult = result;
     vec4 diagnosticHistory = vec4(0.0);
