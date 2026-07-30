@@ -23,7 +23,7 @@ public abstract class SimpleCloudsRendererDhFallbackMixin {
     private CloudsRenderPipeline renderPipelineThisPass;
 
     @Inject(method = "renderBeforeLevel", at = @At("TAIL"))
-    private void projectatmosphere$forceDhSupportPipeline(com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, CallbackInfo ci) {
+    private void projectatmosphere$forceDhSupportPipeline(Matrix4f modelViewMat, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, CallbackInfo ci) {
         if (!SimpleCloudsMod.dhLoaded() || this.renderPipelineThisPass == DhSupportPipeline.INSTANCE) {
             return;
         }

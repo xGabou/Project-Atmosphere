@@ -21,6 +21,7 @@ import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.client.render.mesh.VolumeBoxMesh;
 import net.Gabou.projectatmosphere.tools.debug.TornadoRenderDebugState;
+import net.Gabou.projectatmosphere.modules.weather.StormCloudAttachment;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -345,7 +346,6 @@ public final class SimpleCloudsTornadoRenderer {
                 this.setProxyCullState(cameraPos, tornado);
                 this.applyStormUniforms(shader, tornado);
                 shader.safeGetUniform("DebugMode").set(shaderMode.shaderValue());
-                shader.safeGetUniform("DebugSelectedStorm").set(debugMode == TornadoRenderDebugState.Mode.OFF ? -1 : 0);
                 shader.safeGetUniform("DebugFreeze").set(TornadoRenderDebugState.isFreezeEnabled() ? 1 : 0);
                 shader.safeGetUniform("VolumeMin").set(
                         (float) tornado.boundsMinCloud().x,
@@ -413,15 +413,15 @@ public final class SimpleCloudsTornadoRenderer {
             return;
         }
 
-        BufferBuilder builder = Tesselator.getInstance().getBuilder();
-        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-        builder.vertex(-1.0F, -1.0F, 0.0F).uv(0.0F, 0.0F).endVertex();
-        builder.vertex(1.0F, -1.0F, 0.0F).uv(1.0F, 0.0F).endVertex();
-        builder.vertex(1.0F, 1.0F, 0.0F).uv(1.0F, 1.0F).endVertex();
-        builder.vertex(-1.0F, 1.0F, 0.0F).uv(0.0F, 1.0F).endVertex();
+        BufferBuilder builder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        builder.addVertex(-1.0F, -1.0F, 0.0F).setUv(0.0F, 0.0F);
+        builder.addVertex(1.0F, -1.0F, 0.0F).setUv(1.0F, 0.0F);
+        builder.addVertex(1.0F, 1.0F, 0.0F).setUv(1.0F, 1.0F);
+        builder.addVertex(-1.0F, 1.0F, 0.0F).setUv(0.0F, 1.0F);
         this.fullscreenQuad = new VertexBuffer(VertexBuffer.Usage.STATIC);
         this.fullscreenQuad.bind();
-        this.fullscreenQuad.upload(builder.end());
+        this.fullscreenQuad.upload(builder.buildOrThrow());
         VertexBuffer.unbind();
         this.initialized = true;
     }
@@ -537,7 +537,6 @@ public final class SimpleCloudsTornadoRenderer {
         stormShapes[0] = tornado.shape();
         stormProgress[0] = tornado.touchdownProgress();
 
-        shader.safeGetUniform("StormCount").set(1);
         shader.safeGetUniform("StormPositions").set(stormPositions);
         shader.safeGetUniform("StormHeights").set(stormHeights);
         shader.safeGetUniform("StormWidths").set(stormWidths);
@@ -1064,7 +1063,10 @@ public final class SimpleCloudsTornadoRenderer {
                                    float boundsRadiusCloud, float boundsRadiusWorld, float wallcloudRadiusWorld) {
         static PreparedTornado from(ClientLevel level, TornadoInstance tornado, float animationTime, float partialTick) {
             float scale = SimpleCloudsConstants.CLOUD_SCALE;
-            float cloudHeight = CloudManager.get(level).getCloudHeight();
+            StormCloudAttachment attachment = tornado.getCloudAttachment();
+            float cloudHeight = attachment.isAttached()
+                    ? attachment.cloudBaseY()
+                    : CloudManager.get(level).getCloudHeight();
             Vec3 renderPos = tornado.getRenderPosition(partialTick);
             float renderBottomY = tornado.getRenderBottomY(partialTick);
             float renderRadius = tornado.getRenderRadius(partialTick);
@@ -1077,9 +1079,10 @@ public final class SimpleCloudsTornadoRenderer {
                     renderBottomY - GROUND_VISUAL_SINK_WORLD
             );
             float formationProgress = tornado.getFormationProgress(partialTick);
+            float funnelAnchorY = attachment.isAttached() ? attachment.funnelTopY() : cloudHeight;
             float topWorld = Math.max(
                     renderBottomY + tornado.getRenderHeight(partialTick),
-                    cloudHeight + CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD
+                    funnelAnchorY + CLOUD_BLEND_PAD_ABOVE_CLOUD_BASE_WORLD
             );
             float bottomY = (bottomWorld - cloudHeight) / scale;
             float height = Math.max(

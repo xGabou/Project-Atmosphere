@@ -1,0 +1,84 @@
+package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
+
+import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
+import net.Gabou.projectatmosphere.clouds.cell.CloudCellDensityMath;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.List;
+
+/**
+ * Tracks the analytic cloud density at the camera each frame and smooths it.
+ * Drives the in-cloud whiteout fog so terrain and entities fade exactly where
+ * the raymarched volume becomes opaque.
+ */
+public final class CameraCloudDensityTracker {
+    /**
+     * Far below the first visual consumer threshold (0.03). Once an exact-clear
+     * sample has released this far, retaining an exponentially decaying residue
+     * only uploads denormal values and prevents stable-frame comparisons.
+     */
+    private static final float CLEAR_SETTLE_EPSILON = 1.0e-4F;
+    private static volatile float smoothedDensity;
+    private static volatile long lastUpdateNanos;
+
+    private CameraCloudDensityTracker() {
+    }
+
+    public static void update(List<CloudCell> cells, Vec3 cameraPos) {
+        float raw = cells == null || cells.isEmpty()
+                ? 0.0F
+                : CloudCellDensityMath.densityAt(cells, cameraPos.x(), cameraPos.y(), cameraPos.z());
+
+        update(raw);
+    }
+
+    public static void update(float rawDensity) {
+        float raw = Mth.clamp(rawDensity, 0.0F, 1.0F);
+
+        long now = System.nanoTime();
+        float deltaSeconds = lastUpdateNanos == 0L
+                ? 0.05F
+                : Mth.clamp((now - lastUpdateNanos) / 1.0e9F, 0.001F, 0.25F);
+        lastUpdateNanos = now;
+
+        // Fast attack, slower release: entering a cloud whites out promptly,
+        // leaving it clears smoothly.
+        float rate = raw > smoothedDensity ? 6.0F : 2.5F;
+        float blend = 1.0F - (float) Math.exp(-rate * deltaSeconds);
+        float next = Mth.lerp(blend, smoothedDensity, raw);
+        smoothedDensity = settleExactClear(raw, next);
+    }
+
+    /** Smoothed in-cloud density at the camera, 0..1. */
+    public static float smoothedCameraDensity() {
+        return smoothedDensity;
+    }
+
+    public static void reset() {
+        smoothedDensity = 0.0F;
+        lastUpdateNanos = 0L;
+    }
+
+    static void selfCheckExactClearSettlement() {
+        float below = settleExactClear(0.0F, CLEAR_SETTLE_EPSILON * 0.5F);
+        float capturedSubnormal = settleExactClear(0.0F, Float.intBitsToFloat(0x3a));
+        float above = settleExactClear(0.0F, CLEAR_SETTLE_EPSILON * 2.0F);
+        float nonClear = settleExactClear(CLEAR_SETTLE_EPSILON * 0.5F,
+                CLEAR_SETTLE_EPSILON * 0.5F);
+        if (Float.floatToRawIntBits(below) != Float.floatToRawIntBits(0.0F)
+                || Float.floatToRawIntBits(capturedSubnormal) != Float.floatToRawIntBits(0.0F)) {
+            throw new IllegalStateException("exact-clear release did not settle to canonical zero");
+        }
+        if (above == 0.0F) {
+            throw new IllegalStateException("exact-clear release truncated above its settle epsilon");
+        }
+        if (nonClear == 0.0F) {
+            throw new IllegalStateException("non-zero raw camera density was incorrectly cleared");
+        }
+    }
+
+    private static float settleExactClear(float raw, float next) {
+        return raw == 0.0F && next <= CLEAR_SETTLE_EPSILON ? 0.0F : next;
+    }
+}

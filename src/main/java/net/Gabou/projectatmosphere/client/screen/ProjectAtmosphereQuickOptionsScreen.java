@@ -10,8 +10,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
-import net.minecraftforge.fml.config.ConfigTracker;
-import net.minecraftforge.fml.config.ModConfig;
+import net.neoforged.fml.config.ConfigTracker;
+import net.neoforged.fml.config.ModConfig;
 
 /**
  * Petit menu PA intégré au menu Options de Minecraft.
@@ -146,7 +146,7 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(guiGraphics);
+        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
         int panelWidth = this.getPanelWidth();
         int left = this.getPanelLeft();
@@ -250,15 +250,6 @@ public final class ProjectAtmosphereQuickOptionsScreen extends Screen {
      * @param modId identifiant du mod à sauvegarder
      */
     private static void saveCommonConfigForMod(String modId) {
-        var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
-        if (set == null) {
-            return;
-        }
-        for (ModConfig cfg : set) {
-            if (cfg.getModId().equals(modId)) {
-                cfg.save();
-                return;
-            }
-        }
+        AtmoCommonConfig.COMMON_SPEC.save();
     }
 }

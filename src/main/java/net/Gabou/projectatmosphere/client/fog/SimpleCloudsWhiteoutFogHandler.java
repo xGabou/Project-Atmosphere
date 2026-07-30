@@ -5,14 +5,15 @@ import dev.nonamecrackers2.simpleclouds.client.renderer.WorldEffects;
 import dev.nonamecrackers2.simpleclouds.common.cloud.CloudType;
 import dev.nonamecrackers2.simpleclouds.common.cloud.SimpleCloudsConstants;
 import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
+import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.apache.commons.lang3.tuple.Pair;
 
 public final class SimpleCloudsWhiteoutFogHandler {
@@ -25,7 +26,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
             return;
         }
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
+        if (!shouldApply(level)) {
             return;
         }
 
@@ -48,7 +49,7 @@ public final class SimpleCloudsWhiteoutFogHandler {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onComputeFogColor(ViewportEvent.ComputeFogColor event) {
         ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) {
+        if (!shouldApply(level)) {
             return;
         }
 
@@ -99,5 +100,10 @@ public final class SimpleCloudsWhiteoutFogHandler {
         float distToVerticalEdge = (float) Math.min(cameraPos.y - bottom, top - cameraPos.y);
         float vertical = 1.0F - Mth.clamp(distToVerticalEdge / 16.0F, 0.0F, 1.0F);
         return Mth.clamp(horizontal * vertical, 0.0F, 1.0F);
+    }
+
+    private static boolean shouldApply(ClientLevel level) {
+        return ClientCloudRenderOwnership.resolve(level)
+                == ClientCloudRenderOwnership.Owner.SIMPLE_CLOUDS;
     }
 }

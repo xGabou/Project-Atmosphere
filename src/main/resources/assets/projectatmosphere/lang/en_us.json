@@ -15,6 +15,7 @@
   "block.projectatmosphere.anemometer": "Anemometer",
   "block.projectatmosphere.thermometer_block": "Thermometer",
   "block.projectatmosphere.barometer_block": "Barometer",
-  "block.projectatmosphere.humidimeter_block": "Hygrometer"
+  "block.projectatmosphere.humidimeter_block": "Hygrometer",
+  "block.projectatmosphere.storm_siren": "Storm Siren",
+  "block.projectatmosphere.storm_shield": "Storm Shield"
 }
-

@@ -4,12 +4,14 @@ import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.region.RegionAdapters;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Range;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.FloatTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
@@ -23,6 +25,23 @@ import java.util.concurrent.ConcurrentHashMap;
  * Values are expressed in intuitive units (랍C, % humidity, hPa, m/s).
  */
 public class RegionAtmosphereState {
+    private static final String TAG_TEMPERATURE = "Temperature";
+    private static final String TAG_HUMIDITY = "Humidity";
+    private static final String TAG_PRESSURE = "Pressure";
+    private static final String TAG_WIND = "Wind";
+    private static final String TAG_WIND_BASE_SPEED = "BaseSpeed";
+    private static final String TAG_WIND_ANGLE = "AngleRadians";
+    private static final String TAG_WIND_GUST_SPEED = "GustSpeed";
+    private static final String TAG_CLOUD_COVER = "CloudCover";
+    private static final String TAG_CLOUD_WATER = "CloudWater";
+    private static final String TAG_CYCLONE_CLOUD_FLOOR = "CycloneCloudFloor";
+    private static final String TAG_CYCLONE_RAIN_FLOOR = "CycloneRainFloor";
+    private static final String TAG_SUNLIGHT = "Sunlight";
+    private static final String TAG_RAIN_INTENSITY = "RainIntensity";
+    private static final String TAG_DAILY_TEMPERATURE = "DailyTemperature";
+    private static final String TAG_DAILY_HUMIDITY = "DailyHumidity";
+    private static final String TAG_DAILY_PRESSURE = "DailyPressure";
+
     private static final int DAILY_SLOTS = 240;
     private static final float MIN_TEMPERATURE_C = -273.15f;
     private static final float MAX_REASONABLE_TEMPERATURE_C = 70f;
@@ -39,9 +58,14 @@ public class RegionAtmosphereState {
     private final float baseHumidity; // normalized 0..1
     private final float basePressure;
     private final float biomeSunlightMultiplier;
+    private final float[] forecastTemperatureProfile;
+    private final float[] forecastHumidityProfile;
+    private final float[] forecastPressureProfile;
+    private final float[][] forecastPressureWeek;
     private final float[] dailyTemperatureProfile;
     private final float[] dailyHumidityProfile;
     private final float[] dailyPressureProfile;
+    private final float dayZeroPressureMean;
     private final float baselineMinTemp;
     private final float baselineMaxTemp;
 
@@ -69,10 +93,15 @@ public class RegionAtmosphereState {
         this.pressure = basePressure;
         this.wind = wind;
         this.biomeSunlightMultiplier = computeBiomeSunlightMultiplier(dominantBiome);
-        this.dailyTemperatureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getTemperature(), baseTemperature), baseTemperature);
-        this.dailyHumidityProfile = initialiseDailyCurveScaled(deriveDailyCurve(forecastRegion.getHumidity(), baseHumidity * 100f), this.humidity, 100f);
-        this.dailyPressureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getPressure(), basePressure), basePressure);
-        float[] bounds = computeTemperatureBounds(this.dailyTemperatureProfile, baseTemperature);
+        this.forecastTemperatureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getTemperature(), baseTemperature), baseTemperature);
+        this.forecastHumidityProfile = initialiseDailyCurveScaled(deriveDailyCurve(forecastRegion.getHumidity(), baseHumidity * 100f), this.humidity, 100f);
+        this.forecastPressureProfile = initialiseDailyCurve(deriveDailyCurve(forecastRegion.getPressure(), basePressure), basePressure);
+        this.forecastPressureWeek = cloneWeek(forecastRegion.getPressure());
+        this.dailyTemperatureProfile = forecastTemperatureProfile.clone();
+        this.dailyHumidityProfile = forecastHumidityProfile.clone();
+        this.dailyPressureProfile = forecastPressureProfile.clone();
+        this.dayZeroPressureMean = averageCurve(this.forecastPressureProfile, basePressure);
+        float[] bounds = computeTemperatureBounds(this.forecastTemperatureProfile, baseTemperature);
         this.baselineMinTemp = bounds[0];
         this.baselineMaxTemp = bounds[1];
     }
@@ -90,17 +119,6 @@ public class RegionAtmosphereState {
         }
         ResourceLocation dominantBiome = selectDominantBiome(forecastRegion.getBiomeWeights());
         return new RegionAtmosphereState(id, forecastRegion.getAnchor(), forecastRegion, dominantBiome, temperature, humidity, pressure, wind);
-    }
-
-    /**
-     * Legacy compatibility path: wraps a biome forecast into a region forecast using the default grid.
-     */
-    @Deprecated
-    public static RegionAtmosphereState fromForecast(BiomeInstanceKey biomeKey, net.Gabou.projectatmosphere.modules.core.BiomeForecast forecast) {
-        ForecastRegion region = new ForecastRegion(net.Gabou.projectatmosphere.util.RegionInstanceKey.from(biomeKey.samplePos()));
-        region.addBiomeForecast(biomeKey, forecast);
-        region.finalizeAggregation();
-        return fromForecast(region.getKey(), region);
     }
 
     private static ResourceLocation selectDominantBiome(Map<ResourceLocation, Integer> weights) {
@@ -138,20 +156,20 @@ public class RegionAtmosphereState {
         return regionId;
     }
 
-    /**
-     * Legacy view for components still expecting RegionInstanceKey.
-     */
-    @Deprecated
-    public net.Gabou.projectatmosphere.util.RegionInstanceKey getKey() {
-        return legacyKey;
-    }
-
     public BlockPos getPosition() {
         return anchor;
     }
 
     public ResourceLocation getDominantBiome() {
         return dominantBiome;
+    }
+
+    public float getBasePressure() {
+        return basePressure;
+    }
+
+    public float getBaseTemperature() {
+        return baseTemperature;
     }
 
     public float getTemperature() {
@@ -292,12 +310,170 @@ public class RegionAtmosphereState {
         return dailyPressureProfile.clone();
     }
 
+    public CompoundTag saveMutableState() {
+        CompoundTag tag = new CompoundTag();
+        tag.putFloat(TAG_TEMPERATURE, temperature);
+        tag.putFloat(TAG_HUMIDITY, humidity);
+        tag.putFloat(TAG_PRESSURE, pressure);
+        tag.putFloat(TAG_CLOUD_COVER, cloudCover);
+        tag.putFloat(TAG_CLOUD_WATER, cloudWater);
+        tag.putFloat(TAG_CYCLONE_CLOUD_FLOOR, cycloneCloudFloor);
+        tag.putFloat(TAG_CYCLONE_RAIN_FLOOR, cycloneRainFloor);
+        tag.putFloat(TAG_SUNLIGHT, sunlight);
+        tag.putFloat(TAG_RAIN_INTENSITY, rainIntensity);
+        if (wind != null) {
+            tag.put(TAG_WIND, saveWind(wind));
+        }
+        tag.put(TAG_DAILY_TEMPERATURE, saveFloatArray(dailyTemperatureProfile));
+        tag.put(TAG_DAILY_HUMIDITY, saveFloatArray(dailyHumidityProfile));
+        tag.put(TAG_DAILY_PRESSURE, saveFloatArray(dailyPressureProfile));
+        return tag;
+    }
+
+    public void applyMutableState(CompoundTag tag) {
+        if (tag == null || tag.isEmpty()) {
+            return;
+        }
+        if (tag.contains(TAG_TEMPERATURE, Tag.TAG_FLOAT)) {
+            setTemperature(tag.getFloat(TAG_TEMPERATURE));
+        }
+        if (tag.contains(TAG_HUMIDITY, Tag.TAG_FLOAT)) {
+            setHumidity(tag.getFloat(TAG_HUMIDITY));
+        }
+        if (tag.contains(TAG_PRESSURE, Tag.TAG_FLOAT)) {
+            setPressure(tag.getFloat(TAG_PRESSURE));
+        }
+        if (tag.contains(TAG_CLOUD_COVER, Tag.TAG_FLOAT)) {
+            setCloudCover(tag.getFloat(TAG_CLOUD_COVER));
+        }
+        if (tag.contains(TAG_CLOUD_WATER, Tag.TAG_FLOAT)) {
+            setCloudWater(tag.getFloat(TAG_CLOUD_WATER));
+        }
+        if (tag.contains(TAG_CYCLONE_CLOUD_FLOOR, Tag.TAG_FLOAT)) {
+            cycloneCloudFloor = Mth.clamp(tag.getFloat(TAG_CYCLONE_CLOUD_FLOOR), 0f, 1f);
+        }
+        if (tag.contains(TAG_CYCLONE_RAIN_FLOOR, Tag.TAG_FLOAT)) {
+            cycloneRainFloor = Mth.clamp(tag.getFloat(TAG_CYCLONE_RAIN_FLOOR), 0f, 1f);
+        }
+        if (tag.contains(TAG_SUNLIGHT, Tag.TAG_FLOAT)) {
+            setSunlight(tag.getFloat(TAG_SUNLIGHT));
+        }
+        if (tag.contains(TAG_RAIN_INTENSITY, Tag.TAG_FLOAT)) {
+            setRainIntensity(tag.getFloat(TAG_RAIN_INTENSITY));
+        }
+        if (tag.contains(TAG_WIND, Tag.TAG_COMPOUND)) {
+            wind = loadWind(tag.getCompound(TAG_WIND));
+        }
+        restoreFloatArray(tag, TAG_DAILY_TEMPERATURE, dailyTemperatureProfile);
+        restoreFloatArray(tag, TAG_DAILY_HUMIDITY, dailyHumidityProfile);
+        restoreFloatArray(tag, TAG_DAILY_PRESSURE, dailyPressureProfile);
+    }
+
+    public float getTargetTemperature(long dayTime) {
+        return getBaseTargetTemperature(dayTime) + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
+    }
+
+    public float getBaseTargetTemperature(long dayTime) {
+        if (forecastTemperatureProfile.length == 0) {
+            return temperature;
+        }
+        float position = (float) Math.floorMod(dayTime, 24000L) / 100f;
+        if (position >= forecastTemperatureProfile.length - 1f) {
+            return forecastTemperatureProfile[forecastTemperatureProfile.length - 1];
+        }
+        return interpolate(forecastTemperatureProfile, position);
+    }
+
+    public float getTargetHumidity(long dayTime) {
+        if (forecastHumidityProfile.length == 0) {
+            return humidity;
+        }
+        float position = (float) Math.floorMod(dayTime, 24000L) / 100f;
+        if (position >= forecastHumidityProfile.length - 1f) {
+            return clampHumidity(forecastHumidityProfile[forecastHumidityProfile.length - 1]);
+        }
+        return clampHumidity(interpolate(forecastHumidityProfile, position));
+    }
+
+    public float getTargetPressure(long forecastTime) {
+        return pressureTargetDebug(forecastTime).effectiveTargetPressure();
+    }
+
+    public PressureTargetDebug pressureTargetDebug(long forecastTime) {
+        if (forecastPressureProfile.length == 0) {
+            return new PressureTargetDebug(
+                    0f,
+                    0,
+                    pressure,
+                    pressure,
+                    0f,
+                    pressure,
+                    pressure,
+                    pressure,
+                    "live-pressure-fallback",
+                    0,
+                    0,
+                    false,
+                    false,
+                    false,
+                    0f,
+                    "live pressure fallback"
+            );
+        }
+        float position = (float) Math.floorMod(forecastTime, 24000L) / 100f;
+        int lower = (int) Math.floor(Math.min(position, forecastPressureProfile.length - 1f));
+        int upper = Math.min(forecastPressureProfile.length - 1, lower + 1);
+        float interpolation = upper == lower ? 0f : position - lower;
+        float previous = Mth.clamp(forecastPressureProfile[lower], MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        float next = Mth.clamp(forecastPressureProfile[upper], MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        float rawTarget = Mth.clamp(previous + (next - previous) * interpolation, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        boolean hasWeeklyPressure = forecastPressureWeek != null && forecastPressureWeek.length > 0;
+        float currentForecastPressure = hasWeeklyPressure
+                ? sampleWeeklyPressure(forecastPressureWeek, forecastTime, basePressure)
+                : rawTarget;
+        float dailyShapeOffset = rawTarget - dayZeroPressureMean;
+        float effectiveTarget = hasWeeklyPressure
+                ? Mth.clamp(currentForecastPressure + dailyShapeOffset, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA)
+                : rawTarget;
+        int currentForecastDay = currentForecastDayIndex(forecastPressureWeek, forecastTime);
+        float staleCorrectionDelta = effectiveTarget - rawTarget;
+        boolean staleTargetDetected = hasWeeklyPressure && Math.abs(staleCorrectionDelta) > 3.0f;
+        return new PressureTargetDebug(
+                position,
+                lower,
+                previous,
+                next,
+                interpolation,
+                rawTarget,
+                effectiveTarget,
+                currentForecastPressure,
+                hasWeeklyPressure ? "weekly-forecast-plus-day0-diurnal-shape" : "region-daily-pressure-profile",
+                0,
+                currentForecastDay,
+                hasWeeklyPressure,
+                true,
+                staleTargetDetected,
+                staleCorrectionDelta,
+                staleTargetDetected ? "stale unsupported target" : "current forecast"
+        );
+    }
+
     public void relaxTowardBase(float factor) {
-        temperature += (baseTemperature - temperature) * factor;
+        temperature += (getEffectiveBaseTemperature() - temperature) * factor;
         humidity += (baseHumidity - humidity) * factor;
         pressure += (basePressure - pressure) * factor;
         humidity = clampHumidity(humidity);
         pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+    }
+
+    public void relaxTemperatureAndPressureTowardBase(float factor) {
+        temperature += (getEffectiveBaseTemperature() - temperature) * factor;
+        pressure += (basePressure - pressure) * factor;
+        pressure = Mth.clamp(pressure, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+    }
+
+    public float getEffectiveBaseTemperature() {
+        return baseTemperature + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
     public double distanceTo(double x, double z) {
@@ -307,11 +483,11 @@ public class RegionAtmosphereState {
     }
 
     public float getBaselineMinTemperature() {
-        return baselineMinTemp;
+        return baselineMinTemp + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
     public float getBaselineMaxTemperature() {
-        return baselineMaxTemp;
+        return baselineMaxTemp + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
     public float getBaselineTemperatureSpan() {
@@ -321,6 +497,34 @@ public class RegionAtmosphereState {
     public float getSunlightDrivenTemperature(float sunlightFactor) {
         float clamped = Mth.clamp(sunlightFactor, 0f, 1f);
         return Mth.lerp(clamped, baselineMinTemp, baselineMaxTemp);
+    }
+
+    public record PressureTargetDebug(
+            float curvePosition,
+            int lowerIndex,
+            float previousPoint,
+            float nextPoint,
+            float interpolation,
+            float rawTargetPressure,
+            float effectiveTargetPressure,
+            float forecastPressureCurrentSample,
+            String source,
+            int targetDayIndex,
+            int currentForecastDayIndex,
+            boolean targetUsesCurrentForecastDay,
+            boolean day0TargetProfileActive,
+            boolean staleTargetDetected,
+            float staleTargetCorrectionDelta,
+            String anomalyClassification
+    ) {
+    }
+
+    /**
+     * Legacy view for components still expecting RegionInstanceKey.
+     */
+    @Deprecated
+    public net.Gabou.projectatmosphere.util.RegionInstanceKey getKey() {
+        return legacyKey;
     }
 
     private static float clampHumidity(float value) {
@@ -386,6 +590,56 @@ public class RegionAtmosphereState {
         return arr;
     }
 
+    private static float[][] cloneWeek(@Nullable float[][] week) {
+        if (week == null || week.length == 0) {
+            return new float[0][];
+        }
+        float[][] copy = new float[week.length][];
+        for (int i = 0; i < week.length; i++) {
+            copy[i] = week[i] == null ? null : week[i].clone();
+        }
+        return copy;
+    }
+
+    private static float sampleWeeklyPressure(@Nullable float[][] week, long gameTime, float fallback) {
+        if (week == null || week.length == 0) {
+            return fallback;
+        }
+        int day = currentForecastDayIndex(week, gameTime);
+        float[] dayProfile = week[day];
+        if (dayProfile == null || dayProfile.length == 0) {
+            return fallback;
+        }
+        if (dayProfile.length == 1) {
+            return Mth.clamp(dayProfile[0], MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        }
+        float dayFraction = (float) Math.floorMod(gameTime, 24000L) / 24000f;
+        return Mth.clamp(Mth.lerp(dayFraction, dayProfile[0], dayProfile[1]), MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+    }
+
+    private static int currentForecastDayIndex(@Nullable float[][] week, long gameTime) {
+        if (week == null || week.length == 0) {
+            return 0;
+        }
+        long day = Math.floorMod(gameTime / 24000L, week.length);
+        return (int) day;
+    }
+
+    private static float averageCurve(@Nullable float[] curve, float fallback) {
+        if (curve == null || curve.length == 0) {
+            return fallback;
+        }
+        float sum = 0f;
+        int count = 0;
+        for (float value : curve) {
+            if (Float.isFinite(value)) {
+                sum += value;
+                count++;
+            }
+        }
+        return count == 0 ? fallback : sum / count;
+    }
+
     private static float[] resampleDailyCurve(float[] source) {
         float[] target = new float[DAILY_SLOTS];
         if (source.length == DAILY_SLOTS) {
@@ -432,6 +686,46 @@ public class RegionAtmosphereState {
         return new float[]{min, max};
     }
 
+    private static CompoundTag saveWind(WindVector wind) {
+        CompoundTag tag = new CompoundTag();
+        tag.putFloat(TAG_WIND_BASE_SPEED, wind.baseSpeed());
+        tag.putFloat(TAG_WIND_ANGLE, wind.angleRadians());
+        tag.putFloat(TAG_WIND_GUST_SPEED, wind.gustSpeed());
+        return tag;
+    }
+
+    private static WindVector loadWind(CompoundTag tag) {
+        float baseSpeed = tag.getFloat(TAG_WIND_BASE_SPEED);
+        float angle = tag.getFloat(TAG_WIND_ANGLE);
+        float gustSpeed = tag.getFloat(TAG_WIND_GUST_SPEED);
+        if (!Float.isFinite(baseSpeed) || !Float.isFinite(angle) || !Float.isFinite(gustSpeed)) {
+            return WindVector.fromBase(1f, 0f);
+        }
+        return new WindVector(Math.max(0f, baseSpeed), angle, Math.max(0f, gustSpeed));
+    }
+
+    private static ListTag saveFloatArray(float[] values) {
+        ListTag list = new ListTag();
+        if (values == null) {
+            return list;
+        }
+        for (float value : values) {
+            list.add(FloatTag.valueOf(value));
+        }
+        return list;
+    }
+
+    private static void restoreFloatArray(CompoundTag tag, String key, float[] target) {
+        if (target == null || !tag.contains(key, Tag.TAG_LIST)) {
+            return;
+        }
+        ListTag list = tag.getList(key, Tag.TAG_FLOAT);
+        int count = Math.min(target.length, list.size());
+        for (int i = 0; i < count; i++) {
+            target[i] = list.getFloat(i);
+        }
+    }
+
     private float clampTemperature(float value) {
         float ceiling = Math.max(MAX_REASONABLE_TEMPERATURE_C, baselineMaxTemp + 25f);
         float clamped = Math.max(MIN_TEMPERATURE_C, Math.min(value, ceiling));
@@ -467,4 +761,5 @@ public class RegionAtmosphereState {
                 new RuntimeException("Temperature clamp trace")
         );
     }
+
 }

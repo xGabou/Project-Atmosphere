@@ -47,6 +47,7 @@ public final class CloudGroupSpawner {
 
         CloudClusterState primary = state.getClusters().stream().findFirst().orElse(null);
         if (primary != null) {
+            primary.setMorphologyMembership(state.getRegionId(), 0, morphology.clusterCount());
             CloudMorphologyGenerators.tuneSpawnedCluster(primary, definition, morphology, 1.0F, 0, random);
         }
 
@@ -57,7 +58,7 @@ public final class CloudGroupSpawner {
                     UUID.randomUUID(),
                     level.dimension(),
                     clusterCenter,
-                    Math.max(8.0F, morphology.radius() * scale),
+                    Math.max(8.0F, morphology.radius()),
                     spawnHeight - morphology.baseDrop() * (0.84F + random.nextFloat() * 0.20F),
                     spawnHeight + morphology.topRise() * (0.82F + random.nextFloat() * 0.34F),
                     morphology.density() * (0.86F + random.nextFloat() * 0.22F),
@@ -67,6 +68,7 @@ public final class CloudGroupSpawner {
             cluster.setCloudTypeId(resolvedTypeId);
             cluster.setPreviousCloudTypeId(resolvedTypeId);
             cluster.setMorphologyFamily(definition.getMorphologyFamily());
+            cluster.setMorphologyMembership(state.getRegionId(), i, morphology.clusterCount());
             CloudMorphologyGenerators.tuneSpawnedCluster(cluster, definition, morphology, scale, i, random);
             state.addCluster(cluster);
         }

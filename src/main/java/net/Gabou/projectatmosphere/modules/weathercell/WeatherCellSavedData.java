@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.modules.weathercell;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -29,8 +30,10 @@ public final class WeatherCellSavedData extends SavedData {
 
     public static @NotNull WeatherCellSavedData get(@NotNull ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-                WeatherCellSavedData::new,
-                WeatherCellSavedData::new,
+                new SavedData.Factory<>(
+                        WeatherCellSavedData::new,
+                        (tag, provider) -> new WeatherCellSavedData(tag)
+                ),
                 DATA_NAME
         );
     }
@@ -58,7 +61,7 @@ public final class WeatherCellSavedData extends SavedData {
     }
 
     @Override
-    public @NotNull CompoundTag save(@NotNull CompoundTag tag) {
+    public @NotNull CompoundTag save(@NotNull CompoundTag tag, HolderLookup.Provider provider) {
         tag.putInt(TAG_VERSION, VERSION);
         ListTag list = new ListTag();
         for (WeatherCellState cell : cells.values()) {

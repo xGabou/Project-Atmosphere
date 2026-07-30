@@ -129,6 +129,15 @@ final class CloudRegionMergeController {
                     continue;
                 }
 
+                // A morphology group is intentionally built from overlapping
+                // persistent lobes. Treating those siblings as colliding
+                // simulation cells collapsed every cumulus tower into one tall
+                // aggregate within a few ticks. Independent cloud formations
+                // retain the existing interaction/absorption behavior.
+                if (first.isMorphologySibling(second)) {
+                    continue;
+                }
+
                 float overlap = computeClusterOverlap(first, second);
                 if (overlap <= 0.0F) {
                     continue;

@@ -1,12 +1,11 @@
 package net.Gabou.projectatmosphere.clouds.service;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsAtmosphereCloudService;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.neoforged.fml.ModList;
 
 /**
- * RÃ©sout le service de nuages actif sans charger Simple Clouds quand il est absent.
+ * Résout le service de nuages actif sans charger Simple Clouds quand il est absent.
  */
 public final class AtmosphereCloudServices {
 
@@ -30,9 +29,9 @@ public final class AtmosphereCloudServices {
     }
 
     /**
-     * Indique si Simple Clouds est chargÃ©.
+     * Indique si Simple Clouds est chargé.
      *
-     * @return true si Simple Clouds est prÃ©sent
+     * @return true si Simple Clouds est présent
      */
     public static boolean isSimpleCloudsLoaded() {
         return ModList.get().isLoaded(SIMPLE_CLOUDS_MOD_ID);
@@ -45,10 +44,29 @@ public final class AtmosphereCloudServices {
         }
         if (isSimpleCloudsLoaded()) {
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; using Simple Clouds cloud service.");
-            return new SimpleCloudsAtmosphereCloudService();
+            return createOptionalService(
+                    "net.Gabou.projectatmosphere.compat.simpleclouds.SimpleCloudsAtmosphereCloudService"
+            );
         }
 
         ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds absent; using native PA cloud service.");
         return new NativeAtmosphereCloudService();
+    }
+
+    private static AtmosphereCloudService createOptionalService(String className) {
+        try {
+            Class<?> serviceClass = Class.forName(className, true, AtmosphereCloudServices.class.getClassLoader());
+            if (!AtmosphereCloudService.class.isAssignableFrom(serviceClass)) {
+                throw new IllegalStateException(className + " does not implement AtmosphereCloudService");
+            }
+            return (AtmosphereCloudService) serviceClass.getConstructor().newInstance();
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            ProjectAtmosphere.LOGGER.error(
+                    "[Atmosphere] Optional cloud backend {} failed to initialize; its visual renderer remains owner but PA integration is disabled.",
+                    className,
+                    exception
+            );
+            return new DisabledAtmosphereCloudService();
+        }
     }
 }

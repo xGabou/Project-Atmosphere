@@ -9,6 +9,9 @@ public class CloudLibrary {
 
     private static final Random RANDOM = new Random();
 
+    // ---------------------------------------------------------------------
+    // Cloud groupings
+    // ---------------------------------------------------------------------
     private static final String[] RAINSTORM_CLOUDS = {
             "heavy_stratus",
             "dense_stratocumulus",
@@ -16,13 +19,11 @@ public class CloudLibrary {
             "stratus",
             "floating_farlands",
             "thicker_stratocumulus",
-            "altostratus",
             "nimbostratus",
             "severe_nimbostratus",
             "cumulus_congestus",
             "cumulus_mediocris",
-            "mammatus_thin",
-            "altocumulus"
+            "mammatus_thin"
 
     };
     private static final Set<String> SNOW_CLOUDS = Set.of(RAINSTORM_CLOUDS);
@@ -80,7 +81,6 @@ public class CloudLibrary {
             "nimbostratus",
             "floating_farlands",
             "thicker_stratocumulus",
-            "altostratus",
             "cumulus_mediocris"
     };
 
@@ -88,9 +88,6 @@ public class CloudLibrary {
             "dense_itty_bitty",
             "stratocumulus",
             "cumulus",
-            "altocumulus",
-            "stratocumulus_opacus",
-            "altostratus_dry",
             "mammatus_thin"
     };
 
@@ -99,8 +96,6 @@ public class CloudLibrary {
             "smaller_stratocumulus",
             "islands",
             "spots",
-            "pattern",
-            "balls",
             "cumulus_noise",
             "dense_cumulus",
             "tall_noise"
@@ -113,12 +108,12 @@ public class CloudLibrary {
             "itty_bitty_bigger",
             "pathway",
             "spotted",
-            "matrix",
-            "snow",
-            "tall_weirdness",
-            "cumulus_humilis"
+            "tall_weirdness"
     };
 
+    // ---------------------------------------------------------------------
+    // Cloud selection helpers
+    // ---------------------------------------------------------------------
     private static String getRandomFrom(String[] clouds) {
         return clouds[RANDOM.nextInt(clouds.length)];
     }
@@ -180,8 +175,6 @@ public class CloudLibrary {
                  "smaller_stratocumulus",
                  "islands",
                  "spots",
-                 "pattern",
-                 "balls",
                  "cumulus_noise",
                  "dense_cumulus",
                  "tall_noise" -> 2;
@@ -190,8 +183,6 @@ public class CloudLibrary {
                  "itty_bitty_bigger",
                  "pathway",
                  "spotted",
-                 "matrix",
-                 "snow",
                  "mammatus_thin",
                  "tall_weirdness" -> 1;
             default -> 0;

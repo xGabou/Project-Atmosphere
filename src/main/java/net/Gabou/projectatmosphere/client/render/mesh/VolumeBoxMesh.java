@@ -16,8 +16,8 @@ public final class VolumeBoxMesh implements AutoCloseable {
             return;
         }
 
-        BufferBuilder builder = Tesselator.getInstance().getBuilder();
-        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        BufferBuilder builder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
 
         // Front (+Z)
         vertex(builder, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F);
@@ -57,7 +57,7 @@ public final class VolumeBoxMesh implements AutoCloseable {
 
         this.buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
         this.buffer.bind();
-        this.buffer.upload(builder.end());
+        this.buffer.upload(builder.buildOrThrow());
         VertexBuffer.unbind();
     }
 
@@ -77,6 +77,6 @@ public final class VolumeBoxMesh implements AutoCloseable {
     }
 
     private static void vertex(BufferBuilder builder, float x, float y, float z, float u, float v) {
-        builder.vertex(x, y, z).uv(u, v).endVertex();
+        builder.addVertex(x, y, z).setUv(u, v);
     }
 }

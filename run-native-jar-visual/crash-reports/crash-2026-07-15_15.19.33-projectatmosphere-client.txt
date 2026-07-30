@@ -1,0 +1,244 @@
+---- Minecraft Crash Report ----
+// Uh... Did I do that?
+
+Time: 2026-07-15 15:19:33
+Description: Rendering overlay
+
+net.minecraftforge.fml.ModLoadingException: Project Atmosphere (projectatmosphere) encountered an error during the done event phase
+§7net.minecraft.server.ChainedJsonException: Invalid shaders/core/cloud_atmosphere_volume.json: Couldn't compile fragment program (mod_resources, projectatmosphere:cloud_atmosphere_volume) : 0(353) : error C0000: syntax error, unexpected identifier, expecting ')' at token "rank"
+0(354) : error C1503: undefined variable "rank"
+0(355) : error C0000: syntax error, unexpected '.', expecting "::" at token "."
+0(357) : error C1503: undefined variable "component"
+0(358) : error C1503: undefined variable "rank"
+0(358) : error C1503: undefined variable "rank"
+0(387) : error C0000: syntax error, unexpected '=', expecting ';' or '(' at token "="
+0(392) : error C0000: syntax error, unexpected ',', expecting "::" at token ","
+0(393) : error C1503: undefined variable "index"
+0(393) : error C1503: undefined variable "index"
+0(393) : error C1503: undefined variable "index"
+0(397) : error C1503: undefined variable "index"
+0(398) : error C1503: undefined variable "index"
+0(399) : error C1503: undefined variable "index"
+	at net.minecraftforge.fml.javafmlmod.FMLModContainer.acceptEvent(FMLModContainer.java:125) ~[javafmllanguage-1.20.1-47.4.20.jar%23166!/:?] {}
+	at net.minecraftforge.fml.ModLoader.lambda$postEvent$29(ModLoader.java:326) ~[fmlcore-1.20.1-47.4.20.jar%23165!/:?] {}
+	at java.lang.Iterable.forEach(Unknown Source) ~[?:?] {re:computing_frames}
+	at net.minecraftforge.fml.ModList.forEachModInOrder(ModList.java:227) ~[fmlcore-1.20.1-47.4.20.jar%23165!/:?] {}
+	at net.minecraftforge.fml.ModLoader.postEvent(ModLoader.java:326) ~[fmlcore-1.20.1-47.4.20.jar%23165!/:?] {}
+	at net.minecraft.client.renderer.GameRenderer.m_172767_(GameRenderer.java:616) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinGameRenderer,pl:mixin:A}
+	at net.minecraft.client.renderer.GameRenderer$1.m_5787_(GameRenderer.java:379) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.client.renderer.GameRenderer$1.m_5787_(GameRenderer.java:357) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.server.packs.resources.SimplePreparableReloadListener.m_10789_(SimplePreparableReloadListener.java:13) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at java.util.concurrent.CompletableFuture$UniAccept.tryFire(Unknown Source) ~[?:?] {}
+	at java.util.concurrent.CompletableFuture$Completion.run(Unknown Source) ~[?:?] {}
+	at net.minecraft.server.packs.resources.SimpleReloadInstance.m_143940_(SimpleReloadInstance.java:69) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.util.thread.BlockableEventLoop.m_6367_(BlockableEventLoop.java:156) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at net.minecraft.util.thread.ReentrantBlockableEventLoop.m_6367_(ReentrantBlockableEventLoop.java:23) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,re:computing_frames,re:classloading}
+	at net.minecraft.util.thread.BlockableEventLoop.m_7245_(BlockableEventLoop.java:130) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at net.minecraft.util.thread.BlockableEventLoop.m_18699_(BlockableEventLoop.java:115) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at net.minecraft.client.Minecraft.m_91383_(Minecraft.java:1106) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:architectury.mixins.json:MixinMinecraft,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinMinecraftLevelLifecycle,pl:mixin:APP:projectatmosphere.mixins.json:client.MinecraftCrashHandlerMixin,pl:mixin:A}
+	at net.minecraft.client.Minecraft.redirect$zbc000$projectatmosphere$wrapRunTick(Minecraft.java:3930) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:architectury.mixins.json:MixinMinecraft,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinMinecraftLevelLifecycle,pl:mixin:APP:projectatmosphere.mixins.json:client.MinecraftCrashHandlerMixin,pl:mixin:A}
+	at net.minecraft.client.Minecraft.m_91374_(Minecraft.java:718) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:architectury.mixins.json:MixinMinecraft,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinMinecraftLevelLifecycle,pl:mixin:APP:projectatmosphere.mixins.json:client.MinecraftCrashHandlerMixin,pl:mixin:A}
+	at net.minecraft.client.main.Main.main(Main.java:218) ~[1.20.1.jar:?] {re:classloading}
+	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[?:?] {}
+	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source) ~[?:?] {}
+	at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source) ~[?:?] {}
+	at java.lang.reflect.Method.invoke(Unknown Source) ~[?:?] {}
+	at net.minecraftforge.fml.loading.targets.CommonLaunchHandler.runTarget(CommonLaunchHandler.java:111) ~[fmlloader-1.20.1-47.4.20.jar:?] {}
+	at net.minecraftforge.fml.loading.targets.CommonLaunchHandler.clientService(CommonLaunchHandler.java:99) ~[fmlloader-1.20.1-47.4.20.jar:?] {}
+	at net.minecraftforge.fml.loading.targets.CommonClientLaunchHandler.lambda$makeService$0(CommonClientLaunchHandler.java:25) ~[fmlloader-1.20.1-47.4.20.jar:?] {}
+	at cpw.mods.modlauncher.LaunchServiceHandlerDecorator.launch(LaunchServiceHandlerDecorator.java:30) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:53) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:71) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.Launcher.run(Launcher.java:108) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.Launcher.main(Launcher.java:78) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:26) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:23) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.bootstraplauncher.BootstrapLauncher.main(BootstrapLauncher.java:141) ~[bootstraplauncher-1.1.2.jar:?] {}
+Caused by: net.minecraft.server.ChainedJsonException: Invalid shaders/core/cloud_atmosphere_volume.json: Couldn't compile fragment program (mod_resources, projectatmosphere:cloud_atmosphere_volume) : 0(353) : error C0000: syntax error, unexpected identifier, expecting ')' at token "rank"
+0(354) : error C1503: undefined variable "rank"
+0(355) : error C0000: syntax error, unexpected '.', expecting "::" at token "."
+0(357) : error C1503: undefined variable "component"
+0(358) : error C1503: undefined variable "rank"
+0(358) : error C1503: undefined variable "rank"
+0(387) : error C0000: syntax error, unexpected '=', expecting ';' or '(' at token "="
+0(392) : error C0000: syntax error, unexpected ',', expecting "::" at token ","
+0(393) : error C1503: undefined variable "index"
+0(393) : error C1503: undefined variable "index"
+0(393) : error C1503: undefined variable "index"
+0(397) : error C1503: undefined variable "index"
+0(398) : error C1503: undefined variable "index"
+0(399) : error C1503: undefined variable "index"
+	at net.minecraft.server.ChainedJsonException.m_135906_(ChainedJsonException.java:48) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.client.renderer.ShaderInstance.<init>(ShaderInstance.java:187) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders.onRegisterShaders(VolumetricCloudShaders.java:65) ~[Forge-projectatmosphere-0.9.1.1-alpha.jar%23162!/:0.9.1.1-alpha] {re:classloading}
+	at net.Gabou.projectatmosphere.client.render.shader.__VolumetricCloudShaders_onRegisterShaders_RegisterShadersEvent.invoke(.dynamic) ~[Forge-projectatmosphere-0.9.1.1-alpha.jar%23162!/:0.9.1.1-alpha] {re:classloading,pl:eventbus:B}
+	at net.minecraftforge.eventbus.ASMEventHandler.invoke(ASMEventHandler.java:55) ~[eventbus-6.2.33.jar%23137!/:?] {}
+	at net.minecraftforge.eventbus.EventBus.post(EventBus.java:312) ~[eventbus-6.2.33.jar%23137!/:?] {}
+	at net.minecraftforge.eventbus.EventBus.post(EventBus.java:298) ~[eventbus-6.2.33.jar%23137!/:?] {}
+	at net.minecraftforge.fml.javafmlmod.FMLModContainer.acceptEvent(FMLModContainer.java:121) ~[javafmllanguage-1.20.1-47.4.20.jar%23166!/:?] {}
+	... 34 more
+Caused by: java.io.IOException: Couldn't compile fragment program (mod_resources, projectatmosphere:cloud_atmosphere_volume) : 0(353) : error C0000: syntax error, unexpected identifier, expecting ')' at token "rank"
+0(354) : error C1503: undefined variable "rank"
+0(355) : error C0000: syntax error, unexpected '.', expecting "::" at token "."
+0(357) : error C1503: undefined variable "component"
+0(358) : error C1503: undefined variable "rank"
+0(358) : error C1503: undefined variable "rank"
+0(387) : error C0000: syntax error, unexpected '=', expecting ';' or '(' at token "="
+0(392) : error C0000: syntax error, unexpected ',', expecting "::" at token ","
+0(393) : error C1503: undefined variable "index"
+0(393) : error C1503: undefined variable "index"
+0(393) : error C1503: undefined variable "index"
+0(397) : error C1503: undefined variable "index"
+0(398) : error C1503: undefined variable "index"
+0(399) : error C1503: undefined variable "index"
+	at com.mojang.blaze3d.shaders.Program.m_166612_(Program.java:69) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at com.mojang.blaze3d.shaders.Program.m_166604_(Program.java:51) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.client.renderer.ShaderInstance.m_173340_(ShaderInstance.java:222) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.client.renderer.ShaderInstance.<init>(ShaderInstance.java:172) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders.onRegisterShaders(VolumetricCloudShaders.java:65) ~[Forge-projectatmosphere-0.9.1.1-alpha.jar%23162!/:0.9.1.1-alpha] {re:classloading}
+	at net.Gabou.projectatmosphere.client.render.shader.__VolumetricCloudShaders_onRegisterShaders_RegisterShadersEvent.invoke(.dynamic) ~[Forge-projectatmosphere-0.9.1.1-alpha.jar%23162!/:0.9.1.1-alpha] {re:classloading,pl:eventbus:B}
+	at net.minecraftforge.eventbus.ASMEventHandler.invoke(ASMEventHandler.java:55) ~[eventbus-6.2.33.jar%23137!/:?] {}
+	at net.minecraftforge.eventbus.EventBus.post(EventBus.java:312) ~[eventbus-6.2.33.jar%23137!/:?] {}
+	at net.minecraftforge.eventbus.EventBus.post(EventBus.java:298) ~[eventbus-6.2.33.jar%23137!/:?] {}
+	at net.minecraftforge.fml.javafmlmod.FMLModContainer.acceptEvent(FMLModContainer.java:121) ~[javafmllanguage-1.20.1-47.4.20.jar%23166!/:?] {}
+	... 34 more
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Suspected Mod: 
+	Project Atmosphere (projectatmosphere), Version: 0.9.1.1-alpha
+		Mixin class: net.Gabou.projectatmosphere.mixin.client.MinecraftCrashHandlerMixin
+		Target: net.minecraft.client.Minecraft
+		at TRANSFORMER/minecraft@1.20.1/net.minecraft.client.Minecraft.redirect$zbc000$projectatmosphere$wrapRunTick(Minecraft.java:3930)
+Stacktrace:
+	at net.minecraftforge.fml.javafmlmod.FMLModContainer.acceptEvent(FMLModContainer.java:125) ~[javafmllanguage-1.20.1-47.4.20.jar%23166!/:?] {}
+	at net.minecraftforge.fml.ModLoader.lambda$postEvent$29(ModLoader.java:326) ~[fmlcore-1.20.1-47.4.20.jar%23165!/:?] {}
+	at java.lang.Iterable.forEach(Unknown Source) ~[?:?] {re:computing_frames}
+	at net.minecraftforge.fml.ModList.forEachModInOrder(ModList.java:227) ~[fmlcore-1.20.1-47.4.20.jar%23165!/:?] {}
+	at net.minecraftforge.fml.ModLoader.postEvent(ModLoader.java:326) ~[fmlcore-1.20.1-47.4.20.jar%23165!/:?] {}
+	at net.minecraft.client.renderer.GameRenderer.m_172767_(GameRenderer.java:616) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinGameRenderer,pl:mixin:A}
+	at net.minecraft.client.renderer.GameRenderer$1.m_5787_(GameRenderer.java:379) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.client.renderer.GameRenderer$1.m_5787_(GameRenderer.java:357) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.server.packs.resources.SimplePreparableReloadListener.m_10789_(SimplePreparableReloadListener.java:13) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at java.util.concurrent.CompletableFuture$UniAccept.tryFire(Unknown Source) ~[?:?] {}
+	at java.util.concurrent.CompletableFuture$Completion.run(Unknown Source) ~[?:?] {}
+	at net.minecraft.server.packs.resources.SimpleReloadInstance.m_143940_(SimpleReloadInstance.java:69) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:classloading}
+	at net.minecraft.util.thread.BlockableEventLoop.m_6367_(BlockableEventLoop.java:156) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at net.minecraft.util.thread.ReentrantBlockableEventLoop.m_6367_(ReentrantBlockableEventLoop.java:23) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,re:computing_frames,re:classloading}
+	at net.minecraft.util.thread.BlockableEventLoop.m_7245_(BlockableEventLoop.java:130) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+-- Overlay render details --
+Details:
+	Overlay name: net.minecraftforge.client.loading.ForgeLoadingOverlay
+Stacktrace:
+	at net.minecraft.client.renderer.GameRenderer.m_109093_(GameRenderer.java:957) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinGameRenderer,pl:mixin:A}
+	at net.minecraft.client.Minecraft.m_91383_(Minecraft.java:1146) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:architectury.mixins.json:MixinMinecraft,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinMinecraftLevelLifecycle,pl:mixin:APP:projectatmosphere.mixins.json:client.MinecraftCrashHandlerMixin,pl:mixin:A}
+	at net.minecraft.client.Minecraft.redirect$zbc000$projectatmosphere$wrapRunTick(Minecraft.java:3930) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:architectury.mixins.json:MixinMinecraft,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinMinecraftLevelLifecycle,pl:mixin:APP:projectatmosphere.mixins.json:client.MinecraftCrashHandlerMixin,pl:mixin:A}
+	at net.minecraft.client.Minecraft.m_91374_(Minecraft.java:718) ~[client-1.20.1-20230612.114412-srg.jar%23164!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:architectury.mixins.json:MixinMinecraft,pl:mixin:APP:projectatmosphere.mixins.json:client.MixinMinecraftLevelLifecycle,pl:mixin:APP:projectatmosphere.mixins.json:client.MinecraftCrashHandlerMixin,pl:mixin:A}
+	at net.minecraft.client.main.Main.main(Main.java:218) ~[1.20.1.jar:?] {re:classloading}
+	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method) ~[?:?] {}
+	at jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source) ~[?:?] {}
+	at jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source) ~[?:?] {}
+	at java.lang.reflect.Method.invoke(Unknown Source) ~[?:?] {}
+	at net.minecraftforge.fml.loading.targets.CommonLaunchHandler.runTarget(CommonLaunchHandler.java:111) ~[fmlloader-1.20.1-47.4.20.jar:?] {}
+	at net.minecraftforge.fml.loading.targets.CommonLaunchHandler.clientService(CommonLaunchHandler.java:99) ~[fmlloader-1.20.1-47.4.20.jar:?] {}
+	at net.minecraftforge.fml.loading.targets.CommonClientLaunchHandler.lambda$makeService$0(CommonClientLaunchHandler.java:25) ~[fmlloader-1.20.1-47.4.20.jar:?] {}
+	at cpw.mods.modlauncher.LaunchServiceHandlerDecorator.launch(LaunchServiceHandlerDecorator.java:30) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:53) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:71) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.Launcher.run(Launcher.java:108) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.Launcher.main(Launcher.java:78) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:26) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:23) ~[modlauncher-10.0.9.jar:?] {}
+	at cpw.mods.bootstraplauncher.BootstrapLauncher.main(BootstrapLauncher.java:141) ~[bootstraplauncher-1.1.2.jar:?] {}
+
+
+-- Last reload --
+Details:
+	Reload number: 1
+	Reload reason: initial
+	Finished: No
+	Packs: vanilla, mod_resources
+
+-- System Details --
+Details:
+	Minecraft Version: 1.20.1
+	Minecraft Version ID: 1.20.1
+	Operating System: Windows 11 (amd64) version 10.0
+	Java Version: 17.0.8, Eclipse Adoptium
+	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
+	Memory: 716627728 bytes (683 MiB) / 1073741824 bytes (1024 MiB) up to 4294967296 bytes (4096 MiB)
+	CPUs: 32
+	Processor Vendor: GenuineIntel
+	Processor Name: 13th Gen Intel(R) Core(TM) i9-13900HX
+	Identifier: Intel64 Family 6 Model 183 Stepping 1
+	Microarchitecture: unknown
+	Frequency (GHz): 2.42
+	Number of physical packages: 1
+	Number of physical CPUs: 24
+	Number of logical CPUs: 32
+	Graphics card #0 name: Intel(R) UHD Graphics
+	Graphics card #0 vendor: Intel Corporation (0x8086)
+	Graphics card #0 VRAM (MB): 2048.00
+	Graphics card #0 deviceId: 0xa788
+	Graphics card #0 versionInfo: DriverVersion=32.0.101.7084
+	Graphics card #1 name: NVIDIA GeForce RTX 4070 Laptop GPU
+	Graphics card #1 vendor: NVIDIA (0x10de)
+	Graphics card #1 VRAM (MB): 4095.00
+	Graphics card #1 deviceId: 0x2860
+	Graphics card #1 versionInfo: DriverVersion=32.0.15.9621
+	Memory slot #0 capacity (MB): 16384.00
+	Memory slot #0 clockSpeed (GHz): 5.60
+	Memory slot #0 type: Unknown
+	Memory slot #1 capacity (MB): 16384.00
+	Memory slot #1 clockSpeed (GHz): 5.60
+	Memory slot #1 type: Unknown
+	Virtual memory max (MB): 49288.73
+	Virtual memory used (MB): 43567.32
+	Swap memory total (MB): 16832.02
+	Swap memory used (MB): 1528.81
+	JVM Flags: 3 total; -Xms1024M -Xmx4096M -XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump
+	Launched Version: 1.20.1-forge-47.4.20
+	Backend library: LWJGL version 3.3.1 build 7
+	Backend API: NVIDIA GeForce RTX 4070 Laptop GPU/PCIe/SSE2 GL version 4.6.0 NVIDIA 596.21, NVIDIA Corporation
+	Window size: 1280x720
+	GL Caps: Using framebuffer using OpenGL 3.2
+	GL debug messages: 
+	Using VBOs: Yes
+	Is Modded: Definitely; Client brand changed to 'forge'
+	Type: Client (map_client.txt)
+	Graphics mode: fancy
+	Resource Packs: 
+	Current Language: en_us
+	CPU: 32x 13th Gen Intel(R) Core(TM) i9-13900HX
+	ModLauncher: 10.0.9+10.0.9+main.dcd20f30
+	ModLauncher launch target: forgeclient
+	ModLauncher naming: srg
+	ModLauncher services: 
+		mixin-0.8.5.jar mixin PLUGINSERVICE 
+		eventbus-6.2.33.jar eventbus PLUGINSERVICE 
+		fmlloader-1.20.1-47.4.20.jar slf4jfixer PLUGINSERVICE 
+		fmlloader-1.20.1-47.4.20.jar object_holder_definalize PLUGINSERVICE 
+		fmlloader-1.20.1-47.4.20.jar runtime_enum_extender PLUGINSERVICE 
+		fmlloader-1.20.1-47.4.20.jar capability_token_subclass PLUGINSERVICE 
+		accesstransformers-8.0.4.jar accesstransformer PLUGINSERVICE 
+		fmlloader-1.20.1-47.4.20.jar runtimedistcleaner PLUGINSERVICE 
+		modlauncher-10.0.9.jar mixin TRANSFORMATIONSERVICE 
+		modlauncher-10.0.9.jar fml TRANSFORMATIONSERVICE 
+	FML Language Providers: 
+		minecraft@1.0
+		lowcodefml@null
+		javafml@null
+	Mod List: 
+		client-1.20.1-20230612.114412-srg.jar             |Minecraft                     |minecraft                     |1.20.1              |DONE      |Manifest: a1:d4:5e:04:4f:d3:d6:e0:7b:37:97:cf:77:b0:de:ad:4a:47:ce:8c:96:49:5f:0a:cf:8c:ae:b2:6d:4b:8a:3f
+		cool-rain-reforged-1346978-7270440.jar            |Cool Rain                     |coolrain                      |1.0.3               |DONE      |Manifest: NOSIGNATURE
+		forge-1.20.1-47.4.20-universal.jar                |Forge                         |forge                         |47.4.20             |DONE      |Manifest: NOSIGNATURE
+		architectury-api-419699-5137938.jar               |Architectury                  |architectury                  |9.2.14              |DONE      |Manifest: NOSIGNATURE
+		gabous-libs-1367332-8280104.jar                   |gaboulibs                     |gaboulibs                     |1.8.1               |DONE      |Manifest: NOSIGNATURE
+		Forge-projectatmosphere-0.9.1.1-alpha.jar         |Project Atmosphere            |projectatmosphere             |0.9.1.1-alpha       |DONE      |Manifest: NOSIGNATURE
+	Crash Report UUID: 7c2ff253-2141-4cff-85d6-024413acc81e
+	FML: 47.4
+	Forge: net.minecraftforge:47.4.20

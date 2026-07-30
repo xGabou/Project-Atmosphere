@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = DhSupportPipeline.class, remap = false)
 public abstract class DhSupportPipelineDiagnosticsMixin {
     @Inject(method = "afterDistantHorizonsRender", at = @At("HEAD"))
-    private void projectatmosphere$beginDhPass(Minecraft mc, SimpleCloudsRenderer renderer, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, Frustum frustum, int dhFbo, CallbackInfo ci) {
+    private void projectatmosphere$beginDhPass(Minecraft mc, SimpleCloudsRenderer renderer, Matrix4f modelViewMat, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, Frustum frustum, int dhFbo, CallbackInfo ci) {
         CloudMeshGenerator generator = renderer.getMeshGenerator();
         CloudMeshGeneratorDiagnosticsAccessor accessor = (CloudMeshGeneratorDiagnosticsAccessor)(Object)generator;
         SimpleCloudsRenderDiagnostics.beginDhPipelinePass(
@@ -32,7 +32,7 @@ public abstract class DhSupportPipelineDiagnosticsMixin {
     }
 
     @Inject(method = "afterDistantHorizonsRender", at = @At("RETURN"))
-    private void projectatmosphere$endDhPass(Minecraft mc, SimpleCloudsRenderer renderer, com.mojang.blaze3d.vertex.PoseStack stack, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, Frustum frustum, int dhFbo, CallbackInfo ci) {
+    private void projectatmosphere$endDhPass(Minecraft mc, SimpleCloudsRenderer renderer, Matrix4f modelViewMat, Matrix4f projMat, float partialTick, double camX, double camY, double camZ, Frustum frustum, int dhFbo, CallbackInfo ci) {
         SimpleCloudsRenderDiagnostics.endDhPipelinePass();
     }
 

@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.mixin;
 
-import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -11,7 +10,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import sereneseasons.season.SeasonHooks;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 
 /**
  * Injected by Project Atmosphere to replace Serene Seasons'
@@ -28,17 +26,13 @@ public class SeasonHooksMixin {
     )
     private static void redirectTemperatureToAtmosphere(LevelReader level, BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
         // Only operate on the server to avoid client desyncs
+
         if (level instanceof ServerLevel serverLevel) {
 
             if(serverLevel.dimension() != Level.OVERWORLD) return;
-            // Build a BiomeInstanceKey for PA
-            BiomeInstanceKey key = new BiomeInstanceKey(
-                    serverLevel.getBiome(pos).unwrapKey().orElseThrow().location(),
-                    pos
-            );
 
             // Get real forecasted temperature
-            float temperature = ForecastOrchestrator.getCurrentTemperature(key, serverLevel.getDayTime());
+            float temperature = ForecastOrchestrator.getCurrentTemperature(serverLevel,pos, serverLevel.getDayTime());
 
             // If below 0°C → not warm enough to rain (means it’s freezing)
             if (temperature < 0.0F) {
@@ -52,9 +46,11 @@ public class SeasonHooksMixin {
                 if (level instanceof Level clientLevel) {
                     var biomeKey = clientLevel.getBiome(pos).unwrapKey().orElse(null);
                     if (biomeKey != null) {
-                        boolean freezing = BiomeClientTemperatureCache.isFreezing(biomeKey.location(), clientLevel);
-                        cir.setReturnValue(!freezing);
-                        cir.cancel();
+                        Boolean freezing = queryClientFreezing(biomeKey.location(), clientLevel);
+                        if (freezing != null) {
+                            cir.setReturnValue(!freezing);
+                            cir.cancel();
+                        }
                     }
                 }
             } catch (Throwable ignored) {
@@ -64,5 +60,17 @@ public class SeasonHooksMixin {
 
 
         // Otherwise let the original logic proceed (warm enough)
+    }
+
+    private static Boolean queryClientFreezing(net.minecraft.resources.ResourceLocation biomeId, Level level) {
+        String className = "net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache";
+        try {
+            Class<?> cacheClass = Class.forName(className, true, SeasonHooksMixin.class.getClassLoader());
+            return (Boolean) cacheClass
+                    .getMethod("isFreezing", net.minecraft.resources.ResourceLocation.class, Level.class)
+                    .invoke(null, biomeId, level);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            return null;
+        }
     }
 }

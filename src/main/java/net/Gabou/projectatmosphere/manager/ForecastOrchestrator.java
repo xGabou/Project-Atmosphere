@@ -1,28 +1,35 @@
 package net.Gabou.projectatmosphere.manager;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
+import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
+import net.Gabou.projectatmosphere.client.loading.IntegratedForecastLoadingBridge;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateSavedData;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericUpdateScheduler;
+import net.Gabou.projectatmosphere.modules.atmosphere.CycloneManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
+import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
+import net.Gabou.projectatmosphere.modules.atmosphere.WeakLowManager;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
+import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
+import net.Gabou.projectatmosphere.modules.weather.RegionalWeatherPhase;
+import net.Gabou.projectatmosphere.modules.weather.ServerWeatherStateResolver;
+import net.Gabou.projectatmosphere.modules.weathercell.WeatherCellManager;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.region.RegionOrchestratorBootstrap;
-import net.Gabou.projectatmosphere.modules.tornado.GlassDamageManager;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.Gabou.projectatmosphere.data.TornadoStorageManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneState;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoProbabilityManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
+import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
+import net.Gabou.projectatmosphere.network.NetworkHandler;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -32,11 +39,14 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public class ForecastOrchestrator {
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = ForecastGenerator.RADIUS / 2;
     private static long lastTornadoCheckTick = 0;
     private static final WindVector SAFE_DEFAULT_WIND = WindVector.fromBase(1f, 0f);
+
+    // Global regeneration gate: when true, dependents should skip or defer work
     private static volatile boolean REGENERATING = false;
     private static final java.util.concurrent.ConcurrentLinkedQueue<Runnable> POST_REGEN_QUEUE = new java.util.concurrent.ConcurrentLinkedQueue<>();
 
@@ -57,7 +67,7 @@ public class ForecastOrchestrator {
         }
     }
 
-    private static Map<UUID, Set<BiomeInstanceKey>> activePlayerBiomeKeys = new HashMap<>();
+    private static Map<UUID, Set<RegionInstanceKey>> activePlayerRegions = new HashMap<>();
 
     private static final boolean sandStormLoaded = CompatHandler.isSandStormsLoaded();
 
@@ -65,26 +75,67 @@ public class ForecastOrchestrator {
      * Called when the server starts
      */
     public static boolean onServerStart(ServerLevel level) {
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                "Loading atmosphere systems",
+                0.1F,
+                "server_start_begin"
+        );
         ForecastDataStorage.loadAll(level);
-        TornadoStorageManager.load(level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoStorageManager.load(level);
+        }
         ForecastGenerator.seed = level.getSeed();
         REGION_ORCHESTRATOR = RegionOrchestratorBootstrap.bootstrap(level);
-        AtmosphericStateRegistry.clear();
 
-        if (ForecastDataStorage.hasCenterData() && ForecastDataStorage.hasForecastData()) {
+        if (ForecastDataStorage.hasForecastData()) {
             try {
-                ForecastGenerator.generateForecastForSavedRegion(level);
-                WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
+                if (ForecastDataStorage.hasRegionForecastData()) {
+                    IntegratedForecastLoadingBridge.update(
+                            ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                            "Loading saved forecast regions",
+                            0.18F,
+                            "server_start_saved_regions"
+                    );
+                    WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+                } else {
+                    IntegratedForecastLoadingBridge.update(
+                            ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                            "Rebuilding saved forecast regions",
+                            0.18F,
+                            "server_start_rebuild_saved_regions"
+                    );
+                    ForecastGenerator.generateForecastForSavedRegion(level);
+                    WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+                }
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                        "Initializing weather systems",
+                        0.88F,
+                        "server_start_initialize_systems"
+                );
                 initializeDynamicSystems(level);
+                AtmosphericStateSavedData.restore(level);
                 return true;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 ProjectAtmosphere.LOGGER.error("[Atmosphere] Failed to load saved forecast data. Regenerating from spawn...", e);
 
                 ForecastDataStorage.clearAll(level);
                 ForecastGenerator.clearForecasts();
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                        "Rebuilding forecast data from spawn",
+                        0.22F,
+                        "server_start_regenerate_spawn"
+                );
                 ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
-                WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
+                WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                        "Initializing weather systems",
+                        0.88F,
+                        "server_start_initialize_systems"
+                );
                 initializeDynamicSystems(level);
                 return true;
             }
@@ -92,15 +143,36 @@ public class ForecastOrchestrator {
 
 
         if (!ForecastDataStorage.playerData.isEmpty()) {
+            int totalCenters = ForecastDataStorage.playerData.size();
+            int centerIndex = 0;
             for (BlockPos pos : ForecastDataStorage.playerData.values()) {
+                centerIndex++;
+                IntegratedForecastLoadingBridge.update(
+                        ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                        "Designing forecast region " + centerIndex + " / " + totalCenters,
+                        0.18F + (0.5F * centerIndex / Math.max(1.0F, (float) totalCenters)),
+                        "server_start_player_region_" + centerIndex
+                );
                 ForecastGenerator.generateForecastForRegion(pos, level);
             }
         } else {
+            IntegratedForecastLoadingBridge.update(
+                    ForecastLoadingStage.DESIGNING_FORECAST_REGIONS,
+                    "Designing forecast region 1 / 1",
+                    0.24F,
+                    "server_start_spawn_region"
+            );
             ForecastGenerator.generateForecastForRegion(level.getSharedSpawnPos(), level);
         }
-
-        WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
+        WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+        IntegratedForecastLoadingBridge.update(
+                ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                "Initializing weather systems",
+                0.88F,
+                "server_start_initialize_systems"
+        );
         initializeDynamicSystems(level);
+        AtmosphericStateSavedData.restore(level);
         return true;
     }
 
@@ -109,11 +181,13 @@ public class ForecastOrchestrator {
      * Called when the server stops
      */
     public static void onServerStop(ServerLevel level) {
+        AtmosphericStateSavedData.snapshot(level);
         ForecastDataStorage.saveAll(level);
-        TornadoStorageManager.save(level);
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            TornadoStorageManager.save(level);
+        }
         ForecastGenerator.clearForecasts();
         REGION_ORCHESTRATOR = null;
-        AtmosphericStateRegistry.clear();
     }
 
     /**
@@ -122,9 +196,17 @@ public class ForecastOrchestrator {
     public static void onPlayerLogin(ServerPlayer player, ServerLevel level) {
         UUID uuid = player.getUUID();
         BlockPos playerPos = player.blockPosition();
-        getNearbyBiomeKeys(level, player, 500);
-        long start = System.nanoTime();
-        if (!ForecastDataStorage.playerData.containsKey(uuid)) {
+        RegionInstanceKey playerRegion = RegionInstanceKey.from(playerPos);
+        sendLoginStage(player, "Collecting nearby forecast regions", 0.16F, "player_login_collect_regions");
+        ensureForecastRegionLoaded(level, playerRegion);
+        getNearbyRegions(level, player, 1000);
+        BlockPos savedCenter = ForecastDataStorage.playerData.get(uuid);
+        if (savedCenter != null && !RegionInstanceKey.from(savedCenter).equals(playerRegion)) {
+            ForecastDataStorage.playerData.put(uuid, playerPos);
+            clearActiveRegionsForPlayer(player);
+            getNearbyRegions(level, player, 1000);
+        }
+        if (savedCenter == null) {
             boolean shouldGenerate = true;
             for (BlockPos center : ForecastDataStorage.playerData.values()) {
                 if (center.distManhattan(playerPos) < MIN_DISTANCE_BETWEEN_CENTERS) {
@@ -134,18 +216,35 @@ public class ForecastOrchestrator {
             }
 
             if (shouldGenerate) {
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Player " + player.getName().getString());
                 ForecastDataStorage.playerData.put(uuid, playerPos);
-                SimpleCloudsCompat.doInitialGenWithWeather(playerPos.getX(), playerPos.getZ(), level);
+                sendLoginStage(player, "Seeding local weather systems", 0.28F, "player_login_seed_weather");
+                if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+                    ProjectAtmosphere.LOGGER.debug("[Atmosphere] Simple Clouds owns fresh-world cloud generation; skipping PA initial Simple Clouds seeding.");
+                }
             }
 
         }
-        SimpleCloudsCompat.setIsInit(true);
+        AtmosphereCloudServices.get().ensureCloudAtPosition(playerPos, level);
+        sendLoginStage(player, "Forecast regions ready", 0.38F, "player_login_regions_ready");
 
-        long end = System.nanoTime();
-        long durationMs = (end - start) / 1_000_000;
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Forecast data prepared for player {} in {} ms", player.getName().getString(), durationMs);
+    }
 
+    private static void ensureForecastRegionLoaded(ServerLevel level, RegionInstanceKey playerRegion) {
+        if (playerRegion == null) {
+            return;
+        }
+        if (ForecastGenerator.getRegionForecasts().containsKey(playerRegion)
+                && AtmosphericStateRegistry.getState(playerRegion) != null) {
+            return;
+        }
+        ForecastRegion region = getRegionOrchestrator(level).ensureLoaded(playerRegion);
+        if (region == null) {
+            return;
+        }
+        ForecastGenerator.putRegionForecast(region);
+        WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+        AtmosphericStateRegistry.rebuildNeighbors();
+        ProjectAtmosphere.LOGGER.info("[Atmosphere] Loaded missing player region {} during login.", playerRegion);
     }
 
     /**
@@ -156,30 +255,14 @@ public class ForecastOrchestrator {
     }
 
     public static RegionForecastOrchestrator getRegionOrchestrator(ServerLevel level) {
-        if (REGION_ORCHESTRATOR == null && level != null) {
+        if (REGION_ORCHESTRATOR == null) {
             REGION_ORCHESTRATOR = RegionOrchestratorBootstrap.bootstrap(level);
         }
         return REGION_ORCHESTRATOR;
     }
 
-    /**
-     * @return the currently bootstrapped region orchestrator, or null if the server has not started yet.
-     */
-    public static RegionForecastOrchestrator getRegionOrchestrator() {
-        return REGION_ORCHESTRATOR;
-    }
-
     public static ForecastRegion getRegionForecast(ServerLevel level, BlockPos pos) {
-        if (level == null || pos == null) {
-            return null;
-        }
-        RegionForecastOrchestrator orchestrator = getRegionOrchestrator(level);
-        if (orchestrator == null) {
-            return null;
-        }
-        ForecastRegion region = orchestrator.resolve(pos, level.dimension());
-        ensureAtmosphericState(region);
-        return region;
+        return getRegionOrchestrator(level).resolve(pos, level.dimension());
     }
 
     /**
@@ -189,9 +272,8 @@ public class ForecastOrchestrator {
         REGENERATING = true;
         try {
             ForecastGenerator.clearForecasts();
-            clearActiveBiomeKeys();
+            clearActiveRegions();
             ForecastDataStorage.playerData.clear();
-            AtmosphericStateRegistry.clear();
             List<ServerPlayer> players = AsyncAtmosphereService.callOnMainThread(level::players);
             Set<BlockPos> centers = new HashSet<>();
             for (Player player : players) {
@@ -212,8 +294,7 @@ public class ForecastOrchestrator {
                 ForecastGenerator.generateForecastForRegion(center, level);
             }
 
-            DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
-            WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
+            WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
             initializeDynamicSystems(level);
         } finally {
             REGENERATING = false;
@@ -225,87 +306,31 @@ public class ForecastOrchestrator {
     }
 
     /**
-     * Regenerates forecasts on season change without wiping cloud entities or player centers.
+     * Legacy entry point for season changes. Seasons now drift live atmosphere
+     * toward seasonal targets instead of rebuilding immutable forecast data.
      */
     public static void regenerateForSeason(ServerLevel level) {
         if (level == null) {
             return;
         }
-        REGENERATING = true;
-        try {
-            ForecastGenerator.clearForecasts();
-            clearActiveBiomeKeys();
-            AtmosphericStateRegistry.clear();
-            List<BlockPos> centers = new ArrayList<>();
-            if (!ForecastDataStorage.playerData.isEmpty()) {
-                centers.addAll(ForecastDataStorage.playerData.values());
-            } else {
-                centers.add(level.getSharedSpawnPos());
-            }
-
-            Set<BlockPos> uniqueCenters = new HashSet<>();
-            for (BlockPos center : centers) {
-                boolean tooClose = false;
-                for (BlockPos existingCenter : uniqueCenters) {
-                    if (existingCenter.distManhattan(center) < MIN_DISTANCE_BETWEEN_CENTERS) {
-                        tooClose = true;
-                        break;
-                    }
-                }
-                if (!tooClose) {
-                    uniqueCenters.add(center);
-                }
-            }
-
-            for (BlockPos center : uniqueCenters) {
-                ForecastGenerator.generateForecastForRegion(center, level);
-            }
-            WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
-            initializeDynamicSystems(level);
-        } finally {
-            REGENERATING = false;
-            Runnable r;
-            while ((r = POST_REGEN_QUEUE.poll()) != null) {
-                try { r.run(); } catch (Throwable ignored) { }
-            }
-        }
+        SeasonalAtmosphericDrift.onSeasonChanged(level);
     }
 
     /**
      * Called on profile swap (e.g. midnight transition)
      */
     public static void onSwapDay(ServerLevel level) {
-
-        boolean needsRegen = false;
-
-        for (Map.Entry<BiomeInstanceKey, BiomeForecast> entry : ForecastGenerator.getForecastMap().entrySet()) {
-            BiomeForecast forecast = entry.getValue();
-
-            boolean tempInvalid = forecast.getTemperature() == null || forecast.getTemperature().length < 2;
-            boolean humidityInvalid = forecast.getHumidity() == null || forecast.getHumidity().length < 2;
-            boolean pressureInvalid = forecast.getPressure() == null || forecast.getPressure().length < 2;
-            boolean stormInvalid = forecast.getStormChance() == null || forecast.getStormChance().length < 2;
-            boolean windInvalid = forecast.getWind() == null || forecast.getWind().length < 2;
-
-            if (tempInvalid || humidityInvalid || pressureInvalid || stormInvalid || windInvalid) {
-                needsRegen = true;
-                break;
-            }
-        }
-
-        if (needsRegen || ForecastGenerator.getForecastMap().isEmpty()) {
+        if (ForecastGenerator.getRegionForecasts().isEmpty()) {
             BlockPos spawn = level.getSharedSpawnPos();
-            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing or invalid. Regenerating forecast from spawn...");
+            ProjectAtmosphere.LOGGER.warn("[Atmosphere] Weekly forecast data missing. Regenerating forecast from spawn...");
             ForecastGenerator.generateForecastForRegion(spawn, level);
+            WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
+            initializeDynamicSystems(level);
             return;
         }
 
-        ForecastGenerator.swapToTomorrow();
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
-        WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
-        initializeDynamicSystems(level);
-
-
+        CycloneManager.onMidnight(level);
+        AtmosphericStateRegistry.rebuildNeighbors();
     }
 
 
@@ -314,123 +339,85 @@ public class ForecastOrchestrator {
      */
     public static void updateForecast(ServerLevel level, BlockPos center) {
         ForecastGenerator.generateForecastForRegion(center, level);
-        DailyForecastGenerator.scheduleGenerationForTodayAndTomorrow();
-        WindEngine.rebuildFromForecasts(ForecastGenerator.getForecastMap());
+        WindEngine.rebuildFromRegions(ForecastGenerator.getRegionForecasts());
         initializeDynamicSystems(level);
     }
 
 
     /**
-     * Get temperature for any biome
+     * Region-based temperature sampling. Preferred over biome APIs.
      */
-    public static float getCurrentTemperature(BiomeInstanceKey key, long tick) {
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
-        if (state != null) {
-            return state.getTemperature();
-        }
-        ForecastRegion region = resolveRegionForecast(key);
-        if (region != null && key != null && key.samplePos() != null) {
-            return region.sampleTemperature(Vec3.atCenterOf(key.samplePos()), tick);
-        }
-        return ForecastGenerator.getTemperatureValue(key, tick);
-    }
-
     public static float getCurrentTemperature(ServerLevel level, BlockPos pos, long tick) {
-        if (level == null || pos == null) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
             return 0f;
         }
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(RegionInstanceKey.from(pos));
-        if (state != null) {
-            return state.getTemperature();
-        }
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        return getCurrentTemperature(key, tick);
+        return region.sampleTemperature(getRegionOrchestrator(level).toRegionLocal(pos), tick)
+                + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
     }
 
+    /**
+     * Region-based humidity sampling. Preferred over biome APIs.
+     */
+    public static float getCurrentHumidity(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
+            return 0f;
+        }
+        return region.sampleHumidity(getRegionOrchestrator(level).toRegionLocal(pos), tick);
+    }
+
+    /**
+     * Region-based pressure sampling. Preferred over biome APIs.
+     */
+    public static float getCurrentPressure(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
+        if (region == null) {
+            return 0f;
+        }
+        return region.samplePressure(tick);
+    }
+
+    /**
+     * Region-key temperature sampling. Phase 3 target API for runtime consumers.
+     */
     public static float getCurrentTemperature(RegionInstanceKey regionKey, long tick) {
         RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
         if (state != null) {
             return state.getTemperature();
         }
-        ForecastRegion region = resolveRegionForecast(regionKey);
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
         if (region != null) {
-            return region.sampleTemperature(Vec3.atCenterOf(regionKey.center()), tick);
+            return region.sampleTemperature(new Vec3(regionKey.regionSize() / 2.0, 0.0, regionKey.regionSize() / 2.0), tick)
+                    + SeasonalAtmosphericDrift.currentTemperatureOffsetC();
         }
         return 0f;
     }
 
     /**
-     * Get humidity for any biome
+     * Region-key humidity sampling. Phase 3 target API for runtime consumers.
      */
-    public static float getCurrentHumidity(BiomeInstanceKey key, long tick) {
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
-        if (state != null) {
-            return state.getHumidity();
-        }
-        ForecastRegion region = resolveRegionForecast(key);
-        if (region != null && key != null && key.samplePos() != null) {
-            return region.sampleHumidity(Vec3.atCenterOf(key.samplePos()), tick);
-        }
-        return ForecastGenerator.getHumidityValue(key, tick);
-    }
-
-    public static float getCurrentHumidity(ServerLevel level, BlockPos pos, long tick) {
-        if (level == null || pos == null) {
-            return 0f;
-        }
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(RegionInstanceKey.from(pos));
-        if (state != null) {
-            return state.getHumidity();
-        }
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        return getCurrentHumidity(key, tick);
-    }
-
     public static float getCurrentHumidity(RegionInstanceKey regionKey, long tick) {
         RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
         if (state != null) {
             return state.getHumidityPercent();
         }
-        ForecastRegion region = resolveRegionForecast(regionKey);
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
         if (region != null) {
-            return region.sampleHumidity(Vec3.atCenterOf(regionKey.center()), tick);
+            return region.sampleHumidity(new Vec3(regionKey.regionSize() / 2.0, 0.0, regionKey.regionSize() / 2.0), tick);
         }
         return 0f;
     }
 
     /**
-     * Get pressure for any biome
+     * Region-key pressure sampling. Phase 3 target API for runtime consumers.
      */
-    public static float getCurrentPressure(BiomeInstanceKey key, long tick) {
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
-        if (state != null) {
-            return state.getPressure();
-        }
-        ForecastRegion region = resolveRegionForecast(key);
-        if (region != null) {
-            return region.samplePressure(tick);
-        }
-        return ForecastGenerator.getPressureValue(key, tick);
-    }
-
-    public static float getCurrentPressure(ServerLevel level, BlockPos pos, long tick) {
-        if (level == null || pos == null) {
-            return 0f;
-        }
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(RegionInstanceKey.from(pos));
-        if (state != null) {
-            return state.getPressure();
-        }
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        return getCurrentPressure(key, tick);
-    }
-
     public static float getCurrentPressure(RegionInstanceKey regionKey, long tick) {
         RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
         if (state != null) {
             return state.getPressure();
         }
-        ForecastRegion region = resolveRegionForecast(regionKey);
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
         if (region != null) {
             return region.samplePressure(tick);
         }
@@ -438,135 +425,21 @@ public class ForecastOrchestrator {
     }
 
     /**
-     * Get wind for any biome
+     * Region-based wind sampling. Preferred over biome APIs.
      */
-    public static WindVector getCurrentWind(BiomeInstanceKey key, long tick) {
-        return getWind(key, tick);
-    }
-
-    public static float getCurrentStormChance(BiomeInstanceKey key, long tick) {
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
-        if (state == null) {
-            return ForecastGenerator.getStormChanceValue(key, tick);
-        }
-
-        float rain = Math.min(1f, state.getRainIntensity());
-        float cloud = state.getCloudCover();
-        float wind = Math.min(1f, state.getWindStrength() / 18f);
-        float lowPressure = Math.min(1f, Math.max(0f, (1013.25f - state.getPressure()) / 55f));
-
-        float combined = (rain * 0.45f)
-                + (cloud * 0.3f)
-                + (wind * 0.15f)
-                + (lowPressure * 0.1f);
-
-        return Math.max(0f, Math.min(1f, combined));
-    }
-
-    public static float getCurrentStormChance(RegionInstanceKey regionKey, long tick) {
-        RegionAtmosphereState state = AtmosphericStateRegistry.getState(regionKey);
-        if (state != null) {
-            float rain = Math.min(1f, state.getRainIntensity());
-            float cloud = state.getCloudCover();
-            float wind = Math.min(1f, state.getWindStrength() / 18f);
-            float lowPressure = Math.min(1f, Math.max(0f, (1013.25f - state.getPressure()) / 55f));
-            return Math.max(0f, Math.min(1f, (rain * 0.45f) + (cloud * 0.3f) + (wind * 0.15f) + (lowPressure * 0.1f)));
-        }
-        ForecastRegion region = resolveRegionForecast(regionKey);
-        return region == null ? 0f : region.sampleStorm(tick);
-    }
-
-    public static void tick(ServerLevel level) {
-        if (isRegenerating()) {
-            return;
-        }
-        GlassDamageManager.tick(level);
-
-        // Ensure we have dynamic region state for anything players are currently influencing.
-        Set<BiomeInstanceKey> activeKeys = getActiveBiomeKeys(level);
-        ensureRegionStates(level, activeKeys);
-
-        AtmosphericUpdateScheduler.tick(level);
-        WindVector.update(level);
-        WindEngine.tick(level, activeKeys);
-
-        long now = level.getGameTime();
-        if (now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f) && !level.players().isEmpty()) {
-            lastTornadoCheckTick = now;
-            if (REGENERATING) {
-                runAfterRegen(() -> AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level)));
-            } else {
-                ProjectAtmosphere.LOGGER.info("[Atmosphere] Checking for tornadoes...");
-                AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level));
-            }
-        }
-
-    }
-
-    public static Set<BiomeInstanceKey> getActiveBiomeKeys(ServerLevel level) {
-        Set<BiomeInstanceKey> active = new HashSet<>(AtmosphericStateRegistry.getActiveBiomeKeys());
-        if (active.isEmpty() && !activePlayerBiomeKeys.isEmpty()) {
-            activePlayerBiomeKeys.values().forEach(active::addAll);
-        }
-        return active;
-    }
-
-
-    public static Set<BiomeInstanceKey> getActiveBiomeKeysForPlayer(ServerLevel level, ServerPlayer player) {
-        UUID uuid = player.getUUID();
-        if (activePlayerBiomeKeys.containsKey(uuid)) {
-            return activePlayerBiomeKeys.get(uuid);
-
-        }
-        return Collections.emptySet();
-
-    }
-
-    public static void getNearbyBiomeKeys(ServerLevel level, ServerPlayer player, double radius) {
-        Vec3 center = Vec3.atCenterOf(player.blockPosition());
-        double radiusSq = radius * radius;
-        Set<BiomeInstanceKey> get = getActiveBiomeKeysForPlayer(level, player);
-        if (!get.isEmpty()) {
-            return;
-        }
-        get = ForecastGenerator.getForecastMap().keySet().stream()
-                .filter(key -> key.samplePos() != null &&
-                        key.samplePos().distToCenterSqr(center.x, center.y, center.z) <= radiusSq)
-                .collect(Collectors.toSet());
-        activePlayerBiomeKeys.put(player.getUUID(), get);
-    }
-
-    public static void clearActiveBiomeKeysForPlayer(ServerPlayer player) {
-        activePlayerBiomeKeys.remove(player.getUUID());
-    }
-
-    public static void clearActiveBiomeKeys() {
-        activePlayerBiomeKeys.clear();
+    @Deprecated
+    public static WindVector getCurrentWind(BlockPos pos, long tick) {
+        return getWind(pos, tick);
     }
 
     /**
      * Canonical wind selector: dynamic state if available, forecast fallback, then safe default.
      */
-    public static WindVector getWind(BiomeInstanceKey key, long tick) {
-        if (key == null) {
-            return SAFE_DEFAULT_WIND;
-        }
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        return selectWind(regionKey, tick);
-    }
-
-    /**
-     * Canonical wind selector: dynamic state if available, forecast fallback, then safe default.
-     */
-    public static WindVector getWind(ServerLevel level, BlockPos pos, long tick) {
+    public static WindVector getWind(BlockPos pos, long tick) {
         if (pos == null) {
             return SAFE_DEFAULT_WIND;
         }
         RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
-        if (level != null) {
-            // Ensure region is loaded so downstream systems have a chance to initialize state.
-            getRegionForecast(level, pos);
-        }
         return selectWind(regionKey, tick);
     }
 
@@ -580,11 +453,11 @@ public class ForecastOrchestrator {
     /**
      * Explicit forecast wind access (no dynamic state).
      */
-    public static WindVector getForecastWind(BiomeInstanceKey key, long tick) {
-        if (key == null) {
+    public static WindVector getForecastWind(ServerLevel level, BlockPos pos, long tick) {
+        if (pos == null) {
             return SAFE_DEFAULT_WIND;
         }
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
         return getForecastWind(regionKey, tick);
     }
 
@@ -605,38 +478,7 @@ public class ForecastOrchestrator {
         if (forecast != null) {
             return forecast;
         }
-        if (regionKey == null) {
-            return SAFE_DEFAULT_WIND;
-        }
-        WindVector.WindSample sample = WindVector.getOrFallback(regionKey);
-        float angle = (float) Math.toRadians(sample.directionDeg());
-        return new WindVector(sample.speedMps(), angle, sample.speedMps());
-    }
-
-    private static ForecastRegion resolveRegionForecast(BiomeInstanceKey key) {
-        if (key == null) {
-            return null;
-        }
-        RegionInstanceKey regionKey = AtmosphericStateRegistry.resolveRegionKey(key);
-        if (regionKey == null || REGION_ORCHESTRATOR == null) {
-            return null;
-        }
-        try {
-            return REGION_ORCHESTRATOR.ensureLoaded(regionKey);
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static ForecastRegion resolveRegionForecast(RegionInstanceKey key) {
-        if (key == null || REGION_ORCHESTRATOR == null) {
-            return null;
-        }
-        try {
-            return REGION_ORCHESTRATOR.ensureLoaded(key);
-        } catch (Throwable ignored) {
-            return null;
-        }
+        return SAFE_DEFAULT_WIND;
     }
 
     private static WindVector getDynamicWind(RegionInstanceKey regionKey) {
@@ -652,19 +494,19 @@ public class ForecastOrchestrator {
     }
 
     private static WindVector getForecastWindInternal(RegionInstanceKey regionKey, long tick) {
-        if (regionKey == null || REGION_ORCHESTRATOR == null) {
+        if (regionKey == null) {
             return null;
         }
-        try {
-            ForecastRegion region = REGION_ORCHESTRATOR.ensureLoaded(regionKey);
-            if (region == null) {
-                return null;
-            }
-            WindVector wind = region.sampleWind(tick);
-            return isValidWind(wind) ? wind : null;
-        } catch (Throwable ignored) {
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region == null) {
             return null;
         }
+        WindVector[] windWeek = region.getWind();
+        if (windWeek == null || windWeek.length == 0) {
+            return null;
+        }
+        WindVector wind = region.sampleWind(tick);
+        return isValidWind(wind) ? wind : null;
     }
 
     private static boolean isDynamicAvailable(WindVector wind) {
@@ -683,66 +525,149 @@ public class ForecastOrchestrator {
                 && Float.isFinite(wind.angleRadians());
     }
 
-    private static void ensureRegionStates(ServerLevel level, Set<BiomeInstanceKey> activeKeys) {
-        if (level == null || activeKeys == null || activeKeys.isEmpty()) {
-            return;
+    public static float getCurrentStormChance(RegionInstanceKey regionKey, long tick) {
+        var state = AtmosphericStateRegistry.getState(regionKey);
+        if (state != null) {
+            return computeStormChance(state);
         }
-        RegionForecastOrchestrator orchestrator = getRegionOrchestrator(level);
-        if (orchestrator == null) {
-            return;
+        ForecastRegion region = ForecastGenerator.getRegionForecasts().get(regionKey);
+        if (region != null) {
+            return region.sampleStorm(tick);
         }
-        boolean added = false;
-        Set<RegionInstanceKey> regionKeys = new HashSet<>();
-        for (BiomeInstanceKey key : activeKeys) {
-            if (key == null || key.samplePos() == null) {
-                continue;
-            }
-            regionKeys.add(RegionInstanceKey.from(key.samplePos()));
-        }
-        for (RegionInstanceKey regionKey : regionKeys) {
-            if (AtmosphericStateRegistry.getState(regionKey) != null) {
-                continue;
-            }
-            ForecastRegion forecast = orchestrator.ensureLoaded(regionKey);
-            if (forecast != null) {
-                AtmosphericStateRegistry.initializeState(regionKey, forecast);
-                added = true;
-            }
-        }
-        if (added) {
-            AtmosphericStateRegistry.rebuildNeighbors();
-        }
+        return 0f;
     }
 
-    private static void ensureAtmosphericState(ForecastRegion region) {
+    public static RegionalWeatherPhase getWeatherPhase(ServerLevel level, RegionInstanceKey key, long tick) {
+        return ServerWeatherStateResolver.resolve(level, key, tick);
+    }
+
+    private static float computeStormChance(RegionAtmosphereState state) {
+        float rain = Math.min(1f, state.getRainIntensity());
+        float cloud = state.getCloudCover();
+        float wind = Math.min(1f, state.getWindStrength() / 18f);
+        float lowPressure = Math.min(1f, Math.max(0f, (1013.25f - state.getPressure()) / 55f));
+
+        float combined = (rain * 0.45f)
+                + (cloud * 0.3f)
+                + (wind * 0.15f)
+                + (lowPressure * 0.1f);
+
+        return Math.max(0f, Math.min(1f, combined));
+    }
+
+    /**
+     * Region-based storm factor sampling. Preferred over biome APIs.
+     */
+    public static float getCurrentStormChance(ServerLevel level, BlockPos pos, long tick) {
+        ForecastRegion region = getRegionForecast(level, pos);
         if (region == null) {
+            return 0f;
+        }
+        return region.sampleStorm(tick);
+    }
+
+    public static void tick(ServerLevel level) {
+        if(isRegenerating())
+            return;
+        GlassDamageManager.tick(level);
+        if (sandStormLoaded)
+            SandStormManager.tickSandstormScheduler(level);
+
+        SeasonalAtmosphericDrift.tick(level);
+        AtmosphericUpdateScheduler.tick(level);
+        WeakLowManager.tick(level);
+        WeatherCellManager.tick(level);
+        Set<RegionInstanceKey> activeRegions = getActiveRegions(level);
+        OceanBasinManager.update(level, activeRegions);
+        CycloneManager.update(level);
+        WindVector.update(level);
+        AtmosphereCloudServices.get().updateForecastClouds(level);
+        WindEngine.tick(level, activeRegions);
+
+        long now = level.getGameTime();
+        if (AtmosphereCloudServices.isSimpleCloudsLoaded()
+                && now - lastTornadoCheckTick >= (long) (AtmoCommonConfig.TORNADO_CHECK_INTERVAL_SEC.get().floatValue() * 20f)
+                && !level.players().isEmpty()) {
+            lastTornadoCheckTick = now;
+            if (REGENERATING) {
+                runAfterRegen(() -> AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level)));
+            } else {
+                AsyncAtmosphereService.runStorm(() -> TornadoProbabilityManager.onScheduledCheck(level));
+            }
+        }
+
+    }
+    public static Set<RegionInstanceKey> getActiveRegions(ServerLevel level) {
+        Set<RegionInstanceKey> active = new HashSet<>(AtmosphericStateRegistry.getActiveStates());
+        if (active.isEmpty() && !activePlayerRegions.isEmpty()) {
+            activePlayerRegions.values().forEach(active::addAll);
+        }
+        return active;
+    }
+
+    public static Set<RegionInstanceKey> getActiveRegionsForPlayer(ServerLevel level, ServerPlayer player) {
+        Set<RegionInstanceKey> active = new HashSet<>();
+        BlockPos pos = player.blockPosition();
+        double radiusSq = 1000d * 1000d;
+        for (RegionInstanceKey key : AtmosphericStateRegistry.getActiveStates()) {
+            if (key == null) {
+                continue;
+            }
+            BlockPos center = key.center();
+            if (key.contains(pos) || center.distToCenterSqr(pos.getX(), pos.getY(), pos.getZ()) <= radiusSq) {
+                active.add(key);
+            }
+        }
+        return active;
+    }
+
+
+    public static void getNearbyRegions(ServerLevel level, ServerPlayer player, double radius) {
+        Vec3 center = Vec3.atCenterOf(player.blockPosition());
+        double radiusSq = radius * radius;
+        Set<RegionInstanceKey> regions = getActiveRegionsForPlayer(level, player);
+        if (!regions.isEmpty()) {
+            activePlayerRegions.put(player.getUUID(), regions);
             return;
         }
-        RegionInstanceKey key = region.getKey();
-        if (key == null) {
-            return;
-        }
-        if (AtmosphericStateRegistry.getState(key) != null) {
-            return;
-        }
-        AtmosphericStateRegistry.initializeState(key, region);
-        AtmosphericStateRegistry.rebuildNeighbors();
+
+        regions = ForecastGenerator.getRegionForecasts().keySet().stream()
+                .filter(key -> key != null)
+                .filter(key -> {
+                    BlockPos regionCenter = key.center();
+                    return key.contains(player.blockPosition())
+                            || regionCenter.distToCenterSqr(center.x, center.y, center.z) <= radiusSq;
+                })
+                .collect(Collectors.toSet());
+        activePlayerRegions.put(player.getUUID(), regions);
+    }
+
+    public static void clearActiveRegionsForPlayer(ServerPlayer player) {
+        activePlayerRegions.remove(player.getUUID());
+    }
+
+    public static void clearActiveRegions() {
+        activePlayerRegions.clear();
     }
 
     private static void initializeDynamicSystems(ServerLevel level) {
         AtmosphericStateRegistry.rebuildNeighbors();
-        AtmosphericStateRegistry.rebuildActiveStates(level);
+        AtmosphereCloudServices.get().initializeForecastClouds(level);
+        WeakLowManager.initialize(level);
+        CycloneManager.initialize(level);
+        OceanBasinManager.initialize(level);
     }
 
-
-    public static HurricaneState getActiveHurricane() {
-        var hurricanes = HurricaneManager.getActiveHurricanes();
-        if (hurricanes.isEmpty()) {
-            return null;
-        }
-
-        var h = hurricanes.get(0);
-        return new HurricaneState(h.position.x, h.position.z, h.radius, h.radius * 0.5);
+    private static void sendLoginStage(ServerPlayer player, String subtext, float progress, String source) {
+        PacketDistributor.sendToPlayer(
+                player,
+                ForecastLoadingStatusPacket.status(
+                        ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
+                        null,
+                        subtext,
+                        progress,
+                        source
+                )
+        );
     }
-
 }

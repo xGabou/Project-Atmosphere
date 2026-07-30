@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.simulation;
 
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
+import net.minecraft.util.Mth;
 import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.NotNull;
 
@@ -42,6 +43,7 @@ final class CloudRegionLifecycleController {
 
             cluster.setGrowth(growth);
             cluster.setDecay(decay);
+            changed |= integrateGrowth(level, cluster, growth, decay);
 
             if (nextAge >= lifetime) {
                 cluster.setActive(false);
@@ -93,5 +95,52 @@ final class CloudRegionLifecycleController {
         }
 
         return 1.0F - ((float) remainingTicks / (float) DEFAULT_DECAY_DURATION_TICKS);
+    }
+
+    private boolean integrateGrowth(@NotNull ServerLevel level, @NotNull CloudClusterState cluster, float growth, float decay) {
+        float beforeRadius = cluster.getRadius();
+        float beforeCoverage = cluster.getCoverage();
+        float beforeDensity = cluster.getDensity();
+
+        float targetRadius = Math.min(CloudClusterState.RADIUS_CAP, Math.max(1.0F, cluster.getTargetRadius()));
+        float desiredRadius = Mth.lerp(growth, cluster.getSpawnRadius(), targetRadius);
+        if (targetRadius >= beforeRadius) {
+            desiredRadius = Math.max(beforeRadius, desiredRadius);
+        }
+        desiredRadius = Math.min(CloudClusterState.RADIUS_CAP, Math.max(1.0F, desiredRadius));
+
+        float targetCoverage = cluster.getTargetCoverage();
+        float targetDensity = cluster.getTargetDensity();
+        float desiredCoverage = Mth.lerp(0.08F, beforeCoverage, Mth.lerp(growth, beforeCoverage, targetCoverage));
+        float desiredDensity = Mth.lerp(0.08F, beforeDensity, Mth.lerp(growth, beforeDensity, targetDensity));
+
+        if (decay > 0.0F) {
+            float fade = 1.0F - (decay * 0.65F);
+            desiredCoverage = Mth.clamp(desiredCoverage * fade, 0.0F, 1.0F);
+            desiredDensity = Mth.clamp(desiredDensity * fade, 0.0F, 1.0F);
+        }
+
+        float radiusDelta = desiredRadius - beforeRadius;
+        boolean radiusChanged = Math.abs(radiusDelta) > 0.001F;
+        boolean coverageChanged = Math.abs(desiredCoverage - beforeCoverage) > 0.0005F;
+        boolean densityChanged = Math.abs(desiredDensity - beforeDensity) > 0.0005F;
+
+        if (radiusChanged) {
+            cluster.setRadius(desiredRadius);
+        }
+        if (coverageChanged) {
+            cluster.setCoverage(desiredCoverage);
+        }
+        if (densityChanged) {
+            cluster.setDensity(desiredDensity);
+        }
+
+        cluster.setLastGrowthRate(radiusDelta);
+        if (radiusChanged || coverageChanged || densityChanged) {
+            cluster.setLastGrowthTick(level.getGameTime());
+            return true;
+        }
+
+        return false;
     }
 }

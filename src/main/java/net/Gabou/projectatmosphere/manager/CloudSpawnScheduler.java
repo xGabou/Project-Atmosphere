@@ -1,15 +1,15 @@
 package net.Gabou.projectatmosphere.manager;
 
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-@Mod.EventBusSubscriber
+@EventBusSubscriber
 public class CloudSpawnScheduler {
     private static final List<ScheduledSpawn> tasks = new ArrayList<>();
 
@@ -18,9 +18,7 @@ public class CloudSpawnScheduler {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-
+    public static void onServerTick(ServerTickEvent.Post event) {
         Iterator<ScheduledSpawn> iterator = tasks.iterator();
         while (iterator.hasNext()) {
             ScheduledSpawn s = iterator.next();

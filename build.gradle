@@ -115,14 +115,7 @@ neoForge {
 
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
-def neoforgeUnportedSources = file('docs/neoforge_1_21_1_unported_sources.txt')
-if (neoforgeUnportedSources.exists()) {
-    // Compile staging only: files may be removed from this list only after behavioral parity review is logged.
-    sourceSets.main.java.exclude(neoforgeUnportedSources.readLines().findAll { it && !it.startsWith('#') })
-}
 dependencies {
-    // PA-NEOFORGE-TODO: Restore the Mixin annotation processor after Forge-era mixin targets are ported to 1.21.1 names.
-    // annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     implementation "curse.maven:serene-seasons-291874:6182596"
     implementation "curse.maven:glitchcore-955399:5660740"
     implementation "curse.maven:betterdays-895618:7294209"
@@ -137,6 +130,9 @@ dependencies {
     implementation "curse.maven:rainboows-1121832:6416604"
     implementation "curse.maven:gabous-libs-1367332:7195722"
     implementation "curse.maven:architectury-api-419699:5786327"
+    compileOnly "curse.maven:dynamictrees-252818:7197017"
+    compileOnly "curse.maven:ecliptic-seasons-1118306:6303967"
+    compileOnly "curse.maven:legendary-survival-overhaul-840254:7215072"
 
 }
 

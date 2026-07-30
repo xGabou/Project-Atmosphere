@@ -1,0 +1,23 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "zero",
+    "srcalpha": "one",
+    "dstalpha": "zero"
+  },
+  "vertex": "projectatmosphere:cloud_volume",
+  "fragment": "projectatmosphere:cloud_weather_cumulus_layers",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [],
+  "uniforms": [
+    { "name": "WeatherOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "WeatherExtent", "type": "float", "count": 1, "values": [ 4096.0 ] },
+    { "name": "WeatherCoverageScale", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "CellCount", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "OutputMode", "type": "int", "count": 1, "values": [ 0 ] }
+  ]
+}

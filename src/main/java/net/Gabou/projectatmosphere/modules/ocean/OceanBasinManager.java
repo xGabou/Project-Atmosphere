@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.ocean;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
@@ -61,7 +62,7 @@ public final class OceanBasinManager {
                         BASINS.put(basin.getId(), basin);
                     }
                     READY.set(true);
-                    if(ProjectAtmosphere.DEBUG_MODE)
+                    if (AtmoCommonConfig.DEBUG_MODE.get())
                         ProjectAtmosphere.LOGGER.info("[Ocean] Detected {} basins", basins.size());
                 })
                 .exceptionally(ex -> {

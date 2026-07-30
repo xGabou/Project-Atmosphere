@@ -2,11 +2,10 @@ package net.Gabou.projectatmosphere.util;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.async.PoolType;
-import net.minecraft.client.Minecraft;
-import net.minecraft.server.MinecraftServer;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.neoforged.fml.LogicalSide;
+import net.neoforged.neoforge.common.util.LogicalSidedProvider;
 import net.neoforged.fml.util.thread.EffectiveSide;
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.Objects;
 import java.util.concurrent.*;
@@ -23,7 +22,7 @@ import java.util.function.Consumer;
  *
  * Call once at boot:
  *   AsyncAtmosphereService.init(isClient-> true|false);
- */
+        */
 public final class AsyncAtmosphereService {
 
     private static volatile boolean initialized = false;
@@ -47,6 +46,9 @@ public final class AsyncAtmosphereService {
 
     private AsyncAtmosphereService() {}
 
+    // ---------------------------------------------------------------------
+    // Bootstrap
+    // ---------------------------------------------------------------------
     /** prefer this: we’ll size pools using the detected SystemProfile */
     public static void init(boolean isClient) {
         if (initialized) return;
@@ -61,7 +63,7 @@ public final class AsyncAtmosphereService {
             final boolean goodGpu = profile.isGoodEnoughGPU();
 
             // choose mode
-            final boolean USE_SHARED = lowSpec || cpu <= 4;
+            final boolean USE_SHARED = AtmoCommonConfig.FORCE_SHARED_EXECUTOR.get() || lowSpec || cpu <= 4;
             final boolean SPLIT_POOLS = !USE_SHARED;
 
             // queue caps: smaller on low-mem
@@ -146,7 +148,9 @@ public final class AsyncAtmosphereService {
         init(false);
     }
 
-    // ----------------- public API (unchanged) -----------------
+    // ---------------------------------------------------------------------
+    // Public API
+    // ---------------------------------------------------------------------
 
     public static void runStorm(Runnable task) {
         ensureInit();
@@ -197,43 +201,18 @@ public final class AsyncAtmosphereService {
      */
     public static void runOnMainThread(Runnable task) {
         Objects.requireNonNull(task, "task");
-        if (EffectiveSide.get() == LogicalSide.CLIENT) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null) {
-                mc.execute(task);
-            } else {
-                ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] Tried to schedule on client thread but Minecraft was null");
-            }
-        } else {
-            MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
-            if (server != null) {
-                server.execute(task);
-            } else {
-                ProjectAtmosphere.LOGGER.warn("[AsyncAtmosphere] Tried to schedule on server thread but server was null");
-            }
-        }
+        LogicalSidedProvider.WORKQUEUE.get(EffectiveSide.get()).execute(task);
     }
 
     public static <T> T callOnMainThread(Callable<T> task) {
         Objects.requireNonNull(task, "task");
 
-        if (EffectiveSide.get() == LogicalSide.CLIENT) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null) {
-                try {
-                    return task.call(); // already on client thread
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        } else if (EffectiveSide.get() == LogicalSide.SERVER) {
-            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-            if (server != null && server.isSameThread()) {
-                try {
-                    return task.call(); // already on server thread
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
+        var workQueue = LogicalSidedProvider.WORKQUEUE.get(EffectiveSide.get());
+        if (workQueue.isSameThread()) {
+            try {
+                return task.call();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
 
@@ -291,8 +270,9 @@ public final class AsyncAtmosphereService {
         }, pool.name()));
     }
 
-
-    // ----------------- helpers -----------------
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
 
     private static void ensureInit() {
         if (!initialized) init(false);

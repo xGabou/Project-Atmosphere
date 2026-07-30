@@ -3,13 +3,13 @@ package net.Gabou.projectatmosphere.modules.wind;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.region.RegionIdCodec;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,24 +24,57 @@ public final class WindEngine {
 
     private WindEngine() { }
 
-    public static void rebuildFromForecasts(Map<BiomeInstanceKey, BiomeForecast> biomeForecasts) {
+    public static void rebuildFromRegions(Map<RegionInstanceKey, ForecastRegion> regionForecasts) {
         FORECASTS.clear();
-        biomeForecasts.forEach((key, forecast) -> {
-            RegionInstanceKey id = RegionIdCodec.ofBlockPos(key.samplePos());
-            FORECASTS.put(id, WindForecast.fromBiomeForecast(forecast));
-        });
+        regionForecasts.forEach((key, forecast) -> FORECASTS.put(key, WindForecast.fromRegionForecast(forecast)));
     }
 
-    public static void tick(ServerLevel level, Set<BiomeInstanceKey> activeKeys) {
+    public static CompoundTag savePersistentState() {
+        CompoundTag root = new CompoundTag();
+        ListTag states = new ListTag();
+        for (Map.Entry<RegionInstanceKey, WindRuntimeState> entry : STATES.entrySet()) {
+            RegionInstanceKey key = entry.getKey();
+            WindRuntimeState state = entry.getValue();
+            if (key == null || state == null) {
+                continue;
+            }
+            CompoundTag stateTag = new CompoundTag();
+            stateTag.put("Region", saveRegionKey(key));
+            stateTag.put("State", state.save());
+            states.add(stateTag);
+        }
+        root.put("States", states);
+        return root;
+    }
+
+    public static void loadPersistentState(CompoundTag root) {
+        STATES.clear();
+        if (root == null || root.isEmpty()) {
+            return;
+        }
+        ListTag states = root.getList("States", Tag.TAG_COMPOUND);
+        for (int i = 0; i < states.size(); i++) {
+            CompoundTag stateTag = states.getCompound(i);
+            RegionInstanceKey key = loadRegionKey(stateTag.getCompound("Region"));
+            if (key == null || !FORECASTS.containsKey(key)) {
+                continue;
+            }
+            STATES.put(key, WindRuntimeState.load(stateTag.getCompound("State")));
+        }
+    }
+
+    public static void tick(ServerLevel level, Set<RegionInstanceKey> activeKeys) {
         long now = level.getGameTime();
-        for (BiomeInstanceKey key : activeKeys) {
-            RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
+        for (RegionInstanceKey regionId : activeKeys) {
+            if (regionId == null) {
+                continue;
+            }
             WindForecast forecast = FORECASTS.get(regionId);
             if (forecast == null) {
                 continue;
             }
             WindRuntimeState runtime = STATES.computeIfAbsent(regionId, k -> new WindRuntimeState());
-            float stormChance = ForecastOrchestrator.getCurrentStormChance(key, now);
+            float stormChance = ForecastOrchestrator.getCurrentStormChance(regionId, now);
 
             WindVector high = HighWindModel.sample(forecast, runtime, now);
             WindVector low = LowWindModel.sample(forecast, runtime, now, stormChance);
@@ -53,14 +86,8 @@ public final class WindEngine {
 
             WindVector.WindSample sample = new WindVector.WindSample(low.baseSpeed(),
                     (float) Math.toDegrees(low.angleRadians()));
-            RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
-            WindVector.set(regionKey, sample.speedMps(), sample.directionDeg());
+            WindVector.set(regionId, sample.speedMps(), sample.directionDeg());
         }
-    }
-
-    public static WindVector getCurrentHighWindVector(BiomeInstanceKey key, long worldTime) {
-        RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
-        return getCurrentHighWindVector(regionId, worldTime);
     }
 
     public static WindVector getCurrentHighWindVector(RegionInstanceKey regionId, long worldTime) {
@@ -72,11 +99,6 @@ public final class WindEngine {
         return HighWindModel.sample(forecast, runtime, worldTime);
     }
 
-    public static WindVector getCurrentLowWindVector(BiomeInstanceKey key, long worldTime) {
-        RegionInstanceKey regionId = RegionIdCodec.ofBlockPos(key.samplePos());
-        return getCurrentLowWindVector(regionId, worldTime, ForecastOrchestrator.getCurrentStormChance(key, worldTime));
-    }
-
     public static WindVector getCurrentLowWindVector(RegionInstanceKey regionId, long worldTime, float stormChance) {
         WindRuntimeState runtime = STATES.computeIfAbsent(regionId, k -> new WindRuntimeState());
         WindForecast forecast = FORECASTS.get(regionId);
@@ -86,12 +108,19 @@ public final class WindEngine {
         return LowWindModel.sample(forecast, runtime, worldTime, stormChance);
     }
 
-    public static boolean isGustActive(BiomeInstanceKey key) {
-        WindRuntimeState runtime = STATES.get(RegionIdCodec.ofBlockPos(key.samplePos()));
-        return runtime != null && runtime.isGustActive();
+    private static CompoundTag saveRegionKey(RegionInstanceKey key) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("RegionX", key.regionX());
+        tag.putInt("RegionZ", key.regionZ());
+        tag.putInt("RegionSize", key.regionSize());
+        return tag;
     }
 
-    public static TornadoWindModel.TornadoForces getCurrentTornadoForce(Vec3 position) {
-        return TornadoWindModel.compute(position);
+    private static RegionInstanceKey loadRegionKey(CompoundTag tag) {
+        if (tag == null || !tag.contains("RegionX", Tag.TAG_INT) || !tag.contains("RegionZ", Tag.TAG_INT)) {
+            return null;
+        }
+        int size = tag.contains("RegionSize", Tag.TAG_INT) ? tag.getInt("RegionSize") : RegionInstanceKey.DEFAULT_REGION_SIZE;
+        return new RegionInstanceKey(tag.getInt("RegionX"), tag.getInt("RegionZ"), size);
     }
 }

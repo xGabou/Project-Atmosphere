@@ -1,8 +1,10 @@
 package net.Gabou.projectatmosphere.command.tree.service;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.api.WindVectorApi;
+import net.Gabou.projectatmosphere.clouds.field.backend.CloudFieldBackendBridge;
+import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
+import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudGroupSpawner;
@@ -11,7 +13,6 @@ import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandMessages;
 import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
-import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
@@ -22,8 +23,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.fml.config.ConfigTracker;
-import net.minecraftforge.fml.config.ModConfig;
+import net.neoforged.fml.config.ConfigTracker;
+import net.neoforged.fml.config.ModConfig;
 
 import java.util.List;
 import java.util.Locale;
@@ -47,10 +48,18 @@ public final class CommandCloudService {
             Map.entry("tsegrus", "cumulonimbus_calvus"),
             Map.entry("dense_tsegrus", "cumulonimbus_capillatus"),
             Map.entry("stronger_stratus", "nimbostratus"),
-            Map.entry("severe_nimbostratus", "nimbostratus")
+            Map.entry("severe_nimbostratus", "nimbostratus"),
+            Map.entry("cirrus_fibratus", "cirrus")
     );
 
     private CommandCloudService() {
+    }
+
+    public static int spawnCloud(CommandSourceStack source) {
+        String defaultCloudId = AtmosphereCloudServices.isSimpleCloudsLoaded()
+                ? "cumulus"
+                : CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
+        return spawnCloud(source, defaultCloudId);
     }
 
     public static int spawnCloud(CommandSourceStack source, String cloudId) {
@@ -65,6 +74,7 @@ public final class CommandCloudService {
             return 0;
         }
 
+        int clearedRuntimeFields = CloudFieldRuntimeManager.getInstance().clearRuntimeFields(level);
         BlockPos pos = player.blockPosition();
         RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
         WindVectorApi.WindSample sample = WindVectorApi.getOrFallback(regionKey, level.getGameTime());
@@ -75,12 +85,12 @@ public final class CommandCloudService {
                 );
 
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
-            if (region == null) {
+            if (!AtmosphereCloudServices.get().spawnExternalCloud(level, cloudId, regionKey, wind)) {
                 source.sendFailure(Component.literal("Failed to create Simple Clouds cloud '" + cloudId + "'."));
                 return 0;
             }
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
             PaCommandMessages.success(
                     source,
                     true,
@@ -88,6 +98,7 @@ public final class CommandCloudService {
                     "Cloud: " + cloudId,
                     "Region: " + regionKey,
                     "Wind: " + PaCommandSupport.formatWind(wind),
+                    "Cleared stale runtime fields: " + clearedRuntimeFields,
                     "Result: Simple Clouds region created"
             );
             return 1;
@@ -100,6 +111,7 @@ public final class CommandCloudService {
         }
 
         CloudRegionSyncManager.syncPlayer(player);
+        CloudFieldSyncManager.syncPlayer(player);
         PaCommandMessages.success(
                 source,
                 true,
@@ -108,6 +120,7 @@ public final class CommandCloudService {
                 "Resolved: " + state.getCloudTypeId(),
                 "Region: " + regionKey,
                 "Wind: " + PaCommandSupport.formatWind(wind),
+                "Cleared stale runtime fields: " + clearedRuntimeFields,
                 "Result: native PA region created"
         );
         return 1;
@@ -153,12 +166,162 @@ public final class CommandCloudService {
         ServerLevel level = source.getLevel();
         int storedCount = CloudRegionManager.getInstance().getCloudRegionCount(level);
         int activeRenderDataCount = CloudRegionManager.getInstance().getActiveRenderData(level).size();
+        int activeFieldCount = CloudFieldRuntimeManager.getInstance().ensureCurrent(level).fields().size();
         PaCommandMessages.success(
                 source,
                 false,
                 "Cloud count",
-                "Stored: " + storedCount,
+                "Active CloudFields: " + activeFieldCount,
+                "Stored cloud regions: " + storedCount,
                 "Active render data: " + activeRenderDataCount
+        );
+        return 1;
+    }
+
+    public static int sendCloudFieldList(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        List<String> lines = CloudFieldRuntimeManager.getInstance().describeCloudFields(level);
+        if (lines.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: CloudField list\nResult: no active CloudFields"), false);
+            return 1;
+        }
+
+        StringBuilder message = new StringBuilder("[Project Atmosphere]\nAction: CloudField list");
+        message.append("\nActive fields: ").append(lines.size());
+        int limit = Math.min(lines.size(), 8);
+        for (int i = 0; i < limit; i++) {
+            message.append("\n").append(i + 1).append(". ").append(lines.get(i));
+        }
+        if (lines.size() > limit) {
+            message.append("\n... ").append(lines.size() - limit).append(" more");
+        }
+        source.sendSuccess(() -> Component.literal(message.toString()), false);
+        return 1;
+    }
+
+    /**
+     * Sends a debug-only comparison of persistent CloudField state against the
+     * resolved evolution target.
+     */
+    public static int sendCloudFieldEvolution(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        List<String> lines = CloudFieldRuntimeManager.getInstance().describeCloudFieldEvolution(level);
+        if (lines.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("[Project Atmosphere]\nAction: CloudField evolution\nResult: no active CloudFields"), false);
+            return 1;
+        }
+
+        StringBuilder message = new StringBuilder("[Project Atmosphere]\nAction: CloudField evolution");
+        message.append("\nActive fields: ").append(lines.size());
+        int limit = Math.min(lines.size(), 5);
+        for (int i = 0; i < limit; i++) {
+            message.append("\n").append(i + 1).append(". ").append(lines.get(i));
+        }
+        if (lines.size() > limit) {
+            message.append("\n... ").append(lines.size() - limit).append(" more");
+        }
+        source.sendSuccess(() -> Component.literal(message.toString()), false);
+        return 1;
+    }
+
+    /**
+     * Sends debug-only CloudField source/apply/removal stats from the latest
+     * runtime tick.
+     */
+    public static int sendCloudFieldStats(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        List<String> lines = CloudFieldRuntimeManager.getInstance().describeCloudFieldStats(level);
+        StringBuilder message = new StringBuilder("[Project Atmosphere]\nAction: CloudField stats");
+        int limit = Math.min(lines.size(), 12);
+        for (int i = 0; i < limit; i++) {
+            message.append("\n").append(lines.get(i));
+        }
+        if (lines.size() > limit) {
+            message.append("\n... ").append(lines.size() - limit).append(" more");
+        }
+        source.sendSuccess(() -> Component.literal(message.toString()), false);
+        return 1;
+    }
+
+    /**
+     * Legacy/debug-only CloudField spawn retained for weatherdebug aliases.
+     * Normal /pa cloud spawn creates a real cloud region through spawnCloud.
+     *
+     * @param source command source
+     * @return command result
+     */
+    public static int spawnCloudField(CommandSourceStack source) {
+        return spawnCloudField(source, null);
+    }
+
+    /**
+     * Legacy/debug-only CloudField spawn retained for weatherdebug aliases.
+     * The optional id is only a legacy hint; normal /pa cloud spawn <id>
+     * creates a real cloud region through spawnCloud.
+     *
+     * @param source command source
+     * @param requestedId optional legacy requested cloud id
+     * @return command result
+     */
+    public static int spawnCloudField(CommandSourceStack source, String requestedId) {
+        ServerPlayer player = PaCommandSupport.requirePlayer(source, "CloudField spawning is only available to players.");
+        if (player == null) {
+            return 0;
+        }
+
+        CloudFieldRuntimeManager.DebugFieldSpawnResult spawnResult =
+                CloudFieldRuntimeManager.getInstance().spawnDebugField(player);
+        CloudFieldBackendBridge.ApplyResult result = spawnResult.applyResult();
+        CloudFieldSyncManager.syncPlayer(player);
+        String requestedLine = requestedId == null || requestedId.isBlank()
+                ? "Requested id: none"
+                : "Requested id: " + requestedId + " (legacy hint accepted; manual CloudField preset controls shape)";
+        PaCommandMessages.success(
+                source,
+                true,
+                "Manual test CloudField spawned",
+                requestedLine,
+                "Source: manual_test (MANUAL_DEBUG)",
+                "Manual debug isolation: active",
+                "Replaced previous manual test fields: " + spawnResult.replacedManualFields(),
+                "Suppressed automatic/backend fields for this test: " + spawnResult.suppressedBackendFields(),
+                "Use /weatherdebug clouds clearFields to leave manual debug isolation.",
+                "Created: " + result.created(),
+                "Updated: " + result.updated(),
+                "Rebound: " + result.reboundSourceFields(),
+                "Duplicates skipped: " + result.duplicateSourcesSkipped(),
+                "Lifetime: 12000 ticks"
+        );
+        return 1;
+    }
+
+    /**
+     * Legacy debug spawn helper retained for old weatherdebug aliases.
+     *
+     * @param source command source
+     * @return command result
+     */
+    public static int spawnDebugCloudField(CommandSourceStack source) {
+        return spawnCloudField(source, null);
+    }
+
+    /**
+     * Clears server-side CloudField runtime state only. Backend PA cloud
+     * regions are left intact and can recreate fields on the next runtime tick.
+     */
+    public static int clearCloudFields(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        int removed = CloudFieldRuntimeManager.getInstance().clearRuntimeFields(level);
+        ServerPlayer player = source.getPlayer();
+        if (player != null) {
+            CloudFieldSyncManager.syncPlayer(player);
+        }
+        PaCommandMessages.success(
+                source,
+                true,
+                "CloudFields cleared",
+                "Removed runtime fields: " + removed,
+                "Backend cloud regions were not removed"
         );
         return 1;
     }
@@ -187,11 +350,18 @@ public final class CommandCloudService {
     public static int clearClouds(CommandSourceStack source) {
         ServerLevel level = source.getLevel();
         CloudRegionManager.getInstance().clearCloudRegions(level);
+        int removedRuntimeFields = CloudFieldRuntimeManager.getInstance().clearRuntimeFields(level);
         ServerPlayer player = source.getPlayer();
         if (player != null) {
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
         }
-        PaCommandMessages.success(source, true, "Cloud regions cleared");
+        PaCommandMessages.success(
+                source,
+                true,
+                "Cloud regions cleared",
+                "Runtime fields cleared: " + removedRuntimeFields
+        );
         return 1;
     }
 
@@ -201,6 +371,7 @@ public final class CommandCloudService {
         ServerPlayer player = source.getPlayer();
         if (player != null) {
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
         }
         PaCommandMessages.success(
                 source,
@@ -217,6 +388,7 @@ public final class CommandCloudService {
             return 0;
         }
         CloudRegionSyncManager.syncPlayer(player);
+        CloudFieldSyncManager.syncPlayer(player);
         PaCommandMessages.success(source, false, "Cloud sync sent");
         return 1;
     }
@@ -239,16 +411,7 @@ public final class CommandCloudService {
     }
 
     private static void saveCommonConfigForMod(String modId) {
-        var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
-        if (set == null) {
-            return;
-        }
-        for (ModConfig config : set) {
-            if (config.getModId().equals(modId)) {
-                config.save();
-                return;
-            }
-        }
+        AtmoCommonConfig.COMMON_SPEC.save();
     }
 
     public static boolean spawnWeatherCloudAtSource(CommandSourceStack source, String cloudId) {
@@ -259,8 +422,7 @@ public final class CommandCloudService {
                 net.Gabou.projectatmosphere.modules.core.WindVector.fromBase(1.0F, 0.0F);
 
         if (AtmosphereCloudServices.isSimpleCloudsLoaded()) {
-            CloudRegion region = SimpleCloudsCompat.spawnCloudInRegion(cloudId, regionKey, level, null, wind);
-            if (region == null) {
+            if (!AtmosphereCloudServices.get().spawnExternalCloud(level, cloudId, regionKey, wind)) {
                 return false;
             }
         } else if (spawnNativeCloud(level, pos, cloudId) == null) {
@@ -270,6 +432,7 @@ public final class CommandCloudService {
         ServerPlayer player = source.getPlayer();
         if (player != null) {
             CloudRegionSyncManager.syncPlayer(player);
+            CloudFieldSyncManager.syncPlayer(player);
         }
         return true;
     }

@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 import net.Gabou.projectatmosphere.modules.ocean.OceanBasinManager;
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -51,8 +52,10 @@ public final class AtmosphericStateSavedData extends SavedData {
 
     private static AtmosphericStateSavedData get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-                AtmosphericStateSavedData::new,
-                AtmosphericStateSavedData::new,
+                new SavedData.Factory<>(
+                        AtmosphericStateSavedData::new,
+                        (tag, provider) -> new AtmosphericStateSavedData(tag)
+                ),
                 DATA_NAME
         );
     }
@@ -84,6 +87,7 @@ public final class AtmosphericStateSavedData extends SavedData {
         root.put("ActiveRegions", activeRegions);
 
         root.put("Scheduler", AtmosphericUpdateScheduler.savePersistentState());
+        root.put("WeakLows", WeakLowManager.savePersistentState());
         root.put("Cyclones", CycloneManager.savePersistentState());
         root.put("OceanBasins", OceanBasinManager.savePersistentState());
         root.put("WindEngine", WindEngine.savePersistentState());
@@ -121,6 +125,7 @@ public final class AtmosphericStateSavedData extends SavedData {
         AtmosphericStateRegistry.replaceActiveStates(activeRegions);
 
         AtmosphericUpdateScheduler.loadPersistentState(payload.getCompound("Scheduler"));
+        WeakLowManager.loadPersistentState(payload.getCompound("WeakLows"));
         CycloneManager.loadPersistentState(level, payload.getCompound("Cyclones"));
         OceanBasinManager.loadPersistentState(payload.getCompound("OceanBasins"));
         WindEngine.loadPersistentState(payload.getCompound("WindEngine"));
@@ -129,7 +134,10 @@ public final class AtmosphericStateSavedData extends SavedData {
     }
 
     @Override
-    public @NotNull CompoundTag save(@NotNull CompoundTag tag) {
+    public @NotNull CompoundTag save(
+            @NotNull CompoundTag tag,
+            @NotNull HolderLookup.Provider provider
+    ) {
         tag.put("LiveAtmosphere", payload == null ? new CompoundTag() : payload.copy());
         return tag;
     }

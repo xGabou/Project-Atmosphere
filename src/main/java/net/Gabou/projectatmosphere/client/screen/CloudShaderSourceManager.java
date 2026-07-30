@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class CloudShaderSourceManager {
 
-    private static final String RESOURCE_PATH = "assets/projectatmosphere/shaders/core/cloud_volume.fsh";
+    private static final String RESOURCE_PATH = "assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh";
     private static final String SOURCE_RELATIVE_PATH = "src/main/resources/" + RESOURCE_PATH;
     private static final String BUILD_RELATIVE_PATH = "build/resources/main/" + RESOURCE_PATH;
 
@@ -51,7 +51,7 @@ public final class CloudShaderSourceManager {
             }
         }
 
-        throw new IOException("Impossible de lire le shader cloud_volume.fsh");
+        throw new IOException("Impossible de lire le shader cloud_atmosphere_volume.fsh");
     }
 
     /**

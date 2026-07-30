@@ -6,72 +6,57 @@ import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionRemovedEvent
 import dev.nonamecrackers2.simpleclouds.api.common.event.CloudRegionTickEvent;
 import dev.nonamecrackers2.simpleclouds.api.common.event.ModifyCloudSpeedEvent;
 import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.compat.SimpleCloudsCompat;
-import net.Gabou.projectatmosphere.manager.AtmosphereManager;
+import net.Gabou.projectatmosphere.manager.AtmosphereCloudRegionTracker;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
-import net.Gabou.projectatmosphere.util.ICloudRegionId;
+import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec2;
-import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 
-public final class SimpleCloudsEventListener {
-    private static final float CLOUD_DIRECTION_VARIANCE_RAD = 0.15f;
-    private static final float CLOUD_DIRECTION_WOBBLE_RAD = 0.06f;
-    private static final float CLOUD_SPEED_VARIANCE = 0.12f;
-    private static final int CLOUD_DRIFT_PERIOD_TICKS = 24000;
-    private static final float TWO_PI = (float) (Math.PI * 2.0);
-
-    private SimpleCloudsEventListener() { }
-
-    public static void register(IEventBus bus) {
-        bus.addListener(SimpleCloudsEventListener::onCloudRegionSpawn);
-        bus.addListener(SimpleCloudsEventListener::onCloudRegionRemoved);
-        bus.addListener(SimpleCloudsEventListener::onCloudRegionTick);
-        bus.addListener(SimpleCloudsEventListener::onModifyCloudSpeed);
-    }
-
+public class SimpleCloudsEventListener {
+    @SubscribeEvent
     public static void onCloudRegionSpawn(CloudRegionNaturallySpawnEvent event) {
-        if (!(event.getLevel() instanceof ServerLevel)) {
-            return;
+       if(!(event.getLevel() instanceof ServerLevel serverLevel)) {
+           return;
         }
-        CloudRegion region = (CloudRegion) event.getCloudRegion();
-        ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud region spawned naturally at {}, {}", region.getWorldX(),
-                region.getWorldZ());
-        AtmosphereManager.queueAddCloudRegion(region);
+        CloudRegion region =(CloudRegion) event.getCloudRegion();
+        AtmosphereCloudRegionTracker.queueAdd(region);
     }
 
+    @SubscribeEvent
     public static void onCloudRegionRemoved(CloudRegionRemovedEvent event) {
+
     }
 
+
+    @SubscribeEvent
     public static void onCloudRegionTick(CloudRegionTickEvent event) {
-        if (event.getLevel() == null || event.getLevel().isClientSide || !SimpleCloudsCompat.getIsInit()) {
+
+
+        if ((event.getLevel() == null || event.getLevel().isClientSide)||!SimpleCloudsCompat.getIsInit())
             return;
-        }
+
         ServerLevel serverLevel = (ServerLevel) event.getLevel();
         ScAPICloudRegion region = event.getCloudRegion();
 
+        // Determine a representative biome key at the region center
         int x = (int) region.getWorldX();
         int z = (int) region.getWorldZ();
         int y = serverLevel.getSeaLevel();
 
-        BiomeInstanceKey key = AtmosphereUtils.getBiomeKey(serverLevel, new BlockPos(x, y, z));
-        RegionInstanceKey regionKey = RegionInstanceKey.from(key.samplePos());
-
-        WindVector current = WindEngine.getCurrentHighWindVector(key, serverLevel.getGameTime());
+        RegionInstanceKey regionKey = RegionInstanceKey.from(new BlockPos(x, y, z));
+        WindVector current = WindEngine.getCurrentHighWindVector(regionKey, serverLevel.getGameTime());
         float currentSpeed = current.baseSpeed();
         float dirDeg = (float) Math.toDegrees(current.angleRadians());
 
-        float stormFactor = ForecastOrchestrator.getCurrentStormChance(key, serverLevel.getGameTime());
+        // Storm-based boost
+        float stormFactor = ForecastOrchestrator.getCurrentStormChance(regionKey, serverLevel.getGameTime());
         if (stormFactor > 0.15f) {
+            // Scale boost with storm activity; cap to avoid absurd values
             float finalSpeed = getFinalSpeed(stormFactor, currentSpeed, region);
             WindVector.set(regionKey, finalSpeed, dirDeg);
         }
@@ -83,57 +68,33 @@ public final class SimpleCloudsEventListener {
         float stormBoost = Math.min(12.0f, 3.0f + stormFactor * 12.0f); // 3..15 m/s
         float boosted = Math.max(currentSpeed, stormBoost);
 
+        // Extra amplification if a tornado is active in this cloud region vicinity
         float tornadoBoost = 0f;
         for (var t : TornadoManager.getActiveTornadoes()) {
             var cr = t.getCloudRegion();
-            double dx = cr.getWorldX() - region.getWorldX();
-            double dz = cr.getWorldZ() - region.getWorldZ();
+            double centerX = cr != null ? cr.getWorldX() : t.position.x;
+            double centerZ = cr != null ? cr.getWorldZ() : t.position.z;
+            // Standalone tornadoes do not have a Simple Clouds region; compare against the tornado position instead.
+            double dx = centerX - region.getWorldX();
+            double dz = centerZ - region.getWorldZ();
             double dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist <= (double) (t.radius + 150f)) {
+            if (dist <= (double) (t.radius + 150f)) { // generous overlap threshold
+                // Amplify based on tornado level
                 tornadoBoost = Math.max(tornadoBoost, (float) (8.0f + t.getLevel().getMaxWindSpeed() * 0.5f));
             }
         }
 
-        return Math.min(30.0f, boosted + tornadoBoost);
+        float finalSpeed = Math.min(30.0f, boosted + tornadoBoost);
+        return finalSpeed;
     }
 
+
+    @SubscribeEvent
     public static void onModifyCloudSpeed(ModifyCloudSpeedEvent event) {
     }
 
     private static void applyCloudShear(CloudRegionTickEvent event, WindVector wind, long gameTime) {
-        ScAPICloudRegion region = event.getCloudRegion();
-        int id = getStableCloudId(region);
-        float baseOffset = (hashToUnit(id) - 0.5f) * 2.0f * CLOUD_DIRECTION_VARIANCE_RAD;
-        float wobblePhase = hashToUnit(id * 31 + 7) * TWO_PI;
-        float wobble = Mth.sin((gameTime / (float) CLOUD_DRIFT_PERIOD_TICKS) * TWO_PI + wobblePhase)
-                * CLOUD_DIRECTION_WOBBLE_RAD;
-        float angle = wind.angleRadians() + baseOffset + wobble;
-        Vec2 direction = new Vec2((float) -Math.sin(angle), (float) Math.cos(angle));
-        if (direction.length() > 0.001f) {
-            event.setModifiedMovementDirection(direction.normalized());
-        }
-
-        float speedScale = 1.0f + (hashToUnit(id * 13 + 101) - 0.5f) * 2.0f * CLOUD_SPEED_VARIANCE;
-        float baseMaxSpeed = region.getMaxSpeed();
-        float scaledSpeed = Math.max(0.001f, baseMaxSpeed * speedScale);
-        event.setModifiedMaxSpeed(scaledSpeed);
+        // PA must not override Simple Clouds movement while Simple Clouds owns the visual backend.
     }
 
-    private static int getStableCloudId(ScAPICloudRegion region) {
-        if (region instanceof ICloudRegionId id) {
-            return id.projectatmosphere$getId();
-        }
-        return System.identityHashCode(region);
-    }
-
-    private static float hashToUnit(int value) {
-        int x = value;
-        x ^= (x >>> 16);
-        x *= 0x7feb352d;
-        x ^= (x >>> 15);
-        x *= 0x846ca68b;
-        x ^= (x >>> 16);
-        return (x & 0x7fffffff) / (float) Integer.MAX_VALUE;
-    }
 }
-

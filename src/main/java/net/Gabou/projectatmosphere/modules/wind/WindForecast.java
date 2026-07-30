@@ -1,13 +1,12 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.minecraft.util.Mth;
 
 /**
  * Unified wind forecast describing both the upper-level (high) and ground-level (low) wind curves.
- * The forecast is derived from the weekly {@link BiomeForecast} produced by {@link net.Gabou.projectatmosphere.manager.ForecastGenerator}
- * without modifying the generator itself.
+ * The forecast is derived from the weekly wind curve stored on a ForecastRegion.
  */
 public final class WindForecast {
     public static final class WindSlice {
@@ -98,11 +97,12 @@ public final class WindForecast {
         return Math.max(0f, base * dailyScale);
     }
 
-    /**
-     * Creates a unified forecast from the immutable BiomeForecast generated elsewhere.
-     */
-    public static WindForecast fromBiomeForecast(BiomeForecast biomeForecast) {
-        WindVector[] week = biomeForecast.getWind();
+    public static WindForecast fromRegionForecast(ForecastRegion regionForecast) {
+        if (regionForecast == null) {
+            return new WindForecast(new WindSlice[]{new WindSlice(0f, 0f, 0f, 0f, 0f)}, 0f, 0f, 0f);
+        }
+
+        WindVector[] week = regionForecast.getWind();
         if (week == null || week.length == 0) {
             return new WindForecast(new WindSlice[]{new WindSlice(0f, 0f, 0f, 0f, 0f)}, 0f, 0f, 0f);
         }
@@ -129,4 +129,3 @@ public final class WindForecast {
         return new WindForecast(slices, baseProb, stormProb, spikeChance);
     }
 }
-

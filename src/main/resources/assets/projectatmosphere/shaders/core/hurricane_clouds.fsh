@@ -19,7 +19,6 @@ uniform float MaxDistance;
 uniform vec2 OutSize;
 uniform vec3 VolumeMin;
 uniform vec3 VolumeMax;
-uniform int StormCount;
 uniform float StormPositions[12];
 uniform vec4 StormHeights;
 uniform vec4 EyeRadii;

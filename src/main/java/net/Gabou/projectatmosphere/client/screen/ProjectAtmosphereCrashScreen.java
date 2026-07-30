@@ -59,7 +59,7 @@ public class ProjectAtmosphereCrashScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(guiGraphics);
+        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         guiGraphics.fillGradient(0, 0, this.width, this.height, 0xFF200D12, 0xFF070A10);
 
         int contentWidth = Math.min(420, this.width - 48);

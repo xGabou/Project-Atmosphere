@@ -1,43 +1,59 @@
 package net.Gabou.projectatmosphere.event;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.cloud.spawning.CloudGenerator;
-import dev.nonamecrackers2.simpleclouds.common.world.CloudManager;
-import dev.nonamecrackers2.simpleclouds.common.world.ServerCloudManager;
-import net.Gabou.projectatmosphere.blocks.BlockManager;
-import net.Gabou.projectatmosphere.compat.CompatHandler;
-import net.Gabou.projectatmosphere.compat.rainbows.RainbowRainBridge;
+import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.backend.CloudBackendMigrationManager;
+import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
+import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
+import net.Gabou.projectatmosphere.clouds.cell.sim.NativeTornadoEffects;
+import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
+import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
+import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
+import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudService;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsManager;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.manager.SimpleCloudSpawner;
-import net.Gabou.projectatmosphere.modules.core.CloudLibrary;
+import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphereStatusSyncManager;
 import net.Gabou.projectatmosphere.modules.wind.WindForces;
-import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 
-public final class EventHandler {
+
+@EventBusSubscriber(modid = ProjectAtmosphere.MODID)
+public class EventHandler {
+
+    private static final int MIN_TICKS_BETWEEN_DUST_SPAWN = 5000;
+
     private static final int MIN_TICKS_BETWEEN_TEMPESTA = 2000;
+
+    private static final int LIVING_WEATHER_EFFECT_INTERVAL_TICKS = 5;
+
     private static int tickCounter = 0;
 
-    private static boolean finishedRegenerating = true;
-    private static boolean wasRegenerating = false;
-    private static int cloudBoosterTicks = 0;
+    private static boolean hasDisplayedMessage = false;
 
-    private EventHandler() { }
+    private static boolean wasRegenerating = false;
+
+    private static boolean finishedRegenerating = true;
+
+    private static int cloudBoosterTicks = 0;
 
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
-        if (event.getLevel().isClientSide || !(event.getLevel() instanceof ServerLevel serverLevel)) {
+        if (!(event.getLevel() instanceof ServerLevel serverLevel)) {
             return;
         }
         if (!AtmosphereManager.isInitialGenerationDone) {
@@ -46,53 +62,54 @@ public final class EventHandler {
         if (serverLevel.players().isEmpty()) {
             return;
         }
-        if (!serverLevel.dimension().equals(Level.OVERWORLD)) {
-            return;
-        }
 
-        // Daily profile swap check
-        long t = serverLevel.getDayTime() % 24000L;
-        if (t == 21000L) {
-            AtmosphereManager.onSwapProfiles(serverLevel);
-        }
-
-        ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(serverLevel);
-        CloudGenerator generator = cloudManager.getCloudGenerator();
-
-        AtmosphereManager.tick(serverLevel);
-        AtmosphereWorldEffectsManager.tick(serverLevel);
-
-        if (ForecastOrchestrator.isRegenerating()) {
-            finishedRegenerating = false;
-        } else if (!finishedRegenerating) {
-            wasRegenerating = true;
-        }
-
-        if (generator.getTicksTillNextGen() - cloudBoosterTicks <= 0 || wasRegenerating) {
-            SimpleCloudSpawner.trySpawnClouds(serverLevel, generator);
-            wasRegenerating = false;
-            finishedRegenerating = true;
-            cloudBoosterTicks = 0;
-        }
-
-        if (CompatHandler.isRainbowsLoaded()) {
-            RainbowRainBridge.sync(serverLevel, generator);
-        }
-
-        if (AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()
-                && tickCounter % MIN_TICKS_BETWEEN_TEMPESTA == 0) {
-            int cloudY = cloudManager.getCloudHeight();
-            for (CloudRegion region : generator.getClouds()) {
-                int severity = CloudLibrary.getSeverityFromRessourceLocation(region.getCloudTypeId());
-                if (severity > 5) {
-                    BlockPos pos = new BlockPos((int) region.getWorldX(), cloudY, (int) region.getWorldZ());
-                    BlockManager.simulateTempesta(serverLevel, pos, (int) region.getRadius());
-                }
+        AtmosphereCloudService cloudService = AtmosphereCloudServices.get();
+        CloudVisualBackend activeBackend = CloudBackendMigrationManager.tick(serverLevel, cloudService);
+        if (activeBackend == CloudVisualBackend.PA_NATIVE) {
+            CloudRegionManager.getInstance().tickCloudRegions(serverLevel);
+            CloudFieldRuntimeManager.getInstance().tick(serverLevel);
+            if (AtmoCommonConfig.CLOUD_VOLUMETRIC_RENDERER_ENABLED.get()) {
+                CloudCellSimulationManager.getInstance().tick(serverLevel);
+                NativeTornadoEffects.tick(serverLevel);
             }
         }
 
-        if (generator.getClouds().size() <= 3) {
-            cloudBoosterTicks += 5;
+        if (!serverLevel.dimension().equals(Level.OVERWORLD)) return;
+
+        boolean eventsEnabled = AtmoCommonConfig.EVENTS_ENABLED.get();
+        if (eventsEnabled) {
+            AtmosphereManager.tick(serverLevel);
+            AtmosphereWorldEffectsManager.tick(serverLevel);
+            if (ForecastOrchestrator.isRegenerating()) {
+                finishedRegenerating = false;
+            } else if (!finishedRegenerating) {
+                wasRegenerating = true;
+            }
+
+            if (cloudService.shouldTrySpawn(serverLevel, cloudBoosterTicks, wasRegenerating)) {
+                cloudService.trySpawnClouds(serverLevel);
+                wasRegenerating = false;
+                finishedRegenerating = true;
+                cloudBoosterTicks = 0;
+            }
+        }
+
+        AtmosphereStatusSyncManager.syncPlayers(serverLevel);
+        if (activeBackend == CloudVisualBackend.PA_NATIVE) {
+            CloudRegionSyncManager.syncPlayers(serverLevel);
+            CloudFieldSyncManager.syncPlayers(serverLevel);
+        }
+        if(!serverLevel.players().isEmpty() && !hasDisplayedMessage) {
+            hasDisplayedMessage = true;
+            serverLevel.players().forEach(player -> {player.sendSystemMessage(Component.literal(ForecastGenerator.message) );});
+        }
+
+
+        if (eventsEnabled && AtmoCommonConfig.ENABLE_STORM_DEBRIS.get()) {
+            if (tickCounter % MIN_TICKS_BETWEEN_TEMPESTA == 0) {
+                cloudService.simulateSevereCloudDebris(serverLevel);
+            }
+            cloudBoosterTicks = cloudService.updateCloudBoosterTicks(serverLevel, cloudBoosterTicks);
         }
 
         tickCounter++;
@@ -104,18 +121,20 @@ public final class EventHandler {
             return;
         }
         ServerLevel level = player.serverLevel();
-        if (CompatHandler.isRainbowsLoaded() && level.dimension().equals(event.getTo())) {
-            ServerCloudManager cloudManager = (ServerCloudManager) CloudManager.get(level);
-            RainbowRainBridge.sendSnapshot(player, level, cloudManager.getCloudGenerator());
+        if (level.dimension().equals(event.getTo())) {
+            AtmosphereStatusSyncManager.syncPlayer(player);
+            if (CloudBackendMigrationManager.status(level).currentBackend() == CloudVisualBackend.PA_NATIVE) {
+                CloudRegionSyncManager.syncPlayer(player);
+                CloudFieldSyncManager.syncPlayer(player);
+                CloudCellSimulationManager.getInstance().syncPlayer(player);
+            }
+
         }
     }
 
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
-            return;
-        }
-        if (player.level().isClientSide) {
             return;
         }
         ServerLevel level = player.serverLevel();
@@ -129,7 +148,7 @@ public final class EventHandler {
     }
 
     @SubscribeEvent
-    public static void onEntityTick(EntityTickEvent.Post event) {
+    public static void onLivingTick(EntityTickEvent.Post event) {
         if (!(event.getEntity() instanceof LivingEntity entity)) {
             return;
         }
@@ -145,17 +164,17 @@ public final class EventHandler {
         if (!level.dimension().equals(Level.OVERWORLD)) {
             return;
         }
+        if ((entity.tickCount + entity.getId()) % LIVING_WEATHER_EFFECT_INTERVAL_TICKS != 0) {
+            return;
+        }
         AtmosphereWorldEffectsManager.applyCloudCoverEffects(level, entity);
         if (entity instanceof ServerPlayer) {
             return;
         }
-        WindForces.applyToEntity(level, entity, 1.0f);
+        WindForces.applyToEntity(level, entity, LIVING_WEATHER_EFFECT_INTERVAL_TICKS);
     }
 
     public static void onRegenerate() {
         tickCounter = 0;
-        finishedRegenerating = true;
-        wasRegenerating = false;
-        cloudBoosterTicks = 0;
     }
 }

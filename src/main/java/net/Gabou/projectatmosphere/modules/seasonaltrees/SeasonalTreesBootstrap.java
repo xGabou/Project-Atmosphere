@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.modules.seasonaltrees;
 
 import net.Gabou.projectatmosphere.modules.seasonaltrees.core.SeasonalTreesCore;
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.neoforge.common.NeoForge;
 
 public final class SeasonalTreesBootstrap {
     private SeasonalTreesBootstrap() {
@@ -12,6 +12,6 @@ public final class SeasonalTreesBootstrap {
     }
 
     public static void initHost() {
-        MinecraftForge.EVENT_BUS.register(SeasonalTreesEventHandler.class);
+        NeoForge.EVENT_BUS.register(SeasonalTreesEventHandler.class);
     }
 }

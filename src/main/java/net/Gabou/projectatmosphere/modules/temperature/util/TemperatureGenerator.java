@@ -1,9 +1,8 @@
 package net.Gabou.projectatmosphere.modules.temperature.util;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -11,14 +10,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import sereneseasons.api.season.SeasonHelper;
-import sereneseasons.init.ModTags;
-import sereneseasons.season.SeasonHooks;
-import sereneseasons.season.SeasonTime;
 import net.Gabou.projectatmosphere.modules.temperature.config.BiomeTempConfig.Season;
+import net.Gabou.projectatmosphere.seasons.SeasonStage;
+import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 
-
-import javax.annotation.Nullable;
 import java.util.Objects;
 import java.util.Random;
 
@@ -28,8 +23,16 @@ public class TemperatureGenerator {
     private static final float IN_MIN = -0.5f;
     private static final float IN_MAX =  2.0f;
     private static final float DEN    = (IN_MAX - IN_MIN);
-    private static final float SEA_LEVEL = 63f;
     private static final float LAPSE_RATE = -0.0065f;
+    static final float SEA_LEVEL = 63.0F;
+
+    public static BiomeTempConfig.DailyRange getSeasonClamp(ServerLevel level, ResourceLocation biomeId) {
+        return AsyncAtmosphereService.callOnMainThread(() -> {
+            SeasonStage stage = SeasonTimeHelper.stage(level);
+            Season season = mapSeasonStage(stage);
+            return BiomeTempConfig.getClamp(biomeId, season);
+        });
+    }
 
     /**
      * Generates a 7×2 weekly forecast (min at 3 AM, max at 3 PM),
@@ -43,13 +46,13 @@ public class TemperatureGenerator {
     public static float[][] generateWeekForecast(ServerLevel level, BlockPos chunkPos, ResourceLocation biomeId) {
         // Step 1: Grab world-dependent values safely
         ForecastBaseData base = AsyncAtmosphereService.callOnMainThread(() -> {
-            int cycleTicks = SeasonHelper.getSeasonState(level).getSeasonCycleTicks();
-            long seasonDuration = SeasonHelper.getSeasonState(level).getSeasonDuration();
-            long dayDuration = SeasonHelper.getSeasonState(level).getDayDuration();
-            SeasonTime st = new SeasonTime(cycleTicks);
-            Season currentSeason = Season.valueOf(st.getSeason().name());
+            int cycleTicks = (int) SeasonTimeHelper.seasonCycleTicks(level);
+            long seasonDuration = SeasonTimeHelper.seasonDuration(level);
+            long dayDuration = SeasonTimeHelper.dayDuration(level);
+            SeasonStage stage = SeasonTimeHelper.stage(level);
+            Season currentSeason = mapSeasonStage(stage);
 
-            float baseTemp = SeasonHooks.getBiomeTemperature(level, level.getBiome(chunkPos), chunkPos);
+            float baseTemp = level.getBiome(chunkPos).value().getBaseTemperature();
             BiomeTempConfig.DailyRange clamp = BiomeTempConfig.getClamp(biomeId, currentSeason);
 
             return new ForecastBaseData(cycleTicks, seasonDuration, dayDuration, currentSeason, baseTemp, clamp);
@@ -105,6 +108,7 @@ public class TemperatureGenerator {
         return week;
     }
 
+    // Small record to carry main-thread values
     private record ForecastBaseData(
             int cycleTicks,
             long seasonDuration,
@@ -114,10 +118,8 @@ public class TemperatureGenerator {
             BiomeTempConfig.DailyRange clamp
     ) {}
 
-
-
     /**
-     * If {@code v} lies outside {@code [boundLow..boundHigh]}, then:
+     * If {@code CloudDebugSnapshotFactory} lies outside {@code [boundLow..boundHigh]}, then:
      * <ol>
      *   <li>globally cap to ±65 °C,</li>
      *   <li>credit back a scaled portion of the overshoot,</li>
@@ -171,7 +173,7 @@ public class TemperatureGenerator {
 
 
     /**
-     * Eases {@code v} toward {@code avg} in four bands:
+     * Eases {@code CloudDebugSnapshotFactory} toward {@code avg} in four bands:
      * <ul>
      *   <li>|Δ| ≤ 3°C  → 10% pull</li>
      *   <li>|Δ| ≤ 6°C  → 35% pull</li>
@@ -179,7 +181,7 @@ public class TemperatureGenerator {
      *   <li>|Δ| > 10°C → 100% pull</li>
      * </ul>
      * Does not enforce any bounds—it simply returns an eased value:
-     * {@code eased = avg + (v - avg) * (1 - factor)}.
+     * {@code eased = avg + (CloudDebugSnapshotFactory - avg) * (1 - factor)}.
      *
      * @param v   the value to ease
      * @param avg the target average
@@ -249,11 +251,8 @@ public class TemperatureGenerator {
         Registry<Biome> reg = level.registryAccess().registryOrThrow(Registries.BIOME);
         Biome b = reg.get(biomeId);
         if (b == null) return nonTropicalAmp;
-        Boolean bol= reg.getResourceKey(b)
-                .flatMap(reg::getHolder)
-                .map(holder -> holder.is(ModTags.Biomes.TROPICAL_BIOMES))
-                .orElse(false);
-        return bol ? tropicalAmp : nonTropicalAmp;
+        float baseTemp = b.getBaseTemperature();
+        return baseTemp >= 1.2f ? tropicalAmp : nonTropicalAmp;
     }
 
     /**
@@ -268,5 +267,14 @@ public class TemperatureGenerator {
         long day = world.getDayTime() / 24000L;
         int hash = Objects.hash(pos.getX() >> 4, pos.getZ() >> 4, day);
         return ((hash % 200) - 100) / 100f * maxFluctuation;
+    }
+
+    private static Season mapSeasonStage(SeasonStage stage) {
+        return switch (stage) {
+            case WINTER -> Season.WINTER;
+            case AUTUMN -> Season.AUTUMN;
+            case SPRING -> Season.SPRING;
+            default -> Season.SUMMER;
+        };
     }
 }

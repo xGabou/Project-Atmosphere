@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.clouds.state;
 
 import net.Gabou.projectatmosphere.clouds.type.CloudFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
+import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -43,10 +44,22 @@ public final class CloudClusterState {
     private static final String TAG_LIFETIME_TICKS = "LifetimeTicks";
     private static final String TAG_GROWTH = "Growth";
     private static final String TAG_DECAY = "Decay";
+    private static final String TAG_TARGET_RADIUS = "TargetRadius";
+    private static final String TAG_TARGET_COVERAGE = "TargetCoverage";
+    private static final String TAG_TARGET_DENSITY = "TargetDensity";
+    private static final String TAG_SPAWN_RADIUS = "SpawnRadius";
+    private static final String TAG_LAST_MOTION_TICK = "LastMotionTick";
+    private static final String TAG_LAST_GROWTH_TICK = "LastGrowthTick";
+    private static final String TAG_LAST_GROWTH_RATE = "LastGrowthRate";
     private static final String TAG_MERGE_PRESSURE = "MergePressure";
     private static final String TAG_CLOUD_TYPE_ID = "CloudTypeId";
     private static final String TAG_PREVIOUS_CLOUD_TYPE_ID = "PreviousCloudTypeId";
     private static final String TAG_MORPHOLOGY_FAMILY = "MorphologyFamily";
+    private static final String TAG_MORPHOLOGY_GROUP_ID = "MorphologyGroupId";
+    private static final String TAG_MORPHOLOGY_INDEX = "MorphologyIndex";
+    private static final String TAG_MORPHOLOGY_COUNT = "MorphologyCount";
+    private static final String TAG_MORPHOLOGY_LAYOUT_VERSION = "MorphologyLayoutVersion";
+    private static final String TAG_MORPHOLOGY_MEMBER_TIER = "MorphologyMemberTier";
     private static final String TAG_CLOUD_TYPE_TICKS = "CloudTypeTicks";
     private static final String TAG_CLOUD_SEED = "CloudSeed";
 
@@ -58,6 +71,8 @@ public final class CloudClusterState {
     private static final float DEFAULT_EDGE_SOFTNESS = 0.35F;
     private static final int DEFAULT_LIFETIME_TICKS = 20 * 60 * 10;
     private static final int TRANSITION_BLEND_TICKS = 20 * 15;
+    public static final float RADIUS_CAP = 1400.0F;
+    public static final int HIERARCHICAL_PUFF_LAYOUT_VERSION = 1;
 
     private final UUID clusterId;
     private final ResourceKey<Level> dimension;
@@ -75,10 +90,22 @@ public final class CloudClusterState {
     private int lifetimeTicks;
     private float growth;
     private float decay;
+    private float targetRadius;
+    private float targetCoverage;
+    private float targetDensity;
+    private float spawnRadius;
+    private long lastMotionTick;
+    private long lastGrowthTick;
+    private float lastGrowthRate;
     private float mergePressure;
     private String cloudTypeId;
     private String previousCloudTypeId;
     private CloudMorphologyFamily morphologyFamily;
+    private UUID morphologyGroupId;
+    private int morphologyIndex;
+    private int morphologyCount;
+    private int morphologyLayoutVersion;
+    private CloudMorphologyMemberTier morphologyMemberTier;
     private int cloudTypeTicks;
     private int cloudSeed;
 
@@ -108,10 +135,22 @@ public final class CloudClusterState {
         this.lifetimeTicks = DEFAULT_LIFETIME_TICKS;
         this.growth = 1.0F;
         this.decay = 0.0F;
+        this.targetRadius = this.radius;
+        this.targetCoverage = this.coverage;
+        this.targetDensity = this.density;
+        this.spawnRadius = this.radius;
+        this.lastMotionTick = 0L;
+        this.lastGrowthTick = 0L;
+        this.lastGrowthRate = 0.0F;
         this.mergePressure = 0.0F;
         this.cloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.previousCloudTypeId = CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID;
         this.morphologyFamily = CloudTypeRegistry.getOrDefault(CloudTypeRegistry.DEFAULT_CLOUD_TYPE_ID).getMorphologyFamily();
+        this.morphologyGroupId = clusterId;
+        this.morphologyIndex = 0;
+        this.morphologyCount = 1;
+        this.morphologyLayoutVersion = 0;
+        this.morphologyMemberTier = CloudMorphologyMemberTier.UNKNOWN;
         this.cloudTypeTicks = 0;
         this.cloudSeed = createRandomCloudSeed();
         this.active = true;
@@ -191,7 +230,7 @@ public final class CloudClusterState {
             throw new IllegalArgumentException("radius must be greater than 0");
         }
 
-        this.radius = radius;
+        this.radius = Math.min(radius, RADIUS_CAP);
     }
 
     public float getBaseY() {
@@ -275,6 +314,76 @@ public final class CloudClusterState {
         this.decay = clamp01(decay);
     }
 
+    public float getTargetRadius() {
+        return targetRadius;
+    }
+
+    public void setTargetRadius(float targetRadius) {
+        if (targetRadius <= 0.0F) {
+            throw new IllegalArgumentException("targetRadius must be greater than 0");
+        }
+
+        this.targetRadius = Math.min(targetRadius, RADIUS_CAP);
+    }
+
+    public float getTargetCoverage() {
+        return targetCoverage;
+    }
+
+    public void setTargetCoverage(float targetCoverage) {
+        this.targetCoverage = clamp01(targetCoverage);
+    }
+
+    public float getTargetDensity() {
+        return targetDensity;
+    }
+
+    public void setTargetDensity(float targetDensity) {
+        this.targetDensity = clamp01(targetDensity);
+    }
+
+    public float getSpawnRadius() {
+        return spawnRadius;
+    }
+
+    public void setSpawnRadius(float spawnRadius) {
+        if (spawnRadius <= 0.0F) {
+            throw new IllegalArgumentException("spawnRadius must be greater than 0");
+        }
+
+        this.spawnRadius = Math.min(spawnRadius, RADIUS_CAP);
+    }
+
+    public long getLastMotionTick() {
+        return lastMotionTick;
+    }
+
+    public void setLastMotionTick(long lastMotionTick) {
+        this.lastMotionTick = Math.max(0L, lastMotionTick);
+    }
+
+    public long getLastGrowthTick() {
+        return lastGrowthTick;
+    }
+
+    public void setLastGrowthTick(long lastGrowthTick) {
+        this.lastGrowthTick = Math.max(0L, lastGrowthTick);
+    }
+
+    public float getLastGrowthRate() {
+        return lastGrowthRate;
+    }
+
+    public void setLastGrowthRate(float lastGrowthRate) {
+        this.lastGrowthRate = Float.isFinite(lastGrowthRate) ? lastGrowthRate : 0.0F;
+    }
+
+    public void setGrowthTargets(float targetRadius, float targetCoverage, float targetDensity) {
+        setTargetRadius(targetRadius);
+        setTargetCoverage(targetCoverage);
+        setTargetDensity(targetDensity);
+    }
+
     public float getMergePressure() {
         return mergePressure;
     }
@@ -304,6 +413,75 @@ public final class CloudClusterState {
         this.morphologyFamily = morphologyFamily == null
                 ? CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily()
                 : morphologyFamily;
+    }
+
+    /**
+     * Identifies the persistent set of lobes produced by one morphology spawn.
+     * Sibling lobes may overlap for smooth visual union, but must not absorb one
+     * another or the intended cauliflower topology is destroyed.
+     */
+    public UUID getMorphologyGroupId() {
+        return morphologyGroupId;
+    }
+
+    public int getMorphologyIndex() {
+        return morphologyIndex;
+    }
+
+    public int getMorphologyCount() {
+        return morphologyCount;
+    }
+
+    public int getMorphologyLayoutVersion() {
+        return morphologyLayoutVersion;
+    }
+
+    public CloudMorphologyMemberTier getMorphologyMemberTier() {
+        return morphologyMemberTier;
+    }
+
+    public void setMorphologyMembership(UUID groupId, int index, int count) {
+        setMorphologyMembership(
+                groupId,
+                index,
+                count,
+                0,
+                CloudMorphologyMemberTier.UNKNOWN
+        );
+    }
+
+    public void setMorphologyMembership(
+            UUID groupId,
+            int index,
+            int count,
+            int layoutVersion,
+            CloudMorphologyMemberTier memberTier
+    ) {
+        morphologyGroupId = Objects.requireNonNull(groupId, "groupId");
+        morphologyCount = Math.max(1, count);
+        morphologyIndex = Math.max(0, Math.min(index, morphologyCount - 1));
+        morphologyLayoutVersion = Math.max(0, layoutVersion);
+        morphologyMemberTier = morphologyLayoutVersion == 0 || memberTier == null
+                ? CloudMorphologyMemberTier.UNKNOWN
+                : memberTier;
+    }
+
+    public void setMorphologyLayout(
+            int layoutVersion,
+            CloudMorphologyMemberTier memberTier
+    ) {
+        morphologyLayoutVersion = Math.max(0, layoutVersion);
+        morphologyMemberTier = morphologyLayoutVersion == 0 || memberTier == null
+                ? CloudMorphologyMemberTier.UNKNOWN
+                : memberTier;
+    }
+
+    public boolean isMorphologySibling(@Nullable CloudClusterState other) {
+        return other != null
+                && other != this
+                && morphologyCount > 1
+                && other.morphologyCount > 1
+                && morphologyGroupId.equals(other.morphologyGroupId);
     }
 
     public int getCloudTypeTicks() {
@@ -367,6 +545,13 @@ public final class CloudClusterState {
         setDensity(weightedFloat(density, thisWeight, other.density, otherWeight));
         setCoverage(weightedFloat(coverage, thisWeight, other.coverage, otherWeight));
         setEdgeSoftness(weightedFloat(edgeSoftness, thisWeight, other.edgeSoftness, otherWeight));
+        setTargetRadius(Math.max(targetRadius, other.targetRadius));
+        setTargetCoverage(weightedFloat(targetCoverage, thisWeight, other.targetCoverage, otherWeight));
+        setTargetDensity(weightedFloat(targetDensity, thisWeight, other.targetDensity, otherWeight));
+        setSpawnRadius(Math.min(spawnRadius, other.spawnRadius));
+        setLastMotionTick(Math.max(lastMotionTick, other.lastMotionTick));
+        setLastGrowthTick(Math.max(lastGrowthTick, other.lastGrowthTick));
+        setLastGrowthRate(Math.max(lastGrowthRate, other.lastGrowthRate));
         setAgeTicks(Math.round(weightedFloat((float) ageTicks, thisWeight, (float) other.ageTicks, otherWeight)));
         setLifetimeTicks(Math.round(Math.max(lifetimeTicks, other.lifetimeTicks)));
         setGrowth(weightedFloat(growth, thisWeight, other.growth, otherWeight));
@@ -411,10 +596,22 @@ public final class CloudClusterState {
         tag.putInt(TAG_LIFETIME_TICKS, lifetimeTicks);
         tag.putFloat(TAG_GROWTH, growth);
         tag.putFloat(TAG_DECAY, decay);
+        tag.putFloat(TAG_TARGET_RADIUS, targetRadius);
+        tag.putFloat(TAG_TARGET_COVERAGE, targetCoverage);
+        tag.putFloat(TAG_TARGET_DENSITY, targetDensity);
+        tag.putFloat(TAG_SPAWN_RADIUS, spawnRadius);
+        tag.putLong(TAG_LAST_MOTION_TICK, lastMotionTick);
+        tag.putLong(TAG_LAST_GROWTH_TICK, lastGrowthTick);
+        tag.putFloat(TAG_LAST_GROWTH_RATE, lastGrowthRate);
         tag.putFloat(TAG_MERGE_PRESSURE, mergePressure);
         tag.putString(TAG_CLOUD_TYPE_ID, cloudTypeId);
         tag.putString(TAG_PREVIOUS_CLOUD_TYPE_ID, previousCloudTypeId);
         tag.putString(TAG_MORPHOLOGY_FAMILY, morphologyFamily.name());
+        tag.putUUID(TAG_MORPHOLOGY_GROUP_ID, morphologyGroupId);
+        tag.putInt(TAG_MORPHOLOGY_INDEX, morphologyIndex);
+        tag.putInt(TAG_MORPHOLOGY_COUNT, morphologyCount);
+        tag.putInt(TAG_MORPHOLOGY_LAYOUT_VERSION, morphologyLayoutVersion);
+        tag.putString(TAG_MORPHOLOGY_MEMBER_TIER, morphologyMemberTier.name());
         tag.putInt(TAG_CLOUD_TYPE_TICKS, cloudTypeTicks);
         tag.putInt(TAG_CLOUD_SEED, cloudSeed);
 
@@ -471,6 +668,13 @@ public final class CloudClusterState {
         int lifetimeTicks = tag.contains(TAG_LIFETIME_TICKS) ? tag.getInt(TAG_LIFETIME_TICKS) : DEFAULT_LIFETIME_TICKS;
         float growth = tag.contains(TAG_GROWTH) ? tag.getFloat(TAG_GROWTH) : 1.0F;
         float decay = tag.contains(TAG_DECAY) ? tag.getFloat(TAG_DECAY) : 0.0F;
+        float targetRadius = tag.contains(TAG_TARGET_RADIUS) ? tag.getFloat(TAG_TARGET_RADIUS) : radius;
+        float targetCoverage = tag.contains(TAG_TARGET_COVERAGE) ? tag.getFloat(TAG_TARGET_COVERAGE) : coverage;
+        float targetDensity = tag.contains(TAG_TARGET_DENSITY) ? tag.getFloat(TAG_TARGET_DENSITY) : density;
+        float spawnRadius = tag.contains(TAG_SPAWN_RADIUS) ? tag.getFloat(TAG_SPAWN_RADIUS) : radius;
+        long lastMotionTick = tag.contains(TAG_LAST_MOTION_TICK) ? tag.getLong(TAG_LAST_MOTION_TICK) : 0L;
+        long lastGrowthTick = tag.contains(TAG_LAST_GROWTH_TICK) ? tag.getLong(TAG_LAST_GROWTH_TICK) : 0L;
+        float lastGrowthRate = tag.contains(TAG_LAST_GROWTH_RATE) ? tag.getFloat(TAG_LAST_GROWTH_RATE) : 0.0F;
         float mergePressure = tag.contains(TAG_MERGE_PRESSURE) ? tag.getFloat(TAG_MERGE_PRESSURE) : 0.0F;
         String cloudTypeId = tag.contains(TAG_CLOUD_TYPE_ID, Tag.TAG_STRING)
                 ? tag.getString(TAG_CLOUD_TYPE_ID)
@@ -481,6 +685,22 @@ public final class CloudClusterState {
         CloudMorphologyFamily morphologyFamily = tag.contains(TAG_MORPHOLOGY_FAMILY, Tag.TAG_STRING)
                 ? CloudMorphologyFamily.byId(tag.getString(TAG_MORPHOLOGY_FAMILY), CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily())
                 : CloudTypeRegistry.getOrDefault(cloudTypeId).getMorphologyFamily();
+        UUID morphologyGroupId = tag.hasUUID(TAG_MORPHOLOGY_GROUP_ID)
+                ? tag.getUUID(TAG_MORPHOLOGY_GROUP_ID)
+                : clusterId;
+        int morphologyCount = tag.contains(TAG_MORPHOLOGY_COUNT, Tag.TAG_INT)
+                ? Math.max(1, tag.getInt(TAG_MORPHOLOGY_COUNT))
+                : 1;
+        int morphologyIndex = tag.contains(TAG_MORPHOLOGY_INDEX, Tag.TAG_INT)
+                ? tag.getInt(TAG_MORPHOLOGY_INDEX)
+                : 0;
+        int morphologyLayoutVersion = tag.contains(TAG_MORPHOLOGY_LAYOUT_VERSION, Tag.TAG_INT)
+                ? Math.max(0, tag.getInt(TAG_MORPHOLOGY_LAYOUT_VERSION))
+                : 0;
+        CloudMorphologyMemberTier morphologyMemberTier = morphologyLayoutVersion > 0
+                && tag.contains(TAG_MORPHOLOGY_MEMBER_TIER, Tag.TAG_STRING)
+                ? CloudMorphologyMemberTier.byId(tag.getString(TAG_MORPHOLOGY_MEMBER_TIER))
+                : CloudMorphologyMemberTier.UNKNOWN;
         int cloudTypeTicks = tag.contains(TAG_CLOUD_TYPE_TICKS) ? tag.getInt(TAG_CLOUD_TYPE_TICKS) : 0;
         int cloudSeed = tag.contains(TAG_CLOUD_SEED) ? tag.getInt(TAG_CLOUD_SEED) : deriveCloudSeed(clusterId);
 
@@ -503,10 +723,22 @@ public final class CloudClusterState {
         state.setLifetimeTicks(lifetimeTicks);
         state.setGrowth(growth);
         state.setDecay(decay);
+        state.setGrowthTargets(Math.max(1.0F, targetRadius), targetCoverage, targetDensity);
+        state.setSpawnRadius(Math.max(1.0F, spawnRadius));
+        state.setLastMotionTick(lastMotionTick);
+        state.setLastGrowthTick(lastGrowthTick);
+        state.setLastGrowthRate(lastGrowthRate);
         state.setMergePressure(mergePressure);
         state.setCloudTypeId(cloudTypeId);
         state.setPreviousCloudTypeId(previousCloudTypeId);
         state.setMorphologyFamily(morphologyFamily);
+        state.setMorphologyMembership(
+                morphologyGroupId,
+                morphologyIndex,
+                morphologyCount,
+                morphologyLayoutVersion,
+                morphologyMemberTier
+        );
         state.setCloudTypeTicks(cloudTypeTicks);
         state.setCloudSeed(cloudSeed);
 

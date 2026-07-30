@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.compat;
 
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 final class CompatModuleDetector {
     private CompatModuleDetector() {

@@ -2,7 +2,9 @@ package net.Gabou.projectatmosphere.mixin;
 
 import net.Gabou.projectatmosphere.client.BiomeClientTemperatureCache;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.temperature.util.LocalBiomeTemperatureResolver;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -20,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(value = Biome.class, remap = false)
+@Mixin(Biome.class)
 public class BiomeFreezingMixin {
     private static final float FREEZE_THRESHOLD_C = 0.0f;
 
@@ -89,12 +91,12 @@ public class BiomeFreezingMixin {
 
     private static Float resolveTemperature(LevelReader level, BlockPos pos) {
         if (level instanceof ServerLevel serverLevel) {
-            ResourceLocation biomeId = serverLevel.getBiome(pos).unwrapKey().map(key -> key.location()).orElse(null);
-            if (biomeId == null) {
+            ForecastRegion forecast = ForecastOrchestrator.getRegionForecast(serverLevel, pos);
+            if (forecast == null) {
                 return null;
             }
-            BiomeInstanceKey key = new BiomeInstanceKey(biomeId, pos);
-            return ForecastOrchestrator.getCurrentTemperature(key, serverLevel.getGameTime());
+            RegionInstanceKey key = RegionInstanceKey.from(pos);
+            return (float) LocalBiomeTemperatureResolver.getLocalBiomeTemperature(serverLevel, pos, key, forecast);
         }
         if (level instanceof Level clientLevel
                 && "net.minecraft.client.multiplayer.ClientLevel".equals(level.getClass().getName())) {

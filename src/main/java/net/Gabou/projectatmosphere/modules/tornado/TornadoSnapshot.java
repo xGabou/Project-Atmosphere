@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
 import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
+import net.Gabou.projectatmosphere.modules.weather.StormCloudAttachment;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
 
@@ -19,8 +20,13 @@ public record TornadoSnapshot(
         int stormLevel,
         float recentDebrisScore,
         float formationProgress,
-        StormLifecyclePhase phase
+        StormLifecyclePhase phase,
+        StormCloudAttachment cloudAttachment
 ) {
+    public TornadoSnapshot {
+        cloudAttachment = cloudAttachment == null ? StormCloudAttachment.NONE : cloudAttachment;
+    }
+
     // ---------------------------------------------------------------------
     // Network serialization
     // ---------------------------------------------------------------------
@@ -40,6 +46,7 @@ public record TornadoSnapshot(
         buf.writeFloat(this.recentDebrisScore);
         buf.writeFloat(this.formationProgress);
         buf.writeEnum(this.phase);
+        this.cloudAttachment.write(buf);
     }
 
     public static TornadoSnapshot read(FriendlyByteBuf buf) {
@@ -56,6 +63,7 @@ public record TornadoSnapshot(
         float recentDebrisScore = buf.readFloat();
         float formationProgress = buf.readFloat();
         StormLifecyclePhase phase = buf.readEnum(StormLifecyclePhase.class);
-        return new TornadoSnapshot(id, position, radius, bottomY, height, windSpeed, windAngle, windGust, normalizedIntensity, stormLevel, recentDebrisScore, formationProgress, phase);
+        StormCloudAttachment cloudAttachment = StormCloudAttachment.read(buf);
+        return new TornadoSnapshot(id, position, radius, bottomY, height, windSpeed, windAngle, windGust, normalizedIntensity, stormLevel, recentDebrisScore, formationProgress, phase, cloudAttachment);
     }
 }

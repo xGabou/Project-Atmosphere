@@ -4,7 +4,6 @@ import net.Gabou.projectatmosphere.client.atmosphere.AtmosphereClientState;
 import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
 import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
-import net.Gabou.projectatmosphere.clouds.client.lighting.CloudLightingManager;
 import net.Gabou.projectatmosphere.client.fog.FogBiomeClassifier;
 import net.Gabou.projectatmosphere.compat.temperature.ClientTemperatureResolver;
 import net.minecraft.client.Minecraft;
@@ -12,8 +11,8 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
 @OnlyIn(Dist.CLIENT)
 public final class AtmosphereSkySampler {
@@ -47,8 +46,7 @@ public final class AtmosphereSkySampler {
         float atmosphericClarity = 0.0F;
         if (canSeeSky) {
             float mapShadow = CloudShadowMapAccess.sampleShadowAt(pos.getX() + 0.5D, pos.getZ() + 0.5D);
-            float managedShadow = CloudLightingManager.getPlayerShadowIntensity();
-            float cloudShadow = Math.max(mapShadow, managedShadow * 0.82F);
+            float cloudShadow = mapShadow;
             float sunOcclusion = Mth.clamp(1.0F - cloudCover * 0.82F - rainIntensity * 0.95F - cloudShadow * 0.70F, 0.0F, 1.0F);
             sunVisibility = daylightFactor * sunOcclusion;
 

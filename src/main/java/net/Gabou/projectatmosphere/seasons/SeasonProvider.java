@@ -1,5 +1,6 @@
 package net.Gabou.projectatmosphere.seasons;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 /**
@@ -14,4 +15,8 @@ public interface SeasonProvider {
      * return {@link SeasonSnapshot#neutral()} if data is unavailable.
      */
     SeasonSnapshot snapshot(Level level);
+
+    default SeasonSnapshot snapshot(Level level, BlockPos pos) {
+        return snapshot(level);
+    }
 }

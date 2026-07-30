@@ -1,10 +1,9 @@
 package net.Gabou.projectatmosphere.mixin;
 
-import com.BreadRes.desertstormwarming.client.SandstormDebugBlocker;
-import net.minecraftforge.client.event.RenderGuiOverlayEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
-@Mixin(SandstormDebugBlocker.class)
+@Mixin(targets = "com.BreadRes.desertstormwarming.client.SandstormDebugBlocker", remap = false)
 public class MixinSandstormDebugBlocker {
 
     /**
@@ -13,7 +12,7 @@ public class MixinSandstormDebugBlocker {
      * @reason Because I said so
      */
     @Overwrite(remap = false)
-    public static void onRenderOverlay(RenderGuiOverlayEvent.Pre event) {
+    public static void onRenderOverlay(RenderGuiEvent.Pre event) {
         // do nothing
     }
 
@@ -23,7 +22,7 @@ public class MixinSandstormDebugBlocker {
      * @reason Because I said so
      */
     @Overwrite(remap = false)
-    public static void onRenderOverlay(RenderGuiOverlayEvent.Post event) {
+    public static void onRenderOverlay(RenderGuiEvent.Post event) {
         // do nothing
     }
 }

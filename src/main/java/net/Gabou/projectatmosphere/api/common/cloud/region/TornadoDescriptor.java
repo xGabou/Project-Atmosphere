@@ -130,12 +130,10 @@ public class TornadoDescriptor {
     }
 
     /**
-     * Applies the velocity of the tornado and the delta movement of the parent region to the cached offsets.
-     * This keeps the serialized descriptor aligned with the owning cloud region.
+     * Descriptor movement is owned by TornadoInstance. Region ticks keep this
+     * method for compatibility, but they must not integrate a second motion path.
      */
     public void tick(float regionDeltaX, float regionDeltaZ) {
-        this.offsetX += regionDeltaX + this.velocityX;
-        this.offsetZ += regionDeltaZ + this.velocityZ;
     }
 
     public CompoundTag toTag() {
@@ -182,7 +180,7 @@ public class TornadoDescriptor {
     public static TornadoDescriptor fromTag(CompoundTag tag) {
         UUID uuid = tag.hasUUID(KEY_UUID) ? tag.getUUID(KEY_UUID) : UUID.randomUUID();
         ResourceLocation controller = tag.contains(KEY_CONTROLLER, Tag.TAG_STRING)
-                ? new ResourceLocation(tag.getString(KEY_CONTROLLER)) : null;
+                ? ResourceLocation.parse(tag.getString(KEY_CONTROLLER)) : null;
         float offsetX = tag.getFloat(KEY_OFFSET_X);
         float offsetZ = tag.getFloat(KEY_OFFSET_Z);
         float velocityX = tag.getFloat(KEY_VELOCITY_X);

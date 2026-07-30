@@ -17,6 +17,7 @@ public final class PaCloudCommand {
         return Commands.literal("cloud")
                 .then(Commands.literal("spawn")
                         .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> CommandCloudService.spawnCloud(ctx.getSource()))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .suggests(PaCommandSuggestions.CLOUD_TYPE_SUGGESTIONS)
                                 .executes(ctx -> CommandCloudService.spawnCloud(ctx.getSource(), StringArgumentType.getString(ctx, "id")))))
@@ -48,6 +49,10 @@ public final class PaCloudCommand {
                         .executes(ctx -> CommandCloudService.sendCloudList(ctx.getSource())))
                 .then(Commands.literal("count")
                         .executes(ctx -> CommandCloudService.sendCloudCount(ctx.getSource())))
+                .then(Commands.literal("stats")
+                        .executes(ctx -> CommandCloudService.sendCloudFieldStats(ctx.getSource())))
+                .then(Commands.literal("evolution")
+                        .executes(ctx -> CommandCloudService.sendCloudFieldEvolution(ctx.getSource())))
                 .then(Commands.literal("clear")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> CommandCloudService.clearClouds(ctx.getSource()))
@@ -70,14 +75,19 @@ public final class PaCloudCommand {
                                     ctx.getSource(),
                                     false,
                                     "Cloud commands",
-                                    "/pa cloud spawn <id>",
+                                    "/pa cloud spawn",
+                                    "/pa cloud spawn [id]",
                                     "/pa cloud rain [intensity]",
                                     "/pa cloud thunder [intensity]",
                                     "/pa cloud snowstorm [overwrite]",
                                     "/pa cloud list",
                                     "/pa cloud count",
+                                    "/pa cloud stats",
+                                    "/pa cloud evolution",
+                                    "/pa cloud render on|off|status",
+                                    "/pa cloud render quality <low|low_24|low_24_steps|medium|high|ultra>",
                                     "/pa cloud clear",
-                                    "/pa cloud clear inactive",
+                                    "/pa cloud clear inactive (legacy region cleanup)",
                                     "/pa cloud freeze <true|false>",
                                     "/pa cloud sync"
                             );

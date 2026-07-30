@@ -1,15 +1,18 @@
 package net.Gabou.projectatmosphere.modules.region;
 
-import java.util.Optional;
 import java.util.List;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import java.util.Optional;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 
 /**
- * Persistence boundary for region saves and biome fallback JSON.
+ * Persistence boundary for region forecast JSON.
  */
 public interface RegionPersistence {
-    Optional<BiomeFallbackSnapshot> loadFallback(RegionInstanceKey id);
+    boolean hasRegionData();
 
-    BiomeFallbackSnapshot saveFallback(RegionInstanceKey id, ForecastRegion.Section[] sections, List<BiomeInstanceKey> sourceBiomes);
+    List<RegionInstanceKey> listRegionIds();
+
+    Optional<ForecastRegion> loadRegion(RegionInstanceKey id);
+
+    void saveRegion(ForecastRegion region);
 }

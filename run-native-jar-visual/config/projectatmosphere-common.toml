@@ -1,0 +1,380 @@
+
+[performance]
+	#Force use of shared executor for all async tasks, regardless of CPU count
+	forceSharedExecutor = false
+	#Maximum distance in blocks to render clouds; higher values impact performance
+	#Range: > 100
+	cloudRenderDistance = 2000
+	#Qualite du raymarch volumetrique PA: LOW=24 etapes a 25%, LOW_24=32 etapes a 37.5%, MEDIUM=40 etapes a 50%, HIGH=64 etapes a 50%, ULTRA=96 etapes a 75%
+	#Allowed Values: LOW, LOW_24, MEDIUM, HIGH, ULTRA
+	cloudRaymarchQuality = "ULTRA"
+	#Enable the Project Atmosphere CloudField volume renderer when Simple Clouds is not installed. Disable this as a persistent kill switch to fall back to vanilla clouds.
+	cloudFieldRendererEnabled = true
+	#Enable the PA-native volumetric cloud pipeline (weather-map + global raymarch). When disabled, the legacy per-field CloudField renderer is used instead.
+	cloudVolumetricRendererEnabled = true
+	#Apply volumetric cloud ground shadows as a depth-based post-process. The GPU shadow map texture stays published for shader packs even when this is disabled.
+	enableVolumetricGroundShadows = true
+
+[display]
+	#Display values in imperial units (F, mph, inHg) instead of metric (C, m/s, hPa)
+	imperialUnits = false
+	#Select how Project Atmosphere cloud rendering should behave
+	#Allowed Values: FULL, HYBRID, VANILLA
+	cloudMode = "FULL"
+	#Controls whether cloudDimensionIds is used as an allow-list or deny-list for PA cloud/weather ownership
+	#Allowed Values: WHITELIST, BLACKLIST
+	cloudDimensionFilterMode = "WHITELIST"
+	#Dimension ids used by cloudDimensionFilterMode. Default allows PA clouds/weather only in the Overworld.
+	cloudDimensionIds = ["minecraft:overworld"]
+
+[storms]
+	#Global multiplier for storm severity calculations
+	#Range: 0.5 ~ 28.0
+	stormSeverityBooster = 3.2
+	#Enable tornado spawning and commands
+	enableTornadoes = true
+	#Enable random debris spawning during storms
+	enableStormDebris = false
+	#Maximum number of storm debris items allowed per chunk
+	#Range: > 0
+	maxStormDebrisPerChunk = 10
+	#Automatically repair tornado-damaged glass after 5 minutes of no new damage
+	autoRepairGlass = true
+	#Enable glass damage when a tornado passes over it
+	damageGlassOnTornado = true
+	#Enable limited hurricane block destruction
+	enableHurricaneDestruction = true
+	#Overall hurricane destruction strength. Higher values increase checks, break chance, and tree damage.
+	#Range: 0.0 ~ 3.0
+	hurricaneDestructionStrength = 1.0
+	#Drop items from blocks broken by hurricanes
+	hurricaneDropBrokenBlocks = false
+	#Allow hurricanes to damage leaves and occasionally break logs
+	hurricaneDamageTrees = true
+	#Forecast-region radius around each active player used for weak-low and cyclone candidate scans.
+	#Range: 1 ~ 32
+	cycloneCandidateScanRadiusRegions = 10
+	#Ticks between weak-low/cyclone candidate scan passes.
+	#Range: 20 ~ 24000
+	cycloneCandidateScanIntervalTicks = 600
+	#Maximum forecast-known regions evaluated per candidate scan pass.
+	#Range: 16 ~ 4096
+	cycloneCandidateMaxRegionsPerTick = 512
+	#Enable storm and weather event spawning/processing
+	eventsEnabled = true
+	#Enable hurricane spawning, ticking, syncing, and commands
+	enableHurricanes = false
+	#Enable tornado block destruction and terrain scouring
+	enableTornadoDestruction = true
+
+	[storms.tornado]
+		#Seconds between tornado spawn checks
+		#Range: 1.0 ~ 3600.0
+		checkIntervalSec = 60.0
+		#Base radius around a biome center to spawn a tornado
+		#Range: 1.0 ~ 512.0
+		baseSpawnRadiusM = 64.0
+		#Minimum surface vs aloft temperature contrast for risk
+		#Range: 0.0 ~ 100.0
+		minTempContrastC = 6.0
+		#Minimum humidity percentage for risk
+		#Range: 0.0 ~ 100.0
+		humidityMinPercent = 65.0
+		#Multiplier for pressure gradient contribution
+		#Range: 0.0 ~ 100.0
+		pressureGradientGain = 10.0
+		#Maximum pressure gradient contribution
+		#Range: 0.0 ~ 100.0
+		pressureGradientCap = 3.0
+		#Minimum wind speed difference for shear
+		#Range: 0.0 ~ 100.0
+		shearMinSpeedDiffMps = 5.0
+		#Minimum wind direction difference for shear
+		#Range: 0.0 ~ 360.0
+		shearMinDirDiffDeg = 45.0
+		#Risk multiplier during storms
+		#Range: 0.0 ~ 10.0
+		stormMultiplier = 1.5
+		#Minimum computed risk to consider spawning
+		#Range: 0.0 ~ 100.0
+		riskMinToConsider = 4.0
+		#Base chance per risk point to trigger a tornado
+		#Range: 0.0 ~ 1.0
+		baseTriggerChance = 0.05
+		#Temperature lapse rate per 100m for aloft proxy
+		#Range: 0.0 ~ 10.0
+		lapseRateCPer100m = 0.65
+		#Height difference in meters for aloft temperature proxy
+		#Range: 0.0 ~ 10000.0
+		aloftDeltaHM = 1500.0
+		#Minimum tornado intensity
+		#Range: 0.0 ~ 1.0
+		intensityMin = 0.4
+		#Maximum tornado intensity
+		#Range: 0.0 ~ 1.0
+		intensityMax = 1.0
+		#Cooldown in minutes before a cell can spawn another tornado
+		#Range: > 0
+		cellCooldownMinutes = 20
+		#Enable verbose tornado logging (SSBO detection, fallback decisions, command outcomes).
+		debugTornadoLogging = false
+		#Client tornado volume quality multiplier. Lower values reduce tornado shader step count and detail for better FPS.
+		#Range: 0.25 ~ 1.0
+		renderQuality = 0.72
+		#Disable Project Atmosphere's Simple Clouds storm SSBO integration. Tornado cloud carving uses safer uniforms; hurricane cloud shaping falls back off when this is enabled.
+		disableSimpleCloudsTornadoSSBO = false
+		#Client tornado volume downsample factor. 1.0 renders at full resolution; higher values reduce shaded pixels before upsampling.
+		#Range: 1.0 ~ 4.0
+		renderDownsample = 2.5
+
+[wind]
+	#Seconds between base wind retarget
+	#Range: 1.0 ~ 600.0
+	baseRetargetSec = 60.0
+	#Seconds between direction retarget
+	#Range: 1.0 ~ 600.0
+	dirRetargetSec = 90.0
+	#Average gust duration in seconds
+	#Range: 1.0 ~ 600.0
+	gustMeanSec = 15.0
+	#Gust decay speed in m/s per second
+	#Range: 0.0 ~ 100.0
+	gustDecayMps = 1.0
+	#Multiplier for gust speed during storms
+	#Range: 0.0 ~ 10.0
+	stormGustMult = 2.0
+	#Minimum wind speed to push entities
+	#Range: 0.0 ~ 100.0
+	pushThresholdMps = 6.0
+	#Push scale applied to players
+	#Range: 0.0 ~ 1.0
+	playerPushScale = 0.04
+	#Push scale applied to other entities
+	#Range: 0.0 ~ 1.0
+	entityPushScale = 0.03
+	#Soft-start range above the threshold where wind push ramps up
+	#Range: 0.0 ~ 100.0
+	pushRampMps = 8.0
+	#Blend strength for steering wind-bent particles per tick
+	#Range: 0.0 ~ 1.0
+	particleBendStrength = 0.08
+	#Minimum base wind speed (m/s) before player gusts can occur
+	#Range: 0.0 ~ 100.0
+	playerWindThresholdMps = 11.1
+	#Maximum per-tick gust impulse for players (blocks per tick)
+	#Range: 0.0 ~ 0.2
+	playerMaxGustBpt = 0.002
+	#Scale for gust chance once wind exceeds the threshold
+	#Range: 0.0 ~ 1.0
+	playerGustChanceScale = 0.03
+	#Divider for excess wind when computing gust chance (m/s)
+	#Range: 1.0 ~ 100.0
+	playerGustChanceDivider = 15.0
+	#Strength scale applied to excess wind for player gusts
+	#Range: 0.0 ~ 1.0
+	playerGustStrengthScale = 0.006666666667
+	#Minimum gust duration for players (ticks)
+	#Range: 1 ~ 200
+	playerGustDurationMin = 10
+	#Maximum gust duration for players (ticks)
+	#Range: 1 ~ 200
+	playerGustDurationMax = 40
+	#Angle variance applied to gust direction (degrees)
+	#Range: 0.0 ~ 45.0
+	playerGustAngleVarianceDeg = 10.0
+	#Wind speed at which extreme gust multipliers kick in (m/s)
+	#Range: 0.0 ~ 100.0
+	playerGustExtremeThresholdMps = 30.0
+	#Multiplier applied to gust chance in extreme winds
+	#Range: 1.0 ~ 10.0
+	playerGustExtremeChanceMult = 2.5
+	#Multiplier applied to max gust strength in extreme winds
+	#Range: 1.0 ~ 10.0
+	playerGustExtremeStrengthMult = 2.0
+
+[leafParticles]
+	#Sampling radius in blocks around the player for wind-driven leaf particles
+	#Range: 4 ~ 128
+	radiusBlocks = 32
+	#Vertical scan range above the player for canopy sampling
+	#Range: 0 ~ 64
+	verticalScanUp = 12
+	#Vertical scan range below the player for canopy sampling
+	#Range: 0 ~ 64
+	verticalScanDown = 12
+	#Number of canopy sampling attempts per client tick
+	#Range: 0 ~ 32
+	attemptsPerTick = 2
+	#Chance per valid canopy candidate to spawn a particle
+	#Range: 0.0 ~ 1.0
+	chancePerCandidate = 0.03
+	#Minimum foliage blocks required in a 3x3x3 neighborhood to accept a canopy candidate
+	#Range: 1 ~ 27
+	minFoliageNeighbors = 6
+	#Require at least one log block below the canopy candidate
+	requireLogBelow = true
+	#Maximum depth to search for a log block below the canopy candidate
+	#Range: 1 ~ 32
+	maxLogSearchDepth = 8
+
+[seasonalTrees]
+	#Enable seasonal tree leaf transitions and spreading
+	enabled = false
+	#Enable Dynamic Trees support (preferred)
+	dynamicTreesEnabled = false
+	#Enable conservative vanilla tree support (off by default)
+	vanillaEnabled = true
+	#In-game days for leaves to drop during autumn
+	#Range: 0.1 ~ 40.0
+	leafDropDays = 4.0
+	#In-game days for leaves to regrow during spring
+	#Range: 0.1 ~ 40.0
+	leafRegrowDays = 4.0
+	#Cooldown in days before a tree can restart a season transition
+	#Range: 0.0 ~ 40.0
+	transitionCooldownDays = 2.0
+	#Max random offset in days applied to per-tree seasonal transitions
+	#Range: 0.0 ~ 20.0
+	transitionOffsetDays = 2.0
+	#Chance per in-game day for mature trees to attempt spreading
+	#Range: 0.0 ~ 1.0
+	spreadChancePerDay = 0.02
+	#Baseline spread radius in blocks for local seed dispersal
+	#Range: 1 ~ 128
+	spreadRadiusBlocks = 12
+	#Base vigor regeneration per in-game day
+	#Range: 0.0 ~ 1.0
+	vigorRegenPerDay = 0.05
+	#Minimum vigor required before a tree can spread
+	#Range: 0.0 ~ 1.0
+	vigorMinForSpread = 0.55
+	#Maximum number of active seed particles (wind transport) per world
+	#Range: 0 ~ 10000
+	maxActiveSeeds = 256
+	#Seed particle lifetime in ticks before attempting to plant
+	#Range: 20 ~ 72000
+	seedLifetimeTicks = 400
+	#Base speed multiplier for wind-transported seeds
+	#Range: 0.0 ~ 5.0
+	seedBaseSpeed = 0.15
+	#Enable wind-based seed transport when Project Atmosphere is installed
+	windTransportEnabled = true
+	#Maximum number of tree updates per tick
+	#Range: 1 ~ 10000
+	budgetPerTick = 80
+	#Maximum number of chunk scan steps per tick
+	#Range: 1 ~ 20000
+	scanBudgetPerTick = 120
+
+[worldEffects]
+	#Enable Project Atmosphere world effects (cloud burn suppression, rain extinguish, cauldron filling)
+	enabled = true
+	#Random sample count per player per tick for weather world effects
+	#Range: 0 ~ 128
+	samplesPerPlayerPerTick = 12
+	#Sampling radius in blocks around each player
+	#Range: 8 ~ 512
+	sampleRadiusBlocks = 64
+	#Cloud cover threshold above which sun-burning mobs stop igniting
+	#Range: 0.0 ~ 1.0
+	cloudBurnPreventionThreshold = 0.75
+	#Cloud cover threshold above which burning mobs cool down faster
+	#Range: 0.0 ~ 1.0
+	cloudFireDampThreshold = 0.9
+	#Extra fire ticks removed per tick when clouds are very dense
+	#Range: 0 ~ 200
+	cloudFireDampTicks = 4
+	#Base chance per sample to extinguish fire/campfires when raining (scaled by rain intensity)
+	#Range: 0.0 ~ 1.0
+	fireExtinguishBaseChance = 0.12
+	#Base chance per sample to fill cauldrons when raining (scaled by rain intensity)
+	#Range: 0.0 ~ 1.0
+	cauldronFillBaseChance = 0.06
+
+[fog]
+	#Enable humidity-driven dynamic fog rendering on the client
+	enabled = true
+	#Ticks between lightweight server->client atmosphere sync updates used by fog and sky-effect compatibility sampling
+	#Range: 1 ~ 200
+	syncIntervalTicks = 20
+	#Humidity percentage where dynamic fog starts to form
+	#Range: 0.0 ~ 100.0
+	humidityStartPercent = 72.0
+	#Humidity percentage where the humidity contribution reaches full strength
+	#Range: 0.0 ~ 100.0
+	humidityFullPercent = 96.0
+	#Base fog strength added by moisture-heavy biomes such as swamps or rainforests
+	#Range: 0.0 ~ 1.0
+	wetBiomeBaseStrength = 0.18
+	#Additional fog strength contributed by active rain intensity
+	#Range: 0.0 ~ 1.0
+	rainBoost = 0.22
+	#Near fog plane used when dynamic fog is fully saturated
+	#Range: 0.0 ~ 64.0
+	nearDistance = 0.5
+	#Far fog plane used when dynamic fog is fully saturated
+	#Range: 4.0 ~ 512.0
+	farDistance = 72.0
+	#Color tint blend applied by dynamic fog
+	#Range: 0.0 ~ 1.0
+	colorBlend = 0.45
+	#Biome downfall value that starts contributing wet-biome fog weighting
+	#Range: 0.0 ~ 1.0
+	wetBiomeDownfallMin = 0.75
+	#Explicit biome ids that should always count as moisture-heavy for fog
+	wetBiomeIds = ["minecraft:swamp", "minecraft:mangrove_swamp"]
+	#Biome path keywords that should count as moisture-heavy for fog
+	wetBiomeKeywords = ["swamp", "marsh", "bog", "fen", "rainforest", "jungle", "mangrove", "wetland", "bayou"]
+
+[telemetry]
+	#Enable lightweight telemetry collection for diagnostics
+	enableTelemetry = true
+	#Number of days to retain exported telemetry archives before pruning
+	#Range: 0 ~ 365
+	telemetryRetentionDays = 14
+
+[debug]
+	#Enable debug mode for verbose logging and diagnostics
+	debugMode = false
+	#Cloud render diagnostics overlay mode. F3+O cycles this in-game.
+	#Allowed Values: OFF, BASIC, FULL
+	cloudDiagnosticsOverlay = "OFF"
+	#Show cloud render diagnostics in the Project Atmosphere overlay.
+	cloudDiagnosticsShowRender = true
+	#Show localized weather diagnostics in the Project Atmosphere overlay.
+	cloudDiagnosticsShowWeather = true
+	#Show world effect diagnostics in the Project Atmosphere overlay.
+	cloudDiagnosticsShowWorldEffects = true
+
+[clouds]
+	#Hauteur Y fixe utilisee par le spawn natif des nuages Project Atmosphere
+	#Range: -2048 ~ 4096
+	nativeCloudSpawnHeight = 256
+	#Enable Project Atmosphere custom rain and snow rendering hooks. Vanilla precipitation remains the fallback.
+	enableCustomPrecipitationRendering = true
+	#Enable Project Atmosphere cloud shadow map publication for render, terrain, fog, rainbow, and mod API consumers.
+	enableCloudShadowMap = true
+	#Enable native Project Atmosphere cloud drift from regional wind.
+	enableCloudMovement = true
+	#Freeze native Project Atmosphere cloud movement for debugging and screenshots.
+	freezeCloudMovement = true
+	#Blocks-per-tick drift multiplier applied to wind speed in m/s for native PA clouds.
+	#Range: 0.0 ~ 1.0
+	cloudWindDriftScale = 0.035
+	#Prefer conservative cloud rendering paths intended to avoid shader-pack conflicts.
+	shaderSafeMode = false
+
+[forecast]
+	#Multiplier applied to daily forecast variation
+	#Range: 0.0 ~ 3.0
+	forecastDeviationMultiplier = 1.0
+
+[auth]
+	#Reject offline UUID v3 identities during the launcher auth check
+	strictOfflineUuidReject = true
+	#Kick players who fail or timeout the launcher auth challenge
+	kickOnFailure = true
+	#Ticks before a pending launcher auth challenge times out
+	#Range: > 1
+	challengeTimeoutTicks = 200
+

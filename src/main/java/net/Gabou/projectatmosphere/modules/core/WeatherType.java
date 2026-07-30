@@ -10,6 +10,7 @@ import java.util.Map;
  * and provides a mapping from cloudId (ResourceLocation)
  * to the corresponding WeatherType.
  */
+@SuppressWarnings({"removal"})
 public enum WeatherType {
     NONE,
     RAIN,
@@ -34,7 +35,6 @@ public enum WeatherType {
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "mammatus_thin"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "overcast"), RAIN);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "pathway"), NONE);
-        CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "pattern"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "real_itty_bitty"), NONE);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "severe_cumulonimbus"), THUNDERSTORM);
         CLOUD_MAP.put(ResourceLocation.fromNamespaceAndPath("simpleclouds", "severe_nimbostratus"), THUNDERSTORM);

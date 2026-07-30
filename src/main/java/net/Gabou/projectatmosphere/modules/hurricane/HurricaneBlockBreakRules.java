@@ -11,7 +11,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.PushReaction;
-import net.minecraftforge.common.Tags;
+import net.neoforged.neoforge.common.Tags;
 
 final class HurricaneBlockBreakRules {
     static final net.minecraft.tags.TagKey<Block> HURRICANE_FRAGILE = BlockTags.create(

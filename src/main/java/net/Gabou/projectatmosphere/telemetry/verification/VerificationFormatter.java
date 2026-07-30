@@ -32,9 +32,13 @@ public final class VerificationFormatter {
         lines.add("");
         appendCloudBackend(lines, report.cloudBackend());
         lines.add("");
+        appendPaNativeBackend(lines, report.paNativeBackend());
+        lines.add("");
         appendMorphology(lines, report.morphology());
         lines.add("");
         appendEvolution(lines, report.evolution());
+        lines.add("");
+        appendNearestNativeCloud(lines, report.nearestNativeCloud());
         lines.add("");
         appendPersistence(lines, report.persistence());
         if (!report.issues().isEmpty()) {
@@ -56,6 +60,7 @@ public final class VerificationFormatter {
         VerificationReport.WeatherCellSection cells = report.weatherCells();
         VerificationReport.CloudSection clouds = report.clouds();
         VerificationReport.CloudBackendSection cloudBackend = report.cloudBackend();
+        VerificationReport.PaNativeBackendSection paNativeBackend = report.paNativeBackend();
         VerificationReport.PersistenceSection persistence = report.persistence();
 
         lines.add("PA_VERIFY_SNAPSHOT");
@@ -159,12 +164,50 @@ public final class VerificationFormatter {
         lines.add("cloudBackend.lastMigrationDirection=" + cloudBackend.lastMigrationDirection());
         lines.add("cloudBackend.duplicateRisk=" + cloudBackend.duplicateVisualCloudRisk());
         lines.add("cloudBackend.migrationStatus=" + cloudBackend.migrationStatus().label());
+        lines.add("paNative.enabled=" + paNativeBackend.paNativeEnabled());
+        lines.add("paNative.cloudsStored=" + paNativeBackend.paNativeCloudsStored());
+        lines.add("paNative.cloudsSynced=" + paNativeBackend.paNativeCloudsSynced());
+        lines.add("paNative.cloudsRendered=" + paNativeBackend.paNativeCloudsRendered());
+        lines.add("paNative.syncActive=" + paNativeBackend.nativeCloudSyncActive());
+        lines.add("paNative.renderActive=" + paNativeBackend.nativeCloudRenderActive());
+        lines.add("paNative.shadowActive=" + paNativeBackend.nativeCloudShadowActive());
+        lines.add("paNative.fallbackDarkeningActive=" + paNativeBackend.fallbackDarkeningActive());
+        lines.add("paNative.lightingMetadataActive=" + paNativeBackend.lightingMetadataActive());
+        lines.add("paNative.dhMetadataActive=" + paNativeBackend.dhMetadataActive());
         for (CloudMorphologyFamily family : CloudMorphologyFamily.values()) {
             int count = report.morphology().countsByFamily().getOrDefault(family, 0);
             lines.add("morphology." + family.name() + "=" + count);
         }
         for (Map.Entry<String, Integer> entry : report.evolution().countsByType().entrySet()) {
             lines.add("evolution." + entry.getKey() + "=" + entry.getValue());
+        }
+        VerificationReport.NearestNativeCloud nativeCloud = report.nearestNativeCloud();
+        if (nativeCloud != null) {
+            lines.add("nativeCloud.id=" + nativeCloud.cloudId());
+            lines.add("nativeCloud.type=" + nativeCloud.type());
+            lines.add("nativeCloud.position=" + nativeCloud.position());
+            lines.add("nativeCloud.previousPosition=" + nativeCloud.previousPosition());
+            lines.add("nativeCloud.velocity=" + nativeCloud.velocity());
+            lines.add("nativeCloud.windCoupling=" + formatNumber(nativeCloud.windCoupling()));
+            lines.add("nativeCloud.motionActive=" + nativeCloud.motionActive());
+            lines.add("nativeCloud.motionBlockedReason=" + nativeCloud.motionBlockedReason());
+            lines.add("nativeCloud.radius=" + formatNumber(nativeCloud.radius()));
+            lines.add("nativeCloud.targetRadius=" + formatNumber(nativeCloud.targetRadius()));
+            lines.add("nativeCloud.renderedRadius=" + formatNumber(nativeCloud.renderedRadius()));
+            lines.add("nativeCloud.radiusCap=" + formatNumber(nativeCloud.radiusCap()));
+            lines.add("nativeCloud.coverage=" + formatNumber(nativeCloud.coverage()));
+            lines.add("nativeCloud.targetCoverage=" + formatNumber(nativeCloud.targetCoverage()));
+            lines.add("nativeCloud.density=" + formatNumber(nativeCloud.density()));
+            lines.add("nativeCloud.targetDensity=" + formatNumber(nativeCloud.targetDensity()));
+            lines.add("nativeCloud.growthRate=" + formatNumber(nativeCloud.growthRate()));
+            lines.add("nativeCloud.growthActive=" + nativeCloud.growthActive());
+            lines.add("nativeCloud.growthBlockedReason=" + nativeCloud.growthBlockedReason());
+            lines.add("nativeCloud.age=" + nativeCloud.age());
+            lines.add("nativeCloud.lifetime=" + nativeCloud.lifetime());
+            lines.add("nativeCloud.lastStateTick=" + nativeCloud.lastStateTick());
+            lines.add("nativeCloud.lastSyncTick=" + nativeCloud.lastSyncTick());
+            lines.add("nativeCloud.lastRenderSnapshotTick=" + nativeCloud.lastRenderSnapshotTick());
+            lines.add("nativeCloud.renderBounds=" + nativeCloud.renderBounds());
         }
         lines.add("persistence.forecast=" + persistence.forecast().label());
         lines.add("persistence.atmosphere=" + persistence.atmosphere().label());
@@ -440,6 +483,20 @@ public final class VerificationFormatter {
         lines.add("Migration Status: " + backend.migrationStatus().label());
     }
 
+    private static void appendPaNativeBackend(List<String> lines, VerificationReport.PaNativeBackendSection backend) {
+        lines.add("PA-Native Cloud Backend:");
+        lines.add("PA Native Enabled: " + (backend.paNativeEnabled() ? "yes" : "no"));
+        lines.add("PA Native Clouds Stored: " + backend.paNativeCloudsStored());
+        lines.add("PA Native Clouds Synced: " + backend.paNativeCloudsSynced());
+        lines.add("PA Native Clouds Rendered: " + backend.paNativeCloudsRendered());
+        lines.add("Native Cloud Sync Active: " + (backend.nativeCloudSyncActive() ? "yes" : "no"));
+        lines.add("Native Cloud Render Active: " + (backend.nativeCloudRenderActive() ? "yes" : "no"));
+        lines.add("Native Cloud Shadow Active: " + (backend.nativeCloudShadowActive() ? "yes" : "no"));
+        lines.add("Fallback Darkening Active: " + (backend.fallbackDarkeningActive() ? "yes" : "no"));
+        lines.add("Lighting Metadata Active: " + (backend.lightingMetadataActive() ? "yes" : "no"));
+        lines.add("DH Metadata Active: " + (backend.dhMetadataActive() ? "yes" : "no"));
+    }
+
     private static void appendMorphology(List<String> lines, VerificationReport.MorphologySection morphology) {
         lines.add("Morphology:");
         lines.add("Status: " + morphology.status().label());
@@ -507,6 +564,39 @@ public final class VerificationFormatter {
             lines.add("Render Bounds: " + nearest.renderBounds());
             lines.add("LOD Tier: " + nearest.lodTier());
         }
+    }
+
+    private static void appendNearestNativeCloud(List<String> lines, VerificationReport.NearestNativeCloud nearest) {
+        lines.add("Nearest Native Cloud:");
+        if (nearest == null) {
+            lines.add("Cloud Id: none");
+            return;
+        }
+        lines.add("Cloud Id: " + nearest.cloudId());
+        lines.add("Type: " + nearest.type());
+        lines.add("Position: " + nearest.position());
+        lines.add("Previous Position: " + nearest.previousPosition());
+        lines.add("Velocity: " + nearest.velocity());
+        lines.add("Wind Coupling: " + formatNumber(nearest.windCoupling()));
+        lines.add("Motion Active: " + (nearest.motionActive() ? "yes" : "no"));
+        lines.add("Motion Blocked Reason: " + nearest.motionBlockedReason());
+        lines.add("Radius: " + formatNumber(nearest.radius()));
+        lines.add("Target Radius: " + formatNumber(nearest.targetRadius()));
+        lines.add("Rendered Radius: " + formatNumber(nearest.renderedRadius()));
+        lines.add("Radius Cap: " + formatNumber(nearest.radiusCap()));
+        lines.add("Coverage: " + formatRatio(nearest.coverage()));
+        lines.add("Target Coverage: " + formatRatio(nearest.targetCoverage()));
+        lines.add("Density: " + formatRatio(nearest.density()));
+        lines.add("Target Density: " + formatRatio(nearest.targetDensity()));
+        lines.add("Growth Rate: " + formatNumber(nearest.growthRate()));
+        lines.add("Growth Active: " + (nearest.growthActive() ? "yes" : "no"));
+        lines.add("Growth Blocked Reason: " + nearest.growthBlockedReason());
+        lines.add("Age: " + nearest.age());
+        lines.add("Lifetime: " + nearest.lifetime());
+        lines.add("Last State Tick: " + nearest.lastStateTick());
+        lines.add("Last Sync Tick: " + nearest.lastSyncTick());
+        lines.add("Last Render Snapshot Tick: " + nearest.lastRenderSnapshotTick());
+        lines.add("Render Bounds: " + nearest.renderBounds());
     }
 
     private static void appendPersistence(List<String> lines, VerificationReport.PersistenceSection persistence) {

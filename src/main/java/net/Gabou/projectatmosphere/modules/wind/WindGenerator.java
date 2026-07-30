@@ -1,83 +1,75 @@
 package net.Gabou.projectatmosphere.modules.wind;
 
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
-import net.Gabou.projectatmosphere.modules.core.ForecastType;
-import net.Gabou.projectatmosphere.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
+import net.Gabou.projectatmosphere.modules.region.RegionBiomeSample;
+import net.Gabou.projectatmosphere.util.AtmosphericPhysics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec2;
-
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class WindGenerator {
-    private static final Map<BiomeInstanceKey, Set<BiomeInstanceKey>> neighborCache = new ConcurrentHashMap<>();
-    private static final int MIN_DISTANCE = 200;
-
-    private static Set<BiomeInstanceKey> getNeighbors(BiomeInstanceKey self, Set<BiomeInstanceKey> all) {
-        return neighborCache.computeIfAbsent(self, key -> {
-            Set<BiomeInstanceKey> list = new HashSet<>();
-            BlockPos c = key.samplePos();
-            for (BiomeInstanceKey other : all) {
-                if (other == key) continue;
-                BlockPos o = other.samplePos();
-                if (c.distSqr(o) <= MIN_DISTANCE * MIN_DISTANCE) {
-                    list.add(other);
-                }
-            }
-            return list;
-        });
-    }
-
+    private static final int NEIGHBOR_DISTANCE = 200;
+    private static final int NEIGHBOR_DISTANCE_SQR = NEIGHBOR_DISTANCE * NEIGHBOR_DISTANCE;
     private static final float SPEED_SCALING = 1.0f;
 
-    public static WindVector[] generateWindWeek(BiomeInstanceKey selfKey) {
-        BlockPos center = selfKey.samplePos();
-        ResourceLocation biome = selfKey.biomeType();
+    public static List<ForecastRegion.GeneratedSample> attachWindForecasts(List<ForecastRegion.GeneratedSample> samples) {
+        if (samples == null || samples.isEmpty()) {
+            return List.of();
+        }
+        List<ForecastRegion.GeneratedSample> result = new ArrayList<>(samples.size());
+        for (ForecastRegion.GeneratedSample sample : samples) {
+            WindVector[] wind = generateWindWeek(sample, samples);
+            result.add(new ForecastRegion.GeneratedSample(
+                    sample.sample(),
+                    sample.temperature(),
+                    sample.humidity(),
+                    sample.pressure(),
+                    wind
+            ));
+        }
+        return result;
+    }
+
+    private static WindVector[] generateWindWeek(ForecastRegion.GeneratedSample self, List<ForecastRegion.GeneratedSample> all) {
+        RegionBiomeSample selfSample = self.sample();
+        BlockPos center = selfSample.pos();
         WindVector[] result = new WindVector[7];
-
-        BiomeForecast biomeForecast = ForecastGenerator.getClosestValidForecast(selfKey, ForecastType.PRESSURE);
-        float[][] selfPressure = biomeForecast.getPressure();
-        float[][] selfTemp = biomeForecast.getTemperature();
-        float[][] selfHumidity = biomeForecast.getHumidity();
-        Set<BiomeInstanceKey> neighbors = getNeighbors(selfKey, ForecastGenerator.getBiomeSamples());
-
-        float altitude = center.getY();
-        float biomeFactor = getBiomeWindModifier(biome);
-        double[] airDensity = AtmosphericPhysics.computeAirDensity(selfTemp, selfHumidity);
+        float[][] pressure = self.pressure();
+        float[][] temperature = self.temperature();
+        float[][] humidity = self.humidity();
+        double[] airDensity = AtmosphericPhysics.computeAirDensity(temperature, humidity);
+        float biomeFactor = getBiomeWindModifier(selfSample.biomeId());
+        float altitudeFactor = 0.5f + 0.5f * Math.min(center.getY() / 256f, 1f);
 
         for (int d = 0; d < 7; d++) {
-            float Pself = (selfPressure[d][0] + selfPressure[d][1]) * 0.5f;
-            float Pavg = 0f;
+            float selfPressure = averageDay(pressure, d);
+            float neighborPressureSum = 0f;
             int count = 0;
-            Vec2 windVector = new Vec2(0, 0);
+            float sumVx = 0f;
+            float sumVz = 0f;
 
-            for (BiomeInstanceKey key : neighbors) {
-                BiomeForecast forecast = ForecastGenerator.getClosestValidForecast(key, ForecastType.PRESSURE);
-                if (forecast == null) continue;
-                float[][] p = forecast.getPressure();
-                if (p == null) continue;
-                float Pn = (p[d][0] + p[d][1]) * 0.5f;
-                Pavg += Pn;
+            for (ForecastRegion.GeneratedSample other : all) {
+                if (other == self || other.sample() == null || other.sample().pos() == null) {
+                    continue;
+                }
+                BlockPos neighborPos = other.sample().pos();
+                int dx = neighborPos.getX() - center.getX();
+                int dz = neighborPos.getZ() - center.getZ();
+                int distSq = dx * dx + dz * dz;
+                if (distSq <= 0 || distSq > NEIGHBOR_DISTANCE_SQR) {
+                    continue;
+                }
+
+                float neighborPressure = averageDay(other.pressure(), d);
+                neighborPressureSum += neighborPressure;
                 count++;
-
-                BlockPos neighborPos = key.samplePos();
-                double dx = neighborPos.getX() - center.getX();
-                double dz = neighborPos.getZ() - center.getZ();
-                double dist = Math.sqrt(dx * dx + dz * dz);
-                if (dist < 1e-2) continue;
-
-                float dP = Pself - Pn;
-                float vx = (float) (dP * dx / dist);
-                float vz = (float) (dP * dz / dist);
-
-                windVector = new Vec2(windVector.x + vx, windVector.y + vz);
-
+                float dist = Mth.sqrt(distSq);
+                float dP = selfPressure - neighborPressure;
+                sumVx += dP * dx / dist;
+                sumVz += dP * dz / dist;
             }
 
             if (count == 0) {
@@ -86,34 +78,37 @@ public class WindGenerator {
                 continue;
             }
 
-            Pavg /= count;
-            float dP = Math.abs(Pavg - Pself);
-            float densityFactor = (float) (airDensity[d] / 1.225f);
-            float normalizedAltitude = Math.min(altitude / 256f, 1f);
-            float altitudeFactor = 0.5f + 0.5f * normalizedAltitude;
-
-
-            float speed = (float) Math.sqrt(2 * dP / densityFactor) * biomeFactor * altitudeFactor * SPEED_SCALING;
+            float avgPressure = neighborPressureSum / count;
+            float dPHpa = Math.abs(avgPressure - selfPressure);
+            float dPPa = dPHpa * 100f;
+            float densityFactor = airDensity.length > d && airDensity[d] > 0 ? (float) (airDensity[d] / 1.225f) : 1f;
+            float speed = (float) Math.sqrt(2 * dPPa / Math.max(0.1f, densityFactor)) * biomeFactor * altitudeFactor * SPEED_SCALING;
             speed = Mth.clamp(speed, 1.2f, 60f);
-            int hash = selfKey.hashCode();
-            float baseSpeed = speed;
-            float gustFactor = Mth.sin((d + hash % 50) * 0.6f) * 0.5f + 1.6f; 
-            float gustSpeed = baseSpeed * gustFactor;
-            gustSpeed = Mth.clamp(gustSpeed, 1.5f, 75f);
-            if (windVector.length() > 1e-3) {
-                windVector = windVector.normalized();
-            }
-            float angle = (float) Math.atan2(windVector.y, windVector.x);
 
+            int hash = selfSample.hashCode();
+            float gustFactor = Mth.sin((d + hash % 50) * 0.6f) * 0.5f + 1.6f;
+            float gustSpeed = Mth.clamp(speed * gustFactor, 1.5f, 75f);
 
-            result[d] = new WindVector(baseSpeed, angle, gustSpeed);
+            float lenSq = sumVx * sumVx + sumVz * sumVz;
+            float angle = lenSq > 1e-6f ? (float) Math.atan2(sumVz, sumVx) : 0f;
+            result[d] = new WindVector(speed, angle, gustSpeed);
         }
 
         return result;
     }
 
+    private static float averageDay(float[][] curve, int day) {
+        if (curve == null || curve.length <= day || curve[day] == null || curve[day].length == 0) {
+            return 0f;
+        }
+        if (curve[day].length == 1) {
+            return curve[day][0];
+        }
+        return (curve[day][0] + curve[day][1]) * 0.5f;
+    }
+
     private static float getBiomeWindModifier(ResourceLocation biome) {
-        String path = biome.getPath();
+        String path = biome == null ? "" : biome.getPath();
         if (path.contains("forest") || path.contains("taiga") || path.contains("jungle")) return 0.7f;
         if (path.contains("plains") || path.contains("savanna")) return 1.1f;
         if (path.contains("ocean") || path.contains("beach")) return 1.25f;

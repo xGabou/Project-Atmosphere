@@ -1,8 +1,6 @@
 package net.Gabou.projectatmosphere.modules.snowstorm;
 
-
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
-import dev.nonamecrackers2.simpleclouds.common.world.SpawnRegion;
+import net.Gabou.projectatmosphere.modules.weather.SnowTier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -14,17 +12,15 @@ import net.neoforged.fml.ModList;
 
 import java.util.ArrayList;
 import java.util.List;
-
 public class SnowstormManager {
 
-    private static double accumulationRatePerTick = 0.0;
-    private static boolean snowstormActive = false;
 
 
     private static final List<SnowStorm> affectedRegions = new ArrayList<>();
 
-    public static void startSnowstorm(int intensity, CloudRegion region) {
-        affectedRegions.add(new SnowStorm(intensity,region));
+
+    public static void startSnowstorm(int intensity, double centerX, double centerZ, double radius) {
+        affectedRegions.add(new SnowStorm(intensity, centerX, centerZ, radius));
 
     }
 
@@ -34,39 +30,59 @@ public class SnowstormManager {
 
     public static int getSnowStormIntensity(ChunkPos pos)
     {
-        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(),pos.getMinBlockZ(),16);
         return affectedRegions.stream()
-                .filter(storm -> storm.getCloudRegion().intersects(region))
+                .filter(storm -> storm.intersects(pos))
                 .mapToInt(SnowStorm::getIntensity)
                 .max()
                 .orElse(0);
     }
 
+    public static SnowTier getSnowTier(ChunkPos pos) {
+        return affectedRegions.stream()
+                .filter(storm -> storm.intersects(pos))
+                .map(SnowStorm::getTier)
+                .max(java.util.Comparator.comparingInt(Enum::ordinal))
+                .orElse(SnowTier.NONE);
+    }
 
 
     public static boolean isSnowStormAt(ChunkPos pos){
-        SpawnRegion region = new SpawnRegion(pos.getMaxBlockX(),pos.getMinBlockZ(),16);
-        return affectedRegions.stream().anyMatch(storm -> storm.getCloudRegion().intersects(region));
+        return affectedRegions.stream().anyMatch(storm -> storm.intersects(pos));
     }
 
     public static void tick(ServerLevel level) {
         for (SnowStorm snow : affectedRegions) {
             for (ServerPlayer player : level.players()) {
                 BlockPos pos = player.blockPosition();
-                if (snow.getCloudRegion().intersects(new SpawnRegion(pos.getX(), pos.getY(), 5)))
-                    applyEffects(player, snow.getIntensity());
+                if (snow.intersects(pos.getX() - 5.0D, pos.getZ() - 5.0D, pos.getX() + 5.0D, pos.getZ() + 5.0D))
+                    applyEffects(player, snow);
+
             }
         }
     }
 
-    private static void applyEffects(ServerPlayer player, int forecast) {
-        player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 40, 0, false, false));
+
+
+
+
+    private static void applyEffects(ServerPlayer player, SnowStorm snowstorm) {
+        SnowTier tier = snowstorm.getTier();
+        if (tier == SnowTier.NONE) {
+            return;
+        }
+
+        int amplifier = tier == SnowTier.BLIZZARD ? 1 : 0;
+        int duration = tier == SnowTier.SNOWY_DAY ? 20 : 40;
+        if (tier != SnowTier.SNOWY_DAY) {
+            player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, duration, amplifier, false, false));
+        }
         triggerTemperatureEffect(player);
-        player.displayClientMessage(Component.literal("Snow forecast: " + forecast + " blocks"), true);
+        player.displayClientMessage(Component.literal("Snow tier: " + tier.name() + " (" + snowstorm.getIntensity() + ")"), true);
     }
 
     private static final String[] TEMPERATURE_MODS = {
             "toughasnails",
+            "legendarysurvivaloverhaul",
             "coldsweat"
     };
 
@@ -87,7 +103,5 @@ public class SnowstormManager {
         }
     }
 
-    public static int forecastBlockCount(int durationTicks) {
-        return (int) (durationTicks * accumulationRatePerTick);
-    }
+
 }

@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.weathercell;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericSupportEvaluator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
+import net.Gabou.projectatmosphere.modules.atmosphere.WeakLowManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -72,14 +73,76 @@ final class WeatherCellFormationController {
         return changed;
     }
 
+    WeatherCellManager.WeatherCellCandidateDiagnostics evaluateCandidateDiagnostics(
+            ServerLevel level,
+            Collection<WeatherCellState> activeCells,
+            long lastFormationAttemptTick,
+            long lastWeatherCellSpawnTick,
+            long nextFormationTick
+    ) {
+        if (level == null) {
+            return new WeatherCellManager.WeatherCellCandidateDiagnostics(List.of(), 0, Map.of(), lastFormationAttemptTick, lastWeatherCellSpawnTick, nextFormationTick);
+        }
+        Map<String, Integer> blockedReasons = new HashMap<>();
+        if (level.players().isEmpty()) {
+            blockedReasons.put("no players", 1);
+            return new WeatherCellManager.WeatherCellCandidateDiagnostics(List.of(), 0, Map.copyOf(blockedReasons), lastFormationAttemptTick, lastWeatherCellSpawnTick, nextFormationTick);
+        }
+        int activeWeatherCells = countActiveWeatherCells(activeCells);
+        if (activeWeatherCells >= MAX_ACTIVE_WEATHER_CELLS) {
+            blockedReasons.put("global weather cell cap reached", 1);
+            return new WeatherCellManager.WeatherCellCandidateDiagnostics(List.of(), 0, Map.copyOf(blockedReasons), lastFormationAttemptTick, lastWeatherCellSpawnTick, nextFormationTick);
+        }
+
+        Map<RegionInstanceKey, Integer> regionalCounts = countCellsByCurrentRegion(activeCells);
+        Set<RegionInstanceKey> keys = collectCandidateKeys(level);
+        List<WeatherCellManager.WeatherCellCandidateDebug> candidates = new ArrayList<>();
+        for (RegionInstanceKey key : keys) {
+            RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
+            if (state == null) {
+                blockedReasons.merge("missing live state", 1, Integer::sum);
+                continue;
+            }
+            ServerPlayer nearestPlayer = nearestPlayer(level, state.getPosition());
+            if (nearestPlayer == null) {
+                blockedReasons.merge("not near player", 1, Integer::sum);
+                continue;
+            }
+            if (regionalCounts.getOrDefault(key, 0) >= MAX_ACTIVE_CELLS_PER_REGION) {
+                blockedReasons.merge("regional cell cap reached", 1, Integer::sum);
+                continue;
+            }
+            int localActiveCells = countCellsNear(nearestPlayer, activeCells);
+            if (localActiveCells >= MAX_ACTIVE_CELLS_NEAR_PLAYER) {
+                blockedReasons.merge("near-player cell cap reached", 1, Integer::sum);
+                continue;
+            }
+            WeatherCellManager.WeatherCellCandidateDebug candidate = evaluateDebug(key, state, activeCells, localActiveCells);
+            if (candidate == null) {
+                blockedReasons.merge("candidate unavailable", 1, Integer::sum);
+                continue;
+            }
+            candidates.add(candidate);
+            blockedReasons.merge(candidate.blockedReason(), 1, Integer::sum);
+        }
+        candidates.sort(Comparator.comparing(WeatherCellManager.WeatherCellCandidateDebug::score).reversed());
+        int maxCandidates = Math.min(MAX_CANDIDATES, Math.max(1, level.players().size() * MAX_CANDIDATES_PER_PLAYER));
+        if (candidates.size() > maxCandidates) {
+            candidates = new ArrayList<>(candidates.subList(0, maxCandidates));
+        }
+        return new WeatherCellManager.WeatherCellCandidateDiagnostics(
+                List.copyOf(candidates),
+                keys.size(),
+                Map.copyOf(blockedReasons),
+                lastFormationAttemptTick,
+                lastWeatherCellSpawnTick,
+                nextFormationTick
+        );
+    }
+
     private static List<FormationCandidate> collectCandidates(ServerLevel level, Collection<WeatherCellState> activeCells) {
         Map<RegionInstanceKey, Integer> regionalCounts = countCellsByCurrentRegion(activeCells);
-        Set<RegionInstanceKey> keys = new HashSet<>(AtmosphericStateRegistry.getActiveStates());
-        if (keys.isEmpty()) {
-            for (ServerPlayer player : level.players()) {
-                keys.add(RegionInstanceKey.from(player.blockPosition()));
-            }
-        }
+        Set<RegionInstanceKey> keys = collectCandidateKeys(level);
 
         List<FormationCandidate> candidates = new ArrayList<>();
         for (RegionInstanceKey key : keys) {
@@ -115,31 +178,77 @@ final class WeatherCellFormationController {
                                                Collection<WeatherCellState> activeCells,
                                                ServerPlayer nearestPlayer,
                                                int localActiveCells) {
-        AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(key, state);
-        float coverage = WeatherCellSupport.estimateCellCoverage(state.getPosition(), activeCells);
-
-        float score = support.rainCellFormationScore(coverage);
-        if (support.humidity() < 0.78F
-                || support.cloudWater() < 0.22F
-                || coverage >= 0.58F
-                || score < AtmosphericSupportEvaluator.RAIN_CELL_FORMATION_THRESHOLD) {
+        WeatherCellManager.WeatherCellCandidateDebug debug = evaluateDebug(key, state, activeCells, localActiveCells);
+        if (debug == null || !debug.eligible()) {
             return null;
         }
-
-        float pressureAnomaly = 1013.25F - support.pressure();
-        float windInfluence = Mth.clamp(support.windConvergence() * 0.65F + Math.max(0.0F, support.humidityTransport()) * 8.0F, 0.0F, 1.0F);
-        float formationChance = Mth.clamp(0.08F + score * 0.28F, 0.08F, 0.32F);
         return new FormationCandidate(
                 key,
                 nearestPlayer.getUUID(),
                 localActiveCells,
                 state,
+                debug.score(),
+                debug.formationChance(),
+                Mth.clamp(AtmosphericSupportEvaluator.evaluate(key, state).rainCellSustain()
+                        + WeakLowManager.weatherCellBoost(key, state.getPosition()).evolutionBoost() * 0.50F, 0.0F, 1.0F),
+                debug.pressureAnomaly(),
+                Mth.clamp(debug.convergence() * 0.65F + Math.max(0.0F, debug.humidityTransport()) * 8.0F, 0.0F, 1.0F)
+        );
+    }
+
+    private static WeatherCellManager.WeatherCellCandidateDebug evaluateDebug(RegionInstanceKey key,
+                                                                              RegionAtmosphereState state,
+                                                                              Collection<WeatherCellState> activeCells,
+                                                                              int localActiveCells) {
+        AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(key, state);
+        float coverage = WeatherCellSupport.estimateCellCoverage(state.getPosition(), activeCells);
+        WeakLowManager.WeatherCellBoost lowBoost = WeakLowManager.weatherCellBoost(key, state.getPosition());
+
+        float score = Mth.clamp(support.rainCellFormationScore(coverage) + lowBoost.formationBoost(), -1.0F, 1.0F);
+        float minimumHumidity = lowBoost.organization() >= 0.35F ? 0.72F : 0.78F;
+        float minimumCloudWater = lowBoost.organization() >= 0.35F ? 0.18F : 0.22F;
+        String blockedReason = "none";
+        if (support.humidity() < minimumHumidity) {
+            blockedReason = "humidity too low";
+        } else if (support.cloudWater() < minimumCloudWater) {
+            blockedReason = "cloud water too low";
+        } else if (coverage >= 0.58F) {
+            blockedReason = "coverage too high";
+        } else if (score < AtmosphericSupportEvaluator.RAIN_CELL_FORMATION_THRESHOLD) {
+            blockedReason = "support score too low";
+        }
+
+        float pressureAnomaly = 1013.25F - support.pressure();
+        float formationChance = Mth.clamp(0.08F + score * 0.28F + lowBoost.chanceBoost(), 0.08F, 0.38F);
+        return new WeatherCellManager.WeatherCellCandidateDebug(
+                key,
+                state.getPosition(),
+                "none".equals(blockedReason),
                 score,
                 formationChance,
-                support.rainCellSustain(),
                 pressureAnomaly,
-                windInfluence
+                support.humidity(),
+                minimumHumidity,
+                support.cloudWater(),
+                minimumCloudWater,
+                support.cloudCover(),
+                coverage,
+                support.windConvergence(),
+                support.humidityTransport(),
+                lowBoost.organization(),
+                localActiveCells,
+                blockedReason
         );
+    }
+
+    private static Set<RegionInstanceKey> collectCandidateKeys(ServerLevel level) {
+        Set<RegionInstanceKey> keys = new HashSet<>(AtmosphericStateRegistry.getActiveStates());
+        if (keys.isEmpty()) {
+            for (ServerPlayer player : level.players()) {
+                keys.add(RegionInstanceKey.from(player.blockPosition()));
+            }
+        }
+        return keys;
     }
 
     private static WeatherCellState createRainCell(ServerLevel level, FormationCandidate candidate, RandomSource random) {

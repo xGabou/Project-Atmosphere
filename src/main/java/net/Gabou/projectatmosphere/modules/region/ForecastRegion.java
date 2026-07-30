@@ -1,15 +1,11 @@
 package net.Gabou.projectatmosphere.modules.region;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import javax.annotation.Nullable;
-import net.Gabou.projectatmosphere.modules.core.BiomeForecast;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -17,8 +13,9 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Region-level forecast container with weighted sections derived from biomes.
- * Also supports legacy aggregation from per-biome forecasts.
+ * Region-level forecast container. The region key is the only runtime forecast
+ * identity; biome ids are retained only as aggregate weights for diagnostics
+ * and climate modifiers.
  */
 public final class ForecastRegion {
     private static final float MIN_TEMPERATURE_C = -90f;
@@ -30,50 +27,39 @@ public final class ForecastRegion {
 
     private final RegionInstanceKey id;
     private final BlockPos anchor;
-    private final List<BiomeInstanceKey> sourceBiomes;
-    private Section[] sections;
+    private final Map<ResourceLocation, Integer> biomeWeights;
     private RegionCurves curves;
-    private final BiomeFallbackSnapshot fallbackSnapshot;
-
-    private final List<BiomeInstanceKey> samples = new ArrayList<>();
-    private final List<BiomeForecast> biomeForecasts = new ArrayList<>();
-    private final Map<ResourceLocation, Integer> biomeWeights = new HashMap<>();
 
     private float[][] temperature;
     private float[][] humidity;
     private float[][] pressure;
     private WindVector[] wind;
     private WindVector windDay;
-    private boolean legacyFinalized;
 
     public ForecastRegion(RegionInstanceKey id) {
-        this(id, null);
+        this(id, id == null ? null : id.center());
     }
 
     public ForecastRegion(RegionInstanceKey id, @Nullable BlockPos anchor) {
-        this(id, anchor, List.of(), new Section[0], null, null);
+        this(id, anchor, null, Map.of());
     }
 
     public ForecastRegion(RegionInstanceKey id,
-                          List<BiomeInstanceKey> sourceBiomes,
-                          Section[] sections,
-                          RegionCurves curves,
-                          BiomeFallbackSnapshot fallbackSnapshot) {
-        this(id, null, sourceBiomes, sections, curves, fallbackSnapshot);
-    }
-
-    private ForecastRegion(RegionInstanceKey id,
-                           @Nullable BlockPos anchor,
-                           List<BiomeInstanceKey> sourceBiomes,
-                           Section[] sections,
-                           RegionCurves curves,
-                           BiomeFallbackSnapshot fallbackSnapshot) {
+                          @Nullable BlockPos anchor,
+                          @Nullable RegionCurves curves,
+                          @Nullable Map<ResourceLocation, Integer> biomeWeights) {
         this.id = id;
-        this.sourceBiomes = sourceBiomes == null ? List.of() : List.copyOf(sourceBiomes);
-        this.sections = sections == null ? new Section[0] : sections.clone();
+        this.anchor = anchor == null && id != null ? id.center() : anchor;
         this.curves = curves;
-        this.fallbackSnapshot = fallbackSnapshot;
-        this.anchor = resolveAnchor(id, anchor, this.sourceBiomes);
+        this.biomeWeights = new HashMap<>();
+        if (biomeWeights != null) {
+            biomeWeights.forEach((key, value) -> {
+                if (key != null && value != null && value > 0) {
+                    this.biomeWeights.merge(key, value, Integer::sum);
+                }
+            });
+        }
+        syncFromCurvesOrFallback();
     }
 
     public RegionInstanceKey id() {
@@ -88,36 +74,24 @@ public final class ForecastRegion {
         return curves;
     }
 
-    public BiomeFallbackSnapshot fallbackSnapshot() {
-        return fallbackSnapshot;
-    }
-
-    public List<BiomeInstanceKey> sourceBiomes() {
-        return sourceBiomes;
-    }
-
-    public Section[] sections() {
-        return sections.clone();
-    }
-
     public BlockPos getAnchor() {
         return anchor;
     }
 
     public Map<ResourceLocation, Integer> getBiomeWeights() {
-        if (biomeWeights.isEmpty()) {
-            for (BiomeInstanceKey sample : getSamples()) {
-                if (sample == null) {
-                    continue;
-                }
-                biomeWeights.merge(sample.biomeType(), 1, Integer::sum);
-            }
-        }
         return biomeWeights;
     }
 
-    public List<BiomeInstanceKey> getSamples() {
-        return samples.isEmpty() ? sourceBiomes : samples;
+    public ResourceLocation getDominantBiome() {
+        ResourceLocation dominant = null;
+        int best = Integer.MIN_VALUE;
+        for (Map.Entry<ResourceLocation, Integer> entry : biomeWeights.entrySet()) {
+            if (entry.getValue() != null && entry.getValue() > best) {
+                dominant = entry.getKey();
+                best = entry.getValue();
+            }
+        }
+        return dominant;
     }
 
     public float[][] getTemperature() {
@@ -154,108 +128,70 @@ public final class ForecastRegion {
     public WindVector getWindDay() {
         if (windDay == null) {
             WindVector[] week = getWind();
-            if (week != null && week.length > 0) {
-                windDay = week[0];
-            }
+            windDay = week != null && week.length > 0 ? week[0] : WindVector.fromBase(0f, 0f);
         }
         return windDay;
     }
 
+    public void finalizeAggregation() {
+        syncFromCurvesOrFallback();
+    }
+
     public float sampleTemperature(Vec3 inRegionPos, long gameTime) {
-        if (curves == null) {
-            return 0f;
-        }
-        return curves.sampleTemperature(inRegionPos, gameTime, sections);
+        return curves == null ? 0f : curves.sampleTemperature(inRegionPos, gameTime);
     }
 
     public float sampleHumidity(Vec3 inRegionPos, long gameTime) {
-        if (curves == null) {
-            return 0f;
-        }
-        return curves.sampleHumidity(inRegionPos, gameTime, sections);
+        return curves == null ? 0f : curves.sampleHumidity(inRegionPos, gameTime);
     }
 
     public float samplePressure(long gameTime) {
-        if (curves == null) {
-            return 0f;
-        }
-        return curves.samplePressure(gameTime, sections);
+        return curves == null ? 0f : curves.samplePressure(gameTime);
     }
 
     public WindVector sampleWind(long gameTime) {
-        if (curves == null) {
-            return WindVector.fromBase(0f, 0f);
-        }
-        return curves.sampleWind(gameTime, sections);
+        return curves == null ? WindVector.fromBase(0f, 0f) : curves.sampleWind(gameTime);
     }
 
     public float sampleStorm(long gameTime) {
-        if (curves == null) {
-            return 0f;
-        }
-        return curves.sampleStorm(gameTime, sections);
+        return curves == null ? 0f : curves.sampleStorm(gameTime);
     }
 
-    /**
-     * Drop references to per-biome snapshots after aggregation to keep runtime region-only.
-     */
-    public void clearBiomeForecasts() {
-        if (sections == null) {
-            return;
+    public static ForecastRegion aggregate(RegionInstanceKey id,
+                                           BlockPos anchor,
+                                           List<GeneratedSample> samples,
+                                           @Nullable float[] stormWeek) {
+        if (samples == null || samples.isEmpty()) {
+            return new ForecastRegion(id, anchor);
         }
-        for (Section s : sections) {
-            s.clearSnapshot();
-        }
-    }
 
-    /**
-     * Adds a biome contribution to this region. Weight defaults to 1 per sample.
-     */
-    public void addBiomeForecast(BiomeInstanceKey biomeKey, BiomeForecast forecast) {
-        addBiomeForecast(biomeKey, forecast, 1);
-    }
-
-    /**
-     * Adds a biome contribution to this region with an explicit weight.
-     */
-    public void addBiomeForecast(BiomeInstanceKey biomeKey, BiomeForecast forecast, int weight) {
-        if (biomeKey == null || forecast == null) {
-            return;
-        }
-        samples.add(biomeKey);
-        biomeForecasts.add(forecast);
-        biomeWeights.merge(biomeKey.biomeType(), Math.max(1, weight), Integer::sum);
-        legacyFinalized = false;
-    }
-
-    /**
-     * Builds unified curves by averaging the contributed biome forecasts and clamping
-     * them to reasonable physical ranges.
-     */
-    public void finalizeAggregation() {
-        if (legacyFinalized) {
-            return;
-        }
-        if (biomeForecasts.isEmpty()) {
-            if (curves == null) {
-                buildFallback();
-            } else {
-                syncFromCurves();
+        Map<ResourceLocation, Integer> weights = new HashMap<>();
+        int totalWeight = 0;
+        for (GeneratedSample sample : samples) {
+            if (sample == null || sample.sample() == null) {
+                continue;
             }
-            legacyFinalized = true;
-            return;
+            int weight = Math.max(1, sample.sample().weight());
+            totalWeight += weight;
+            weights.merge(sample.sample().biomeId(), weight, Integer::sum);
+        }
+        if (totalWeight <= 0) {
+            return new ForecastRegion(id, anchor);
         }
 
-        temperature = clampWeek(averageWeek(biomeForecasts, BiomeForecast::getTemperature), MIN_TEMPERATURE_C, MAX_TEMPERATURE_C);
-        humidity = clampWeek(averageWeek(biomeForecasts, BiomeForecast::getHumidity), MIN_HUMIDITY, MAX_HUMIDITY);
-        pressure = clampWeek(averageWeek(biomeForecasts, BiomeForecast::getPressure), MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
-        wind = averageWindWeek(biomeForecasts, BiomeForecast::getWind);
-        windDay = wind.length > 0 ? wind[0] : WindVector.fromBase(0f, 0f);
-        curves = new DefaultRegionCurves(temperature, humidity, pressure, wind, new float[0]);
-        legacyFinalized = true;
+        float[][] temperature = weightedWeek(samples, GeneratedSample::temperature, totalWeight, MIN_TEMPERATURE_C, MAX_TEMPERATURE_C);
+        float[][] humidity = weightedWeek(samples, GeneratedSample::humidity, totalWeight, MIN_HUMIDITY, MAX_HUMIDITY);
+        float[][] pressure = weightedWeek(samples, GeneratedSample::pressure, totalWeight, MIN_PRESSURE_HPA, MAX_PRESSURE_HPA);
+        WindVector[] wind = weightedWind(samples, totalWeight);
+        RegionCurves curves = new DefaultRegionCurves(temperature, humidity, pressure, wind, stormWeek == null ? new float[0] : stormWeek);
+        return new ForecastRegion(id, anchor, curves, weights);
     }
 
-    private void syncFromCurves() {
+    private void syncFromCurvesOrFallback() {
+        if (curves == null) {
+            buildFallback();
+            return;
+        }
         temperature = curves.temperatureWeek();
         humidity = curves.humidityWeek();
         pressure = curves.pressureWeek();
@@ -268,25 +204,9 @@ public final class ForecastRegion {
         humidity = flatWeek(65f);
         pressure = flatWeek(1013.25f);
         wind = new WindVector[7];
-        for (int i = 0; i < wind.length; i++) {
-            wind[i] = WindVector.fromBase(1.2f, 0f);
-        }
+        Arrays.fill(wind, WindVector.fromBase(1.2f, 0f));
         windDay = wind[0];
         curves = new DefaultRegionCurves(temperature, humidity, pressure, wind, new float[0]);
-    }
-
-    private static BlockPos resolveAnchor(RegionInstanceKey id, @Nullable BlockPos anchor, List<BiomeInstanceKey> sourceBiomes) {
-        if (anchor != null) {
-            return anchor;
-        }
-        if (sourceBiomes != null) {
-            for (BiomeInstanceKey key : sourceBiomes) {
-                if (key != null && key.samplePos() != null) {
-                    return key.samplePos();
-                }
-            }
-        }
-        return id == null ? null : id.center();
     }
 
     private static float[][] flatWeek(float value) {
@@ -298,110 +218,89 @@ public final class ForecastRegion {
         return arr;
     }
 
-    private static float[][] averageWeek(List<BiomeForecast> forecasts, Function<BiomeForecast, float[][]> extractor) {
-        int days = 7;
-        int cols = 2;
-        float[][] result = new float[days][cols];
-        int count = forecasts.size();
-
-        for (BiomeForecast forecast : forecasts) {
-            float[][] data = extractor.apply(forecast);
-            if (data == null) {
+    private static float[][] weightedWeek(List<GeneratedSample> samples,
+                                          CurveExtractor extractor,
+                                          int totalWeight,
+                                          float min,
+                                          float max) {
+        float[][] result = new float[7][2];
+        for (GeneratedSample sample : samples) {
+            float[][] week = extractor.get(sample);
+            if (week == null) {
                 continue;
             }
-            for (int d = 0; d < days; d++) {
-                for (int c = 0; c < cols; c++) {
-                    result[d][c] += data[d][c];
+            int weight = Math.max(1, sample.sample().weight());
+            for (int d = 0; d < result.length && d < week.length; d++) {
+                if (week[d] == null) {
+                    continue;
+                }
+                for (int c = 0; c < result[d].length && c < week[d].length; c++) {
+                    result[d][c] += week[d][c] * weight;
                 }
             }
         }
-
-        if (count == 0) {
-            return result;
-        }
-
-        for (int d = 0; d < days; d++) {
-            for (int c = 0; c < cols; c++) {
-                result[d][c] /= count;
+        for (int d = 0; d < result.length; d++) {
+            for (int c = 0; c < result[d].length; c++) {
+                result[d][c] = Mth.clamp(result[d][c] / totalWeight, min, max);
             }
         }
         return result;
     }
 
-    private static float[][] clampWeek(float[][] week, float min, float max) {
-        if (week == null) {
-            return flatWeek(Mth.clamp(0f, min, max));
-        }
-        for (int d = 0; d < week.length; d++) {
-            for (int c = 0; c < week[d].length; c++) {
-                week[d][c] = Mth.clamp(week[d][c], min, max);
-            }
-        }
-        return week;
-    }
-
-    private static WindVector[] averageWindWeek(List<BiomeForecast> forecasts, Function<BiomeForecast, WindVector[]> extractor) {
+    private static WindVector[] weightedWind(List<GeneratedSample> samples, int totalWeight) {
         WindVector[] result = new WindVector[7];
         for (int d = 0; d < result.length; d++) {
             float sumX = 0f;
             float sumZ = 0f;
             float sumGust = 0f;
-            int count = 0;
-            for (BiomeForecast forecast : forecasts) {
-                WindVector[] week = extractor.apply(forecast);
+            int usedWeight = 0;
+            for (GeneratedSample sample : samples) {
+                WindVector[] week = sample.wind();
                 if (week == null || week.length <= d || week[d] == null) {
                     continue;
                 }
+                int weight = Math.max(1, sample.sample().weight());
                 WindVector wind = week[d];
                 float angle = wind.angleRadians();
                 float speed = wind.baseSpeed();
-                sumX += speed * (float) Math.cos(angle);
-                sumZ += speed * (float) Math.sin(angle);
-                sumGust += wind.gustSpeed();
-                count++;
+                sumX += speed * (float) Math.cos(angle) * weight;
+                sumZ += speed * (float) Math.sin(angle) * weight;
+                sumGust += wind.gustSpeed() * weight;
+                usedWeight += weight;
             }
-            if (count == 0) {
-                result[d] = WindVector.fromBase(0.5f, 0f);
+            int divisor = usedWeight > 0 ? usedWeight : totalWeight;
+            if (divisor <= 0) {
+                result[d] = WindVector.fromBase(1.2f, 0f);
                 continue;
             }
-            float avgX = sumX / count;
-            float avgZ = sumZ / count;
+            float avgX = sumX / divisor;
+            float avgZ = sumZ / divisor;
             float avgSpeed = (float) Math.sqrt(avgX * avgX + avgZ * avgZ);
             float avgAngle = (float) Math.atan2(avgZ, avgX);
-            float avgGust = sumGust / count;
+            float avgGust = sumGust / divisor;
             result[d] = new WindVector(avgSpeed, avgAngle, avgGust);
         }
         return result;
     }
 
-    public static final class Section {
-        private final float factor;
-        private BiomeForecastSnapshot snapshot; // cleared after aggregation
+    @FunctionalInterface
+    private interface CurveExtractor {
+        float[][] get(GeneratedSample sample);
+    }
 
-        public Section(float factor, @Nullable BiomeForecastSnapshot snapshot) {
-            this.factor = factor;
-            this.snapshot = snapshot;
-        }
-
-        public float factor() {
-            return factor;
-        }
-
-        public @Nullable BiomeForecastSnapshot snapshot() {
-            return snapshot;
-        }
-
-        public void clearSnapshot() {
-            this.snapshot = null;
-        }
+    public record GeneratedSample(RegionBiomeSample sample,
+                                  float[][] temperature,
+                                  float[][] humidity,
+                                  float[][] pressure,
+                                  WindVector[] wind) {
     }
 
     @Override
     public String toString() {
         return "ForecastRegion{" +
                 "id=" + id +
-                ", sourceBiomes=" + sourceBiomes.size() +
-                ", sections=" + Arrays.toString(sections) +
+                ", anchor=" + anchor +
+                ", biomeWeights=" + biomeWeights +
                 '}';
     }
 }

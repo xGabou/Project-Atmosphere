@@ -1,9 +1,7 @@
 package net.Gabou.projectatmosphere.modules.seasonaltrees.integration;
 
-import com.ferreusveritas.dynamictrees.api.TreeHelper;
-import com.ferreusveritas.dynamictrees.api.TreeRegistry;
-import com.ferreusveritas.dynamictrees.tree.species.Species;
-import com.ferreusveritas.dynamictrees.util.SafeChunkBounds;
+import com.dtteam.dynamictrees.tree.TreeHelper;
+import com.dtteam.dynamictrees.tree.species.Species;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.modules.seasonaltrees.core.LeafState;
 import net.Gabou.projectatmosphere.modules.seasonaltrees.core.SeasonPhase;
@@ -18,7 +16,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 public class DynamicTreesAccessor implements SeasonalTreesTreeAccessor {
     private static final float MIN_TRANSITION_PROGRESS = 0.1f;
@@ -72,11 +70,11 @@ public class DynamicTreesAccessor implements SeasonalTreesTreeAccessor {
         TreeState state = record.state();
         BlockPos rootPos = record.key().rootPos();
         if (state.leafState().isDormant()) {
-            DynamicTreesDormancyHelper.applyDormantLeaves(level, rootPos, SafeChunkBounds.ANY);
+            DynamicTreesDormancyHelper.applyDormantLeaves(level, rootPos);
             return;
         }
         if (state.leafState() == LeafState.FULL) {
-            DynamicTreesDormancyHelper.applyActiveLeaves(level, rootPos, SafeChunkBounds.ANY);
+            DynamicTreesDormancyHelper.applyActiveLeaves(level, rootPos);
             if (phase == SeasonPhase.SPRING || phase == SeasonPhase.SUMMER) {
                 TreeHelper.growPulse(level, rootPos);
             }
@@ -87,13 +85,13 @@ public class DynamicTreesAccessor implements SeasonalTreesTreeAccessor {
             if (state.leafState() == LeafState.PARTIAL && progress <= 0.0f) {
                 progress = MIN_TRANSITION_PROGRESS;
             }
-            DynamicTreesDormancyHelper.applyDormantLeaves(level, rootPos, SafeChunkBounds.ANY, progress);
+            DynamicTreesDormancyHelper.applyDormantLeaves(level, rootPos, progress);
         } else if (phase == SeasonPhase.SPRING) {
             float progress = state.progress();
             if (state.leafState() == LeafState.PARTIAL && progress <= 0.0f) {
                 progress = MIN_TRANSITION_PROGRESS;
             }
-            DynamicTreesDormancyHelper.applyActiveLeaves(level, rootPos, SafeChunkBounds.ANY, progress);
+            DynamicTreesDormancyHelper.applyActiveLeaves(level, rootPos, progress);
             TreeHelper.growPulse(level, rootPos);
         }
     }
@@ -124,7 +122,7 @@ public class DynamicTreesAccessor implements SeasonalTreesTreeAccessor {
         if (!isEnabled() || speciesId == null) {
             return false;
         }
-        Species species = TreeRegistry.findSpecies(speciesId);
+        Species species = Species.findSpecies(speciesId);
         if (species == null || species == Species.NULL_SPECIES) {
             return false;
         }

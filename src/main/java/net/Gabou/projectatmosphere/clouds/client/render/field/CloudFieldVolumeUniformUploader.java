@@ -1,0 +1,101 @@
+package net.Gabou.projectatmosphere.clouds.client.render.field;
+
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import net.Gabou.projectatmosphere.clouds.field.CloudFieldRendererInput;
+import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricRenderCell;
+import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
+
+/**
+ * Uploads one synced CloudField snapshot to the bounded volume shader.
+ */
+public final class CloudFieldVolumeUniformUploader {
+    private CloudFieldVolumeUniformUploader() {
+    }
+
+    /**
+     * Applies per-frame and per-field uniforms for a single CloudField draw.
+     *
+     * @param shader target shader
+     * @param input renderer input produced by ClientCloudFieldCache
+     * @param snapshot field snapshot to render
+     * @param bounds world-space AABB bounds used by the volume mesh
+     * @param modelViewMat current model-view matrix
+     * @param projectionMat current projection matrix
+     */
+    public static void apply(
+            ShaderInstance shader,
+            CloudFieldRendererInput input,
+            CloudFieldSnapshot snapshot,
+            CloudFieldVolumeRenderer.Bounds bounds,
+            Matrix4f modelViewMat,
+            Matrix4f projectionMat,
+            RenderTarget outputTarget,
+            int sceneDepthTextureId,
+            int raymarchSteps,
+            boolean useSceneDepth
+    ) {
+        shader.safeGetUniform("ModelViewMat").set(modelViewMat);
+        shader.safeGetUniform("ProjMat").set(projectionMat);
+        shader.safeGetUniform("InvModelViewMat").set(new Matrix4f(modelViewMat).invert());
+        shader.safeGetUniform("InvProjMat").set(new Matrix4f(projectionMat).invert());
+        if (outputTarget != null) {
+            shader.safeGetUniform("OutputSize").set((float) outputTarget.width, (float) outputTarget.height);
+        } else {
+            shader.safeGetUniform("OutputSize").set(1.0F, 1.0F);
+        }
+        shader.setSampler("SceneDepthSampler", useSceneDepth ? Math.max(0, sceneDepthTextureId) : 0);
+        shader.safeGetUniform("UseSceneDepth").set(useSceneDepth ? 1 : 0);
+
+        Vec3 min = bounds.min();
+        Vec3 max = bounds.max();
+        shader.safeGetUniform("VolumeMin").set((float) min.x(), (float) min.y(), (float) min.z());
+        shader.safeGetUniform("VolumeMax").set((float) max.x(), (float) max.y(), (float) max.z());
+
+        Vec3 camera = input.cameraPosition();
+        shader.safeGetUniform("CameraPos").set((float) camera.x(), (float) camera.y(), (float) camera.z());
+
+        Vec3 center = snapshot.center();
+        shader.safeGetUniform("FieldCenter").set((float) center.x(), (float) center.y(), (float) center.z());
+        shader.safeGetUniform("FieldRadius").set(snapshot.radius());
+        shader.safeGetUniform("FieldBaseY").set(snapshot.baseY());
+        shader.safeGetUniform("FieldTopY").set(snapshot.topY());
+        shader.safeGetUniform("FieldDensity").set(snapshot.density());
+        shader.safeGetUniform("FieldCoverage").set(snapshot.coverage());
+        shader.safeGetUniform("FieldHydration").set(snapshot.hydrationProgress());
+        shader.safeGetUniform("FieldGrowth").set(snapshot.growth());
+        shader.safeGetUniform("FieldDecay").set(snapshot.decay());
+        shader.safeGetUniform("FieldHumidityInfluence").set(snapshot.humidityInfluence());
+        Vec3 wind = snapshot.windVector();
+        shader.safeGetUniform("FieldWind").set((float) wind.x(), (float) wind.y(), (float) wind.z());
+        shader.safeGetUniform("FieldVerticalDevelopment").set(snapshot.verticalDevelopment());
+        shader.safeGetUniform("FieldStormPotential").set(snapshot.stormPotential());
+        shader.safeGetUniform("FieldCloudProfile").set(VolumetricRenderCell.profileFor(snapshot));
+        shader.safeGetUniform("FieldMorphologyFamily").set(snapshot.morphologyFamily().ordinal());
+        shader.safeGetUniform("FieldAnvilStrength").set(snapshot.anvilStrength());
+        shader.safeGetUniform("FieldPrecipitationIntensity").set(snapshot.precipitationIntensity());
+        shader.safeGetUniform("FieldLifecycleStage").set(snapshot.lifecycleStage());
+        shader.safeGetUniform("FieldAgeTicks").set((float) Math.min(snapshot.fieldAgeTicks(), 16_777_216L));
+        shader.safeGetUniform("FieldLifetimeTicks").set((float) Math.min(snapshot.lifetimeTicks(), 16_777_216L));
+        shader.safeGetUniform("FieldSeed").set((float) (snapshot.seed() & 0xFFFFL));
+        shader.safeGetUniform("FieldCloudletCount").set((float) snapshot.activeCloudletCount());
+
+        shader.safeGetUniform("FieldSourceKind").set(snapshot.sourceKind().shaderId());
+        shader.safeGetUniform("AnimationTime").set((input.worldTime() + input.partialTick()) * 0.05F);
+        shader.safeGetUniform("RaymarchSteps").set(Math.max(4, raymarchSteps));
+        shader.safeGetUniform("DetailOctaves").set(CloudFieldVolumeRenderConfig.detailOctaves());
+        shader.safeGetUniform("CloudletBudget").set(CloudFieldVolumeRenderConfig.cloudletBudget());
+        shader.safeGetUniform("DebugMode").set(CloudFieldVolumeRenderConfig.mode().shaderId());
+        shader.safeGetUniform("TuneOpacityStrength").set(CloudFieldVolumeRenderConfig.opacityStrength());
+        shader.safeGetUniform("TuneDensityThreshold").set(CloudFieldVolumeRenderConfig.densityThreshold());
+        shader.safeGetUniform("TuneMaxFinalAlpha").set(CloudFieldVolumeRenderConfig.maxFinalAlpha());
+        shader.safeGetUniform("TuneNoiseStrength").set(CloudFieldVolumeRenderConfig.noiseStrength());
+        shader.safeGetUniform("TuneErosionStrength").set(CloudFieldVolumeRenderConfig.erosionStrength());
+        shader.safeGetUniform("TuneBrightness").set(CloudFieldVolumeRenderConfig.brightness());
+        shader.safeGetUniform("TuneUndersideDarkening").set(CloudFieldVolumeRenderConfig.undersideDarkening());
+        shader.safeGetUniform("TuneDensityBoost").set(CloudFieldVolumeRenderConfig.densityBoost());
+        shader.safeGetUniform("TuneAnimSpeed").set(CloudFieldVolumeRenderConfig.animSpeed());
+    }
+}

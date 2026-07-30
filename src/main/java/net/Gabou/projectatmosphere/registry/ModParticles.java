@@ -1,7 +1,5 @@
 package net.Gabou.projectatmosphere.registry;
 
-import betterdays.registry.RegistryObject;
-import com.mojang.serialization.Codec;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.particles.DebrisParticleData;
 import net.minecraft.core.particles.ParticleType;
@@ -50,7 +48,10 @@ public class ModParticles {
                 @Override
                 public com.mojang.serialization.MapCodec<DebrisParticleData> codec() {
                     return com.mojang.serialization.Codec.unit(
-                            new DebrisParticleData(null, 0, 0, 0)
+                            new DebrisParticleData(
+                                    net.Gabou.projectatmosphere.particles.DebrisOrbitSource.NONE,
+                                    0, 0, 0, 0, 0, 0
+                            )
                     ).fieldOf("debris");
                 }
 

@@ -35,6 +35,13 @@ public final class CloudRegionRenderData {
     private final int lifetimeTicks;
     private final float growth;
     private final float decay;
+    private final float targetRadius;
+    private final float targetCoverage;
+    private final float targetDensity;
+    private final float spawnRadius;
+    private final long lastMotionTick;
+    private final long lastGrowthTick;
+    private final float lastGrowthRate;
     private final String cloudTypeId;
     private final String previousCloudTypeId;
     private final CloudMorphologyFamily morphologyFamily;
@@ -82,6 +89,13 @@ public final class CloudRegionRenderData {
             int lifetimeTicks,
             float growth,
             float decay,
+            float targetRadius,
+            float targetCoverage,
+            float targetDensity,
+            float spawnRadius,
+            long lastMotionTick,
+            long lastGrowthTick,
+            float lastGrowthRate,
             String cloudTypeId,
             String previousCloudTypeId,
             CloudMorphologyFamily morphologyFamily,
@@ -128,6 +142,13 @@ public final class CloudRegionRenderData {
         this.lifetimeTicks = lifetimeTicks;
         this.growth = growth;
         this.decay = decay;
+        this.targetRadius = targetRadius;
+        this.targetCoverage = clamp01(targetCoverage);
+        this.targetDensity = clamp01(targetDensity);
+        this.spawnRadius = spawnRadius;
+        this.lastMotionTick = Math.max(0L, lastMotionTick);
+        this.lastGrowthTick = Math.max(0L, lastGrowthTick);
+        this.lastGrowthRate = Float.isFinite(lastGrowthRate) ? lastGrowthRate : 0.0F;
         this.cloudTypeId = cloudTypeId;
         this.previousCloudTypeId = previousCloudTypeId;
         this.morphologyFamily = morphologyFamily == null ? CloudMorphologyFamily.PUFF : morphologyFamily;
@@ -230,6 +251,34 @@ public final class CloudRegionRenderData {
 
     public float getDecay() {
         return decay;
+    }
+
+    public float getTargetRadius() {
+        return targetRadius;
+    }
+
+    public float getTargetCoverage() {
+        return targetCoverage;
+    }
+
+    public float getTargetDensity() {
+        return targetDensity;
+    }
+
+    public float getSpawnRadius() {
+        return spawnRadius;
+    }
+
+    public long getLastMotionTick() {
+        return lastMotionTick;
+    }
+
+    public long getLastGrowthTick() {
+        return lastGrowthTick;
+    }
+
+    public float getLastGrowthRate() {
+        return lastGrowthRate;
     }
 
     public String getCloudTypeId() {
@@ -367,6 +416,13 @@ public final class CloudRegionRenderData {
         buffer.writeVarInt(lifetimeTicks);
         buffer.writeFloat(growth);
         buffer.writeFloat(decay);
+        buffer.writeFloat(targetRadius);
+        buffer.writeFloat(targetCoverage);
+        buffer.writeFloat(targetDensity);
+        buffer.writeFloat(spawnRadius);
+        buffer.writeLong(lastMotionTick);
+        buffer.writeLong(lastGrowthTick);
+        buffer.writeFloat(lastGrowthRate);
         buffer.writeUtf(cloudTypeId);
         buffer.writeUtf(previousCloudTypeId);
         buffer.writeEnum(morphologyFamily);
@@ -421,6 +477,13 @@ public final class CloudRegionRenderData {
         int lifetimeTicks = buffer.readVarInt();
         float growth = buffer.readFloat();
         float decay = buffer.readFloat();
+        float targetRadius = buffer.readFloat();
+        float targetCoverage = buffer.readFloat();
+        float targetDensity = buffer.readFloat();
+        float spawnRadius = buffer.readFloat();
+        long lastMotionTick = buffer.readLong();
+        long lastGrowthTick = buffer.readLong();
+        float lastGrowthRate = buffer.readFloat();
         String cloudTypeId = buffer.readUtf();
         String previousCloudTypeId = buffer.readUtf();
         CloudMorphologyFamily morphologyFamily = buffer.readEnum(CloudMorphologyFamily.class);
@@ -468,6 +531,13 @@ public final class CloudRegionRenderData {
                 lifetimeTicks,
                 growth,
                 decay,
+                targetRadius,
+                targetCoverage,
+                targetDensity,
+                spawnRadius,
+                lastMotionTick,
+                lastGrowthTick,
+                lastGrowthRate,
                 cloudTypeId,
                 previousCloudTypeId,
                 morphologyFamily,

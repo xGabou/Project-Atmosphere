@@ -1,8 +1,7 @@
 package net.Gabou.projectatmosphere.items;
 
 import net.Gabou.projectatmosphere.blocks.InstrumentReader;
-import net.Gabou.projectatmosphere.client.screen.WeatherRadarScreen;
-import net.minecraft.client.Minecraft;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
@@ -50,6 +49,15 @@ public class WeatherRadarItem extends Item implements InstrumentReader {
     @OnlyIn(Dist.CLIENT)
     @Override
     public void display(Level level, Player player) {
-        Minecraft.getInstance().setScreen(new WeatherRadarScreen(player));
+        if (!AtmosphereCloudServices.isSimpleCloudsLoaded()) {
+            return;
+        }
+        String className = "net.Gabou.projectatmosphere.client.screen.WeatherRadarClientBridge";
+        try {
+            Class<?> bridge = Class.forName(className, true, WeatherRadarItem.class.getClassLoader());
+            bridge.getMethod("open", Player.class).invoke(null, player);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            throw new IllegalStateException("Weather radar client screen failed to open", exception);
+        }
     }
 }

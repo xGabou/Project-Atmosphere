@@ -2,6 +2,7 @@ package net.Gabou.projectatmosphere.modules.weathercell;
 
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericSupportEvaluator;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
+import net.Gabou.projectatmosphere.modules.atmosphere.WeakLowManager;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -31,8 +32,12 @@ final class WeatherCellLifecycleController {
         RegionInstanceKey currentKey = WeatherCellSupport.currentRegionKey(cell);
         RegionAtmosphereState currentState = WeatherCellSupport.currentAtmosphere(cell);
         AtmosphericSupportEvaluator.Support support = AtmosphericSupportEvaluator.evaluate(currentKey, currentState);
-        float evolutionTarget = resolveEvolutionTarget(cell, support);
-        float severeEvolutionTarget = resolveSevereEvolutionTarget(cell, support);
+        WeakLowManager.WeatherCellBoost lowBoost = WeakLowManager.weatherCellBoost(
+                currentKey,
+                currentState == null ? null : currentState.getPosition()
+        );
+        float evolutionTarget = resolveEvolutionTarget(cell, support, lowBoost);
+        float severeEvolutionTarget = resolveSevereEvolutionTarget(cell, support, lowBoost);
         cell.setEvolutionScore(Mth.lerp(EVOLUTION_TRACKING, cell.getEvolutionScore(), evolutionTarget));
         cell.setSevereEvolutionScore(Mth.lerp(EVOLUTION_TRACKING, cell.getSevereEvolutionScore(), severeEvolutionTarget));
         updateTypeFromSupport(cell);
@@ -62,7 +67,9 @@ final class WeatherCellLifecycleController {
         return true;
     }
 
-    private static float resolveEvolutionTarget(WeatherCellState cell, AtmosphericSupportEvaluator.Support support) {
+    private static float resolveEvolutionTarget(WeatherCellState cell,
+                                                AtmosphericSupportEvaluator.Support support,
+                                                WeakLowManager.WeatherCellBoost lowBoost) {
         if (!support.hasState()) {
             return 0.0F;
         }
@@ -72,15 +79,19 @@ final class WeatherCellLifecycleController {
             case RAIN_CELL -> support.rainCellSustain();
             case CYCLONE, BLIZZARD -> 0.0F;
         };
-        return Mth.clamp(base * ageDecay, 0.0F, 1.0F);
+        float weakLowBoost = lowBoost == null ? 0.0F : lowBoost.evolutionBoost();
+        return Mth.clamp((base + weakLowBoost) * ageDecay, 0.0F, 1.0F);
     }
 
-    private static float resolveSevereEvolutionTarget(WeatherCellState cell, AtmosphericSupportEvaluator.Support support) {
+    private static float resolveSevereEvolutionTarget(WeatherCellState cell,
+                                                      AtmosphericSupportEvaluator.Support support,
+                                                      WeakLowManager.WeatherCellBoost lowBoost) {
         if (!support.hasState() || !isPhase4EvolutionType(cell.getType())) {
             return 0.0F;
         }
         float ageDecay = Mth.clamp((cell.getLifetimeTicks() - cell.getAgeTicks()) / (float) (20 * 180), 0.0F, 1.0F);
-        return Mth.clamp(support.supercellSupport() * ageDecay, 0.0F, 1.0F);
+        float weakLowBoost = lowBoost == null ? 0.0F : lowBoost.severeBoost();
+        return Mth.clamp((support.supercellSupport() + weakLowBoost) * ageDecay, 0.0F, 1.0F);
     }
 
     private static void updateTypeFromSupport(WeatherCellState cell) {

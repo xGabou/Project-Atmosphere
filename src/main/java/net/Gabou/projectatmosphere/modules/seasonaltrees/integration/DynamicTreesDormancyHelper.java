@@ -1,15 +1,14 @@
 package net.Gabou.projectatmosphere.modules.seasonaltrees.integration;
 
-import com.ferreusveritas.dynamictrees.api.TreeHelper;
-import com.ferreusveritas.dynamictrees.api.network.MapSignal;
-import com.ferreusveritas.dynamictrees.api.network.NodeInspector;
-import com.ferreusveritas.dynamictrees.block.branch.BranchBlock;
-import com.ferreusveritas.dynamictrees.block.leaves.LeavesProperties;
-import com.ferreusveritas.dynamictrees.block.rooty.RootyBlock;
-import com.ferreusveritas.dynamictrees.tree.family.Family;
-import com.ferreusveritas.dynamictrees.tree.species.Species;
-import com.ferreusveritas.dynamictrees.util.SafeChunkBounds;
-import com.ferreusveritas.dynamictrees.util.SimpleVoxmap;
+import com.dtteam.dynamictrees.api.network.MapSignal;
+import com.dtteam.dynamictrees.api.network.NodeInspector;
+import com.dtteam.dynamictrees.api.voxmap.SimpleVoxmap;
+import com.dtteam.dynamictrees.block.branch.BranchBlock;
+import com.dtteam.dynamictrees.block.leaves.LeavesProperties;
+import com.dtteam.dynamictrees.block.soil.SoilBlock;
+import com.dtteam.dynamictrees.tree.TreeHelper;
+import com.dtteam.dynamictrees.tree.family.Family;
+import com.dtteam.dynamictrees.tree.species.Species;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,12 +26,10 @@ public final class DynamicTreesDormancyHelper {
     private static final class LeafContext {
         private final Species species;
         private final Family family;
-        private final SafeChunkBounds bounds;
 
-        private LeafContext(Species species, Family family, SafeChunkBounds bounds) {
+        private LeafContext(Species species, Family family) {
             this.species = species;
             this.family = family;
-            this.bounds = bounds;
         }
     }
 
@@ -40,8 +37,8 @@ public final class DynamicTreesDormancyHelper {
         boolean shouldConvert(BlockPos pos);
     }
 
-    public static int applyDormantLeaves(ServerLevel level, BlockPos rootPos, SafeChunkBounds safeBounds) {
-        LeafContext context = resolveContext(level, rootPos, safeBounds);
+    public static int applyDormantLeaves(ServerLevel level, BlockPos rootPos) {
+        LeafContext context = resolveContext(level, rootPos);
         if (context == null) {
             return 0;
         }
@@ -49,7 +46,7 @@ public final class DynamicTreesDormancyHelper {
         if (dormantState == null || dormantState.isAir()) {
             return 0;
         }
-        int converted = applyLeavesState(level, rootPos, context.species, context.family, context.bounds, dormantState, null);
+        int converted = applyLeavesState(level, rootPos, context.species, context.family, dormantState, null);
         ProjectAtmosphere.LOGGER.debug(
                 "[Atmosphere] Dynamic Trees dormancy applied at {} (converted {} leaf blocks).",
                 rootPos,
@@ -58,8 +55,8 @@ public final class DynamicTreesDormancyHelper {
         return converted;
     }
 
-    public static int applyDormantLeaves(ServerLevel level, BlockPos rootPos, SafeChunkBounds safeBounds, float progress) {
-        LeafContext context = resolveContext(level, rootPos, safeBounds);
+    public static int applyDormantLeaves(ServerLevel level, BlockPos rootPos, float progress) {
+        LeafContext context = resolveContext(level, rootPos);
         if (context == null) {
             return 0;
         }
@@ -70,8 +67,8 @@ public final class DynamicTreesDormancyHelper {
         return applyLeavesState(level, rootPos, context, dormantState, progress);
     }
 
-    public static int applyActiveLeaves(ServerLevel level, BlockPos rootPos, SafeChunkBounds safeBounds) {
-        LeafContext context = resolveContext(level, rootPos, safeBounds);
+    public static int applyActiveLeaves(ServerLevel level, BlockPos rootPos) {
+        LeafContext context = resolveContext(level, rootPos);
         if (context == null) {
             return 0;
         }
@@ -79,7 +76,7 @@ public final class DynamicTreesDormancyHelper {
         if (activeState == null || activeState.isAir()) {
             return 0;
         }
-        int converted = applyLeavesState(level, rootPos, context.species, context.family, context.bounds, activeState, null);
+        int converted = applyLeavesState(level, rootPos, context.species, context.family, activeState, null);
         ProjectAtmosphere.LOGGER.debug(
                 "[Atmosphere] Dynamic Trees foliage restored at {} (converted {} leaf blocks).",
                 rootPos,
@@ -88,8 +85,8 @@ public final class DynamicTreesDormancyHelper {
         return converted;
     }
 
-    public static int applyActiveLeaves(ServerLevel level, BlockPos rootPos, SafeChunkBounds safeBounds, float progress) {
-        LeafContext context = resolveContext(level, rootPos, safeBounds);
+    public static int applyActiveLeaves(ServerLevel level, BlockPos rootPos, float progress) {
+        LeafContext context = resolveContext(level, rootPos);
         if (context == null) {
             return 0;
         }
@@ -100,17 +97,16 @@ public final class DynamicTreesDormancyHelper {
         return applyLeavesState(level, rootPos, context, activeState, progress);
     }
 
-    private static LeafContext resolveContext(ServerLevel level, BlockPos rootPos, SafeChunkBounds safeBounds) {
+    private static LeafContext resolveContext(ServerLevel level, BlockPos rootPos) {
         if (level == null || rootPos == null) {
             return null;
         }
-        SafeChunkBounds bounds = safeBounds == null ? SafeChunkBounds.ANY : safeBounds;
         BlockState rootState = level.getBlockState(rootPos);
-        Optional<RootyBlock> rootyOpt = TreeHelper.getRootyOpt(rootState);
+        Optional<SoilBlock> rootyOpt = TreeHelper.getRootyOpt(rootState);
         if (rootyOpt.isEmpty()) {
             return null;
         }
-        RootyBlock rooty = rootyOpt.get();
+        SoilBlock rooty = rootyOpt.get();
         Species species = rooty.getSpecies(rootState, level, rootPos);
         if (species == null || species == Species.NULL_SPECIES) {
             return null;
@@ -122,7 +118,7 @@ public final class DynamicTreesDormancyHelper {
         if (family == null) {
             return null;
         }
-        return new LeafContext(species, family, bounds);
+        return new LeafContext(species, family);
     }
 
     private static int applyLeavesState(ServerLevel level, BlockPos rootPos, LeafContext context, BlockState targetState, float progress) {
@@ -131,15 +127,15 @@ public final class DynamicTreesDormancyHelper {
             return 0;
         }
         if (clamped >= 1.0f) {
-            return applyLeavesState(level, rootPos, context.species, context.family, context.bounds, targetState, null);
+            return applyLeavesState(level, rootPos, context.species, context.family, targetState, null);
         }
         long seed = level.getSeed() ^ rootPos.asLong();
         LeafSwapSelector selector = pos -> leafNoise(pos, seed) <= clamped;
-        return applyLeavesState(level, rootPos, context.species, context.family, context.bounds, targetState, selector);
+        return applyLeavesState(level, rootPos, context.species, context.family, targetState, selector);
     }
 
-    private static int applyLeavesState(ServerLevel level, BlockPos rootPos, Species species, Family family, SafeChunkBounds bounds, BlockState targetState, LeafSwapSelector selector) {
-        LeafSwapNode node = new LeafSwapNode(level, species, family, bounds, targetState, selector);
+    private static int applyLeavesState(ServerLevel level, BlockPos rootPos, Species species, Family family, BlockState targetState, LeafSwapSelector selector) {
+        LeafSwapNode node = new LeafSwapNode(level, species, family, targetState, selector);
         TreeHelper.startAnalysisFromRoot(level, rootPos, new MapSignal(node));
         return node.getConvertedLeaves();
     }
@@ -148,7 +144,6 @@ public final class DynamicTreesDormancyHelper {
         private final ServerLevel level;
         private final Species species;
         private final Family family;
-        private final SafeChunkBounds safeBounds;
         private final BlockState targetState;
         private final LeafSwapSelector selector;
         private final SimpleVoxmap leafCluster;
@@ -157,11 +152,10 @@ public final class DynamicTreesDormancyHelper {
         private final int clusterLenZ;
         private int convertedLeaves;
 
-        private LeafSwapNode(ServerLevel level, Species species, Family family, SafeChunkBounds safeBounds, BlockState targetState, LeafSwapSelector selector) {
+        private LeafSwapNode(ServerLevel level, Species species, Family family, BlockState targetState, LeafSwapSelector selector) {
             this.level = level;
             this.species = species;
             this.family = family;
-            this.safeBounds = safeBounds;
             this.targetState = targetState;
             this.selector = selector;
             LeavesProperties leavesProperties = species.getLeavesProperties();
@@ -220,7 +214,7 @@ public final class DynamicTreesDormancyHelper {
                         if (selector != null && !selector.shouldConvert(cursor)) {
                             continue;
                         }
-                        if (!safeBounds.inBounds(cursor, false)) {
+                        if (!level.hasChunkAt(cursor)) {
                             continue;
                         }
                         BlockState state = level.getBlockState(cursor);
@@ -230,7 +224,7 @@ public final class DynamicTreesDormancyHelper {
                         if (state == targetState) {
                             continue;
                         }
-                        safeBounds.setBlockState(level, cursor, targetState, 3, false);
+                        level.setBlock(cursor, targetState, 3);
                         convertedLeaves++;
                     }
                 }
@@ -252,7 +246,9 @@ public final class DynamicTreesDormancyHelper {
         if (species == null) {
             return null;
         }
-        LeavesProperties bare = LeavesProperties.REGISTRY.getOptional(new ResourceLocation("dynamictrees", "bare")).orElse(null);
+        LeavesProperties bare = LeavesProperties.REGISTRY
+                .getOptional(ResourceLocation.fromNamespaceAndPath("dynamictrees", "bare"))
+                .orElse(null);
         if (bare != null) {
             BlockState candidate = bare.getDynamicLeavesState();
             if (candidate != null && !candidate.isAir()) {

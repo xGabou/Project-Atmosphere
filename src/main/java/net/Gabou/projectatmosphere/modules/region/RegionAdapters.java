@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.modules.region;
 
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;

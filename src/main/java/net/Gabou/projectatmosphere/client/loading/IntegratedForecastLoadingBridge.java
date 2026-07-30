@@ -2,15 +2,16 @@ package net.Gabou.projectatmosphere.client.loading;
 
 import net.Gabou.projectatmosphere.client.ClientSyncLock;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
+import net.neoforged.fml.loading.FMLEnvironment;
 
 public final class IntegratedForecastLoadingBridge {
     private IntegratedForecastLoadingBridge() {
     }
 
     public static void update(ForecastLoadingStage stage, String subtext, Float progress, String source) {
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> apply(stage, subtext, progress, source));
+        if (FMLEnvironment.dist.isClient()) {
+            apply(stage, subtext, progress, source);
+        }
     }
 
     private static void apply(ForecastLoadingStage stage, String subtext, Float progress, String source) {

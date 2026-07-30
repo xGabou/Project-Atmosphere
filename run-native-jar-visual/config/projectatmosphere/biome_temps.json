@@ -1,0 +1,29 @@
+{
+  "biomes": {
+    "minecraft:plains": {
+      "spring": {
+        "min": 0.0,
+        "max": 15.0
+      },
+      "winter": {
+        "min": -10.0,
+        "max": 5.0
+      },
+      "autumn": {
+        "min": 0.0,
+        "max": 15.0
+      },
+      "summer": {
+        "min": 10.0,
+        "max": 25.0
+      }
+    },
+    "examplemod:hot_biome": {
+      "all": {
+        "min": 20.0,
+        "max": 30.0
+      }
+    }
+  },
+  "_note": "Add your biome ids under \u0027biomes\u0027. Provide either per-season min/max or an \u0027all\u0027 min/max to apply to all seasons. Temperatures are in Celsius."
+}

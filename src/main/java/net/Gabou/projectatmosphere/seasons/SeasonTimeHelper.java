@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.seasons;
 
-import dev.nonamecrackers2.simpleclouds.common.cloud.region.CloudRegion;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
@@ -16,27 +17,17 @@ public final class SeasonTimeHelper {
     private static final AtomicReference<SeasonTimeDelegate> DELEGATE =
             new AtomicReference<>(new NeutralDelegate());
 
-    private static boolean sereneSeasonsPresent = false;
-
     private SeasonTimeHelper() {
-    }
-
-    public static boolean isSereneSeasonsPresent() {
-        return sereneSeasonsPresent;
     }
 
     public static void setDelegate(SeasonTimeDelegate delegate) {
         if (delegate == null) return;
-        try {
-            if (delegate instanceof SereneSeasonsSeasonDelegate) {
-                sereneSeasonsPresent = true;
-            }
-        }
-        catch (Exception e) {
-            LOGGER.warn("Failed to detect Serene Seasons presence.", e);
-        }
         DELEGATE.set(delegate);
-        LOGGER.info("Season time delegate set to '{}'.", delegate.getClass().getName());
+        LOGGER.info("Season time delegate set to '{}' ({}).", delegate.providerId(), delegate.getClass().getName());
+    }
+
+    public static String providerId() {
+        return DELEGATE.get().providerId();
     }
 
     public static SeasonSnapshot snapshot(Level level) {
@@ -44,6 +35,15 @@ public final class SeasonTimeHelper {
             return DELEGATE.get().snapshot(level);
         } catch (Exception e) {
             LOGGER.warn("Season delegate failed; using neutral snapshot.", e);
+            return SeasonSnapshot.neutral();
+        }
+    }
+
+    public static SeasonSnapshot snapshot(Level level, BlockPos pos) {
+        try {
+            return DELEGATE.get().snapshot(level, pos);
+        } catch (Exception e) {
+            LOGGER.warn("Season delegate failed for position {}; using neutral snapshot.", pos, e);
             return SeasonSnapshot.neutral();
         }
     }
@@ -76,26 +76,36 @@ public final class SeasonTimeHelper {
         }
     }
 
-    public static void onRainStarted(ServerLevel level, CloudRegion cloudRegion) {
+    public static void onRainStarted(ServerLevel level, int externalCloudRegionId) {
         try {
-            DELEGATE.get().onRainStarted(level, cloudRegion);
+            DELEGATE.get().onRainStarted(level, externalCloudRegionId);
         } catch (Exception e) {
             LOGGER.warn("Season delegate failed while handling rain start.", e);
         }
     }
 
-    public static void onRainEnded(ServerLevel level, CloudRegion cloudRegion) {
+    public static void onRainEnded(ServerLevel level, int externalCloudRegionId) {
         try {
-            DELEGATE.get().onRainEnded(level, cloudRegion);
+            DELEGATE.get().onRainEnded(level, externalCloudRegionId);
         } catch (Exception e) {
             LOGGER.warn("Season delegate failed while handling rain end.", e);
         }
+    }
+
+    public static void useNeutralDelegate() {
+        setDelegate(new NeutralDelegate());
     }
 
     private static final class NeutralDelegate implements SeasonTimeDelegate {
         static final long DAY_DURATION = 24000L;
         static final long SEASON_DURATION = 24000L;
         static final long SEASON_CYCLE = SEASON_DURATION * 4;
+        private static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("projectatmosphere", "neutral");
+
+        @Override
+        public String providerId() {
+            return ID.toString();
+        }
 
         @Override
         public SeasonSnapshot snapshot(Level level) {

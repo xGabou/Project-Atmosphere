@@ -412,3 +412,237 @@ Risk Level:
 Medium.
 Verification:
 Build success; needs cloud evolution/weather-cell runtime testing.
+
+## 2026-07-29 Region-First Forecast Restoration
+
+The June rebuild restored older NeoForge files over matching Forge paths. That kept
+loader compatibility, but it also replaced the 0.9.1 region-first forecast runtime
+with the legacy biome-map generator. This pass restores the authoritative
+`Forge-1.20.1` forecast implementation from `84ab6b5`, the last forecast-equivalent
+commit before later cloud-renderer work.
+
+File:
+`net/Gabou/projectatmosphere/manager/ForecastGenerator.java`,
+`net/Gabou/projectatmosphere/manager/ForecastOrchestrator.java`,
+`net/Gabou/projectatmosphere/manager/ForecastDataStorage.java`,
+`net/Gabou/projectatmosphere/modules/region/DefaultRegionCurves.java`,
+`net/Gabou/projectatmosphere/modules/region/FileRegionPersistence.java`,
+`net/Gabou/projectatmosphere/modules/region/ForecastRegion.java`,
+`net/Gabou/projectatmosphere/modules/region/GridRegionIndex.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionAdapters.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionCurves.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionForecastOrchestrator.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionIdCodec.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionIndex.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionOrchestratorBootstrap.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionPersistence.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionBiomeSample.java`,
+`net/Gabou/projectatmosphere/modules/region/RegionForecastCorruptionValidator.java`
+Forge API Removed:
+Forge `SimpleChannel`/`PacketDistributor` send targets.
+NeoForge Replacement:
+NeoForge typed payload dispatch through `PacketDistributor.sendToPlayer` and
+`PacketDistributor.sendToAllPlayers`.
+Reason:
+Forecast identity, persistence, migration, aggregation, sampling, and corruption
+repair are region owned in 0.9.1. Typed payload dispatch preserves the existing
+temperature snapshot delivery semantics on NeoForge 1.21.1.
+Behavior Change:
+Legacy biome-key callers use deprecated adapters that resolve through
+`BiomeInstanceKey.samplePos()` into the owning `RegionInstanceKey`; no biome-owned
+runtime forecast map is restored.
+Risk Level:
+High.
+Verification:
+`compileJava` success; full build success required; needs fresh-world generation,
+legacy migration, login sync, regeneration, and save/reload runtime tests.
+
+File:
+`net/Gabou/projectatmosphere/client/loading/IntegratedForecastLoadingBridge.java`
+Forge API Removed:
+Forge `DistExecutor` and Forge dist marker imports.
+NeoForge Replacement:
+`FMLEnvironment.dist.isClient()` guards the integrated-client state update.
+Reason:
+The bridge only mirrors server generation progress into the in-process client.
+Dedicated servers skip the client-only method before touching `Minecraft`.
+Behavior Change:
+None intended.
+Risk Level:
+Medium.
+Verification:
+Build success; needs integrated-server loading overlay test.
+
+File:
+`net/Gabou/projectatmosphere/modules/atmosphere/AtmosphericStateLookup.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/AtmosphericStateSavedData.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/AtmosphericTelemetryReporter.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/CloudWaterExchange.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/CloudWaterService.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/CycloneImpactApplier.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/CycloneManager.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/CycloneSnapshot.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/HumidityBudget.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/HumidityBudgetService.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/HumiditySourceProfile.java`,
+`net/Gabou/projectatmosphere/modules/atmosphere/SeasonalAtmosphericDrift.java`,
+`net/Gabou/projectatmosphere/seasons/SeasonClimateProfile.java`
+Forge/Mojang API Removed:
+Minecraft 1.20 `SavedData` factory and single-argument `save` signature.
+NeoForge Replacement:
+Minecraft 1.21.1 `SavedData.Factory` and
+`save(CompoundTag, HolderLookup.Provider)`.
+Reason:
+These classes are the mutable atmosphere layer driven by the restored immutable
+region forecast. The registry lookup parameter is unused because the payload
+contains primitives and Project Atmosphere region keys only.
+Behavior Change:
+None intended.
+Risk Level:
+High.
+Verification:
+Build success; needs live-state persistence, seasonal transition, cyclone, and
+humidity/cloud-water runtime tests.
+
+File:
+`net/Gabou/projectatmosphere/modules/ocean/AtmosphericVolume.java`,
+`net/Gabou/projectatmosphere/modules/ocean/AtmosVolumeInfluence.java`,
+`net/Gabou/projectatmosphere/modules/ocean/influence/AtmosphereFluxInfluence.java`,
+`net/Gabou/projectatmosphere/modules/ocean/influence/BasinPressureMemoryInfluence.java`,
+`net/Gabou/projectatmosphere/modules/ocean/influence/BasinThermalMemoryInfluence.java`,
+`net/Gabou/projectatmosphere/modules/ocean/OceanBasin.java`,
+`net/Gabou/projectatmosphere/modules/ocean/OceanBasinManager.java`,
+`net/Gabou/projectatmosphere/modules/ocean/OceanBiomeClassifier.java`,
+`net/Gabou/projectatmosphere/modules/ocean/OceanInfluence.java`,
+`net/Gabou/projectatmosphere/modules/ocean/OceanUpdateContext.java`
+Forge API Removed:
+Forge mod-list queries inherited from the Forge compatibility handler.
+NeoForge Replacement:
+NeoForge `ModList` checks exposed by `CompatHandler` for Tectonic and Continents.
+Reason:
+Ocean thermal and pressure memory are inputs to the 0.9.1 dynamic forecast.
+The optional keyword expansion remains gated by the same mod IDs.
+Behavior Change:
+None intended.
+Risk Level:
+Medium.
+Verification:
+Build success; needs ocean/coastal region generation and persistence tests.
+
+File:
+`net/Gabou/projectatmosphere/modules/weather/RegionalWeatherPhase.java`,
+`net/Gabou/projectatmosphere/modules/weather/ServerWeatherStateResolver.java`,
+`net/Gabou/projectatmosphere/modules/weather/SnowTier.java`,
+`net/Gabou/projectatmosphere/modules/weather/StormMotionModel.java`,
+`net/Gabou/projectatmosphere/modules/weather/StormSeverityScale.java`,
+`net/Gabou/projectatmosphere/modules/weather/WeatherSampler.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellFormationController.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellLifecycleController.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellManager.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellMotionController.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellSavedData.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellState.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellSupport.java`,
+`net/Gabou/projectatmosphere/modules/weathercell/WeatherCellType.java`
+Forge/Mojang API Removed:
+Minecraft 1.20 `SavedData` construction and save signature.
+NeoForge Replacement:
+Minecraft 1.21.1 `SavedData.Factory` with registry-aware save.
+Reason:
+Weather phases and cells consume region forecast and live atmosphere values; they
+are required for behavioral parity even when native cloud rendering is deferred.
+Behavior Change:
+None intended.
+Risk Level:
+High.
+Verification:
+Build success; needs cell formation, motion, lifecycle, weather phase, and
+save/reload tests.
+
+File:
+`net/Gabou/projectatmosphere/modules/wind/RegionWindForecastApi.java`,
+`net/Gabou/projectatmosphere/modules/wind/WindForecastApi.java`,
+`net/Gabou/projectatmosphere/modules/temperature/util/LocalBiomeTemperatureResolver.java`,
+`net/Gabou/projectatmosphere/modules/tornado/scheduling/TornadoSpawnScheduler.java`
+Forge API Removed:
+None.
+NeoForge Replacement:
+None; these are loader-neutral forecast consumers.
+Reason:
+They were staged only because they were absent from the old NeoForge overlay.
+Their inputs now resolve through the restored region forecast and wind runtime.
+Behavior Change:
+None intended.
+Risk Level:
+Medium.
+Verification:
+Build success; needs wind API, local temperature, and tornado scheduling tests.
+
+File:
+`net/Gabou/projectatmosphere/manager/SandStormManager.java`,
+`net/Gabou/projectatmosphere/modules/sandStorm/SandStormAPI.java`
+Forge API Removed:
+Direct Desert Storms `SandstormPhase` and sound API references, which have no
+configured NeoForge 1.21.1 dependency.
+NeoForge Replacement:
+Internal phase bookkeeping and a no-op optional bridge.
+Reason:
+Region forecast generation must not fail to compile when the unavailable optional
+integration is absent. The boundary is explicit so a future compatible dependency
+can replace the bridge without changing forecast ownership.
+Behavior Change:
+Project Atmosphere computes sandstorm-eligible regions, but it does not start
+external Desert Storms effects on NeoForge 1.21.1.
+Risk Level:
+Medium.
+Verification:
+Build success; external integration unavailable for runtime verification.
+
+## 2026-07-29 Full Current-Branch Port
+
+This section supersedes the June staging status and the earlier forecast-only
+restoration notes.
+
+- Ported the complete `Forge-1.20.1` source state at `e16523f` to NeoForge
+  1.21.1. The source trees have identical Java path inventories: 616 Forge
+  sources, 616 enabled NeoForge sources, zero missing paths, and zero extra
+  stale paths.
+- Removed all Java compilation exclusions. The build emits 948 class files.
+- Ported lifecycle registration, configuration, game events, tick events,
+  registries, typed payload networking, saved data, client screens, particles,
+  render buffers, shader registration, and 1.21 resource-location APIs.
+- Ported the current forecast, atmosphere, weather-cell, wind, temperature,
+  tornado, hurricane, precipitation, cloud-region, cloud-field, and volumetric
+  cloud implementations. Clouds are included even though they were not the
+  priority.
+- Updated optional integration boundaries for Dynamic Trees, Ecliptic Seasons,
+  Legendary Survival Overhaul, Serene Seasons Plus, Distant Horizons, and
+  Desert Storms. Desert Storms uses reflection because no compatible artifact
+  is available to compile against; native sand movement remains active and an
+  installed compatible external mod can be invoked without a hard dependency.
+- Updated NeoForge metadata to the `type = "required"` / `type = "optional"`
+  dependency schema. Simple Clouds and Gaboulibs remain required.
+- Synced current assets, data, sounds, mixin configuration, and cloud shaders.
+  Removed stale Forge metadata and superseded shader resources.
+
+Verification:
+
+- `gradlew clean build --console=plain --no-daemon`: successful, including
+  tests.
+- 179 resource JSON files parsed successfully.
+- All 42 mixin configuration entries resolve to compiled classes.
+- NeoForge client startup reached completed resource reload and renderer
+  initialization. Project Atmosphere volumetric/cloud-field shaders registered,
+  the replacement Simple Clouds cube-mesh shader reported valid, and Simple
+  Clouds finished initialization without Project Atmosphere errors.
+- NeoForge dedicated-server startup reached `Done` with Project Atmosphere
+  common setup active and no distribution, payload, mixin, or classloading
+  failures.
+- Loaded the existing `New World (3)` integrated-server save and rendered live
+  gameplay. The test exposed and fixed the remaining Simple Clouds 1.21
+  two-matrix callback signatures in the default, shader-support, and Distant
+  Horizons pipeline mixins. After rebuilding, the player joined successfully,
+  `/pa status` returned live forecast/weather values, the world ticked without
+  errors, and all dimensions saved cleanly on exit.
+- Packaged artifact:
+  `build/libs/NeoForge-projectatmosphere-0.9.1.1-alpha.jar`.

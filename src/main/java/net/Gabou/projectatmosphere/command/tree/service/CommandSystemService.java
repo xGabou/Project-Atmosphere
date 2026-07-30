@@ -5,8 +5,7 @@ import net.Gabou.projectatmosphere.command.tree.util.PaCommandSupport;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphereStatusSyncManager;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionSyncManager;
-import net.Gabou.projectatmosphere.modules.hurricane.HurricaneManager;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerLevel;
@@ -46,8 +45,7 @@ public final class CommandSystemService {
         if (player != null) {
             AtmosphereStatusSyncManager.syncPlayer(player);
             CloudRegionSyncManager.syncPlayer(player);
-            TornadoManager.syncToPlayer(player);
-            HurricaneManager.syncToPlayer(player);
+            AtmosphereCloudServices.get().syncSevereWeather(player);
         }
         PaCommandMessages.success(
                 source,
@@ -65,8 +63,7 @@ public final class CommandSystemService {
         }
         AtmosphereStatusSyncManager.syncPlayer(player);
         CloudRegionSyncManager.syncPlayer(player);
-        TornadoManager.syncToPlayer(player);
-        HurricaneManager.syncToPlayer(player);
+        AtmosphereCloudServices.get().syncSevereWeather(player);
         PaCommandMessages.success(
                 source,
                 false,

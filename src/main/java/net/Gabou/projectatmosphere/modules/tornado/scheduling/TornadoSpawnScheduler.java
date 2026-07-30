@@ -1,6 +1,6 @@
 package net.Gabou.projectatmosphere.modules.tornado.scheduling;
 
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
+import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 
 /**
  * Manages tornado spawn slots and cooldowns.
@@ -29,7 +29,8 @@ public final class TornadoSpawnScheduler {
      * active tornado count is below the allowed maximum.
      */
     public static boolean isSlotAvailable(long nowTick) {
-        if (TornadoManager.getActiveTornadoes().size() >= MAX_TORNADOES) {
+        int activeTornadoes = AtmosphereCloudServices.get().activeTornadoCount();
+        if (activeTornadoes >= MAX_TORNADOES) {
             return false;
         }
         for (long ready : slotReadyTicks) {

@@ -5,6 +5,9 @@ import net.Gabou.projectatmosphere.clouds.CloudWeatherSample;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowMapAccess;
 import net.Gabou.projectatmosphere.clouds.api.CloudShadowSnapshot;
 import net.Gabou.projectatmosphere.clouds.client.ClientLocalizedWeatherState;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CloudWeatherMapRenderer;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudFrameDiagnostics;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.AtmosphereWorldEffectsDiagnostics;
 import net.Gabou.projectatmosphere.tools.debug.HurricaneRenderDiagnostics;
@@ -15,11 +18,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
-import net.minecraftforge.client.event.InputEvent;
-import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.config.ConfigTracker;
-import net.minecraftforge.fml.config.ModConfig;
+import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.config.ConfigTracker;
+import net.neoforged.fml.config.ModConfig;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -55,8 +58,8 @@ public final class CloudDiagnosticsOverlay {
     }
 
     @SubscribeEvent
-    public static void onRenderOverlay(RenderGuiOverlayEvent.Post event) {
-        if (!event.getOverlay().id().toString().equals("minecraft:debug_text")) {
+    public static void onRenderOverlay(RenderGuiLayerEvent.Post event) {
+        if (!event.getName().toString().equals("minecraft:debug_text")) {
             return;
         }
 
@@ -203,67 +206,43 @@ public final class CloudDiagnosticsOverlay {
 
         lines.add("PA [" + mode.name() + "]");
 
-        CloudRenderDiagnostics.FrameStats stats = CloudRenderDiagnostics.getLastStats();
-
-        if (stats == null) {
-            lines.add("Cloud renderer: waiting for stats");
-            appendHurricaneLine(lines, mode, maxLines);
-            return lines;
-        }
+        VolumetricCloudFrameDiagnostics.Snapshot stats = VolumetricCloudFrameDiagnostics.latest();
 
         if (showRenderSection() && lines.size() < maxLines) {
             if (full) {
-                lines.add("Render " + stats.qualityName()
-                        + " " + stats.raymarchSteps() + "s "
-                        + percent(stats.resolutionScale())
-                        + " | " + stats.targetWidth() + "x" + stats.targetHeight()
-                        + "/" + stats.mainWidth() + "x" + stats.mainHeight()
-                        + " | ds=" + yesNo(stats.downscaled()));
+                lines.add("Render " + stats.qualityProfile()
+                        + " | target " + abbreviate(stats.cloudTargetSize(), 30)
+                        + " | active=" + yesNo(stats.rendererActive()));
             } else {
-                lines.add("Render: " + stats.qualityName()
-                        + " / " + stats.raymarchSteps()
-                        + " steps / " + percent(stats.resolutionScale()));
+                lines.add("Render: " + stats.qualityProfile()
+                        + " / " + stats.renderCellCount() + " cells"
+                        + " / history " + yesNo(stats.historyConsumedThisFrame()));
             }
         }
 
         if (showRenderSection() && lines.size() < maxLines) {
             if (full) {
-                lines.add("Clouds " + stats.renderedSnapshots()
-                        + "/" + stats.renderableSnapshots()
-                        + "/" + stats.sourceSnapshots()
-                        + " | skip " + stats.totalSkippedSnapshots()
-                        + "/" + stats.filteredSkippedSnapshots()
-                        + "/" + stats.submitSkippedSnapshots()
-                        + " | comp=" + yesNo(stats.compositeSubmitted()));
+                lines.add("Clouds fields=" + stats.fieldsReceived()
+                        + " cells=" + stats.renderCellCount()
+                        + " splat=" + stats.weather().cloudletsSplatted()
+                        + " dropped=" + stats.weather().cloudletsDroppedBeforeSplat());
             } else {
-                lines.add("Clouds: " + stats.renderedSnapshots()
-                        + " rendered / " + stats.renderableSnapshots()
-                        + " renderable / " + stats.sourceSnapshots()
-                        + " synced");
+                lines.add("Clouds: " + stats.fieldsReceived()
+                        + " fields / " + stats.weather().cloudletsSplatted()
+                        + " cloudlets");
             }
         }
 
         if (showRenderSection() && full && lines.size() < maxLines) {
-            lines.add("CPU " + formatFloat(stats.frameCpuMs())
-                    + "/" + formatFloat(stats.raymarchCpuMs())
-                    + "/" + formatFloat(stats.compositeCpuMs())
-                    + "ms | work=" + formatFloat(stats.pixelStepMegas()) + "M");
+            lines.add("GPU ray=" + formatFloat(VolumetricCloudRenderer.lastGpuMilliseconds())
+                    + "ms | history=" + formatFloat(VolumetricCloudRenderer.lastHistoryConfidence())
+                    + " | " + CloudWeatherMapRenderer.cacheStatus());
         }
 
         if (showRenderSection() && full && lines.size() < maxLines) {
-            lines.add("GPU ray " + formatTiming(
-                    stats.raymarchGpuMs(),
-                    stats.gpuTimingSupported(),
-                    stats.raymarchGpuTimingValid(),
-                    stats.raymarchGpuAgeFrames(),
-                    stats.raymarchGpuPendingQueries()
-            ) + " | comp " + formatTiming(
-                    stats.compositeGpuMs(),
-                    stats.gpuTimingSupported(),
-                    stats.compositeGpuTimingValid(),
-                    stats.compositeGpuAgeFrames(),
-                    stats.compositeGpuPendingQueries()
-            ));
+            lines.add("Depth scene=" + yesNo(stats.sceneDepthAvailable())
+                    + " tex=" + stats.sceneDepthTextureId()
+                    + " | composite=" + stats.compositeMode());
         }
 
         if (showRenderSection() && full && lines.size() < maxLines) {
@@ -513,18 +492,7 @@ public final class CloudDiagnosticsOverlay {
      */
     private static void saveCommonConfigForMod(String modId) {
         try {
-            var set = ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.COMMON);
-
-            if (set == null) {
-                return;
-            }
-
-            for (ModConfig cfg : set) {
-                if (cfg.getModId().equals(modId)) {
-                    cfg.save();
-                    return;
-                }
-            }
+            AtmoCommonConfig.COMMON_SPEC.save();
         } catch (Exception ignored) {
         }
     }

@@ -25,7 +25,7 @@ public abstract class ShaderSupportPipelineTornadoMixin {
             require = 0
     )
     private void projectatmosphere$renderTornadoOpaque(Minecraft mc, SimpleCloudsRenderer renderer,
-                                                       PoseStack stack, Matrix4f projMat, float partialTick,
+                                                       Matrix4f modelViewMat, Matrix4f projMat, float partialTick,
                                                        double camX, double camY, double camZ, Frustum frustum,
                                                        CallbackInfo ci) {
         ClientLevel level = mc.level;
@@ -84,6 +84,8 @@ public abstract class ShaderSupportPipelineTornadoMixin {
             );
         }
         renderer.getCloudTarget().bindWrite(false);
+        PoseStack stack = new PoseStack();
+        stack.last().pose().set(modelViewMat);
         SimpleCloudsTornadoRenderer.INSTANCE.renderOpaque(
                 renderer, stack, projMat, partialTick, cloudColor[0], cloudColor[1], cloudColor[2],
                 null,

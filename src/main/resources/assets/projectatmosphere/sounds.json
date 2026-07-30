@@ -1,12 +1,66 @@
 {
   "weather_siren": {
+    "category": "weather",
     "sounds": [
-      { "name": "projectatmosphere:weather_siren", "stream": true }
+      {
+        "name": "projectatmosphere:weather_siren",
+        "stream": true
+      }
     ]
   },
+
   "tornado_roar": {
+    "category": "weather",
     "sounds": [
-      { "name": "projectatmosphere:tornado_roar", "stream": true }
+      {
+        "name": "projectatmosphere:tornado_roar",
+        "stream": true
+      }
+    ]
+  },
+
+  "thunder.in_clouds": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "projectatmosphere:thunder_in_clouds"
+      }
+    ]
+  },
+
+  "thunder.hit_distant": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "projectatmosphere:thunder_hit_distant"
+      }
+    ]
+  },
+
+  "thunder.hit_semi_distant": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "projectatmosphere:thunder_hit_semi_distant"
+      }
+    ]
+  },
+
+  "thunder.rumbling_close": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "projectatmosphere:thunder_rumbling_close"
+      }
+    ]
+  },
+
+  "thunder.rumbling_distant": {
+    "category": "weather",
+    "sounds": [
+      {
+        "name": "projectatmosphere:thunder_rumbling_distant"
+      }
     ]
   }
 }

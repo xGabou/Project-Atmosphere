@@ -17,6 +17,8 @@ public final class WeatherCellManager {
 
     private static long nextTick;
     private static long nextFormationTick;
+    private static long lastFormationAttemptTick = -1L;
+    private static long lastWeatherCellSpawnTick = -1L;
 
     private WeatherCellManager() {
     }
@@ -50,7 +52,12 @@ public final class WeatherCellManager {
         activeCells = activeCells(data.getCells());
         if (now >= nextFormationTick) {
             nextFormationTick = now + FORMATION_INTERVAL;
+            lastFormationAttemptTick = now;
+            int activeBeforeFormation = activeCells.size();
             changed |= FORMATION.tick(level, data, activeCells);
+            if (activeCells(data.getCells()).size() > activeBeforeFormation) {
+                lastWeatherCellSpawnTick = now;
+            }
         }
 
         if (changed) {
@@ -65,9 +72,24 @@ public final class WeatherCellManager {
         return List.copyOf(WeatherCellSavedData.get(level).getCells());
     }
 
+    public static WeatherCellCandidateDiagnostics evaluateCandidateDiagnostics(ServerLevel level) {
+        if (level == null) {
+            return new WeatherCellCandidateDiagnostics(List.of(), 0, java.util.Map.of(), lastFormationAttemptTick, lastWeatherCellSpawnTick, nextFormationTick);
+        }
+        return FORMATION.evaluateCandidateDiagnostics(
+                level,
+                WeatherCellSavedData.get(level).getCells(),
+                lastFormationAttemptTick,
+                lastWeatherCellSpawnTick,
+                nextFormationTick
+        );
+    }
+
     public static void resetRuntimeState() {
         nextTick = 0L;
         nextFormationTick = 0L;
+        lastFormationAttemptTick = -1L;
+        lastWeatherCellSpawnTick = -1L;
     }
 
     private static List<WeatherCellState> activeCells(Collection<WeatherCellState> cells) {
@@ -78,5 +100,36 @@ public final class WeatherCellManager {
             }
         }
         return active;
+    }
+
+    public record WeatherCellCandidateDiagnostics(
+            List<WeatherCellCandidateDebug> candidates,
+            int checkedRegionCount,
+            java.util.Map<String, Integer> blockedReasonCounts,
+            long lastFormationAttemptTick,
+            long lastWeatherCellSpawnTick,
+            long nextFormationTick
+    ) {
+    }
+
+    public record WeatherCellCandidateDebug(
+            net.Gabou.projectatmosphere.util.RegionInstanceKey regionKey,
+            net.minecraft.core.BlockPos position,
+            boolean eligible,
+            float score,
+            float formationChance,
+            float pressureAnomaly,
+            float humidity,
+            float minimumHumidity,
+            float cloudWater,
+            float minimumCloudWater,
+            float cloudCover,
+            float coverage,
+            float convergence,
+            float humidityTransport,
+            float weakLowOrganization,
+            int localActiveCells,
+            String blockedReason
+    ) {
     }
 }

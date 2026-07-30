@@ -11,12 +11,12 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec2;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -61,6 +61,10 @@ public final class CycloneManager {
         return Math.max(0L, COOLDOWN_TICKS - (dayTime - lastSpawnTick));
     }
 
+    public static long lastCycloneSeedTick() {
+        return lastSpawnTick;
+    }
+
     public static float minSeedDistanceBlocks() {
         return MIN_SEED_DISTANCE_BLOCKS;
     }
@@ -87,7 +91,8 @@ public final class CycloneManager {
         }
         if (support.convergenceSupport() < 0.18f
                 && atmospheric.stormPressureSupport() < 0.22f
-                && support.oceanMoistureBonus() < 0.12f) {
+                && support.oceanMoistureBonus() < 0.12f
+                && support.weakLowSupport() < 0.25f) {
             blockers.add("no organizing source");
         }
         if (ACTIVE_CYCLONES.size() >= MAX_ACTIVE_CYCLONES) {
@@ -185,6 +190,7 @@ public final class CycloneManager {
                 0f,
                 1f
         );
+        float weakLowSupport = WeakLowManager.organizationFor(state.getRegionId());
 
         float seedSupport = Mth.clamp(
                 humidityScore * 0.22f
@@ -192,7 +198,8 @@ public final class CycloneManager {
                         + pressureScore * 0.26f
                         + support.stormPressureSupport() * 0.14f
                         + convergenceScore * 0.12f
-                        + oceanMoistureBonus * 0.04f,
+                        + oceanMoistureBonus * 0.04f
+                        + weakLowSupport * 0.08f,
                 0f,
                 1f
         );
@@ -203,7 +210,8 @@ public final class CycloneManager {
                         + convergenceScore * 0.14f
                         + support.rainSupport() * 0.08f
                         + support.thunderstormSupport() * 0.16f
-                        + oceanMoistureBonus * 0.04f,
+                        + oceanMoistureBonus * 0.04f
+                        + weakLowSupport * 0.10f,
                 0f,
                 1f
         );
@@ -211,7 +219,8 @@ public final class CycloneManager {
                 support.thunderstormSupport() * 0.42f
                         + support.supercellSupport() * 0.34f
                         + pressureScore * 0.10f
-                        + convergenceScore * 0.14f,
+                        + convergenceScore * 0.14f
+                        + weakLowSupport * 0.04f,
                 0f,
                 1f
         );
@@ -219,7 +228,7 @@ public final class CycloneManager {
                 && support.cloudWater() >= 0.25f
                 && pressureAnomaly >= 8f
                 && seedSupport >= SEED_SUPPORT_THRESHOLD
-                && (convergenceScore >= 0.18f || support.stormPressureSupport() >= 0.22f || oceanMoistureBonus >= 0.12f);
+                && (convergenceScore >= 0.18f || support.stormPressureSupport() >= 0.22f || oceanMoistureBonus >= 0.12f || weakLowSupport >= 0.25f);
         return new CycloneSupport(
                 seedEligible,
                 seedSupport,
@@ -229,7 +238,8 @@ public final class CycloneManager {
                 convergenceScore,
                 oceanMoistureBonus,
                 support.thunderstormSupport(),
-                support.supercellSupport()
+                support.supercellSupport(),
+                weakLowSupport
         );
     }
 
@@ -363,24 +373,14 @@ public final class CycloneManager {
         );
         ACTIVE_CYCLONES.add(cyclone);
         ACTIVE_SNAPSHOTS.put(cyclone.id, cyclone.snapshot());
+        WeakLowManager.markPromoted(state);
 
         lastSpawnTick = level.getDayTime();
     }
-    private static List<RegionAtmosphereState> findNearbyStates(ServerLevel level) {
-        List<BlockPos> players = collectPlayerPositions(level);
-
-        if (players.isEmpty()) return List.of();
-
-        final double MAX_DIST_SQ = 5000d * 5000d;
-
-        return AtmosphericStateRegistry.snapshot().stream()
-                .filter(state -> isNearAnyPlayer(state, players, MAX_DIST_SQ))
-                .toList();
-    }
-
     private static List<RegionAtmosphereState> findCycloneSupportStates(ServerLevel level) {
         long gameTime = level.getGameTime();
-        return findNearbyStates(level).stream()
+        return CandidateRegionScanner.scan(level).regions().stream()
+                .map(CandidateRegionScanner.CandidateRegion::state)
                 .filter(state -> {
                     CycloneSupport support = evaluateCycloneSupport(state, gameTime);
                     return support.seedEligible() && !isTooCloseToActiveCyclone(state);
@@ -392,6 +392,78 @@ public final class CycloneManager {
                 .toList();
     }
 
+    public static List<CycloneCandidateDebug> evaluateCycloneCandidates(ServerLevel level) {
+        return evaluateCycloneCandidateDiagnostics(level).candidates();
+    }
+
+    public static CycloneCandidateDiagnostics evaluateCycloneCandidateDiagnostics(ServerLevel level) {
+        if (level == null) {
+            return new CycloneCandidateDiagnostics(
+                    List.of(),
+                    CandidateRegionScanner.scanRadiusRegions(),
+                    CandidateRegionScanner.maxRegionsPerTick(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    Map.of(),
+                    lastSpawnTick,
+                    WeakLowManager.lastWeakLowSpawnTick()
+            );
+        }
+        long gameTime = level.getGameTime();
+        long dayTime = level.getDayTime();
+        CandidateRegionScanner.ScanResult scan = CandidateRegionScanner.scan(level);
+        Map<String, Integer> blockedReasons = new ConcurrentHashMap<>();
+        List<CycloneCandidateDebug> candidates = new ArrayList<>();
+        for (CandidateRegionScanner.CandidateRegion region : scan.regions()) {
+            RegionAtmosphereState state = region.state();
+            CycloneSupport support = evaluateCycloneSupport(state, gameTime);
+            SeedSpawnCheck spawnCheck = evaluateSeedSpawn(state, gameTime, dayTime);
+            AtmosphericSupportEvaluator.Support atmospheric = AtmosphericSupportEvaluator.evaluate(state.getRegionId(), state);
+            CycloneCandidateDebug candidate = new CycloneCandidateDebug(
+                    state.getRegionId(),
+                    state.getPosition(),
+                    spawnCheck.canSpawn(),
+                    support.seedSupport(),
+                    support.intensificationSupport(),
+                    support.severeSupport(),
+                    support.pressureAnomalyHpa(),
+                    atmospheric.humidity(),
+                    atmospheric.cloudWater(),
+                    atmospheric.cloudCover(),
+                    support.convergenceSupport(),
+                    support.oceanMoistureBonus(),
+                    support.thunderstormSupport(),
+                    support.supercellSupport(),
+                    support.weakLowSupport(),
+                    spawnCheck.blockedReasonSummary()
+            );
+            candidates.add(candidate);
+            blockedReasons.merge(candidate.blockedReason(), 1, Integer::sum);
+        }
+        candidates.sort(Comparator.comparing(CycloneCandidateDebug::seedSupport).reversed());
+        if (candidates.size() > 24) {
+            candidates = new ArrayList<>(candidates.subList(0, 24));
+        }
+        return new CycloneCandidateDiagnostics(
+                List.copyOf(candidates),
+                scan.scanRadiusRegions(),
+                scan.maxRegionsPerTick(),
+                scan.activePlayersIncluded(),
+                scan.checkedRegions(),
+                scan.loadedRegions(),
+                scan.forecastOnlyRegions(),
+                scan.skippedRegions(),
+                scan.duplicateRegionsSkipped(),
+                Map.copyOf(blockedReasons),
+                lastSpawnTick,
+                WeakLowManager.lastWeakLowSpawnTick()
+        );
+    }
+
     private static boolean isTooCloseToActiveCyclone(RegionAtmosphereState state) {
         if (state == null || state.getPosition() == null || ACTIVE_SNAPSHOTS.isEmpty()) {
             return false;
@@ -400,27 +472,6 @@ public final class CycloneManager {
             double dx = state.getPosition().getX() - cyclone.centerX();
             double dz = state.getPosition().getZ() - cyclone.centerZ();
             if (Math.sqrt(dx * dx + dz * dz) < MIN_SEED_DISTANCE_BLOCKS) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static List<BlockPos> collectPlayerPositions(ServerLevel level) {
-        return level.players().stream()
-                .map(ServerPlayer::blockPosition)
-                .toList();
-    }
-
-    private static boolean isNearAnyPlayer(RegionAtmosphereState state, List<BlockPos> players, double maxDistanceSq) {
-        BlockPos pos = state.getPosition();
-        if (pos == null) {
-            return false;
-        }
-        for (BlockPos player : players) {
-            double dx = pos.getX() - player.getX();
-            double dz = pos.getZ() - player.getZ();
-            if ((dx * dx + dz * dz) <= maxDistanceSq) {
                 return true;
             }
         }
@@ -443,11 +494,48 @@ public final class CycloneManager {
             float convergenceSupport,
             float oceanMoistureBonus,
             float thunderstormSupport,
-            float supercellSupport
+            float supercellSupport,
+            float weakLowSupport
     ) {
         static CycloneSupport empty() {
-            return new CycloneSupport(false, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
+            return new CycloneSupport(false, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
         }
+    }
+
+    public record CycloneCandidateDebug(
+            RegionInstanceKey regionKey,
+            BlockPos position,
+            boolean canSpawn,
+            float seedSupport,
+            float intensificationSupport,
+            float severeSupport,
+            float pressureAnomalyHpa,
+            float humidity,
+            float cloudWater,
+            float cloudCover,
+            float convergenceSupport,
+            float oceanMoistureBonus,
+            float thunderstormSupport,
+            float supercellSupport,
+            float weakLowSupport,
+            String blockedReason
+    ) {
+    }
+
+    public record CycloneCandidateDiagnostics(
+            List<CycloneCandidateDebug> candidates,
+            int scanRadiusRegions,
+            int maxRegionsPerTick,
+            int activePlayersIncluded,
+            int checkedRegions,
+            int loadedRegions,
+            int forecastOnlyRegions,
+            int skippedRegions,
+            int duplicateRegionsSkipped,
+            Map<String, Integer> blockedReasonCounts,
+            long lastCycloneSeedTick,
+            long lastWeakLowTick
+    ) {
     }
 
     public record SeedSpawnCheck(

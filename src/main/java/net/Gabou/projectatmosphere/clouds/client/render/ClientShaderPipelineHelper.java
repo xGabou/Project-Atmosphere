@@ -27,8 +27,9 @@ public final class ClientShaderPipelineHelper {
 
     public static boolean isExternalShaderPackActive() {
         try {
-            return nonamecrackers2.crackerslib.common.compat.CompatHelper.areShadersRunning();
-        } catch (Throwable ignored) {
+            Class<?> helper = Class.forName("nonamecrackers2.crackerslib.common.compat.CompatHelper");
+            return Boolean.TRUE.equals(helper.getMethod("areShadersRunning").invoke(null));
+        } catch (ReflectiveOperationException | LinkageError ignored) {
             return false;
         }
     }

@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.modules.seasonaltrees.data;
 import net.Gabou.projectatmosphere.modules.seasonaltrees.core.TreeKey;
 import net.Gabou.projectatmosphere.modules.seasonaltrees.core.TreeRecord;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -26,10 +27,13 @@ public class SeasonalTreesSavedData extends SavedData {
     private final Map<Long, Map<BlockPos, TreeRecord>> chunkTrees = new HashMap<>();
 
     public static SeasonalTreesSavedData get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(SeasonalTreesSavedData::load, SeasonalTreesSavedData::new, DATA_NAME);
+        return level.getDataStorage().computeIfAbsent(
+                new SavedData.Factory<>(SeasonalTreesSavedData::new, SeasonalTreesSavedData::load),
+                DATA_NAME
+        );
     }
 
-    public static SeasonalTreesSavedData load(CompoundTag tag) {
+    public static SeasonalTreesSavedData load(CompoundTag tag, HolderLookup.Provider provider) {
         SeasonalTreesSavedData data = new SeasonalTreesSavedData();
         ListTag chunks = tag.getList(TAG_CHUNKS, Tag.TAG_COMPOUND);
         for (Tag entry : chunks) {
@@ -51,7 +55,7 @@ public class SeasonalTreesSavedData extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
         ListTag chunks = new ListTag();
         for (Map.Entry<Long, Map<BlockPos, TreeRecord>> entry : chunkTrees.entrySet()) {
             long chunkKey = entry.getKey();

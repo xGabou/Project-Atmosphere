@@ -4,29 +4,29 @@ import java.util.*;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
+import net.Gabou.projectatmosphere.clouds.WeatherCloudQueries;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
-import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.DominantBiomeOccupancy;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.ChannelSummary;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.OccupiedChunk;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.PlayerExperienceSample;
 import net.Gabou.projectatmosphere.telemetry.TelemetryModels.RegionForecastSample;
-import net.Gabou.projectatmosphere.telemetry.TelemetryCollector;
 import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 @EventBusSubscriber(modid = ProjectAtmosphere.MODID)
 public final class ServerTelemetrySampler {
@@ -45,9 +45,6 @@ public final class ServerTelemetrySampler {
             return;
         }
         if (!(event.getEntity() instanceof ServerPlayer player)) {
-            return;
-        }
-        if (player.level().isClientSide) {
             return;
         }
 
@@ -70,13 +67,28 @@ public final class ServerTelemetrySampler {
         }
     }
 
+    public static void captureServerSnapshot(ServerLevel level) {
+        if (level == null || !AtmoCommonConfig.TELEMETRY_ENABLED.get()) {
+            return;
+        }
+
+        long gameTime = level.getGameTime();
+        for (ServerPlayer player : level.players()) {
+            recordPlayerSample(level, player, player.blockPosition(), gameTime);
+        }
+        emitDominantBiomeOccupancy(gameTime);
+        recordRegionForecasts(level, gameTime);
+    }
+
     private static void recordPlayerSample(ServerLevel level, ServerPlayer player, BlockPos pos, long gameTime) {
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        float temperature = ForecastOrchestrator.getCurrentTemperature(key, gameTime);
-        float humidity = ForecastOrchestrator.getCurrentHumidity(key, gameTime);
-        float pressure = ForecastOrchestrator.getCurrentPressure(key, gameTime);
-        WindVector wind = ForecastOrchestrator.getWind(key, gameTime);
-        boolean isRaining = level.isRainingAt(pos);
+        RegionInstanceKey regionKey = RegionInstanceKey.from(pos);
+        ResourceLocation biomeId = AtmosphereUtils.getBiomeLocation(pos, level);
+        float temperature = ForecastOrchestrator.getCurrentTemperature(level, pos, gameTime);
+        float humidity = ForecastOrchestrator.getCurrentHumidity(level, pos, gameTime);
+        float pressure = ForecastOrchestrator.getCurrentPressure(level, pos, gameTime);
+        WindVector wind = ForecastOrchestrator.getWind(regionKey, gameTime);
+        boolean isThundering = WeatherCloudQueries.isThunderingAt(level, pos);
+        boolean isRaining = WeatherCloudQueries.isRainingAt(level, pos);
         boolean temperatureOutOfRange = temperature < -60f || temperature > 60f;
 
         PlayerExperienceSample sample = new PlayerExperienceSample(
@@ -86,14 +98,14 @@ public final class ServerTelemetrySampler {
                 level.dimension().location().toString(),
                 pos.getX() >> 4,
                 pos.getZ() >> 4,
-                key.biomeType().toString(),
+                biomeId.toString(),
                 temperature,
                 humidity,
                 pressure,
                 wind.baseSpeed(),
                 wind.angleRadians(),
-                level.isRaining(),
-                level.isThundering(),
+                isRaining,
+                isThundering,
                 isRaining ? "RAINING" : "CLEAR",
                 temperatureOutOfRange,
                 false,
@@ -120,8 +132,8 @@ public final class ServerTelemetrySampler {
     }
 
     private static void recordRegionForecasts(ServerLevel level, long gameTime) {
-        RegionForecastOrchestrator orchestrator = ForecastOrchestrator.getRegionOrchestrator(level);
-        if (orchestrator == null) {
+        Map<RegionInstanceKey, ForecastRegion> forecasts = ForecastGenerator.getRegionForecasts();
+        if (forecasts.isEmpty()) {
             return;
         }
         var active = AtmosphericStateRegistry.getActiveStates();
@@ -137,7 +149,10 @@ public final class ServerTelemetrySampler {
         String dimensionId = level.dimension().location().toString();
 
         for (RegionInstanceKey key : targets) {
-            ForecastRegion region = orchestrator.ensureLoaded(key);
+            ForecastRegion region = forecasts.get(key);
+            if (region == null) {
+                continue;
+            }
             RegionAtmosphereState state = AtmosphericStateRegistry.getState(key);
             if (state == null) {
                 continue;
@@ -181,6 +196,7 @@ public final class ServerTelemetrySampler {
                     currentWindSpeed,
                     currentWindDirection,
                     state.getCloudCover(),
+                    state.getCloudWater(),
                     state.getRainIntensity()
             );
             TelemetryCollector.get().recordRegionForecastSample(sample);

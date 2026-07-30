@@ -8,9 +8,7 @@ import net.Gabou.projectatmosphere.command.tree.service.CommandCloudService;
 import net.Gabou.projectatmosphere.command.tree.service.CommandDebugService;
 import net.Gabou.projectatmosphere.command.tree.service.CommandForecastService;
 import net.Gabou.projectatmosphere.command.tree.service.CommandFogService;
-import net.Gabou.projectatmosphere.command.tree.service.CommandHurricaneService;
 import net.Gabou.projectatmosphere.command.tree.service.CommandSystemService;
-import net.Gabou.projectatmosphere.command.tree.service.CommandTornadoService;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 
@@ -39,6 +37,16 @@ public final class PaCommandAliases {
         root.then(Commands.literal("clouds")
                 .then(Commands.literal("list").executes(ctx -> CommandCloudService.sendCloudList(ctx.getSource())))
                 .then(Commands.literal("count").executes(ctx -> CommandCloudService.sendCloudCount(ctx.getSource())))
+                .then(Commands.literal("stats")
+                        .executes(ctx -> CommandCloudService.sendCloudFieldStats(ctx.getSource())))
+                .then(Commands.literal("evolution")
+                        .executes(ctx -> CommandCloudService.sendCloudFieldEvolution(ctx.getSource())))
+                .then(Commands.literal("spawnField")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> CommandCloudService.spawnDebugCloudField(ctx.getSource())))
+                .then(Commands.literal("clearFields")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> CommandCloudService.clearCloudFields(ctx.getSource())))
                 .then(Commands.literal("clear")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> CommandCloudService.clearClouds(ctx.getSource())))
@@ -89,45 +97,9 @@ public final class PaCommandAliases {
                                 BoolArgumentType.getBool(ctx, "value")
                         ))));
 
-        root.then(Commands.literal("spawnTornado")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> CommandTornadoService.spawnTornado(ctx.getSource(), false)));
-        root.then(Commands.literal("spawntornadoes")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> CommandTornadoService.spawnTornado(ctx.getSource(), false)));
-        root.then(Commands.literal("spawnTornadoNoClouds")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> CommandTornadoService.spawnTornado(ctx.getSource(), true)));
-        root.then(Commands.literal("cleartornadoes")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> CommandTornadoService.clearTornadoes(ctx.getSource())));
-        root.then(Commands.literal("removetornado")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> CommandTornadoService.removeTornado(ctx.getSource(), 256.0D))
-                .then(Commands.argument("radius", IntegerArgumentType.integer(1))
-                        .executes(ctx -> CommandTornadoService.removeTornado(
-                                ctx.getSource(),
-                                IntegerArgumentType.getInteger(ctx, "radius")
-                        ))));
-
-        root.then(Commands.literal("spawnHurricane")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.argument("category", IntegerArgumentType.integer(1, 5))
-                        .executes(ctx -> CommandHurricaneService.spawnHurricane(
-                                ctx.getSource(),
-                                IntegerArgumentType.getInteger(ctx, "category")
-                        ))));
-        root.then(Commands.literal("clearhurricanes")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> CommandHurricaneService.clearHurricanes(ctx.getSource())));
-        root.then(Commands.literal("removehurricane")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> CommandHurricaneService.removeHurricane(ctx.getSource(), 256.0D))
-                .then(Commands.argument("radius", IntegerArgumentType.integer(1))
-                        .executes(ctx -> CommandHurricaneService.removeHurricane(
-                                ctx.getSource(),
-                                IntegerArgumentType.getInteger(ctx, "radius")
-                        ))));
+        if (simpleCloudsLoaded) {
+            OptionalSimpleCloudsCommands.addAliases(root);
+        }
 
         root.then(Commands.literal("windSpeed")
                 .then(Commands.literal("get")

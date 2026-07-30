@@ -1,8 +1,7 @@
 package net.Gabou.projectatmosphere.modules.tornado;
 
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.registry.ModTags;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
+import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
@@ -11,6 +10,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import static net.Gabou.projectatmosphere.util.AtmosphereUtils.isGlass;
 
 /**
  * Tracks damage done to glass blocks by tornado debris and handles auto repair.
@@ -25,10 +25,7 @@ public class GlassDamageManager {
     public static boolean DEBUG_GLASS_DESTROY = false;
     public static boolean doDamageGlass = AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get();
     public static boolean doAutoRepairGlass = AtmoCommonConfig.AUTO_REPAIR_GLASS.get();
-
-
     private static it.unimi.dsi.fastutil.longs.LongArrayList toDestroy = new it.unimi.dsi.fastutil.longs.LongArrayList(2048);
-
 
 
     /**
@@ -39,6 +36,7 @@ public class GlassDamageManager {
      * @param toProcess A list of block positions (as long values) to process for damage.
      */
     public static void damageGlass(ServerLevel level, it.unimi.dsi.fastutil.longs.LongArrayList toProcess) {
+        if (!AtmoCommonConfig.ENABLE_TORNADO_DESTRUCTION.get() || !AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get()) return;
         if (toProcess.isEmpty()) return;
         for(int i = 0; i < toProcess.size(); i++) {
             BlockPos pos = BlockPos.of(toProcess.getLong(i));
@@ -51,7 +49,7 @@ public class GlassDamageManager {
             glass.damage = Math.min(MAX_DAMAGE, glass.damage + 1);
             glass.lastDamageTime = System.currentTimeMillis();
 
-            if (glass.damage >= MAX_DAMAGE && !glass.broken && doDamageGlass) {
+            if (glass.damage >= MAX_DAMAGE && !glass.broken) {
                 toDestroy.add((pos.asLong()));
                 glass.broken = true;
             }
@@ -66,8 +64,13 @@ public class GlassDamageManager {
 
     private static int _destroyCursor = 0;
     private static void processGlassDestruction(ServerLevel level,
-                                                it.unimi.dsi.fastutil.longs.LongArrayList list,
-                                                int perTick) {
+                                           it.unimi.dsi.fastutil.longs.LongArrayList list,
+                                           int perTick) {
+        if (!AtmoCommonConfig.ENABLE_TORNADO_DESTRUCTION.get() || !AtmoCommonConfig.DAMAGE_GLASS_ON_TORNADO.get()) {
+            _destroyCursor = 0;
+            list.clear();
+            return;
+        }
         if (_destroyCursor >= list.size()) { _destroyCursor = 0; return; }
 
         int end = Math.min(_destroyCursor + perTick, list.size());
@@ -114,9 +117,5 @@ public class GlassDamageManager {
         GlassState(BlockState originalState) {
             this.originalState = originalState;
         }
-    }
-
-    private static boolean isGlass(BlockState state) {
-        return state.is(ModTags.GLASS_LIKE);
     }
 }

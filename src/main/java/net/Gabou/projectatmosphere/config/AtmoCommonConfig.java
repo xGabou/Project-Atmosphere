@@ -1,21 +1,117 @@
 package net.Gabou.projectatmosphere.config;
-
 import net.neoforged.neoforge.common.ModConfigSpec;
-
 import java.util.List;
+public class AtmoCommonConfig {
+    public enum CloudMode {
+        FULL,
+        HYBRID,
+        VANILLA;
 
-public final class AtmoCommonConfig {
-    public static final ModConfigSpec COMMON_SPEC;
+        public CloudMode next() {
+            CloudMode[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
+    public enum DimensionFilterMode {
+        WHITELIST,
+        BLACKLIST;
+
+        public DimensionFilterMode next() {
+            DimensionFilterMode[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
+    public enum CloudRaymarchQuality {
+        LOW("LOW", 24, 0.25F),
+        LOW_24("LOW 32", 32, 0.375F),
+        MEDIUM("MEDIUM", 40, 0.50F),
+        HIGH("HIGH", 64, 0.50F),
+        ULTRA("ULTRA", 96, 0.75F);
+
+        private final String displayName;
+        private final int raymarchSteps;
+        private final float resolutionScale;
+
+        CloudRaymarchQuality(
+                String displayName,
+                int raymarchSteps,
+                float resolutionScale
+        ) {
+            this.displayName = displayName;
+            this.raymarchSteps = raymarchSteps;
+            this.resolutionScale = resolutionScale;
+        }
+
+        /**
+         * Returns the user-facing label for this quality preset.
+         *
+         * @return display name
+         */
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public int getRaymarchSteps() {
+            return raymarchSteps;
+        }
+
+        public float getResolutionScale() {
+            return resolutionScale;
+        }
+
+        /**
+         * Retourne la qualite suivante pour les boutons cyclables.
+         *
+         * @return prochaine qualite
+         */
+        public CloudRaymarchQuality next() {
+            CloudRaymarchQuality[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
+
+    public enum CloudDiagnosticsOverlayMode {
+        OFF,
+        BASIC,
+        FULL;
+
+        public CloudDiagnosticsOverlayMode next() {
+            CloudDiagnosticsOverlayMode[] values = values();
+            return values[(ordinal() + 1) % values.length];
+        }
+    }
 
     public static final ModConfigSpec.IntValue CLOUD_RENDER_DISTANCE;
+    public static final ModConfigSpec.EnumValue<CloudRaymarchQuality> CLOUD_RAYMARCH_QUALITY;
+    public static final ModConfigSpec.BooleanValue CLOUD_FIELD_RENDERER_ENABLED;
+    public static final ModConfigSpec.BooleanValue CLOUD_VOLUMETRIC_RENDERER_ENABLED;
+    public static final ModConfigSpec.BooleanValue ENABLE_VOLUMETRIC_GROUND_SHADOWS;
+    public static final ModConfigSpec.IntValue NATIVE_CLOUD_SPAWN_HEIGHT;
     public static final ModConfigSpec.BooleanValue FORCE_SHARED_EXECUTOR;
-
+    public static final ModConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
+    public static final ModConfigSpec.EnumValue<CloudMode> CLOUD_MODE;
+    public static final ModConfigSpec.EnumValue<DimensionFilterMode> CLOUD_DIMENSION_FILTER_MODE;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> CLOUD_DIMENSION_IDS;
+    public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_PRECIPITATION_RENDERING;
+    public static final ModConfigSpec.BooleanValue ENABLE_CLOUD_SHADOW_MAP;
+    public static final ModConfigSpec.BooleanValue ENABLE_CLOUD_MOVEMENT;
+    public static final ModConfigSpec.BooleanValue FREEZE_CLOUD_MOVEMENT;
+    public static final ModConfigSpec.DoubleValue CLOUD_WIND_DRIFT_SCALE;
+    public static final ModConfigSpec.BooleanValue SHADER_SAFE_MODE;
     public static final ModConfigSpec.BooleanValue ENABLE_TORNADOES;
+    public static final ModConfigSpec.BooleanValue ENABLE_HURRICANES;
+    public static final ModConfigSpec.BooleanValue ENABLE_TORNADO_DESTRUCTION;
     public static final ModConfigSpec.BooleanValue ENABLE_STORM_DEBRIS;
+    public static final ModConfigSpec.BooleanValue EVENTS_ENABLED;
     public static final ModConfigSpec.IntValue MAX_STORM_DEBRIS_PER_CHUNK;
     public static final ModConfigSpec.BooleanValue AUTO_REPAIR_GLASS;
     public static final ModConfigSpec.BooleanValue DAMAGE_GLASS_ON_TORNADO;
-
+    public static final ModConfigSpec.BooleanValue ENABLE_HURRICANE_DESTRUCTION;
+    public static final ModConfigSpec.DoubleValue HURRICANE_DESTRUCTION_STRENGTH;
+    public static final ModConfigSpec.BooleanValue HURRICANE_DROP_BROKEN_BLOCKS;
+    public static final ModConfigSpec.BooleanValue HURRICANE_DAMAGE_TREES;
     public static final ModConfigSpec.DoubleValue TORNADO_CHECK_INTERVAL_SEC;
     public static final ModConfigSpec.DoubleValue TORNADO_BASE_SPAWN_RADIUS_M;
     public static final ModConfigSpec.DoubleValue TORNADO_MIN_TEMP_CONTRAST_C;
@@ -32,9 +128,24 @@ public final class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MIN;
     public static final ModConfigSpec.DoubleValue TORNADO_INTENSITY_MAX;
     public static final ModConfigSpec.IntValue TORNADO_CELL_COOLDOWN_MINUTES;
+    public static final ModConfigSpec.BooleanValue DISABLE_SIMPLE_CLOUDS_TORNADO_SSBO;
+    public static final ModConfigSpec.BooleanValue TORNADO_DEBUG_LOGGING;
+    public static final ModConfigSpec.DoubleValue TORNADO_RENDER_QUALITY;
+    public static final ModConfigSpec.DoubleValue TORNADO_RENDER_DOWNSAMPLE;
 
-    public static final ModConfigSpec.BooleanValue DISPLAY_UNITS_IMPERIAL;
     public static final ModConfigSpec.DoubleValue STORM_SEVERITY_BOOSTER;
+    public static final ModConfigSpec.IntValue CYCLONE_CANDIDATE_SCAN_RADIUS_REGIONS;
+    public static final ModConfigSpec.IntValue CYCLONE_CANDIDATE_SCAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue CYCLONE_CANDIDATE_MAX_REGIONS_PER_TICK;
+
+    public static final ModConfigSpec.BooleanValue DEBUG_MODE;
+    public static final ModConfigSpec.EnumValue<CloudDiagnosticsOverlayMode> CLOUD_DIAGNOSTICS_OVERLAY;
+    public static final ModConfigSpec.BooleanValue CLOUD_DIAGNOSTICS_SHOW_RENDER;
+    public static final ModConfigSpec.BooleanValue CLOUD_DIAGNOSTICS_SHOW_WEATHER;
+    public static final ModConfigSpec.BooleanValue CLOUD_DIAGNOSTICS_SHOW_WORLD_EFFECTS;
+
+
+
 
     public static final ModConfigSpec.DoubleValue WIND_BASE_RETARGET_SEC;
     public static final ModConfigSpec.DoubleValue WIND_DIR_RETARGET_SEC;
@@ -46,7 +157,6 @@ public final class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue WIND_PLAYER_PUSH_SCALE;
     public static final ModConfigSpec.DoubleValue WIND_ENTITY_PUSH_SCALE;
     public static final ModConfigSpec.DoubleValue WIND_PARTICLE_BEND_STRENGTH;
-
     public static final ModConfigSpec.DoubleValue PLAYER_WIND_THRESHOLD_MPS;
     public static final ModConfigSpec.DoubleValue PLAYER_MAX_GUST_BPT;
     public static final ModConfigSpec.DoubleValue PLAYER_GUST_CHANCE_SCALE;
@@ -58,7 +168,31 @@ public final class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue PLAYER_GUST_EXTREME_THRESHOLD_MPS;
     public static final ModConfigSpec.DoubleValue PLAYER_GUST_EXTREME_CHANCE_MULT;
     public static final ModConfigSpec.DoubleValue PLAYER_GUST_EXTREME_STRENGTH_MULT;
-
+    public static final ModConfigSpec.IntValue WIND_LEAF_PARTICLE_RADIUS_BLOCKS;
+    public static final ModConfigSpec.IntValue WIND_LEAF_PARTICLE_SCAN_UP;
+    public static final ModConfigSpec.IntValue WIND_LEAF_PARTICLE_SCAN_DOWN;
+    public static final ModConfigSpec.IntValue WIND_LEAF_PARTICLE_ATTEMPTS_PER_TICK;
+    public static final ModConfigSpec.DoubleValue WIND_LEAF_PARTICLE_CHANCE_PER_CANDIDATE;
+    public static final ModConfigSpec.IntValue WIND_LEAF_PARTICLE_MIN_FOLIAGE_NEIGHBORS;
+    public static final ModConfigSpec.BooleanValue WIND_LEAF_PARTICLE_REQUIRE_LOG_BELOW;
+    public static final ModConfigSpec.IntValue WIND_LEAF_PARTICLE_MAX_LOG_SEARCH_DEPTH;
+    public static final ModConfigSpec.BooleanValue SEASONAL_TREES_ENABLED;
+    public static final ModConfigSpec.BooleanValue SEASONAL_TREES_DYNAMIC_TREES_ENABLED;
+    public static final ModConfigSpec.BooleanValue SEASONAL_TREES_VANILLA_ENABLED;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_LEAF_DROP_DAYS;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_LEAF_REGROW_DAYS;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_TRANSITION_COOLDOWN_DAYS;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_TRANSITION_OFFSET_DAYS;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_SPREAD_CHANCE_PER_DAY;
+    public static final ModConfigSpec.IntValue SEASONAL_TREES_SPREAD_RADIUS_BLOCKS;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_VIGOR_REGEN_PER_DAY;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_VIGOR_MIN_FOR_SPREAD;
+    public static final ModConfigSpec.IntValue SEASONAL_TREES_MAX_ACTIVE_SEEDS;
+    public static final ModConfigSpec.IntValue SEASONAL_TREES_SEED_LIFETIME_TICKS;
+    public static final ModConfigSpec.DoubleValue SEASONAL_TREES_SEED_BASE_SPEED;
+    public static final ModConfigSpec.BooleanValue SEASONAL_TREES_WIND_TRANSPORT_ENABLED;
+    public static final ModConfigSpec.IntValue SEASONAL_TREES_BUDGET_PER_TICK;
+    public static final ModConfigSpec.IntValue SEASONAL_TREES_SCAN_BUDGET_PER_TICK;
     public static final ModConfigSpec.BooleanValue WORLD_EFFECTS_ENABLED;
     public static final ModConfigSpec.IntValue WORLD_EFFECT_SAMPLES_PER_PLAYER;
     public static final ModConfigSpec.IntValue WORLD_EFFECT_SAMPLE_RADIUS;
@@ -67,28 +201,8 @@ public final class AtmoCommonConfig {
     public static final ModConfigSpec.IntValue CLOUD_FIRE_DAMP_TICKS;
     public static final ModConfigSpec.DoubleValue FIRE_EXTINGUISH_BASE_CHANCE;
     public static final ModConfigSpec.DoubleValue CAULDRON_FILL_BASE_CHANCE;
-
-    public enum CloudMode {
-        FULL,
-        HYBRID,
-        VANILLA,
-        NATIVE,
-        SIMPLE_CLOUDS
-    }
-
-    public enum DimensionFilterMode {
-        WHITELIST,
-        BLACKLIST
-    }
-
-    public static final ModConfigSpec.EnumValue<CloudMode> CLOUD_MODE;
-    public static final ModConfigSpec.EnumValue<DimensionFilterMode> CLOUD_DIMENSION_FILTER_MODE;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> CLOUD_DIMENSION_IDS;
-    public static final ModConfigSpec.IntValue NATIVE_CLOUD_SPAWN_HEIGHT;
-    public static final ModConfigSpec.BooleanValue ENABLE_CLOUD_MOVEMENT;
-    public static final ModConfigSpec.BooleanValue FREEZE_CLOUD_MOVEMENT;
-    public static final ModConfigSpec.DoubleValue CLOUD_WIND_DRIFT_SCALE;
     public static final ModConfigSpec.BooleanValue FOG_ENABLED;
+    public static final ModConfigSpec.DoubleValue FORECAST_DEVIATION_MULTIPLIER;
     public static final ModConfigSpec.IntValue FOG_SYNC_INTERVAL_TICKS;
     public static final ModConfigSpec.DoubleValue FOG_HUMIDITY_START_PERCENT;
     public static final ModConfigSpec.DoubleValue FOG_HUMIDITY_FULL_PERCENT;
@@ -100,19 +214,14 @@ public final class AtmoCommonConfig {
     public static final ModConfigSpec.DoubleValue FOG_WET_BIOME_DOWNFALL_MIN;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_IDS;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> FOG_WET_BIOME_KEYWORDS;
+    public static final ModConfigSpec.BooleanValue TELEMETRY_ENABLED;
+    public static final ModConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
     public static final ModConfigSpec.BooleanValue AUTH_STRICT_OFFLINE_UUID_REJECT;
     public static final ModConfigSpec.BooleanValue AUTH_KICK_ON_FAILURE;
     public static final ModConfigSpec.IntValue AUTH_CHALLENGE_TIMEOUT_TICKS;
-    public static final ModConfigSpec.BooleanValue EVENTS_ENABLED;
-
-    public static final ModConfigSpec.BooleanValue TELEMETRY_ENABLED;
-    public static final ModConfigSpec.IntValue TELEMETRY_RETENTION_DAYS;
-
-    public static final ModConfigSpec.BooleanValue DEBUG_MODE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-
         builder.push("performance");
         FORCE_SHARED_EXECUTOR = builder
                 .comment("Force use of shared executor for all async tasks, regardless of CPU count")
@@ -120,24 +229,91 @@ public final class AtmoCommonConfig {
         CLOUD_RENDER_DISTANCE = builder
                 .comment("Maximum distance in blocks to render clouds; higher values impact performance")
                 .defineInRange("cloudRenderDistance", 2000, 100, Integer.MAX_VALUE);
+        CLOUD_RAYMARCH_QUALITY = builder
+                .comment("Qualite du raymarch volumetrique PA: LOW=24 etapes a 25%, LOW_24=32 etapes a 37.5%, MEDIUM=40 etapes a 50%, HIGH=64 etapes a 50%, ULTRA=96 etapes a 75%")
+                .defineEnum("cloudRaymarchQuality", CloudRaymarchQuality.MEDIUM);
+        CLOUD_FIELD_RENDERER_ENABLED = builder
+                .comment("Enable the Project Atmosphere CloudField volume renderer when Simple Clouds is not installed. Disable this as a persistent kill switch to fall back to vanilla clouds.")
+                .define("cloudFieldRendererEnabled", true);
+        CLOUD_VOLUMETRIC_RENDERER_ENABLED = builder
+                .comment("Enable the PA-native volumetric cloud pipeline (weather-map + global raymarch). When disabled, the legacy per-field CloudField renderer is used instead.")
+                .define("cloudVolumetricRendererEnabled", true);
+        ENABLE_VOLUMETRIC_GROUND_SHADOWS = builder
+                .comment("Apply volumetric cloud ground shadows as a depth-based post-process. The GPU shadow map texture stays published for shader packs even when this is disabled.")
+                .define("enableVolumetricGroundShadows", true);
+        builder.pop();
+
+        builder.push("clouds");
+        NATIVE_CLOUD_SPAWN_HEIGHT = builder
+                .comment("Hauteur Y fixe utilisee par le spawn natif des nuages Project Atmosphere")
+                .defineInRange("nativeCloudSpawnHeight", 256, -2048, 4096);
+        ENABLE_CUSTOM_PRECIPITATION_RENDERING = builder
+                .comment("Enable Project Atmosphere custom rain and snow rendering hooks. Vanilla precipitation remains the fallback.")
+                .define("enableCustomPrecipitationRendering", true);
+        ENABLE_CLOUD_SHADOW_MAP = builder
+                .comment("Enable Project Atmosphere cloud shadow map publication for render, terrain, fog, rainbow, and mod API consumers.")
+                .define("enableCloudShadowMap", true);
+        ENABLE_CLOUD_MOVEMENT = builder
+                .comment("Enable native Project Atmosphere cloud drift from regional wind.")
+                .define("enableCloudMovement", true);
+        FREEZE_CLOUD_MOVEMENT = builder
+                .comment("Freeze native Project Atmosphere cloud movement for debugging and screenshots.")
+                .define("freezeCloudMovement", false);
+        CLOUD_WIND_DRIFT_SCALE = builder
+                .comment("Blocks-per-tick drift multiplier applied to wind speed in m/s for native PA clouds.")
+                .defineInRange("cloudWindDriftScale", 0.035d, 0.0d, 1.0d);
+        SHADER_SAFE_MODE = builder
+                .comment("Prefer conservative cloud rendering paths intended to avoid shader-pack conflicts.")
+                .define("shaderSafeMode", false);
         builder.pop();
 
         builder.push("display");
         DISPLAY_UNITS_IMPERIAL = builder
                 .comment("Display values in imperial units (F, mph, inHg) instead of metric (C, m/s, hPa)")
                 .define("imperialUnits", false);
+        CLOUD_MODE = builder
+                .comment("Select how Project Atmosphere cloud rendering should behave")
+                .defineEnum("cloudMode", CloudMode.FULL);
+        CLOUD_DIMENSION_FILTER_MODE = builder
+                .comment("Controls whether cloudDimensionIds is used as an allow-list or deny-list for PA cloud/weather ownership")
+                .defineEnum("cloudDimensionFilterMode", DimensionFilterMode.WHITELIST);
+        CLOUD_DIMENSION_IDS = builder
+                .comment("Dimension ids used by cloudDimensionFilterMode. Default allows PA clouds/weather only in the Overworld.")
+                .defineListAllowEmpty("cloudDimensionIds",
+                        List.of("minecraft:overworld"),
+                        value -> value instanceof String);
         builder.pop();
 
+        builder.push("forecast");
+        FORECAST_DEVIATION_MULTIPLIER = builder
+                .comment("Multiplier applied to daily forecast variation")
+                .defineInRange("forecastDeviationMultiplier", 1.0d, 0.0d, 3.0d);
+        builder.pop();
         builder.push("storms");
         STORM_SEVERITY_BOOSTER = builder
-                .comment("Global multiplier for storm severity (affects wind speed and precipitation intensity)")
-                .defineInRange("stormSeverityBooster", 3.2D, 0.5D, 8.0D);
+                .comment("Global multiplier for storm severity calculations")
+                .defineInRange("stormSeverityBooster", 3.2d, 0.5d, 28d);
+        CYCLONE_CANDIDATE_SCAN_RADIUS_REGIONS = builder
+                .comment("Forecast-region radius around each active player used for weak-low and cyclone candidate scans.")
+                .defineInRange("cycloneCandidateScanRadiusRegions", 10, 1, 32);
+        CYCLONE_CANDIDATE_SCAN_INTERVAL_TICKS = builder
+                .comment("Ticks between weak-low/cyclone candidate scan passes.")
+                .defineInRange("cycloneCandidateScanIntervalTicks", 600, 20, 24000);
+        CYCLONE_CANDIDATE_MAX_REGIONS_PER_TICK = builder
+                .comment("Maximum forecast-known regions evaluated per candidate scan pass.")
+                .defineInRange("cycloneCandidateMaxRegionsPerTick", 512, 16, 4096);
         EVENTS_ENABLED = builder
                 .comment("Enable storm and weather event spawning/processing")
                 .define("eventsEnabled", true);
         ENABLE_TORNADOES = builder
                 .comment("Enable tornado spawning and commands")
                 .define("enableTornadoes", true);
+        ENABLE_HURRICANES = builder
+                .comment("Enable hurricane spawning, ticking, syncing, and commands")
+                .define("enableHurricanes", false);
+        ENABLE_TORNADO_DESTRUCTION = builder
+                .comment("Enable tornado block destruction and terrain scouring")
+                .define("enableTornadoDestruction", true);
         ENABLE_STORM_DEBRIS = builder
                 .comment("Enable random debris spawning during storms")
                 .define("enableStormDebris", false);
@@ -150,7 +326,18 @@ public final class AtmoCommonConfig {
         DAMAGE_GLASS_ON_TORNADO = builder
                 .comment("Enable glass damage when a tornado passes over it")
                 .define("damageGlassOnTornado", true);
-
+        ENABLE_HURRICANE_DESTRUCTION = builder
+                .comment("Enable limited hurricane block destruction")
+                .define("enableHurricaneDestruction", true);
+        HURRICANE_DESTRUCTION_STRENGTH = builder
+                .comment("Overall hurricane destruction strength. Higher values increase checks, break chance, and tree damage.")
+                .defineInRange("hurricaneDestructionStrength", 1.0d, 0.0d, 3.0d);
+        HURRICANE_DROP_BROKEN_BLOCKS = builder
+                .comment("Drop items from blocks broken by hurricanes")
+                .define("hurricaneDropBrokenBlocks", false);
+        HURRICANE_DAMAGE_TREES = builder
+                .comment("Allow hurricanes to damage leaves and occasionally break logs")
+                .define("hurricaneDamageTrees", true);
         builder.push("tornado");
         TORNADO_CHECK_INTERVAL_SEC = builder
                 .comment("Seconds between tornado spawn checks")
@@ -200,9 +387,20 @@ public final class AtmoCommonConfig {
         TORNADO_CELL_COOLDOWN_MINUTES = builder
                 .comment("Cooldown in minutes before a cell can spawn another tornado")
                 .defineInRange("cellCooldownMinutes", 20, 0, Integer.MAX_VALUE);
+        DISABLE_SIMPLE_CLOUDS_TORNADO_SSBO = builder
+                .comment("Disable Project Atmosphere's Simple Clouds storm SSBO integration. Tornado cloud carving uses safer uniforms; hurricane cloud shaping falls back off when this is enabled.")
+                .define("disableSimpleCloudsTornadoSSBO", false);
+        TORNADO_DEBUG_LOGGING = builder
+                .comment("Enable verbose tornado logging (SSBO detection, fallback decisions, command outcomes).")
+                .define("debugTornadoLogging", false);
+        TORNADO_RENDER_QUALITY = builder
+                .comment("Client tornado volume quality multiplier. Lower values reduce tornado shader step count and detail for better FPS.")
+                .defineInRange("renderQuality", 0.72d, 0.25d, 1.0d);
+        TORNADO_RENDER_DOWNSAMPLE = builder
+                .comment("Client tornado volume downsample factor. 1.0 renders at full resolution; higher values reduce shaded pixels before upsampling.")
+                .defineInRange("renderDownsample", 2.5d, 1.0d, 4.0d);
         builder.pop();
-
-        builder.pop(); // storms
+        builder.pop();
 
         builder.push("wind");
         WIND_BASE_RETARGET_SEC = builder
@@ -224,8 +422,8 @@ public final class AtmoCommonConfig {
                 .comment("Minimum wind speed to push entities")
                 .defineInRange("pushThresholdMps", 6.0d, 0d, 100d);
         WIND_PUSH_RAMP_MPS = builder
-                .comment("Wind speed ramp around the threshold for smoothing (m/s)")
-                .defineInRange("pushRampMps", 5.0d, 0d, 100d);
+                .comment("Soft-start range above the threshold where wind push ramps up")
+                .defineInRange("pushRampMps", 8.0d, 0d, 100d);
         WIND_PLAYER_PUSH_SCALE = builder
                 .comment("Push scale applied to players")
                 .defineInRange("playerPushScale", 0.013333333333d, 0d, 1d);
@@ -235,7 +433,6 @@ public final class AtmoCommonConfig {
         WIND_PARTICLE_BEND_STRENGTH = builder
                 .comment("Blend strength for steering wind-bent particles per tick")
                 .defineInRange("particleBendStrength", 0.08d, 0d, 1d);
-
         PLAYER_WIND_THRESHOLD_MPS = builder
                 .comment("Minimum base wind speed (m/s) before player gusts can occur")
                 .defineInRange("playerWindThresholdMps", 11.1d, 0d, 100d);
@@ -270,6 +467,86 @@ public final class AtmoCommonConfig {
                 .comment("Multiplier applied to max gust strength in extreme winds")
                 .defineInRange("playerGustExtremeStrengthMult", 2.0d, 1d, 10d);
         builder.pop();
+        builder.push("leafParticles");
+        WIND_LEAF_PARTICLE_RADIUS_BLOCKS = builder
+                .comment("Sampling radius in blocks around the player for wind-driven leaf particles")
+                .defineInRange("radiusBlocks", 32, 4, 128);
+        WIND_LEAF_PARTICLE_SCAN_UP = builder
+                .comment("Vertical scan range above the player for canopy sampling")
+                .defineInRange("verticalScanUp", 12, 0, 64);
+        WIND_LEAF_PARTICLE_SCAN_DOWN = builder
+                .comment("Vertical scan range below the player for canopy sampling")
+                .defineInRange("verticalScanDown", 12, 0, 64);
+        WIND_LEAF_PARTICLE_ATTEMPTS_PER_TICK = builder
+                .comment("Number of canopy sampling attempts per client tick")
+                .defineInRange("attemptsPerTick", 2, 0, 32);
+        WIND_LEAF_PARTICLE_CHANCE_PER_CANDIDATE = builder
+                .comment("Chance per valid canopy candidate to spawn a particle")
+                .defineInRange("chancePerCandidate", 0.03d, 0d, 1d);
+        WIND_LEAF_PARTICLE_MIN_FOLIAGE_NEIGHBORS = builder
+                .comment("Minimum foliage blocks required in a 3x3x3 neighborhood to accept a canopy candidate")
+                .defineInRange("minFoliageNeighbors", 6, 1, 27);
+        WIND_LEAF_PARTICLE_REQUIRE_LOG_BELOW = builder
+                .comment("Require at least one log block below the canopy candidate")
+                .define("requireLogBelow", true);
+        WIND_LEAF_PARTICLE_MAX_LOG_SEARCH_DEPTH = builder
+                .comment("Maximum depth to search for a log block below the canopy candidate")
+                .defineInRange("maxLogSearchDepth", 8, 1, 32);
+        builder.pop();
+
+        builder.push("seasonalTrees");
+        SEASONAL_TREES_ENABLED = builder
+                .comment("Enable seasonal tree leaf transitions and spreading")
+                .define("enabled", false);
+        SEASONAL_TREES_DYNAMIC_TREES_ENABLED = builder
+                .comment("Enable Dynamic Trees support (preferred)")
+                .define("dynamicTreesEnabled", false);
+        SEASONAL_TREES_VANILLA_ENABLED = builder
+                .comment("Enable conservative vanilla tree support (off by default)")
+                .define("vanillaEnabled", true);
+        SEASONAL_TREES_LEAF_DROP_DAYS = builder
+                .comment("In-game days for leaves to drop during autumn")
+                .defineInRange("leafDropDays", 4.0d, 0.1d, 40d);
+        SEASONAL_TREES_LEAF_REGROW_DAYS = builder
+                .comment("In-game days for leaves to regrow during spring")
+                .defineInRange("leafRegrowDays", 4.0d, 0.1d, 40d);
+        SEASONAL_TREES_TRANSITION_COOLDOWN_DAYS = builder
+                .comment("Cooldown in days before a tree can restart a season transition")
+                .defineInRange("transitionCooldownDays", 2.0d, 0d, 40d);
+        SEASONAL_TREES_TRANSITION_OFFSET_DAYS = builder
+                .comment("Max random offset in days applied to per-tree seasonal transitions")
+                .defineInRange("transitionOffsetDays", 2.0d, 0d, 20d);
+        SEASONAL_TREES_SPREAD_CHANCE_PER_DAY = builder
+                .comment("Chance per in-game day for mature trees to attempt spreading")
+                .defineInRange("spreadChancePerDay", 0.02d, 0d, 1d);
+        SEASONAL_TREES_SPREAD_RADIUS_BLOCKS = builder
+                .comment("Baseline spread radius in blocks for local seed dispersal")
+                .defineInRange("spreadRadiusBlocks", 12, 1, 128);
+        SEASONAL_TREES_VIGOR_REGEN_PER_DAY = builder
+                .comment("Base vigor regeneration per in-game day")
+                .defineInRange("vigorRegenPerDay", 0.05d, 0d, 1d);
+        SEASONAL_TREES_VIGOR_MIN_FOR_SPREAD = builder
+                .comment("Minimum vigor required before a tree can spread")
+                .defineInRange("vigorMinForSpread", 0.55d, 0d, 1d);
+        SEASONAL_TREES_MAX_ACTIVE_SEEDS = builder
+                .comment("Maximum number of active seed particles (wind transport) per world")
+                .defineInRange("maxActiveSeeds", 256, 0, 10000);
+        SEASONAL_TREES_SEED_LIFETIME_TICKS = builder
+                .comment("Seed particle lifetime in ticks before attempting to plant")
+                .defineInRange("seedLifetimeTicks", 400, 20, 72000);
+        SEASONAL_TREES_SEED_BASE_SPEED = builder
+                .comment("Base speed multiplier for wind-transported seeds")
+                .defineInRange("seedBaseSpeed", 0.15d, 0d, 5d);
+        SEASONAL_TREES_WIND_TRANSPORT_ENABLED = builder
+                .comment("Enable wind-based seed transport when Project Atmosphere is installed")
+                .define("windTransportEnabled", true);
+        SEASONAL_TREES_BUDGET_PER_TICK = builder
+                .comment("Maximum number of tree updates per tick")
+                .defineInRange("budgetPerTick", 80, 1, 10000);
+        SEASONAL_TREES_SCAN_BUDGET_PER_TICK = builder
+                .comment("Maximum number of chunk scan steps per tick")
+                .defineInRange("scanBudgetPerTick", 120, 1, 20000);
+        builder.pop();
 
         builder.push("worldEffects");
         WORLD_EFFECTS_ENABLED = builder
@@ -296,32 +573,6 @@ public final class AtmoCommonConfig {
         CAULDRON_FILL_BASE_CHANCE = builder
                 .comment("Base chance per sample to fill cauldrons when raining (scaled by rain intensity)")
                 .defineInRange("cauldronFillBaseChance", 0.06d, 0d, 1d);
-        builder.pop();
-
-        builder.push("clouds");
-        CLOUD_MODE = builder
-                .comment("Select how Project Atmosphere cloud rendering should behave")
-                .defineEnum("cloudMode", CloudMode.FULL);
-        CLOUD_DIMENSION_FILTER_MODE = builder
-                .comment("Controls whether cloudDimensionIds is used as an allow-list or deny-list for PA cloud/weather ownership")
-                .defineEnum("cloudDimensionFilterMode", DimensionFilterMode.WHITELIST);
-        CLOUD_DIMENSION_IDS = builder
-                .comment("Dimension ids used by cloudDimensionFilterMode. Default allows PA clouds/weather only in the Overworld.")
-                .defineListAllowEmpty("cloudDimensionIds",
-                        List.of("minecraft:overworld"),
-                        value -> value instanceof String);
-        NATIVE_CLOUD_SPAWN_HEIGHT = builder
-                .comment("Fixed Y height used by native Project Atmosphere cloud spawning")
-                .defineInRange("nativeCloudSpawnHeight", 256, -2048, 4096);
-        ENABLE_CLOUD_MOVEMENT = builder
-                .comment("Enable native Project Atmosphere cloud drift from regional wind")
-                .define("enableCloudMovement", true);
-        FREEZE_CLOUD_MOVEMENT = builder
-                .comment("Freeze native Project Atmosphere cloud movement for debugging and screenshots")
-                .define("freezeCloudMovement", false);
-        CLOUD_WIND_DRIFT_SCALE = builder
-                .comment("Blocks-per-tick drift multiplier applied to wind speed in m/s for native PA clouds")
-                .defineInRange("cloudWindDriftScale", 0.035d, 0.0d, 1.0d);
         builder.pop();
 
         builder.push("fog");
@@ -392,11 +643,23 @@ public final class AtmoCommonConfig {
         DEBUG_MODE = builder
                 .comment("Enable debug mode for verbose logging and diagnostics")
                 .define("debugMode", false);
+        CLOUD_DIAGNOSTICS_OVERLAY = builder
+                .comment("Cloud render diagnostics overlay mode. F3+O cycles this in-game.")
+                .defineEnum("cloudDiagnosticsOverlay", CloudDiagnosticsOverlayMode.OFF);
+        CLOUD_DIAGNOSTICS_SHOW_RENDER = builder
+                .comment("Show cloud render diagnostics in the Project Atmosphere overlay.")
+                .define("cloudDiagnosticsShowRender", true);
+        CLOUD_DIAGNOSTICS_SHOW_WEATHER = builder
+                .comment("Show localized weather diagnostics in the Project Atmosphere overlay.")
+                .define("cloudDiagnosticsShowWeather", true);
+        CLOUD_DIAGNOSTICS_SHOW_WORLD_EFFECTS = builder
+                .comment("Show world effect diagnostics in the Project Atmosphere overlay.")
+                .define("cloudDiagnosticsShowWorldEffects", true);
         builder.pop();
 
         COMMON_SPEC = builder.build();
     }
 
-    private AtmoCommonConfig() { }
+    public static final ModConfigSpec COMMON_SPEC;
 }
 

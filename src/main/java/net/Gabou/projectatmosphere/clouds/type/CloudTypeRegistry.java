@@ -22,7 +22,8 @@ public final class CloudTypeRegistry {
 
     private static final String[] THUNDER_CLOUD_IDS = {
             "cumulonimbus_calvus",
-            "cumulonimbus_capillatus"
+            "cumulonimbus_capillatus",
+            "supercell"
     };
 
     private static final Set<String> PRECIPITATING_CLOUD_IDS = Set.of(
@@ -31,11 +32,12 @@ public final class CloudTypeRegistry {
             RAIN_CLOUD_IDS[2],
             RAIN_CLOUD_IDS[3],
             THUNDER_CLOUD_IDS[0],
-            THUNDER_CLOUD_IDS[1]
+            THUNDER_CLOUD_IDS[1],
+            THUNDER_CLOUD_IDS[2]
     );
 
     private static final Map<String, CloudTypeDefinition> BUILT_IN_TYPES = new LinkedHashMap<>();
-    private static final Map<String, CloudTypeDefinition> TYPES = new LinkedHashMap<>();
+    private static volatile Map<String, CloudTypeDefinition> types = Map.of();
 
     static {
         register(new CloudTypeDefinition(
@@ -111,11 +113,21 @@ public final class CloudTypeRegistry {
         ));
 
         register(new CloudTypeDefinition(
+                "supercell",
+                "Supercell",
+                CloudFamily.CUMULONIMBUS,
+                CloudMorphologyFamily.SPIRAL_STORM,
+                new CloudVisualProfile(3.20F, 0.78F, 0.52F, 0.10F, 0.86F, 0.010F, 0.145F, 0.190F, 1.68F, 1.30F, 0.24F, 1.00F, 1.00F, 0.74F),
+                stormReady(),
+                new CloudEvolutionRules(List.of())
+        ));
+
+        register(new CloudTypeDefinition(
                 "stratus_nebulosus",
                 "Stratus nebulosus",
                 CloudFamily.STRATUS,
                 CloudMorphologyFamily.SHEET,
-                new CloudVisualProfile(0.24F, 0.14F, 0.50F, 0.46F, 0.42F, 0.008F, 0.044F, 0.058F, 0.72F, 1.20F, 3.70F, 0.00F, 0.00F, 0.00F),
+                new CloudVisualProfile(0.46F, 0.18F, 0.46F, 0.38F, 0.42F, 0.008F, 0.054F, 0.066F, 0.76F, 1.14F, 2.15F, 0.00F, 0.00F, 0.00F),
                 new CloudSpawnConditions(0.62F, 1.00F, -20.0F, 24.0F, 0.92F, 1.08F, 0.00F, 0.00F, 0.00F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -125,7 +137,7 @@ public final class CloudTypeRegistry {
                 "Stratocumulus",
                 CloudFamily.STRATOCUMULUS,
                 CloudMorphologyFamily.CELLULAR_SHEET,
-                new CloudVisualProfile(0.62F, 0.50F, 0.34F, 0.24F, 0.36F, 0.014F, 0.092F, 0.128F, 0.82F, 0.96F, 2.35F, 0.04F, 0.00F, 0.00F),
+                new CloudVisualProfile(0.82F, 0.50F, 0.32F, 0.22F, 0.36F, 0.014F, 0.104F, 0.136F, 0.86F, 0.98F, 1.65F, 0.06F, 0.00F, 0.00F),
                 new CloudSpawnConditions(0.48F, 1.00F, -15.0F, 30.0F, 0.90F, 1.10F, 0.00F, 0.00F, 0.00F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -135,7 +147,7 @@ public final class CloudTypeRegistry {
                 "Nimbostratus",
                 CloudFamily.NIMBOSTRATUS,
                 CloudMorphologyFamily.SHEET,
-                new CloudVisualProfile(0.34F, 0.16F, 0.52F, 0.40F, 0.82F, 0.009F, 0.054F, 0.070F, 1.12F, 1.28F, 3.20F, 0.00F, 0.00F, 0.54F),
+                new CloudVisualProfile(0.58F, 0.18F, 0.48F, 0.34F, 0.82F, 0.009F, 0.064F, 0.080F, 1.16F, 1.24F, 2.05F, 0.00F, 0.00F, 0.54F),
                 new CloudSpawnConditions(0.72F, 1.00F, -10.0F, 22.0F, 0.80F, 1.00F, 0.15F, 0.10F, 0.05F),
                 new CloudEvolutionRules(List.of())
         ));
@@ -159,29 +171,27 @@ public final class CloudTypeRegistry {
         if (id == null || id.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(TYPES.get(id));
+        return Optional.ofNullable(types.get(id));
     }
 
     public static CloudTypeDefinition getOrDefault(String id) {
-        return get(id).orElse(TYPES.get(DEFAULT_CLOUD_TYPE_ID));
+        return get(id).orElse(types.get(DEFAULT_CLOUD_TYPE_ID));
     }
 
     public static Map<String, CloudTypeDefinition> getAll() {
-        return Map.copyOf(TYPES);
+        return types;
     }
 
     public static synchronized void replaceDataPackDefinitions(Map<String, CloudTypeDefinition> dataPackDefinitions) {
-        TYPES.clear();
-        TYPES.putAll(BUILT_IN_TYPES);
-        if (dataPackDefinitions == null || dataPackDefinitions.isEmpty()) {
-            return;
-        }
-
-        for (CloudTypeDefinition definition : dataPackDefinitions.values()) {
-            if (definition != null && definition.getId() != null && !definition.getId().isBlank()) {
-                TYPES.put(definition.getId(), definition);
+        Map<String, CloudTypeDefinition> replacement = new LinkedHashMap<>(BUILT_IN_TYPES);
+        if (dataPackDefinitions != null && !dataPackDefinitions.isEmpty()) {
+            for (CloudTypeDefinition definition : dataPackDefinitions.values()) {
+                if (definition != null && definition.getId() != null && !definition.getId().isBlank()) {
+                    replacement.put(definition.getId(), definition);
+                }
             }
         }
+        types = Map.copyOf(replacement);
     }
 
     public static String getClearWeatherCloudId() {
@@ -221,7 +231,7 @@ public final class CloudTypeRegistry {
 
     private static void register(CloudTypeDefinition definition) {
         BUILT_IN_TYPES.put(definition.getId(), definition);
-        TYPES.put(definition.getId(), definition);
+        types = Map.copyOf(BUILT_IN_TYPES);
     }
 
     private static String pick(String[] ids) {

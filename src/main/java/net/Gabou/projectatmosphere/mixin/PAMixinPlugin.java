@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.mixin;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
-import net.minecraftforge.fml.loading.FMLEnvironment;
+import net.neoforged.fml.loading.FMLEnvironment;
 
 import java.util.List;
 import java.util.Set;
@@ -13,18 +13,12 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
     private static Boolean AURORASLOADED = null;
     private static Boolean RAINBOWSLOADED = null;
     private static Boolean SIMPLECLOUDSLOADED = null;
+    private static Boolean SERENESEASONSLOADED = null;
 
 
     private boolean isSandStormLoaded() {
         if (SANDSTORMLOADED != null) return SANDSTORMLOADED;
-
-        try {
-            // Safer to check for a known class rather than the base package
-            Class.forName("com.BreadRes.desertstormwarming.BurymodMain", false, getClass().getClassLoader());
-            SANDSTORMLOADED = true;
-        } catch (ClassNotFoundException e) {
-            SANDSTORMLOADED = false;
-        }
+        SANDSTORMLOADED = isClassPresent("com.BreadRes.desertstormwarming.BurymodMain");
 
         System.out.println("[Project Atmosphere] SandStorms detected: " + SANDSTORMLOADED);
         return SANDSTORMLOADED;
@@ -71,6 +65,13 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
                 || mixinClassName.contains("BindingManager");
     }
 
+    private boolean isSereneSeasonsLoaded() {
+        if (SERENESEASONSLOADED != null) return SERENESEASONSLOADED;
+        SERENESEASONSLOADED = isClassPresent("sereneseasons.season.SeasonHooks");
+        System.out.println("[Project Atmosphere] Serene Seasons detected: " + SERENESEASONSLOADED);
+        return SERENESEASONSLOADED;
+    }
+
     private boolean isHurricaneRenderPipelineMixin(String mixinClassName) {
         return mixinClassName.contains("DefaultPipelineHurricane")
                 || mixinClassName.contains("ShaderSupportPipelineHurricane");
@@ -98,12 +99,8 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
     }
 
     private boolean isClassPresent(String className) {
-        try {
-            Class.forName(className, false, getClass().getClassLoader());
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
+        String resourceName = className.replace('.', '/') + ".class";
+        return getClass().getClassLoader().getResource(resourceName) != null;
     }
 
     @Override
@@ -113,7 +110,7 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public String getRefMapperConfig() {
-        return "projectatmosphere.refmap.json";
+        return null;
     }
 
 
@@ -124,6 +121,9 @@ public class PAMixinPlugin implements IMixinConfigPlugin {
         }
         boolean simpleCloudsLoaded = isSimpleCloudsLoaded();
         if (isSimpleCloudsMixin(mixinClassName) && !simpleCloudsLoaded) {
+            return false;
+        }
+        if (mixinClassName.endsWith("SeasonHooksMixin") && !isSereneSeasonsLoaded()) {
             return false;
         }
         if (isSimpleCloudsMixin(mixinClassName)) {

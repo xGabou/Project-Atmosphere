@@ -3,8 +3,6 @@ package net.Gabou.projectatmosphere.blocks;
 import com.mojang.serialization.MapCodec;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.util.AtmosphereUtils;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
 import net.Gabou.projectatmosphere.util.InstrumentUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -62,8 +60,7 @@ public class WeatherVaneBlock extends InstrumentBlock {
      */
     @Override
     public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        BiomeInstanceKey key = new BiomeInstanceKey(AtmosphereUtils.getBiomeLocation(pos, level), pos);
-        WindVector wind = ForecastOrchestrator.getCurrentWind(key, level.getGameTime());
+        WindVector wind = ForecastOrchestrator.getWind(pos, level.getGameTime());
         Direction dir = Direction.fromYRot((float) Math.toDegrees(wind.angleRadians())).getOpposite();
         if (dir != state.getValue(FACING)) {
             level.setBlock(pos, state.setValue(FACING, dir), 2);

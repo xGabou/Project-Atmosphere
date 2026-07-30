@@ -36,6 +36,6 @@ final class CloudRegionTypeGeometry {
 
     static void apply(@NotNull CloudClusterState cluster, String cloudTypeId) {
         CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
-        CloudMorphologyGenerators.applyToCluster(cluster, definition);
+        CloudMorphologyGenerators.retargetCluster(cluster, definition);
     }
 }

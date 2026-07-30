@@ -1,0 +1,31 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "dstcolor",
+    "dstrgb": "0",
+    "srcalpha": "0",
+    "dstalpha": "1"
+  },
+  "vertex": "projectatmosphere:cloud_volume",
+  "fragment": "projectatmosphere:cloud_shadow_apply",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    { "name": "ShadowMapSampler" },
+    { "name": "SceneDepthSampler" }
+  ],
+  "uniforms": [
+    { "name": "InvProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "InvViewRotMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "CameraPos", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+    { "name": "ShadowOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
+    { "name": "ShadowExtent", "type": "float", "count": 1, "values": [ 4096.0 ] },
+    { "name": "SlabBaseY", "type": "float", "count": 1, "values": [ 120.0 ] },
+    { "name": "GroundY", "type": "float", "count": 1, "values": [ 64.0 ] },
+    { "name": "LightDir", "type": "float", "count": 3, "values": [ 0.3, 0.9, 0.2 ] },
+    { "name": "ShadowStrength", "type": "float", "count": 1, "values": [ 0.38 ] },
+    { "name": "DaylightFactor", "type": "float", "count": 1, "values": [ 1.0 ] }
+  ]
+}

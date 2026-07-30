@@ -1,12 +1,12 @@
 package net.Gabou.projectatmosphere.compat;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.async.ThreadingDetector;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.async.ThreadingDetector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+
 import net.minecraft.world.level.Level;
 import toughasnails.api.temperature.TemperatureLevel;
 import toughasnails.temperature.TemperatureHelperImpl;
@@ -20,10 +20,12 @@ public class ToughAsNailsCompat {
 
     /**
      * Generate a weekly forecast for TAN using mapped base temperature + fluctuation.
-     * Each day contains [min, max] values.
+     * Thread-aware: safe to call from main or async.
+     *
+     * - On main thread: runs directly.
+     * - On async thread: schedules temperature lookup on main, then continues math async.
      */
-    public static float[][] injectForecastForTAN(BiomeInstanceKey key, ServerLevel level) {
-        BlockPos sample = key.samplePos();
+    public static float[][] injectForecastForTAN(ServerLevel level, BlockPos sample) {
         RandomSource rng = RandomSource.create(sample.asLong() ^ level.getSeed());
 
         // If already on main thread → run inline
@@ -54,11 +56,14 @@ public class ToughAsNailsCompat {
         }
     }
 
+
+
+
     private static float[][] generateMinMaxCurve(float base, RandomSource random) {
         float[][] result = new float[7][2];
 
         for (int i = 0; i < 7; i++) {
-            float swing = DAILY_SWING * (float) Math.sin((i / 6.0F) * Math.PI); 
+            float swing = DAILY_SWING * (float) Math.sin((i / 6.0F) * Math.PI);
             float min = (float) (base - swing / 2 + random.nextGaussian() * DAILY_JITTER);
             float max = (float) (base + swing / 2 + random.nextGaussian() * DAILY_JITTER);
 
@@ -71,11 +76,11 @@ public class ToughAsNailsCompat {
 
     private static float mapBandToTemperature(TemperatureLevel level) {
         return switch (level) {
-            case ICY     -> -20.0F;
-            case COLD    -> 0.0F;
+            case ICY -> -20.0F;
+            case COLD -> 0.0F;
             case NEUTRAL -> 15.0F;
-            case WARM    -> 28.0F;
-            case HOT     -> 38.0F;
+            case WARM -> 28.0F;
+            case HOT -> 38.0F;
         };
     }
 

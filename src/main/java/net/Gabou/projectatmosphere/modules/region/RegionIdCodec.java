@@ -2,10 +2,6 @@ package net.Gabou.projectatmosphere.modules.region;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
-
 public final class RegionIdCodec {
     private RegionIdCodec() {}
 

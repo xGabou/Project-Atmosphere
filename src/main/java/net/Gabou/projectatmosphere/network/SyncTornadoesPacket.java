@@ -1,7 +1,6 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.modules.tornado.TornadoManager;
 import net.Gabou.projectatmosphere.modules.tornado.TornadoSnapshot;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -14,14 +13,14 @@ import java.util.List;
 
 /**
  * Server-to-client packet carrying tornado snapshots.
+ * It updates the client tornado cache and must not own tornado simulation logic.
  */
 public class SyncTornadoesPacket implements CustomPacketPayload {
-    public static final ResourceLocation ID =
-            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "sync_tornadoes");
-    public static final Type<SyncTornadoesPacket> TYPE = new Type<>(ID);
+    public static final Type<SyncTornadoesPacket> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "sync_tornadoes")
+    );
     public static final StreamCodec<FriendlyByteBuf, SyncTornadoesPacket> STREAM_CODEC =
-            StreamCodec.of((buf, pkt) -> pkt.encode(buf), SyncTornadoesPacket::decode);
-
+            StreamCodec.of((buf, packet) -> packet.encode(buf), SyncTornadoesPacket::decode);
     private final List<TornadoSnapshot> snapshots;
 
     public SyncTornadoesPacket(List<TornadoSnapshot> snapshots) {
@@ -34,7 +33,7 @@ public class SyncTornadoesPacket implements CustomPacketPayload {
         for (int i = 0; i < count; i++) {
             read.add(TornadoSnapshot.read(buf));
         }
-        this.snapshots = List.copyOf(read);
+        this.snapshots = read;
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -44,6 +43,9 @@ public class SyncTornadoesPacket implements CustomPacketPayload {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
     public static SyncTornadoesPacket decode(FriendlyByteBuf buf) {
         return new SyncTornadoesPacket(buf);
     }
@@ -53,7 +55,7 @@ public class SyncTornadoesPacket implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static void handle(SyncTornadoesPacket pkt, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> TornadoManager.applyClientSnapshots(pkt.snapshots));
+    public static void handle(SyncTornadoesPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> SevereWeatherClientPacketHandlers.syncTornadoes(packet.snapshots));
     }
 }

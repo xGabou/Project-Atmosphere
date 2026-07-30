@@ -1,0 +1,160 @@
+{
+  "version": 2,
+  "region": {
+    "rx": 0,
+    "rz": 2,
+    "size": 2000
+  },
+  "anchor": {
+    "x": 1000,
+    "y": 63,
+    "z": 5000
+  },
+  "biomeWeights": {
+    "minecraft:windswept_forest": 3,
+    "minecraft:sunflower_plains": 13,
+    "minecraft:mangrove_swamp": 12,
+    "minecraft:birch_forest": 25,
+    "minecraft:stony_shore": 8,
+    "minecraft:swamp": 6,
+    "minecraft:flower_forest": 27,
+    "minecraft:old_growth_birch_forest": 28,
+    "minecraft:beach": 23,
+    "minecraft:grove": 2,
+    "minecraft:cherry_grove": 1,
+    "minecraft:windswept_hills": 9,
+    "minecraft:dark_forest": 5,
+    "minecraft:old_growth_pine_taiga": 25,
+    "minecraft:meadow": 13,
+    "minecraft:old_growth_spruce_taiga": 6,
+    "minecraft:windswept_savanna": 27
+  },
+  "temperature": [
+    [
+      16.717144,
+      24.695017
+    ],
+    [
+      16.682545,
+      24.624132
+    ],
+    [
+      16.739134,
+      24.616076
+    ],
+    [
+      16.538336,
+      24.446367
+    ],
+    [
+      16.538675,
+      24.416952
+    ],
+    [
+      16.583067,
+      24.530266
+    ],
+    [
+      16.774324,
+      24.686562
+    ]
+  ],
+  "humidity": [
+    [
+      48.539032,
+      65.96459
+    ],
+    [
+      48.566547,
+      65.82095
+    ],
+    [
+      48.707703,
+      65.81766
+    ],
+    [
+      48.61849,
+      65.9694
+    ],
+    [
+      48.689556,
+      65.841156
+    ],
+    [
+      48.578003,
+      65.89698
+    ],
+    [
+      48.629242,
+      65.85355
+    ]
+  ],
+  "pressure": [
+    [
+      977.6486,
+      978.2486
+    ],
+    [
+      977.66534,
+      978.26544
+    ],
+    [
+      977.6712,
+      978.2717
+    ],
+    [
+      977.7917,
+      978.39185
+    ],
+    [
+      977.7935,
+      978.3938
+    ],
+    [
+      977.73737,
+      978.3376
+    ],
+    [
+      977.6319,
+      978.2326
+    ]
+  ],
+  "wind": [
+    {
+      "base": 2.8403397,
+      "angle": 1.7329375,
+      "gust": 28.042099
+    },
+    {
+      "base": 1.9432591,
+      "angle": 1.5150044,
+      "gust": 27.081757
+    },
+    {
+      "base": 2.203553,
+      "angle": 1.0641079,
+      "gust": 29.029062
+    },
+    {
+      "base": 2.7175555,
+      "angle": 1.7594224,
+      "gust": 28.05305
+    },
+    {
+      "base": 1.8496382,
+      "angle": 1.9460747,
+      "gust": 27.415264
+    },
+    {
+      "base": 2.0593948,
+      "angle": 1.8483574,
+      "gust": 26.71274
+    },
+    {
+      "base": 2.732298,
+      "angle": 1.8390326,
+      "gust": 27.15665
+    }
+  ],
+  "storm": []
+}

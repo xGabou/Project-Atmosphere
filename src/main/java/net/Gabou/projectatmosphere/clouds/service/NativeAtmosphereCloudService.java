@@ -1,5 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.service;
 
+import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
+import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudGroupSpawner;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
@@ -35,15 +37,39 @@ final class NativeAtmosphereCloudService implements AtmosphereCloudService {
     private static final double SPAWN_POSITION_JITTER = 420.0D;
 
     private long nextSpawnAttemptTick;
+    private ServerLevel activeLevel;
 
     @Override
     public void onServerStarted(ServerLevel level) {
         nextSpawnAttemptTick = 0L;
+        activeLevel = level;
     }
 
     @Override
     public void onServerStopping(ServerLevel level) {
         nextSpawnAttemptTick = 0L;
+        activeLevel = null;
+    }
+
+    @Override
+    public int activeTornadoCount() {
+        return activeLevel == null
+                ? 0
+                : CloudCellSimulationManager.getInstance().nativeTornadoCells(activeLevel).size();
+    }
+
+    @Override
+    public boolean hasActiveTornadoNear(ServerLevel level, BlockPos pos, double radius) {
+        if (level == null || pos == null || radius <= 0.0D) {
+            return false;
+        }
+        double radiusSq = radius * radius;
+        for (CloudCell cell : CloudCellSimulationManager.getInstance().nativeTornadoCells(level)) {
+            if (cell.funnelStrength() > 0.02F && cell.distanceSqrTo(pos.getX(), pos.getZ()) <= radiusSq) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

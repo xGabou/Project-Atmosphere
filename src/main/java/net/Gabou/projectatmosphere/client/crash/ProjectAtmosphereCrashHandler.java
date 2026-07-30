@@ -3,13 +3,13 @@ package net.Gabou.projectatmosphere.client.crash;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.client.screen.ProjectAtmosphereCrashScreen;
 import net.minecraft.CrashReport;
+import net.minecraft.ReportType;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -163,17 +163,16 @@ public final class ProjectAtmosphereCrashHandler {
 
     @Nullable
     private static Path saveCrashReport(Minecraft minecraft, CrashReport report) {
-        File existingSave = report.getSaveFile();
+        Path existingSave = report.getSaveFile();
         if (existingSave != null) {
-            return existingSave.toPath();
+            return existingSave;
         }
 
-        File reportFile = new File(
-                new File(minecraft.gameDirectory, "crash-reports"),
-                "crash-" + REPORT_TIMESTAMP.format(LocalDateTime.now()) + "-projectatmosphere-client.txt"
-        );
+        Path reportFile = minecraft.gameDirectory.toPath()
+                .resolve("crash-reports")
+                .resolve("crash-" + REPORT_TIMESTAMP.format(LocalDateTime.now()) + "-projectatmosphere-client.txt");
 
-        return report.saveToFile(reportFile) ? reportFile.toPath() : null;
+        return report.saveToFile(reportFile, ReportType.CRASH) ? reportFile : null;
     }
 
     @Nullable

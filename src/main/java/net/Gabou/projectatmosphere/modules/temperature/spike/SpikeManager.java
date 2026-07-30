@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.modules.temperature.spike;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.ApplyOngoingSpikeCommand;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.ApplyRandomJoltCommand;
 import net.Gabou.projectatmosphere.modules.temperature.spike.commands.StartNewSpikeCommand;
-import net.Gabou.projectatmosphere.util.BiomeInstanceKey;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.HashMap;
@@ -17,21 +17,21 @@ public class SpikeManager {
     private static final float RANDOM_JOLT_CHANCE = 0.10f;
     private static final float RANDOM_JOLT_MAX = 4.0f;
 
-    private static final Map<BiomeInstanceKey, SpikeState> biomeSpikeStates = new HashMap<>();
+    private static final Map<RegionInstanceKey, SpikeState> regionSpikeStates = new HashMap<>();
 
-    public static float[][] applySpikeLogic(BiomeInstanceKey biome, float[][] week) {
-        SpikeState state = biomeSpikeStates.computeIfAbsent(biome, k -> new SpikeState());
+    public static float[][] applySpikeLogic(RegionInstanceKey regionId, float[][] week) {
+        SpikeState state = regionSpikeStates.computeIfAbsent(regionId, k -> new SpikeState());
 
         
         if (state.remainingSpikeDays > 0) {
-            SpikeData data = new SpikeData(biome, week, state);
+            SpikeData data = new SpikeData(regionId, week, state);
             new ApplyOngoingSpikeCommand(data).execute();
             return week;
         }
 
         
         if (shouldStartNewSpike(state)) {
-            SpikeData data = new SpikeData(biome, week, state);
+            SpikeData data = new SpikeData(regionId, week, state);
             new StartNewSpikeCommand(data).execute();
             new ApplyOngoingSpikeCommand(data).execute();
             return week;
@@ -39,7 +39,7 @@ public class SpikeManager {
 
         
         if (random.nextFloat() < RANDOM_JOLT_CHANCE) {
-            SpikeData data = new SpikeData(biome, week, state);
+            SpikeData data = new SpikeData(regionId, week, state);
             new ApplyRandomJoltCommand(data, RANDOM_JOLT_MAX).execute();
         }
 
@@ -52,13 +52,13 @@ public class SpikeManager {
     }
 
     
-    public static Map<BiomeInstanceKey, SpikeState> getAllStates() {
-        return biomeSpikeStates;
+    public static Map<RegionInstanceKey, SpikeState> getAllStates() {
+        return regionSpikeStates;
     }
 
-    public static void setAllStates(Map<BiomeInstanceKey, SpikeState> map) {
-        biomeSpikeStates.clear();
-        biomeSpikeStates.putAll(map);
+    public static void setAllStates(Map<RegionInstanceKey, SpikeState> map) {
+        regionSpikeStates.clear();
+        regionSpikeStates.putAll(map);
     }
 
     public static void clearSpikeCache(ServerLevel level) {

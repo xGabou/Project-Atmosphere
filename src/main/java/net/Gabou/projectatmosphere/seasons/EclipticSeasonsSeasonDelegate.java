@@ -5,14 +5,14 @@ import com.teamtea.eclipticseasons.common.core.solar.SolarDataManager;
 import net.Gabou.projectatmosphere.event.EclipticTracker;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.neoforge.common.NeoForge;
 
 public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
     private static final String PROVIDER_ID = "eclipticseasons";
     private static final long DEFAULT_DAYS_PER_TERM = 5L;
 
     public EclipticSeasonsSeasonDelegate() {
-        MinecraftForge.EVENT_BUS.addListener(EclipticTracker::onSolarTermChange);
+        NeoForge.EVENT_BUS.addListener(EclipticTracker::onSolarTermChange);
     }
 
     private static final int TERMS_PER_SEASON = 6;
@@ -48,7 +48,7 @@ public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
         };
 
         // --- Progression dans la saison (0..1)
-        int dayInSeason = data.getSolarTermDaysInPeriod()
+        int dayInSeason = Math.floorMod(data.getSolarTermsDay(), Math.max(1, daysPerTerm))
                 + (termIndex % TERMS_PER_SEASON) * daysPerTerm;
 
         int totalSeasonDays = TERMS_PER_SEASON * daysPerTerm;
@@ -56,7 +56,7 @@ public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
         float progress = (float) dayInSeason / (float) totalSeasonDays;
 
         return new SeasonSnapshot(
-                new ResourceLocation("eclipticseasons", "season"),
+                ResourceLocation.fromNamespaceAndPath("eclipticseasons", "season"),
                 stage,
                 progress,
                 SeasonClimateProfile.temperatureOffsetC(stage, progress)
@@ -75,7 +75,10 @@ public class EclipticSeasonsSeasonDelegate implements SeasonTimeDelegate {
         }
 
         long dayInCycle = (long) data.getSolarTermIndex() * data.getSolarTermLastingDays()
-                + Math.max(0, data.getSolarTermDaysInPeriod());
+                + Math.floorMod(
+                        data.getSolarTermsDay(),
+                        Math.max(1, data.getSolarTermLastingDays())
+                );
         long dayTime = Math.floorMod(level.getDayTime(), 24000L);
         return dayInCycle * 24000L + dayTime;
     }

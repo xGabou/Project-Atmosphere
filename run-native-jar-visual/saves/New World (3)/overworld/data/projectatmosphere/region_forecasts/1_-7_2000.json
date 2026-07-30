@@ -1,0 +1,167 @@
+{
+  "version": 2,
+  "region": {
+    "rx": 1,
+    "rz": -7,
+    "size": 2000
+  },
+  "anchor": {
+    "x": 3000,
+    "y": 63,
+    "z": -13000
+  },
+  "biomeWeights": {
+    "minecraft:forest": 32,
+    "minecraft:sparse_jungle": 2,
+    "minecraft:deep_ocean": 64,
+    "minecraft:jagged_peaks": 38,
+    "minecraft:sunflower_plains": 31,
+    "minecraft:jungle": 4,
+    "minecraft:snowy_slopes": 19,
+    "minecraft:birch_forest": 15,
+    "minecraft:ocean": 175,
+    "minecraft:savanna": 8,
+    "minecraft:stony_shore": 25,
+    "minecraft:flower_forest": 34,
+    "minecraft:deep_lukewarm_ocean": 74,
+    "minecraft:cold_ocean": 19,
+    "minecraft:old_growth_birch_forest": 17,
+    "minecraft:beach": 74,
+    "minecraft:plains": 27,
+    "minecraft:grove": 10,
+    "minecraft:cherry_grove": 7,
+    "minecraft:river": 8,
+    "minecraft:dark_forest": 12,
+    "minecraft:meadow": 41,
+    "minecraft:lukewarm_ocean": 166,
+    "minecraft:deep_cold_ocean": 8
+  },
+  "temperature": [
+    [
+      2.7478864,
+      8.909149
+    ],
+    [
+      2.3767102,
+      8.0247555
+    ],
+    [
+      2.2799945,
+      7.1503105
+    ],
+    [
+      2.388965,
+      6.7319036
+    ],
+    [
+      2.4540308,
+      6.4043703
+    ],
+    [
+      2.4401457,
+      6.1581173
+    ],
+    [
+      2.4274433,
+      6.195039
+    ]
+  ],
+  "humidity": [
+    [
+      47.81424,
+      62.34165
+    ],
+    [
+      48.464256,
+      61.667686
+    ],
+    [
+      49.387444,
+      60.654663
+    ],
+    [
+      50.097416,
+      60.046307
+    ],
+    [
+      50.595367,
+      59.53143
+    ],
+    [
+      50.884636,
+      59.245556
+    ],
+    [
+      50.844078,
+      59.33699
+    ]
+  ],
+  "pressure": [
+    [
+      957.2613,
+      957.86194
+    ],
+    [
+      957.64374,
+      958.2419
+    ],
+    [
+      957.9289,
+      958.52856
+    ],
+    [
+      958.0395,
+      958.63904
+    ],
+    [
+      958.11615,
+      958.71497
+    ],
+    [
+      958.19806,
+      958.7987
+    ],
+    [
+      958.19775,
+      958.7971
+    ]
+  ],
+  "wind": [
+    {
+      "base": 0.5653589,
+      "angle": -3.0116117,
+      "gust": 33.004414
+    },
+    {
+      "base": 0.9734509,
+      "angle": -3.0184731,
+      "gust": 31.752342
+    },
+    {
+      "base": 0.7350512,
+      "angle": 2.8138545,
+      "gust": 31.519028
+    },
+    {
+      "base": 0.83649766,
+      "angle": 3.0319626,
+      "gust": 31.372625
+    },
+    {
+      "base": 0.9133824,
+      "angle": -3.0521402,
+      "gust": 31.020615
+    },
+    {
+      "base": 1.6352522,
+      "angle": -2.9222345,
+      "gust": 31.624784
+    },
+    {
+      "base": 2.1242511,
+      "angle": -2.852486,
+      "gust": 31.73639
+    }
+  ],
+  "storm": []
+}

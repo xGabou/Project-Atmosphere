@@ -5,30 +5,35 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
 public class ModSounds {
-    // Main DeferredRegister for SoundEvents
     public static final DeferredRegister<SoundEvent> SOUND_EVENTS =
             DeferredRegister.create(Registries.SOUND_EVENT, ProjectAtmosphere.MODID);
 
-    // Example sounds
-    public static final DeferredHolder<SoundEvent, SoundEvent> WEATHER_SIREN =
-            registerSound("weather_siren");
+    // ---------------------------------------------------------------------
+    // Registered sounds
+    // ---------------------------------------------------------------------
+    public static final DeferredHolder<SoundEvent, SoundEvent> WEATHER_SIREN = registerSound("weather_siren");
 
-    public static final DeferredHolder<SoundEvent, SoundEvent> TORNADO_ROAR =
-            registerSound("tornado_roar");
+    public static final DeferredHolder<SoundEvent, SoundEvent> TORNADO_ROAR = registerSound("tornado_roar");
 
-    // Hook into mod event bus
+    public static final DeferredHolder<SoundEvent, SoundEvent> THUNDER_IN_CLOUDS = registerSound("thunder.in_clouds");
+    public static final DeferredHolder<SoundEvent, SoundEvent> THUNDER_HIT_DISTANT = registerSound("thunder.hit_distant");
+    public static final DeferredHolder<SoundEvent, SoundEvent> THUNDER_HIT_SEMI_DISTANT = registerSound("thunder.hit_semi_distant");
+    public static final DeferredHolder<SoundEvent, SoundEvent> THUNDER_RUMBLING_CLOSE = registerSound("thunder.rumbling_close");
+    public static final DeferredHolder<SoundEvent, SoundEvent> THUNDER_RUMBLING_DISTANT = registerSound("thunder.rumbling_distant");
+
     public static void register(IEventBus eventBus) {
         SOUND_EVENTS.register(eventBus);
     }
 
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
     private static DeferredHolder<SoundEvent, SoundEvent> registerSound(String name) {
-        return SOUND_EVENTS.register(name,
-                () -> SoundEvent.createVariableRangeEvent(
-                        ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, name)));
+        return SOUND_EVENTS.register(name, () -> SoundEvent.createVariableRangeEvent(
+                ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, name)));
     }
 }

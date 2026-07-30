@@ -1,45 +1,35 @@
 package net.Gabou.projectatmosphere.event;
 
-
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
 import net.Gabou.projectatmosphere.manager.ForecastDataStorage;
-import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
-import net.minecraft.client.Minecraft;
+import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biome;
-
-import net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
-
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-
+@EventBusSubscriber
 public class BiomeChangeManager {
+    private static final Map<UUID, Pair<RegionInstanceKey, BlockPos>> regionTrack = new HashMap<>();
     private static final Map<UUID, Pair<ResourceLocation, Boolean>> lastBiome = new HashMap<>();
     private static final int RUN_INTERVAL_TICKS = 2000;
-    private static final int MIN_DISTANCE_BETWEEN_CENTERS = 6000;
+    // Threshold to move the tracked center: 4/5 of default region size.
+    private static final int MOVE_THRESHOLD = (int) (RegionInstanceKey.DEFAULT_REGION_SIZE * 0.8);
+
 
     private static final boolean sandStormsLoaded = CompatHandler.isSandStormsLoaded();
-
-
     public static  Map<UUID, Pair<ResourceLocation, Boolean>> getLastBiome() {
         return lastBiome;
     }
@@ -49,28 +39,31 @@ public class BiomeChangeManager {
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post ev) {
         if (!(ev.getEntity() instanceof ServerPlayer player)) return;
-        if (player.level().isClientSide) return;
-
         ServerLevel level = player.serverLevel();
         long t = player.serverLevel().getDayTime() % 24000L;
         if (t % RUN_INTERVAL_TICKS != 0) return;
 
         UUID uuid = player.getUUID();
+        BlockPos pos = player.blockPosition();
+        RegionInstanceKey region = RegionInstanceKey.from(pos);
+        Pair<RegionInstanceKey, BlockPos> track = regionTrack.computeIfAbsent(uuid, id -> Pair.of(region, pos));
         ResourceLocation nowBiome = getBiomeKeyAt(player);
-        ResourceLocation last;
-        boolean wasInDesert;
-        try{
-            last = lastBiome.get(uuid).getKey();
-            wasInDesert = lastBiome.get(uuid).getValue();
+        Pair<ResourceLocation, Boolean> last = lastBiome.get(uuid);
+        if (last == null || !last.getKey().equals(nowBiome)) {
+            lastBiome.put(uuid, Pair.of(nowBiome, isDesert(nowBiome)));
         }
-        catch (NullPointerException e){
-            last = null;
-            wasInDesert = false;
+        // If we enter a new region, update and trigger regen.
+        if (!track.getLeft().equals(region)) {
+            track = Pair.of(region, pos);
+            regionTrack.put(uuid, track);
+            onRegionChanged(player, region, nowBiome);
+            return;
         }
-
-        if (last == null || !last.equals(nowBiome)) {
-            lastBiome.put(uuid,Pair.of(nowBiome,isDesert(nowBiome)));
-            onBiomeChanged(player, last, nowBiome); 
+        // If we moved far from the tracked center within the same region, update center and regen.
+        if (track.getRight().distManhattan(pos) > MOVE_THRESHOLD) {
+            track = Pair.of(region, pos);
+            regionTrack.put(uuid, track);
+            onRegionChanged(player, region, nowBiome);
         }
 
     }
@@ -111,21 +104,16 @@ public class BiomeChangeManager {
                 .orElse(ResourceLocation.fromNamespaceAndPath("minecraft", "plains"));
     }
 
-    private static void onBiomeChanged(ServerPlayer player, ResourceLocation oldBiome, ResourceLocation newBiome) {
+    private static void onRegionChanged(ServerPlayer player, RegionInstanceKey region, ResourceLocation currentBiome) {
         UUID uuid = player.getUUID();
         BlockPos currentPos = player.blockPosition();
-        BlockPos originalCenter = ForecastDataStorage.playerData.get(uuid);
-
-        ForecastOrchestrator.clearActiveBiomeKeysForPlayer(player);
-        ForecastOrchestrator.getNearbyBiomeKeys(player.serverLevel(), player, 500);
-
-        if (originalCenter == null || originalCenter.distManhattan(currentPos) > MIN_DISTANCE_BETWEEN_CENTERS) {
-            ForecastDataStorage.playerData.put(uuid, currentPos);
-            AtmosphereManager.updateForecastAround(player.serverLevel(), currentPos);
-
-            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                    "[Atmosphere] Moved >5000 blocks. Forecast regenerated."
-            ));
-        }
+        ForecastDataStorage.playerData.put(uuid, currentPos);
+        lastBiome.put(uuid, Pair.of(currentBiome, isDesert(currentBiome)));
+        ForecastOrchestrator.clearActiveRegionsForPlayer(player);
+        ForecastOrchestrator.getNearbyRegions(player.serverLevel(), player, 500);
+        AtmosphereManager.updateForecastAround(player.serverLevel(), currentPos);
+        player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                "[Atmosphere] Entered region " + region + ". Forecast regenerated."
+        ));
     }
 }

@@ -1,18 +1,17 @@
 //TODO remove biomeInstanceKeys
 package net.Gabou.projectatmosphere.manager;
 
-import com.BreadRes.desertstormwarming.logic.SandstormPhase;
-import com.BreadRes.desertstormwarming.sounds.SandstormSounds;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.event.BiomeChangeManager;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI;
+import net.Gabou.projectatmosphere.modules.sandStorm.SandStormAPI.SandstormPhase;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
-import net.minecraft.client.Minecraft;
+import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -111,8 +110,8 @@ public class SandStormManager {
                                 .getValue();
 
                         if (!lastBiomeFlag) {
-                            for (SoundEvent soundEvent : SandstormSounds.getSoundsForPhase(SandStormAPI.getSandstormPhase())) {
-                                Minecraft.getInstance().getSoundManager().stop(soundEvent.getLocation(), null);
+                            for (SoundEvent soundEvent : SandStormAPI.getSoundsForCurrentPhase()) {
+                                player.connection.send(new ClientboundStopSoundPacket(soundEvent.getLocation(), null));
                             }
                         }
                     }

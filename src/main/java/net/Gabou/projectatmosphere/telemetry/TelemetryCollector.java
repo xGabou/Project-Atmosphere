@@ -3,13 +3,14 @@ package net.Gabou.projectatmosphere.telemetry;
 import com.google.common.hash.Hashing;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonPrimitive;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.manager.ForecastGenerator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.modules.region.RegionForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.SharedConstants;
@@ -20,6 +21,7 @@ import net.neoforged.fml.ModList;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
@@ -41,11 +43,18 @@ import static net.Gabou.projectatmosphere.telemetry.TelemetryModels.*;
  */
 public final class TelemetryCollector {
 
-    private static final Gson GSON = new GsonBuilder().create();
+    private static final Gson GSON = new GsonBuilder()
+            .registerTypeAdapter(Instant.class, (com.google.gson.JsonSerializer<Instant>) (src, typeOfSrc, context) ->
+                    src == null ? null : new JsonPrimitive(src.toString()))
+            .registerTypeAdapter(Instant.class, (com.google.gson.JsonDeserializer<Instant>) (json, typeOfT, context) ->
+                    json == null || json.isJsonNull() ? null : Instant.parse(json.getAsString()))
+            .create();
     private static final int DEFAULT_TIMELINE_CAP = 240; // ~10 Minecraft days if sampled hourly
     private static final int DEFAULT_FORECAST_CAP = 90;  // 3 dominant biomes x 30 days
     private static final int DEFAULT_CLOUD_EVENT_CAP = 1024;
     private static final int DEFAULT_REGION_FORECAST_CAP = 480;
+    private static final int DEFAULT_HUMIDITY_BUDGET_CAP = 2048;
+    private static final int DEFAULT_ATMOSPHERE_COUPLING_CAP = 2048;
     private static final int DEFAULT_DECISION_CAP = 128;
     private static final int DEFAULT_ANOMALY_CAP = 64;
 
@@ -55,6 +64,8 @@ public final class TelemetryCollector {
     private final TelemetryRingBuffer<DominantBiomeOccupancy> dominantBiomes;
     private final TelemetryRingBuffer<ForecastSnapshot> forecasts;
     private final TelemetryRingBuffer<RegionForecastSample> regionForecasts;
+    private final TelemetryRingBuffer<HumidityBudgetSample> humidityBudgets;
+    private final TelemetryRingBuffer<AtmosphereCouplingSample> atmosphereCoupling;
     private final TelemetryRingBuffer<CloudEvent> cloudEvents;
     private final TelemetryRingBuffer<PrecipitationDecisionTrace> precipitationDecisions;
     private final TelemetryRingBuffer<AnomalyMarker> anomalies;
@@ -66,6 +77,8 @@ public final class TelemetryCollector {
         this.dominantBiomes = new TelemetryRingBuffer<>(30); // last 30 days
         this.forecasts = new TelemetryRingBuffer<>(DEFAULT_FORECAST_CAP);
         this.regionForecasts = new TelemetryRingBuffer<>(DEFAULT_REGION_FORECAST_CAP);
+        this.humidityBudgets = new TelemetryRingBuffer<>(DEFAULT_HUMIDITY_BUDGET_CAP);
+        this.atmosphereCoupling = new TelemetryRingBuffer<>(DEFAULT_ATMOSPHERE_COUPLING_CAP);
         this.cloudEvents = new TelemetryRingBuffer<>(DEFAULT_CLOUD_EVENT_CAP);
         this.precipitationDecisions = new TelemetryRingBuffer<>(DEFAULT_DECISION_CAP);
         this.anomalies = new TelemetryRingBuffer<>(DEFAULT_ANOMALY_CAP);
@@ -92,6 +105,14 @@ public final class TelemetryCollector {
 
     public synchronized void recordRegionForecastSample(RegionForecastSample sample) {
         regionForecasts.add(sample);
+    }
+
+    public synchronized void recordHumidityBudgetSample(HumidityBudgetSample sample) {
+        humidityBudgets.add(sample);
+    }
+
+    public synchronized void recordAtmosphereCouplingSample(AtmosphereCouplingSample sample) {
+        atmosphereCoupling.add(sample);
     }
 
     public synchronized void recordCloudEvent(CloudEvent event) {
@@ -121,6 +142,8 @@ public final class TelemetryCollector {
                 dominantBiomes.snapshot(),
                 forecasts.snapshot(),
                 regionForecasts.snapshot(),
+                humidityBudgets.snapshot(),
+                atmosphereCoupling.snapshot(),
                 cloudEvents.snapshot(),
                 precipitationDecisions.snapshot(),
                 anomalies.snapshot(),
@@ -141,6 +164,8 @@ public final class TelemetryCollector {
         writeJsonLines(outputDir.resolve("dominant_biomes.jsonl"), snapshot.dominantBiomes());
         writeJsonLines(outputDir.resolve("forecast_snapshots.jsonl"), snapshot.forecasts());
         writeJsonLines(outputDir.resolve("region_forecast_samples.jsonl"), snapshot.regionForecastSamples());
+        writeJsonLines(outputDir.resolve("humidity_budget.jsonl"), snapshot.humidityBudgetSamples());
+        writeJsonLines(outputDir.resolve("atmosphere_coupling.jsonl"), snapshot.atmosphereCouplingSamples());
         writeJsonLines(outputDir.resolve("cloud_events.jsonl"), snapshot.cloudEvents());
         writeJsonLines(outputDir.resolve("precipitation_traces.jsonl"), snapshot.precipitationTraces());
         writeJsonLines(outputDir.resolve("anomalies.jsonl"), snapshot.anomalies());
@@ -190,7 +215,7 @@ public final class TelemetryCollector {
                 Collections.unmodifiableMap(selectedValues),
                 Collections.unmodifiableList(compatMods),
                 null,
-                "1.1"
+                "1.3"
         );
     }
 
@@ -245,8 +270,8 @@ public final class TelemetryCollector {
     }
 
     private List<ActiveRegionForecast> buildActiveRegionForecasts() {
-        RegionForecastOrchestrator orchestrator = ForecastOrchestrator.getRegionOrchestrator();
-        if (orchestrator == null) {
+        Map<RegionInstanceKey, ForecastRegion> forecasts = ForecastGenerator.getRegionForecasts();
+        if (forecasts.isEmpty()) {
             return List.of();
         }
         Set<RegionInstanceKey> targets = new HashSet<>(AtmosphericStateRegistry.getActiveStates());
@@ -258,7 +283,10 @@ public final class TelemetryCollector {
         }
         List<ActiveRegionForecast> out = new ArrayList<>();
         for (RegionInstanceKey key : targets) {
-            ForecastRegion region = orchestrator.ensureLoaded(key);
+            ForecastRegion region = forecasts.get(key);
+            if (region == null) {
+                continue;
+            }
             ChannelSummary temperature = summarizeWeek(region.getTemperature());
             ChannelSummary humidity = summarizeWeek(region.getHumidity());
             ChannelSummary pressure = summarizeWeek(region.getPressure());
@@ -342,6 +370,8 @@ public final class TelemetryCollector {
                                     List<DominantBiomeOccupancy> dominantBiomes,
                                     List<ForecastSnapshot> forecasts,
                                     List<RegionForecastSample> regionForecastSamples,
+                                    List<HumidityBudgetSample> humidityBudgetSamples,
+                                    List<AtmosphereCouplingSample> atmosphereCouplingSamples,
                                     List<CloudEvent> cloudEvents,
                                     List<PrecipitationDecisionTrace> precipitationTraces,
                                     List<AnomalyMarker> anomalies,

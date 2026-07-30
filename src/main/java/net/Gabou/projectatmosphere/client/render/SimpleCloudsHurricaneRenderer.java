@@ -95,9 +95,9 @@ public final class SimpleCloudsHurricaneRenderer {
         StormUniforms uniforms = StormUniforms.from(this.preparedHurricanes);
 
         long passStartNs = HurricaneRenderDiagnostics.nowNs();
-        this.runOpaqueEyeMaskPass(renderer, stack, projMat, uniforms, this.opaqueScratchTarget,
+        this.runOpaqueEyeMaskPass(stack, projMat, uniforms, this.opaqueScratchTarget,
                 renderer.getCloudTarget().getColorTextureId(), renderer.getCloudTarget().getDepthTextureId(), false);
-        this.runOpaqueEyeMaskPass(renderer, stack, projMat, uniforms, renderer.getCloudTarget(),
+        this.runOpaqueEyeMaskPass(stack, projMat, uniforms, renderer.getCloudTarget(),
                 this.opaqueScratchTarget.getColorTextureId(), this.opaqueScratchTarget.getDepthTextureId(), true);
         HurricaneRenderDiagnostics.recordOpaqueMaskCpuTime(passStartNs);
 
@@ -123,12 +123,12 @@ public final class SimpleCloudsHurricaneRenderer {
         StormUniforms uniforms = StormUniforms.from(this.preparedHurricanes);
 
         long passStartNs = HurricaneRenderDiagnostics.nowNs();
-        this.runTransparencyMaskPass(renderer, stack, projMat, uniforms, this.transparencyScratchTarget,
+        this.runTransparencyMaskPass(stack, projMat, uniforms, this.transparencyScratchTarget,
                 renderer.getCloudTransparencyTarget().getColorTextureId(),
                 renderer.getCloudTransparencyTarget().getRevealageTextureId(),
                 renderer.getCloudTransparencyTarget().getDepthTextureId(),
                 false);
-        this.runTransparencyMaskPass(renderer, stack, projMat, uniforms, renderer.getCloudTransparencyTarget(),
+        this.runTransparencyMaskPass(stack, projMat, uniforms, renderer.getCloudTransparencyTarget(),
                 this.transparencyScratchTarget.getColorTextureId(),
                 this.transparencyScratchTarget.getRevealageTextureId(),
                 this.transparencyScratchTarget.getDepthTextureId(),
@@ -167,15 +167,15 @@ public final class SimpleCloudsHurricaneRenderer {
         if (this.initialized) {
             return;
         }
-        BufferBuilder builder = Tesselator.getInstance().getBuilder();
-        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-        builder.vertex(-1.0F, -1.0F, 0.0F).uv(0.0F, 0.0F).endVertex();
-        builder.vertex(1.0F, -1.0F, 0.0F).uv(1.0F, 0.0F).endVertex();
-        builder.vertex(1.0F, 1.0F, 0.0F).uv(1.0F, 1.0F).endVertex();
-        builder.vertex(-1.0F, 1.0F, 0.0F).uv(0.0F, 1.0F).endVertex();
+        BufferBuilder builder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        builder.addVertex(-1.0F, -1.0F, 0.0F).setUv(0.0F, 0.0F);
+        builder.addVertex(1.0F, -1.0F, 0.0F).setUv(1.0F, 0.0F);
+        builder.addVertex(1.0F, 1.0F, 0.0F).setUv(1.0F, 1.0F);
+        builder.addVertex(-1.0F, 1.0F, 0.0F).setUv(0.0F, 1.0F);
         this.fullscreenQuad = new VertexBuffer(VertexBuffer.Usage.STATIC);
         this.fullscreenQuad.bind();
-        this.fullscreenQuad.upload(builder.end());
+        this.fullscreenQuad.upload(builder.buildOrThrow());
         VertexBuffer.unbind();
         this.initialized = true;
     }
@@ -207,7 +207,7 @@ public final class SimpleCloudsHurricaneRenderer {
         }
     }
 
-    private void runOpaqueEyeMaskPass(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat, StormUniforms uniforms,
+    private void runOpaqueEyeMaskPass(PoseStack stack, Matrix4f projMat, StormUniforms uniforms,
                                       RenderTarget destination, int sourceColorTextureId, int sourceDepthTextureId,
                                       boolean protectionEnabled) {
         ShaderInstance shader = HurricaneShaders.getOpaqueMaskShader();
@@ -224,8 +224,8 @@ public final class SimpleCloudsHurricaneRenderer {
 
         shader.setSampler("SourceColorSampler", sourceColorTextureId);
         shader.setSampler("SourceDepthSampler", sourceDepthTextureId);
-        this.applyCommonUniforms(shader, renderer, stack, projMat);
-        this.applyStormUniforms(shader, uniforms);
+        this.applyEyeMaskCommonUniforms(shader, stack, projMat);
+        this.applyEyeMaskStormUniforms(shader, uniforms);
         shader.safeGetUniform("ProtectionEnabled").set(protectionEnabled ? 1 : 0);
         shader.apply();
 
@@ -238,7 +238,7 @@ public final class SimpleCloudsHurricaneRenderer {
         RenderSystem.enableCull();
     }
 
-    private void runTransparencyMaskPass(SimpleCloudsRenderer renderer, PoseStack stack, Matrix4f projMat, StormUniforms uniforms,
+    private void runTransparencyMaskPass(PoseStack stack, Matrix4f projMat, StormUniforms uniforms,
                                          WeightedBlendingTarget destination, int sourceAccumTextureId,
                                          int sourceRevealageTextureId, int sourceDepthTextureId,
                                          boolean protectionEnabled) {
@@ -257,8 +257,8 @@ public final class SimpleCloudsHurricaneRenderer {
         shader.setSampler("SourceAccumSampler", sourceAccumTextureId);
         shader.setSampler("SourceRevealageSampler", sourceRevealageTextureId);
         shader.setSampler("SourceDepthSampler", sourceDepthTextureId);
-        this.applyCommonUniforms(shader, renderer, stack, projMat);
-        this.applyStormUniforms(shader, uniforms);
+        this.applyEyeMaskCommonUniforms(shader, stack, projMat);
+        this.applyEyeMaskStormUniforms(shader, uniforms);
         shader.safeGetUniform("ProtectionEnabled").set(protectionEnabled ? 1 : 0);
         shader.apply();
 
@@ -294,7 +294,11 @@ public final class SimpleCloudsHurricaneRenderer {
         shader.setSampler("BaseSampler", baseTexture);
         shader.setSampler("NoiseSampler", noiseTexture);
         shader.setSampler("FlowSampler", flowTexture);
-        shader.setSampler("DepthSampler", renderer.getCloudTarget().getDepthTextureId());
+        // The opaque eye-mask ping-pong immediately before this pass leaves an
+        // exact, detached copy of the cloud target depth in opaqueScratchTarget.
+        // Sampling cloudTarget's attached depth while writing cloudTarget is an
+        // OpenGL feedback loop with undefined results on every driver.
+        shader.setSampler("DepthSampler", this.opaqueScratchTarget.getDepthTextureId());
 
         this.applyCommonUniforms(shader, renderer, stack, projMat);
         shader.safeGetUniform("CloudColor").set(cloudR, cloudG, cloudB, 1.0F);
@@ -418,29 +422,29 @@ public final class SimpleCloudsHurricaneRenderer {
         shader.safeGetUniform("FogColor").set(fogColor[0], fogColor[1], fogColor[2], fogColor[3]);
     }
 
-    private void applyStormUniforms(ShaderInstance shader, StormUniforms uniforms) {
+    private void applyEyeMaskCommonUniforms(ShaderInstance shader, PoseStack stack, Matrix4f projMat) {
+        Minecraft mc = Minecraft.getInstance();
+        shader.safeGetUniform("InverseProjMat").set(new Matrix4f(projMat).invert());
+        shader.safeGetUniform("InverseModelViewMat").set(new Matrix4f(stack.last().pose()).invert());
+
+        float scale = SimpleCloudsConstants.CLOUD_SCALE;
+        float cloudHeight = this.preparedLevel == null ? 0.0F : dev.nonamecrackers2.simpleclouds.common.world.CloudManager.get(this.preparedLevel).getCloudHeight();
+        Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
+        shader.safeGetUniform("CameraPos").set(
+                (float) cameraPos.x / scale,
+                ((float) cameraPos.y - cloudHeight) / scale,
+                (float) cameraPos.z / scale
+        );
+        shader.safeGetUniform("MaxDistance").set(MAX_RAY_DISTANCE_CLOUD);
+    }
+
+    private void applyEyeMaskStormUniforms(ShaderInstance shader, StormUniforms uniforms) {
         shader.safeGetUniform("StormCount").set(uniforms.stormCount());
         shader.safeGetUniform("StormPositions").set(uniforms.stormPositions());
         shader.safeGetUniform("StormHeights").set(uniforms.stormHeights());
         shader.safeGetUniform("EyeRadii").set(uniforms.eyeRadii());
         shader.safeGetUniform("EyeClearRadii").set(uniforms.eyeClearRadii());
         shader.safeGetUniform("EyeSlopes").set(uniforms.eyeSlopes());
-        shader.safeGetUniform("EyewallThicknesses").set(uniforms.eyewallThicknesses());
-        shader.safeGetUniform("CanopyRadii").set(uniforms.canopyRadii());
-        shader.safeGetUniform("ShieldRadii").set(uniforms.shieldRadii());
-        shader.safeGetUniform("CanopyBaseFactors").set(uniforms.canopyBaseFactors());
-        shader.safeGetUniform("CanopyTopFactors").set(uniforms.canopyTopFactors());
-        shader.safeGetUniform("ShieldBaseFactors").set(uniforms.shieldBaseFactors());
-        shader.safeGetUniform("ShieldTopFactors").set(uniforms.shieldTopFactors());
-        shader.safeGetUniform("BandStartRadii").set(uniforms.bandStartRadii());
-        shader.safeGetUniform("BandEndRadii").set(uniforms.bandEndRadii());
-        shader.safeGetUniform("BandWidths").set(uniforms.bandWidths());
-        shader.safeGetUniform("BandStrengths").set(uniforms.bandStrengths());
-        shader.safeGetUniform("BandCounts").set(uniforms.bandCounts());
-        shader.safeGetUniform("FringeStrengths").set(uniforms.fringeStrengths());
-        shader.safeGetUniform("StormSpins").set(uniforms.stormSpins());
-        shader.safeGetUniform("StormIntensities").set(uniforms.stormIntensities());
-        shader.safeGetUniform("StormSeeds").set(uniforms.stormSeeds());
     }
 
     private void applySingleStormUniforms(ShaderInstance shader, HurricaneCloudVolume hurricane) {
@@ -490,7 +494,6 @@ public final class SimpleCloudsHurricaneRenderer {
         stormIntensities[0] = hurricane.intensity();
         stormSeeds[0] = hurricane.seed();
 
-        shader.safeGetUniform("StormCount").set(1);
         shader.safeGetUniform("StormPositions").set(stormPositions);
         shader.safeGetUniform("StormHeights").set(stormHeights);
         shader.safeGetUniform("EyeRadii").set(eyeRadii);

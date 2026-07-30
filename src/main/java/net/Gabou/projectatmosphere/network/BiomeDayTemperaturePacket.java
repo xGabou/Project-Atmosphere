@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.client.loading.ClientForecastLoadingWorkQueue;
+import net.Gabou.projectatmosphere.client.ClientPacketHandlers;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -12,55 +12,59 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Synchronizes daily biome temperature arrays from server to client.
- * <p>
- * Rewritten for NeoForge 1.21.1 using StreamCodec + CustomPacketPayload.
+ * Server-to-client forecast packet carrying per-biome day temperature arrays.
+ * It updates the client forecast cache and must not own forecast generation or mutation logic.
  */
-public record BiomeDayTemperaturePacket(Map<ResourceLocation, float[]> temperatureDayMap)
-        implements CustomPacketPayload {
+public class BiomeDayTemperaturePacket implements CustomPacketPayload {
+    public static final Type<BiomeDayTemperaturePacket> TYPE = new Type<>(
+            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "biome_day_temperature")
+    );
+    public static final StreamCodec<FriendlyByteBuf, BiomeDayTemperaturePacket> STREAM_CODEC =
+            StreamCodec.of((buf, packet) -> packet.encode(buf), BiomeDayTemperaturePacket::decode);
+    private final Map<ResourceLocation, float[]> temperatureDayMap;
 
-    public static final ResourceLocation ID =
-            ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "biomedaytemperaturepacket");
+    public BiomeDayTemperaturePacket(Map<ResourceLocation, float[]> temperatureDayMap) {
+        this.temperatureDayMap = temperatureDayMap;
+    }
 
-    public static final Type<BiomeDayTemperaturePacket> TYPE = new Type<>(ID);
+    public BiomeDayTemperaturePacket(FriendlyByteBuf buf) {
+        int size = buf.readVarInt();
+        this.temperatureDayMap = new HashMap<>(size);
+        for (int i = 0; i < size; i++) {
+            ResourceLocation biome = buf.readResourceLocation();
+            int len = buf.readVarInt();
+            float[] temps = new float[len];
+            for (int j = 0; j < len; j++) temps[j] = buf.readFloat();
+            temperatureDayMap.put(biome, temps);
+        }
+    }
+
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeVarInt(temperatureDayMap.size());
+        temperatureDayMap.forEach((biome, temps) -> {
+            buf.writeResourceLocation(biome);
+            buf.writeVarInt(temps.length);
+            for (float f : temps) buf.writeFloat(f);
+        });
+    }
+
+    // ---------------------------------------------------------------------
+    // Decode and handle
+    // ---------------------------------------------------------------------
+    public static BiomeDayTemperaturePacket decode(FriendlyByteBuf buf) {
+        return new BiomeDayTemperaturePacket(buf);
+    }
 
     /**
-     * StreamCodec handles serialization & deserialization of the packet.
+     * Handles incoming daily temperature data on the client.
+     * Clears old forecasts before inserting new ones to prevent stale data.
      */
-    public static final StreamCodec<FriendlyByteBuf, BiomeDayTemperaturePacket> STREAM_CODEC =
-            StreamCodec.of(
-                    (buf, pkt) -> {
-                        buf.writeVarInt(pkt.temperatureDayMap.size());
-                        pkt.temperatureDayMap.forEach((biome, temps) -> {
-                            buf.writeResourceLocation(biome);
-                            buf.writeVarInt(temps.length);
-                            for (float f : temps) buf.writeFloat(f);
-                        });
-                    },
-                    buf -> {
-                        int size = buf.readVarInt();
-                        Map<ResourceLocation, float[]> map = new HashMap<>(size);
-                        for (int i = 0; i < size; i++) {
-                            ResourceLocation biome = buf.readResourceLocation();
-                            int len = buf.readVarInt();
-                            float[] temps = new float[len];
-                            for (int j = 0; j < len; j++) temps[j] = buf.readFloat();
-                            map.put(biome, temps);
-                        }
-                        return new BiomeDayTemperaturePacket(map);
-                    }
-            );
-
     @Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 
-    /**
-     * Handles incoming biome day temperature data on the client.
-     * Clears old forecasts before inserting new ones to prevent stale data.
-     */
-    public static void handle(BiomeDayTemperaturePacket pkt, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> ClientForecastLoadingWorkQueue.queueForecastSnapshot(pkt.temperatureDayMap(), "biome_day_temperature_packet"));
+    public static void handle(BiomeDayTemperaturePacket msg, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPacketHandlers.handleBiomeDayTemperatures(msg.temperatureDayMap));
     }
 }

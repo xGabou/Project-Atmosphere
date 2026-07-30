@@ -1,0 +1,25 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "srcalpha",
+    "dstrgb": "1-srcalpha",
+    "srcalpha": "one",
+    "dstalpha": "1-srcalpha"
+  },
+  "vertex": "projectatmosphere:cloud_volume",
+  "fragment": "projectatmosphere:cloud_field_composite",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    { "name": "CloudColorSampler" },
+    { "name": "CloudDepthSampler" },
+    { "name": "SceneDepthSampler" }
+  ],
+  "uniforms": [
+    { "name": "CompositeMode", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "DepthCompositeEnabled", "type": "int", "count": 1, "values": [ 1 ] },
+    { "name": "SceneDepthValid", "type": "int", "count": 1, "values": [ 0 ] }
+  ]
+}
