@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.compat.simpleclouds;
 
-import net.Gabou.projectatmosphere.client.fog.SimpleCloudsWhiteoutFogHandler;
 import net.Gabou.projectatmosphere.client.hurricane.cache.ClientHurricaneStateCache;
 import net.Gabou.projectatmosphere.clouds.client.render.ClientCloudRenderOwnership;
 import dev.nonamecrackers2.simpleclouds.client.renderer.SimpleCloudsRenderer;
@@ -12,7 +11,6 @@ import net.Gabou.projectatmosphere.network.SevereWeatherClientPacketHandlers;
 import net.Gabou.projectatmosphere.network.SevereWeatherClientPacketHandlers.TornadoSpawn;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.List;
 
@@ -30,7 +28,6 @@ public final class SimpleCloudsClientIntegration {
                 SimpleCloudsClientIntegration::syncTornadoes,
                 ClientHurricaneStateCache::applySnapshots
         );
-        NeoForge.EVENT_BUS.register(SimpleCloudsWhiteoutFogHandler.class);
     }
 
     private static void spawnTornado(TornadoSpawn spawn) {

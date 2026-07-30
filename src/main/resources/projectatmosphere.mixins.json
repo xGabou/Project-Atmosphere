@@ -44,7 +44,6 @@
     "client.MinecraftCrashHandlerMixin",
     "client.LoadingScreenMixin",
     "OverwriteDesertSound",
-    "client.LoadingOverlayMixin",
     "client.particle.ParticleMotionAccessor",
     "client.particle.WindBentParticleEngineMixin",
     "compat.auroras.AuroraRendererMixin",

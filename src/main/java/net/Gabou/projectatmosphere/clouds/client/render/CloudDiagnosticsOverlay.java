@@ -20,6 +20,7 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.config.ConfigTracker;
 import net.neoforged.fml.config.ModConfig;
@@ -35,8 +36,8 @@ public final class CloudDiagnosticsOverlay {
     private static final int TEXT_COLOR = 0xFFE6F2FF;
     private static final int MUTED_TEXT_COLOR = 0xFFB8C6D0;
 
-    private static final int X = 6;
-    private static final int Y = 6;
+    private static final int SCREEN_MARGIN = 6;
+    private static final int HOTBAR_CLEARANCE = 30;
     private static final int LINE_HEIGHT = 10;
     private static final int PADDING = 4;
 
@@ -47,6 +48,7 @@ public final class CloudDiagnosticsOverlay {
 
     private static List<FormattedCharSequence> cachedVisualLines = Collections.emptyList();
     private static int cachedWidth;
+    private static int cachedMaxTextWidth;
     private static long lastCacheRefreshNs;
     private static AtmoCommonConfig.CloudDiagnosticsOverlayMode cachedMode;
 
@@ -59,13 +61,13 @@ public final class CloudDiagnosticsOverlay {
 
     @SubscribeEvent
     public static void onRenderOverlay(RenderGuiLayerEvent.Post event) {
-        if (!event.getName().toString().equals("minecraft:debug_text")) {
+        if (!event.getName().equals(VanillaGuiLayers.DEBUG_OVERLAY)) {
             return;
         }
 
         Minecraft minecraft = Minecraft.getInstance();
 
-        if (minecraft.options.hideGui) {
+        if (minecraft.options.hideGui || minecraft.getDebugOverlay().showDebugScreen()) {
             return;
         }
 
@@ -76,25 +78,36 @@ public final class CloudDiagnosticsOverlay {
         }
 
         Font font = minecraft.font;
-        List<FormattedCharSequence> lines = getCachedVisualLines(font, mode);
+        GuiGraphics guiGraphics = event.getGuiGraphics();
+        int maxTextWidth = Math.max(
+                40,
+                guiGraphics.guiWidth() - (SCREEN_MARGIN + PADDING) * 2
+        );
+        List<FormattedCharSequence> lines = getCachedVisualLines(font, mode, maxTextWidth);
 
         if (lines.isEmpty()) {
             return;
         }
 
-        GuiGraphics guiGraphics = event.getGuiGraphics();
-
         int height = lines.size() * LINE_HEIGHT + PADDING * 2;
+        int x = Math.max(
+                SCREEN_MARGIN + PADDING,
+                guiGraphics.guiWidth() - cachedWidth - PADDING - SCREEN_MARGIN
+        );
+        int y = Math.max(
+                SCREEN_MARGIN + PADDING,
+                guiGraphics.guiHeight() - height - HOTBAR_CLEARANCE + PADDING
+        );
 
         guiGraphics.fill(
-                X - PADDING,
-                Y - PADDING,
-                X + cachedWidth + PADDING,
-                Y + height - PADDING,
+                x - PADDING,
+                y - PADDING,
+                x + cachedWidth + PADDING,
+                y + height - PADDING,
                 BACKGROUND_COLOR
         );
 
-        drawLines(guiGraphics, font, lines);
+        drawLines(guiGraphics, font, lines, x, y);
     }
 
     /**
@@ -106,12 +119,14 @@ public final class CloudDiagnosticsOverlay {
      */
     private static List<FormattedCharSequence> getCachedVisualLines(
             Font font,
-            AtmoCommonConfig.CloudDiagnosticsOverlayMode mode
+            AtmoCommonConfig.CloudDiagnosticsOverlayMode mode,
+            int maxTextWidth
     ) {
         long nowNs = System.nanoTime();
 
         if (
                 cachedMode == mode
+                        && cachedMaxTextWidth == maxTextWidth
                         && nowNs - lastCacheRefreshNs < REFRESH_INTERVAL_NS
                         && !cachedVisualLines.isEmpty()
         ) {
@@ -124,12 +139,14 @@ public final class CloudDiagnosticsOverlay {
         int width = 0;
 
         for (String line : rawLines) {
-            width = Math.max(width, font.width(line));
-            visualLines.add(FormattedCharSequence.forward(line, Style.EMPTY));
+            String fittedLine = fitLine(font, line, maxTextWidth);
+            width = Math.max(width, font.width(fittedLine));
+            visualLines.add(FormattedCharSequence.forward(fittedLine, Style.EMPTY));
         }
 
         cachedVisualLines = visualLines;
         cachedWidth = width;
+        cachedMaxTextWidth = maxTextWidth;
         cachedMode = mode;
         lastCacheRefreshNs = nowNs;
 
@@ -146,11 +163,13 @@ public final class CloudDiagnosticsOverlay {
     private static void drawLines(
             GuiGraphics guiGraphics,
             Font font,
-            List<FormattedCharSequence> lines
+            List<FormattedCharSequence> lines,
+            int x,
+            int y
     ) {
         for (int i = 0; i < lines.size(); i++) {
             int color = i == 0 ? TEXT_COLOR : MUTED_TEXT_COLOR;
-            guiGraphics.drawString(font, lines.get(i), X, Y + i * LINE_HEIGHT, color, false);
+            guiGraphics.drawString(font, lines.get(i), x, y + i * LINE_HEIGHT, color, false);
         }
     }
 
@@ -189,6 +208,7 @@ public final class CloudDiagnosticsOverlay {
     private static void invalidateCache() {
         cachedVisualLines = Collections.emptyList();
         cachedWidth = 0;
+        cachedMaxTextWidth = 0;
         lastCacheRefreshNs = 0L;
         cachedMode = null;
     }
@@ -483,6 +503,14 @@ public final class CloudDiagnosticsOverlay {
         }
 
         return value.substring(0, Math.max(0, maxLength - 1)) + "~";
+    }
+
+    private static String fitLine(Font font, String value, int maxWidth) {
+        if (font.width(value) <= maxWidth) {
+            return value;
+        }
+        String suffix = "...";
+        return font.plainSubstrByWidth(value, Math.max(1, maxWidth - font.width(suffix))) + suffix;
     }
 
     /**

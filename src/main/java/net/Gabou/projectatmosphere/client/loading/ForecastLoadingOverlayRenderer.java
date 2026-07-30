@@ -1,6 +1,5 @@
 package net.Gabou.projectatmosphere.client.loading;
 
-import net.Gabou.projectatmosphere.client.ClientSyncLock;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -12,8 +11,8 @@ public final class ForecastLoadingOverlayRenderer {
     private static final String TITLE = "Project Atmosphere";
     private static final String[] DOTS = {"", ".", "..", "..."};
     private static final String WAITING_HINT = "Large modpacks may take longer.";
-    private static final int PANEL_TOP_MARGIN = 14;
-    private static final int PANEL_TOP_BIAS = 84;
+    private static final int PANEL_MARGIN = 12;
+    private static final int PANEL_VERTICAL_OFFSET = 56;
     private static final int PANEL_FILL_TOP = FastColor.ARGB32.color(214, 9, 14, 20);
     private static final int PANEL_FILL_BOTTOM = FastColor.ARGB32.color(198, 15, 20, 28);
     private static final int PANEL_OUTLINE = FastColor.ARGB32.color(255, 110, 158, 214);
@@ -32,7 +31,7 @@ public final class ForecastLoadingOverlayRenderer {
     }
 
     public static void render(GuiGraphics guiGraphics) {
-        ForecastLoadingState.Snapshot snapshot = ensureActiveSnapshot();
+        ForecastLoadingState.Snapshot snapshot = ForecastLoadingState.snapshot();
         if (!snapshot.active()) {
             return;
         }
@@ -51,11 +50,24 @@ public final class ForecastLoadingOverlayRenderer {
         int detailWidth = detail == null ? 0 : font.width(detail);
         int hintWidth = hint == null ? 0 : font.width(hint);
         int contentWidth = Math.max(Math.max(Math.max(titleWidth, stageWidth), detailWidth), hintWidth);
-        int panelWidth = Mth.clamp(contentWidth + 34, 220, 300);
+        int availableWidth = Math.max(1, screenWidth - PANEL_MARGIN * 2);
+        int minPanelWidth = Math.min(220, availableWidth);
+        int maxPanelWidth = Math.min(320, availableWidth);
+        int panelWidth = Mth.clamp(contentWidth + 34, minPanelWidth, maxPanelWidth);
         int panelHeight = hint == null ? (detail == null ? 48 : 60) : 72;
+        int maxTextWidth = Math.max(1, panelWidth - 28);
+
+        stageLabel = fitText(font, stageLabel, maxTextWidth);
+        detail = fitText(font, detail, maxTextWidth);
+        hint = fitText(font, hint, maxTextWidth);
 
         int left = (screenWidth - panelWidth) / 2;
-        int top = Math.max(PANEL_TOP_MARGIN, (screenHeight / 2) - panelHeight - PANEL_TOP_BIAS);
+        int maxTop = Math.max(PANEL_MARGIN, screenHeight - panelHeight - PANEL_MARGIN);
+        int top = Mth.clamp(
+                (screenHeight - panelHeight) / 2 + PANEL_VERTICAL_OFFSET,
+                PANEL_MARGIN,
+                maxTop
+        );
         int right = left + panelWidth;
         int bottom = top + panelHeight;
 
@@ -122,18 +134,12 @@ public final class ForecastLoadingOverlayRenderer {
         return null;
     }
 
-    private static ForecastLoadingState.Snapshot ensureActiveSnapshot() {
-        ForecastLoadingState.Snapshot snapshot = ForecastLoadingState.snapshot();
-        if (!snapshot.active() && !ClientSyncLock.isReady()) {
-            ForecastLoadingState.start(
-                    ForecastLoadingStage.WAITING_FOR_SERVER,
-                    null,
-                    null,
-                    null,
-                    "loading_screen_render_fallback"
-            );
-            snapshot = ForecastLoadingState.snapshot();
+    private static String fitText(Font font, String text, int maxWidth) {
+        if (text == null || font.width(text) <= maxWidth) {
+            return text;
         }
-        return snapshot;
+        String suffix = "...";
+        int contentWidth = Math.max(1, maxWidth - font.width(suffix));
+        return font.plainSubstrByWidth(text, contentWidth) + suffix;
     }
 }

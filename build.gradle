@@ -3,7 +3,7 @@ plugins {
     id 'maven-publish'
     id 'idea'
     id 'net.neoforged.moddev' version '2.0.107'
-    id 'com.matthewprenger.cursegradle' version '1.4.0' // CurseForge uploader
+    id 'com.hypherionmc.modutils.modpublisher' version '2.1.8' // CurseForge uploader
     id "com.modrinth.minotaur" version "2.8.10" // Modrinth uploader
 }
 
@@ -121,14 +121,14 @@ dependencies {
     implementation "curse.maven:betterdays-895618:7294209"
     implementation "curse.maven:simple-clouds-1121215:6928979"
     //implementation files("libs/Serene Seasons Plus-neoforge-1.21.1-1.21.1-1.0.9.5.jar")
-    implementation "curse.maven:serene-seasons-plus-1288843:7512515"
+    implementation "curse.maven:serene-seasons-plus-1288843:8238082"
     implementation "nonamecrackers2:simplecloudsapi-neoforge:${api_version}"
     compileOnly "curse.maven:tough-as-nails-246391:5833252"
     compileOnly "curse.maven:cold-sweat-506194:7492465"
     runtimeOnly "curse.maven:sodium-394468:6382651"
     implementation "curse.maven:auroras-1105290:6040674"
     implementation "curse.maven:rainboows-1121832:6416604"
-    implementation "curse.maven:gabous-libs-1367332:7195722"
+    implementation "curse.maven:gabous-libs-1367332:8376871"
     implementation "curse.maven:architectury-api-419699:5786327"
     compileOnly "curse.maven:dynamictrees-252818:7197017"
     compileOnly "curse.maven:ecliptic-seasons-1118306:6303967"
@@ -207,30 +207,68 @@ modrinth {
     }
     uploadFile = file("build/libs/${archivesBaseName}-${version}.jar")
 }
-def curseforgeToken = System.getenv("CURSEFORGE_TOKEN")
-if (!curseforgeToken) {
-    project.logger.lifecycle("CURSEFORGE_TOKEN not set; CurseForge upload tasks will be disabled.")
-    tasks.matching { it.name.toLowerCase().contains("curseforge") }.configureEach { enabled = false }
-} else {
-    curseforge {
-        apiKey = curseforgeToken
-
-        project {
-            id = "1258344"
-            changelog = rootProject.file("PAchangelog.md")
-            releaseType = "beta" // options: alpha, beta, release
-            addGameVersion "1.21.1"
-            addGameVersion "NeoForge"
-            mainArtifact(file("build/libs/${archivesBaseName}-${version}.jar")) {
-                displayName = "NeoForge-${version}"
-            }
+def releaseJarFile = tasks.named("jar", Jar).flatMap { it.archiveFile }
+def curseForgeToken = System.getenv("CURSEFORGE_TOKEN")?.trim()
+if (curseForgeToken) {
+    publisher {
+        apiKeys {
+            curseforge curseForgeToken
         }
+        setCurseID("1197707")
+        setVersionType("release")
+        setChangelog(rootProject.file("PAchangelog.md"))
+        setDisplayName("NeoForge-${project.version}")
+        setGameVersions("1.21.1")
+        setLoaders("neoforge")
+        setCurseEnvironment("both")
+        getJavaVersions().set([JavaVersion.VERSION_21])
+        setArtifact(releaseJarFile.get().asFile)
+        setDebug(providers.gradleProperty("publisherDebug").map {
+            it.toBoolean()
+        }.orElse(false).get())
     }
+} else {
+    project.logger.lifecycle("CURSEFORGE_TOKEN not set; CurseForge upload tasks will be disabled.")
+    tasks.named("publishCurseforge").configure { enabled = false }
+}
+
+tasks.named("publishCurseforge").configure {
+    dependsOn("build")
+}
+
+tasks.register("curseforge1197707") {
+    group = "publishing"
+    description = "Publishes this release to CurseForge project 1197707."
+    dependsOn("publishCurseforge")
+    enabled = curseForgeToken != null
 }
 import groovy.json.JsonOutput
+def windowsUserDiscordWebhookUrl = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")
+        ? providers.exec {
+            commandLine "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                    "[Environment]::GetEnvironmentVariable('DISCORD_WEBHOOK_URL', 'User')"
+        }.standardOutput.asText.map { it.trim() }
+        : providers.provider { "" }
+def discordWebhookUrl = providers.environmentVariable("DISCORD_WEBHOOK_URL")
+        .orElse(providers.gradleProperty("discordWebhookUrl"))
+        .orElse(windowsUserDiscordWebhookUrl)
 tasks.register("discordWebhook") {
     doLast {
-        def webhookUrl = System.getenv("DISCORD_WEBHOOK_URL")
+        def webhookUrl = discordWebhookUrl.getOrNull()?.trim()
+        if (!webhookUrl) {
+            throw new GradleException("Discord webhook URL is missing. Set DISCORD_WEBHOOK_URL or pass -PdiscordWebhookUrl=<url>.")
+        }
+
+        def webhookUri
+        try {
+            webhookUri = new URI(webhookUrl)
+        } catch (URISyntaxException exception) {
+            throw new GradleException("DISCORD_WEBHOOK_URL is not a valid URL.", exception)
+        }
+        if (webhookUri.scheme != "https" || !webhookUri.host) {
+            throw new GradleException("DISCORD_WEBHOOK_URL must be an absolute HTTPS URL.")
+        }
+
         def changelogText = rootProject.file("PAchangelog.md").text
 
         def payload = [
@@ -244,7 +282,7 @@ tasks.register("discordWebhook") {
         ]
 
         println "Sending release notification to Discord..."
-        def connection = new URL(webhookUrl).openConnection()
+        def connection = webhookUri.toURL().openConnection()
         connection.with {
             doOutput = true
             requestMethod = "POST"

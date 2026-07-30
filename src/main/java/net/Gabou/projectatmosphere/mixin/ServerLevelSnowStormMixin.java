@@ -1,7 +1,7 @@
 package net.Gabou.projectatmosphere.mixin;
 
 
-import com.Gabou.sereneseasonsplus.features.snowstorm.ISnowStormLevel;
+import net.Gabou.gaboulibs.util.ISnowStormLevel;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
