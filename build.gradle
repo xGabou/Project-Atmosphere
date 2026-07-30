@@ -133,6 +133,7 @@ dependencies {
     compileOnly "curse.maven:dynamictrees-252818:7197017"
     compileOnly "curse.maven:ecliptic-seasons-1118306:6303967"
     compileOnly "curse.maven:legendary-survival-overhaul-840254:7215072"
+    implementation "curse.maven:better-simple-clouds-1606950:8510674"
 
 }
 
@@ -214,7 +215,7 @@ if (curseForgeToken) {
         apiKeys {
             curseforge curseForgeToken
         }
-        setCurseID("1197707")
+        setCurseID("1258344")
         setVersionType("release")
         setChangelog(rootProject.file("PAchangelog.md"))
         setDisplayName("NeoForge-${project.version}")
@@ -236,9 +237,9 @@ tasks.named("publishCurseforge").configure {
     dependsOn("build")
 }
 
-tasks.register("curseforge1197707") {
+tasks.register("curseforge1258344") {
     group = "publishing"
-    description = "Publishes this release to CurseForge project 1197707."
+    description = "Publishes this release to CurseForge project 1258344."
     dependsOn("publishCurseforge")
     enabled = curseForgeToken != null
 }
