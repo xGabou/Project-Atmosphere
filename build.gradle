@@ -214,7 +214,7 @@ if (curseForgeToken) {
         apiKeys {
             curseforge curseForgeToken
         }
-        setCurseID("1197707")
+        setCurseID("1258344")
         setVersionType("release")
         setChangelog(rootProject.file("PAchangelog.md"))
         setDisplayName("NeoForge-${project.version}")
@@ -236,9 +236,9 @@ tasks.named("publishCurseforge").configure {
     dependsOn("build")
 }
 
-tasks.register("curseforge1197707") {
+tasks.register("curseforge1258344") {
     group = "publishing"
-    description = "Publishes this release to CurseForge project 1197707."
+    description = "Publishes this release to CurseForge project 1258344."
     dependsOn("publishCurseforge")
     enabled = curseForgeToken != null
 }
@@ -270,25 +270,37 @@ tasks.register("discordWebhook") {
         }
 
         def changelogText = rootProject.file("PAchangelog.md").text
+        def messageHeader = "**New release published!** 🎉\n" +
+                "<@&1401956072784269443>\n" +
+                "Project: ${mod_name}\n" +
+                "Version: v${project.mod_version}-1.21.1\n\n"
+        def maxDiscordContentLength = 2000
+        def changelogLimit = Math.max(0, maxDiscordContentLength - messageHeader.length())
 
         def payload = [
                 username: "Build Bot",
                 allowed_mentions: [ parse: ["roles"] ],
-                content: "**New release published!** 🎉\n" +
-                        "<@&1401956072784269443>\n" + // role mention
-                        "Project: ${mod_name}\n" +
-                        "Version: v${project.mod_version}-1.21.1\n\n" +
-                        "${changelogText.take(1891)}"
+                content: messageHeader + changelogText.take(changelogLimit)
         ]
 
         println "Sending release notification to Discord..."
         def connection = webhookUri.toURL().openConnection()
-        connection.with {
-            doOutput = true
-            requestMethod = "POST"
-            setRequestProperty("Content-Type", "application/json")
-            outputStream.withWriter("UTF-8") { it << JsonOutput.toJson(payload) }
-            println "Webhook sent with response code: ${responseCode}"
+        try {
+            connection.doOutput = true
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 15_000
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.outputStream.withWriter("UTF-8") { it << JsonOutput.toJson(payload) }
+
+            def status = connection.responseCode
+            if (status < 200 || status >= 300) {
+                def errorBody = connection.errorStream?.getText("UTF-8")?.take(500)
+                throw new GradleException("Discord webhook failed with HTTP ${status}${errorBody ? ": ${errorBody}" : "."}")
+            }
+            println "Webhook sent with response code: ${status}"
+        } finally {
+            connection.disconnect()
         }
     }
 }
