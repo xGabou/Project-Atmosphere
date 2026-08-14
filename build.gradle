@@ -133,6 +133,7 @@ dependencies {
     compileOnly "curse.maven:dynamictrees-252818:7197017"
     compileOnly "curse.maven:ecliptic-seasons-1118306:6303967"
     compileOnly "curse.maven:legendary-survival-overhaul-840254:7215072"
+    implementation "curse.maven:better-simple-clouds-1606950:8510674"
 
 }
 
