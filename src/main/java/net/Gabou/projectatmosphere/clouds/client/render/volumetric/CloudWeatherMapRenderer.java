@@ -57,6 +57,14 @@ public final class CloudWeatherMapRenderer {
     private static int lastStormLayerHeightTextureId = -1;
     private static int lastStormTowerTextureId = -1;
     private static int lastPuffCandidateTextureId = -1;
+    // Diagnostic-only: whether the last weather-map bake found any cell whose
+    // envelopeRole fell in the structured BASE..ANVIL range. This is the
+    // authoritative gate for the storm-structure/height/tower passes (see
+    // hasSevereStructures below); false means those three GPU passes were
+    // skipped entirely and stormStructureShape() cannot contribute in the
+    // raymarch, regardless of what the shader's DebugView modes would show.
+    private static boolean lastHasSevereStructures;
+    private static boolean lastHasStructuredCumulus;
     private static Result lastResult = Result.EMPTY;
     private static long cacheHits;
     private static long cacheMisses;
@@ -120,7 +128,9 @@ public final class CloudWeatherMapRenderer {
 
     public static String cacheStatus() {
         return "weatherMapCacheHits=" + cacheHits + " misses=" + cacheMisses
-                + " inputSignature=" + hex(lastInputSignature);
+                + " inputSignature=" + hex(lastInputSignature)
+                + " hasSevereStructures=" + lastHasSevereStructures
+                + " hasStructuredCumulus=" + lastHasStructuredCumulus;
     }
 
     public static String diagnosticSignatureStatus() {
@@ -549,6 +559,8 @@ public final class CloudWeatherMapRenderer {
         lastStormLayerHeightTextureId = stormLayerHeightTextureId;
         lastStormTowerTextureId = stormTowerTextureId;
         lastPuffCandidateTextureId = puffCandidateTextureId;
+        lastHasSevereStructures = hasSevereStructures;
+        lastHasStructuredCumulus = hasStructuredCumulus;
         lastResult = result;
         return result;
     }

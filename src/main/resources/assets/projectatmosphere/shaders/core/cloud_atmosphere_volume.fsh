@@ -1930,7 +1930,12 @@ float cloudDensity(
             } else if (profileId == 2) {
                 erosion = 0.17;
             } else if (stormProfile) {
-                erosion = envelopeRole == 5 ? 0.26 : 0.22;
+                // Storm bodies (cumulonimbus/supercell) are large enough that
+                // the shared 0.68 floor below reads as barely-visible
+                // dimpling on a smooth analytic dome. Give them a stronger,
+                // deeper-reaching billow without touching the protected core
+                // (cloud > ~0.72 still keeps edgeExposure at 0 either way).
+                erosion = envelopeRole == 5 ? 0.48 : 0.42;
             } else if (profileId == 6) {
                 erosion = 0.06;
             }
@@ -1942,7 +1947,8 @@ float cloudDensity(
                 cloud = max(cloud - (1.0 - detailFbm) * erosion, 0.0);
             } else {
                 float edgeRetention = 1.0 - (1.0 - detailFbm) * erosion * edgeExposure;
-                cloud *= clamp(edgeRetention, 0.68, 1.0);
+                float erosionFloor = stormProfile ? 0.42 : 0.68;
+                cloud *= clamp(edgeRetention, erosionFloor, 1.0);
             }
         }
 

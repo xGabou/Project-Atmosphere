@@ -4,22 +4,18 @@ This folder is the main reference point for weather, cloud, storm, and renderer-
 
 ## Start Here
 
-If you want to understand how to proceed toward a backend cloud layer, read these in order:
-
-1. `Renderer/cloud_backend_start_here.md`
-2. `Renderer/cloud_render_data_contract.md`
-3. `Renderer/cloud_renderer_integration_points.md`
-4. `Renderer/phase0_cloud_boundary/phase0_contract.md`
-5. `Renderer/phase0_cloud_boundary/phase0_verdict.md`
+For cloud rendering specifically: `Clouds/CLOUD_RENDERING_OVERVIEW.md` — current as of 2026-08-15,
+verified against a live client. It supersedes the reading list that used to be here; those planning
+docs (`cloud_backend_start_here.md`, `cloud_render_data_contract.md`,
+`cloud_renderer_integration_points.md`, `phase0_cloud_boundary/`) predate the native renderer's
+implementation and were moved to `Clouds/archived/`.
 
 ## Supporting Material
 
-- `Renderer/codebase_audit/backend_readiness_for_cloud_renderer.md`
+- `Renderer/codebase_audit/backend_readiness_for_cloud_renderer.md` (note: this file's own
+  "canonical entry point" pointer is now stale — see `Clouds/CLOUD_RENDERING_OVERVIEW.md` instead)
 - `Renderer/codebase_audit/class_responsibility_matrix.md`
 - `Renderer/codebase_audit/renderer_blockers.md`
-- `Renderer/phase0_cloud_boundary/backend_to_snapshot_flow.md`
-- `Renderer/phase0_cloud_boundary/snapshot_boundary_design.md`
-- `Renderer/phase0_cloud_boundary/minimal_fake_renderer_requirements.md`
 - `Studies/runtime-atmosphere-coupling-study.md`
 - `Studies/pa_realistic_cloud_renderer_design.md`
 
