@@ -29,7 +29,7 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import net.Gabou.projectatmosphere.modules.wind.WindEngine;
 import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -39,7 +39,6 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import net.minecraftforge.network.PacketDistributor;
 
 public class ForecastOrchestrator {
     private static final int MIN_DISTANCE_BETWEEN_CENTERS = ForecastGenerator.RADIUS / 2;
@@ -659,8 +658,8 @@ public class ForecastOrchestrator {
     }
 
     private static void sendLoginStage(ServerPlayer player, String subtext, float progress, String source) {
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
+        AtmosphereNetwork.sendToPlayer(
+                player,
                 ForecastLoadingStatusPacket.status(
                         ForecastLoadingStage.PREPARING_WEATHER_SYSTEMS,
                         null,

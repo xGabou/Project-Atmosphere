@@ -4,14 +4,13 @@ import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.Gabou.projectatmosphere.network.FogDebugOverridePacket;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.PacketDistributor;
 
 public final class FogCommand {
     private static final float DEFAULT_STRENGTH = 0.85F;
@@ -50,10 +49,7 @@ public final class FogCommand {
         }
 
         int durationTicks = seconds * 20;
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new FogDebugOverridePacket(strength, durationTicks)
-        );
+        AtmosphereNetwork.sendToPlayer(player, new FogDebugOverridePacket(strength, durationTicks));
         ctx.getSource().sendSuccess(
                 () -> Component.literal(String.format("Fog override applied: strength=%.2f duration=%ds", strength, seconds)),
                 true
@@ -69,10 +65,7 @@ public final class FogCommand {
             return 0;
         }
 
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new FogDebugOverridePacket(0.0F, 0)
-        );
+        AtmosphereNetwork.sendToPlayer(player, new FogDebugOverridePacket(0.0F, 0));
         ctx.getSource().sendSuccess(() -> Component.literal("Fog override cleared."), true);
         return 1;
     }

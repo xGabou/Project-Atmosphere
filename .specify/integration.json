@@ -1,0 +1,24 @@
+{
+  "version": "0.16.4",
+  "integration_state_schema": 1,
+  "installed_integrations": [
+    "codex",
+    "claude"
+  ],
+  "integration_settings": {
+    "codex": {
+      "script": "ps",
+      "raw_options": "--skills",
+      "parsed_options": {
+        "skills": true
+      },
+      "invoke_separator": "-"
+    },
+    "claude": {
+      "script": "ps",
+      "invoke_separator": "-"
+    }
+  },
+  "integration": "codex",
+  "default_integration": "codex"
+}

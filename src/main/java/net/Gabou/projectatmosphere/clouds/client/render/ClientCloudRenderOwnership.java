@@ -9,7 +9,7 @@ import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricClo
 import net.Gabou.projectatmosphere.client.render.shader.CloudFieldVolumeShaders;
 import net.Gabou.projectatmosphere.client.render.shader.VolumetricCloudShaders;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
 import net.minecraft.client.multiplayer.ClientLevel;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,6 +21,14 @@ import java.util.function.Predicate;
  * layer. Callers must not infer ownership from individual configuration flags.
  */
 public final class ClientCloudRenderOwnership {
+    /**
+     * Temporary rollback switch for the legacy per-field renderer. It is
+     * deliberately a JVM property instead of a player-facing setting so a
+     * normal installation can never select two independent PA render paths.
+     */
+    public static final String FIELD_FALLBACK_PROPERTY =
+            "projectatmosphere.dev.enableFieldRendererFallback";
+
     private static volatile Predicate<ClientLevel> simpleCloudsDimensionProbe = level -> false;
     private static volatile Owner lastResolvedOwner;
 
@@ -43,7 +51,7 @@ public final class ClientCloudRenderOwnership {
                     : Owner.VANILLA);
         }
         if (level == null
-                || AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.VANILLA
+                || AtmosphereConfig.clouds().vanillaCloudMode()
                 || !AtmosphereCloudPolicy.canUsePaInDimension(level)
                 || CloudBackendResolver.resolve(level) != CloudVisualBackend.PA_NATIVE) {
             return recordOwner(Owner.VANILLA);
@@ -52,7 +60,8 @@ public final class ClientCloudRenderOwnership {
                 && VolumetricCloudShaders.isReady()) {
             return recordOwner(Owner.PA_VOLUMETRIC);
         }
-        if (CloudFieldVolumeRenderConfig.isEnabled()
+        if (isFieldFallbackAllowed()
+                && CloudFieldVolumeRenderConfig.isEnabled()
                 && CloudFieldVolumeShaders.isReady()) {
             return recordOwner(Owner.PA_FIELD_FALLBACK);
         }
@@ -87,6 +96,10 @@ public final class ClientCloudRenderOwnership {
 
     public static boolean ownsFieldFallbackPass(@Nullable ClientLevel level) {
         return resolve(level) == Owner.PA_FIELD_FALLBACK;
+    }
+
+    public static boolean isFieldFallbackAllowed() {
+        return Boolean.getBoolean(FIELD_FALLBACK_PROPERTY);
     }
 
     private static Owner recordOwner(Owner owner) {

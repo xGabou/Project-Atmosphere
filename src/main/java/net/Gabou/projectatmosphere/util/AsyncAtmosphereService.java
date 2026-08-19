@@ -170,6 +170,28 @@ public final class AsyncAtmosphereService {
         executeSafe(CLIENT_POOL, wrap(task, "Client"));
     }
 
+    /**
+     * Attempts to queue client CPU work without ever applying the pool's
+     * caller-runs rejection policy. Render code uses this for optional cached
+     * geometry: saturation keeps the last valid generation instead of
+     * blocking the render thread.
+     */
+    public static boolean tryRunClient(Runnable task) {
+        ensureInit();
+        Objects.requireNonNull(task, "task");
+        return tryOfferClientTask(CLIENT_POOL, wrap(task, "Client"));
+    }
+
+    /** Package-independent test seam for the non-blocking queue contract. */
+    public static boolean tryOfferClientTask(ThreadPoolExecutor executor, Runnable task) {
+        Objects.requireNonNull(task, "task");
+        if (executor == null || executor.isShutdown() || executor.isTerminating()) {
+            return false;
+        }
+        executor.prestartCoreThread();
+        return executor.getQueue().offer(task);
+    }
+
     public static void shutdown() {
         if (!initialized) return;
         synchronized (AsyncAtmosphereService.class) {

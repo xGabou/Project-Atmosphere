@@ -1,16 +1,13 @@
 package net.Gabou.projectatmosphere.clouds.field.network;
 
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /** Player-interest delta for render-authoritative CloudField snapshots. */
 public final class CloudFieldDeltaPacket {
@@ -56,12 +53,9 @@ public final class CloudFieldDeltaPacket {
 
     public static void handle(
             CloudFieldDeltaPacket packet,
-            Supplier<NetworkEvent.Context> contextSupplier
+            PacketContext context
     ) {
-        NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                CloudFieldPacketDispatcher.handleClientDelta(packet.updated, packet.removed)
-        ));
-        context.setPacketHandled(true);
+        context.enqueueClient(() -> CloudFieldPacketDispatcher.handleClientDelta(packet.updated, packet.removed));
+        context.markHandled();
     }
 }

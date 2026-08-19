@@ -3,7 +3,7 @@ package net.Gabou.projectatmosphere.clouds.simulation;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
@@ -185,7 +185,7 @@ final class CloudRegionMotionController {
 
     static boolean isMovementFrozen() {
         try {
-            return AtmoCommonConfig.FREEZE_CLOUD_MOVEMENT.get();
+            return AtmosphereConfig.clouds().freezeCloudMovement();
         } catch (IllegalStateException exception) {
             return false;
         }
@@ -193,7 +193,7 @@ final class CloudRegionMotionController {
 
     private boolean isMovementEnabled() {
         try {
-            return AtmoCommonConfig.ENABLE_CLOUD_MOVEMENT.get();
+            return AtmosphereConfig.clouds().cloudMovementEnabled();
         } catch (IllegalStateException exception) {
             return true;
         }
@@ -342,7 +342,7 @@ final class CloudRegionMotionController {
 
     private double getDriftScale() {
         try {
-            return AtmoCommonConfig.CLOUD_WIND_DRIFT_SCALE.get();
+            return AtmosphereConfig.clouds().cloudWindDriftScale();
         } catch (IllegalStateException exception) {
             return 0.035D;
         }

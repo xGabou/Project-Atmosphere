@@ -2,11 +2,10 @@ package net.Gabou.projectatmosphere.clouds.field.network;
 
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,10 +67,7 @@ public final class CloudFieldSyncManager {
             Set<UUID> removed = new HashSet<>(state.fingerprints.keySet());
             removed.removeAll(nextFingerprints.keySet());
             if (!updated.isEmpty() || !removed.isEmpty()) {
-                NetworkHandler.CHANNEL.send(
-                        PacketDistributor.PLAYER.with(() -> player),
-                        new CloudFieldDeltaPacket(updated, removed)
-                );
+                AtmosphereNetwork.sendToPlayer(player, new CloudFieldDeltaPacket(updated, removed));
                 sent += updated.size();
             }
             state.fingerprints = Map.copyOf(nextFingerprints);
@@ -116,10 +112,9 @@ public final class CloudFieldSyncManager {
         if (player == null) {
             return;
         }
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new SyncCloudFieldsPacket(snapshots == null ? List.of() : snapshots)
-        );
+        AtmosphereNetwork.sendToPlayer(
+                player,
+                new SyncCloudFieldsPacket(snapshots == null ? List.of() : snapshots));
     }
 
     private static List<CloudFieldSnapshot> interestedSnapshots(
@@ -129,7 +124,7 @@ public final class CloudFieldSyncManager {
         if (player == null || snapshots == null || snapshots.isEmpty()) {
             return List.of();
         }
-        double configuredDistance = AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get();
+        double configuredDistance = AtmosphereConfig.clouds().cloudRenderDistance();
         double baseInterest = Math.max(MIN_INTEREST_RADIUS, configuredDistance) + INTEREST_MARGIN;
         List<CloudFieldSnapshot> interested = new ArrayList<>();
         for (CloudFieldSnapshot snapshot : snapshots) {

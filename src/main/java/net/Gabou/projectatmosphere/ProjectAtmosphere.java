@@ -6,6 +6,8 @@ import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldSyncManager;
 import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDataReloadListener;
+import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
+import net.Gabou.projectatmosphere.clouds.state.SavedDataCloudRegionStateRepository;
 import net.Gabou.projectatmosphere.compat.CompatHandler;
 import net.Gabou.projectatmosphere.registry.*;
 import net.Gabou.projectatmosphere.manager.AtmosphereManager;
@@ -35,6 +37,10 @@ import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
+import net.Gabou.projectatmosphere.platform.config.ForgeCloudConfigAdapter;
+import net.Gabou.projectatmosphere.platform.AtmospherePlatform;
+import net.Gabou.projectatmosphere.platform.ForgePlatformEnvironment;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import net.Gabou.projectatmosphere.event.*;
@@ -63,6 +69,9 @@ public class ProjectAtmosphere {
         IEventBus modEventBus = context.getModEventBus();
 
         context.registerConfig(ModConfig.Type.COMMON, AtmoCommonConfig.COMMON_SPEC);
+        AtmosphereConfig.installClouds(new ForgeCloudConfigAdapter());
+        AtmospherePlatform.installEnvironment(new ForgePlatformEnvironment());
+        CloudRegionStateStore.install(new SavedDataCloudRegionStateRepository());
 
 
         CompatHandler.init();

@@ -32,11 +32,19 @@ import net.minecraftforge.fml.common.Mod;
  */
 @Mod.EventBusSubscriber(modid = ProjectAtmosphere.MODID, value = Dist.CLIENT)
 public final class VolumetricCloudClientLifecycle {
+    private static volatile long worldGeneration = 1L;
+    private static volatile long dimensionGeneration = 1L;
+    private static volatile long ownerGeneration = 1L;
+    private static volatile long resourceGeneration = 1L;
+
     private VolumetricCloudClientLifecycle() {
     }
 
     @SubscribeEvent
     public static void onClientLogin(ClientPlayerNetworkEvent.LoggingIn event) {
+        worldGeneration++;
+        dimensionGeneration++;
+        ownerGeneration++;
         resetSessionState();
         VolumetricCloudRenderHook.setRuntimeEnabled(true);
     }
@@ -48,6 +56,8 @@ public final class VolumetricCloudClientLifecycle {
 
     /** Called by the exact Minecraft#setLevel lifecycle mixin on every world/dimension change. */
     public static void onClientLevelChanged() {
+        worldGeneration++;
+        dimensionGeneration++;
         resetSessionState();
     }
 
@@ -85,6 +95,8 @@ public final class VolumetricCloudClientLifecycle {
 
     /** Runs after a client resource reload, before fresh cloud resources are used. */
     public static void onResourceReload() {
+        resourceGeneration++;
+        VolumetricCloudRenderer.invalidateBeforeNextComposite();
         ClientCloudVisualDensity.clear();
         CameraCloudDensityTracker.reset();
         runOnRenderThread(() -> {
@@ -105,6 +117,8 @@ public final class VolumetricCloudClientLifecycle {
 
     /** Clears temporal and target state when a configuration/backend switch occurs. */
     public static void onBackendChanged() {
+        ownerGeneration++;
+        VolumetricCloudRenderer.invalidateBeforeNextComposite();
         VolumetricCloudDebugConfig.resetDefaults();
         ClientCloudVisualDensity.clear();
         CameraCloudDensityTracker.reset();
@@ -113,9 +127,26 @@ public final class VolumetricCloudClientLifecycle {
     }
 
     private static void resetSessionState() {
+        VolumetricCloudRenderer.invalidateBeforeNextComposite();
         VolumetricCloudDebugConfig.resetDefaults();
         clearClientCaches();
         runOnRenderThread(() -> releaseRenderResources(false));
+    }
+
+    static long worldGeneration() {
+        return worldGeneration;
+    }
+
+    static long dimensionGeneration() {
+        return dimensionGeneration;
+    }
+
+    static long ownerGeneration() {
+        return ownerGeneration;
+    }
+
+    static long resourceGeneration() {
+        return resourceGeneration;
     }
 
     private static void clearClientCaches() {

@@ -3,13 +3,12 @@ package net.Gabou.projectatmosphere.modules.atmosphere;
 import net.Gabou.projectatmosphere.api.AtmoApi;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.network.SyncAtmosphereStatusPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
-import net.minecraftforge.network.PacketDistributor;
 
 public final class AtmosphereStatusSyncManager {
     private AtmosphereStatusSyncManager() {
@@ -37,8 +36,8 @@ public final class AtmosphereStatusSyncManager {
         float humidity = ForecastOrchestrator.getCurrentHumidity(level, pos, gameTime);
         var snapshot = AtmoApi.getInstance().getWeatherSnapshot(level, pos, gameTime);
 
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
+        AtmosphereNetwork.sendToPlayer(
+                player,
                 new SyncAtmosphereStatusPacket(
                         Mth.clamp(humidity, 0.0F, 100.0F),
                         Mth.clamp(snapshot.rainIntensity(), 0.0F, 1.0F),

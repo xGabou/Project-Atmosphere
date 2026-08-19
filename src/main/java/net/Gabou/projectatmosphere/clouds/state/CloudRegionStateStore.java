@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -12,9 +13,22 @@ import java.util.UUID;
  * Le registre réel reste interne au package state.
  */
 public final class CloudRegionStateStore {
+    private static volatile CloudRegionStateRepository repository;
 
     private CloudRegionStateStore() {
 
+    }
+
+    public static void install(CloudRegionStateRepository installedRepository) {
+        repository = Objects.requireNonNull(installedRepository, "installedRepository");
+    }
+
+    private static CloudRegionStateRepository repository() {
+        CloudRegionStateRepository current = repository;
+        if (current == null) {
+            throw new IllegalStateException("Cloud region state repository has not been installed");
+        }
+        return current;
     }
 
     /**
@@ -24,8 +38,7 @@ public final class CloudRegionStateStore {
      * @param state état de région à stocker
      */
     public static void add(@NotNull ServerLevel level, @NotNull CloudRegionState state) {
-        CloudRegionBackend.getRegistry(level).add(state);
-        markDirty(level);
+        repository().add(level, state);
     }
 
     /**
@@ -35,8 +48,7 @@ public final class CloudRegionStateStore {
      * @param regionId identifiant de région
      */
     public static void remove(@NotNull ServerLevel level, @NotNull UUID regionId) {
-        CloudRegionBackend.getRegistry(level).remove(regionId);
-        markDirty(level);
+        repository().remove(level, regionId);
     }
 
     /**
@@ -45,8 +57,7 @@ public final class CloudRegionStateStore {
      * @param level niveau serveur
      */
     public static void clear(@NotNull ServerLevel level) {
-        CloudRegionBackend.getRegistry(level).clear();
-        markDirty(level);
+        repository().clear(level);
     }
 
     /**
@@ -56,11 +67,7 @@ public final class CloudRegionStateStore {
      * @return nombre de régions supprimées
      */
     public static int removeInactiveRegions(@NotNull ServerLevel level) {
-        int removed = CloudRegionBackend.getRegistry(level).removeInactiveRegions();
-        if (removed > 0) {
-            markDirty(level);
-        }
-        return removed;
+        return repository().removeInactiveRegions(level);
     }
 
     /**
@@ -70,7 +77,7 @@ public final class CloudRegionStateStore {
      * @return états sauvegardés
      */
     public static @NotNull Collection<CloudRegionState> getAll(@NotNull ServerLevel level) {
-        return CloudRegionBackend.getRegistry(level).getAll();
+        return repository().getAll(level);
     }
 
     /**
@@ -80,7 +87,7 @@ public final class CloudRegionStateStore {
      * @return états actifs
      */
     public static @NotNull Collection<CloudRegionState> getActiveRegions(@NotNull ServerLevel level) {
-        return CloudRegionBackend.getRegistry(level).getActiveRegions();
+        return repository().getActiveRegions(level);
     }
 
     /**
@@ -90,7 +97,7 @@ public final class CloudRegionStateStore {
      * @return données de rendu réseau
      */
     public static @NotNull Collection<CloudRegionRenderData> createRenderDataForActiveRegions(@NotNull ServerLevel level) {
-        return CloudRegionBackend.getRegistry(level).createRenderDataForActiveRegions(level.getGameTime());
+        return repository().createRenderDataForActiveRegions(level);
     }
 
     /**
@@ -100,7 +107,7 @@ public final class CloudRegionStateStore {
      * @return nombre de régions
      */
     public static int size(@NotNull ServerLevel level) {
-        return CloudRegionBackend.getRegistry(level).size();
+        return repository().size(level);
     }
 
     /**
@@ -109,6 +116,6 @@ public final class CloudRegionStateStore {
      * @param level niveau serveur
      */
     public static void markDirty(@NotNull ServerLevel level) {
-        CloudRegionBackend.markDirty(level);
+        repository().markDirty(level);
     }
 }

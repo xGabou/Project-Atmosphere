@@ -15,6 +15,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Minimal render-side view of one cloud cell for weather-map splatting and
@@ -46,8 +47,19 @@ public record VolumetricRenderCell(
         float rotation,
         boolean macroCarrier,
         CloudMorphologyMemberTier puffTier,
-        EnvelopeRole envelopeRole
+        EnvelopeRole envelopeRole,
+        UUID fieldId,
+        UUID morphologyGroupId,
+        int morphologyMemberIndex,
+        int morphologyMemberCount
 ) {
+    public VolumetricRenderCell {
+        fieldId = fieldId == null ? new UUID(0L, 0L) : fieldId;
+        morphologyGroupId = morphologyGroupId == null ? fieldId : morphologyGroupId;
+        morphologyMemberCount = Math.max(1, morphologyMemberCount);
+        morphologyMemberIndex = Math.max(0, Math.min(morphologyMemberIndex, morphologyMemberCount - 1));
+    }
+
     public static VolumetricRenderCell fromCell(CloudCell cell) {
         return new VolumetricRenderCell(
                 cell.x(),
@@ -76,7 +88,11 @@ public record VolumetricRenderCell(
                 cell.rotation(),
                 true,
                 CloudMorphologyMemberTier.UNKNOWN,
-                EnvelopeRole.MACRO
+                EnvelopeRole.MACRO,
+                cell.id(),
+                cell.id(),
+                0,
+                1
         );
     }
 
@@ -174,7 +190,11 @@ public record VolumetricRenderCell(
                 0.0F,
                 true,
                 CloudMorphologyMemberTier.UNKNOWN,
-                identifiableDetail ? EnvelopeRole.CARRIER_ONLY : EnvelopeRole.MACRO
+                identifiableDetail ? EnvelopeRole.CARRIER_ONLY : EnvelopeRole.MACRO,
+                snapshot.fieldId(),
+                snapshot.morphologyMembership().groupId(),
+                snapshot.morphologyMembership().memberIndex(),
+                snapshot.morphologyMembership().memberCount()
         );
     }
 
@@ -202,12 +222,19 @@ public record VolumetricRenderCell(
             case CORE -> EnvelopeRole.CORE;
             case TOWER -> EnvelopeRole.TOWER;
             case CROWN -> EnvelopeRole.CROWN;
+            case ANVIL -> EnvelopeRole.ANVIL;
             case MACRO -> EnvelopeRole.MACRO;
         };
         float radiusScale = switch (morphology) {
             case PUFF -> 0.96F;
             case TOWER -> 0.92F;
-            case STORM_ANVIL -> 0.98F;
+            case STORM_ANVIL -> switch (stage) {
+                case BASE -> 1.00F;
+                case CORE -> 1.18F;
+                case TOWER -> 1.28F;
+                case ANVIL -> 1.00F;
+                default -> 0.98F;
+            };
             case SHEET -> 1.06F;
             case CELLULAR_SHEET -> 0.96F;
             case FILAMENT -> 1.04F;
@@ -217,7 +244,13 @@ public record VolumetricRenderCell(
         float aspect = switch (morphology) {
             case PUFF -> 0.90F;
             case TOWER -> 0.86F;
-            case STORM_ANVIL -> 0.82F;
+            case STORM_ANVIL -> switch (stage) {
+                case BASE -> 0.90F;
+                case CORE -> 0.90F;
+                case TOWER -> 0.82F;
+                case ANVIL -> 0.58F;
+                default -> 0.82F;
+            };
             case SHEET -> 0.70F;
             case CELLULAR_SHEET -> 0.82F;
             case FILAMENT -> 0.20F;
@@ -228,13 +261,26 @@ public record VolumetricRenderCell(
             case FILAMENT -> 0.74F;
             case SHEET -> 0.88F;
             case CELLULAR_SHEET -> 0.86F;
-            case STORM_ANVIL, SPIRAL_STORM -> 0.98F;
+            case STORM_ANVIL -> switch (stage) {
+                case BASE -> 0.92F;
+                case CORE -> 1.08F;
+                case TOWER -> 1.00F;
+                case ANVIL -> 0.84F;
+                default -> 0.98F;
+            };
+            case SPIRAL_STORM -> 0.98F;
             default -> 0.94F;
         };
         float edgeSoftness = switch (morphology) {
             case PUFF -> 0.38F;
             case TOWER -> 0.30F;
-            case STORM_ANVIL -> 0.28F;
+            case STORM_ANVIL -> switch (stage) {
+                case BASE -> 0.52F;
+                case CORE -> 0.48F;
+                case TOWER -> 0.44F;
+                case ANVIL -> 0.56F;
+                default -> 0.48F;
+            };
             case SHEET -> 0.54F;
             case CELLULAR_SHEET -> 0.42F;
             case FILAMENT -> 0.66F;
@@ -273,7 +319,11 @@ public record VolumetricRenderCell(
                         : 0.0F,
                 false,
                 puffTier,
-                canonicalRole
+                canonicalRole,
+                snapshot.fieldId(),
+                membership.groupId(),
+                membership.memberIndex(),
+                membership.memberCount()
         );
     }
 
@@ -363,7 +413,11 @@ public record VolumetricRenderCell(
                         : 0.0F,
                 false,
                 puffTierFromCloudletRole(cloudlet.role()),
-                EnvelopeRole.fromCloudletRole(cloudlet.role())
+                EnvelopeRole.fromCloudletRole(cloudlet.role()),
+                snapshot.fieldId(),
+                snapshot.morphologyMembership().groupId(),
+                snapshot.morphologyMembership().memberIndex(),
+                snapshot.morphologyMembership().memberCount()
         );
     }
 

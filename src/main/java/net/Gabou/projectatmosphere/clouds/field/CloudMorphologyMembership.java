@@ -75,6 +75,9 @@ public record CloudMorphologyMembership(
         if (family == CloudMorphologyFamily.PUFF && memberCount >= 3) {
             return Stage.BASE;
         }
+        if (family == CloudMorphologyFamily.STORM_ANVIL && memberCount >= 4) {
+            return stormAnvilStage();
+        }
         if (family != CloudMorphologyFamily.TOWER || memberCount <= 1) {
             return Stage.MACRO;
         }
@@ -98,11 +101,37 @@ public record CloudMorphologyMembership(
         return Stage.CROWN;
     }
 
+    /**
+     * Resolves the renderer roles already implied by the authoritative storm
+     * generator. The generator places indices above {@code count / 2} in the
+     * raised, horizontally displaced anvil population. The remaining members
+     * form a lower convective stack; split them deterministically while
+     * guaranteeing BASE, CORE, and TOWER support for every supported group.
+     */
+    private Stage stormAnvilStage() {
+        int anvilStart = memberCount / 2 + 1;
+        if (memberIndex >= anvilStart) {
+            return Stage.ANVIL;
+        }
+
+        int lowerCount = anvilStart;
+        int baseCount = Math.max(1, lowerCount / 3);
+        int coreCount = Math.max(1, (lowerCount - baseCount) / 2);
+        if (memberIndex < baseCount) {
+            return Stage.BASE;
+        }
+        if (memberIndex < baseCount + coreCount) {
+            return Stage.CORE;
+        }
+        return Stage.TOWER;
+    }
+
     public enum Stage {
         MACRO,
         BASE,
         CORE,
         TOWER,
-        CROWN
+        CROWN,
+        ANVIL
     }
 }

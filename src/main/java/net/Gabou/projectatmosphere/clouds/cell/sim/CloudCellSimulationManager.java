@@ -11,19 +11,18 @@ import net.Gabou.projectatmosphere.clouds.cell.network.CloudCellDeltaPacket;
 import net.Gabou.projectatmosphere.clouds.cell.network.SyncCloudCellsPacket;
 import net.Gabou.projectatmosphere.clouds.field.CloudFieldSnapshot;
 import net.Gabou.projectatmosphere.clouds.field.runtime.CloudFieldRuntimeManager;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.atmosphere.AtmosphericStateRegistry;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -98,10 +97,9 @@ public final class CloudCellSimulationManager {
         ServerLevel level = player.serverLevel();
         DimensionSim sim = sims.get(dimensionId(level));
         if (sim == null) {
-            NetworkHandler.CHANNEL.send(
-                    PacketDistributor.PLAYER.with(() -> player),
-                    new SyncCloudCellsPacket(List.of(), level.getGameTime())
-            );
+            AtmosphereNetwork.sendToPlayer(
+                    player,
+                    new SyncCloudCellsPacket(List.of(), level.getGameTime()));
         } else {
             sim.sendFull(player);
         }
@@ -202,7 +200,7 @@ public final class CloudCellSimulationManager {
     private static void broadcastFull(ServerLevel level, List<CloudCell> cells) {
         SyncCloudCellsPacket packet = new SyncCloudCellsPacket(cells, level.getGameTime());
         for (ServerPlayer player : level.players()) {
-            NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+            AtmosphereNetwork.sendToPlayer(player, packet);
         }
     }
 
@@ -401,11 +399,11 @@ public final class CloudCellSimulationManager {
 
         private synchronized void tick(ServerLevel level, List<CloudFieldSnapshot> fields) {
             long gameTime = level.getGameTime();
-            boolean frozen = AtmoCommonConfig.FREEZE_CLOUD_MOVEMENT.get();
+            boolean frozen = AtmosphereConfig.clouds().freezeCloudMovement();
             reconcileDerivedFields(level, fields, gameTime);
 
             // Motion every tick: keeps client extrapolation honest.
-            if (!frozen && AtmoCommonConfig.ENABLE_CLOUD_MOVEMENT.get()) {
+            if (!frozen && AtmosphereConfig.clouds().cloudMovementEnabled()) {
                 for (MutableCell cell : cells.values()) {
                     if (!cell.derivedFromField) {
                         cell.x += cell.windX;
@@ -578,7 +576,7 @@ public final class CloudCellSimulationManager {
         // Wind: forecast wind with altitude shear (speed and veer).
         // -------------------------------------------------------------
         private void refreshWinds(ServerLevel level, long gameTime) {
-            double driftScale = AtmoCommonConfig.CLOUD_WIND_DRIFT_SCALE.get();
+            double driftScale = AtmosphereConfig.clouds().cloudWindDriftScale();
             for (MutableCell cell : cells.values()) {
                 if (cell.derivedFromField) {
                     continue;
@@ -906,10 +904,9 @@ public final class CloudCellSimulationManager {
                 return;
             }
             List<CloudCell> interested = interestedCells(player);
-            NetworkHandler.CHANNEL.send(
-                    PacketDistributor.PLAYER.with(() -> player),
-                    new SyncCloudCellsPacket(interested, player.serverLevel().getGameTime())
-            );
+            AtmosphereNetwork.sendToPlayer(
+                    player,
+                    new SyncCloudCellsPacket(interested, player.serverLevel().getGameTime()));
             playerSyncStates.computeIfAbsent(player.getUUID(), ignored -> new PlayerCellSyncState())
                     .replace(interested);
         }
@@ -950,10 +947,9 @@ public final class CloudCellSimulationManager {
                 Set<UUID> removed = new HashSet<>(state.fingerprints.keySet());
                 removed.removeAll(nextFingerprints.keySet());
                 if (!updated.isEmpty() || !removed.isEmpty()) {
-                    NetworkHandler.CHANNEL.send(
-                            PacketDistributor.PLAYER.with(() -> player),
-                            new CloudCellDeltaPacket(updated, removed, gameTime)
-                    );
+                    AtmosphereNetwork.sendToPlayer(
+                            player,
+                            new CloudCellDeltaPacket(updated, removed, gameTime));
                 }
                 state.fingerprints = Map.copyOf(nextFingerprints);
             }

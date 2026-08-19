@@ -1,12 +1,8 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.client.HUDOverlayRenderer;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
  * Server-to-client packet carrying a single instrument readout string.
@@ -34,10 +30,8 @@ public class InstrumentReadoutPacket {
         return new InstrumentReadoutPacket(buf);
     }
 
-    public static void handle(InstrumentReadoutPacket msg, Supplier<NetworkEvent.Context> ctx) {
-        NetworkEvent.Context context = ctx.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                HUDOverlayRenderer.showTemperatureOverlay(msg.message)));
-        context.setPacketHandled(true);
+    public static void handle(InstrumentReadoutPacket msg, PacketContext context) {
+        context.enqueueClient(() -> HUDOverlayRenderer.showTemperatureOverlay(msg.message));
+        context.markHandled();
     }
 }

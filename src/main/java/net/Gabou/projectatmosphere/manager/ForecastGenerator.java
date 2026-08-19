@@ -25,7 +25,7 @@ import net.Gabou.projectatmosphere.modules.temperature.util.TemperatureGenerator
 import net.Gabou.projectatmosphere.modules.temperature.variation.VariationGenerator;
 import net.Gabou.projectatmosphere.modules.wind.WindGenerator;
 import net.Gabou.projectatmosphere.network.BiomeDayTemperaturePacket;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
@@ -33,7 +33,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraftforge.network.PacketDistributor;
 
 public class ForecastGenerator {
     private static final int SAMPLE_STEP = 64;
@@ -141,7 +140,7 @@ public class ForecastGenerator {
         if (player == null) {
             return;
         }
-        NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new BiomeDayTemperaturePacket(snapshot));
+        AtmosphereNetwork.sendToPlayer(player, new BiomeDayTemperaturePacket(snapshot));
     }
 
     public static Map<ResourceLocation, float[]> createDailyTemperatureSnapshotForSync() {
@@ -149,7 +148,7 @@ public class ForecastGenerator {
     }
 
     static void computeAverageForecastsByBiomeType() {
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new BiomeDayTemperaturePacket(createDailyTemperatureSnapshot()));
+        AtmosphereNetwork.sendToAll(new BiomeDayTemperaturePacket(createDailyTemperatureSnapshot()));
     }
 
     public static float[][] getRegionTemperatureWeek(ServerLevel level, BlockPos pos) {

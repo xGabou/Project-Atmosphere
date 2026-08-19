@@ -2,7 +2,7 @@ package net.Gabou.projectatmosphere.clouds.backend;
 
 import net.Gabou.projectatmosphere.clouds.AtmosphereCloudPolicy;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,7 +11,7 @@ public final class CloudBackendResolver {
     }
 
     public static CloudVisualBackend resolve(@Nullable Level level) {
-        if (AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.VANILLA
+        if (AtmosphereConfig.clouds().vanillaCloudMode()
                 || !AtmosphereCloudPolicy.canUsePaInDimension(level)) {
             return CloudVisualBackend.DISABLED;
         }

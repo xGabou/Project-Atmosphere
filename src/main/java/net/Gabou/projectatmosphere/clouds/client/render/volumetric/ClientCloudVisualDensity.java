@@ -14,6 +14,13 @@ import java.util.List;
  * cannot accidentally query a parallel simulation.
  */
 public final class ClientCloudVisualDensity {
+    /**
+     * Render-thread CPU mirror of the shader storm composition. Single
+     * instance so its scratch storage is reused instead of allocating per
+     * sample; every call site below is render-thread only.
+     */
+    private static final StormFieldSampler STORM_FIELD = StormFieldSampler.production();
+
     public enum Source {
         NONE,
         VOLUMETRIC_FIELDS,
@@ -36,7 +43,8 @@ public final class ClientCloudVisualDensity {
             boolean includeRegionalLayer,
             float worldTime,
             int weatherMapSize,
-            VolumetricCloudRenderer.Tuning tuning
+            VolumetricCloudRenderer.Tuning tuning,
+            StormRenderSnapshot stormSnapshot
     ) {
         if (weather == null || !weather.rendered()) {
             clear();
@@ -56,7 +64,8 @@ public final class ClientCloudVisualDensity {
                 worldTime,
                 Math.max(1, weatherMapSize),
                 safeTuning.coverageMul(), safeTuning.densityMul(),
-                true
+                true,
+                stormSnapshot == null ? StormRenderSnapshot.EMPTY : stormSnapshot
         );
     }
 
@@ -91,7 +100,8 @@ public final class ClientCloudVisualDensity {
                 0.0F, 0.0F,
                 worldTime, 1,
                 1.0F, 1.0F,
-                false
+                false,
+                StormRenderSnapshot.EMPTY
         );
     }
 
@@ -132,6 +142,44 @@ public final class ClientCloudVisualDensity {
     }
 
     private static float sample(Frame frame, double x, double y, double z) {
+        float directStorm = (float) sampleStormSnapshot(frame.stormSnapshot(), x, y, z);
+        float stormVisualDensity = clamp01(directStorm * frame.densityMul() * 0.72F);
+        float broadDensity = sampleBroad(frame, x, y, z);
+        return 1.0F - (1.0F - stormVisualDensity) * (1.0F - broadDensity);
+    }
+
+    /** Exact allocation-free analytic union used by tests and camera-density publication. */
+    static double sampleStormSnapshot(
+            StormRenderSnapshot snapshot,
+            double x,
+            double y,
+            double z
+    ) {
+        if (snapshot == null || snapshot.descriptorCount() == 0) {
+            return 0.0D;
+        }
+        // Whiteout and camera-inside state must agree with what the frame
+        // actually shows, so this reads the final noise-formed density, never
+        // the coverage envelope.
+        return STORM_FIELD.densityAt(snapshot.descriptorsUnsafe(), x, y, z);
+    }
+
+    /** Local visible-body underside used by precipitation attachment diagnostics. */
+    static double sampleStormUnderside(
+            StormRenderSnapshot snapshot,
+            double x,
+            double z,
+            double fallbackY
+    ) {
+        if (snapshot == null || snapshot.descriptorCount() == 0) {
+            return fallbackY;
+        }
+        return StormLobeEvaluator.localBaseUndersideAt(
+                snapshot.descriptorsUnsafe(), x, z, fallbackY
+        );
+    }
+
+    private static float sampleBroad(Frame frame, double x, double y, double z) {
         float edgeFade = 1.0F;
         if (frame.weatherMapModel()) {
             float u = (float) ((x - frame.originX()) / frame.extent());
@@ -165,6 +213,13 @@ public final class ClientCloudVisualDensity {
         int count = Math.min(CloudWeatherMapRenderer.MAX_CELLS, frame.cells().size());
         for (int i = 0; i < count; i++) {
             VolumetricRenderCell cell = frame.cells().get(i);
+            // Complete adopted descriptor groups own severe-storm boundaries.
+            // The broad maps remain material/scheduling inputs and must not add
+            // a second generic envelope to the CPU whiteout query.
+            if (StormLobeSpatialIndex.isDirectStorm(cell)
+                    && snapshotOwnsGroup(frame.stormSnapshot(), cell.morphologyGroupId())) {
+                continue;
+            }
             int profile = cell.cloudProfile();
 
             if (frame.weatherMapModel() && cell.macroCarrier() && profile == 1) {
@@ -510,6 +565,18 @@ public final class ClientCloudVisualDensity {
         return Mth.clamp(value, 0.0F, 1.0F);
     }
 
+    private static boolean snapshotOwnsGroup(StormRenderSnapshot snapshot, java.util.UUID groupId) {
+        if (snapshot == null || snapshot.descriptorCount() == 0 || groupId == null) {
+            return false;
+        }
+        for (StormLobeDescriptor descriptor : snapshot.descriptorsUnsafe()) {
+            if (groupId.equals(descriptor.groupId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static String normalizeDimension(String dimensionId) {
         return dimensionId == null || dimensionId.isBlank() ? "minecraft:overworld" : dimensionId;
     }
@@ -529,14 +596,15 @@ public final class ClientCloudVisualDensity {
             int weatherMapSize,
             float coverageMul,
             float densityMul,
-            boolean weatherMapModel
+            boolean weatherMapModel,
+            StormRenderSnapshot stormSnapshot
     ) {
         private static final Frame EMPTY = new Frame(
                 "minecraft:overworld", Source.NONE, List.of(),
                 0.0D, 0.0D, 0.0F,
                 0.0F, 0.0F,
                 0.0F, 0.0F,
-                0.0F, 1, 1.0F, 1.0F, false
+                0.0F, 1, 1.0F, 1.0F, false, StormRenderSnapshot.EMPTY
         );
     }
 }

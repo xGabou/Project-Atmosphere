@@ -5,7 +5,7 @@ import net.Gabou.projectatmosphere.clouds.state.CloudRegionState;
 import net.Gabou.projectatmosphere.clouds.state.CloudRegionStateStore;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -27,7 +27,7 @@ public final class CloudGroupSpawner {
 
         CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault(cloudTypeId);
         String resolvedTypeId = definition.getId();
-        float spawnHeight = AtmoCommonConfig.NATIVE_CLOUD_SPAWN_HEIGHT.get();
+        float spawnHeight = AtmosphereConfig.clouds().nativeCloudSpawnHeight();
         RandomSource random = level.getRandom();
         CloudMorphologyGenerators.SpawnPlan morphology = CloudMorphologyGenerators.createSpawnPlan(definition, random);
         Vec3 center = new Vec3(pos.getX(), spawnHeight, pos.getZ());

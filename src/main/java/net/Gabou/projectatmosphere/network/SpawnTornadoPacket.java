@@ -1,12 +1,11 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.modules.core.WindVector;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Server-to-client packet spawning a tornado in the client cache.
@@ -64,8 +63,8 @@ public class SpawnTornadoPacket {
         return new SpawnTornadoPacket(buf);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
+    public void handle(PacketContext context) {
+        context.enqueueClient(() -> {
             SevereWeatherClientPacketHandlers.spawnTornado(
                     new SevereWeatherClientPacketHandlers.TornadoSpawn(
                             id,
@@ -77,7 +76,7 @@ public class SpawnTornadoPacket {
                     )
             );
         });
-        ctx.get().setPacketHandled(true);
+        context.markHandled();
     }
 }
 

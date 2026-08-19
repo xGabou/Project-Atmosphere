@@ -21,14 +21,14 @@ public final class VolumetricCloudRenderTargets {
     private static RenderTarget cumulusStageSupportTarget;
     private static RenderTarget cumulusStageBaseTarget;
     private static RenderTarget cumulusStageTopTarget;
-    private static RenderTarget stormStructureTarget;
-    private static RenderTarget stormLayerHeightTarget;
-    private static RenderTarget stormTowerTarget;
+    private static RenderTarget stormCandidateTarget;
+    private static RenderTarget stormDescriptorTarget;
     private static RenderTarget puffCandidateTarget;
     private static RenderTarget shadowTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
     private static int currentIndex;
     private static boolean historyValid;
+    private static long resolutionGeneration = 1L;
 
     private VolumetricCloudRenderTargets() {
     }
@@ -90,6 +90,33 @@ public final class VolumetricCloudRenderTargets {
         return puffCandidateTarget;
     }
 
+    /** Eight packed direct-storm descriptor indices per conservative world tile. */
+    public static RenderTarget prepareStormCandidateTarget() {
+        int size = StormLobeSpatialIndex.GRID_SIZE;
+        if (stormCandidateTarget == null || stormCandidateTarget.width != size) {
+            if (stormCandidateTarget != null) {
+                stormCandidateTarget.destroyBuffers();
+            }
+            stormCandidateTarget = createFloatMap(size, size, GL11.GL_NEAREST);
+        }
+        return stormCandidateTarget;
+    }
+
+    /** Four RGBA32F texels for each of the bounded 64 direct-storm lobes. */
+    public static RenderTarget prepareStormDescriptorTarget() {
+        int width = StormLobeSpatialIndex.DESCRIPTOR_WIDTH;
+        int height = StormLobeSpatialIndex.DESCRIPTOR_HEIGHT;
+        if (stormDescriptorTarget == null
+                || stormDescriptorTarget.width != width
+                || stormDescriptorTarget.height != height) {
+            if (stormDescriptorTarget != null) {
+                stormDescriptorTarget.destroyBuffers();
+            }
+            stormDescriptorTarget = createFloatMap(width, height, GL11.GL_NEAREST);
+        }
+        return stormDescriptorTarget;
+    }
+
     /** Independent BASE/CORE/TOWER/CROWN supports for native profile-3 clouds. */
     public static RenderTarget prepareCumulusStageSupportTarget(int size) {
         if (cumulusStageSupportTarget == null || cumulusStageSupportTarget.width != size) {
@@ -123,62 +150,6 @@ public final class VolumetricCloudRenderTargets {
         return cumulusStageTopTarget;
     }
 
-    /**
-     * Severe BASE plus combined convective support and their first endpoints.
-     * The paired height target completes convection and stores ANVIL support.
-     */
-    public static RenderTarget prepareStormStructureTarget(int size) {
-        if (stormStructureTarget == null || stormStructureTarget.width != size) {
-            if (stormStructureTarget != null) {
-                stormStructureTarget.destroyBuffers();
-            }
-            stormStructureTarget = new TextureTarget(size, size, false, Minecraft.ON_OSX);
-            stormStructureTarget.setFilterMode(GL11.GL_LINEAR);
-            configureClamp(stormStructureTarget.getColorTextureId());
-            upgradeColorToRgba16f(stormStructureTarget.getColorTextureId(), size, size);
-            stormStructureTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
-        }
-        return stormStructureTarget;
-    }
-
-    /**
-     * Premultiplied severe-layer endpoints. Half-float precision is required
-     * because the raymarch divides filtered encoded heights by filtered role
-     * support near layer edges.
-     */
-    public static RenderTarget prepareStormLayerHeightTarget(int size) {
-        if (stormLayerHeightTarget == null || stormLayerHeightTarget.width != size) {
-            if (stormLayerHeightTarget != null) {
-                stormLayerHeightTarget.destroyBuffers();
-            }
-            stormLayerHeightTarget = new TextureTarget(size, size, false, Minecraft.ON_OSX);
-            stormLayerHeightTarget.setFilterMode(GL11.GL_LINEAR);
-            configureClamp(stormLayerHeightTarget.getColorTextureId());
-            upgradeColorToRgba16f(stormLayerHeightTarget.getColorTextureId(), size, size);
-            stormLayerHeightTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
-        }
-        return stormLayerHeightTarget;
-    }
-
-    /**
-     * Independent severe TOWER support and endpoints. Keeping this interval
-     * separate prevents the primary CORE and secondary towers from erasing one
-     * another in the weather-map argmax.
-     */
-    public static RenderTarget prepareStormTowerTarget(int size) {
-        if (stormTowerTarget == null || stormTowerTarget.width != size) {
-            if (stormTowerTarget != null) {
-                stormTowerTarget.destroyBuffers();
-            }
-            stormTowerTarget = new TextureTarget(size, size, false, Minecraft.ON_OSX);
-            stormTowerTarget.setFilterMode(GL11.GL_LINEAR);
-            configureClamp(stormTowerTarget.getColorTextureId());
-            upgradeColorToRgba16f(stormTowerTarget.getColorTextureId(), size, size);
-            stormTowerTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
-        }
-        return stormTowerTarget;
-    }
-
     public static RenderTarget weatherTargetOrNull() {
         return weatherTarget;
     }
@@ -199,20 +170,16 @@ public final class VolumetricCloudRenderTargets {
         return cumulusStageTopTarget;
     }
 
-    public static RenderTarget stormStructureTargetOrNull() {
-        return stormStructureTarget;
-    }
-
-    public static RenderTarget stormLayerHeightTargetOrNull() {
-        return stormLayerHeightTarget;
-    }
-
-    public static RenderTarget stormTowerTargetOrNull() {
-        return stormTowerTarget;
-    }
-
     public static RenderTarget puffCandidateTargetOrNull() {
         return puffCandidateTarget;
+    }
+
+    public static RenderTarget stormCandidateTargetOrNull() {
+        return stormCandidateTarget;
+    }
+
+    public static RenderTarget stormDescriptorTargetOrNull() {
+        return stormDescriptorTarget;
     }
 
     /**
@@ -240,6 +207,7 @@ public final class VolumetricCloudRenderTargets {
             }
             historyValid = false;
             currentIndex = 0;
+            resolutionGeneration++;
         }
         return true;
     }
@@ -310,17 +278,13 @@ public final class VolumetricCloudRenderTargets {
             cumulusStageTopTarget.destroyBuffers();
             cumulusStageTopTarget = null;
         }
-        if (stormStructureTarget != null) {
-            stormStructureTarget.destroyBuffers();
-            stormStructureTarget = null;
+        if (stormCandidateTarget != null) {
+            stormCandidateTarget.destroyBuffers();
+            stormCandidateTarget = null;
         }
-        if (stormLayerHeightTarget != null) {
-            stormLayerHeightTarget.destroyBuffers();
-            stormLayerHeightTarget = null;
-        }
-        if (stormTowerTarget != null) {
-            stormTowerTarget.destroyBuffers();
-            stormTowerTarget = null;
+        if (stormDescriptorTarget != null) {
+            stormDescriptorTarget.destroyBuffers();
+            stormDescriptorTarget = null;
         }
         if (puffCandidateTarget != null) {
             puffCandidateTarget.destroyBuffers();
@@ -331,6 +295,7 @@ public final class VolumetricCloudRenderTargets {
             shadowTarget = null;
         }
         destroyCloudTargets();
+        StormGeometryBuildCoordinator.reset();
     }
 
     private static void destroyCloudTargets() {
@@ -348,6 +313,19 @@ public final class VolumetricCloudRenderTargets {
         target.setFilterMode(GL11.GL_LINEAR);
         configureClamp(target.getColorTextureId());
         upgradeColorToRgba16f(target.getColorTextureId(), size, size);
+        target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        return target;
+    }
+
+    static long resolutionGeneration() {
+        return resolutionGeneration;
+    }
+
+    private static RenderTarget createFloatMap(int width, int height, int filterMode) {
+        RenderTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
+        target.setFilterMode(filterMode);
+        configureClamp(target.getColorTextureId());
+        upgradeColorToRgba32f(target.getColorTextureId(), width, height);
         target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
         return target;
     }
@@ -375,6 +353,29 @@ public final class VolumetricCloudRenderTargets {
                     0,
                     GL11.GL_RGBA,
                     GL30.GL_HALF_FLOAT,
+                    null
+            );
+        } finally {
+            RenderSystem.bindTexture(previousTexture);
+        }
+    }
+
+    private static void upgradeColorToRgba32f(int textureId, int width, int height) {
+        if (textureId <= 0) {
+            return;
+        }
+        int previousTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        try {
+            RenderSystem.bindTexture(textureId);
+            GlStateManager._texImage2D(
+                    GL11.GL_TEXTURE_2D,
+                    0,
+                    GL30.GL_RGBA32F,
+                    width,
+                    height,
+                    0,
+                    GL11.GL_RGBA,
+                    GL11.GL_FLOAT,
                     null
             );
         } finally {

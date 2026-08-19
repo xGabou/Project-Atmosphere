@@ -1,12 +1,11 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.modules.hurricane.HurricaneRenderSnapshot;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * Server-to-client packet carrying hurricane render snapshots.
@@ -42,8 +41,8 @@ public class SyncHurricaneStatePacket {
         return new SyncHurricaneStatePacket(buf);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> SevereWeatherClientPacketHandlers.syncHurricanes(this.snapshots));
-        ctx.get().setPacketHandled(true);
+    public void handle(PacketContext context) {
+        context.enqueueClient(() -> SevereWeatherClientPacketHandlers.syncHurricanes(this.snapshots));
+        context.markHandled();
     }
 }

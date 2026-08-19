@@ -12,7 +12,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.CycloneSnapshot;
 import net.Gabou.projectatmosphere.modules.atmosphere.RegionAtmosphereState;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.weather.StormLifecyclePhase;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.network.SyncHurricaneStatePacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -23,7 +23,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -169,11 +168,11 @@ public class HurricaneManager {
     }
 
     public static void syncToPlayer(ServerPlayer player) {
-        NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), createSyncPacket());
+        AtmosphereNetwork.sendToPlayer(player, createSyncPacket());
     }
 
     private static void syncToDimension(ServerLevel level) {
-        NetworkHandler.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension), createSyncPacket());
+        AtmosphereNetwork.sendToDimension(level, createSyncPacket());
     }
 
     private static void projectatmosphere$disableAndFlush(@Nullable ServerLevel level) {

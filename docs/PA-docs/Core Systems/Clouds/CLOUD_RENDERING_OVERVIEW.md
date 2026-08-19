@@ -1,6 +1,6 @@
 # Cloud Rendering — Current State Overview
 
-Last verified: 2026-08-15, against a live `Forge-1.20.1` dev client. This is the entry point for
+Last verified: 2026-08-17, against a live `Forge-1.20.1` dev client. This is the entry point for
 cloud rendering work — read this first. Everything else cloud-related in this folder that predates
 2026-08-14 has been moved to `archived/` because it describes a pre-implementation planning phase,
 a since-deleted shader, or an iteration log whose claims were never checked against a real render.
@@ -32,7 +32,9 @@ with `/pa system cloudStatus` (`cloudOwner=`).
 | `cloudOwner` value | `PA_FIELD_FALLBACK` | `PA_VOLUMETRIC` |
 
 `PA_VOLUMETRIC` is preferred whenever `CLOUD_VOLUMETRIC_RENDERER_ENABLED` +
-`CLOUD_FIELD_RENDERER_ENABLED` are both true (default) and the shader compiled successfully. If
+`CLOUD_FIELD_RENDERER_ENABLED` are both true (default) and the shader compiled successfully. The
+Field renderer is disabled as a normal fallback and can only be selected with the developer JVM
+property `projectatmosphere.dev.enableFieldRendererFallback=true`. If
 you're debugging "the clouds look wrong" and haven't checked which of these two is actually on
 screen, check that first — it changes which shader file is even worth reading.
 
@@ -42,6 +44,14 @@ unconditionally — neither native renderer is registered at all. There's no ove
 native renderer while SC stays installed. `cloudMode: HYBRID` is dead code (behaves identically to
 `FULL`); `mods.toml` declares Simple Clouds `mandatory = false` (the FAQ doc's "mandatory
 dependency" claim is stale).
+
+## Gap analysis and portability
+
+For the broader "what's missing to reach realistic clouds" assessment and a concrete design for
+isolating Forge-1.20.1-specific code ahead of a future port, see
+`CLOUD_ARCHITECTURE_ASSESSMENT_2026-08-15.md` in this folder. For the equivalent whole-mod
+architecture question (hexagonal/EDA vs. the current structure), see
+`../PROJECT_ARCHITECTURE_ASSESSMENT_2026-08-15.md`.
 
 ## Current known issues (live-verified 2026-08-14/15)
 
@@ -55,22 +65,17 @@ folder — this is the short version.
    hot-reload-verified against the same coordinates before/after — real improvement, still not
    billowy. See `PA_VOLUMETRIC_LIVE_RENDER_AUDIT_2026-08-14.md`.
 
-2. **The structured multi-tier storm system never activates. Root cause confirmed, not fixed.**
-   `stormStructureShape()` (the "real" BASE/CORE/TOWER/CROWN/ANVIL system, as opposed to the smooth
-   generic fallback) is architecturally unreachable for any `PA_CLUSTER`-sourced storm — the
-   standard source for native storms. Confirmed live via a diagnostic readout
-   (`hasSevereStructures=false`), not inferred. Root cause: structural roles are only ever assigned
-   through cloudlet generation, and cloudlet generation is deliberately disabled for `PA_CLUSTER`
-   fields (to avoid duplicating "already authoritative" cluster geometry) — but nothing was ever
-   built to give clusters their own structured render cells instead. Two fix directions are
-   proposed, neither implemented yet. See `PA_STORM_STRUCTURE_PIPELINE_INVESTIGATION_2026-08-14.md`.
+2. **The structured multi-tier storm system now activates for `PA_CLUSTER` storms.** The existing
+   morphology membership is projected into `BASE`, `CORE`, `TOWER`, and `ANVIL` roles without a
+   packet change. Live validation reports `hasSevereStructures=true`; source/envelope tuning also
+   replaced disconnected pointed volumes with one connected tower/anvil system. Direct wind-axis
+   views can still expose the small number of authoritative source lobes, so silhouette tuning is
+   improved and functional rather than artistically final. See `CLOUD_IMPLEMENTATION_2026-08-17.md`.
 
-3. **Two fully-built parallel renderers**, as above — increases the odds any given debugging pass
-   edits the one that isn't on screen.
+3. **The legacy Field renderer remains in source for one rollback window**, but normal ownership
+   cannot select it. Delete it after a stable tagged build of the Atmosphere renderer.
 
-4. **The repo's own `gradle/wrapper/gradle-wrapper.jar`/`.properties` are gitignored** and were
-   absent from this checkout; a clean clone cannot run `gradlew` directly. Worked around by pointing
-   at a cached Gradle 8.8 install. Worth fixing at the repo level.
+4. **The Gradle 8.8 wrapper has been restored and unignored.** Clean checkouts can run `gradlew`.
 
 5. **Existing saves under `run/saves/` are all `1.21.1`** (from `NeoForge-1.21.1` branch work) and
    are not compatible with a `Forge-1.20.1` client — don't open them with this branch's client.

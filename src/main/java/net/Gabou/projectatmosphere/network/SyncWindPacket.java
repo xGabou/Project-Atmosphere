@@ -1,11 +1,10 @@
 package net.Gabou.projectatmosphere.network;
 
-import java.util.function.Supplier;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.region.RegionIdCodec;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.Gabou.projectatmosphere.util.RegionInstanceKey;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
 
 /**
  * Server-to-client packet carrying the current wind state for a region.
@@ -45,10 +44,8 @@ public class SyncWindPacket {
         return new SyncWindPacket(buf);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            WindVector.set(regionId, baseSpeed + gustSpeed, directionDeg);
-        });
-        ctx.get().setPacketHandled(true);
+    public void handle(PacketContext context) {
+        context.enqueueClient(() -> WindVector.set(regionId, baseSpeed + gustSpeed, directionDeg));
+        context.markHandled();
     }
 }

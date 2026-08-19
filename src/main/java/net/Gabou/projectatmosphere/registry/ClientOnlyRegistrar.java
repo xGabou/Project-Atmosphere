@@ -12,7 +12,8 @@ import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricClo
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudWhiteoutFogHandler;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.ClientCloudVisualDensity;
 import net.Gabou.projectatmosphere.clouds.client.render.CloudDiagnosticsOverlay;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
+import net.Gabou.projectatmosphere.platform.AtmospherePlatform;
 import net.Gabou.projectatmosphere.clouds.field.network.CloudFieldPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.network.CloudRegionPacketDispatcher;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
@@ -27,7 +28,6 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.fml.loading.FMLEnvironment;
 
 @OnlyIn(Dist.CLIENT)
 public class ClientOnlyRegistrar {
@@ -55,12 +55,12 @@ public class ClientOnlyRegistrar {
             MinecraftForge.EVENT_BUS.register(VolumetricCloudWhiteoutFogHandler.class);
             CloudDensityQuery.setClientProvider(ClientCloudVisualDensity::densityAt);
             CloudCellAnalyticsPass.setReportSink(reports ->
-                    NetworkHandler.CHANNEL.sendToServer(new CloudCellAnalyticsPacket(reports)));
+                    AtmosphereNetwork.sendToServer(new CloudCellAnalyticsPacket(reports)));
         } else {
             registerSimpleCloudsClientIntegration();
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Simple Clouds detected; Simple Clouds owns the base cloud layer.");
         }
-        if (!FMLEnvironment.production) {
+        if (!AtmospherePlatform.environment().isProduction()) {
             MinecraftForge.EVENT_BUS.register(WorldSpaceDebugCubeRenderer.class);
         }
 

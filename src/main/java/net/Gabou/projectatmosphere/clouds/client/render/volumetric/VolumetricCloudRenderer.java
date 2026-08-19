@@ -47,6 +47,8 @@ public final class VolumetricCloudRenderer {
     private static boolean denseCameraResolution;
     private static int fragmentTextureUnits = -1;
     private static boolean renderedProductionFrame;
+    private static VolumetricHistoryValidity.Key previousHistoryKey = VolumetricHistoryValidity.Key.EMPTY;
+    private static volatile boolean historyResetBeforeNextComposite;
 
     private VolumetricCloudRenderer() {
     }
@@ -64,11 +66,18 @@ public final class VolumetricCloudRenderer {
     }
 
     public static void invalidateHistory() {
+        historyResetBeforeNextComposite = false;
         hasPrevFrame = false;
         lastHistoryValid = false;
         VolumetricCloudRenderTargets.invalidateHistory();
         renderedProductionFrame = false;
         prevMaterialOffset.zero();
+        previousHistoryKey = VolumetricHistoryValidity.Key.EMPTY;
+    }
+
+    /** Thread-safe lifecycle signal consumed before any next-frame history bind. */
+    public static void invalidateBeforeNextComposite() {
+        historyResetBeforeNextComposite = true;
     }
 
     /** Clears timing and temporal state owned by the native volumetric pass. */
@@ -151,6 +160,12 @@ public final class VolumetricCloudRenderer {
             Tuning tuning,
             boolean sceneRayLimitEnabled
     ) {
+        if (historyResetBeforeNextComposite) {
+            // Resource and backend lifecycle callbacks may originate away from
+            // the render thread. Consume their signal before choosing history
+            // samplers so no first frame can composite against an old key.
+            invalidateHistory();
+        }
         if (!hasTextureUnitCapacity()) {
             return false;
         }
@@ -179,6 +194,21 @@ public final class VolumetricCloudRenderer {
         lastResolutionScale = resolutionScale;
         if (!VolumetricCloudRenderTargets.prepareCloudTargets(mainTarget, resolutionScale)) {
             return false;
+        }
+        VolumetricHistoryValidity.Key currentHistoryKey = VolumetricHistoryValidity.Key.nativeFrame(
+                VolumetricCloudClientLifecycle.worldGeneration(),
+                VolumetricCloudClientLifecycle.dimensionGeneration(),
+                VolumetricCloudClientLifecycle.ownerGeneration(),
+                VolumetricCloudClientLifecycle.resourceGeneration(),
+                StormGeometryBuildCoordinator.renderTopologyGeneration(),
+                VolumetricCloudRenderTargets.resolutionGeneration()
+        );
+        if (hasPrevFrame
+                && !VolumetricHistoryValidity.canRetain(previousHistoryKey, currentHistoryKey)) {
+            // Descriptor interpolation/advection does not alter this key. Only
+            // topology/lifecycle or an effective target-size transition drops
+            // history, preventing a prior silhouette from ghosting the frame.
+            invalidateHistory();
         }
 
         GPU_TIMER.poll();
@@ -237,18 +267,13 @@ public final class VolumetricCloudRenderer {
                 VolumetricCloudRenderTargets.prepareCumulusStageBaseTarget(profile.weatherMapSize());
         RenderTarget cumulusStageTopTarget =
                 VolumetricCloudRenderTargets.prepareCumulusStageTopTarget(profile.weatherMapSize());
-        RenderTarget stormStructureTarget =
-                VolumetricCloudRenderTargets.prepareStormStructureTarget(profile.weatherMapSize());
-        RenderTarget stormLayerHeightTarget =
-                VolumetricCloudRenderTargets.prepareStormLayerHeightTarget(profile.weatherMapSize());
-        RenderTarget stormTowerTarget =
-                VolumetricCloudRenderTargets.prepareStormTowerTarget(profile.weatherMapSize());
+        RenderTarget stormCandidateTarget = VolumetricCloudRenderTargets.prepareStormCandidateTarget();
+        RenderTarget stormDescriptorTarget = VolumetricCloudRenderTargets.prepareStormDescriptorTarget();
         RenderTarget puffCandidateTarget = VolumetricCloudRenderTargets.preparePuffCandidateTarget();
         if (weatherTarget == null || morphologyTarget == null
                 || cumulusStageSupportTarget == null || cumulusStageBaseTarget == null
-                || cumulusStageTopTarget == null
-                || stormStructureTarget == null || stormLayerHeightTarget == null
-                || stormTowerTarget == null || puffCandidateTarget == null) {
+                || cumulusStageTopTarget == null || stormCandidateTarget == null
+                || stormDescriptorTarget == null || puffCandidateTarget == null) {
             return false;
         }
 
@@ -265,9 +290,8 @@ public final class VolumetricCloudRenderer {
         shader.setSampler("CumulusStageSupportMapSampler", cumulusStageSupportTarget.getColorTextureId());
         shader.setSampler("CumulusStageBaseMapSampler", cumulusStageBaseTarget.getColorTextureId());
         shader.setSampler("CumulusStageTopMapSampler", cumulusStageTopTarget.getColorTextureId());
-        shader.setSampler("StormStructureMapSampler", stormStructureTarget.getColorTextureId());
-        shader.setSampler("StormLayerHeightMapSampler", stormLayerHeightTarget.getColorTextureId());
-        shader.setSampler("StormTowerMapSampler", stormTowerTarget.getColorTextureId());
+        shader.setSampler("StormCandidateMapSampler", stormCandidateTarget.getColorTextureId());
+        shader.setSampler("StormDescriptorSampler", stormDescriptorTarget.getColorTextureId());
         shader.setSampler("BlueNoiseSampler", CloudNoiseTextureManager.blueNoiseTextureId());
         SceneDepthFrame safeSceneDepth = sceneDepth == null ? SceneDepthFrame.INVALID : sceneDepth;
         shader.setSampler("SceneDepthSampler", safeSceneDepth.valid() ? safeSceneDepth.textureId() : 0);
@@ -287,6 +311,7 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("SlabTopY").set(weather.slabTopY());
         shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
+        shader.safeGetUniform("StormLobeCount").set(StormGeometryBuildCoordinator.lobeCount());
         shader.safeGetUniform("PuffShapeMode").set(PuffLobeSpatialIndex.effectiveShapeMode().shaderId());
         shader.safeGetUniform("PuffDensityStage").set(
                 VolumetricCloudDebugConfig.puffDensityStage().shaderId()
@@ -404,6 +429,7 @@ public final class VolumetricCloudRenderer {
             prevViewRot.set(viewRotation);
             prevCameraPos.set(cameraPos);
             prevMaterialOffset.set(materialOffsetX, materialOffsetZ);
+            previousHistoryKey = currentHistoryKey;
             hasPrevFrame = true;
         }
         frameIndex++;
@@ -442,8 +468,8 @@ public final class VolumetricCloudRenderer {
 
     /**
      * Minecraft 1.20.1's managed shader path has twelve texture-state slots.
-     * The candidate indirection map is therefore bound manually on unit 12,
-     * followed by the two 3-D noise textures on units 13 and 14.
+     * Storm candidates/descriptors stay managed; the PUFF candidate map is
+     * bound manually on unit 12, followed by noise on units 13 and 14.
      */
     private static void bindManualTextures(ShaderInstance shader, int puffCandidateTextureId) {
         int program = shader.getId();

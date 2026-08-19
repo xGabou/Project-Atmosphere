@@ -4,12 +4,8 @@ import net.Gabou.projectatmosphere.client.ClientSyncLock;
 import net.Gabou.projectatmosphere.client.loading.ClientForecastLoadingWorkQueue;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingStage;
 import net.Gabou.projectatmosphere.client.loading.ForecastLoadingState;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
  * Server-to-client packet carrying forecast loading progress and readiness state.
@@ -87,10 +83,9 @@ public class ForecastLoadingStatusPacket {
         return new ForecastLoadingStatusPacket(buf);
     }
 
-    public static void handle(ForecastLoadingStatusPacket msg, Supplier<NetworkEvent.Context> ctx) {
-        NetworkEvent.Context context = ctx.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> applyClient(msg)));
-        context.setPacketHandled(true);
+    public static void handle(ForecastLoadingStatusPacket msg, PacketContext context) {
+        context.enqueueClient(() -> applyClient(msg));
+        context.markHandled();
     }
 
     private static void applyClient(ForecastLoadingStatusPacket msg) {

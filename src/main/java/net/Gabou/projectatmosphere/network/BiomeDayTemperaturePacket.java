@@ -1,15 +1,12 @@
 package net.Gabou.projectatmosphere.network;
 
 import net.Gabou.projectatmosphere.client.ClientPacketHandlers;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
 
 /**
  * Server-to-client forecast packet carrying per-biome day temperature arrays.
@@ -54,13 +51,8 @@ public class BiomeDayTemperaturePacket {
      * Handles incoming daily temperature data on the client.
      * Clears old forecasts before inserting new ones to prevent stale data.
      */
-    public static void handle(BiomeDayTemperaturePacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            DistExecutor.unsafeRunWhenOn(
-                    Dist.CLIENT,
-                    () -> () -> ClientPacketHandlers.handleBiomeDayTemperatures(msg.temperatureDayMap)
-            );
-        });
-        ctx.get().setPacketHandled(true);
+    public static void handle(BiomeDayTemperaturePacket msg, PacketContext context) {
+        context.enqueueClient(() -> ClientPacketHandlers.handleBiomeDayTemperatures(msg.temperatureDayMap));
+        context.markHandled();
     }
 }

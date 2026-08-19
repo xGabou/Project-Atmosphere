@@ -233,6 +233,7 @@ public final class CloudFieldValidation {
         }
         validateStructuredTowerStages(issues);
         validateStructuredPuffStages(issues);
+        validateStructuredStormStages(issues);
         CloudFieldLifecycleController controller = CloudFieldLifecycleController.defaultController();
         CloudField stale = projected.withCenter(projected.center().add(32.0D, 0.0D, -12.0D), 9_999L);
         CloudFieldLifecycleController.TickResult result = controller.tick(
@@ -320,6 +321,37 @@ public final class CloudFieldValidation {
         );
         if (legacy.memberTier() != CloudMorphologyMemberTier.UNKNOWN) {
             issues.add("legacy PUFF membership invented a semantic tier");
+        }
+    }
+
+    private static void validateStructuredStormStages(List<String> issues) {
+        UUID groupId = new UUID(0x143L, 0x5702L);
+        for (int memberCount = 7; memberCount <= 11; memberCount++) {
+            int[] counts = new int[CloudMorphologyMembership.Stage.values().length];
+            for (int index = 0; index < memberCount; index++) {
+                CloudMorphologyMembership membership =
+                        new CloudMorphologyMembership(groupId, index, memberCount);
+                counts[membership.stageFor(CloudMorphologyFamily.STORM_ANVIL).ordinal()]++;
+            }
+            if (counts[CloudMorphologyMembership.Stage.BASE.ordinal()] == 0
+                    || counts[CloudMorphologyMembership.Stage.CORE.ordinal()] == 0
+                    || counts[CloudMorphologyMembership.Stage.TOWER.ordinal()] == 0
+                    || counts[CloudMorphologyMembership.Stage.ANVIL.ordinal()] == 0
+                    || counts[CloudMorphologyMembership.Stage.MACRO.ordinal()] != 0) {
+                issues.add("structured STORM_ANVIL membership lost a required role for count="
+                        + memberCount);
+            }
+            int expectedAnvils = memberCount - (memberCount / 2 + 1);
+            if (counts[CloudMorphologyMembership.Stage.ANVIL.ordinal()] != expectedAnvils) {
+                issues.add("structured STORM_ANVIL membership disagrees with generator boundary for count="
+                        + memberCount);
+            }
+        }
+
+        CloudMorphologyMembership singleton = new CloudMorphologyMembership(groupId, 0, 1);
+        if (singleton.stageFor(CloudMorphologyFamily.STORM_ANVIL)
+                != CloudMorphologyMembership.Stage.MACRO) {
+            issues.add("single-member STORM_ANVIL no longer uses the macro fallback");
         }
     }
 

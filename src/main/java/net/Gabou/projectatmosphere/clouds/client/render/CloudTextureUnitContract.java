@@ -2,8 +2,10 @@ package net.Gabou.projectatmosphere.clouds.client.render;
 
 /**
  * One source of truth for texture units touched by the native cloud pass.
- * Minecraft 1.20.1 caches units 0..11; PA binds the remaining textures with
- * raw OpenGL and the render-state guard must capture every one of them.
+ * Minecraft 1.20.1 caches units 0..11. The managed volume samplers consume
+ * units 0..10, including the direct-storm candidate and descriptor textures;
+ * PA binds PUFF candidates and noise with raw OpenGL on units 12..14. The
+ * render-state guard must capture every touched unit.
  */
 public final class CloudTextureUnitContract {
     public static final int MINECRAFT_WORKING_UNIT = 0;

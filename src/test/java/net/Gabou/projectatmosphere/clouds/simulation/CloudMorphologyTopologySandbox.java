@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.clouds.simulation;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeDefinition;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
+import net.Gabou.projectatmosphere.clouds.field.CloudMorphologyMembership;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
 
@@ -67,6 +68,7 @@ public final class CloudMorphologyTopologySandbox {
         validatePuffTopology("cumulus_mediocris", mediocris, 2.20D);
         validateStructuredPuffProfileOrdering();
         validatePuffRetargetPreservesRadiusRatios();
+        validateStormAnvilTopology();
 
         CloudMorphologyGenerators.PuffTopologyParameters puff =
                 CloudMorphologyGenerators.puffTopologyParameters();
@@ -84,6 +86,187 @@ public final class CloudMorphologyTopologySandbox {
                 puff.angularJitterRadians()
         );
         requireAtMost("PUFF analytical primary separation", analyticalWorstPrimaryRatio, 0.90D);
+    }
+
+    private static void validateStormAnvilTopology() {
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault("cumulonimbus_calvus");
+        CloudTypeDefinition retargetDefinition =
+                CloudTypeRegistry.getOrDefault("cumulonimbus_capillatus");
+        for (int sample = 0; sample < 512; sample++) {
+            long seed = 0x53544F524D4C4F42L + sample * 0x9E3779B9L;
+            RandomSource firstRandom = RandomSource.create(seed);
+            RandomSource secondRandom = RandomSource.create(seed);
+            CloudMorphologyGenerators.SpawnPlan first =
+                    CloudMorphologyGenerators.createSpawnPlan(definition, firstRandom);
+            CloudMorphologyGenerators.SpawnPlan second =
+                    CloudMorphologyGenerators.createSpawnPlan(definition, secondRandom);
+            requireRange("storm member count", first.clusterCount(), 7, 11);
+            if (first.clusterCount() != second.clusterCount()) {
+                throw new IllegalStateException("storm plan count is not seed-stable");
+            }
+
+            Vec3 origin = new Vec3(0.0D, 256.0D, 0.0D);
+            Vec3[] firstCenters = new Vec3[first.clusterCount()];
+            Vec3[] secondCenters = new Vec3[second.clusterCount()];
+            firstCenters[0] = origin;
+            secondCenters[0] = origin;
+            for (int index = 1; index < first.clusterCount(); index++) {
+                firstCenters[index] = CloudMorphologyGenerators.createClusterCenter(
+                        origin, first, index, firstRandom
+                );
+                secondCenters[index] = CloudMorphologyGenerators.createClusterCenter(
+                        origin, second, index, secondRandom
+                );
+                requireVecBits("storm center " + index, firstCenters[index], secondCenters[index]);
+            }
+
+            double[] lowestBase = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY,
+                    Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY};
+            double[] highestTop = {Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY,
+                    Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY};
+            double[] minimumRadius = {Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY,
+                    Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY};
+            int[] roleByMember = new int[first.clusterCount()];
+            int roleMask = 0;
+            for (int index = 0; index < first.clusterCount(); index++) {
+                CloudMorphologyMembership.Stage stage = new CloudMorphologyMembership(
+                        java.util.UUID.nameUUIDFromBytes(("storm-" + sample).getBytes()),
+                        index,
+                        first.clusterCount()
+                ).stageFor(net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily.STORM_ANVIL);
+                CloudMorphologyGenerators.StormLobeSpec spec =
+                        CloudMorphologyGenerators.stormLobeSpec(
+                                first, index, (float) firstCenters[index].y
+                        );
+                int role = switch (stage) {
+                    case BASE -> 0;
+                    case CORE -> 1;
+                    case TOWER -> 2;
+                    case ANVIL -> 3;
+                    default -> throw new IllegalStateException("unexpected storm role " + stage);
+                };
+                roleByMember[index] = role;
+                roleMask |= 1 << role;
+                lowestBase[role] = Math.min(lowestBase[role], spec.baseY());
+                highestTop[role] = Math.max(highestTop[role], spec.topY());
+                minimumRadius[role] = Math.min(
+                        minimumRadius[role],
+                        first.radius() * 0.72D * spec.radiusMultiplier()
+                );
+                if (!(spec.radiusMultiplier() > 0.0F && spec.topY() > spec.baseY())) {
+                    throw new IllegalStateException("invalid storm lobe envelope");
+                }
+
+                CloudMorphologyGenerators.SpawnPlan retargetPlan =
+                        CloudMorphologyGenerators.stormAnvilPlanForCount(
+                                retargetDefinition, first.clusterCount()
+                        );
+                CloudMorphologyGenerators.StormLobeSpec retarget =
+                        CloudMorphologyGenerators.stormLobeSpec(
+                                retargetPlan, index, (float) firstCenters[index].y
+                        );
+                if (retarget.stage() != spec.stage()) {
+                    throw new IllegalStateException("retarget changed stable storm membership");
+                }
+                requireRange(
+                        "storm retarget radius ratio",
+                        retargetPlan.radius() * retarget.radiusMultiplier()
+                                / (first.radius() * spec.radiusMultiplier()),
+                        0.75D,
+                        1.65D
+                );
+            }
+            if (roleMask != 0b1111) {
+                throw new IllegalStateException("storm plan lacks one or more roles mask=" + roleMask);
+            }
+            if (!(lowestBase[1] < highestTop[0]
+                    && lowestBase[2] < highestTop[1]
+                    && lowestBase[3] < highestTop[2])) {
+                throw new IllegalStateException("storm vertical stages are disconnected");
+            }
+            if (!(highestTop[0] < highestTop[1]
+                    && highestTop[1] < highestTop[2]
+                    && highestTop[2] <= highestTop[3] + first.topRise() * 0.35F)) {
+                throw new IllegalStateException("storm stages lost vertical ordering");
+            }
+            double towerSpan = highestTop[2] - lowestBase[2];
+            double anvilSpan = highestTop[3] - lowestBase[3];
+            requireAtLeast(
+                    "storm anvil root above tower root",
+                    lowestBase[3] - lowestBase[2],
+                    first.topRise() * 0.10D
+            );
+            requireAtLeast(
+                    "storm anvil crown above tower crown",
+                    highestTop[3] - highestTop[2],
+                    first.topRise() * 0.06D
+            );
+            requireAtMost(
+                    "storm anvil vertical span",
+                    anvilSpan / towerSpan,
+                    0.88D
+            );
+            requireAtLeast(
+                    "storm base-to-tower breadth",
+                    minimumRadius[0] / minimumRadius[2],
+                    1.45D
+            );
+
+            for (int lowerRole = 0; lowerRole < 3; lowerRole++) {
+                double closest = Double.POSITIVE_INFINITY;
+                for (int firstIndex = 0; firstIndex < first.clusterCount(); firstIndex++) {
+                    if (roleByMember[firstIndex] != lowerRole) {
+                        continue;
+                    }
+                    for (int secondIndex = 0; secondIndex < first.clusterCount(); secondIndex++) {
+                        if (roleByMember[secondIndex] == lowerRole + 1) {
+                            closest = Math.min(
+                                    closest,
+                                    horizontalDistance(firstCenters[firstIndex], firstCenters[secondIndex])
+                            );
+                        }
+                    }
+                }
+                requireAtMost(
+                        "storm adjacent-role horizontal separation " + lowerRole,
+                        closest / (minimumRadius[lowerRole] + minimumRadius[lowerRole + 1]),
+                        0.72D
+                );
+            }
+
+            double lowerMeanX = 0.0D;
+            double anvilMeanX = 0.0D;
+            double anvilMeanZ = 0.0D;
+            int lowerCount = 0;
+            int anvilCount = 0;
+            for (int index = 0; index < first.clusterCount(); index++) {
+                if (roleByMember[index] == 3) {
+                    anvilMeanX += firstCenters[index].x;
+                    anvilMeanZ += firstCenters[index].z;
+                    anvilCount++;
+                } else {
+                    lowerMeanX += firstCenters[index].x;
+                    lowerCount++;
+                }
+            }
+            lowerMeanX /= Math.max(1, lowerCount);
+            anvilMeanX /= Math.max(1, anvilCount);
+            anvilMeanZ /= Math.max(1, anvilCount);
+            requireAtLeast("storm anvil extension", anvilMeanX - lowerMeanX, 0.0D);
+            requireAtMost(
+                    "storm anvil cross-axis drift",
+                    Math.abs(anvilMeanZ),
+                    first.groupRadius() * 0.14D
+            );
+        }
+    }
+
+    private static void requireVecBits(String label, Vec3 actual, Vec3 expected) {
+        if (Double.doubleToLongBits(actual.x) != Double.doubleToLongBits(expected.x)
+                || Double.doubleToLongBits(actual.y) != Double.doubleToLongBits(expected.y)
+                || Double.doubleToLongBits(actual.z) != Double.doubleToLongBits(expected.z)) {
+            throw new IllegalStateException(label + " is not seed-stable");
+        }
     }
 
     private static void validateStructuredPuffProfileOrdering() {

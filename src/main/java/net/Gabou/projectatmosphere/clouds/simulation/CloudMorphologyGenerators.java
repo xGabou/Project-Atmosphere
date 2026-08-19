@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.simulation;
 
 import net.Gabou.projectatmosphere.clouds.state.CloudClusterState;
+import net.Gabou.projectatmosphere.clouds.field.CloudMorphologyMembership;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyMemberTier;
 import net.Gabou.projectatmosphere.clouds.type.CloudShapeProfile;
@@ -149,6 +150,8 @@ final class CloudMorphologyGenerators {
 
         float radiusJitter = family == CloudMorphologyFamily.TOWER
                 ? 0.96F + random.nextFloat() * 0.08F
+                : family == CloudMorphologyFamily.STORM_ANVIL
+                ? 0.98F + random.nextFloat() * 0.04F
                 : 0.92F + random.nextFloat() * 0.16F;
         float tier = family == CloudMorphologyFamily.TOWER
                 ? towerTier(clusterIndex, plan.clusterCount())
@@ -161,6 +164,12 @@ final class CloudMorphologyGenerators {
                     Mth.clamp((scale - 0.72F) / 0.42F, 0.0F, 1.0F),
                     0.96F,
                     1.04F
+                )
+                : family == CloudMorphologyFamily.STORM_ANVIL
+                ? Mth.lerp(
+                    Mth.clamp((scale - 0.72F) / 0.42F, 0.0F, 1.0F),
+                    0.97F,
+                    1.03F
                 )
                 : scale;
         // Start from the plan radius. Secondary clusters were already created
@@ -195,12 +204,8 @@ final class CloudMorphologyGenerators {
         if (family == CloudMorphologyFamily.PUFF || family == CloudMorphologyFamily.TOWER) {
             applyConvectiveLobeEnvelope(cluster, plan, finalRadius, clusterIndex);
         }
-        if (family == CloudMorphologyFamily.STORM_ANVIL && clusterIndex > plan.clusterCount() / 2) {
-            cluster.setVerticalBounds(cluster.getBaseY() + plan.baseDrop() * 0.38F, cluster.getTopY() + plan.topRise() * 0.22F);
-            float anvilRadius = cluster.getRadius() * 1.24F;
-            cluster.setRadius(anvilRadius);
-            cluster.setSpawnRadius(anvilRadius);
-            cluster.setTargetRadius(Math.max(cluster.getTargetRadius(), finalRadius * 1.24F));
+        if (family == CloudMorphologyFamily.STORM_ANVIL) {
+            applyStormLobeEnvelope(cluster, plan, finalRadius, clusterIndex);
         }
     }
 
@@ -257,6 +262,21 @@ final class CloudMorphologyGenerators {
         float targetTopY = (float) centerY + shape.getTopOffset() * topMultiplier(family) + cluster.getMergePressure() * 12.0F;
 
         cluster.setMorphologyFamily(family);
+        if (family == CloudMorphologyFamily.STORM_ANVIL && morphologyCount >= 4) {
+            SpawnPlan stormPlan = stormAnvilPlanForCount(definition, morphologyCount);
+            StormLobeSpec storm = stormLobeSpec(stormPlan, morphologyIndex, (float) centerY);
+            float roleTargetRadius = Math.max(
+                    8.0F,
+                    shape.getBaseRadius() * 1.08F * storm.radiusMultiplier()
+            );
+            cluster.setVerticalBounds(storm.baseY(), storm.topY());
+            cluster.setGrowthTargets(
+                    Math.max(existingRadius, roleTargetRadius),
+                    Mth.clamp(coverageFor(family, visual, shape), 0.0F, 1.0F),
+                    Mth.clamp(densityFor(family, visual), 0.0F, 1.0F)
+            );
+            return;
+        }
         if (family == CloudMorphologyFamily.PUFF || family == CloudMorphologyFamily.TOWER) {
             boolean structuredTower = family == CloudMorphologyFamily.TOWER
                     && morphologyCount == STRUCTURED_TOWER_COUNT;
@@ -349,6 +369,28 @@ final class CloudMorphologyGenerators {
                 0.58F + visual.getDensityMultiplier() * 0.25F + visual.getPrecipitationCoreStrength() * 0.12F,
                 0.58F + visual.getCoverageMultiplier() * 0.24F,
                 0.18F + visual.getEdgeErosionStrength() * 0.42F);
+    }
+
+    static SpawnPlan stormAnvilPlanForCount(
+            @NotNull CloudTypeDefinition definition,
+            int clusterCount
+    ) {
+        CloudShapeProfile shape = definition.getShapeProfile();
+        CloudVisualProfile visual = definition.getVisualProfile();
+        float radius = shape.getBaseRadius() * 1.08F;
+        return new SpawnPlan(
+                CloudMorphologyFamily.STORM_ANVIL,
+                Math.max(4, clusterCount),
+                radius,
+                radius * 2.55F,
+                shape.getBaseOffset(),
+                shape.getTopOffset() * 1.18F,
+                0.58F + visual.getDensityMultiplier() * 0.25F
+                        + visual.getPrecipitationCoreStrength() * 0.12F,
+                0.58F + visual.getCoverageMultiplier() * 0.24F,
+                0.18F + visual.getEdgeErosionStrength() * 0.42F,
+                0.0F
+        );
     }
 
     private static SpawnPlan spiralStormPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {
@@ -570,6 +612,77 @@ final class CloudMorphologyGenerators {
                 : Math.max(groupBaseY, centerY - lowerExtent);
         float localTopY = centerY + upperExtent;
         cluster.setVerticalBounds(localBaseY, Math.max(localBaseY + 4.0F, localTopY));
+    }
+
+    /**
+     * Gives the authoritative storm members distinct, overlapping vertical
+     * jobs. Previously every lower member inherited nearly the complete storm
+     * slab, so activating the role maps exposed several disconnected pointed
+     * masses instead of a base feeding a convective tower and anvil.
+     */
+    private static void applyStormLobeEnvelope(
+            CloudClusterState cluster,
+            SpawnPlan plan,
+            float finalRadius,
+            int clusterIndex
+    ) {
+        float centerY = (float) cluster.getCenter().y();
+        StormLobeSpec spec = stormLobeSpec(plan, clusterIndex, centerY);
+        float targetRadius = Math.max(8.0F, finalRadius * spec.radiusMultiplier());
+        float birthRadius = Math.max(8.0F, targetRadius * 0.88F);
+        cluster.setRadius(birthRadius);
+        cluster.setSpawnRadius(birthRadius);
+        cluster.setTargetRadius(targetRadius);
+        cluster.setVerticalBounds(spec.baseY(), spec.topY());
+    }
+
+    static StormLobeSpec stormLobeSpec(SpawnPlan plan, int clusterIndex, float centerY) {
+        CloudMorphologyMembership.Stage stage = new CloudMorphologyMembership(
+                null,
+                clusterIndex,
+                plan.clusterCount()
+        ).stageFor(CloudMorphologyFamily.STORM_ANVIL);
+        float radiusMultiplier;
+        float baseY;
+        float topY;
+        int anvilStart = plan.clusterCount() / 2 + 1;
+        int lowerCount = anvilStart;
+        int baseCount = Math.max(1, lowerCount / 3);
+        int coreCount = Math.max(1, (lowerCount - baseCount) / 2);
+        int towerStart = baseCount + coreCount;
+        switch (stage) {
+            case BASE -> {
+                radiusMultiplier = 1.22F;
+                baseY = centerY - plan.baseDrop();
+                topY = centerY + plan.topRise() * 0.38F;
+            }
+            case CORE -> {
+                int ordinal = Math.max(0, clusterIndex - baseCount);
+                float progress = coreCount <= 1
+                        ? 0.0F
+                        : (float) ordinal / (float) (coreCount - 1);
+                radiusMultiplier = Mth.lerp(progress, 0.98F, 0.88F);
+                baseY = centerY - plan.topRise() * 0.18F;
+                topY = centerY + plan.topRise() * Mth.lerp(progress, 0.48F, 0.52F);
+            }
+            case TOWER -> {
+                int towerCount = Math.max(1, anvilStart - towerStart);
+                int ordinal = Math.max(0, clusterIndex - towerStart);
+                float progress = towerCount <= 1
+                        ? 0.0F
+                        : (float) ordinal / (float) (towerCount - 1);
+                radiusMultiplier = Mth.lerp(progress, 0.94F, 0.72F);
+                baseY = centerY - plan.topRise() * 0.20F;
+                topY = centerY + plan.topRise() * Mth.lerp(progress, 0.58F, 0.72F);
+            }
+            case ANVIL -> {
+                radiusMultiplier = 0.92F;
+                baseY = centerY - plan.topRise() * 0.05F;
+                topY = centerY + plan.topRise() * 0.80F;
+            }
+            default -> throw new IllegalStateException("Unexpected storm lobe stage " + stage);
+        }
+        return new StormLobeSpec(stage, radiusMultiplier, baseY, Math.max(baseY + 8.0F, topY));
     }
 
     private static void tuneHierarchicalPuff(
@@ -960,14 +1073,84 @@ final class CloudMorphologyGenerators {
         }
     }
 
+    record StormLobeSpec(
+            CloudMorphologyMembership.Stage stage,
+            float radiusMultiplier,
+            float baseY,
+            float topY
+    ) {
+        StormLobeSpec {
+            if (stage == null || !Float.isFinite(radiusMultiplier) || radiusMultiplier <= 0.0F
+                    || !Float.isFinite(baseY) || !Float.isFinite(topY) || topY <= baseY) {
+                throw new IllegalArgumentException("Invalid storm lobe specification");
+            }
+        }
+    }
+
     private static Vec3 stormCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
-        boolean anvil = clusterIndex > plan.clusterCount() / 2;
+        CloudMorphologyMembership.Stage stage = new CloudMorphologyMembership(
+                null,
+                clusterIndex,
+                plan.clusterCount()
+        ).stageFor(CloudMorphologyFamily.STORM_ANVIL);
         float angle = (float) (random.nextFloat() * Math.PI * 2.0D);
-        float distance = anvil
-                ? plan.groupRadius() * (0.34F + random.nextFloat() * 0.58F)
-                : plan.radius() * (0.08F + random.nextFloat() * 0.42F);
-        float shear = anvil ? plan.groupRadius() * 0.34F : plan.radius() * 0.10F;
-        float y = anvil ? plan.topRise() * (0.30F + random.nextFloat() * 0.20F) : random.nextFloat() * 12.0F;
+        if (stage == CloudMorphologyMembership.Stage.ANVIL) {
+            // A tightly overlapping row produces one spreading cap while
+            // avoiding both a single perfect ellipsoid and visibly separate
+            // anvil balls. All members share the wind-aligned orientation.
+            int anvilStart = plan.clusterCount() / 2 + 1;
+            int anvilCount = Math.max(1, plan.clusterCount() - anvilStart);
+            int anvilIndex = Math.max(0, clusterIndex - anvilStart);
+            float along01 = anvilCount <= 1
+                    ? 0.5F
+                    : (float) anvilIndex / (float) (anvilCount - 1);
+            float along = plan.groupRadius() * Mth.lerp(along01, -0.12F, 0.32F)
+                    + (random.nextFloat() - 0.5F) * plan.groupRadius() * 0.025F;
+            float cross = (float) Math.sin(along01 * Math.PI * 2.0D)
+                    * plan.groupRadius() * 0.18F
+                    + (random.nextFloat() - 0.5F) * plan.groupRadius() * 0.025F;
+            float y = plan.topRise() * (0.40F + along01 * 0.025F)
+                    + (random.nextFloat() - 0.5F) * 3.0F;
+            return origin.add(along, y, cross);
+        }
+        int anvilStart = plan.clusterCount() / 2 + 1;
+        int lowerCount = anvilStart;
+        int baseCount = Math.max(1, lowerCount / 3);
+        int coreCount = Math.max(1, (lowerCount - baseCount) / 2);
+        int towerStart = baseCount + coreCount;
+        float distanceScale;
+        float heightScale;
+        float shearScale;
+        switch (stage) {
+            case BASE -> {
+                distanceScale = 0.12F;
+                heightScale = 0.02F;
+                shearScale = 0.00F;
+            }
+            case CORE -> {
+                int ordinal = Math.max(0, clusterIndex - baseCount);
+                float progress = coreCount <= 1
+                        ? 0.0F
+                        : (float) ordinal / (float) (coreCount - 1);
+                distanceScale = Mth.lerp(progress, 0.07F, 0.05F);
+                heightScale = Mth.lerp(progress, 0.06F, 0.14F);
+                shearScale = Mth.lerp(progress, 0.02F, 0.035F);
+            }
+            case TOWER -> {
+                int towerCount = Math.max(1, anvilStart - towerStart);
+                int ordinal = Math.max(0, clusterIndex - towerStart);
+                float progress = towerCount <= 1
+                        ? 0.0F
+                        : (float) ordinal / (float) (towerCount - 1);
+                distanceScale = Mth.lerp(progress, 0.055F, 0.035F);
+                heightScale = Mth.lerp(progress, 0.14F, 0.34F);
+                shearScale = Mth.lerp(progress, 0.04F, 0.075F);
+            }
+            default -> throw new IllegalStateException("Unexpected lower storm stage " + stage);
+        }
+        float distance = plan.radius() * (0.03F + random.nextFloat() * distanceScale);
+        float shear = plan.radius() * shearScale;
+        float y = plan.topRise() * heightScale + (random.nextFloat() - 0.5F) * 6.0F;
         return origin.add(Math.cos(angle) * distance + shear, y, Math.sin(angle) * distance);
     }
 

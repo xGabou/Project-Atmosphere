@@ -225,6 +225,7 @@ public final class VolumetricCloudRenderHook {
             CloudShadowMapAccess.clear();
             ClientCloudVisualDensity.clear();
             CameraCloudDensityTracker.update(0.0F);
+            StormGeometryBuildCoordinator.reset();
             MATERIAL_ADVECTION.suspend();
             VolumetricMaterialDomainDiagnostics.reset();
             return;
@@ -247,6 +248,27 @@ public final class VolumetricCloudRenderHook {
         // field clouds never inherit the rain-coupled regional sheet, so they
         // stay identical when the camera moves between rain and clear air.
         boolean includeRegionalLayer = !renderingFields;
+        float stormTexelSize = CloudWeatherMapRenderer.WEATHER_EXTENT
+                / Math.max(1, profile.weatherMapSize());
+        double stormOriginX = Math.floor(
+                (cameraPos.x() - CloudWeatherMapRenderer.WEATHER_EXTENT * 0.5D) / stormTexelSize
+        ) * stormTexelSize;
+        double stormOriginZ = Math.floor(
+                (cameraPos.z() - CloudWeatherMapRenderer.WEATHER_EXTENT * 0.5D) / stormTexelSize
+        ) * stormTexelSize;
+        // Publish/refresh descriptor ownership before the weather-map bake.
+        // The bake suppresses member rasters only for complete live groups;
+        // omitted or sentinel-marked groups retain the legacy map fallback.
+        StormGeometryBuildCoordinator.update(
+                renderCells,
+                cameraPos.x(),
+                cameraPos.z(),
+                stormOriginX,
+                stormOriginZ,
+                CloudWeatherMapRenderer.WEATHER_EXTENT,
+                VolumetricCloudRenderTargets.prepareStormCandidateTarget(),
+                VolumetricCloudRenderTargets.prepareStormDescriptorTarget()
+        );
         CloudWeatherMapRenderer.Result weather = CloudWeatherMapRenderer.render(
                 renderCells,
                 cameraPos.x(),
@@ -375,6 +397,7 @@ public final class VolumetricCloudRenderHook {
                 sceneDepth
         );
         if (composited) {
+            StormGeometryBuildCoordinator.publishSuccessfulFrame();
             ClientCloudVisualDensity.publishVolumetric(
                     dimensionId,
                     renderingFields
@@ -387,7 +410,8 @@ public final class VolumetricCloudRenderHook {
                     includeRegionalLayer,
                     worldTimeTicks,
                     profile.weatherMapSize(),
-                    tuning
+                    tuning,
+                    StormGeometryBuildCoordinator.snapshot()
             );
             CameraCloudDensityTracker.update(
                     ClientCloudVisualDensity.densityAt(dimensionId, cameraPos)
@@ -483,9 +507,10 @@ public final class VolumetricCloudRenderHook {
                 + " lightColor=" + format(lighting.lightColor())
                 + " ambTop=" + format(lighting.ambientTop())
                 + " ambBot=" + format(lighting.ambientBottom())
-                 + " composited=" + composited
-                 + " funnels=" + funnels.count()
-                 + " " + PuffLobeSpatialIndex.status()
+                  + " composited=" + composited
+                  + " funnels=" + funnels.count()
+                  + " stormDescriptors=" + StormGeometryBuildCoordinator.lobeCount()
+                  + " " + PuffLobeSpatialIndex.status()
                  + " " + VolumetricMaterialDomainDiagnostics.status()
                 + " " + materialAdvection.summary()
                 + " gpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds());
@@ -496,6 +521,7 @@ public final class VolumetricCloudRenderHook {
         int core = 0;
         int tower = 0;
         int crown = 0;
+        int anvil = 0;
         int other = 0;
         for (VolumetricRenderCell cell : renderCells) {
             switch (cell.envelopeRole()) {
@@ -503,6 +529,7 @@ public final class VolumetricCloudRenderHook {
                 case CORE -> core++;
                 case TOWER -> tower++;
                 case CROWN -> crown++;
+                case ANVIL -> anvil++;
                 default -> other++;
             }
         }
@@ -510,6 +537,7 @@ public final class VolumetricCloudRenderHook {
                 + ",core=" + core
                 + ",tower=" + tower
                 + ",crown=" + crown
+                + ",anvil=" + anvil
                 + ",other=" + other;
     }
 

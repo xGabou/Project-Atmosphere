@@ -1,8 +1,8 @@
 package net.Gabou.projectatmosphere.clouds.service;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
-import net.minecraftforge.fml.ModList;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
+import net.Gabou.projectatmosphere.platform.AtmospherePlatform;
 
 /**
  * Résout le service de nuages actif sans charger Simple Clouds quand il est absent.
@@ -34,11 +34,11 @@ public final class AtmosphereCloudServices {
      * @return true si Simple Clouds est présent
      */
     public static boolean isSimpleCloudsLoaded() {
-        return ModList.get().isLoaded(SIMPLE_CLOUDS_MOD_ID);
+        return AtmospherePlatform.environment().isModLoaded(SIMPLE_CLOUDS_MOD_ID);
     }
 
     private static AtmosphereCloudService createService() {
-        if (AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.VANILLA) {
+        if (AtmosphereConfig.clouds().vanillaCloudMode()) {
             ProjectAtmosphere.LOGGER.info("[Atmosphere] Cloud rendering disabled by config; using disabled cloud service.");
             return new DisabledAtmosphereCloudService();
         }

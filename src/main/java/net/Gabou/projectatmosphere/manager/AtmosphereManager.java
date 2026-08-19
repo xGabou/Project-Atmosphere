@@ -16,7 +16,7 @@ import net.Gabou.projectatmosphere.modules.atmosphere.SeasonalAtmosphericDrift;
 import net.Gabou.projectatmosphere.modules.snowstorm.SnowstormManager;
 import net.Gabou.projectatmosphere.modules.weathercell.WeatherCellManager;
 import net.Gabou.projectatmosphere.network.ForecastLoadingStatusPacket;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.seasons.SeasonTimeHelper;
 import net.Gabou.projectatmosphere.seasons.SeasonStage;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
@@ -29,7 +29,6 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import net.minecraftforge.network.PacketDistributor;
 
 public class AtmosphereManager {
 
@@ -180,8 +179,8 @@ public class AtmosphereManager {
     private static void sendPlayerForecastSnapshot(ServerPlayer player) {
         Map<net.minecraft.resources.ResourceLocation, float[]> forecastSnapshot = ForecastGenerator.createDailyTemperatureSnapshotForSync();
         int forecastProfileCount = forecastSnapshot.size();
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
+        AtmosphereNetwork.sendToPlayer(
+                player,
                 ForecastLoadingStatusPacket.status(
                         ForecastLoadingStage.RECEIVING_FORECAST_DATA,
                         null,
@@ -191,8 +190,8 @@ public class AtmosphereManager {
                 )
         );
         ForecastGenerator.sendDailyForecastsToPlayer(player, forecastSnapshot);
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
+        AtmosphereNetwork.sendToPlayer(
+                player,
                 ForecastLoadingStatusPacket.ready("player_login_ready")
         );
     }

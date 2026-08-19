@@ -1,10 +1,9 @@
 package net.Gabou.projectatmosphere.network;
 
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Server-to-client packet removing a tornado by UUID from the client cache.
@@ -32,10 +31,8 @@ public class RemoveTornadoPacket {
         return new RemoveTornadoPacket(buf);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            SevereWeatherClientPacketHandlers.removeTornado(this.id);
-        });
-        ctx.get().setPacketHandled(true);
+    public void handle(PacketContext context) {
+        context.enqueueClient(() -> SevereWeatherClientPacketHandlers.removeTornado(this.id));
+        context.markHandled();
     }
 }

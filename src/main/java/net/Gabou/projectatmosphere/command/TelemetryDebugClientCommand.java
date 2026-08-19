@@ -23,6 +23,7 @@ import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugRenderHook;
 import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitializer;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CloudWeatherMapRenderer;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.PuffLobeSpatialIndex;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormGeometryBuildCoordinator;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudFrameDiagnostics;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudDebugConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
@@ -38,6 +39,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -145,6 +147,8 @@ public class TelemetryDebugClientCommand {
                                 .executes(ctx -> verifyVolumetricPuffIndex(ctx.getSource())))
                         .then(Commands.literal("renderState")
                                 .executes(ctx -> verifyVolumetricRenderState(ctx.getSource())))
+                        .then(Commands.literal("stormDensity")
+                                .executes(ctx -> reportStormDensityCalibration(ctx.getSource())))
                         .then(Commands.literal("log")
                                 .executes(ctx -> sendVolumetricDiagnosticsLogStatus(ctx.getSource()))
                                 .then(Commands.literal("on")
@@ -296,6 +300,21 @@ public class TelemetryDebugClientCommand {
                 false
         );
         return result.startsWith("unavailable") ? 0 : 1;
+    }
+
+    /**
+     * T098 calibration scaffolding. Reports the live {@code cell.density()}
+     * values reaching the descriptor coverage envelope, nearest storm first,
+     * both in chat and in latest.log so the values can be copied out.
+     */
+    private static int reportStormDensityCalibration(CommandSourceStack source) {
+        Vec3 position = source.getPosition();
+        String report = StormGeometryBuildCoordinator.describeDensityCalibration(
+                position.x, position.y, position.z
+        );
+        ProjectAtmosphere.LOGGER.info("[T098] {}", report);
+        source.sendSuccess(() -> Component.literal(report), false);
+        return report.contains("no descriptor-owned storm") ? 0 : 1;
     }
 
     private static int verifyVolumetricRenderState(CommandSourceStack source) {

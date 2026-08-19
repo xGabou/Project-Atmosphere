@@ -2,14 +2,13 @@ package net.Gabou.projectatmosphere.clouds.cell.network;
 
 import net.Gabou.projectatmosphere.clouds.analytics.CloudCellAnalyticsReport;
 import net.Gabou.projectatmosphere.clouds.cell.sim.CloudCellSimulationManager;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * Client-to-server GPU analytics digest. The server treats these as advisory
@@ -42,14 +41,13 @@ public final class CloudCellAnalyticsPacket {
         return new CloudCellAnalyticsPacket(reports);
     }
 
-    public static void handle(CloudCellAnalyticsPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
-        NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
-            ServerPlayer sender = context.getSender();
+    public static void handle(CloudCellAnalyticsPacket packet, PacketContext context) {
+        context.enqueue(() -> {
+            ServerPlayer sender = context.sender();
             if (sender != null) {
                 CloudCellSimulationManager.getInstance().acceptAnalytics(sender, packet.reports);
             }
         });
-        context.setPacketHandled(true);
+        context.markHandled();
     }
 }

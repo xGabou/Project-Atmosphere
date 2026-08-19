@@ -1,15 +1,12 @@
 package net.Gabou.projectatmosphere.clouds.network;
 
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * Packet serveur vers client pour synchroniser les régions de nuage PA.
@@ -64,13 +61,8 @@ public final class SyncCloudRegionsPacket {
      * @param packet packet reçu
      * @param contextSupplier contexte réseau
      */
-    public static void handle(SyncCloudRegionsPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
-        NetworkEvent.Context context = contextSupplier.get();
-
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                CloudRegionPacketDispatcher.handleClientRegions(packet.regions)
-        ));
-
-        context.setPacketHandled(true);
+    public static void handle(SyncCloudRegionsPacket packet, PacketContext context) {
+        context.enqueueClient(() -> CloudRegionPacketDispatcher.handleClientRegions(packet.regions));
+        context.markHandled();
     }
 }

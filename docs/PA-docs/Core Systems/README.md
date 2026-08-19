@@ -10,6 +10,14 @@ docs (`cloud_backend_start_here.md`, `cloud_render_data_contract.md`,
 `cloud_renderer_integration_points.md`, `phase0_cloud_boundary/`) predate the native renderer's
 implementation and were moved to `Clouds/archived/`.
 
+For architecture direction (gap-to-realistic-clouds analysis, Forge-portability isolation design,
+and a whole-mod hexagonal/EDA evaluation): `Clouds/CLOUD_ARCHITECTURE_ASSESSMENT_2026-08-15.md` and
+`PROJECT_ARCHITECTURE_ASSESSMENT_2026-08-15.md` (this folder). Both are evidence-based against this
+repo's actual `Forge-1.20.1` → `NeoForge-1.21.1` branch diff, not speculative.
+
+Implementation status and live verification for those recommendations are recorded in
+`Clouds/CLOUD_IMPLEMENTATION_2026-08-17.md`.
+
 ## Supporting Material
 
 - `Renderer/codebase_audit/backend_readiness_for_cloud_renderer.md` (note: this file's own

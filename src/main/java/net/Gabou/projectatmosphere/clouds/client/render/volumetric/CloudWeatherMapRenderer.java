@@ -26,6 +26,7 @@ public final class CloudWeatherMapRenderer {
     private static final float[] mediaArray = new float[MAX_CELLS * 4];
     private static final float[] morphologyArray = new float[MAX_CELLS * 4];
     private static final float[] dynamicsArray = new float[MAX_CELLS * 4];
+    private static final VolumetricRenderCell[] rasterCells = new VolumetricRenderCell[MAX_CELLS];
 
     private static double lastOriginX;
     private static double lastOriginZ;
@@ -53,16 +54,14 @@ public final class CloudWeatherMapRenderer {
     private static int lastCumulusStageSupportTextureId = -1;
     private static int lastCumulusStageBaseTextureId = -1;
     private static int lastCumulusStageTopTextureId = -1;
-    private static int lastStormStructureTextureId = -1;
-    private static int lastStormLayerHeightTextureId = -1;
-    private static int lastStormTowerTextureId = -1;
+    private static int lastStormCandidateTextureId = -1;
+    private static int lastStormDescriptorTextureId = -1;
     private static int lastPuffCandidateTextureId = -1;
     // Diagnostic-only: whether the last weather-map bake found any cell whose
     // envelopeRole fell in the structured BASE..ANVIL range. This is the
-    // authoritative gate for the storm-structure/height/tower passes (see
-    // hasSevereStructures below); false means those three GPU passes were
-    // skipped entirely and stormStructureShape() cannot contribute in the
-    // raymarch, regardless of what the shader's DebugView modes would show.
+    // authoritative indication that the submitted render-cell set contained
+    // direct severe roles. The coordinator independently decides which
+    // complete groups fit its bounded descriptor capacity.
     private static boolean lastHasSevereStructures;
     private static boolean lastHasStructuredCumulus;
     private static Result lastResult = Result.EMPTY;
@@ -168,9 +167,8 @@ public final class CloudWeatherMapRenderer {
         lastCumulusStageSupportTextureId = -1;
         lastCumulusStageBaseTextureId = -1;
         lastCumulusStageTopTextureId = -1;
-        lastStormStructureTextureId = -1;
-        lastStormLayerHeightTextureId = -1;
-        lastStormTowerTextureId = -1;
+        lastStormCandidateTextureId = -1;
+        lastStormDescriptorTextureId = -1;
         lastPuffCandidateTextureId = -1;
         PuffLobeSpatialIndex.invalidate();
         lastResult = Result.EMPTY;
@@ -205,10 +203,7 @@ public final class CloudWeatherMapRenderer {
         ShaderInstance shader = VolumetricCloudShaders.splatShader();
         ShaderInstance morphologyShader = VolumetricCloudShaders.morphologySplatShader();
         ShaderInstance cumulusLayerShader = VolumetricCloudShaders.cumulusLayerSplatShader();
-        ShaderInstance stormStructureShader = VolumetricCloudShaders.stormStructureSplatShader();
-        ShaderInstance stormHeightShader = VolumetricCloudShaders.stormHeightSplatShader();
-        if (shader == null || morphologyShader == null || cumulusLayerShader == null
-                || stormStructureShader == null || stormHeightShader == null) {
+        if (shader == null || morphologyShader == null || cumulusLayerShader == null) {
             return Result.EMPTY;
         }
         RenderTarget target = VolumetricCloudRenderTargets.prepareWeatherTarget(mapSize);
@@ -219,16 +214,13 @@ public final class CloudWeatherMapRenderer {
                 VolumetricCloudRenderTargets.prepareCumulusStageBaseTarget(mapSize);
         RenderTarget cumulusStageTopTarget =
                 VolumetricCloudRenderTargets.prepareCumulusStageTopTarget(mapSize);
-        RenderTarget stormStructureTarget = VolumetricCloudRenderTargets.prepareStormStructureTarget(mapSize);
-        RenderTarget stormLayerHeightTarget =
-                VolumetricCloudRenderTargets.prepareStormLayerHeightTarget(mapSize);
-        RenderTarget stormTowerTarget = VolumetricCloudRenderTargets.prepareStormTowerTarget(mapSize);
+        RenderTarget stormCandidateTarget = VolumetricCloudRenderTargets.prepareStormCandidateTarget();
+        RenderTarget stormDescriptorTarget = VolumetricCloudRenderTargets.prepareStormDescriptorTarget();
         RenderTarget puffCandidateTarget = VolumetricCloudRenderTargets.preparePuffCandidateTarget();
         if (target == null || morphologyTarget == null
                 || cumulusStageSupportTarget == null || cumulusStageBaseTarget == null
-                 || cumulusStageTopTarget == null
-                 || stormStructureTarget == null || stormLayerHeightTarget == null
-                 || stormTowerTarget == null || puffCandidateTarget == null) {
+                 || cumulusStageTopTarget == null || stormCandidateTarget == null
+                 || stormDescriptorTarget == null || puffCandidateTarget == null) {
             return Result.EMPTY;
         }
 
@@ -279,6 +271,17 @@ public final class CloudWeatherMapRenderer {
             if (cell == null || count >= MAX_CELLS) {
                 break;
             }
+            boolean severeDescriptorRole = StormLobeDescriptor.Role.supports(cell.envelopeRole())
+                    && (cell.cloudProfile() == 4 || cell.cloudProfile() == 7);
+            if (severeDescriptorRole
+                    && StormGeometryBuildCoordinator.renderOwnsGroup(cell.morphologyGroupId())) {
+                // A complete descriptor group owns its body and material
+                // inputs. Keeping its member splats in the raster map makes
+                // role footprints reappear as density/material borders.
+                hasSevereStructures = true;
+                continue;
+            }
+            rasterCells[count] = cell;
             int base = count * 4;
             posRadiusArray[base] = (float) cell.x();
             posRadiusArray[base + 1] = (float) cell.z();
@@ -355,7 +358,7 @@ public final class CloudWeatherMapRenderer {
                 );
 
         long inputSignature = inputSignature(
-                cells,
+                rasterCells,
                 originX,
                 originZ,
                 slabBase,
@@ -375,9 +378,8 @@ public final class CloudWeatherMapRenderer {
         int cumulusStageSupportTextureId = cumulusStageSupportTarget.getColorTextureId();
         int cumulusStageBaseTextureId = cumulusStageBaseTarget.getColorTextureId();
         int cumulusStageTopTextureId = cumulusStageTopTarget.getColorTextureId();
-        int stormStructureTextureId = stormStructureTarget.getColorTextureId();
-        int stormLayerHeightTextureId = stormLayerHeightTarget.getColorTextureId();
-        int stormTowerTextureId = stormTowerTarget.getColorTextureId();
+        int stormCandidateTextureId = stormCandidateTarget.getColorTextureId();
+        int stormDescriptorTextureId = stormDescriptorTarget.getColorTextureId();
         int puffCandidateTextureId = puffCandidateTarget.getColorTextureId();
         if (inputSignature == lastInputSignature
                 && weatherTextureId == lastWeatherTextureId
@@ -385,9 +387,8 @@ public final class CloudWeatherMapRenderer {
                 && cumulusStageSupportTextureId == lastCumulusStageSupportTextureId
                 && cumulusStageBaseTextureId == lastCumulusStageBaseTextureId
                 && cumulusStageTopTextureId == lastCumulusStageTopTextureId
-                && stormStructureTextureId == lastStormStructureTextureId
-                && stormLayerHeightTextureId == lastStormLayerHeightTextureId
-                && stormTowerTextureId == lastStormTowerTextureId
+                && stormCandidateTextureId == lastStormCandidateTextureId
+                && stormDescriptorTextureId == lastStormDescriptorTextureId
                 && puffCandidateTextureId == lastPuffCandidateTextureId
                 && lastResult.rendered()) {
             cacheHits++;
@@ -481,64 +482,6 @@ public final class CloudWeatherMapRenderer {
                 2
         );
 
-        // Preserve all four overlapping severe-cloud roles instead of the one
-        // categorical winner stored by the morphology map. Empty/non-severe
-        // scenes only clear the cached target and skip the third fullscreen
-        // shader pass entirely.
-        VolumetricCloudRenderTargets.clearAndBind(stormStructureTarget);
-        if (hasSevereStructures) {
-            RenderSystem.setShader(() -> stormStructureShader);
-            stormStructureShader.safeGetUniform("WeatherOrigin").set((float) originX, (float) originZ);
-            stormStructureShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
-            stormStructureShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
-            stormStructureShader.safeGetUniform("CellCount").set(count);
-            stormStructureShader.apply();
-            uploadCellArrays(stormStructureShader, false);
-            try {
-                FullscreenQuad.draw(stormStructureShader);
-            } finally {
-                stormStructureShader.clear();
-            }
-        }
-
-        VolumetricCloudRenderTargets.clearAndBind(stormLayerHeightTarget);
-        if (hasSevereStructures) {
-            RenderSystem.setShader(() -> stormHeightShader);
-            stormHeightShader.safeGetUniform("WeatherOrigin").set((float) originX, (float) originZ);
-            stormHeightShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
-            stormHeightShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
-            stormHeightShader.safeGetUniform("CellCount").set(count);
-            stormHeightShader.safeGetUniform("OutputMode").set(0);
-            stormHeightShader.apply();
-            uploadCellArrays(stormHeightShader, false);
-            try {
-                FullscreenQuad.draw(stormHeightShader);
-            } finally {
-                stormHeightShader.clear();
-            }
-        }
-
-        // Reuse the endpoint shader in TOWER mode. CORE and TOWER used to
-        // compete for the same argmax, discarding all secondary convection at
-        // each texel before the raymarch. This target preserves an independent
-        // support/base/top interval without duplicating the shader program.
-        VolumetricCloudRenderTargets.clearAndBind(stormTowerTarget);
-        if (hasSevereStructures) {
-            RenderSystem.setShader(() -> stormHeightShader);
-            stormHeightShader.safeGetUniform("WeatherOrigin").set((float) originX, (float) originZ);
-            stormHeightShader.safeGetUniform("WeatherExtent").set(WEATHER_EXTENT);
-            stormHeightShader.safeGetUniform("WeatherCoverageScale").set(manualCoverageScale);
-            stormHeightShader.safeGetUniform("CellCount").set(count);
-            stormHeightShader.safeGetUniform("OutputMode").set(1);
-            stormHeightShader.apply();
-            uploadCellArrays(stormHeightShader, false);
-            try {
-                FullscreenQuad.draw(stormHeightShader);
-            } finally {
-                stormHeightShader.clear();
-            }
-        }
-
         Result result = new Result(
                 true,
                 originX,
@@ -555,9 +498,8 @@ public final class CloudWeatherMapRenderer {
         lastCumulusStageSupportTextureId = cumulusStageSupportTextureId;
         lastCumulusStageBaseTextureId = cumulusStageBaseTextureId;
         lastCumulusStageTopTextureId = cumulusStageTopTextureId;
-        lastStormStructureTextureId = stormStructureTextureId;
-        lastStormLayerHeightTextureId = stormLayerHeightTextureId;
-        lastStormTowerTextureId = stormTowerTextureId;
+        lastStormCandidateTextureId = stormCandidateTextureId;
+        lastStormDescriptorTextureId = stormDescriptorTextureId;
         lastPuffCandidateTextureId = puffCandidateTextureId;
         lastHasSevereStructures = hasSevereStructures;
         lastHasStructuredCumulus = hasStructuredCumulus;
@@ -635,7 +577,7 @@ public final class CloudWeatherMapRenderer {
     }
 
     private static long inputSignature(
-            List<VolumetricRenderCell> cells,
+            VolumetricRenderCell[] cells,
             double originX,
             double originZ,
             float slabBase,
@@ -707,7 +649,7 @@ public final class CloudWeatherMapRenderer {
         // direct descriptor geometry, therefore a tier-only network update
         // must invalidate the cached descriptor/candidate pair.
         for (int i = 0; i < count; i++) {
-            VolumetricRenderCell cell = cells.get(i);
+            VolumetricRenderCell cell = cells[i];
             long puffTierValue = cell.puffTier() == null
                     ? 3L
                     : cell.puffTier().gpuId();

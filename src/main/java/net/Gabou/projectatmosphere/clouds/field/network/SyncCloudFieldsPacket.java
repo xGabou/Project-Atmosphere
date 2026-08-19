@@ -7,17 +7,14 @@ import net.Gabou.projectatmosphere.clouds.field.CloudLodBand;
 import net.Gabou.projectatmosphere.clouds.field.CloudMorphologyMembership;
 import net.Gabou.projectatmosphere.clouds.type.CloudMorphologyFamily;
 import net.Gabou.projectatmosphere.clouds.type.CloudTypeRegistry;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Server-to-client CloudField snapshot sync. This sends field summaries only;
@@ -69,12 +66,9 @@ public final class SyncCloudFieldsPacket {
         return new SyncCloudFieldsPacket(buffer);
     }
 
-    public static void handle(SyncCloudFieldsPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
-        NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                CloudFieldPacketDispatcher.handleClientSnapshots(packet.fields)
-        ));
-        context.setPacketHandled(true);
+    public static void handle(SyncCloudFieldsPacket packet, PacketContext context) {
+        context.enqueueClient(() -> CloudFieldPacketDispatcher.handleClientSnapshots(packet.fields));
+        context.markHandled();
     }
 
     static void encodeSnapshot(FriendlyByteBuf buffer, CloudFieldSnapshot snapshot) {

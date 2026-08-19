@@ -10,7 +10,6 @@ import org.lwjgl.opengl.GL21;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
-import java.util.stream.IntStream;
 
 /**
  * Bakes and owns the tiling 3D noise textures used by the volumetric cloud
@@ -116,6 +115,21 @@ public final class CloudNoiseTextureManager {
         return BLUE_SIZE;
     }
 
+    /**
+     * Baked base-volume pixels, or {@code null} while the bake is pending.
+     * Exposed so the CPU visual-density mirror samples exactly the volume the
+     * GPU samples rather than a second noise implementation. The array is
+     * never mutated after publication; callers must not write to it.
+     */
+    static byte[] bakedBasePixels() {
+        return basePixels;
+    }
+
+    /** Baked detail-volume pixels, or {@code null} while the bake is pending. */
+    static byte[] bakedDetailPixels() {
+        return detailPixels;
+    }
+
     public static void shutdown() {
         deleteTexture(baseTextureId);
         deleteTexture(detailTextureId);
@@ -140,15 +154,13 @@ public final class CloudNoiseTextureManager {
     private static void bakeAll(long generation) {
         try {
             long startedAt = System.nanoTime();
-            byte[] base = new byte[BASE_SIZE * BASE_SIZE * BASE_SIZE * 4];
-            IntStream.range(0, BASE_SIZE).parallel().forEach(z -> bakeBaseSlice(base, z));
+            byte[] base = CloudNoiseFieldModel.bakeBase();
             if (generation != bakeGeneration) {
                 return;
             }
             basePixels = base;
 
-            byte[] detail = new byte[DETAIL_SIZE * DETAIL_SIZE * DETAIL_SIZE * 4];
-            IntStream.range(0, DETAIL_SIZE).parallel().forEach(z -> bakeDetailSlice(detail, z));
+            byte[] detail = CloudNoiseFieldModel.bakeDetail();
             if (generation != bakeGeneration) {
                 return;
             }
@@ -170,49 +182,6 @@ public final class CloudNoiseTextureManager {
         }
     }
 
-    private static void bakeBaseSlice(byte[] out, int z) {
-        float inv = 1.0F / BASE_SIZE;
-        for (int y = 0; y < BASE_SIZE; y++) {
-            for (int x = 0; x < BASE_SIZE; x++) {
-                float u = x * inv;
-                float v = y * inv;
-                float w = z * inv;
-
-                float perlin = perlinFbm(u, v, w, 4, 5, 1001);
-                float worleyLow = worleyFbm(u, v, w, 8, 2101);
-                float perlinWorley = remap01(perlin, worleyLow - 1.0F, 1.0F);
-
-                float g = worleyFbm(u, v, w, 8, 3301);
-                float b = worleyFbm(u, v, w, 16, 4409);
-                float a = worleyFbm(u, v, w, 32, 5501);
-
-                int index = ((z * BASE_SIZE + y) * BASE_SIZE + x) * 4;
-                out[index] = toByte(perlinWorley);
-                out[index + 1] = toByte(g);
-                out[index + 2] = toByte(b);
-                out[index + 3] = toByte(a);
-            }
-        }
-    }
-
-    private static void bakeDetailSlice(byte[] out, int z) {
-        float inv = 1.0F / DETAIL_SIZE;
-        for (int y = 0; y < DETAIL_SIZE; y++) {
-            for (int x = 0; x < DETAIL_SIZE; x++) {
-                float u = x * inv;
-                float v = y * inv;
-                float w = z * inv;
-                float r = worleyFbm(u, v, w, 2, 6101);
-                float g = worleyFbm(u, v, w, 4, 7207);
-                float b = worleyFbm(u, v, w, 8, 8317);
-                int index = ((z * DETAIL_SIZE + y) * DETAIL_SIZE + x) * 4;
-                out[index] = toByte(r);
-                out[index + 1] = toByte(g);
-                out[index + 2] = toByte(b);
-                out[index + 3] = (byte) 255;
-            }
-        }
-    }
 
     /**
      * Void-and-cluster blue noise ranking. Produces an ordered dither texture
@@ -273,133 +242,11 @@ public final class CloudNoiseTextureManager {
         return out;
     }
 
-    // -----------------------------------------------------------------
-    // Tiling noise primitives
-    // -----------------------------------------------------------------
-
-    private static float perlinFbm(float x, float y, float z, int basePeriod, int octaves, int seed) {
-        float amplitude = 0.5F;
-        float sum = 0.0F;
-        float norm = 0.0F;
-        int period = basePeriod;
-        for (int i = 0; i < octaves; i++) {
-            sum += perlin(x * period, y * period, z * period, period, seed + i * 131) * amplitude;
-            norm += amplitude;
-            amplitude *= 0.5F;
-            period *= 2;
-        }
-        return clamp01(sum / norm * 0.5F + 0.5F);
-    }
-
-    private static float worleyFbm(float x, float y, float z, int basePeriod, int seed) {
-        float w0 = worley(x * basePeriod, y * basePeriod, z * basePeriod, basePeriod, seed);
-        float w1 = worley(x * basePeriod * 2, y * basePeriod * 2, z * basePeriod * 2, basePeriod * 2, seed + 17);
-        float w2 = worley(x * basePeriod * 4, y * basePeriod * 4, z * basePeriod * 4, basePeriod * 4, seed + 41);
-        return clamp01(w0 * 0.625F + w1 * 0.25F + w2 * 0.125F);
-    }
-
-    /** Inverted F1 Worley: 1 at feature points, 0 far away. */
-    private static float worley(float x, float y, float z, int period, int seed) {
-        int xi = (int) Math.floor(x);
-        int yi = (int) Math.floor(y);
-        int zi = (int) Math.floor(z);
-        float minDistSq = Float.MAX_VALUE;
-        for (int dz = -1; dz <= 1; dz++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dx = -1; dx <= 1; dx++) {
-                    int cx = xi + dx;
-                    int cy = yi + dy;
-                    int cz = zi + dz;
-                    int hx = Math.floorMod(cx, period);
-                    int hy = Math.floorMod(cy, period);
-                    int hz = Math.floorMod(cz, period);
-                    int h = hash3(hx, hy, hz, seed);
-                    float fx = cx + unitFloat(h);
-                    float fy = cy + unitFloat(hashInt(h + 0x9E3779B9));
-                    float fz = cz + unitFloat(hashInt(h + 0x85EBCA6B));
-                    float ddx = fx - x;
-                    float ddy = fy - y;
-                    float ddz = fz - z;
-                    float distSq = ddx * ddx + ddy * ddy + ddz * ddz;
-                    if (distSq < minDistSq) {
-                        minDistSq = distSq;
-                    }
-                }
-            }
-        }
-        return clamp01(1.0F - (float) Math.sqrt(minDistSq));
-    }
-
-    private static float perlin(float x, float y, float z, int period, int seed) {
-        int xi = (int) Math.floor(x);
-        int yi = (int) Math.floor(y);
-        int zi = (int) Math.floor(z);
-        float xf = x - xi;
-        float yf = y - yi;
-        float zf = z - zi;
-        float u = fade(xf);
-        float v = fade(yf);
-        float w = fade(zf);
-
-        float n000 = gradDot(xi, yi, zi, xf, yf, zf, period, seed);
-        float n100 = gradDot(xi + 1, yi, zi, xf - 1, yf, zf, period, seed);
-        float n010 = gradDot(xi, yi + 1, zi, xf, yf - 1, zf, period, seed);
-        float n110 = gradDot(xi + 1, yi + 1, zi, xf - 1, yf - 1, zf, period, seed);
-        float n001 = gradDot(xi, yi, zi + 1, xf, yf, zf - 1, period, seed);
-        float n101 = gradDot(xi + 1, yi, zi + 1, xf - 1, yf, zf - 1, period, seed);
-        float n011 = gradDot(xi, yi + 1, zi + 1, xf, yf - 1, zf - 1, period, seed);
-        float n111 = gradDot(xi + 1, yi + 1, zi + 1, xf - 1, yf - 1, zf - 1, period, seed);
-
-        float x00 = lerp(n000, n100, u);
-        float x10 = lerp(n010, n110, u);
-        float x01 = lerp(n001, n101, u);
-        float x11 = lerp(n011, n111, u);
-        float y0 = lerp(x00, x10, v);
-        float y1 = lerp(x01, x11, v);
-        return lerp(y0, y1, w);
-    }
-
-    private static float gradDot(int xi, int yi, int zi, float xf, float yf, float zf, int period, int seed) {
-        int h = hash3(Math.floorMod(xi, period), Math.floorMod(yi, period), Math.floorMod(zi, period), seed) & 15;
-        float gu = h < 8 ? xf : yf;
-        float gv = h < 4 ? yf : (h == 12 || h == 14 ? xf : zf);
-        return ((h & 1) == 0 ? gu : -gu) + ((h & 2) == 0 ? gv : -gv);
-    }
-
-    private static int hash3(int x, int y, int z, int seed) {
-        int h = x * 374761393 + y * 668265263 + z * 1274126177 + seed * 144665;
-        h = (h ^ (h >>> 13)) * 1274126177;
-        return h ^ (h >>> 16);
-    }
-
+    /** Blue-noise ordering hash; the cloud noise fields live in CloudNoiseFieldModel. */
     private static int hashInt(int value) {
         int h = value * 747796405 + -1403630843;
         h = ((h >>> ((h >>> 28) + 4)) ^ h) * 277803737;
         return h ^ (h >>> 22);
-    }
-
-    private static float unitFloat(int hash) {
-        return (hash >>> 8) * (1.0F / 16777216.0F);
-    }
-
-    private static float fade(float t) {
-        return t * t * t * (t * (t * 6.0F - 15.0F) + 10.0F);
-    }
-
-    private static float lerp(float a, float b, float t) {
-        return a + (b - a) * t;
-    }
-
-    private static float remap01(float value, float low, float high) {
-        return clamp01((value - low) / Math.max(high - low, 0.0001F));
-    }
-
-    private static float clamp01(float value) {
-        return Math.max(0.0F, Math.min(1.0F, value));
-    }
-
-    private static byte toByte(float value01) {
-        return (byte) Math.round(clamp01(value01) * 255.0F);
     }
 
     // -----------------------------------------------------------------

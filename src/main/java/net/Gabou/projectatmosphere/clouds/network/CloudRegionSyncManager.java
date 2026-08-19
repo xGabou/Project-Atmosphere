@@ -3,10 +3,9 @@ package net.Gabou.projectatmosphere.clouds.network;
 import net.Gabou.projectatmosphere.clouds.simulation.CloudRegionManager;
 import net.Gabou.projectatmosphere.clouds.service.AtmosphereCloudServices;
 import net.Gabou.projectatmosphere.clouds.transport.CloudRegionRenderData;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.PacketDistributor;
 
 import java.util.Collection;
 
@@ -81,9 +80,6 @@ public final class CloudRegionSyncManager {
         if (player == null) {
             return;
         }
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new SyncCloudRegionsPacket(renderData)
-        );
+        AtmosphereNetwork.sendToPlayer(player, new SyncCloudRegionsPacket(renderData));
     }
 }

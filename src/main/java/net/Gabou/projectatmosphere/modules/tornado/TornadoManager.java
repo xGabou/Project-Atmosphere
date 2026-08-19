@@ -12,7 +12,7 @@ import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.weather.StormCloudAttachment;
 import net.Gabou.projectatmosphere.modules.weather.StormSeverityScale;
 import net.Gabou.projectatmosphere.modules.weather.StormShieldManager;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.network.RemoveTornadoPacket;
 import net.Gabou.projectatmosphere.network.SpawnTornadoPacket;
 import net.Gabou.projectatmosphere.network.SyncTornadoesPacket;
@@ -27,7 +27,6 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -125,10 +124,8 @@ public class TornadoManager {
         }
         SERVER_TORNADOES.add(tornado);
 
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.ALL.noArg(),
-                new SpawnTornadoPacket(id, spawnPos, radius, wind, geometry.bottomY(), geometry.height())
-        );
+        AtmosphereNetwork.sendToAll(
+                new SpawnTornadoPacket(id, spawnPos, radius, wind, geometry.bottomY(), geometry.height()));
         broadcastSnapshots();
         return true;
     }
@@ -173,10 +170,10 @@ public class TornadoManager {
 
     public static void syncToPlayer(ServerPlayer player) {
         if (!AtmoCommonConfig.ENABLE_TORNADOES.get()) {
-            NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncTornadoesPacket(List.of()));
+            AtmosphereNetwork.sendToPlayer(player, new SyncTornadoesPacket(List.of()));
             return;
         }
-        NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), createSyncPacket());
+        AtmosphereNetwork.sendToPlayer(player, createSyncPacket());
     }
 
     public static List<CompoundTag> savePersistentTornadoes() {
@@ -403,11 +400,11 @@ public class TornadoManager {
     }
 
     private static void broadcastRemoval(UUID id) {
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), new RemoveTornadoPacket(id));
+        AtmosphereNetwork.sendToAll(new RemoveTornadoPacket(id));
     }
 
     private static void broadcastSnapshots() {
-        NetworkHandler.CHANNEL.send(PacketDistributor.ALL.noArg(), createSyncPacket());
+        AtmosphereNetwork.sendToAll(createSyncPacket());
     }
 
     private static SyncTornadoesPacket createSyncPacket() {

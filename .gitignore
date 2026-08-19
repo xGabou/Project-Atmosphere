@@ -31,8 +31,6 @@
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_54_PM_[Changes]/fileHashes.lock
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]1/fileHashes.lock
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]2/fileHashes.lock
-/gradle/wrapper/gradle-wrapper.jar
-/gradle/wrapper/gradle-wrapper.properties
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_1_2025_11_21_PM_[Changes]/md5-checksums.bin
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_54_PM_[Changes]/md5-checksums.bin
 /.idea/shelf/Uncommitted_changes_before_Update_at_5_5_2025_10_55_PM_[Changes]1/md5-checksums.bin
@@ -60,3 +58,11 @@ docs/decompiled-mods/Dynamic Trees/.tmp_dynamictrees_full/
 /docs/PA-docs/Core Systems/Studies/pa_realistic_cloud_renderer_design.md
 /diagnostics/
 /run-native-jar-visual/
+
+# Local Java/compiler and editor artifacts (tracked dependency jars remain visible).
+*.class
+out/
+Thumbs.db
+*.tmp
+*.swp
+.vscode/

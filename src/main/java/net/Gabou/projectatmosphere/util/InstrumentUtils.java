@@ -7,7 +7,7 @@ import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.core.WindVector;
 import net.Gabou.projectatmosphere.modules.region.ForecastRegion;
 import net.Gabou.projectatmosphere.network.InstrumentReadoutPacket;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,7 +15,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.network.PacketDistributor;
 
 public class InstrumentUtils {
 
@@ -109,7 +108,7 @@ public class InstrumentUtils {
     }
 
     private static void send(ServerPlayer player, String message) {
-        NetworkHandler.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new InstrumentReadoutPacket(message));
+        AtmosphereNetwork.sendToPlayer(player, new InstrumentReadoutPacket(message));
     }
 
     private static boolean ensureForecastReady(ServerLevel level, ServerPlayer player, BlockPos pos) {

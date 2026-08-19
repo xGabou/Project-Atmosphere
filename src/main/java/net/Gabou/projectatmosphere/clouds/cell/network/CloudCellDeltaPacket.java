@@ -2,16 +2,13 @@ package net.Gabou.projectatmosphere.clouds.cell.network;
 
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.cell.client.ClientCloudCellCache;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Server-to-client cloud cell delta: only cells that changed since the last
@@ -56,11 +53,8 @@ public final class CloudCellDeltaPacket {
         return new CloudCellDeltaPacket(updated, removed, worldTime);
     }
 
-    public static void handle(CloudCellDeltaPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
-        NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                ClientCloudCellCache.applyDelta(packet.updated, packet.removed, packet.worldTime)
-        ));
-        context.setPacketHandled(true);
+    public static void handle(CloudCellDeltaPacket packet, PacketContext context) {
+        context.enqueueClient(() -> ClientCloudCellCache.applyDelta(packet.updated, packet.removed, packet.worldTime));
+        context.markHandled();
     }
 }

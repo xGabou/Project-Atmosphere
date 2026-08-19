@@ -2,15 +2,12 @@ package net.Gabou.projectatmosphere.clouds.cell.network;
 
 import net.Gabou.projectatmosphere.clouds.cell.CloudCell;
 import net.Gabou.projectatmosphere.clouds.cell.client.ClientCloudCellCache;
+import net.Gabou.projectatmosphere.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * Server-to-client full cloud cell snapshot. Sent on join/dimension change or
@@ -44,11 +41,8 @@ public final class SyncCloudCellsPacket {
         return new SyncCloudCellsPacket(cells, worldTime);
     }
 
-    public static void handle(SyncCloudCellsPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
-        NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                ClientCloudCellCache.applyFullSnapshot(packet.cells, packet.worldTime)
-        ));
-        context.setPacketHandled(true);
+    public static void handle(SyncCloudCellsPacket packet, PacketContext context) {
+        context.enqueueClient(() -> ClientCloudCellCache.applyFullSnapshot(packet.cells, packet.worldTime));
+        context.markHandled();
     }
 }

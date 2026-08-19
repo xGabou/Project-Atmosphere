@@ -2,11 +2,10 @@ package net.Gabou.projectatmosphere.clouds;
 
 import net.Gabou.projectatmosphere.clouds.backend.CloudBackendResolver;
 import net.Gabou.projectatmosphere.clouds.backend.CloudVisualBackend;
-import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
+import net.Gabou.projectatmosphere.platform.config.AtmosphereConfig;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
 
 /**
  * Shared cloud/weather ownership policy for native PA rendering and vanilla compatibility hooks.
@@ -21,13 +20,13 @@ public final class AtmosphereCloudPolicy {
 
     public static boolean shouldSuppressVanillaClouds(@Nullable Level level) {
         return CloudBackendResolver.resolve(level) != CloudVisualBackend.DISABLED
-                && AtmoCommonConfig.CLOUD_MODE.get() == AtmoCommonConfig.CloudMode.FULL
+                && AtmosphereConfig.clouds().fullCloudMode()
                 && canUsePaInDimension(level);
     }
 
     public static boolean shouldOwnWeather(@Nullable Level level) {
-        return AtmoCommonConfig.EVENTS_ENABLED.get()
-                && AtmoCommonConfig.CLOUD_MODE.get() != AtmoCommonConfig.CloudMode.VANILLA
+        return AtmosphereConfig.clouds().eventsEnabled()
+                && !AtmosphereConfig.clouds().vanillaCloudMode()
                 && canUsePaInDimension(level);
     }
 
@@ -37,22 +36,6 @@ public final class AtmosphereCloudPolicy {
         }
 
         String dimensionId = level.dimension().location().toString();
-        boolean listed = containsDimension(dimensionId, AtmoCommonConfig.CLOUD_DIMENSION_IDS.get());
-        return AtmoCommonConfig.CLOUD_DIMENSION_FILTER_MODE.get() == AtmoCommonConfig.DimensionFilterMode.BLACKLIST
-                ? !listed
-                : listed;
-    }
-
-    private static boolean containsDimension(String dimensionId, @Nullable List<? extends String> configuredIds) {
-        if (configuredIds == null || configuredIds.isEmpty()) {
-            return false;
-        }
-
-        for (String configuredId : configuredIds) {
-            if (configuredId != null && dimensionId.equals(configuredId.trim())) {
-                return true;
-            }
-        }
-        return false;
+        return AtmosphereConfig.clouds().cloudEnabledInDimension(dimensionId);
     }
 }

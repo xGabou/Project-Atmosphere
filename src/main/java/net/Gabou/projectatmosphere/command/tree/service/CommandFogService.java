@@ -7,7 +7,7 @@ import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 import net.Gabou.projectatmosphere.manager.ForecastOrchestrator;
 import net.Gabou.projectatmosphere.modules.fog.FogHeuristics;
 import net.Gabou.projectatmosphere.network.FogDebugOverridePacket;
-import net.Gabou.projectatmosphere.network.NetworkHandler;
+import net.Gabou.projectatmosphere.platform.network.AtmosphereNetwork;
 import net.Gabou.projectatmosphere.modules.temperature.command.TemperatureCommandHelper;
 import net.Gabou.projectatmosphere.util.UnitFormatter;
 import net.minecraft.commands.CommandSourceStack;
@@ -17,7 +17,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.PacketDistributor;
 
 public final class CommandFogService {
     private static final float DEFAULT_STRENGTH = 0.85F;
@@ -70,10 +69,7 @@ public final class CommandFogService {
         }
 
         int durationTicks = seconds * 20;
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new FogDebugOverridePacket(strength, durationTicks)
-        );
+        AtmosphereNetwork.sendToPlayer(player, new FogDebugOverridePacket(strength, durationTicks));
         PaCommandMessages.success(
                 source,
                 true,
@@ -95,10 +91,7 @@ public final class CommandFogService {
             return 0;
         }
 
-        NetworkHandler.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
-                new FogDebugOverridePacket(0.0F, 0)
-        );
+        AtmosphereNetwork.sendToPlayer(player, new FogDebugOverridePacket(0.0F, 0));
         PaCommandMessages.success(source, true, "Fog override cleared");
         return 1;
     }

@@ -47,7 +47,6 @@ minecraft {
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
 
-
         }
 
         server {
@@ -174,7 +173,12 @@ dependencies {
     compileOnly fg.deobf("curse.maven:desert-storms-1312888:6931061")
     compileOnly fg.deobf("curse.maven:rainboows-1121832:6421980")
     compileOnly fg.deobf("curse.maven:auroras-1105290:6040671")
-    compileOnly "maven.modrinth:protomanlys-weather:0.16.4-1.20.1-alpha"
+    // No production source imports PM Weather. Its historical Modrinth
+    // coordinate is no longer published, so keeping it on the unconditional
+    // compile classpath makes clean builds fail for no functional benefit.
+    if (project.findProperty("enableProtomanlysWeatherCompile") == "true") {
+        compileOnly "maven.modrinth:protomanlys-weather:0.16.4-1.20.1-alpha"
+    }
 
     // Temperature and survival compatibility
     compileOnly fg.deobf("curse.maven:legendary-survival-overhaul-840254:7603852")
@@ -299,11 +303,75 @@ tasks.register('volumetricStabilityDiagnosticsSandbox', JavaExec) {
     workingDir = project.rootDir
 }
 
+tasks.register('stormVolumetricGeometrySandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs deterministic direct severe-storm geometry and cache checks without launching Minecraft.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('stormDensityThresholdSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Measures the baked cloud noise and re-derives the storm morphology thresholds (T100).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormDensityThresholdSandbox'
+    workingDir = project.rootDir
+}
+
+tasks.register('stormMorphologySandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs the Phase 4S positive morphology regressions (T101-T106).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormMorphologySandbox'
+    workingDir = project.rootDir
+    // -Pphase4s.failFirst=true reproduces the recorded fail-first evidence
+    // against the audited pre-correction composition.
+    systemProperty 'phase4s.failFirst', (project.findProperty('phase4s.failFirst') ?: 'false')
+}
+
+tasks.register('architectureBoundaryCheck') {
+    group = 'verification'
+    description = 'Prevents loader networking and ForgeConfigSpec access from leaking back into migrated domain code.'
+
+    doLast {
+        def sourceRoot = file('src/main/java')
+        def violations = []
+        fileTree(sourceRoot) { include '**/*.java' }.files.each { sourceFile ->
+            def relative = sourceRoot.toPath().relativize(sourceFile.toPath()).toString().replace('\\', '/')
+            def text = sourceFile.getText('UTF-8')
+            def networkAdapter = relative.startsWith('net/Gabou/projectatmosphere/platform/network/')
+                    || relative == 'net/Gabou/projectatmosphere/network/NetworkHandler.java'
+            if (!networkAdapter && (text.contains('net.minecraftforge.network')
+                    || text.contains('NetworkHandler.CHANNEL')
+                    || text.contains('PacketDistributor'))) {
+                violations << "Forge networking leaked into ${relative}"
+            }
+
+            def migratedCloudDomain = relative.startsWith('net/Gabou/projectatmosphere/clouds/')
+                    && !relative.startsWith('net/Gabou/projectatmosphere/clouds/client/render/')
+            if (migratedCloudDomain && text.contains('AtmoCommonConfig')) {
+                violations << "Forge config access leaked into ${relative}"
+            }
+        }
+        if (!violations.isEmpty()) {
+            throw new GradleException(violations.join(System.lineSeparator()))
+        }
+    }
+}
+
 tasks.named('check').configure {
+    dependsOn 'architectureBoundaryCheck'
     dependsOn 'materialAdvectionSandbox'
     dependsOn 'cloudRegionMotionSandbox'
     dependsOn 'cloudMorphologyTopologySandbox'
     dependsOn 'volumetricStabilityDiagnosticsSandbox'
+    dependsOn 'stormDensityThresholdSandbox'
+    dependsOn 'stormMorphologySandbox'
+    dependsOn 'stormVolumetricGeometrySandbox'
 }
 
 tasks.withType(JavaCompile).configureEach {
