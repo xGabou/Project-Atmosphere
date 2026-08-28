@@ -175,7 +175,20 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 ### Revalidation Gate
 
 - [X] T097 Run the corrected morphology, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, precipitation, and acceleration regressions plus the US1/US2 sandboxes; record passing results in `specs/001-native-storm-rendering/validation/phase4r-automated.md` and verify each T080 expected failure is closed without weakening assertions (depends on T081-T096) [SC-001-SC-004, SC-010]
-**T098 root cause 2026-08-28.** The missing CORE/TOWER body is a **material-stage** failure, not
+**T098 root cause CORRECTED 2026-08-28.** The carrier-wavelength conclusion below is
+**retracted**. Direct measurement (262,144 samples through the production domain transform)
+shows the shader's `carrierRaw` has p05/p50/p95 = **0.7123/0.7836/0.8452**, matching the
+`STORM_CARRIER_P05/P95` constants to three decimals, with the severe column's distribution
+identical to the global one and exactly **5.06%** zeroed as designed. The dominant base feature
+is **109.4 blocks** (already recorded in `morphology-thresholds.md`), not the 426-block texture
+repeat. There is no dead band and no stale calibration; the earlier finding over-read a single
+correlated centre-line trace. The evidence instead attributes the loss to **erosion against a
+small tower cross-section**: body is non-zero where baseField is zero (Y=344 baseField 0.000,
+body 0.292) but a roughly constant erosion (0.285) removes it, while the same erosion barely
+dents the base/anvil's much larger body. TOWER carries a **19:1** smaller visible envelope than
+ANVIL. **No production change was made.** See `validation/t098-manual-checklist.md`.
+
+**Superseded - T098 root cause 2026-08-28.** The missing CORE/TOWER body is a **material-stage** failure, not
 geometry: CORE and TOWER envelopes carry the highest mean/max envelope and the highest descriptor
 strengths of any role, and T131 engages correctly. The production trace shows `carrierRaw` healthy
 (0.66-0.83) everywhere while **`baseField` collapses to zero** through the whole convective column.

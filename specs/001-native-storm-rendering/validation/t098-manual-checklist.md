@@ -330,7 +330,82 @@ SC-006 / T070 performance debt remains separate and open.
 
 ---
 
-# T098 root cause - 2026-08-28 - carrier normalisation vs base-noise wavelength
+
+---
+
+# T098 root cause CORRECTED - 2026-08-28
+
+**The carrier-wavelength root cause recorded in the section below is WRONG and is retracted.** It was
+inferred from a single centre-line trace and does not survive direct measurement. No production
+change was made on the strength of it.
+
+## What was claimed, and why it was wrong
+
+The earlier section concluded that `STORM_BASE_NOISE_SCALE = 0.0025` gave the carrier a ~426-block
+vertical period against an 865-block column, producing a repeated horizontal dead band that sliced
+the storm. Two independent measurements refute this.
+
+**1. The wavelength was never 426 blocks.** The carrier is
+`perlinFbm(u, v, w, base frequency 4, 5 octaves)` remapped by `worleyFbm(..., 8 cells)`. At scale
+0.0025 the texture repeat is 400 world blocks, so the *dominant* Perlin feature is a quarter of
+that - about 107 blocks. `morphology-thresholds.md` already records this independently: the T124
+re-measurement at base scale 0.0025 found the dominant base feature is **109.4 blocks**. The 426-block
+figure was the texture repeat interval, not the feature size, and re-reading the trace confirms the
+carrier oscillates roughly three times across 400 blocks, consistent with ~107-block features.
+
+**2. The thresholds are correct for the quantity they gate.** The suspicion was that
+`STORM_CARRIER_P05/P95` had been measured on the baked R channel while the shader applies them to
+`carrierRaw = saturate(remap(r, -(1 - lowFbm), 1, 0, 1))`. Measured directly through the exact
+production domain transform (`reportT098CarrierDistribution()`, 262,144 samples):
+
+| Quantity | p05 | p50 | p95 | Below the 0.7128 constant |
+|---|---:|---:|---:|---:|
+| Baked R channel | 0.5693 | 0.6713 | 0.7620 | 75.91% |
+| **Shader `carrierRaw`** | **0.7123** | 0.7836 | **0.8452** | **5.11%** |
+| `carrierRaw`, severe column only | 0.7125 | 0.7834 | 0.8444 | **5.06%** |
+
+The constants match the shader quantity to three decimals, and the severe column's distribution is
+indistinguishable from the global one. Exactly the designed 5% is zeroed. **There is no regional
+bias, no dead band, and no stale calibration.**
+
+The original error was reading 8-of-26 low samples along one vertical line as a systematic band.
+Those samples are 16 blocks apart inside a ~109-block feature, so they are strongly correlated -
+roughly four independent samples that happened to cross one noise trough.
+
+## What the evidence actually supports
+
+The measured chain, from the same trace and the role-occupancy probe:
+
+- `body` is **not** zero where `baseField` is zero. `lowerBound = (1 - coverage) - fill * coverage`,
+  so at high coverage the body floor is positive: at Y=344 `baseField=0.000` but
+  `bodyBefore=0.292`.
+- Density dies at **erosion**, not at the remap. At Y=344 an erosion of `0.285` against a body of
+  `0.292` leaves `density=0.009`; at Y=520 the same-magnitude erosion (`0.223`) against a body of
+  `0.967` leaves `density=0.945`. Erosion is roughly constant; what varies is how much body it has
+  to bite into.
+- The tower is geometrically small. Role occupancy on the live adopted system:
+  TOWER `envelopeVisible=7,478` against ANVIL `143,834` - a **19:1** ratio, and per 48-block band
+  the tower carries 68-495 visible voxels against the anvil's 12,644.
+
+So the tower has both the least cross-section and the least margin against a roughly constant
+erosion bite. Where `baseField` is high the tower survives; where it is in an ordinary trough the
+body sits near the coverage floor and erosion removes essentially all of it. The wide base and anvil
+have enough cross-section that plenty of high-`baseField` material always survives.
+
+**This is a proportion and erosion-sensitivity question, not a noise-calibration bug.** It is
+therefore not addressed by changing `STORM_BASE_NOISE_SCALE`, and that change was not made.
+
+## Status
+
+`STORM_BASE_NOISE_SCALE` remains `0.0025`. `STORM_CARRIER_P05/P95` remain `0.7128`/`0.8451` -
+re-measured and confirmed valid. T131, erosion, lighting, descriptor geometry, role strengths and
+`STORM_MAX_BLEND_BLOCKS = 48` are all unchanged. **T098 remains REJECTED and OPEN**, with the
+failing stage now correctly attributed and the next decision open.
+
+
+---
+
+# RETRACTED - T098 root cause - 2026-08-28 - carrier normalisation vs base-noise wavelength
 
 **T098 remains REJECTED.** The missing CORE/TOWER body has been traced to a single first failing
 stage. No production change was made: correcting it requires either a morphology-wide change or a

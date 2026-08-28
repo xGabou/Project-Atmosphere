@@ -61,6 +61,7 @@ public final class StormVolumetricGeometrySandbox {
         validateT132DeterministicImageComparator();
         validateT132RepeatedSamplingMedian();
         validateT132Attribution();
+        reportT098CarrierDistribution();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -1201,6 +1202,132 @@ public final class StormVolumetricGeometrySandbox {
                 "projectionStability={requiredStableFrames=3 stabilized=true}",
                 StormTopologyMode.COMPACT,
                 StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
+    }
+
+
+    /**
+     * T098 root-cause measurement: the distribution of the quantity
+     * {@code stormBaseField} is actually applied to.
+     *
+     * <p>{@code morphology-thresholds.md} records the Perlin-Worley carrier
+     * p05/p95 as 0.7128/0.8451, measured on the baked R channel. The shader does
+     * not feed the R channel to {@code stormBaseField}: it feeds
+     * {@code carrierRaw = saturate(remap(r, -(1 - lowFbm), 1, 0, 1))}, where
+     * {@code lowFbm} is the weighted Worley FBM of the G/B/A channels. This
+     * measures both quantities through the exact production domain transform so
+     * the thresholds can be checked against what they actually gate.
+     *
+     * <p>Report only - what the thresholds should be is a T098 decision.
+     */
+    private static void reportT098CarrierDistribution() {
+        byte[] base = CloudNoiseFieldModel.bakeBase();
+        double[] sample = new double[4];
+
+        // Production domain transform, mirrored from baseNoiseDomain().
+        final double scale = 0.0025D;
+        java.util.List<Double> rawCarrier = new java.util.ArrayList<>();
+        java.util.List<Double> shaderCarrier = new java.util.ArrayList<>();
+        java.util.List<Double> stormCarrier = new java.util.ArrayList<>();
+
+        // A large uniform world volume for the global distribution, and the
+        // severe column itself for the local one.
+        for (int i = 0; i < 64; i++) {
+            for (int j = 0; j < 64; j++) {
+                for (int k = 0; k < 64; k++) {
+                    double worldX = -2000.0D + i * 62.5D;
+                    double worldY = 100.0D + j * 14.0D;
+                    double worldZ = -2000.0D + k * 62.5D;
+                    double[] uvw = baseDomain(worldX, worldY, worldZ, scale);
+                    CloudNoiseFieldModel.sampleBase(base, uvw[0], uvw[1], uvw[2], sample);
+                    double lowFbm = sample[1] * 0.625D + sample[2] * 0.25D + sample[3] * 0.125D;
+                    double carrier = clamp01(remapValue(sample[0], -(1.0D - lowFbm), 1.0D));
+                    rawCarrier.add(sample[0]);
+                    shaderCarrier.add(carrier);
+                    // The severe column: 865 blocks tall around a storm centre.
+                    if (worldY >= 136.0D && worldY <= 1001.0D
+                            && Math.hypot(worldX, worldZ) <= 650.0D) {
+                        stormCarrier.add(carrier);
+                    }
+                }
+            }
+        }
+
+        java.util.Collections.sort(rawCarrier);
+        java.util.Collections.sort(shaderCarrier);
+        java.util.Collections.sort(stormCarrier);
+
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_CARRIER|quantity=bakedRChannel|samples=%d|p05=%.4f|p50=%.4f|p95=%.4f%n",
+                rawCarrier.size(), percentile(rawCarrier, 0.05D),
+                percentile(rawCarrier, 0.50D), percentile(rawCarrier, 0.95D));
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_CARRIER|quantity=shaderCarrierRaw|samples=%d|p05=%.4f|p50=%.4f|p95=%.4f%n",
+                shaderCarrier.size(), percentile(shaderCarrier, 0.05D),
+                percentile(shaderCarrier, 0.50D), percentile(shaderCarrier, 0.95D));
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_CARRIER|quantity=shaderCarrierRaw_severeColumn|samples=%d"
+                        + "|p05=%.4f|p50=%.4f|p95=%.4f%n",
+                stormCarrier.size(), percentile(stormCarrier, 0.05D),
+                percentile(stormCarrier, 0.50D), percentile(stormCarrier, 0.95D));
+
+        // How much of each distribution the production window zeroes.
+        double p05Constant = 0.7128D;
+        double p95Constant = 0.8451D;
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_CARRIER_WINDOW|p05Constant=%.4f|p95Constant=%.4f"
+                        + "|rawBelowP05=%.2f%%|shaderBelowP05=%.2f%%|severeColumnBelowP05=%.2f%%"
+                        + "|shaderAboveP95=%.2f%%%n",
+                p05Constant, p95Constant,
+                100.0D * fractionBelow(rawCarrier, p05Constant),
+                100.0D * fractionBelow(shaderCarrier, p05Constant),
+                100.0D * fractionBelow(stormCarrier, p05Constant),
+                100.0D * (1.0D - fractionBelow(shaderCarrier, p95Constant)));
+    }
+
+    /** Mirrors baseNoiseDomain() from the production shader. */
+    private static double[] baseDomain(double x, double y, double z, double scale) {
+        double rx = x * 0.8138D + y * 0.2962D + z * -0.5000D;
+        double ry = x * -0.1401D + y * 0.9408D + z * 0.3085D;
+        double rz = x * 0.5630D + y * -0.1677D + z * 0.8090D;
+        double wx = Math.sin(x * 0.00173D + y * 0.00091D + z * -0.00127D + 1.7D);
+        double wy = Math.sin(x * -0.00111D + y * 0.00149D + z * 0.00083D - 2.3D);
+        double wz = Math.sin(x * 0.00079D + y * -0.00131D + z * 0.00191D + 4.1D);
+        return new double[]{
+                rx * scale + wx * 0.31D,
+                ry * scale + wy * 0.31D,
+                rz * scale + wz * 0.31D};
+    }
+
+    /** Mirrors the shader's remap(value, low, high, 0, 1). */
+    private static double remapValue(double value, double low, double high) {
+        return (value - low) / Math.max(high - low, 1.0e-6D);
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0D, Math.min(1.0D, value));
+    }
+
+    private static double percentile(java.util.List<Double> sorted, double q) {
+        if (sorted.isEmpty()) {
+            return 0.0D;
+        }
+        int index = (int) Math.floor(q * (sorted.size() - 1));
+        return sorted.get(Math.max(0, Math.min(sorted.size() - 1, index)));
+    }
+
+    private static double fractionBelow(java.util.List<Double> sorted, double threshold) {
+        if (sorted.isEmpty()) {
+            return 0.0D;
+        }
+        int count = 0;
+        for (double value : sorted) {
+            if (value < threshold) {
+                count++;
+            } else {
+                break;
+            }
+        }
+        return (double) count / sorted.size();
     }
 
     private static int connectedComponents(boolean[][] occupied) {
