@@ -732,3 +732,73 @@ ANVIL specified at 1.20-1.35 of BASE, spanning 1,270-1,287 blocks over a 210-blo
 will dominate any column that a 900-1,100 BASE can physically taper into.
 
 **T098 remains REJECTED. T099 blocked.** `STORM_MAX_BLEND_BLOCKS = 48` is still not the blocker.
+
+---
+
+# T098 ANVIL/BASE hypothesis FALSIFIED - 2026-08-28 - structural limit reached
+
+**Narrowing the anvil does not fix the silhouette, and the anvil is not the dominant term.** No
+production change was made this session.
+
+## Correction to a figure I reported earlier
+
+The previous session quoted the shipped TOWER correction as raising column share to **10.14%**. That
+came from a proxy that scaled CORE and TOWER together. Measured with the fixture rebased onto the
+*actual* shipped geometry - TOWER only, lower x1.120 and upper x1.392, CORE untouched - the true
+figure is **7.83%**, up from 6.49%.
+
+The correction is still real and worth keeping: TOWER visible material more than doubled (943 ->
+2,276 voxels) and ANVIL:TOWER fell from **35.1:1 to 14.5:1**. But the column-share gain is 1.34
+points, not 3.65.
+
+## ANVIL/BASE sweep, corrected TOWER baseline
+
+| anvilScale | ANVIL span | ANVIL/BASE | Column share | anvil:column | anvil:tower | Footprint |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.021 | 1308 | 1.239 | 7.83% | 7.1:1 | 14.5:1 | 2263 |
+| 0.980 | 1266 | 1.200 | 7.94% | 7.0:1 | 14.2:1 | 2263 |
+| 0.940 | 1226 | 1.162 | 8.05% | 6.8:1 | 13.8:1 | 2263 |
+| 0.899 | 1185 | 1.123 | 8.19% | 6.5:1 | 13.3:1 | 2263 |
+| 0.858 | 1144 | 1.084 | 8.33% | 6.3:1 | 12.9:1 | 2229 |
+| 0.780 | 1065 | 1.009 | 8.73% | 5.8:1 | 11.7:1 | 2196 |
+| 0.700 | 985 | **0.933** | 9.28% | 5.1:1 | 10.3:1 | 2039 |
+
+**No transition point exists.** Driving ANVIL/BASE from 1.239 to 0.933 - an anvil *narrower than the
+base*, which no longer reads as an anvil and violates T127's 1.20-1.35 relationship outright - moves
+column share by **1.45 percentage points** and leaves the anvil still 5.1x the entire column. The
+occupied band count stays at 11/19 throughout. Nothing in the admissible range changes the
+silhouette, so no live campaign was run for a change not worth making.
+
+## Why the anvil was never the dominant term
+
+| Comparison | Value |
+|---|---:|
+| BASE visible voxels | 21,521 |
+| CORE + TOWER visible voxels | 4,635 |
+| **BASE alone : entire column** | **4.6 : 1** |
+
+Geometry predicts this independently: BASE 1044 against CORE 504 is a **2.07x diameter ratio**, which
+is **4.29x in cross-sectional area**, and the measured 4.6:1 matches the 4.2:1 volume estimate. **Even
+with the anvil deleted entirely, the base would still be 4.6x the column.**
+
+## Structural conclusion
+
+The mushroom silhouette is not produced by any single contract term. It follows from the role
+decomposition itself: a ten-descriptor system carrying two BASE and four ANVIL members at 1,000-1,300
+blocks wide, against two CORE and two TOWER members at 200-500 blocks, will always render as two
+broad masses joined by a comparatively thin column. Every lever inside the current decomposition has
+now been measured:
+
+| Lever | Result |
+|---|---|
+| Carrier wavelength / thresholds | falsified - calibration correct, 5.06% zeroed as designed |
+| Erosion scaling | falsified - TOWER is the *least* eroded role |
+| TOWER proportion (T127 relationships) | real defect, corrected, silhouette unchanged |
+| ANVIL/BASE proportion | falsified - no transition; anvil is not the dominant term |
+
+**The current descriptor-role decomposition appears incapable of producing T098's required
+silhouette without a structural morphology redesign** - either far fewer/narrower BASE and ANVIL
+members, or a column built from more than two CORE and two TOWER descriptors, or a different
+role-to-descriptor allocation entirely. That is a redesign, not a contract adjustment.
+
+**T098 remains REJECTED. T099 blocked.** `STORM_MAX_BLEND_BLOCKS = 48` is still not the blocker.

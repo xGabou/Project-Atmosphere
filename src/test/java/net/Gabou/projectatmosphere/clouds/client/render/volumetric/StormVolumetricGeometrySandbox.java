@@ -1348,8 +1348,11 @@ public final class StormVolumetricGeometrySandbox {
                 {-66.5D, -38.7D, 152.6D, 600.2D, 527.8D, 475.0D, 0.8985D, 0.5200D, 0.0D},
                 {-49.4D, -64.0D, 352.3D, 633.1D, 297.5D, 267.7D, 1.0000D, 0.4800D, 1.0D},
                 {-29.8D, -94.8D, 405.6D, 702.0D, 279.0D, 251.1D, 1.0000D, 0.4800D, 1.0D},
-                {-14.4D, -106.0D, 433.5D, 800.1D, 200.3D, 164.3D, 0.9045D, 0.4400D, 2.0D},
-                {-1.3D, -95.4D, 592.0D, 927.4D, 142.3D, 116.7D, 0.9681D, 0.4400D, 2.0D},
+                // TOWER radii carry the shipped T127 correction: the lower
+                // member by 0.392/0.35 = 1.120 and the upper by 0.334/0.24 =
+                // 1.392, so this fixture matches current production.
+                {-14.4D, -106.0D, 433.5D, 800.1D, 224.3D, 184.0D, 0.9045D, 0.4400D, 2.0D},
+                {-1.3D, -95.4D, 592.0D, 927.4D, 198.1D, 162.4D, 0.9681D, 0.4400D, 2.0D},
                 {-109.9D, -77.1D, 769.6D, 980.2D, 507.6D, 294.4D, 0.8065D, 0.5600D, 3.0D},
                 {-18.8D, -10.9D, 777.1D, 987.7D, 484.3D, 280.9D, 0.8075D, 0.5600D, 3.0D},
                 {77.3D, -144.1D, 783.6D, 994.2D, 488.4D, 283.2D, 0.7982D, 0.5600D, 3.0D},
@@ -1549,23 +1552,15 @@ public final class StormVolumetricGeometrySandbox {
     private static void reportT098ProportionSensitivity() {
         byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
         byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
-        System.out.println("T098_SENSITIVITY|scaling CORE+TOWER radii, then ANVIL radii"
+        System.out.println("T098_SENSITIVITY|corrected TOWER baseline; sweeping ANVIL/BASE"
                 + "|metric=density-visible voxels (>=0.02)");
-        double[] columnScales = {1.00D, 1.15D, 1.30D, 1.45D, 1.60D, 1.80D};
-        for (double scale : columnScales) {
-            measureProportion(baseVolume, detailVolume, scale, 1.00D);
-        }
-        // The shipped T127 correction: TOWER only, lower x1.120 upper x1.392,
-        // approximated here by the mean tower factor.
-        measureProportion(baseVolume, detailVolume, 1.256D, 1.00D);
-        double[] anvilScales = {0.90D, 0.80D, 0.70D};
+        // ANVIL/BASE is 1.224 at scale 1.0, so these factors target the ratio
+        // band the brief asks for: 1.05, 1.10, 1.15, 1.20, 1.25, plus a wider
+        // reduction to bound the transition if one exists.
+        double[] anvilScales = {1.021D, 0.980D, 0.940D, 0.899D, 0.858D, 0.780D, 0.700D};
         for (double scale : anvilScales) {
             measureProportion(baseVolume, detailVolume, 1.00D, scale);
         }
-        // The combination class the brief asks for: modest column growth with a
-        // modest anvil reduction.
-        measureProportion(baseVolume, detailVolume, 1.30D, 0.90D);
-        measureProportion(baseVolume, detailVolume, 1.45D, 0.85D);
     }
 
     /** One proportion candidate, measured through the production density chain. */
@@ -1587,6 +1582,25 @@ public final class StormVolumetricGeometrySandbox {
                     lobe.density(), lobe.edgeSoftness(), lobe.seed01(), lobe.lifecycleStage(),
                     lobe.verticalDevelopment(), lobe.detailWeight()));
         }
+
+        // The anvil union span and BASE diameter this candidate delivers, so
+        // the ratio and the footprint contract can both be read off directly.
+        double anvilMinX = Double.POSITIVE_INFINITY;
+        double anvilMaxX = Double.NEGATIVE_INFINITY;
+        double anvilMinZ = Double.POSITIVE_INFINITY;
+        double anvilMaxZ = Double.NEGATIVE_INFINITY;
+        double baseDiameter = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            if (lobe.role() == StormLobeDescriptor.Role.ANVIL) {
+                anvilMinX = Math.min(anvilMinX, lobe.centerX() - lobe.majorRadius());
+                anvilMaxX = Math.max(anvilMaxX, lobe.centerX() + lobe.majorRadius());
+                anvilMinZ = Math.min(anvilMinZ, lobe.centerZ() - lobe.majorRadius());
+                anvilMaxZ = Math.max(anvilMaxZ, lobe.centerZ() + lobe.majorRadius());
+            } else if (lobe.role() == StormLobeDescriptor.Role.BASE) {
+                baseDiameter = Math.max(baseDiameter, lobe.majorRadius() * 2.0D);
+            }
+        }
+        double anvilSpan = Math.max(anvilMaxX - anvilMinX, anvilMaxZ - anvilMinZ);
 
         double[] baseSample = new double[4];
         double[] detailSample = new double[4];
@@ -1665,16 +1679,17 @@ public final class StormVolumetricGeometrySandbox {
         long mass = visible[0] + visible[3];
         long total = column + mass;
         System.out.printf(java.util.Locale.ROOT,
-                "T098_PROPORTION|columnScale=%.2f|anvilScale=%.2f"
+                "T098_PROPORTION|anvilScale=%.3f|anvilSpan=%.0f|anvilOverBase=%.3f"
                         + "|base=%-6d|core=%-6d|tower=%-6d|anvil=%-6d"
-                        + "|columnShare=%.2f%%|massOverColumn=%.1f:1|anvilOverTower=%.1f:1"
-                        + "|columnBands=%d/%d|longestColumnGap=%d|footprint=%.0f%n",
-                columnScale, anvilScale,
+                        + "|columnShare=%.2f%%|anvilOverColumn=%.1f:1|anvilOverTower=%.1f:1"
+                        + "|columnBands=%d/%d|footprint=%.0f%n",
+                anvilScale, anvilSpan,
+                baseDiameter == 0.0D ? 0.0D : anvilSpan / baseDiameter,
                 visible[0], visible[1], visible[2], visible[3],
                 total == 0L ? 0.0D : 100.0D * column / total,
-                column == 0L ? 0.0D : (double) mass / column,
+                column == 0L ? 0.0D : (double) visible[3] / column,
                 visible[2] == 0L ? 0.0D : (double) visible[3] / visible[2],
-                bandsWithColumn, bands, longestGap, footprintMax);
+                bandsWithColumn, bands, footprintMax);
     }
 
     private static int connectedComponents(boolean[][] occupied) {

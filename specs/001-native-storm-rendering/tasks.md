@@ -175,7 +175,19 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 ### Revalidation Gate
 
 - [X] T097 Run the corrected morphology, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, precipitation, and acceleration regressions plus the US1/US2 sandboxes; record passing results in `specs/001-native-storm-rendering/validation/phase4r-automated.md` and verify each T080 expected failure is closed without weakening assertions (depends on T081-T096) [SC-001-SC-004, SC-010]
-**T098 2026-08-28: T127 proportional contract CORRECTED; silhouette still REJECTED.** The
+**T098 2026-08-28: ANVIL/BASE falsified; structural limit reached.** Sweeping ANVIL/BASE from
+1.239 down to 0.933 - an anvil narrower than the base, outside T127 entirely - moves column share
+only 7.83% to 9.28% and leaves the anvil 5.1:1 over the whole column; occupied bands stay 11/19.
+**No transition point exists.** The anvil was never the dominant term: BASE alone is **4.6:1** over
+CORE+TOWER, matching the 4.29x area ratio implied by T127 BASE 1044 vs CORE 504. Even deleting the
+anvil would leave the base 4.6x the column. Also correcting an earlier figure: the shipped TOWER
+correction raises column share to **7.83%**, not the 10.14% previously reported, which came from a
+proxy that scaled CORE as well. All four levers inside the current decomposition are now measured and
+exhausted (carrier, erosion, TOWER proportion, ANVIL proportion). **The descriptor-role decomposition
+itself appears incapable of the required silhouette without a structural morphology redesign.** No
+production change made this session.
+
+**Superseded - T098 2026-08-28: T127 proportional contract CORRECTED; silhouette still REJECTED.** The
 violated relationships are fixed at midband (lower TOWER/CORE 0.625 -> 0.700, ANVIL/upper TOWER
 5.917 -> 4.251) by moving the TOWER radius multiplier from lerp(0.35, 0.24) to lerp(0.392, 0.334),
 with all four relationship guards now enforced deterministically. Central-column material rose
