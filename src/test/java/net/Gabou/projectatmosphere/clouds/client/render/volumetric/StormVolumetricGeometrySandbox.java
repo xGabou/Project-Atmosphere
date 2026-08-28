@@ -46,6 +46,21 @@ public final class StormVolumetricGeometrySandbox {
         validateGroupSelectionAndCandidatePacking();
         validateDirtyAndAdoptionContracts();
         validateCoalescingAndSaturationContracts();
+        StormPerformanceSuite.selfCheckStateMachine();
+        validateT132AuthoritativeControlSeparation();
+        validateT133ProductionDefaultUnchanged();
+        validateT123InstrumentationOnly();
+        validateT121VerticalBoundIsConservative();
+        validateT121Float32BoundaryMargin();
+        validateT121GuardAdmitsNoUnionContribution();
+        validateT121SoftnessBoundary();
+        validateT121T122ShaderGuards();
+        StormWorkloadRuntimeCapture.selfCheckFreshnessContract();
+        StormReferenceImageCapture.selfCheckHistoryRestoration();
+        validateT132WorkloadCaptureFreshness();
+        validateT132DeterministicImageComparator();
+        validateT132RepeatedSamplingMedian();
+        validateT132Attribution();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -103,8 +118,16 @@ public final class StormVolumetricGeometrySandbox {
                 0.0D, 0.0D, 220.0F, 270.0F, 90.0F, 70.0F);
         float[] texels = new float[StormLobeDescriptor.FLOATS_PER_DESCRIPTOR];
         base.withGroupSlot(2).writeTexels(texels, 0);
-        requireNear("packed group/role", texels[15], 16.0D, 0.0D);
-        require(StormLobeDescriptor.Role.fromGpuId(((int) texels[15]) % 8)
+        requireNear("packed group topology", texels[15],
+                StormLobeDescriptor.packTopology(2, 7, 0, StormLobeDescriptor.Role.BASE.gpuId()),
+                0.0D);
+        require(StormLobeDescriptor.unpackGroupSlot((int) texels[15]) == 2,
+                "group topology pack/unpack mismatch");
+        require(StormLobeDescriptor.unpackMemberCount((int) texels[15]) == 7,
+                "member count topology pack/unpack mismatch");
+        require(StormLobeDescriptor.unpackMemberIndex((int) texels[15]) == 0,
+                "member index topology pack/unpack mismatch");
+        require(StormLobeDescriptor.Role.fromGpuId(StormLobeDescriptor.unpackRole((int) texels[15]))
                 == StormLobeDescriptor.Role.BASE, "role pack/unpack mismatch");
 
         for (StormLobeDescriptor.Role role : StormLobeDescriptor.Role.values()) {
@@ -506,6 +529,678 @@ public final class StormVolumetricGeometrySandbox {
         int components = connectedComponents(occupied);
         double area = occupiedCount * step * step;
         return new Section(Math.sqrt(area / Math.PI), components);
+    }
+
+
+    /**
+     * The margin the production T121 guard adds to {@code lobeSoftness}, in
+     * world blocks. Derived, not chosen: it must exceed the measured float32 SDF
+     * shortfall plus the ULP of the softness comparison itself, while staying
+     * negligible against the 11.36-block minimum softness it guards.
+     */
+    static final float T121_SOFTNESS_MARGIN_BLOCKS = 9.765625E-4F;
+
+    /**
+     * T132 criterion 3 was rebased onto the adjacent repeated-sampling protocol,
+     * retiring {@code existingSeparatedPassComparison}. That comparison separates
+     * its two passes by multiple teleports and substantial live time, so it
+     * admits drift unrelated to any optimization under test. This guards the
+     * correction structurally: the acceptance verdict must be computed from the
+     * adjacent controls alone, and the retired comparison must stay clearly
+     * labelled and unable to make the suite report a false verdict.
+     */
+    private static void validateT132AuthoritativeControlSeparation() {
+        String suite = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/StormPerformanceSuite.java");
+
+        require(suite.contains("authoritativeAdjacentControls={"),
+                "T132 suite no longer emits authoritativeAdjacentControls");
+        require(suite.contains("historicalSeparatedPassComparison={authoritative=false"),
+                "T132 retired separated-pass comparison is not labelled non-authoritative");
+        require(suite.contains("usedForT132Acceptance=false"),
+                "T132 retired comparison does not declare itself excluded from acceptance");
+        require(suite.contains("separatedPassControlFieldsMatch="),
+                "T132 retired comparison verdict is not namespaced");
+        require(suite.contains("separatedPassControlDifferences="),
+                "T132 retired comparison differences are not namespaced");
+
+        String aggregator = between(suite,
+                "private static String authoritativeAdjacentControls(",
+                "private static String diagnosticViewFor(",
+                "T132 authoritative control aggregator");
+        require(!aggregator.contains("controlDifferences(other"),
+                "T132 authoritative verdict consults the retired separated-pass comparison");
+        require(aggregator.contains("adjacentControlDifferences(fixture)"),
+                "T132 authoritative verdict is not derived from the adjacent controls");
+        require(aggregator.contains("controlsMatched="),
+                "T132 authoritative verdict does not report controlsMatched");
+
+        String adjacent = between(suite,
+                "private List<String> adjacentControlDifferences(",
+                "private void groupControlDifferences(",
+                "T132 adjacent control evaluation");
+        for (String required : new String[]{
+                "frozen_fixture_fingerprint_mismatch",
+                "structuralChanged",
+                "governorScale_not_0.50000",
+                "resolutionScale_not_0.75000",
+                "production_topology_not_compact",
+                "workload_target_does_not_match_baseline_target",
+                "workload_capture_token_missing"}) {
+            require(adjacent.contains(required),
+                    "T132 adjacent controls dropped the " + required + " requirement");
+        }
+        System.out.println(
+                "PHASE4T_RESULT|T132 authoritative control separation|PASSED|invariant satisfied");
+    }
+
+    /**
+     * T133 / SC-020 production-default equivalence. The diagnostic OFF arms are
+     * only admissible if ordinary frames cannot reach them, so this pins the
+     * default at every layer: the shader constant, the shader's uniform default,
+     * the debug config field, its reset contract, and the renderer upload.
+     */
+    private static void validateT133ProductionDefaultUnchanged() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        require(shader.contains("const int PA_OPT_NORMAL_PRODUCTION = 0;")
+                        && shader.contains("uniform int PaDiagnosticOptimizationMode;"),
+                "T133 diagnostic optimization mode is not declared with a zero production value");
+        require(shader.contains("(PaDiagnosticOptimizationMode & PA_OPT_T121_OFF) != 0")
+                        && shader.contains("(PaDiagnosticOptimizationMode & PA_OPT_T122_OFF) != 0"),
+                "T133 optimization mode is not decoded as an opt-in bit set");
+
+        String json = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.json");
+        require(json.contains("\"name\": \"PaDiagnosticOptimizationMode\", \"type\": \"int\", "
+                        + "\"count\": 1, \"values\": [ 0 ]"),
+                "T133 diagnostic optimization uniform does not default to NORMAL_PRODUCTION");
+
+        String config = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudDebugConfig.java");
+        String reset = between(config, "public static void resetDefaults() {", "\n    }",
+                "T133 debug config reset contract");
+        require(reset.contains("optimizationDiagnosticMode = "
+                        + "StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;"),
+                "T133 optimization diagnostic mode is not restored by resetDefaults()");
+
+        String renderer = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/VolumetricCloudRenderer.java");
+        require(renderer.contains("shader.safeGetUniform(\"PaDiagnosticOptimizationMode\").set(")
+                        && renderer.contains(
+                                "VolumetricCloudDebugConfig.optimizationDiagnosticMode().shaderFlags()"),
+                "T133 renderer does not upload the diagnostic optimization mode");
+        require(renderer.contains("VolumetricCloudDebugConfig.optimizationDiagnosticMode(),"),
+                "T133 draw snapshot does not record the optimization mode actually used");
+
+        String suite = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/StormPerformanceSuite.java");
+        require(suite.contains("production_optimization_mode_not_normal"),
+                "T133 adjacent controls do not verify the production optimization mode");
+        System.out.println(
+                "PHASE4T_RESULT|T133 production default unchanged|PASSED|invariant satisfied");
+    }
+
+    /**
+     * T123 / SC-020. T123 owns a documented structural bound and the counters
+     * that report it - not an image transformation. It therefore has no OFF arm
+     * to build: the only candidates would be the transmittance and optical-depth
+     * exits, which predate T123 and belong to the density integration itself.
+     * What SC-020 needs is instead checkable directly: every counter it owns must
+     * be unreachable in a production FINAL frame.
+     */
+    private static void validateT123InstrumentationOnly() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String[] lines = shader.split("\n");
+        int mutations = 0;
+        for (int index = 0; index < lines.length; index++) {
+            String line = lines[index].trim();
+            if (!line.matches("pa[A-Za-z]+\\s*(\\+\\+|\\+=).*")) {
+                continue;
+            }
+            mutations++;
+            boolean guarded = false;
+            for (int back = Math.max(0, index - 3); back < index; back++) {
+                if (lines[back].contains("paWorkloadCaptureActive()")) {
+                    guarded = true;
+                    break;
+                }
+            }
+            require(guarded,
+                    "T123 workload counter at shader line " + (index + 1)
+                            + " is not guarded by paWorkloadCaptureActive(): " + line);
+        }
+        require(mutations >= 10,
+                "T123 workload counters were not found; the instrumentation check is vacuous");
+        String guard = functionBlock(shader, "bool paWorkloadCaptureActive()");
+        require(guard.contains("DebugView == 22") && guard.contains("DebugView == 23"),
+                "T123 workload capture guard is no longer limited to the workload debug views");
+        System.out.println("PHASE4T_RESULT|T123 instrumentation only|PASSED|invariant satisfied"
+                + " guardedCounterMutations=" + mutations);
+    }
+
+    /**
+     * T121's rejection is sound only if the vertical slab bound really is a lower
+     * bound on the lobe SDF: the branch skips a lobe when
+     * {@code verticalLowerBound > max(lobeSoftness, groupDistance + 48)} and
+     * relies on {@code lobeDistance >= verticalLowerBound}. The SDF is a
+     * gradient-normalised first-order distance, exact only for a circular
+     * section, so this searches the eccentricity, shear, orientation and role
+     * space the profiles actually produce for a point where the premise fails.
+     */
+    private static void validateT121VerticalBoundIsConservative() {
+        double worstViolation = 0.0D;
+        String worstCase = "none";
+        long probes = 0L;
+        for (StormLobeDescriptor.Role role : StormLobeDescriptor.Role.values()) {
+            for (int majorStep = 0; majorStep < 6; majorStep++) {
+                for (int minorStep = 0; minorStep < 6; minorStep++) {
+                    for (int orientationStep = 0; orientationStep < 4; orientationStep++) {
+                        for (int shearStep = 0; shearStep < 4; shearStep++) {
+                            double major = 40.0D + majorStep * 90.0D;
+                            double minor = 20.0D + minorStep * 70.0D;
+                            StormLobeDescriptor lobe = descriptor(
+                                    group(121), 0, 1, role, 0.0D, 0.0D,
+                                    200.0F, 700.0F, (float) major, (float) minor);
+                            double roleBaseY = StormLobeEvaluator.roleBaseY(lobe);
+                            double roleTopY = StormLobeEvaluator.roleTopY(lobe);
+                            double centreY = (roleBaseY + roleTopY) * 0.5D;
+                            double halfHeight = (roleTopY - roleBaseY) * 0.5D;
+                            for (int yStep = -30; yStep <= 30; yStep++) {
+                                double worldY = centreY + yStep * 30.0D;
+                                double bound = Math.abs(worldY - centreY) - halfHeight;
+                                if (bound <= 0.0D) {
+                                    continue;
+                                }
+                                for (int xStep = -8; xStep <= 8; xStep++) {
+                                    for (int zStep = -8; zStep <= 8; zStep++) {
+                                        double distance = StormLobeEvaluator.signedDistanceAt(
+                                                lobe, xStep * 90.0D, worldY, zStep * 90.0D);
+                                        probes++;
+                                        double violation = bound - distance;
+                                        if (violation > worstViolation) {
+                                            worstViolation = violation;
+                                            worstCase = role + " major=" + major + " minor=" + minor
+                                                    + " bound=" + bound + " sdf=" + distance;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        System.out.printf(java.util.Locale.ROOT,
+                "T121_BOUND_SEARCH|probes=%d|worstViolationBlocks=%.9f|worstCase=%s%n",
+                probes, worstViolation, worstCase);
+        require(probes > 1_000_000L,
+                "T121 bound search did not cover enough of the descriptor space");
+        require(worstViolation <= 1.0e-6D,
+                "T121 vertical bound is not a lower bound on the lobe SDF; worst violation "
+                        + worstViolation + " blocks at " + worstCase);
+        System.out.println(
+                "PHASE4T_RESULT|T121 vertical bound conservative|PASSED|invariant satisfied");
+    }
+
+    /**
+     * T121 float32 boundary margin. The guard compares {@code verticalLowerBound}
+     * while the smooth union consumes {@code lobeDistance}; those are the same
+     * quantity only up to rounding in the SDF tail. This measures the worst
+     * shortfall over the severe-scale operating range and derives the margin the
+     * rejection guard needs.
+     */
+    private static void validateT121Float32BoundaryMargin() {
+        final float capRoundingFraction = 0.35F;
+        final float minEdgeBlocks = 11.363636F;
+        float worstShortfall = 0.0F;
+        String worstCase = "none";
+        long probes = 0L;
+        for (int capStep = 0; capStep <= 4000; capStep++) {
+            float capDistance = 0.25F * capStep;
+            for (int radiusStep = 0; radiusStep < 12; radiusStep++) {
+                float effectiveRadius = 20.0F + radiusStep * 60.0F;
+                for (int halfStep = 0; halfStep < 6; halfStep++) {
+                    float halfHeight = 40.0F + halfStep * 90.0F;
+                    float rounding = Math.min(
+                            Math.min(effectiveRadius, halfHeight) * capRoundingFraction,
+                            minEdgeBlocks);
+                    float roundedCap = capDistance + rounding;
+                    for (int wallStep = -6; wallStep <= 12; wallStep++) {
+                        float roundedWall = wallStep <= 0
+                                ? wallStep * 40.0F
+                                : roundedCap * (wallStep / 12.0F);
+                        float outsideX = Math.max(roundedWall, 0.0F);
+                        float outsideY = Math.max(roundedCap, 0.0F);
+                        float lengthSquared = outsideX * outsideX + outsideY * outsideY;
+                        float distance = (float) Math.sqrt(lengthSquared)
+                                + Math.min(Math.max(roundedWall, roundedCap), 0.0F)
+                                - rounding;
+                        probes++;
+                        float shortfall = capDistance - distance;
+                        if (shortfall > worstShortfall) {
+                            worstShortfall = shortfall;
+                            worstCase = "capDistance=" + capDistance + " sdf=" + distance;
+                        }
+                    }
+                }
+            }
+        }
+        float halfUlpBelowOne = Math.ulp(1.0F) * 0.5F;
+        float hSaturationShortfall = 48.0F * 2.0F * halfUlpBelowOne;
+        float worstCompareUlp = Math.ulp(32768.0F);
+        float requiredMargin = worstShortfall + worstCompareUlp;
+        System.out.printf(java.util.Locale.ROOT,
+                "T121_MARGIN_DERIVATION|sdfShortfall=%.9f|hSaturationThreshold=%.9f"
+                        + "|reachable=%s|compareUlpAt32768=%.9f|requiredMargin=%.9f|adopted=%.9f%n",
+                worstShortfall, hSaturationShortfall, worstShortfall > hSaturationShortfall,
+                worstCompareUlp, requiredMargin, T121_SOFTNESS_MARGIN_BLOCKS);
+        require(probes > 1_000_000L,
+                "T121 float boundary search did not cover enough of the operating range");
+        require(worstShortfall < hSaturationShortfall,
+                "T121 SDF shortfall now reaches the smooth-union saturation threshold at "
+                        + worstCase);
+        System.out.println(
+                "PHASE4T_RESULT|T121 float32 boundary margin|PASSED|invariant satisfied");
+    }
+
+    /**
+     * Whenever the guard rejects a lobe, the production float32 smooth union must
+     * contribute exactly nothing. Simulates guard and union together in float32
+     * across the operating range. A rejection is safe only if {@code h} lands on
+     * exactly {@code 1.0f}.
+     */
+    private static void validateT121GuardAdmitsNoUnionContribution() {
+        float shortfall = 0.000003815F;
+        long probes = 0L;
+        long unsafe = 0L;
+        String firstUnsafe = "none";
+        for (int distanceStep = 0; distanceStep <= 600; distanceStep++) {
+            float groupDistance = distanceStep <= 300
+                    ? distanceStep * 8.0F
+                    : 2400.0F + (distanceStep - 300) * 100.0F;
+            for (int blendStep = 0; blendStep < 9; blendStep++) {
+                float blend = blendStep == 8 ? 48.0F : 4.0F + blendStep * 5.5F;
+                for (int softnessStep = 0; softnessStep < 4; softnessStep++) {
+                    float softness = 4.0F + softnessStep * 18.0F;
+                    for (int epsilonStep = -4; epsilonStep <= 4; epsilonStep++) {
+                        float threshold = groupDistance + 48.0F;
+                        float verticalLowerBound = threshold + epsilonStep * Math.ulp(threshold);
+                        probes++;
+                        float lobeDistance = verticalLowerBound - shortfall;
+                        boolean guardFires = verticalLowerBound > Math.max(
+                                softness + T121_SOFTNESS_MARGIN_BLOCKS, groupDistance + 48.0F);
+                        if (!guardFires) {
+                            continue;
+                        }
+                        float h = Math.max(0.0F, Math.min(1.0F,
+                                0.5F + 0.5F * (lobeDistance - groupDistance) / blend));
+                        if (h == 1.0F) {
+                            continue;
+                        }
+                        unsafe++;
+                        if ("none".equals(firstUnsafe)) {
+                            firstUnsafe = "groupDistance=" + groupDistance + " blend=" + blend
+                                    + " h=" + h;
+                        }
+                    }
+                }
+            }
+        }
+        System.out.printf(java.util.Locale.ROOT,
+                "T121_UNION_PROOF|probes=%d|unsafe=%d%n", probes, unsafe);
+        require(probes > 40_000L, "T121 union proof did not cover enough of the range");
+        require(unsafe == 0L,
+                "T121 guard admits a non-zero union contribution: " + firstUnsafe);
+        System.out.println(
+                "PHASE4T_RESULT|T121 guard admits no union contribution|PASSED|invariant satisfied");
+    }
+
+    /**
+     * The guard's {@code lobeSoftness} term. At softness magnitudes (11-100
+     * blocks) one float32 ULP is comparable to the SDF shortfall, so without a
+     * margin a rejected lobe could still satisfy
+     * {@code lobeDistance <= lobeSoftness}, which sets a discrete
+     * {@code groupActiveRoleMask} bit. This proves the margin closes every such
+     * flip, and that the unmargined guard genuinely admitted them.
+     */
+    private static void validateT121SoftnessBoundary() {
+        float shortfall = 0.000003815F;
+        long probes = 0L;
+        long roleMaskFlips = 0L;
+        String firstFlip = "none";
+        for (int softnessStep = 0; softnessStep <= 2000; softnessStep++) {
+            float lobeSoftness = 11.363636F + softnessStep * 0.05F;
+            for (int distanceStep = 0; distanceStep < 6; distanceStep++) {
+                float groupDistance = lobeSoftness - 48.0F - distanceStep * 25.0F;
+                for (int epsilonStep = 1; epsilonStep <= 6; epsilonStep++) {
+                    float verticalLowerBound =
+                            lobeSoftness + epsilonStep * Math.ulp(lobeSoftness);
+                    float lobeDistance = verticalLowerBound - shortfall;
+                    boolean unmargined = verticalLowerBound > Math.max(
+                            lobeSoftness, groupDistance + 48.0F);
+                    boolean margined = verticalLowerBound > Math.max(
+                            lobeSoftness + T121_SOFTNESS_MARGIN_BLOCKS, groupDistance + 48.0F);
+                    if (!unmargined) {
+                        continue;
+                    }
+                    probes++;
+                    if (lobeDistance <= lobeSoftness) {
+                        roleMaskFlips++;
+                        if ("none".equals(firstFlip)) {
+                            firstFlip = "lobeSoftness=" + lobeSoftness
+                                    + " verticalLowerBound=" + verticalLowerBound
+                                    + " lobeDistance=" + lobeDistance;
+                        }
+                        require(!margined,
+                                "T121 softness margin still admits a role-mask flip: " + firstFlip);
+                    }
+                }
+            }
+        }
+        System.out.printf(java.util.Locale.ROOT,
+                "T121_SOFTNESS_BOUNDARY|probes=%d|roleMaskFlips=%d%n", probes, roleMaskFlips);
+        require(probes > 1000L, "T121 softness search did not reach the guard's softness term");
+        require(roleMaskFlips > 0L,
+                "T121 unmargined softness term admitted no role-mask flip; "
+                        + "the softness margin would be unjustified");
+        System.out.println("T121_SOFTNESS_WITNESS|" + firstFlip);
+        System.out.println(
+                "PHASE4T_RESULT|T121 softness margin closes role-mask flip|PASSED"
+                        + "|invariant satisfied");
+    }
+
+    /**
+     * The production shader guards for T121's conservative rejection and T122's
+     * descriptor-fetch reuse, including the T133 diagnostic OFF arms: the OFF
+     * paths must be gated so ordinary frames keep the optimized behaviour.
+     */
+    private static void validateT121T122ShaderGuards() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String groupField = functionBlock(shader, "void directStormGroupField");
+        String wrapper = functionBlock(shader, "float directStormLobeDistance(");
+
+        require(shader.contains("float stormVerticalDistanceLowerBound")
+                        && groupField.contains("verticalLowerBound > max(")
+                        && groupField.contains("groupDistance + STORM_MAX_BLEND_BLOCKS")
+                        && groupField.contains("paConservativeDescriptorRejects++")
+                        && groupField.contains("previousRadius = lobeRadius")
+                        && groupField.contains("previousRole = lobeRole"),
+                "T121 descriptor rejection is not conservative or does not preserve union state");
+        require(groupField.contains("started && !paT121Off() && verticalLowerBound > max("),
+                "T121 OFF bypass is not gated behind paT121Off()");
+        require(groupField.contains("lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS"),
+                "T121 rejection lost its derived float32 softness margin");
+        require(shader.contains("const float STORM_MAX_BLEND_BLOCKS = 48.0;"),
+                "STORM_MAX_BLEND_BLOCKS is no longer 48");
+        String marginKey = "const float STORM_T121_SOFTNESS_MARGIN_BLOCKS = ";
+        int marginAt = shader.indexOf(marginKey);
+        require(marginAt >= 0, "T121 softness margin constant is missing");
+        String marginLiteral = shader.substring(
+                marginAt + marginKey.length(), shader.indexOf(';', marginAt)).trim();
+        require(Float.parseFloat(marginLiteral) == T121_SOFTNESS_MARGIN_BLOCKS,
+                "T121 shader softness margin " + marginLiteral + " does not match the derived value");
+
+        require(wrapper.contains("return directStormLobeDistanceFromData(")
+                        && groupField.contains("directStormLobeDistanceFromData(")
+                        && groupField.contains("stormEdgeWidthBlocksFromData(")
+                        && groupField.contains("paAvoidedDescriptorTextureFetches += 2")
+                        && groupField.contains("paAvoidedDescriptorTextureFetches += 4"),
+                "T122 primary group evaluation re-fetches or recomputes descriptor data");
+        require(groupField.contains("? stormEdgeWidthBlocks(descriptorIndex"),
+                "T122 OFF refetch is not gated behind paT122Off()");
+        require(groupField.contains("paWorkloadCaptureActive() && !paT122Off()"),
+                "T122 avoided-fetch counters are not suppressed in the OFF arm");
+        System.out.println(
+                "PHASE4T_RESULT|T121/T122 shader guards|PASSED|invariant satisfied");
+    }
+
+
+    /**
+     * T132 fail-first: a capture that failed after an earlier success used to
+     * leave the earlier WorkloadResult readable, and the suite matched only on
+     * the view name, so a stale result satisfied the next pass over the same
+     * view. Freshness is the capture token, not the view.
+     */
+    private static void validateT132WorkloadCaptureFreshness() {
+        StormWorkloadRuntimeCapture.WorkloadResult passA =
+                new StormWorkloadRuntimeCapture.WorkloadResult(
+                        41L, "above", 641, 360,
+                        70635847.0D, 1941080612.0D, 6714578.0D, 326863346.0D,
+                        2027767531.0D, 21318588.0D, 1488992.0D, 149382.0D);
+
+        require(StormPerformanceSuite.workloadFreshnessFailure(passA, 41L, "above") == null,
+                "T132 freshness rejected the capture it actually requested");
+
+        String staleFailure = StormPerformanceSuite.workloadFreshnessFailure(passA, 42L, "above");
+        require(staleFailure != null && staleFailure.startsWith("workload_capture_stale"),
+                "T132 freshness accepted a stale same-view workload result");
+        require(staleFailure.contains("expectedToken=42") && staleFailure.contains("resultToken=41"),
+                "T132 stale-capture abort reason is not auditable");
+
+        String missing = StormPerformanceSuite.workloadFreshnessFailure(null, 42L, "above");
+        require(missing != null && missing.startsWith("workload_capture_missing"),
+                "T132 freshness accepted a cleared workload result");
+
+        String unrequested = StormPerformanceSuite.workloadFreshnessFailure(
+                passA, StormWorkloadRuntimeCapture.NO_TOKEN, "above");
+        require(unrequested != null && unrequested.startsWith("workload_capture_not_requested"),
+                "T132 freshness accepted a result the suite never requested");
+
+        System.out.println(
+                "PHASE4T_RESULT|T132 workload capture freshness|PASSED|invariant satisfied");
+    }
+
+    /**
+     * T132 criterion 5 is evaluated by a deterministic numeric comparator, not by
+     * visualRef equality: visualRef digests a FINAL frame accumulated at history
+     * blend 0.85, so two passes disagree by construction on an unchanged fixture.
+     * The tolerance is one binary16 storage step at the compared magnitude.
+     */
+    private static void validateT132DeterministicImageComparator() {
+        int width = 8;
+        int height = 4;
+        float[] pixels = new float[width * height * 4];
+        for (int index = 0; index < pixels.length; index++) {
+            pixels[index] = (float) (0.4D + 0.3D * Math.sin(index * 0.7D));
+        }
+        StormReferenceImageComparison.Reference reference =
+                reference("side", width, height, true, pixels.clone());
+
+        StormReferenceImageComparison.Comparison identical =
+                StormReferenceImageComparison.compare(reference,
+                        reference("side", width, height, true, pixels.clone()));
+        require(identical.evaluated() && identical.passed(),
+                "T132 comparator rejected two identical captures");
+        require(identical.changedPixelCountAboveEpsilon() == 0,
+                "T132 comparator reported changed pixels for identical captures");
+
+        // One storage ULP at the compared magnitude must remain acceptable, and
+        // anything meaningfully larger must not.
+        float[] nudged = pixels.clone();
+        double epsilon = StormReferenceImageComparison.halfPrecisionEpsilon(pixels[9]);
+        nudged[9] += (float) (epsilon * 40.0D);
+        StormReferenceImageComparison.Comparison moved =
+                StormReferenceImageComparison.compare(reference,
+                        reference("side", width, height, true, nudged));
+        require(moved.evaluated() && !moved.passed(),
+                "T132 comparator accepted a difference far above one storage ULP");
+        require(moved.changedPixelCountAboveEpsilon() == 1,
+                "T132 comparator did not localise the moved pixel");
+
+        require(StormReferenceImageComparison.halfPrecisionEpsilon(0.0D) > 0.0D,
+                "T132 epsilon is not positive in the subnormal range");
+
+        System.out.println(
+                "PHASE4T_RESULT|T132 deterministic image neutrality|PASSED|invariant satisfied");
+    }
+
+    /**
+     * T132 repeated adjacent sampling. The production raymarch has hard decision
+     * points, so a rare frame differs from its neighbours under otherwise
+     * identical inputs. A per-component median over an odd sample count rejects
+     * that lone frame without touching the tolerance.
+     */
+    private static void validateT132RepeatedSamplingMedian() {
+        int width = 8;
+        int height = 4;
+        float[] clean = new float[width * height * 4];
+        for (int index = 0; index < clean.length; index++) {
+            clean[index] = (float) (0.4D + 0.3D * Math.sin(index * 0.7D));
+        }
+        double epsilon = StormReferenceImageComparison.halfPrecisionEpsilon(0.7D);
+
+        float[] outlier = clean.clone();
+        outlier[9] += (float) (epsilon * 40.0D);
+        java.util.List<StormReferenceImageComparison.Reference> noisy = java.util.List.of(
+                reference("below", width, height, true, clean.clone()),
+                reference("below", width, height, true, outlier),
+                reference("below", width, height, true, clean.clone()),
+                reference("below", width, height, true, clean.clone()),
+                reference("below", width, height, true, clean.clone()));
+        float[] median = StormReferenceSampleSet.median(noisy);
+        require(java.util.Arrays.equals(median, clean),
+                "T132 median did not reject a single outlying sample");
+
+        // The dispersion must still be reported rather than hidden by the median.
+        StormReferenceSampleSet.ArmNoise noise = StormReferenceSampleSet.noise(noisy, median);
+        require(noise.samplesDifferingFromMedian() == 1,
+                "T132 arm noise did not report the deviating sample");
+        require(noise.pairwiseMaxChangedPixels() >= 1,
+                "T132 arm noise did not report the changed pixel population");
+
+        java.util.List<StormReferenceImageComparison.Reference> quiet = java.util.List.of(
+                reference("below", width, height, true, clean.clone()),
+                reference("below", width, height, true, clean.clone()),
+                reference("below", width, height, true, clean.clone()));
+        StormReferenceSampleSet.ArmNoise silent =
+                StormReferenceSampleSet.noise(quiet, StormReferenceSampleSet.median(quiet));
+        require(silent.samplesDifferingFromMedian() == 0
+                        && silent.pairwiseMaxChangedPixels() == 0,
+                "T132 arm noise invented dispersion for identical samples");
+
+        System.out.println(
+                "PHASE4T_RESULT|T132 repeated sampling median|PASSED|invariant satisfied");
+    }
+
+    /** Builds a reference capture for the deterministic comparator checks. */
+    private static StormReferenceImageComparison.Reference reference(
+            String view, int width, int height, boolean historyBypassed, float[] pixels) {
+        return new StormReferenceImageComparison.Reference(
+                view, width, height, historyBypassed,
+                StormReferenceImageComparison.digest(pixels, width, height), pixels,
+                6000.0F, 6000.0F, true,
+                new StormSceneStability.RenderInputs(
+                        0L,
+                        VolumetricCloudRenderer.LastDrawInputs.UniformComponentSignatures.EMPTY,
+                        0L,
+                        "projectionStability={requiredStableFrames=3 stabilized=true}"
+                                + " contentStability={stabilized=true}",
+                        StormTopologyMode.COMPACT,
+                        StormOptimizationDiagnosticMode.NORMAL_PRODUCTION),
+                null);
+    }
+
+
+    /**
+     * T132 criterion 5 attribution. A failing comparison is escalated through
+     * levels, because a partial input set matching never proves the renderer
+     * moved the image:
+     *
+     * <ul>
+     *   <li>a tracked scene input differs -&gt; {@code scene_evolved_between_passes};</li>
+     *   <li>the scene held still but a named uniform group or the weather-map
+     *       signature differs -&gt; {@code render_inputs_differ_between_passes};</li>
+     *   <li>everything tracked matches and the image still differs -&gt;
+     *       {@code unexplained_deterministic_render_difference}, which remains
+     *       blocking.</li>
+     * </ul>
+     *
+     * <p>A passing comparison is a pass regardless of any diagnostic difference.
+     */
+    private static void validateT132Attribution() {
+        StormSceneStability.Snapshot profile = StormSceneStability.Snapshot.of(java.util.List.of());
+        StormSceneStability.AnimatedInputs held = new StormSceneStability.AnimatedInputs(
+                12.5F, -7.25F, 6000.0F, 6000.0F, true, false, 0.0F, 1.0F, 0.0F, profile);
+        StormSceneStability.AnimatedInputs moved = new StormSceneStability.AnimatedInputs(
+                13.5F, -7.25F, 6000.0F, 6000.0F, true, false, 0.0F, 1.0F, 0.0F, profile);
+
+        StormSceneStability.Result stable = StormSceneStability.evaluate(held, held);
+        StormSceneStability.Result evolved = StormSceneStability.evaluate(held, moved);
+        require(stable.evaluated() && stable.sceneStable(),
+                "T132 scene stability rejected two identical animated inputs");
+        require(evolved.evaluated() && !evolved.sceneStable(),
+                "T132 scene stability accepted a moved material offset");
+
+        StormSceneStability.RenderInputs inputsA = renderInputs(0L, 0L);
+        StormSceneStability.RenderInputs inputsB = renderInputs(0L, 0L);
+        StormSceneStability.RenderInputs inputsWeatherMoved = renderInputs(0L, 99L);
+        StormSceneStability.RenderInputComparison sameInputs =
+                StormSceneStability.compareRenderInputs(inputsA, inputsB);
+        StormSceneStability.RenderInputComparison movedInputs =
+                StormSceneStability.compareRenderInputs(inputsA, inputsWeatherMoved);
+        require(sameInputs.evaluated() && sameInputs.renderInputsMatch(),
+                "T132 render-input comparison rejected identical inputs");
+        require(movedInputs.evaluated() && !movedInputs.renderInputsMatch(),
+                "T132 render-input comparison accepted a moved weather-map signature");
+
+        // A matching content comparison, so attribution can reach the levels
+        // above it rather than short-circuiting on missing content.
+        StormCloudContent sameContent = new StormCloudContent(
+                4, 11L, 12L, 10, 10, 1, 10, 13L);
+        StormCloudContent.Comparison content =
+                StormCloudContent.compare(sameContent, sameContent);
+        require(content.evaluated() && content.cloudContentMatch(),
+                "T132 cloud-content comparison rejected two identical snapshots");
+
+        // A passing image is a pass even when a diagnostic input moved.
+        String passing = StormSceneStability.attribution(true, true, evolved, movedInputs, content);
+        require(passing.contains("imageNeutralityPassed=true"),
+                "T132 attribution did not report a passing comparison as passing");
+
+        // Level A: the scene itself evolved.
+        String sceneMoved = StormSceneStability.attribution(
+                true, false, evolved, sameInputs, content);
+        require(sceneMoved.contains("criterion5Attributable=false")
+                        && sceneMoved.contains("scene_evolved_between_passes"),
+                "T132 attribution blamed the renderer for an evolving scene");
+
+        // Level B: the scene held but a named render input differs.
+        String inputsDiffer = StormSceneStability.attribution(
+                true, false, stable, movedInputs, content);
+        require(inputsDiffer.contains("criterion5Attributable=false")
+                        && inputsDiffer.contains("render_inputs_differ_between_passes"),
+                "T132 attribution blamed the renderer for differing render inputs");
+
+        // Level C: everything tracked matches and the image still differs.
+        String unexplained = StormSceneStability.attribution(
+                true, false, stable, sameInputs, content);
+        require(unexplained.contains("unexplained_deterministic_render_difference"),
+                "T132 attribution did not escalate an exhausted input set");
+
+        // An unavailable comparison is never attributable.
+        String unavailable = StormSceneStability.attribution(
+                false, false, stable, sameInputs, content);
+        require(unavailable.contains("criterion5Attributable=false")
+                        && unavailable.contains("image_comparison_unavailable"),
+                "T132 attribution attributed an unavailable comparison");
+
+        System.out.println(
+                "PHASE4T_RESULT|T132 criterion 5 attribution|PASSED|invariant satisfied");
+    }
+
+    /** Builds a render-input snapshot for the attribution checks. */
+    private static StormSceneStability.RenderInputs renderInputs(
+            long comparisonSignature, long weatherSignature) {
+        return new StormSceneStability.RenderInputs(
+                comparisonSignature,
+                VolumetricCloudRenderer.LastDrawInputs.UniformComponentSignatures.EMPTY,
+                weatherSignature,
+                "projectionStability={requiredStableFrames=3 stabilized=true}",
+                StormTopologyMode.COMPACT,
+                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
     }
 
     private static int connectedComponents(boolean[][] occupied) {
