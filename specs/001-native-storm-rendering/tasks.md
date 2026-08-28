@@ -175,7 +175,16 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 ### Revalidation Gate
 
 - [X] T097 Run the corrected morphology, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, precipitation, and acceleration regressions plus the US1/US2 sandboxes; record passing results in `specs/001-native-storm-rendering/validation/phase4r-automated.md` and verify each T080 expected failure is closed without weakening assertions (depends on T081-T096) [SC-001-SC-004, SC-010]
-**T098 root cause CORRECTED 2026-08-28.** The carrier-wavelength conclusion below is
+**T098 erosion hypothesis FALSIFIED 2026-08-28.** Measured per-role on real T134 geometry:
+TOWER is the **least**-eroded role (mean body 0.7032, erosion/body 0.327, erosion>=body 5.7%,
+density-visible 93.3%), while BASE and ANVIL lose ~44% of samples outright. Erosion is not
+erasing the tower; scaling erosion by body would inflate the base and anvil instead. The real
+disparity is **volume**: CORE+TOWER occupy 7,184 samples against BASE+ANVIL's 152,307 - a
+**21.2:1** ratio, with ANVIL:TOWER at **46.2:1** and the convective column just **4.50%** of the
+system. No production change was made. Next candidate is the T127 tower/anvil cross-section
+relationship, a specification question. See `validation/t098-manual-checklist.md`.
+
+**Superseded - T098 root cause CORRECTED 2026-08-28.** The carrier-wavelength conclusion below is
 **retracted**. Direct measurement (262,144 samples through the production domain transform)
 shows the shader's `carrierRaw` has p05/p50/p95 = **0.7123/0.7836/0.8452**, matching the
 `STORM_CARRIER_P05/P95` constants to three decimals, with the severe column's distribution

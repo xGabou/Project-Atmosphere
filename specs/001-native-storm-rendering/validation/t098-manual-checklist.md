@@ -511,3 +511,70 @@ morphology. All three cross that line, so this stops here for a decision.
 **T098 REJECTED, root cause proven. T099 blocked.** `STORM_MAX_BLEND_BLOCKS` remains `48` and was not
 touched; it stays a separate, later question. No accepted T132/T133/T134 evidence is contradicted -
 this is a material-stage calibration that T134 invalidated and nobody remeasured.
+
+---
+
+# T098 erosion hypothesis FALSIFIED - 2026-08-28
+
+**The erosion-scaling path is closed.** No production change was made: the measurement inverts the
+hypothesis before any code was touched.
+
+## Production erosion, as implemented
+
+    detailFbm  = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125
+    erosion    = (1.0 - detailFbm) * STORM_EROSION       // STORM_EROSION = 0.44
+    bodyEroded = max(bodyAfter - erosion, 0.0)
+
+It is an absolute subtraction with no coverage, edge-exposure or role term - so the framing that it
+"subtracts a similar amount regardless of remaining body" is correct as far as the equation goes.
+What does not follow is that this harms the tower.
+
+## Measured erosion versus body, by role
+
+Real adopted T134 geometry (live fixture `38bc5412`, transcribed) against the real baked base and
+detail volumes, 20-block sampling, `reportT098ErosionVersusBody()`:
+
+| Role | Samples | Mean body | Mean erosion | erosion/body | erosion >= body | Density visible | Mean density |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| BASE | 68,540 | 0.3884 | 0.2297 | 0.591 | **44.6%** | 54.4% | 0.2511 |
+| CORE | 5,370 | 0.6608 | 0.2298 | 0.348 | 6.4% | 93.1% | 0.4405 |
+| **TOWER** | **1,814** | **0.7032** | 0.2302 | **0.327** | **5.7%** | **93.3%** | **0.4810** |
+| ANVIL | 83,767 | 0.4058 | 0.2296 | 0.566 | **42.7%** | 56.0% | 0.2593 |
+
+**TOWER is the least-eroded role in the system.** It carries the highest mean body, the lowest
+erosion-to-body ratio, the smallest fraction where erosion consumes the whole body, the highest
+density-visible fraction and the highest mean density. BASE and ANVIL are the heavily eroded roles,
+losing roughly 44% of their samples outright.
+
+Erosion is therefore not erasing the tower, and scaling erosion by available body would help BASE and
+ANVIL - the roles that are already visually solid - while barely touching the tower. It would inflate
+exactly the masses that must not balloon.
+
+## What the numbers do show
+
+The disparity is volume, not material quality:
+
+| Measure | Value |
+|---|---:|
+| CORE + TOWER occupied samples | 7,184 |
+| BASE + ANVIL occupied samples | 152,307 |
+| BASE+ANVIL : CORE+TOWER | **21.2 : 1** |
+| ANVIL : TOWER | **46.2 : 1** |
+| CORE + TOWER share of storm volume | **4.50%** |
+
+The convective column is dense, healthy and well-formed - and it is 4.5% of the system. A ray
+crossing the tower traverses roughly one forty-sixth of the material a ray crossing the anvil does,
+so it accumulates almost no opacity. That is why the tower reads as a wisp between two solid masses
+while its per-sample density is the highest in the storm.
+
+This traces directly to the T127 scale contract: BASE 900-1,100, CORE 420-520, TOWER 280-360 then
+180-250, ANVIL 1,150-1,450. The anvil is specified *wider than the base*, and the tower at roughly a
+quarter of the base diameter. Those ratios, composed, produce two broad masses joined by a thin
+stalk.
+
+## Status
+
+`STORM_EROSION` remains `0.44`. `STORM_BASE_NOISE_SCALE`, `STORM_CARRIER_P05/P95`, T131, descriptor
+geometry, role strengths and `STORM_MAX_BLEND_BLOCKS = 48` are all unchanged. **T098 remains
+REJECTED and OPEN.** The next candidate is the tower/anvil cross-section relationship in the T127
+contract, which is a specification question rather than a renderer bug.

@@ -62,6 +62,7 @@ public final class StormVolumetricGeometrySandbox {
         validateT132RepeatedSamplingMedian();
         validateT132Attribution();
         reportT098CarrierDistribution();
+        reportT098ErosionVersusBody();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -1328,6 +1329,206 @@ public final class StormVolumetricGeometrySandbox {
             }
         }
         return (double) count / sorted.size();
+    }
+
+
+    /**
+     * The T134 severe system dumped from live fixture {@code 38bc5412} by
+     * {@link StormT098RoleOccupancy}. Real adopted production geometry,
+     * transcribed so the offline sweep measures the same system the live
+     * captures showed rather than a synthetic stand-in.
+     */
+    private static java.util.List<StormLobeDescriptor> severeFixture38bc5412() {
+        UUID field = group(3801);
+        UUID storm = group(3802);
+        double[][] rows = {
+                // centreX, centreZ, baseY, topY, major, minor, density, edgeSoftness, role
+                {-33.0D, -77.0D, 136.0D, 583.6D, 525.7D, 473.1D, 0.8570D, 0.5200D, 0.0D},
+                {-66.5D, -38.7D, 152.6D, 600.2D, 527.8D, 475.0D, 0.8985D, 0.5200D, 0.0D},
+                {-49.4D, -64.0D, 352.3D, 633.1D, 297.5D, 267.7D, 1.0000D, 0.4800D, 1.0D},
+                {-29.8D, -94.8D, 405.6D, 702.0D, 279.0D, 251.1D, 1.0000D, 0.4800D, 1.0D},
+                {-14.4D, -106.0D, 433.5D, 800.1D, 200.3D, 164.3D, 0.9045D, 0.4400D, 2.0D},
+                {-1.3D, -95.4D, 592.0D, 927.4D, 142.3D, 116.7D, 0.9681D, 0.4400D, 2.0D},
+                {-109.9D, -77.1D, 769.6D, 980.2D, 507.6D, 294.4D, 0.8065D, 0.5600D, 3.0D},
+                {-18.8D, -10.9D, 777.1D, 987.7D, 484.3D, 280.9D, 0.8075D, 0.5600D, 3.0D},
+                {77.3D, -144.1D, 783.6D, 994.2D, 488.4D, 283.2D, 0.7982D, 0.5600D, 3.0D},
+                {170.7D, -80.5D, 789.1D, 999.7D, 498.4D, 289.1D, 0.8110D, 0.5600D, 3.0D},
+        };
+        java.util.List<StormLobeDescriptor> lobes = new ArrayList<>();
+        for (int index = 0; index < rows.length; index++) {
+            double[] r = rows[index];
+            StormLobeDescriptor.Role role = StormLobeDescriptor.Role.values()[(int) r[8]];
+            lobes.add(new StormLobeDescriptor(
+                    new UUID(field.getMostSignificantBits(),
+                            field.getLeastSignificantBits() + index + 1L),
+                    storm, index, rows.length, 0, role,
+                    r[0], r[1], (float) r[2], (float) r[3], (float) r[4], (float) r[5],
+                    0.0F, 1.0F, 0.0F, 0.0F,
+                    (float) r[6], (float) r[7], 0.5F, 0.5F, 1.0F, 1.0F));
+        }
+        return lobes;
+    }
+
+    /**
+     * T098 phase 1: the erosion-versus-body relationship, resolved by role.
+     *
+     * <p>Production erosion is an absolute subtraction:
+     * {@code bodyEroded = max(body - (1 - detailFbm) * STORM_EROSION, 0)}, with
+     * no coverage, edge-exposure or role term. Body, by contrast, depends on
+     * coverage and the base field. This measures how much of each role's
+     * available body that absolute bite consumes, on the real T134 descriptor
+     * set and the real baked noise volumes.
+     *
+     * <p>Report only. Whether the imbalance warrants a production change is a
+     * T098 decision.
+     */
+    private static void reportT098ErosionVersusBody() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+
+        String[] names = {"BASE", "CORE", "TOWER", "ANVIL"};
+        int roles = 4;
+        long[] samples = new long[roles];
+        long[] erosionExceedsBody = new long[roles];
+        long[] consumed25 = new long[roles];
+        long[] consumed50 = new long[roles];
+        long[] consumed75 = new long[roles];
+        long[] consumed90 = new long[roles];
+        long[] densityPositive = new long[roles];
+        long[] densityVisible = new long[roles];
+        double[] bodySum = new double[roles];
+        double[] erosionSum = new double[roles];
+        double[] densitySum = new double[roles];
+
+        // Density below this cannot read as body in the final image; it is the
+        // same floor the calibration report already treats as empty.
+        final double VISIBLE_DENSITY = 0.02D;
+        double step = 20.0D;
+
+        for (double y = 136.0D; y <= 1000.0D; y += step) {
+            for (double x = -700.0D; x <= 700.0D; x += step) {
+                for (double z = -700.0D; z <= 700.0D; z += step) {
+                    // Attribute the sample to the role whose own envelope is
+                    // strongest here, so roles are measured separately.
+                    int owner = -1;
+                    double bestEnvelope = 0.0D;
+                    for (StormLobeDescriptor lobe : lobes) {
+                        double envelope = StormLobeEvaluator.envelopeFromDistance(
+                                StormLobeEvaluator.signedDistanceAt(lobe, x, y, z),
+                                StormLobeEvaluator.edgeWidthBlocks(lobe),
+                                StormLobeEvaluator.envelopeStrength(lobe));
+                        if (envelope > bestEnvelope) {
+                            bestEnvelope = envelope;
+                            owner = lobe.role().gpuId();
+                        }
+                    }
+                    if (owner < 0 || bestEnvelope <= 0.0D) {
+                        continue;
+                    }
+                    double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                    if (coverage <= 0.0D) {
+                        continue;
+                    }
+                    double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                    boolean embedded =
+                            StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+
+                    double[] uvw = baseDomain(x, y, z, 0.0025D);
+                    CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                    double lowFbm = StormDensityModel.lowFbm(
+                            baseSample[1], baseSample[2], baseSample[3]);
+                    double carrier = StormDensityModel.baseCarrier(baseSample[0], lowFbm);
+                    double baseField = StormDensityModel.stormBaseField(carrier);
+                    double body = StormDensityModel.stormBody(
+                            coverage, strength, baseField, embedded);
+
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    double detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    double erosion = (1.0D - detailFbm) * 0.44D;
+                    double density = StormDensityModel.finalDensity(
+                            coverage, strength, baseField, detailFbm, embedded);
+
+                    samples[owner]++;
+                    bodySum[owner] += body;
+                    erosionSum[owner] += erosion;
+                    densitySum[owner] += density;
+                    if (body > 0.0D) {
+                        double consumed = Math.min(1.0D, erosion / body);
+                        if (erosion >= body) {
+                            erosionExceedsBody[owner]++;
+                        }
+                        if (consumed > 0.25D) {
+                            consumed25[owner]++;
+                        }
+                        if (consumed > 0.50D) {
+                            consumed50[owner]++;
+                        }
+                        if (consumed > 0.75D) {
+                            consumed75[owner]++;
+                        }
+                        if (consumed > 0.90D) {
+                            consumed90[owner]++;
+                        }
+                    } else {
+                        erosionExceedsBody[owner]++;
+                        consumed25[owner]++;
+                        consumed50[owner]++;
+                        consumed75[owner]++;
+                        consumed90[owner]++;
+                    }
+                    if (density > 0.0D) {
+                        densityPositive[owner]++;
+                    }
+                    if (density >= VISIBLE_DENSITY) {
+                        densityVisible[owner]++;
+                    }
+                }
+            }
+        }
+
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_EROSION|fixture=38bc5412|step=%.0f|erosionConstant=0.44"
+                        + "|visibleDensityFloor=%.2f%n", step, VISIBLE_DENSITY);
+        for (int role = 0; role < roles; role++) {
+            long n = Math.max(1L, samples[role]);
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_EROSION_ROLE|%-5s|samples=%-7d|meanBody=%.4f|meanErosion=%.4f"
+                            + "|erosionOverBody=%.3f|erosion>=body=%.1f%%"
+                            + "|consumed>50%%=%.1f%%|consumed>90%%=%.1f%%"
+                            + "|densityPositive=%.1f%%|densityVisible=%.1f%%|meanDensity=%.4f%n",
+                    names[role], samples[role],
+                    bodySum[role] / n, erosionSum[role] / n,
+                    bodySum[role] > 0.0D ? erosionSum[role] / bodySum[role] : 0.0D,
+                    100.0D * erosionExceedsBody[role] / n,
+                    100.0D * consumed50[role] / n,
+                    100.0D * consumed90[role] / n,
+                    100.0D * densityPositive[role] / n,
+                    100.0D * densityVisible[role] / n,
+                    densitySum[role] / n);
+        }
+    }
+
+    /** Mirrors detailNoiseDomain() plus the base-noise offset from the shader. */
+    private static double[] detailDomain(double x, double y, double z, double[] baseSample) {
+        double rx = x * 0.7071D + y * -0.4082D + z * 0.5774D;
+        double ry = x * 0.7071D + y * 0.4082D + z * -0.5774D;
+        double rz = y * 0.8165D + z * 0.5774D;
+        double wx = Math.sin(x * 1.731D * 0.00173D + y * 1.731D * 0.00091D
+                + z * 1.731D * -0.00127D + 1.7D);
+        double wy = Math.sin(x * 1.731D * -0.00111D + y * 1.731D * 0.00149D
+                + z * 1.731D * 0.00083D - 2.3D);
+        double wz = Math.sin(x * 1.731D * 0.00079D + y * 1.731D * -0.00131D
+                + z * 1.731D * 0.00191D + 4.1D);
+        return new double[]{
+                rx * 0.022D + wx * 0.43D + (baseSample[1] - 0.5D) * 0.18D,
+                ry * 0.022D + wy * 0.43D + (baseSample[2] - 0.5D) * 0.18D,
+                rz * 0.022D + wz * 0.43D + (baseSample[0] - 0.5D) * 0.18D};
     }
 
     private static int connectedComponents(boolean[][] occupied) {
