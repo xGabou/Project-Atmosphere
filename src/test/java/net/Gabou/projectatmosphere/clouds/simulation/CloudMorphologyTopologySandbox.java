@@ -491,8 +491,10 @@ public final class CloudMorphologyTopologySandbox {
                 upperOverBaseMin, upperOverBaseMax, anvilOverBaseMin, anvilOverBaseMax,
                 anvilOverUpperMin, anvilOverUpperMax);
         System.out.printf(Locale.ROOT,
-                "T098_T127_TARGETS|base=900..1100|core=420..520|lowerTower=280..360"
-                        + "|upperTower=180..250|anvilSpan=1150..1450%n");
+                "T098_T127_TARGETS|base=900..1100|core=420..520|lowerTower=273..390"
+                        + "|upperTower=230..414|anvilSpan=1150..1450"
+                        + "|relationships core/base=0.45-0.50 lowerTower/core=0.65-0.75"
+                        + " anvil/base=1.20-1.35 anvil/upperTower=3.5-5.0%n");
     }
 
     /**
@@ -511,42 +513,51 @@ public final class CloudMorphologyTopologySandbox {
      * these into live assertions requires choosing a resolution for the
      * inconsistency documented in `t098-manual-checklist.md`.
      */
-    private static void validateT098ProportionGuardRejectsMushroom() {
+    private static void validateT098ProportionContract() {
         // The delivered mature severe system, measured by reportT098RoleProportions().
+        // The corrected mature severe system, measured by
+        // reportT098RoleProportions().
         double base = 1044.0D;
         double core = 504.0D;
-        double lowerTower = 315.0D;
-        double upperTower = 216.0D;
+        double lowerTower = 352.8D;
+        double upperTower = 300.6D;
         double anvil = 1278.0D;
 
-        // Relationships that hold today.
+        // Every relationship now holds on the corrected geometry.
         requireWithin("T127 core/base", core / base, 0.45D, 0.50D);
         requireWithin("T127 anvil/base", anvil / base, 1.20D, 1.35D);
+        requireWithin("T127 lowerTower/core", lowerTower / core, 0.65D, 0.75D);
+        requireWithin("T127 anvil/upperTower", anvil / upperTower, 3.5D, 5.0D);
+        requireWithin("T127 upperTower/lowerTower", upperTower / lowerTower, 0.60D, 0.95D);
 
-        // Relationships T127 states and the delivered system violates.
-        requireOutside("T127 lowerTower/core", lowerTower / core, 0.65D, 0.75D);
-        requireOutside("T127 anvil/upperTower", anvil / upperTower, 3.5D, 5.0D);
+        // Fail-first: the pre-correction proportions must still be rejected, so
+        // the guard cannot silently readmit the mushroom silhouette.
+        double oldLowerTower = 315.0D;
+        double oldUpperTower = 216.0D;
+        requireOutside("T098 pre-correction lowerTower/core", oldLowerTower / core, 0.65D, 0.75D);
+        requireOutside("T098 pre-correction anvil/upperTower",
+                anvil / oldUpperTower, 3.5D, 5.0D);
 
-        // The inconsistency itself: with upper TOWER capped at 250 the 3.5-5.0
-        // relationship cannot admit an anvil above 1250, yet the anvil range
-        // reaches 1450 and the generator delivers 1278.
-        double widestAnvilSatisfiable = 5.0D * 250.0D;
-        if (widestAnvilSatisfiable >= 1450.0D) {
-            throw new IllegalStateException("T127 anvil range and upper-tower range are no "
-                    + "longer in tension; the recorded inconsistency may have been resolved");
-        }
-        if (anvil <= widestAnvilSatisfiable) {
+        // The old absolute upper-TOWER cap could not admit the delivered anvil;
+        // the corrected range must.
+        double widestAnvilUnderOldCap = 5.0D * 250.0D;
+        if (anvil <= widestAnvilUnderOldCap) {
             throw new IllegalStateException("delivered anvil no longer exceeds the widest span "
-                    + "the upper-tower range can satisfy; re-derive the T098 proportion finding");
+                    + "the old upper-tower cap could satisfy; re-derive the T098 finding");
+        }
+        if (upperTower < anvil / 5.0D) {
+            throw new IllegalStateException("corrected upper tower " + upperTower
+                    + " is still too narrow for the delivered anvil " + anvil);
         }
 
         System.out.printf(Locale.ROOT,
-                "T098_PROPORTION_GUARD|coreOverBase=%.3f OK|anvilOverBase=%.3f OK"
-                        + "|lowerTowerOverCore=%.3f VIOLATES 0.65-0.75"
-                        + "|anvilOverUpperTower=%.3f VIOLATES 3.5-5.0"
-                        + "|widestAnvilSatisfiableWithUpperTower250=%.0f|deliveredAnvil=%.0f%n",
-                core / base, anvil / base, lowerTower / core, anvil / upperTower,
-                widestAnvilSatisfiable, anvil);
+                "T098_PROPORTION_GUARD|coreOverBase=%.3f|lowerTowerOverCore=%.3f"
+                        + "|anvilOverBase=%.3f|anvilOverUpperTower=%.3f|narrowing=%.3f"
+                        + "|allRelationshipsSatisfied=true"
+                        + "|rejectsOldLowerTower=%.3f|rejectsOldAnvilOverUpper=%.3f%n",
+                core / base, lowerTower / core, anvil / base, anvil / upperTower,
+                upperTower / lowerTower,
+                oldLowerTower / core, anvil / oldUpperTower);
     }
 
     /** Asserts a measured ratio sits inside a stated contract band. */
@@ -570,7 +581,7 @@ public final class CloudMorphologyTopologySandbox {
         validateT133GuardsRejectKnownViolations();
         reportStormBlendSaturation();
         reportT098RoleProportions();
-        validateT098ProportionGuardRejectsMushroom();
+        validateT098ProportionContract();
         CloudMorphologyGenerators.StormPhysicalScale scale =
                 CloudMorphologyGenerators.stormPhysicalScale();
         requireRange("storm physical member count", scale.memberCount(), 10, 10);
@@ -766,8 +777,25 @@ public final class CloudMorphologyTopologySandbox {
             requireRange("storm physical height", maxY - minY, 720.0D, 880.0D);
             requireRange("storm physical base diameter", baseDiameter, 900.0D, 1100.0D);
             requireRange("storm physical core diameter", coreDiameter, 420.0D, 520.0D);
-            requireRange("storm physical lower tower diameter", lowerTowerDiameter, 280.0D, 360.0D);
-            requireRange("storm physical upper tower diameter", upperTowerDiameter, 180.0D, 250.0D);
+            // T098/T127 correction. The former 280-360 / 180-250 pair could not
+            // satisfy T127's own relationships: upper TOWER <= 250 caps the
+            // admissible ANVIL at 5.0 * 250 = 1250, while the ANVIL range reaches
+            // 1450 and the generator delivers ~1278. These ranges are solved from
+            // the relationships instead - lower TOWER = CORE * 0.65-0.75 over
+            // CORE 420-520, and upper TOWER = ANVIL / 3.5-5.0 over ANVIL
+            // 1150-1450 - so the absolute and proportional halves now agree.
+            requireRange("storm physical lower tower diameter", lowerTowerDiameter, 273.0D, 390.0D);
+            requireRange("storm physical upper tower diameter", upperTowerDiameter, 230.0D, 414.0D);
+
+            // T098: the relationships T127 documented and T134 never enforced.
+            // A system can sit inside every absolute range and still compose
+            // into the rejected mushroom silhouette; these are what prevent it.
+            requireRange("T127 core/base ratio", coreDiameter / baseDiameter, 0.45D, 0.50D);
+            requireRange("T127 lowerTower/core ratio",
+                    lowerTowerDiameter / coreDiameter, 0.65D, 0.75D);
+            // The column must still taper upward rather than becoming a chimney.
+            requireRange("T127 upperTower/lowerTower narrowing",
+                    upperTowerDiameter / lowerTowerDiameter, 0.60D, 0.95D);
             requireRange("storm physical anvil thickness", anvilThickness, 150.0D, 220.0D);
 
             double height = maxY - minY;
@@ -785,6 +813,11 @@ public final class CloudMorphologyTopologySandbox {
             // interpretation cannot silently drift.
             requireRange("storm physical anvil span", anvilUnionSpan,
                     ANVIL_SPAN_MINIMUM, ANVIL_SPAN_MAXIMUM);
+            // T098: the two anvil relationships T127 states, guarded here where
+            // the union span is known.
+            requireRange("T127 anvil/base ratio", anvilUnionSpan / baseDiameter, 1.20D, 1.35D);
+            requireRange("T127 anvil/upperTower ratio",
+                    anvilUnionSpan / upperTowerDiameter, 3.5D, 5.0D);
             requireRange("storm physical anvil span over base",
                     anvilUnionSpan / baseDiameter, 1.20D, 1.35D);
 

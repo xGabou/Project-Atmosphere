@@ -277,6 +277,75 @@ with `governorScale=0.50000` / `resolutionScale=0.75000`, against a 16.7 ms Ultr
 descriptor texture fetches the dominant cost. Any future optimization must preserve the now-proven
 T122 and T119 neutrality contracts.
 
+## T127 proportional contract correction - 2026-08-28
+
+**The upper-TOWER range in the table below was internally inconsistent with the ANVIL relationship
+stated beside it, and is superseded.** This is a contract correction derived from the table's own
+relationships, not visual tuning.
+
+### The contradiction
+
+T127 states each role's absolute diameter *and* a relationship. The relationships were never
+enforced - `validateStormPhysicalScale()` checked only the absolute ranges - so a system inside every
+range still composed into the mushroom silhouette T098 rejected.
+
+With upper TOWER capped at **250** and the stated `ANVIL = 3.5-5.0 x upper TOWER`, the widest
+admissible ANVIL is `5.0 x 250 = 1250`. The ANVIL range reaches **1450**, and the generator delivers
+**1269.9-1287.3**. Above 1250 no upper TOWER inside 180-250 can satisfy the relationship, so the two
+halves of the contract could not both hold at the accepted severe scale.
+
+Measured on the delivered system before correction:
+
+| Relationship | Delivered | T127 target | |
+|---|---:|---|---|
+| CORE / BASE | 0.483 | 0.45-0.50 | OK |
+| lower TOWER / CORE | **0.625** | 0.65-0.75 | **violated** |
+| ANVIL / BASE | 1.224 | 1.20-1.35 | OK |
+| ANVIL / upper TOWER | **5.917** | 3.5-5.0 | **violated** |
+
+### Derived replacement ranges
+
+Solved from the relationships against the accepted BASE (900-1100) and ANVIL (1150-1450) ranges:
+
+| Role | Old range | Corrected range | Derivation |
+|---|---|---|---|
+| CORE | 420-520 | 420-520 (unchanged) | BASE x 0.45-0.50 admits 405-550 |
+| lower TOWER | 280-360 | **273-390** | CORE x 0.65-0.75 |
+| upper TOWER | **180-250** | **230-414** | ANVIL / 3.5-5.0 |
+
+### Delivered geometry after correction
+
+`stormLobeSpec()`'s TOWER radius multiplier moves from `lerp(progress, 0.35, 0.24)` to
+`lerp(progress, 0.392, 0.334)`, placing both relationships at their midband:
+
+| Metric | Before | After | Target |
+|---|---:|---:|---|
+| lower TOWER diameter | 315.0 | **352.8** | 273-390 |
+| upper TOWER diameter | 216.0 | **300.6** | 230-414 |
+| lower TOWER / CORE | 0.625 | **0.700** | 0.65-0.75 |
+| ANVIL / upper TOWER | 5.917 | **4.251** | 3.5-5.0 |
+| upper / lower TOWER | 0.686 | **0.852** | narrowing retained |
+
+**BASE (1044.0), CORE (504.0), ANVIL union (1269.9-1287.3), total footprint and total height are
+unchanged.** Descriptor count, role ordering, lifecycle logic, density, noise, erosion, lighting,
+T131 and `STORM_MAX_BLEND_BLOCKS = 48` are untouched. The change is confined to two TOWER radius
+multipliers.
+
+### Why this is a correction rather than tuning
+
+The replacement ranges are solved from relationships T127 itself specifies, against BASE and ANVIL
+ranges that remain accepted. The operating point is the midband of both relationships rather than
+minimum compliance, and the resulting column still tapers upward. Nothing was chosen to make a
+screenshot look better; the old ranges were arithmetically unsatisfiable at the delivered anvil span.
+
+### Guards added
+
+`CloudMorphologyTopologySandbox.validateStormPhysicalScale()` now enforces `core/base`,
+`lowerTower/core`, `anvil/base`, `anvil/upperTower` and the upper/lower narrowing on every
+deterministic sample. `validateT098ProportionContract()` validates the corrected proportions and
+keeps fail-first coverage that rejects the pre-correction 0.625 and 5.917 values, so the mushroom
+proportions cannot be readmitted silently.
+
 ## T133 combined revalidation - 2026-08-27 - OPEN, one blocker
 
 **Status: T133 is NOT closed.** Five of its six evidence areas pass. One written requirement that

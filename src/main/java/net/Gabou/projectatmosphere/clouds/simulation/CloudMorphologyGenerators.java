@@ -715,7 +715,17 @@ final class CloudMorphologyGenerators {
                 float progress = towerCount <= 1
                         ? 0.0F
                         : (float) ordinal / (float) (towerCount - 1);
-                radiusMultiplier = Mth.lerp(progress, 0.35F, 0.24F);
+                // T098/T127 proportional correction. The former 0.35/0.24 pair
+                // delivered a 315/216-block tower, which violated T127's own
+                // stated relationships: lower TOWER was 0.625 of CORE (band
+                // 0.65-0.75) and ANVIL was 5.92x upper TOWER (band 3.5-5.0).
+                // Those relationships were documented but never guarded, so a
+                // system inside every absolute range still composed into the
+                // mushroom silhouette T098 rejected. These multipliers put both
+                // relationships at their midband: lower TOWER 352.8 (0.700 of
+                // CORE) and upper TOWER 300.6 (ANVIL/4.251), still narrowing
+                // upward at 0.852. BASE, ANVIL, footprint and height unchanged.
+                radiusMultiplier = Mth.lerp(progress, 0.392F, 0.334F);
                 baseY = centerY - plan.topRise() * 0.13F;
                 topY = centerY + plan.topRise() * Mth.lerp(progress, 0.34F, 0.30F);
             }
