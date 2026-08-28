@@ -50,6 +50,13 @@ final class StormLobeEvaluator {
     /** Cap fillet as a fraction of the lobe's smaller extent. */
     private static final double CAP_ROUNDING_FRACTION = 0.35D;
 
+    /**
+     * Ceiling on the envelope boundary half-width as a fraction of a lobe's own
+     * half-height. See {@link #edgeWidthBlocks}: the boundary is isotropic, so
+     * it must stay inside the extent it is applied across.
+     */
+    private static final double VERTICAL_EDGE_BOUND_FRACTION = 0.75D;
+
     private StormLobeEvaluator() {
     }
 
@@ -698,7 +705,23 @@ final class StormLobeEvaluator {
             case BASE -> Math.max(0.06D, lobe.edgeSoftness() * 0.66D);
             default -> Math.max(0.06D, lobe.edgeSoftness() * 0.62D);
         };
-        return Math.max(MIN_EDGE_BLOCKS, normalized * smallerRadius(lobe) * EDGE_SOFTNESS_BLOCKS);
+        double horizontal = normalized * smallerRadius(lobe) * EDGE_SOFTNESS_BLOCKS;
+        // T098: envelopeFromDistance fades over +/- this width, so a lobe whose
+        // softness exceeds its own half-height has a boundary wider than it is
+        // tall - the fade consumes the body and spills past the far cap. The
+        // width above is derived from smallerRadius, a horizontal extent, but
+        // applied isotropically, so a role much wider than it is tall is
+        // exposed. Measured on the severe fixture, softness/halfHeight is 0.73
+        // BASE, 0.57 CORE, 0.27 TOWER and 2.47-2.58 for all four ANVIL members:
+        // the anvil's ~272-block boundary against a 105-block half-height hung
+        // ~150 blocks of very-low-coverage haze below its own baseY, which the
+        // carrier shredded into the 50-84 disconnected fragments that made the
+        // storm read as a detached anvil over a broken column. Bounding by the
+        // lobe's vertical extent is dimensionally correct for every role and,
+        // at this fraction, binds only the degenerate case.
+        double halfHeight = Math.max(roleTopY(lobe) - roleBaseY(lobe), 1.0D) * 0.5D;
+        return Math.max(MIN_EDGE_BLOCKS,
+                Math.min(horizontal, halfHeight * VERTICAL_EDGE_BOUND_FRACTION));
     }
 
     /** Descriptor authority over how much coverage this lobe contributes. */

@@ -70,6 +70,10 @@ const int MAX_STORM_GROUPS = 8;
 // shows through as a seam. Lowest detail octave: period 2 over a 1/0.022 block
 // tile = 22.727 blocks, so the half-width is 11.364 blocks.
 const float STORM_MIN_EDGE_BLOCKS = 11.363636;
+
+// Ceiling on the envelope boundary half-width as a fraction of a lobe's own
+// half-height. Mirrors StormLobeEvaluator.VERTICAL_EDGE_BOUND_FRACTION.
+const float STORM_VERTICAL_EDGE_BOUND_FRACTION = 0.75;
 // Cap fillet as a fraction of the lobe's smaller extent, bounded by the same
 // wavelength. Flat slabs and recognizable spheres are both rejected forms.
 const float STORM_CAP_ROUNDING_FRACTION = 0.35;
@@ -744,21 +748,35 @@ float stormSmoothMinimum(float first, float second, float blendRadius) {
 }
 
 // Envelope boundary half-width in blocks for one descriptor.
-float stormEdgeWidthBlocksFromData(vec4 radiusRotation, vec4 shearMedia, int role) {
+float stormEdgeWidthBlocksFromData(
+        vec4 positionHeight, vec4 radiusRotation, vec4 shearMedia, int role) {
     float edgeSoftness = shearMedia.w;
     float normalized = role == 3
         ? max(0.12, edgeSoftness * 1.65)
         : (role == 0
             ? max(0.06, edgeSoftness * 0.66)
             : max(0.06, edgeSoftness * 0.62));
+    float horizontal = normalized * min(radiusRotation.x, radiusRotation.y);
+    // T098, mirroring StormLobeEvaluator.edgeWidthBlocks. The coverage envelope
+    // fades over +/- this width isotropically, but the width is derived from a
+    // horizontal extent, so a role much wider than it is tall gets a boundary
+    // wider than its own body. Measured on the severe fixture that was every
+    // ANVIL member at 2.47-2.58 half-heights, hanging ~150 blocks of
+    // very-low-coverage haze below its own base for the carrier to shred.
+    // Bounding by the lobe's vertical extent binds only that degenerate case.
+    float roleBaseY;
+    float roleTopY;
+    stormDescriptorVerticalBounds(positionHeight, role, roleBaseY, roleTopY);
+    float halfHeight = max(roleTopY - roleBaseY, 1.0) * 0.5;
     return max(
         STORM_MIN_EDGE_BLOCKS,
-        normalized * min(radiusRotation.x, radiusRotation.y)
+        min(horizontal, halfHeight * STORM_VERTICAL_EDGE_BOUND_FRACTION)
     );
 }
 
 float stormEdgeWidthBlocks(int descriptorIndex, int role) {
     return stormEdgeWidthBlocksFromData(
+        stormDescriptorTexel(descriptorIndex, 0),
         stormDescriptorTexel(descriptorIndex, 1),
         stormDescriptorTexel(descriptorIndex, 2),
         role
@@ -963,7 +981,8 @@ void directStormGroupField(
         // this is the real pre-reuse work, not a copy of the ON result.
         float lobeSoftness = paT122Off()
             ? stormEdgeWidthBlocks(descriptorIndex, lobeRole)
-            : stormEdgeWidthBlocksFromData(radiusRotation, shearMedia, lobeRole);
+            : stormEdgeWidthBlocksFromData(
+                positionHeight, radiusRotation, shearMedia, lobeRole);
         // T122: the FromData softness form consumes the two descriptor texels
         // already fetched above.  Count those two precise wrapper fetches that
         // are avoided; this is a diagnostic-only counter, not an estimate

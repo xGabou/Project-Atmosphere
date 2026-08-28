@@ -68,6 +68,8 @@ public final class StormVolumetricGeometrySandbox {
         reportT098PercolationWidth();
         reportT098AnvilSkirt();
         reportT098AnvilSoftnessSweep();
+        reportT098SoftnessVersusHeight();
+        validateT098EnvelopeBoundedByExtent();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -2306,6 +2308,86 @@ public final class StormVolumetricGeometrySandbox {
                     softness, softness * 1.65D, compSum / bands, fracSum / bands,
                     cellSum / bands, anvilSpan);
         }
+    }
+
+
+    /**
+     * T098 phase 2: envelope boundary width against each lobe's own extent.
+     *
+     * <p>envelopeFromDistance fades over plus/minus the softness, so a lobe
+     * whose softness exceeds its half-height has a boundary wider than the lobe
+     * is tall: the fade consumes the whole body and spills past the far cap.
+     * edgeWidthBlocks derives softness from smallerRadius - a horizontal extent -
+     * and applies it isotropically, so any role that is much wider than it is
+     * tall is exposed. This reports the ratio per role so the bound can be
+     * scoped by measurement rather than special-cased to ANVIL.
+     */
+    private static void reportT098SoftnessVersusHeight() {
+        System.out.println("T098_SOFTHEIGHT|role|member|softnessBlocks|halfHeight"
+                + "|softOverHalfHeight|smallerRadius|degenerate");
+        for (StormLobeDescriptor lobe : severeFixture38bc5412()) {
+            double softness = StormLobeEvaluator.edgeWidthBlocks(lobe);
+            double halfHeight = Math.max(lobe.topY() - lobe.baseY(), 1.0D) * 0.5D;
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_SOFTHEIGHT|%-5s|%d|%14.1f|%10.1f|%18.3f|%13.1f|%s%n",
+                    lobe.role(), lobe.memberIndex(), softness, halfHeight,
+                    softness / halfHeight, StormLobeEvaluator.smallerRadius(lobe),
+                    softness > halfHeight ? "YES" : "no");
+        }
+    }
+
+
+    /**
+     * T098/T127 system-level guard: the coverage envelope's boundary must fit
+     * inside the lobe it bounds.
+     *
+     * <p>The old morphology contract validated roles independently - each
+     * diameter against its own range - which is how a system inside every range
+     * still composed into the rejected silhouette. This is a relationship the
+     * contract never stated: envelopeFromDistance fades over plus/minus
+     * edgeWidthBlocks isotropically, so a lobe whose boundary exceeds its own
+     * half-height has no interior along its short axis, and the fade spills past
+     * the far cap as very-low-coverage material that the carrier shreds.
+     *
+     * <p>Fail-first is carried by the recorded pre-fix witnesses: the ANVIL
+     * members measured 2.47-2.58 half-heights before the bound, so the assertion
+     * rejects the shipped geometry it was written against.
+     */
+    private static void validateT098EnvelopeBoundedByExtent() {
+        double worst = 0.0D;
+        String worstLabel = "none";
+        for (StormLobeDescriptor lobe : severeFixture38bc5412()) {
+            double softness = StormLobeEvaluator.edgeWidthBlocks(lobe);
+            double halfHeight = Math.max(
+                    StormLobeEvaluator.roleTopY(lobe) - StormLobeEvaluator.roleBaseY(lobe),
+                    1.0D) * 0.5D;
+            double ratio = softness / halfHeight;
+            if (ratio > worst) {
+                worst = ratio;
+                worstLabel = lobe.role() + "#" + lobe.memberIndex();
+            }
+            if (ratio > 1.0D) {
+                throw new IllegalStateException(
+                        "T098 envelope boundary exceeds the lobe's own half-height: "
+                                + lobe.role() + "#" + lobe.memberIndex()
+                                + " softness=" + softness + " halfHeight=" + halfHeight
+                                + " ratio=" + ratio);
+            }
+        }
+
+        // Fail-first: the pre-fix ANVIL boundary must still be rejected, so the
+        // guard cannot silently readmit the shredded skirt.
+        double preFixAnvilSoftness = 272.0D;
+        double preFixAnvilHalfHeight = 119.3D;
+        if (preFixAnvilSoftness / preFixAnvilHalfHeight <= 1.0D) {
+            throw new IllegalStateException("the recorded pre-fix anvil boundary no longer "
+                    + "violates the extent bound; re-derive the T098 skirt finding");
+        }
+
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_EXTENT_GUARD|worstSoftnessOverHalfHeight=%.3f (%s)|bound=1.000"
+                        + "|rejectsPreFixAnvil=%.3f|PASSED%n",
+                worst, worstLabel, preFixAnvilSoftness / preFixAnvilHalfHeight);
     }
 
     private static int largestComponent(boolean[][] occupied) {
