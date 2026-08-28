@@ -63,7 +63,11 @@ public final class StormVolumetricGeometrySandbox {
         validateT132Attribution();
         reportT098CarrierDistribution();
         reportT098ErosionVersusBody();
-        reportT098ProportionSensitivity();
+        reportT098VerticalWidthProfile();
+        reportT098TransitionCandidates();
+        reportT098PercolationWidth();
+        reportT098AnvilSkirt();
+        reportT098AnvilSoftnessSweep();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -1690,6 +1694,654 @@ public final class StormVolumetricGeometrySandbox {
                 column == 0L ? 0.0D : (double) visible[3] / column,
                 visible[2] == 0L ? 0.0D : (double) visible[3] / visible[2],
                 bandsWithColumn, bands, footprintMax);
+    }
+
+
+    /**
+     * T098 phase 5: the storm's vertical width profile.
+     *
+     * <p>The old contract validated roles independently, which is how a system
+     * inside every range still composed into the rejected silhouette. This
+     * measures the storm as a vertical shape instead: for each height band it
+     * samples the density field, counts occupied cross-section, and reports the
+     * equivalent diameter and role composition.
+     *
+     * <p>A cumulonimbus should read broad at the base, substantial through the
+     * core, gradually narrowing through the tower, then expanding into the
+     * anvil. A mushroom reads broad, abruptly narrow, then broad again. The
+     * equivalent-diameter column distinguishes them directly.
+     */
+    private static void reportT098VerticalWidthProfile() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+
+        // Descriptor inventory, so the profile can be read against ownership.
+        System.out.println("T098_DESCRIPTOR_MAP|role|member|centre|major|minor|baseY|topY|vSpan");
+        for (StormLobeDescriptor lobe : lobes) {
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_DESCRIPTOR|%-5s|%d|(%.1f,%.1f)|%.1f|%.1f|%.1f|%.1f|%.0f%n",
+                    lobe.role(), lobe.memberIndex(), lobe.centerX(), lobe.centerZ(),
+                    lobe.majorRadius(), lobe.minorRadius(), lobe.baseY(), lobe.topY(),
+                    lobe.topY() - lobe.baseY());
+        }
+
+        double step = 20.0D;
+        double band = 32.0D;
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+        System.out.println("T098_VPROFILE|y|equivDiam|largestCompDiam|cells|comps"
+                + "|base|core|tower|anvil|dominant");
+        for (double y = 136.0D; y <= 1000.0D; y += band) {
+            long occupied = 0L;
+            long[] byRole = new long[4];
+            // Occupancy grid for this band, so connectivity can be measured
+            // rather than inferred from a disc-equivalent area.
+            int gridSize = (int) (1600.0D / step) + 1;
+            boolean[][] grid = new boolean[gridSize][gridSize];
+            for (double x = -800.0D; x <= 800.0D; x += step) {
+                for (double z = -800.0D; z <= 800.0D; z += step) {
+                    int owner = -1;
+                    double bestEnvelope = 0.0D;
+                    for (StormLobeDescriptor lobe : lobes) {
+                        double envelope = StormLobeEvaluator.envelopeFromDistance(
+                                StormLobeEvaluator.signedDistanceAt(lobe, x, y, z),
+                                StormLobeEvaluator.edgeWidthBlocks(lobe),
+                                StormLobeEvaluator.envelopeStrength(lobe));
+                        if (envelope > bestEnvelope) {
+                            bestEnvelope = envelope;
+                            owner = lobe.role().gpuId();
+                        }
+                    }
+                    if (owner < 0) {
+                        continue;
+                    }
+                    double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                    if (coverage <= 0.0D) {
+                        continue;
+                    }
+                    double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                    boolean embedded =
+                            StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                    double[] uvw = baseDomain(x, y, z, 0.0025D);
+                    CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                    double lowFbm = StormDensityModel.lowFbm(
+                            baseSample[1], baseSample[2], baseSample[3]);
+                    double baseField = StormDensityModel.stormBaseField(
+                            StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    double detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    double density = StormDensityModel.finalDensity(
+                            coverage, strength, baseField, detailFbm, embedded);
+                    if (density >= 0.02D) {
+                        occupied++;
+                        byRole[owner]++;
+                        int gx = (int) ((x + 800.0D) / step);
+                        int gz = (int) ((z + 800.0D) / step);
+                        if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                            grid[gz][gx] = true;
+                        }
+                    }
+                }
+            }
+            // Equivalent diameter of the occupied cross-section.
+            double area = occupied * step * step;
+            double equivalentDiameter = 2.0D * Math.sqrt(area / Math.PI);
+            int dominant = 0;
+            for (int r = 1; r < 4; r++) {
+                if (byRole[r] > byRole[dominant]) {
+                    dominant = r;
+                }
+            }
+            String[] names = {"BASE", "CORE", "TOWER", "ANVIL"};
+            int components = occupied == 0L ? 0 : connectedComponents(grid);
+            int largest = largestComponent(grid);
+            double largestDiameter =
+                    2.0D * Math.sqrt((largest * step * step) / Math.PI);
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_VPROFILE|%7.1f|%8.1f|%8.1f|%-6d|%-3d|%-6d|%-6d|%-6d|%-6d|%s%n",
+                    y, equivalentDiameter, largestDiameter, occupied, components,
+                    byRole[0], byRole[1], byRole[2], byRole[3],
+                    occupied == 0L ? "none" : names[dominant]);
+        }
+    }
+
+    /** Cell count of the largest connected occupied region. */
+
+    /**
+     * T098 phase 6: candidate structural changes, scored on the transition band.
+     *
+     * <p>The vertical profile shows the failure is fragmentation, not width: the
+     * cross-section between the top of BASE and the body of ANVIL breaks into
+     * 50-84 connected components, against 14-24 in the base and anvil bands.
+     * This scores candidates on that band directly - largest connected component
+     * and component count over y616-776 - rather than on voxel share.
+     */
+    private static void reportT098TransitionCandidates() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        System.out.println("T098_TRANSITION|candidate|band y616-776"
+                + "|meanLargestCompDiam|meanComponents|meanCells");
+
+        scoreTransition(baseVolume, detailVolume, "current", 1.0D, 0.0D, 0.0D);
+        // A: taller TOWER - extend the column up into the anvil body.
+        scoreTransition(baseVolume, detailVolume, "towerTop+120", 1.0D, 120.0D, 0.0D);
+        scoreTransition(baseVolume, detailVolume, "towerTop+200", 1.0D, 200.0D, 0.0D);
+        // B: anvil starts lower - close the gap from above.
+        scoreTransition(baseVolume, detailVolume, "anvilBase-120", 1.0D, 0.0D, -120.0D);
+        scoreTransition(baseVolume, detailVolume, "anvilBase-200", 1.0D, 0.0D, -200.0D);
+        // C: wider upper tower alone, for comparison with the width lever.
+        scoreTransition(baseVolume, detailVolume, "towerWide x1.5", 1.5D, 0.0D, 0.0D);
+        // D: combination - taller tower plus a lower anvil base.
+        scoreTransition(baseVolume, detailVolume, "tower+160 anvil-160", 1.0D, 160.0D, -160.0D);
+        scoreTransition(baseVolume, detailVolume,
+                "tower+160 anvil-160 wide1.25", 1.25D, 160.0D, -160.0D);
+        // E: extend CORE upward. CORE is 560-595 wide, so unlike the narrow
+        // tower it can actually fill the transition band, and T098 asks for a
+        // visible dense convective region there.
+        scoreTransition(baseVolume, detailVolume, "coreTop+100", 1.0D, 0.0D, 0.0D, 100.0D);
+        scoreTransition(baseVolume, detailVolume, "coreTop+150", 1.0D, 0.0D, 0.0D, 150.0D);
+        scoreTransition(baseVolume, detailVolume, "coreTop+220", 1.0D, 0.0D, 0.0D, 220.0D);
+        scoreTransition(baseVolume, detailVolume,
+                "coreTop+150 towerTop+120", 1.0D, 120.0D, 0.0D, 150.0D);
+        // F: extend BASE upward. BASE is the other wide role, and T127 sets no
+        // thickness target for it, unlike ANVIL 150-220.
+        scoreTransition(baseVolume, detailVolume, "baseTop+100", 1.0D, 0.0D, 0.0D, 0.0D, 100.0D);
+        scoreTransition(baseVolume, detailVolume, "baseTop+180", 1.0D, 0.0D, 0.0D, 0.0D, 180.0D);
+        scoreTransition(baseVolume, detailVolume, "baseTop+260", 1.0D, 0.0D, 0.0D, 0.0D, 260.0D);
+        scoreTransition(baseVolume, detailVolume,
+                "baseTop+180 coreTop+150", 1.0D, 0.0D, 0.0D, 150.0D, 180.0D);
+        // G: option C - insert one bridging TOWER stage across y560-830 rather
+        // than scaling the two isolated tower lobes.
+        for (double r : new double[] {200.0D, 260.0D, 320.0D, 380.0D}) {
+            scoreTransition(baseVolume, detailVolume,
+                    String.format(java.util.Locale.ROOT, "bridge r=%.0f", r),
+                    1.0D, 0.0D, 0.0D, 0.0D, 0.0D, r);
+        }
+        scoreTransition(baseVolume, detailVolume,
+                "bridge r=320 baseTop+180", 1.0D, 0.0D, 0.0D, 0.0D, 180.0D, 320.0D);
+    }
+
+    /** Scores one candidate on the transition band. */
+    private static void scoreTransition(
+            byte[] baseVolume, byte[] detailVolume, String label,
+            double towerWidth, double towerTopRise, double anvilBaseDrop) {
+        scoreTransition(baseVolume, detailVolume, label,
+                towerWidth, towerTopRise, anvilBaseDrop, 0.0D);
+    }
+
+    private static void scoreTransition(
+            byte[] baseVolume, byte[] detailVolume, String label,
+            double towerWidth, double towerTopRise, double anvilBaseDrop, double coreTopRise) {
+        scoreTransition(baseVolume, detailVolume, label,
+                towerWidth, towerTopRise, anvilBaseDrop, coreTopRise, 0.0D);
+    }
+
+    private static void scoreTransition(
+            byte[] baseVolume, byte[] detailVolume, String label,
+            double towerWidth, double towerTopRise, double anvilBaseDrop,
+            double coreTopRise, double baseTopRise) {
+        scoreTransition(baseVolume, detailVolume, label, towerWidth, towerTopRise,
+                anvilBaseDrop, coreTopRise, baseTopRise, 0.0D);
+    }
+
+    private static void scoreTransition(
+            byte[] baseVolume, byte[] detailVolume, String label,
+            double towerWidth, double towerTopRise, double anvilBaseDrop,
+            double coreTopRise, double baseTopRise, double bridgeRadius) {
+        java.util.List<StormLobeDescriptor> lobes = new ArrayList<>();
+        for (StormLobeDescriptor lobe : severeFixture38bc5412()) {
+            double major = lobe.majorRadius();
+            double minor = lobe.minorRadius();
+            double topY = lobe.topY();
+            double baseY = lobe.baseY();
+            if (lobe.role() == StormLobeDescriptor.Role.TOWER) {
+                major *= towerWidth;
+                minor *= towerWidth;
+                topY += towerTopRise;
+            } else if (lobe.role() == StormLobeDescriptor.Role.ANVIL) {
+                baseY += anvilBaseDrop;
+            } else if (lobe.role() == StormLobeDescriptor.Role.CORE) {
+                topY += coreTopRise;
+            } else if (lobe.role() == StormLobeDescriptor.Role.BASE) {
+                topY += baseTopRise;
+            }
+            lobes.add(new StormLobeDescriptor(
+                    lobe.fieldId(), lobe.groupId(), lobe.memberIndex(), lobe.memberCount(),
+                    lobe.groupSlot(), lobe.role(), lobe.centerX(), lobe.centerZ(),
+                    (float) baseY, (float) topY, (float) major, (float) minor,
+                    lobe.sinOrientation(), lobe.cosOrientation(), lobe.shearX(), lobe.shearZ(),
+                    lobe.density(), lobe.edgeSoftness(), lobe.seed01(), lobe.lifecycleStage(),
+                    lobe.verticalDevelopment(), lobe.detailWeight()));
+        }
+        if (bridgeRadius > 0.0D) {
+            // Option C: a mid-tower stage spanning the gap between the CORE tops
+            // (633/702) and the ANVIL bases (770/789), placed on the column axis
+            // and inheriting the upper TOWER's softness and density.
+            StormLobeDescriptor upper = null;
+            for (StormLobeDescriptor lobe : severeFixture38bc5412()) {
+                if (lobe.role() == StormLobeDescriptor.Role.TOWER) {
+                    upper = lobe;
+                }
+            }
+            lobes.add(new StormLobeDescriptor(
+                    upper.fieldId(), upper.groupId(), 10, 11, upper.groupSlot(),
+                    StormLobeDescriptor.Role.TOWER, -8.0F, -100.0F,
+                    560.0F, 830.0F, (float) bridgeRadius, (float) (bridgeRadius * 0.82D),
+                    upper.sinOrientation(), upper.cosOrientation(),
+                    upper.shearX(), upper.shearZ(), upper.density(), upper.edgeSoftness(),
+                    upper.seed01(), upper.lifecycleStage(),
+                    upper.verticalDevelopment(), upper.detailWeight()));
+        }
+
+        double step = 20.0D;
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+        int gridSize = (int) (1600.0D / step) + 1;
+        double largestSum = 0.0D;
+        double compSum = 0.0D;
+        double cellSum = 0.0D;
+        int bands = 0;
+
+        for (double y = 616.0D; y <= 776.0D; y += 32.0D) {
+            boolean[][] grid = new boolean[gridSize][gridSize];
+            long cells = 0L;
+            for (double x = -800.0D; x <= 800.0D; x += step) {
+                for (double z = -800.0D; z <= 800.0D; z += step) {
+                    double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                    if (coverage <= 0.0D) {
+                        continue;
+                    }
+                    double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                    boolean embedded =
+                            StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                    double[] uvw = baseDomain(x, y, z, 0.0025D);
+                    CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                    double lowFbm = StormDensityModel.lowFbm(
+                            baseSample[1], baseSample[2], baseSample[3]);
+                    double baseField = StormDensityModel.stormBaseField(
+                            StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    double detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    double density = StormDensityModel.finalDensity(
+                            coverage, strength, baseField, detailFbm, embedded);
+                    if (density >= 0.02D) {
+                        cells++;
+                        int gx = (int) ((x + 800.0D) / step);
+                        int gz = (int) ((z + 800.0D) / step);
+                        if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                            grid[gz][gx] = true;
+                        }
+                    }
+                }
+            }
+            int largest = largestComponent(grid);
+            largestSum += 2.0D * Math.sqrt((largest * step * step) / Math.PI);
+            compSum += cells == 0L ? 0 : connectedComponents(grid);
+            cellSum += cells;
+            bands++;
+        }
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_TRANSITION|%-28s|%8.1f|%8.1f|%8.1f%n",
+                label, largestSum / bands, compSum / bands, cellSum / bands);
+    }
+
+
+    /**
+     * T098 phase 2: the minimum column width that stays connected under the
+     * current noise calibration.
+     *
+     * <p>Every candidate in the transition sweep that improved connectivity did
+     * so by putting wider material in the band, monotonically in width and
+     * independently of which role supplied it. That is the signature of a
+     * percolation threshold: the carrier's feature size is fixed at roughly
+     * 1/(STORM_BASE_NOISE_SCALE * baseFrequency) = 100 blocks, so an envelope
+     * only a few features wide is carved into disconnected blobs, while a wide
+     * one keeps a spanning cluster. This measures that threshold directly with a
+     * single isolated vertical column, so the morphology contract can state a
+     * minimum central-column width instead of guessing one.
+     */
+    private static void reportT098PercolationWidth() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        StormLobeDescriptor upper = null;
+        for (StormLobeDescriptor lobe : severeFixture38bc5412()) {
+            if (lobe.role() == StormLobeDescriptor.Role.TOWER) {
+                upper = lobe;
+            }
+        }
+        System.out.println("T098_PERCOLATION|columnDiameter|meanConnectedFraction"
+                + "|meanComponents|meanOccupiedCells|featureWidths");
+        for (double radius : new double[] {
+                100.0D, 130.0D, 160.0D, 190.0D, 220.0D, 250.0D,
+                280.0D, 320.0D, 360.0D, 400.0D, 460.0D, 520.0D}) {
+            java.util.List<StormLobeDescriptor> lobes = new ArrayList<>();
+            lobes.add(new StormLobeDescriptor(
+                    upper.fieldId(), upper.groupId(), 0, 1, upper.groupSlot(),
+                    StormLobeDescriptor.Role.TOWER, 0.0F, 0.0F, 400.0F, 900.0F,
+                    (float) radius, (float) radius,
+                    0.0F, 1.0F, 0.0F, 0.0F, upper.density(), upper.edgeSoftness(),
+                    upper.seed01(), upper.lifecycleStage(),
+                    upper.verticalDevelopment(), upper.detailWeight()));
+
+            double step = 12.0D;
+            double half = radius + 80.0D;
+            int gridSize = (int) (2.0D * half / step) + 2;
+            double[] baseSample = new double[4];
+            double[] detailSample = new double[4];
+            double connectedSum = 0.0D;
+            double compSum = 0.0D;
+            double cellSum = 0.0D;
+            int bands = 0;
+            for (double y = 460.0D; y <= 840.0D; y += 20.0D) {
+                boolean[][] grid = new boolean[gridSize][gridSize];
+                long cells = 0L;
+                for (double x = -half; x <= half; x += step) {
+                    for (double z = -half; z <= half; z += step) {
+                        double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                        if (coverage <= 0.0D) {
+                            continue;
+                        }
+                        double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                        boolean embedded =
+                                StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                        double[] uvw = baseDomain(x, y, z, 0.0025D);
+                        CloudNoiseFieldModel.sampleBase(
+                                baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                        double lowFbm = StormDensityModel.lowFbm(
+                                baseSample[1], baseSample[2], baseSample[3]);
+                        double baseField = StormDensityModel.stormBaseField(
+                                StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                        double[] duvw = detailDomain(x, y, z, baseSample);
+                        CloudNoiseFieldModel.sampleDetail(
+                                detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                        double detailFbm = StormDensityModel.detailFbm(
+                                detailSample[0], detailSample[1], detailSample[2]);
+                        double density = StormDensityModel.finalDensity(
+                                coverage, strength, baseField, detailFbm, embedded);
+                        if (density >= 0.02D) {
+                            cells++;
+                            int gx = (int) ((x + half) / step);
+                            int gz = (int) ((z + half) / step);
+                            if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                                grid[gz][gx] = true;
+                            }
+                        }
+                    }
+                }
+                if (cells > 0L) {
+                    connectedSum += (double) largestComponent(grid) / cells;
+                    compSum += connectedComponents(grid);
+                } 
+                cellSum += cells;
+                bands++;
+            }
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_PERCOLATION|%8.0f|%8.3f|%8.1f|%9.1f|%8.2f%n",
+                    radius * 2.0D, connectedSum / bands, compSum / bands,
+                    cellSum / bands, radius * 2.0D / 100.0D);
+        }
+    }
+
+
+    /**
+     * T098 phase 2: what actually fragments the transition band.
+     *
+     * <p>An isolated column stays 99.9% connected at every width, so the band's
+     * 50-84 components are not the column shattering. This isolates the roles:
+     * it scores the band with the full descriptor set, then with the ANVIL
+     * members removed, and reports the coverage distribution of the cells each
+     * role contributes there. If the ANVIL's soft lower boundary is producing
+     * low-coverage material far below its baseY, that material is what the noise
+     * shreds - and shredding around the column is itself a T098 rejection.
+     */
+    private static void reportT098AnvilSkirt() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> all = severeFixture38bc5412();
+        java.util.List<StormLobeDescriptor> noAnvil = new ArrayList<>();
+        for (StormLobeDescriptor lobe : all) {
+            if (lobe.role() != StormLobeDescriptor.Role.ANVIL) {
+                noAnvil.add(lobe);
+            }
+        }
+        double anvilBase = Double.POSITIVE_INFINITY;
+        for (StormLobeDescriptor lobe : all) {
+            if (lobe.role() == StormLobeDescriptor.Role.ANVIL) {
+                anvilBase = Math.min(anvilBase, lobe.baseY());
+            }
+        }
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SKIRT|lowestAnvilBaseY=%.1f%n", anvilBase);
+        System.out.println("T098_SKIRT|y|set|cells|components|largestFrac"
+                + "|anvilCells|anvilCovP50|anvilCovP90|belowAnvilBase");
+
+        for (double y = 616.0D; y <= 776.0D; y += 32.0D) {
+            scoreSkirtBand(baseVolume, detailVolume, all, "full", y, anvilBase);
+            scoreSkirtBand(baseVolume, detailVolume, noAnvil, "noAnvil", y, anvilBase);
+        }
+    }
+
+    private static void scoreSkirtBand(
+            byte[] baseVolume, byte[] detailVolume,
+            java.util.List<StormLobeDescriptor> lobes, String set,
+            double y, double anvilBase) {
+        double step = 16.0D;
+        double half = 900.0D;
+        int gridSize = (int) (2.0D * half / step) + 2;
+        boolean[][] grid = new boolean[gridSize][gridSize];
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+        long cells = 0L;
+        long anvilCells = 0L;
+        java.util.List<Double> anvilCoverage = new ArrayList<>();
+
+        for (double x = -half; x <= half; x += step) {
+            for (double z = -half; z <= half; z += step) {
+                double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                if (coverage <= 0.0D) {
+                    continue;
+                }
+                double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                boolean embedded =
+                        StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                double[] uvw = baseDomain(x, y, z, 0.0025D);
+                CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                double lowFbm = StormDensityModel.lowFbm(
+                        baseSample[1], baseSample[2], baseSample[3]);
+                double baseField = StormDensityModel.stormBaseField(
+                        StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                double[] duvw = detailDomain(x, y, z, baseSample);
+                CloudNoiseFieldModel.sampleDetail(
+                        detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                double detailFbm = StormDensityModel.detailFbm(
+                        detailSample[0], detailSample[1], detailSample[2]);
+                double density = StormDensityModel.finalDensity(
+                        coverage, strength, baseField, detailFbm, embedded);
+                if (density < 0.02D) {
+                    continue;
+                }
+                cells++;
+                int gx = (int) ((x + half) / step);
+                int gz = (int) ((z + half) / step);
+                if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                    grid[gz][gx] = true;
+                }
+                // Which role owns this cell, and at what coverage.
+                int owner = -1;
+                double best = 0.0D;
+                for (StormLobeDescriptor lobe : lobes) {
+                    double envelope = StormLobeEvaluator.envelopeFromDistance(
+                            StormLobeEvaluator.signedDistanceAt(lobe, x, y, z),
+                            StormLobeEvaluator.edgeWidthBlocks(lobe),
+                            StormLobeEvaluator.envelopeStrength(lobe));
+                    if (envelope > best) {
+                        best = envelope;
+                        owner = lobe.role().gpuId();
+                    }
+                }
+                if (owner == StormLobeDescriptor.Role.ANVIL.gpuId()) {
+                    anvilCells++;
+                    anvilCoverage.add(coverage);
+                }
+            }
+        }
+        java.util.Collections.sort(anvilCoverage);
+        double p50 = anvilCoverage.isEmpty() ? 0.0D
+                : anvilCoverage.get(anvilCoverage.size() / 2);
+        double p90 = anvilCoverage.isEmpty() ? 0.0D
+                : anvilCoverage.get((int) (anvilCoverage.size() * 0.9D));
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SKIRT|%6.0f|%-8s|%6d|%6d|%8.3f|%8d|%8.3f|%8.3f|%s%n",
+                y, set, cells, cells == 0L ? 0 : connectedComponents(grid),
+                cells == 0L ? 0.0D : (double) largestComponent(grid) / cells,
+                anvilCells, p50, p90, y < anvilBase ? "yes" : "no");
+    }
+
+
+    /**
+     * T098 phase 6: the anvil edge-softness lever.
+     *
+     * <p>The skirt probe showed the transition band is coherent without the
+     * ANVIL and shattered with it, by material sitting entirely below the
+     * anvil's own baseY at coverage as low as 0.045. The cause is in
+     * edgeWidthBlocks: ANVIL uses max(0.12, edgeSoftness * 1.65), which against
+     * a ~400-block minor radius is a ~150-block boundary, and
+     * envelopeFromDistance applies it isotropically - so the widening intended
+     * for the canopy rim hangs the same distance straight down.
+     *
+     * <p>edgeWidthBlocks scales linearly with edgeSoftness, so sweeping the
+     * fixture's ANVIL edgeSoftness measures the lever without touching
+     * production. The reported effective multiplier is edgeSoftness * 1.65,
+     * against the shipped 0.726.
+     */
+    private static void reportT098AnvilSoftnessSweep() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        System.out.println("T098_ANVIL_SOFT|edgeSoftness|effectiveMultiplier"
+                + "|meanComponents|meanLargestFrac|meanCells|anvilSpanKept");
+        for (double softness : new double[] {
+                0.440D, 0.360D, 0.280D, 0.220D, 0.160D, 0.120D, 0.080D}) {
+            java.util.List<StormLobeDescriptor> lobes = new ArrayList<>();
+            for (StormLobeDescriptor lobe : severeFixture38bc5412()) {
+                float edge = lobe.role() == StormLobeDescriptor.Role.ANVIL
+                        ? (float) softness : lobe.edgeSoftness();
+                lobes.add(new StormLobeDescriptor(
+                        lobe.fieldId(), lobe.groupId(), lobe.memberIndex(), lobe.memberCount(),
+                        lobe.groupSlot(), lobe.role(), lobe.centerX(), lobe.centerZ(),
+                        lobe.baseY(), lobe.topY(), lobe.majorRadius(), lobe.minorRadius(),
+                        lobe.sinOrientation(), lobe.cosOrientation(),
+                        lobe.shearX(), lobe.shearZ(), lobe.density(), edge,
+                        lobe.seed01(), lobe.lifecycleStage(),
+                        lobe.verticalDevelopment(), lobe.detailWeight()));
+            }
+            double step = 16.0D;
+            double half = 900.0D;
+            int gridSize = (int) (2.0D * half / step) + 2;
+            double[] baseSample = new double[4];
+            double[] detailSample = new double[4];
+            double compSum = 0.0D;
+            double fracSum = 0.0D;
+            double cellSum = 0.0D;
+            int bands = 0;
+            // The anvil's delivered span at its own mid-height, so a softness
+            // reduction that silently shrinks the canopy is visible here.
+            double anvilSpan = 0.0D;
+            for (double y = 616.0D; y <= 900.0D; y += 32.0D) {
+                boolean[][] grid = new boolean[gridSize][gridSize];
+                long cells = 0L;
+                double maxAbs = 0.0D;
+                for (double x = -half; x <= half; x += step) {
+                    for (double z = -half; z <= half; z += step) {
+                        double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                        if (coverage <= 0.0D) {
+                            continue;
+                        }
+                        double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                        boolean embedded =
+                                StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                        double[] uvw = baseDomain(x, y, z, 0.0025D);
+                        CloudNoiseFieldModel.sampleBase(
+                                baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                        double lowFbm = StormDensityModel.lowFbm(
+                                baseSample[1], baseSample[2], baseSample[3]);
+                        double baseField = StormDensityModel.stormBaseField(
+                                StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                        double[] duvw = detailDomain(x, y, z, baseSample);
+                        CloudNoiseFieldModel.sampleDetail(
+                                detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                        double detailFbm = StormDensityModel.detailFbm(
+                                detailSample[0], detailSample[1], detailSample[2]);
+                        double density = StormDensityModel.finalDensity(
+                                coverage, strength, baseField, detailFbm, embedded);
+                        if (density >= 0.02D) {
+                            cells++;
+                            maxAbs = Math.max(maxAbs, Math.max(Math.abs(x), Math.abs(z)));
+                            int gx = (int) ((x + half) / step);
+                            int gz = (int) ((z + half) / step);
+                            if (gx >= 0 && gx < gridSize && gz >= 0 && gz < gridSize) {
+                                grid[gz][gx] = true;
+                            }
+                        }
+                    }
+                }
+                if (y >= 850.0D) {
+                    anvilSpan = Math.max(anvilSpan, maxAbs * 2.0D);
+                }
+                if (cells > 0L) {
+                    compSum += connectedComponents(grid);
+                    fracSum += (double) largestComponent(grid) / cells;
+                }
+                cellSum += cells;
+                bands++;
+            }
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_ANVIL_SOFT|%12.3f|%20.3f|%8.1f|%8.3f|%9.1f|%8.0f%n",
+                    softness, softness * 1.65D, compSum / bands, fracSum / bands,
+                    cellSum / bands, anvilSpan);
+        }
+    }
+
+    private static int largestComponent(boolean[][] occupied) {
+        boolean[][] visited = new boolean[occupied.length][occupied[0].length];
+        int best = 0;
+        int[] dx = {1, -1, 0, 0};
+        int[] dz = {0, 0, 1, -1};
+        for (int z = 0; z < occupied.length; z++) {
+            for (int x = 0; x < occupied[z].length; x++) {
+                if (!occupied[z][x] || visited[z][x]) {
+                    continue;
+                }
+                int size = 0;
+                ArrayDeque<Integer> pending = new ArrayDeque<>();
+                pending.add(z * occupied[z].length + x);
+                visited[z][x] = true;
+                while (!pending.isEmpty()) {
+                    int cell = pending.poll();
+                    int cz = cell / occupied[z].length;
+                    int cx = cell % occupied[z].length;
+                    size++;
+                    for (int d = 0; d < 4; d++) {
+                        int nz = cz + dz[d];
+                        int nx = cx + dx[d];
+                        if (nz >= 0 && nz < occupied.length && nx >= 0
+                                && nx < occupied[nz].length
+                                && occupied[nz][nx] && !visited[nz][nx]) {
+                            visited[nz][nx] = true;
+                            pending.add(nz * occupied[nz].length + nx);
+                        }
+                    }
+                }
+                best = Math.max(best, size);
+            }
+        }
+        return best;
     }
 
     private static int connectedComponents(boolean[][] occupied) {
