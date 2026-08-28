@@ -802,3 +802,101 @@ members, or a column built from more than two CORE and two TOWER descriptors, or
 role-to-descriptor allocation entirely. That is a redesign, not a contract adjustment.
 
 **T098 remains REJECTED. T099 blocked.** `STORM_MAX_BLEND_BLOCKS = 48` is still not the blocker.
+
+## T098 root cause: the anvil's isotropic envelope boundary (2026-08-28)
+
+Five hypotheses were measured and falsified before this one. Recorded so the
+falsifications are not re-run: carrier wavelength/thresholds (calibration
+correct, 5.06% zeroed as designed), erosion scaling (TOWER is the least-eroded
+role), TOWER proportion (a real T127 contract defect, found and corrected, but
+the silhouette was unchanged), ANVIL/BASE proportion (swept to 0.933, no
+transition), and descriptor-role allocation (see below).
+
+### What the profile actually showed
+
+Equivalent cross-sectional diameter alone showed no mushroom - 1029 at y296,
+705 at y616, 1658 at y904 - which contradicted the screenshots. Adding
+connected-component analysis resolved it: the transition band does not narrow,
+it **shatters**. 50-84 components at y616-776, against 14-24 in the base and
+anvil bands.
+
+### Why it is not an allocation problem
+
+Every column-side lever is inert. Scored on the y616-776 band by mean
+largest-component diameter:
+
+| candidate | largest comp | components |
+|---|---:|---:|
+| current | 648.6 | 61.2 |
+| towerTop+200 | 676.3 | 59.2 |
+| coreTop+220 | 685.0 | 58.8 |
+| towerWide x1.5 | 757.8 | 50.8 |
+| bridge stage r=380 | 829.4 | 38.7 |
+| baseTop+260 | 891.2 | 37.8 |
+| anvilBase-200 | 1410.5 | 44.8 |
+
+Connectivity tracked envelope *width* monotonically, regardless of which role
+supplied it. That suggested a percolation threshold, so one was measured
+directly - and falsified: an isolated column holds a 0.977-0.999 connected
+fraction at every diameter from 200 to 1040 blocks, and narrow columns
+fragment *less* (1.1 components at 200 wide, 27.0 at 1040). Column width is
+not the cause.
+
+### The actual defect
+
+Isolating the roles found it. Dropping the ANVIL members from the band leaves
+the column coherent:
+
+| y | full | no-anvil | anvil cells | anvil coverage p50 |
+|---:|:--|:--|---:|---:|
+| 616 | 55 comps, 0.776 | 27 comps, 0.881 | 367 | 0.045 |
+| 680 | 86 comps, 0.623 | 19 comps, 0.788 | 1186 | 0.200 |
+| 744 | 58 comps, 0.463 | 4 comps, 0.984 | 1769 | 0.331 |
+| 776 | 59 comps, 0.876 | 1 comp, 1.000 | 2214 | 0.403 |
+
+All of that anvil material sat **below the anvil's own baseY of 769.6**, at
+coverage low enough for the carrier to shred it.
+
+The cause is in `StormLobeEvaluator.edgeWidthBlocks`. `envelopeFromDistance`
+fades over +/- that width isotropically, but the width is derived from
+`smallerRadius`, a horizontal extent. A role much wider than it is tall
+therefore gets a boundary wider than its own body:
+
+| role | softness | half-height | ratio |
+|---|---:|---:|---:|
+| BASE | 162.4 | 223.8 | 0.726 |
+| CORE | 79.7 / 74.7 | 140.4 / 148.2 | 0.567 / 0.504 |
+| TOWER | 50.2 / 44.3 | 183.3 / 167.7 | 0.274 / 0.264 |
+| ANVIL (x4) | 259.6-272.0 | 105.3 | 2.465-2.583 |
+
+The ANVIL multiplier `max(0.12, edgeSoftness * 1.65)` was introduced to stop
+the strength-weighted iso contour discarding the canopy rim - a **lateral**
+concern - but it is applied isotropically, so it also hung ~150 blocks of haze
+straight down through the storm's waist.
+
+### Fix
+
+Bound the boundary by the lobe's own vertical extent, at 0.75 of half-height.
+Dimensionally correct for every role, and it binds only the degenerate case:
+BASE/CORE/TOWER softness is unchanged to the block, ANVIL falls 272.0 -> 89.5.
+The anvil now contributes zero cells at y616/648/680 (was 367/735/1186).
+
+Band components 61.2 -> 22.5; full-vs-noAnvil now track each other (24 vs 27
+at y616) instead of diverging 3:1. Canopy is not shrunk: span stays 1800
+blocks, total material falls 2.7%.
+
+Mirrored in `cloud_atmosphere_volume.fsh` through the existing
+`stormDescriptorVerticalBounds`. T076 GLSL parity and T111 shader compilation
+pass; `./gradlew check` and `./gradlew build` pass with 40 invariants green.
+T127 relationships and the T134 scale contract are unaffected - no morphology
+geometry changed.
+
+`validateT098EnvelopeBoundedByExtent` guards it as a system-level relationship
+rather than another independent range, and carries the pre-fix witness
+(2.280). Verified to throw when the bound is disabled.
+
+### Status
+
+T098 remains **OPEN**. The fix is proven offline and in regression, but the
+live visual campaign (>=5 fresh severe fixtures through the controlled views)
+has not been re-run. T098 must not be marked passed until it has.
