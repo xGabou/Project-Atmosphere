@@ -183,7 +183,7 @@ with all four relationship guards now enforced deterministically. Central-column
 fresh fixtures still show the mushroom.** At full compliance the anvil alone holds 32,515
 density-visible voxels against the column's 5,976 (5.4:1), and even columnScale 1.80 - beyond any
 T127 range - reaches only 24.62%. The relationship violation was real and is fixed, but it was not
-the cause. See .
+the cause. See `validation/t098-manual-checklist.md`.
 
 **Superseded - T098 root cause 2026-08-28: T127's proportional contract is violated and internally
 inconsistent.** Every absolute role diameter passes its T127 range (BASE 1044, CORE 504, lower
