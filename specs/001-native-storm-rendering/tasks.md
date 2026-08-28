@@ -175,7 +175,17 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 ### Revalidation Gate
 
 - [X] T097 Run the corrected morphology, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, precipitation, and acceleration regressions plus the US1/US2 sandboxes; record passing results in `specs/001-native-storm-rendering/validation/phase4r-automated.md` and verify each T080 expected failure is closed without weakening assertions (depends on T081-T096) [SC-001-SC-004, SC-010]
-**T098 root cause 2026-08-28: T127's proportional contract is violated and internally
+**T098 2026-08-28: T127 proportional contract CORRECTED; silhouette still REJECTED.** The
+violated relationships are fixed at midband (lower TOWER/CORE 0.625 -> 0.700, ANVIL/upper TOWER
+5.917 -> 4.251) by moving the TOWER radius multiplier from lerp(0.35, 0.24) to lerp(0.392, 0.334),
+with all four relationship guards now enforced deterministically. Central-column material rose
+6.49% -> 10.14% and ANVIL:TOWER fell 35.1:1 -> 21.1:1. **The live silhouette did not change: 3 of 3
+fresh fixtures still show the mushroom.** At full compliance the anvil alone holds 32,515
+density-visible voxels against the column's 5,976 (5.4:1), and even columnScale 1.80 - beyond any
+T127 range - reaches only 24.62%. The relationship violation was real and is fixed, but it was not
+the cause. See .
+
+**Superseded - T098 root cause 2026-08-28: T127's proportional contract is violated and internally
 inconsistent.** Every absolute role diameter passes its T127 range (BASE 1044, CORE 504, lower
 TOWER 315, upper TOWER 216, ANVIL 1270-1287), but T127's stated *relationships* were never
 guarded and two fail: **lower TOWER/CORE = 0.625** against 0.65-0.75, and **ANVIL/upper TOWER =

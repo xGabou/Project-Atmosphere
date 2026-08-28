@@ -1555,6 +1555,9 @@ public final class StormVolumetricGeometrySandbox {
         for (double scale : columnScales) {
             measureProportion(baseVolume, detailVolume, scale, 1.00D);
         }
+        // The shipped T127 correction: TOWER only, lower x1.120 upper x1.392,
+        // approximated here by the mean tower factor.
+        measureProportion(baseVolume, detailVolume, 1.256D, 1.00D);
         double[] anvilScales = {0.90D, 0.80D, 0.70D};
         for (double scale : anvilScales) {
             measureProportion(baseVolume, detailVolume, 1.00D, scale);

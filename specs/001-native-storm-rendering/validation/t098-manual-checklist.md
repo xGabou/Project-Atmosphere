@@ -675,3 +675,60 @@ than the proportions: converting it into a live contract guard requires the deci
 Unchanged: all T127/T134 role geometry, `STORM_EROSION`, `STORM_BASE_NOISE_SCALE`,
 `STORM_CARRIER_P05/P95`, T131, role strengths, `STORM_MAX_BLEND_BLOCKS = 48`. **T098 remains
 REJECTED and OPEN.**
+
+---
+
+# T098 after the T127 proportional correction - 2026-08-28 - STILL REJECTED
+
+**The contract correction was real and is retained. It did not fix the silhouette.**
+
+## What was corrected
+
+`stormLobeSpec()`'s TOWER radius multiplier moved from `lerp(0.35, 0.24)` to
+`lerp(0.392, 0.334)`, and the relationship guards T127 documented but never enforced are now live.
+Both violated relationships are resolved at their midband:
+
+| Relationship | Before | After | Target |
+|---|---:|---:|---|
+| lower TOWER / CORE | 0.625 | **0.700** | 0.65-0.75 |
+| ANVIL / upper TOWER | 5.917 | **4.251** | 3.5-5.0 |
+| upper / lower TOWER | 0.686 | 0.852 | narrowing retained |
+
+BASE, CORE, ANVIL union, footprint and height unchanged.
+
+## Measured effect on material
+
+| Metric | Before | After |
+|---|---:|---:|
+| CORE+TOWER share of occupied material | 6.49% | **10.14%** |
+| BASE+ANVIL : CORE+TOWER | 14.4 : 1 | **8.9 : 1** |
+| ANVIL : TOWER | 35.1 : 1 | **21.1 : 1** |
+| Column bands occupied | 11/19 | 11/19 |
+
+A genuine +56% relative gain in central-column material.
+
+## Live result: unchanged, 3 of 3 fixtures
+
+Fixtures `8218145e`, `9bc87f73`, `f0529e4e`. Every SIDE capture still shows the same silhouette: a
+broad banded anvil dome, a thin wispy neck, and a visibly separate lower base. **No T098 criterion
+changed state.** The storm still reads as a mushroom rather than one connected cumulonimbus.
+
+## The remaining deficit, measured
+
+At full midband compliance the anvil alone still holds **32,515** density-visible voxels against the
+entire central column's **5,976** - the anvil is **5.4x the whole CORE+TOWER column by itself**.
+Reaching parity from role width alone would need a column far outside any T127 range and would turn
+the storm into a cylinder, which T098 also rejects.
+
+The sweep bounds this: even `columnScale = 1.80` - well beyond the derived contract - reaches only
+24.62% column share with the anvil still at 8.9:1, and the occupied band count never moves off 11/19
+at any candidate.
+
+## Conclusion
+
+The T127 relationship violation was real, worth fixing, and is fixed. It was **not** the cause of the
+mushroom silhouette. The silhouette is produced by the accepted severe-scale envelope itself: an
+ANVIL specified at 1.20-1.35 of BASE, spanning 1,270-1,287 blocks over a 210-block vertical extent,
+will dominate any column that a 900-1,100 BASE can physically taper into.
+
+**T098 remains REJECTED. T099 blocked.** `STORM_MAX_BLEND_BLOCKS = 48` is still not the blocker.
