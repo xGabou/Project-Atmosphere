@@ -307,6 +307,11 @@ public final class PuffLobeSpatialIndex {
         return descriptorSignature;
     }
 
+    /** T132 read-only view of the uploaded candidate grid signature. */
+    public static long candidateSignatureForDiagnostics() {
+        return uploadedGridSignature;
+    }
+
     public static String status() {
         return String.format(
                 Locale.ROOT,

@@ -28,7 +28,7 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 - **[P]**: Can run in parallel after its stated prerequisites because it affects different files and does not depend on another incomplete task in the same group.
 - **[Story]**: Maps the task to a user story from `spec.md`.
 - Requirement IDs in descriptions provide direct specification traceability.
-- Existing task IDs remain stable for audit history. Phase 4R uses T074-T099, Phase 4S uses T100-T118, and Phase 4P uses T119-T123. Phases are placed by dependency order, not by numeric sorting.
+- Existing task IDs remain stable for audit history. Phase 4R uses T074-T099, Phase 4S uses T100-T118, Phase 4P uses T119-T123, and the renderer-wide correction gate uses T127-T134. Phases are placed by dependency order, not by numeric sorting.
 - Completed Phase 4R implementation tasks are **not** retroactively unchecked. Where the Phase 4S architecture invalidates what a completed task built, that task is listed as superseded and a new Phase 4S task ID owns the replacement. Only validation gates whose acceptance criteria are invalidated are reopened.
 
 ## Phase 1: Setup and Baseline
@@ -175,10 +175,34 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 ### Revalidation Gate
 
 - [X] T097 Run the corrected morphology, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, precipitation, and acceleration regressions plus the US1/US2 sandboxes; record passing results in `specs/001-native-storm-rendering/validation/phase4r-automated.md` and verify each T080 expected failure is closed without weakening assertions (depends on T081-T096) [SC-001-SC-004, SC-010]
-- [ ] T098 **[REOPENED 2026-08-19 - revised criteria]** Replace `specs/001-native-storm-rendering/validation/us1-readable-storms.md` evidence with new below/beside/inside/above captures and a two-part checklist. **Positive half (FR-023, all nine must be present)**: a broad continuous lower cloud base; a dense convective/core region; vertical tower development emerging naturally from the base; progressive vertical narrowing where appropriate; a broad upper anvil; multi-scale billowing across the visible storm body; surface variation at multiple spatial frequencies; irregular but coherent silhouette curvature; continuous transitions between base, tower, core, and anvil. **Negative half (FR-024, none may be present)**: large smooth balloon surfaces; large regions of visually uniform density; visible ellipsoid or sphere primitives; isolated ears or bulb protrusions; descriptor seams; rectangular or vertical walls; flat slabs; uniformly smooth silhouettes. Record the T118 measured proxy values alongside each capture, and the live `cell.density` calibration flagged as a risk by T118. The capture plan, the diagnostic command, and the two-part checklist are prepared in `specs/001-native-storm-rendering/validation/t098-manual-checklist.md`. This task is not passable while any positive item is absent, even if every negative item is clear (depends on T118; fulfills reopened T030) [FR-023, FR-024; SC-001-SC-002, SC-011]
+**T098 root cause 2026-08-28.** The missing CORE/TOWER body is a **material-stage** failure, not
+geometry: CORE and TOWER envelopes carry the highest mean/max envelope and the highest descriptor
+strengths of any role, and T131 engages correctly. The production trace shows `carrierRaw` healthy
+(0.66-0.83) everywhere while **`baseField` collapses to zero** through the whole convective column.
+`stormBaseField` is `smoothstep(0.7128, 0.8451, carrier)`, so carrier below p05 maps to exactly
+zero. `STORM_BASE_NOISE_SCALE = 0.0025` gives the carrier a ~426-block vertical period; the T134
+column is 865 blocks, so it spans **2.03 periods** and the carrier dips below p05 in a horizontal
+dead band that slices the storm. Pre-T134 the column was ~284 blocks - under one period - so the
+calibration was sound. `renderer-wide-architecture-audit.md:471` required these wavelengths to be
+re-evaluated after a derived system scale; that remeasurement was never done. **No production
+change was made** - every candidate fix is morphology-wide or a subjective visual choice. See
+`validation/t098-manual-checklist.md`.
+
+**T098 status 2026-08-27: REJECTED on live evidence.** Three fresh fixtures (`142bca36`,
+`cf410ea8`, `aa731334`) captured automatically through `StormT098CaptureDriver`. All three show
+the same failure: a smooth banded anvil dome, a broken neck, and a detached lower base - a
+mushroom silhouette rather than a cumulonimbus. **Six of nine FR-023 positive criteria are
+absent** and at least four FR-024 rejected forms are present. Surface detail is good (ABOVE
+shows correct multi-scale billowing); the failure is vertical continuity and descriptor joining.
+The 48-block blend cap saturates on **88.9%** of T134 descriptor pairs, delivering joins at
+16-30% of the requested width, but is graded **PARTIAL** - not proven sufficient, because CORE
+and TOWER descriptors are adopted yet produce no visible body. No production change was made.
+See `validation/t098-manual-checklist.md`.
+
+- [ ] T098 **[REOPENED 2026-08-19 - renderer-wide gate]** Replace `specs/001-native-storm-rendering/validation/us1-readable-storms.md` evidence with new below/beside/inside/above captures and a two-part checklist only after T133 passes. **Positive half (FR-023, all nine must be present)**: a broad continuous lower cloud base; a dense convective/core region; vertical tower development emerging naturally from the base; progressive vertical narrowing where appropriate; a broad upper anvil; multi-scale billowing across the visible storm body; surface variation at multiple spatial frequencies; irregular but coherent silhouette curvature; continuous transitions between base, tower, core, and anvil. **Negative half (FR-024, none may be present)**: large smooth balloon surfaces; large regions of visually uniform density; visible ellipsoid or sphere primitives; isolated ears or bulb protrusions; descriptor seams; rectangular or vertical walls; flat slabs; uniformly smooth silhouettes. Record T133's physical-scale, vertical-material, and performance evidence with the capture set. This task is not passable while any positive item is absent, even if every negative item is clear (depends on T133; fulfills reopened T030) [FR-023, FR-024, FR-028-FR-031; SC-001-SC-002, SC-011, SC-018-SC-020]
 - [ ] T099 **[REOPENED 2026-08-19 - revised criteria]** Replace `specs/001-native-storm-rendering/validation/us2-rain-whiteout-stability.md` evidence with new dry/local-rain/remote-rain/boundary stationary and moving captures proving rain remains attached to the **final noise-formed** storm density (not the coverage envelope) and whiteout remains stable, then record the final morphology pass/fail gate. Not passable until T098's positive criteria are satisfied (depends on T098, T115, T116, T118) [FR-021, FR-022; SC-001, SC-003-SC-004, SC-011]
 
-**Checkpoint (superseded 2026-08-19)**: Phase 4R established that the descriptor set - not a statistical envelope or candidate grid - is the evaluated storm field. Phase 4S narrows that result: the descriptor union is a bounded coverage envelope, and the noise field forms the visible body. T098 and T099 are reopened under the revised positive morphology criteria and now depend on T118.
+**Checkpoint (superseded 2026-08-19)**: Phase 4R established that the descriptor set - not a statistical envelope or candidate grid - is the evaluated storm field. Phase 4S narrows that result: the descriptor union is a bounded coverage envelope, and the noise field forms the visible body. T098 remains open behind the T127-T133 renderer-wide correction gate; T099 remains blocked by T098.
 
 ### Superseded by Phase 4S
 
@@ -255,11 +279,266 @@ tasks may proceed once their prerequisite correctness tasks land, in separate co
 ### Revalidation Gate
 
 - [X] T118 Run the Phase 4S regressions (T101-T106), the retained Phase 4R regressions, the independent GLSL parity fixture, and the US1/US2 sandboxes; record passing results and the measured proxy values in `specs/001-native-storm-rendering/validation/phase4s-automated.md`; verify each T107 expected failure is closed without weakening any assertion or retuning any threshold outside its recorded derivation (depends on T108-T117) [FR-021-FR-026; SC-010-SC-016]
+- [X] T124 [US1] Add and run a deterministic macro-coherence validation in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormMorphologySandbox.java` against the measured live ten-descriptor composition (BASE 0.7832/0.8792, CORE 0.9485/1.0000, TOWER 0.9700/0.9539, ANVIL 0.8222/0.7231/0.7851/0.7992). Before accepting a morphology correction, record a fail-first result against the live-calibrated current composition. Require a connected substantial lower base; coherent base → core → tower → anvil hierarchy; bounded substantial protrusions; no long radial/finger-like macro structures; high-frequency detail subordinate to the macro silhouette; and low-frequency dominance at macro scale. The highest-frequency detail band removal must not materially move the macro silhouette (depends on T100, T118) [FR-021-FR-024, FR-026; SC-011-SC-016]
+- [X] T125 [US1] Add and run a deterministic live-calibrated role-envelope transition validation in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormMorphologySandbox.java`: require substantial CORE→TOWER overlap and connected cross-sections, TOWER→ANVIL continuity, a broad upper canopy relative to tower width, sufficient upper lateral coverage across the storm height, and no narrow role-transition neck. Record a fail-first result before making the smallest role-geometry/envelope correction; preserve the T124 base-noise scale, proportional warp, erosion hierarchy, and live descriptor strengths (depends on T124) [FR-021-FR-024, FR-026; SC-011-SC-016]
+- [X] T126 [US1] Add and run deterministic structural-continuity validation for the live `3c039aa7` ten-member strength fixture in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormMorphologySandbox.java`: measure progressive vertical occupied-envelope area/radius and its derivative, a substantial vertical CORE→TOWER overlap interval, TOWER→ANVIL continuity before tower support ends, geometry-derived upper-canopy span, low-frequency BASE underside variation in large highly occupied regions, and directional envelope-versus-low-frequency anisotropy. Record fail-first evidence before the smallest role-geometry correction, preserving Phase 4S noise, warp, erosion, strengths, and downstream final-density consumers (depends on T125) [FR-021-FR-024, FR-026; SC-011-SC-016]
 
-**Then**: T098 and T099 execute here, after T118. They are listed under Phase 4R's Revalidation Gate to keep their audit history in place; their acceptance criteria are the revised positive/negative checklist recorded there.
++## Phase 4A: Renderer-wide Severe-Storm Correction Gate
+
+**Purpose**: Replace incremental role tuning with a physical-system scale derivation, a complete
+vertical material trace, measured cause attribution, and visually-neutral performance architecture.
+
+**Gate**: Do not modify storm role geometry, density/noise composition, or lighting to address the
+BASE/CORE versus TOWER/ANVIL split until T129 records the first discontinuous stage. Preserve the
+Phase 4S density architecture and every retained ownership/fallback invariant.
+
+- [X] T127 [US1] Audit and derive the severe-storm physical-scale target in `specs/001-native-storm-rendering/validation/renderer-wide-architecture-audit.md`: record BASE footprint, CORE width, TOWER width/height, ANVIL span/thickness, total height, aspect ratio, descriptor count per occupied volume, and horizon dominance from three several-hundred-block viewpoints. Trace the controlling source-plan, lobe-spec, render-scale/aspect, placement, and union inputs; then evaluate the 50/25/12.5-block base bands and approximately 22.7-to-1.4-block detail bands against the derived system dimensions. Do not accept uniform descriptor scaling as a target derivation (depends on T126) [FR-028; SC-018]
+- [X] T128 [US4] Add fail-first deterministic and on-demand runtime vertical material-continuity diagnostics for the existing live-calibrated ten-descriptor fixture and live `3c039aa7` strengths. Sample a fixed centre X/Z at no more than 16-block Y intervals and report active descriptor roles/IDs, coverage/strength, base noise/carrier, detail erosion, final density, extinction, light optical depth, direct light, ambient light, final rendered contribution, and direct/fallback plus weather/slab height-normalization branch flags. Keep CPU/shader values independently comparable (depends on T126) [FR-029; SC-019]
+- [X] T129 [US1] Run T128 against the current composition before a correction and record fail-first evidence identifying the first lower/upper discontinuity as geometry/coverage, density/noise, optical medium, lighting, or sampling/history. Rule out every earlier stage before authorizing a correction; do not substitute another role-overlap or union-radius iteration for measured attribution (depends on T127-T128) [FR-029; SC-019]
+- [X] T130 [US3] Capture the reference performance architecture baseline: raymarch time, primary and lighting-cone density samples, group-range scans, descriptor fetches, envelope rejections, empty-space skips, termination behavior, and register/scratch-risk locations. Freeze comparison captures and a material-trace/image tolerance for visually-neutral optimization; classify every proposed optimization as neutral or quality-changing (depends on T126) [FR-030; SC-020]
+- [X] T131 [US1] Add a deterministic fail-first regression for the measured cause from T129, then correct only that single-medium discontinuity in the responsible renderer stage. Role geometry may change only if T129 attributes the first discontinuity to geometry/coverage; preserve Phase 4S base scale, warp, erosion hierarchy, live strengths, final-density rain/whiteout, parity, and all ownership/fallback behavior (depends on T129) [FR-029; SC-019]
+- [X] T134 [US1] Implement the separately derived severe-system physical scale from T127 through the source plan, role-specific lobe placement/extents, and group distribution. Reach the 1,200–1,500 footprint and 720–880 height targets without a uniform descriptor multiplier; retain the 50/25/12.5-block base and ~22.7-to-1.4-block detail wavelengths unless remeasurement proves a change is required. Record controlled SIDE/FAR/BELOW/ABOVE scale evidence before T133 (depends on T127, T129; separate from T131) [FR-028; SC-018]
+
+**T134 accepted 2026-08-21**: the source-plan, role-envelope, and group-placement implementation
+plus the seeded resolved-centre scale guard are complete, and the required controlled four-view live
+evidence was collected on a freshly spawned severe system rather than the earlier compact-cloud
+fixture. Accepted fixture `66a15248-6262-441d-bc42-60e2d4e6b4e5`, structural fingerprint
+`16536fe1abb39ea0`, `descriptors=10`, `height=865.31018`, `footprintDiameter=1238.61042`, compact
+topology with `0` group-boundary scans and `3` metadata reads per group evaluation. SIDE, FAR,
+BELOW, and ABOVE PASS A/B controls matched and `structuralChanged=false` throughout. Topology
+generation numbers changed during acquisition; that is permitted because the structural fingerprint
+was identical at every capture and completion (see
+`StormPerformanceBaseline.StructuralFingerprint`, which deliberately excludes request generation).
+Deterministic backing: `cloudMorphologyTopologySandbox` reports
+`T134_SCALE_CONTRACT|members=10|planRadius=450.0|groupRadius=400.0|baseDrop=120.0|topRise=780.0`
+and `T134_RESOLVED_CENTRE_ENVELOPE|matureLowerMin=1265.701|matureUpperMax=1416.327`.
+
+**Deferred to T133, not to T134**: SC-018 additionally requires the recorded footprint and
+silhouette at T127's three reference viewing distances (600, 900, and 1,200 blocks). The suite's
+fixture-relative SIDE/FAR/BELOW/ABOVE poses satisfy T134's own acceptance text but do not satisfy
+that clause. T133 owns it. The system aspect ratio (`865.31018 / 1238.61042 = 0.699`) sits at the
+upper edge of T127's 0.55-0.70 band, and neither the aspect ratio nor the ANVIL horizontal span is
+asserted by `CloudMorphologyTopologySandbox.validateStormPhysicalScale()`; T133 owns closing those
+guards as well.
+- [X] T132 [US3] **[ACCEPTED 2026-08-27]** **[REBASED 2026-08-21 - post-T134 reference]** Revalidate each approved foundational performance change against a **fresh post-T134 controlled reference** and a fresh post-T134 material trace, not against T130's pre-T134 frozen captures: record each change's owned work reduction/bound and reject any image or material-trace movement outside the neutral tolerance. A lighting-support proxy remains blocked unless it meets the same equivalence evidence (depends on T119, T121-T123, T130, T134) [FR-030; SC-020]
+
+**T132 revised acceptance criteria (2026-08-21)**: T134 changed every severe system's physical
+dimensions, so the T130 reference fixture `ce4ffed5-14f1-4b78-bec7-059c1985cedb` (fingerprint
+`b018367ca17bc7d8`) and the T121-T123 fixture `66b2c85a-aa93-4d18-b428-ac546e280c02` (fingerprint
+`459873e8d8c8425a`) can no longer be reproduced. Their frozen visual references
+(`bd3e82e9315cb38c`, `4afdd85d03ea68a3`, `be40dffe53e91e97`, `d4ea81479379a6db`) describe
+compact-scale geometry; comparing a post-T134 render against them would report T134's intended
+effect as a performance regression. They are retained as historical record only and are not a
+T132 comparison basis.
+
+T132 is accepted only when all of the following hold on **one** post-T134 severe fixture:
+
+1. **Fresh post-T134 baseline.** One frozen fixture established after T134, resolved from a
+   severe system carrying the T134 scale contract: ten descriptors, `720-880` height, and a
+   `1,200-1,500` resolved-centre footprint diameter as reported by the suite's `scaleEnvelope`.
+   The compact-scale fixtures above must not be reused.
+2. **One identity for every comparison pass.** Identical group UUID and identical structural
+   fingerprint at capture and at completion for every pass, with `structuralChanged=false`
+   throughout. Topology-generation changes alone do not invalidate a capture, because
+   `StormPerformanceBaseline.StructuralFingerprint` deliberately excludes request generation,
+   candidate-grid origin, upload generation, material advection, history, and frame state.
+3. **Identical authoritative adjacent controls in every accepted comparison.**
+   **[REBASED 2026-08-27 - separated-pass control retired]** The authoritative controls are those
+   of the adjacent repeated-sampling protocol, which is the protocol that supplies every piece of
+   T132 evidence. They are reported as `authoritativeAdjacentControls={...}` and are the sole input
+   to the T132 acceptance verdict.
+
+   For **every** accepted comparison - both the A/A local-noise control and any optimization A/B -
+   all of the following must hold:
+
+   - same fixture UUID;
+   - same accepted `StructuralFingerprint`, with `structuralChanged=false`;
+   - the same exact SIDE, FAR, BELOW or ABOVE pose, held within one adjacent settled window;
+   - `governorScale` exactly `0.50000`; `resolutionScale` exactly `0.75000`;
+   - compact storm topology wherever compact is the required production arm;
+   - identical configured primary ray steps and light steps;
+   - identical target and workload dimensions;
+   - projection settled (`projectionStability` stabilized);
+   - effective `WorldTime` matched across the compared arms;
+   - fixture daylight frozen, so `lightDirection` is controlled rather than drifting;
+   - per-descriptor runtime profile matched;
+   - material advection offset matched;
+   - the required cloud-content signatures matched;
+   - the content and projection stability gates passed for every sample;
+   - fresh capture and sample identities, with no stale sample or workload reuse;
+   - optimization arm identity **observed from the draw snapshot** wherever an A/B is being made,
+     so `armsDistinct` proves the toggle took effect rather than recording what the suite intended;
+   - diagnostic toggles restored afterwards (`topologyRestored=true`).
+
+   Any difference in these authoritative adjacent controls is a failed capture, not a measurement.
+
+   The retired separated-pass comparison is **not** one of these controls; see the note below.
+4. **Owned-work evidence per change.** For each of T119, T121, T122, and T123, the counter it owns
+   is recorded and its reduction or bound stated: group-boundary scans and metadata reads per group
+   evaluation (T119), `conservativeDescriptorRejects` (T121), `avoidedDescriptorTextureFetches`
+   (T122), and the primary/light/empty-space/termination counters (T123).
+5. **No image or material movement.** Evaluated by the deterministic numeric comparator, **not**
+   by `visualRef` equality. `visualRef` digests a FINAL frame accumulated at history blend `0.85`,
+   so two passes disagree by construction on an unchanged fixture at an identical pose; it is
+   retained as an informational fingerprint only. Each view instead captures a reference frame with
+   temporal history bypassed - which also pins the shader jitter phase, because
+   `jitterFrame` in `cloud_atmosphere_volume.fsh` is `FrameIndex` only while
+   `HistoryValid == 1 && HistoryBlend > 0.001` - and compares the raw `RGBA16F` cloud buffers.
+   The suite must report `maxAbsRGBA`, `meanAbsRGBA`, `rmsRGBA`,
+   `changedPixelCountAboveEpsilon`, `totalComparedPixels`, `epsilon`, and `passed` for every view,
+   with `epsilon` equal to one binary16 storage step at the compared magnitude
+   (`2^(exponent-10)`, `2^-24` below the normal range). The fresh post-T134 material trace must
+   likewise stay within the documented neutral tolerance. A lighting-support proxy stays blocked
+   until it proves equivalence by this same evidence.
+
+   **Attribution is required before a failure counts against the performance path.** Both suite
+   passes run the same binary, the same shader, and the same performance paths, so the suite is
+   structurally an A/A repeatability test, not an A/B optimization test. The structural fingerprint
+   deliberately excludes advection state and the per-tick descriptor runtime profile, so
+   `structuralChanged=false` means the topology is frozen, not that the storm is. Each view
+   therefore also reports `sceneStability={...}` (`materialOffsetMatch`, `materialOffsetDeltaX/Z`,
+   `runtimeProfileMatch`, `runtimeProfileDigestA/B`, `changedDescriptorCount`, and the maximum
+   per-field deltas for major/minor radius, aspect, shear, density, detail weight, lifecycle, and
+   vertical development) and `criterion5={...}`:
+
+   - `sceneStable=true` with a passing comparison satisfies criterion 5;
+   - a failing comparison is escalated through three levels, because a partial input set matching
+     never proves the renderer moved the image:
+     **A** a tracked scene input differs -> `criterion5Attributable=false
+     reason=scene_evolved_between_passes`; **B** the scene held still but a named production uniform
+     group or the weather-map input signature differs -> `criterion5Attributable=false
+     reason=render_inputs_differ_between_passes` naming the differing groups; **C** every tracked
+     scene input, every named `UniformComponentSignatures` group and the weather-map input signature
+     match and the image still differs -> `criterion5Attributable=true
+     reason=unexplained_deterministic_render_difference`, which **remains blocking**. Level C means
+     the known deterministic inputs are exhausted and a deeper render-path investigation is due; it
+     is not a proven renderer defect and not proven GPU nondeterminism;
+   - `sceneStable=false` with a failing comparison is recorded as
+     `criterion5Attributable=false reason=scene_evolved_between_passes differingInputs=...` and must
+     **not** be claimed as evidence that the performance path moved the image.
+
+   `sceneStable` covers four evolving inputs: the material advection offset, the per-descriptor
+   runtime profile, `LightDir`, and `WorldTime`. `WorldTime` is **conditionally** render-relevant:
+   the renderer computes
+   `worldTimeAffectsDensity = weather.maxPrecipitation() > 0.02F || funnels > 0`, and the shader
+   consumes `WorldTime` in the precipitation shaft domain
+   (`p.y * 0.0014 - WorldTime * 0.0015`, `cloud_atmosphere_volume.fsh:2508`) and in the funnel
+   terms. A differing clock destabilizes the comparison only when the renderer marked it relevant
+   for at least one pass; when it is irrelevant it cannot move the image and must not be reported
+   as instability.
+6. **Fresh post-T134 material trace.** The T128 centre-line trace is re-taken on this same fixture,
+   spanning the full post-T134 severe column of roughly 865 blocks (from below the BASE underside
+   to above the ANVIL canopy) at no more than 16-block intervals, and it shows no new discontinuity
+   beyond the T131-corrected composition. The retained
+   `StormMaterialContinuityDiagnosticsSandbox` fixture is pre-T134 compact geometry (BASE radius
+   `172`, ANVIL radius `206`, span Y `224..508`) and is therefore not sufficient evidence for this
+   item on its own.
+
+**Retired: `existingSeparatedPassComparison` is historical, non-authoritative evidence.**
+The original protocol separated PASS A and PASS B by multiple teleports and substantial live game
+time. That separation was empirically shown to admit `WorldTime` drift, projection/FOV drift,
+weather-map and cloud-content change, and `lightDirection` drift - none of which are attributable to
+any optimization under test. Back-to-back adjacent capture removed those systematic differences, and
+the repeated-median adjacent protocol then reached zero median failures across the campaigns recorded
+in `validation/t128-t131-material-continuity.md`.
+
+`existingSeparatedPassComparison` is therefore retained in the suite output as **historical
+diagnostic record only**. It is reported as `historicalSeparatedPassComparison={...}`, it is
+explicitly non-authoritative, and it is **not** used for T132 acceptance. It is known to be invalid
+as a neutrality or repeatability control because of that temporal separation. In particular its
+`workload_capture_token_reused` difference - an artifact of `PASSES = 1`, where pass B reuses pass
+A's workload capture token - its render drift, and its control differences must not feed the
+authoritative criterion 3 verdict. `PASSES = 2` must not be restored merely to satisfy a retired
+protocol.
+
+This is a **protocol correction, not a relaxed control requirement**: criterion 3 above demands
+strictly more of each accepted comparison than the retired wording did, including gates
+(projection settling, content stability, clock pinning, daylight control, runtime-profile and
+advection matching, arm-identity observation) that did not exist when the original wording was
+written.
+
+**What criterion 5 does and does not prove.** Both suite passes run the same binary, the same
+shader and the same performance paths, so the suite is an **A/A repeatability test**. Passing
+criterion 5 proves the deterministic capture can reproduce the same scene under the same
+implementation. It does **not** by itself prove that T119, T121, T122 or T123 are image-neutral,
+because neither pass has the optimization disabled. **The A/A control remains an A/A test and is
+never evidence of optimization neutrality**; it measures only whether the capture can reproduce a
+scene under one fixed implementation.
+
+T119 is the one change that also has a real A/B, via
+`/pa system volumetric debug stormTopology legacy_scan|compact`, and it has now been run as one:
+see "T119 banked" in `validation/t128-t131-material-continuity.md`. **T121 and T122 still have no
+equivalent A/B toggle**, so their neutrality remains unproven and only their execution is evidenced
+by their owned counters. This limitation must not be removed or softened in T132 or T133
+documentation; closing it needs a separate decision about adding an OFF branch to
+`cloud_atmosphere_volume.fsh`, which is a production shader change and is not authorised here.
+
+Reference frames additionally wait for the `projection` component signature to repeat for three
+consecutive rendered frames before being accepted, because Minecraft's FOV interpolates after the
+suite's teleport and a changing projection reprojects the entire image. The wait is bounded at 240
+frames and reports `projection_stability_timeout` rather than capturing an unsettled frame.
+
+Step-count reductions, reduced noise or lighting, resolution changes, and any accepted image change
+remain quality work behind T098/T099 and are out of T132's scope.
+**T121/T122 debt CLOSED 2026-08-27.** Diagnostic shader OFF arms were built and validated on
+five fixtures. **T122 is image-neutral** (40/40 medians, 0 changed pixels, 37.4% fetch
+reduction). **T121's failure was isolated and fixed**: the guard could reject a lobe that still
+satisfied `lobeDistance <= lobeSoftness`, flipping a discrete `groupActiveRoleMask` bit
+(15,546 witnesses found offline). A derived `STORM_T121_SOFTNESS_MARGIN_BLOCKS = 2^-10` margin
+on the softness term closes it; the blend term was measured safe and left unmargined. Re-run:
+**40/40 T121, 40/40 T122, 40/40 A/A, zero failures**, with ~55% descriptor-evaluation reduction
+preserved. **SC-020 and FR-030 are satisfied.**
+
+**Superseded - T121/T122 debt resolved 2026-08-27, with one failure.** Diagnostic shader OFF arms were built
+and validated through the accepted adjacent repeated-median protocol on five fixtures.
+**T122 is image-neutral** (40/40 medians, 0 changed pixels) and removes 37.4% of descriptor
+texture fetches. **T121 is NOT image-neutral**: one of twenty distinct fixture x view
+comparisons produced a deterministic 1-pixel difference at 11x the tolerance
+(`maxAbsRGBA=5.371094e-03` against `epsilon=4.882813e-04`), with both arms at `dev=0` and the
+A/A control clean. The vertical bound itself is provably conservative (29.3M-probe search,
+worst violation 1.4e-14 blocks), so this is not a logic error; no production behaviour was
+changed. **SC-020 and FR-030 therefore remain unsatisfied for T121, and T098 stays blocked.**
+See `validation/renderer-wide-architecture-audit.md`.
+
+**Superseded - original validation debt entering T133 (recorded 2026-08-27 at T132 closure)**: T121 and T122 are
+**execution-evidenced only**. Their execution is proven by nonzero `conservativeDescriptorRejects`
+and `avoidedDescriptorTextureFetches` on all four views, but **neither has ever been run with an OFF
+arm**, so neither one's image neutrality has been independently demonstrated. Unlike T119, which
+toggles through the `StormTopologyMode` uniform, both are shader-internal: building true OFF arms
+requires adding pre-optimization diagnostic branches to `cloud_atmosphere_volume.fsh`, which is a
+production shader change and was outside the diagnostic-only scope under which T132 was closed.
+T119's banked neutrality must **not** be read as covering T121 or T122. T133 must either carry this
+limitation forward explicitly or resolve it with a deliberate decision to add those shader toggles.
+
+**T133 status 2026-08-27: CLOSED, ACCEPTED.** All six evidence areas pass, including SC-020's
+optimization-neutrality clause for T119, T121, T122 and T123. **T098 is unblocked.** SC-006 /
+T070 performance remains failed and open and is not closed by this. See
+`validation/renderer-wide-architecture-audit.md`.
+
+**Superseded - T133 status 2026-08-27: OPEN, one blocker.** Aspect-ratio and ANVIL-span guards implemented
+and passing; SC-018 passes at 600/900/1,200 blocks; SC-019 and SC-020's recording clause pass;
+no accepted T132/T134 evidence regressed. **SC-020's optimization-neutrality clause is
+unsatisfied for T121 and T122**, which T133 cites and which is a written T098 entry condition.
+Closing it requires pre-optimization OFF branches in `cloud_atmosphere_volume.fsh` - a
+production shader change. Severe-scale storm raymarch measures 136-261 ms at `641x360` with
+`governorScale=0.50000` / `resolutionScale=0.75000`; SC-006's 16.7 ms Ultra contract is owned by
+T070, not T133. See `validation/renderer-wide-architecture-audit.md`.
+
+- [X] T133 [US1] **[ACCEPTED 2026-08-27]** Revalidate physical scale, one-medium continuity, T124-T126 macro morphology, CPU/GPU noise parity, final-density rain/whiteout, retained Phase 4R invariants, production shader compilation, and T130-T132 performance evidence together. Record the result in `specs/001-native-storm-rendering/validation/renderer-wide-architecture-audit.md`; only a passing result allows T098 to resume (depends on T127-T132, T134) [FR-028-FR-031; SC-018-SC-020]
+
+**Checkpoint**: A severe storm has an explicit physical-system target **and an accepted
+implementation of it (T134)**, the lower/upper material split has an attributed cause, and
+performance work has evidence of visual neutrality before T098 resumes. T132 is the only remaining
+prerequisite for T133; T133 is the only remaining prerequisite for T098.
+
+---
+
+
+**Then**: T098 and T099 execute only after T133. They are listed under Phase 4R's Revalidation Gate to keep their audit history in place; their acceptance criteria are the revised positive/negative checklist recorded there.
 
 **Checkpoint**: The coverage envelope comes from descriptors, the visible body comes from noise, and
-morphology is measured positively. T118 unblocks the reopened T098 and T099.
+morphology is measured positively. T118/T124-T126 are retained evidence; T133, not T118, unblocks
+the reopened T098, while T099 remains blocked by T098.
 
 ---
 
@@ -272,33 +551,40 @@ morphology is measured positively. T118 unblocks the reopened T098 and T099.
 **Independent Test**: Measure storm descriptor evaluation cost per sample and per frame through the
 existing storm diagnostics before and after each task, and confirm the rendered result is unchanged.
 
-**Ordering**: These tasks are **not** blocked by T098/T099. Each is a separate task and a separate
-commit from visual-correctness work. No task in this phase may alter the rendered result; a
-performance change that moves the image is a correctness defect. T119 is the one task permitted to
-run concurrently with Phase 4S, because the corrected union no longer discards zero-density lobes
-and may be impractical without it.
+**Ordering**: These tasks are **not** blocked by T098/T099, but a frozen timing, comparison-image,
+and material-trace baseline must exist first. T130 froze that baseline for T119 and T121-T123 on
+pre-T134 compact fixtures. Since T134 is accepted, T132 re-establishes an equivalent frozen baseline
+on a post-T134 severe fixture; see the revised T132 criteria above. Each is a separate task and a separate commit
+from visual-correctness work. No task in this phase may alter the rendered result; a performance
+change that moves the image or trace outside the documented neutral tolerance is a correctness
+defect. A lighting proxy is permitted before T098 only when it proves equivalent by that evidence.
 
-- [ ] T119 [US3] Precompute descriptor group topology during the existing CPU build in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeSpatialIndex.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormGeometryBuildCoordinator.java`, and supply per-group first/end indices or equivalent compact metadata to the shader, replacing the per-sample `stormGroupFirstIndex()` / `stormGroupEndIndex()` descriptor scans in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`. The metadata is acceleration only and never defines density (may run concurrently with T108-T113 when the corrected union is otherwise impractical) [FR-027; SC-017]
+- [X] T119 [US3] Precompute descriptor group topology during the existing CPU build in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeSpatialIndex.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormGeometryBuildCoordinator.java`, and supply per-group first/end indices or equivalent compact metadata to the shader, replacing the per-sample `stormGroupFirstIndex()` / `stormGroupEndIndex()` descriptor scans in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`. The metadata is acceleration only and never defines density (depends on T130) [FR-027, FR-030; SC-017, SC-020]
 - [X] T120 [US3] Replace `bool groupVisited[MAX_STORM_GROUPS]` with a compact integer bit mask or another GPU-friendly representation in `directStormShape()` and `directStormSegmentMayIntersect()` in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`, removing the per-call array allocation and clear loop (depends on T111) [FR-027; SC-017]
-- [ ] T121 [US3] Introduce a cheaper storm lighting proxy for lighting cone taps in `lightMarchOpticalDepth()` and its endpoint/capped/refined/no-detail variants in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` so the full cloud density function is not evaluated per tap; document the proxy in `contracts/storm-density-composition.md` and confirm the visual acceptance criteria still pass (depends on T113, T118) [FR-006, FR-027; SC-011, SC-017]
-- [ ] T122 [US3] Audit repeated descriptor texture fetches inside `cloudDensity()` and `lightMarchOpticalDepth()` in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`, hoist or reuse fetches re-issued for the same descriptor within one evaluation, and record the resulting fetch count in the storm diagnostics (depends on T119, T121) [FR-027; SC-017]
-- [ ] T123 [US3] Define and enforce a bounded per-sample and per-frame descriptor evaluation cost, report it through `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudFrameDiagnostics.java` and the storm diagnostic capture, and document the bound in `plan.md` (depends on T119-T122) [FR-027; SC-017]
+- [X] T121 [US3] Add only conservative descriptor and empty-space rejection in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` where a mathematically derived lower bound proves a lobe cannot affect coverage, final density, active roles, or local-height output. Retain full `cloudDensity()` for lighting taps; any lighting-support proxy remains blocked until frozen-image and material-trace equivalence is proven. Record the proof and per-view workload comparison in `contracts/storm-density-composition.md` (depends on T119, T130) [FR-006, FR-027, FR-030; SC-011, SC-017, SC-020]
+- [X] T122 [US3] Audit repeated descriptor texture fetches inside `cloudDensity()` and `lightMarchOpticalDepth()` in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`, hoist or reuse fetches re-issued for the same descriptor within one evaluation, and record the resulting fetch count in the storm diagnostics (depends on T119, T130) [FR-027, FR-030; SC-017, SC-020]
+- [X] T123 [US3] Define and enforce a bounded per-sample and per-frame descriptor evaluation cost, report it through `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudFrameDiagnostics.java` and the storm diagnostic capture, and document the bound in `plan.md` (depends on T119, T122, T130; incorporate T121 only if its equivalent path is implemented) [FR-027, FR-030; SC-017, SC-020]
 
-**Status 2026-08-19**: T120 is complete — it is provably free of any rendered-result change and is
-verified by the production shader compile check and the full regression suite. T119, T121, T122 and
-T123 are **deferred, not blocked**:
+**Status 2026-08-27 (T119 image-neutrality banked)**: T119 now has live OFF/ON evidence, not
+just execution evidence. Forty median comparisons across five independent fixtures and all four
+views passed at zero changed pixels, with `armA=legacy_scan armB=compact armsDistinct=true`
+observed from the draw snapshot on every group and forty same-campaign A/A controls clean. See
+"T119 banked" in `validation/t128-t131-material-continuity.md`. **T121 and T122 remain
+execution-evidenced only**; they have no A/B toggle and adding one is a production shader change.
 
-- **T119** was the candidate for being inseparable from the correctness refactor. It is not. The
-  corrected union no longer discards zero-density lobes, but the per-lobe evaluation cost is
-  essentially unchanged: the pre-correction path also evaluated each lobe fully and only skipped
-  afterwards. The per-sample `stormGroupFirstIndex()` / `stormGroupEndIndex()` scans that T119
-  removes were already present before Phase 4S, so they are a pre-existing cost rather than one the
-  correction introduced. T119 changes the descriptor upload contract, and its benefit can only be
-  measured on the reference hardware, so it is sequenced with the other measured work.
-- **T121** substitutes a cheaper lighting proxy, which by construction changes the rendered result
-  and must be judged against the visual acceptance criteria. It cannot be validated before T098.
-- **T122** and **T123** need before/after GPU measurements on the reference machine to mean
-  anything, and T123's bound is meaningless until T119 and T121 have set the cost profile.
+**Status 2026-08-21**: T119-T123 are accepted. The two-pass compact `stormPerformanceSuite`
+fixture `66b2c85a-aa93-4d18-b428-ac546e280c02` (fingerprint `459873e8d8c8425a`) kept group,
+structural fingerprint, poses, governor scale, resolution, topology, target, and configured controls
+equal. That fixture is pre-T134 compact geometry; the acceptance stands because none of the four
+arguments depends on descriptor scale (T121's lower bound holds for any radius since
+`stormLobeBlendRadius()` clamps to `STORM_MAX_BLEND_BLOCKS`, T122 is exact same-register reuse,
+T119 follows from group-contiguous build ordering plus `STABLE_IDENTITY_ORDER`, and T123 is gated to
+`DebugView == 22 || DebugView == 23`), but T132's visual/material neutrality evidence must be
+re-collected post-T134. T121 conservative rejections, T122 exact avoided descriptor texture
+fetches, and T123 primary/light/termination counters executed in every controlled view. This is
+runtime execution and equivalence evidence, not a historical pre/post timing percentage. An
+image-changing approximation remains blocked behind T098. None of these tasks may replace the
+required material-continuity correction.
 
 **Checkpoint**: Descriptor evaluation cost is bounded and reported, with the rendered result
 unchanged from the Phase 4S baseline.
@@ -396,11 +682,13 @@ Phase 1 Setup
         -> US1 Readable Volumetric Storms (MVP)
             -> US2 Stable Cloud and Rain
                 -> Phase 4R Storm Morphology Correction  (T074-T097 complete)
-                    -> Phase 4S Storm Density Architecture Correction (T100-T118)
+                    -> Phase 4S Storm Density Architecture Correction (T100-T126 complete)
                         |                          \
-                        |                           -> Phase 4P Storm Performance Architecture
-                        |                              (T119-T123; T119 may start with 4S)
-                        -> T098 / T099 Morphology Validation Gates (reopened)
+                        |                           -> T130 -> Phase 4P Storm Performance Architecture
+                        |                              (T119-T123) -> T132
+                        -> Phase 4A Renderer-wide Correction Gate (T127-T131)
+                                                   \
+                                                    -> T133 -> T098 / T099 Morphology Validation Gates
                             -> US3 Scalable Quality Modes
                                 -> US4 Diagnostics
                                     -> Phase 7 Compatibility and Release Validation
@@ -411,22 +699,24 @@ Phase 1 Setup
 - US1 depends on all foundational contracts and produces the direct structured-storm path.
 - US2 depends on the adopted render snapshot and direct shader path from US1.
 - Phase 4R depends on the T041 audit and is complete through T097. Its T081, T085, T086, T089, T090, and T097 acceptance criteria are superseded by Phase 4S; those tasks stay checked as implementation history and are not rewritten.
-- Phase 4S depends on Phase 4R and owns the corrected density architecture. T100 must precede every Phase 4S regression so no threshold is set without a derivation, and T107 must record meaningful fail-first results before any Phase 4S production change.
-- Phase 4P depends on Phase 4S for its correctness prerequisites, **not** on T098/T099. T119 may run concurrently with T108-T113 when the corrected union - which no longer discards zero-density lobes - is otherwise impractical. Phase 4P tasks are separate commits from visual-correctness work and may not alter the rendered result.
-- T098 and T099 are reopened under the revised positive morphology criteria (FR-023, FR-024) and depend on T118. They remain release gates for the visual result.
+- Phase 4S depends on Phase 4R and owns the corrected density architecture. T100 must precede every Phase 4S regression so no threshold is set without a derivation, and T107 must record meaningful fail-first results before any Phase 4S production change. T124-T126 are complete history; their morphology thresholds remain retained inputs to T133.
+- Phase 4A depends on the completed Phase 4S gate. T127-T129 derive scale and attribute the first material discontinuity. T131 may change only the measured responsible stage. T130 and neutral Phase 4P work can proceed in parallel with that diagnosis, but T132 must prove equivalence before convergence at T133.
+- Phase 4P is **not** blocked by T098/T099. T119, T122, and T123 run after T130's baseline; T121 remains conditional on materially equivalent optical evidence. Phase 4P tasks are separate commits from visual-correctness work and may not alter the rendered result.
+- T098 and T099 are reopened under the revised positive morphology criteria (FR-023, FR-024). T098 depends on T133; T099 remains blocked by T098.
 - US3 depends on T099 for *visual* acceptance. The former rule that no quality or performance work of any kind may start before T099 is **removed**: Phase 4P structural performance work proceeds on its own dependencies. T042's dependency on T099 is retained because quality-mode scaling is judged against the accepted visual result. T050 also retains its dependency on US2 history work.
 - US4 depends on US1 for workload sources and on the effective quality and visual-density state from US2/US3 for a complete report.
-- Phase 7 depends on all desired stories; T070-T072 are post-correction hard release gates, not optional polish. The approximately 39 FPS / 23 ms audited Ultra result is not final evidence and must be re-measured after Phase 4S and Phase 4P.
+- Phase 7 depends on all desired stories; T070-T072 are post-correction hard release gates, not optional polish. The observed roughly 80, 100, 140, and 200+ ms raymarch times are not final evidence; T130 establishes their baseline and T132/T133 re-measure the approved architecture work.
 
 ### User Story Dependency Graph
 
 | Story | Required predecessors | Independent completion signal |
 |---|---|---|
-| US1 (P1) | Setup + Foundational; reopened work closes in Phase 4S | Corrected storm passes the revised two-part T098 checklist: all nine positive features present, none of the eight rejected forms present |
-| US2 (P2) | US1; reopened work closes in Phase 4S | Replacement T099 proves rain and whiteout follow final noise-formed density |
+| US1 (P1) | Setup + Foundational; Phase 4S retained, Phase 4A converged at T133 | Corrected storm passes the revised two-part T098 checklist: all nine positive features present, none of the eight rejected forms present |
+| US2 (P2) | US1; T099 remains blocked by T098 | Replacement T099 proves rain and whiteout follow final noise-formed density |
 | Phase 4R | T041 audit | T097 recorded corrected union evidence; superseded in part by Phase 4S |
-| Phase 4S | Phase 4R | T118 records corrected density-architecture evidence with model-derived thresholds and unblocks T098/T099 |
-| Phase 4P | Phase 4S correctness prerequisites | T123 reports a bounded descriptor evaluation cost with the rendered result unchanged |
+| Phase 4S | Phase 4R | T118 records corrected density-architecture evidence; T124-T126 retain macro/role evidence |
+| Phase 4A | Completed Phase 4S | T133 records scale, material continuity, morphology, final-density, and performance convergence |
+| Phase 4P | T130 reference baseline | T132 proves bounded cost work preserves the frozen rendered result and trace |
 | US3 (P3) | T099 for visual acceptance; T050 also needs US2 history work | T052 proves all modes, LOD, and adaptive stability |
 | US4 (P4) | US1 plus completed US2/US3 state providers | T060 answers the diagnostic contract from one session |
 
@@ -437,8 +727,9 @@ Phase 1 Setup
 - **Async/cache lifecycle**: T005-T010 -> T014 -> T021-T022 -> T028 -> T064.
 - **Rain/whiteout/history**: T031-T033 -> T034-T040 -> T041 -> T078-T079 -> T089, T093-T095 -> T097 -> T115-T116 -> T099.
 - **Morphology correction (Phase 4R)**: T074-T079 -> T080 -> T081-T090 -> T091-T096 -> T097.
-- **Density architecture (Phase 4S)**: T100 -> T101-T106 -> T107 -> T108-T111 -> T112-T114 -> T115-T117 -> T118 -> T098 -> T099.
-- **Performance architecture (Phase 4P)**: T119 (may start with T108) -> T120 -> T121 -> T122 -> T123.
+- **Density architecture (Phase 4S)**: T100 -> T101-T106 -> T107 -> T108-T111 -> T112-T114 -> T115-T117 -> T118 -> T124-T126.
+- **Renderer-wide correction (Phase 4A)**: T127 -> T128 -> T129 -> T131; T130 -> T119/T121/T122/T123 -> T132; T131 + T132 -> T133 -> T098 -> T099.
+- **Performance architecture (Phase 4P)**: T130 -> T119 -> T121/T122 -> T123 -> T132; T121 is skipped rather than approximated if equivalent evidence is unavailable.
 - **Quality/LOD**: T099 -> T042-T043 -> T044-T051 -> T052 -> T070-T071.
 - **Diagnostics**: T053 -> T054-T059 -> T060.
 - **Compatibility/fallback**: T061-T065 -> T066 -> T067-T069.
@@ -484,10 +775,12 @@ T113/T114 because they own different consumers.
 ### Phase 4P
 
 ```text
-T119 group topology (may start with T108)  ||  T120 bit-mask visitation (after T111)
+T127/T128/T129 measured continuity diagnosis  ||  T130 baseline -> T119 group topology
 ```
 
-T121, T122, and T123 follow in order because each measures the previous task's result.
+T122 may follow T119; T121 may run only if its equivalent lighting-support proof is available.
+T123 and T132 converge their measured work with T131 at T133. T098 cannot run before that
+convergence.
 
 ### User Story 3
 
@@ -511,7 +804,7 @@ Converge at frame diagnostics, shader views, and command registration.
 
 ### Cross-Story
 
-Phase 4R may use only the parallelism explicitly marked in T079; its tests complete and fail meaningfully before production fixes. Phase 4S follows the same fail-first discipline through T107. Phase 4P may run alongside Phase 4S on its stated dependencies, in separate commits, and may not alter the rendered result. US3 quality-mode work remains gated on T099 for visual acceptance. Begin US4's standalone diagnostic data model only after the corrected workload/counter meanings and the test contract in T053 are stable.
+Phase 4R may use only the parallelism explicitly marked in T079; its tests complete and fail meaningfully before production fixes. Phase 4S follows the same fail-first discipline through T107. Phase 4A requires fail-first material attribution before correction. Phase 4P runs after T130's frozen baseline, in separate commits, and may not alter the rendered result. US3 quality-mode work remains gated on T099 for visual acceptance. Begin US4's standalone diagnostic data model only after the corrected workload/counter meanings and the test contract in T053 are stable.
 
 ## Implementation Strategy
 
@@ -530,21 +823,24 @@ Phase 4R may use only the parallelism explicitly marked in T079; its tests compl
 2. **US2** aligns rain, whiteout, and history with the completed-frame representation.
 3. **Phase 4R** corrects the audited composition defect and restores the candidate index only as acceleration.
 4. **Phase 4S** makes descriptors a coverage envelope, makes noise form the visible body, replaces density-space pseudo-distance with world-space geometric distance, applies erosion across the interior, and replaces US1/US2 evidence against positive morphology criteria.
-5. **Phase 4P** makes the corrected model practical: precomputed group topology, compact group metadata, bit-mask visitation, a cheaper lighting proxy, a descriptor-fetch audit, and a bounded evaluation cost. It runs on its own dependencies rather than behind the morphology gate, in separate commits.
-6. **US3** adds predictable mode scaling, LOD, and adaptive performance policy after T099 accepts the visual result.
-7. **US4** exposes bounded evidence for ownership, workload, artifacts, and timing.
-8. **Phase 7** proves Simple Clouds boundaries, legacy fallback, server safety, full regressions, and the post-correction RTX 4070 release gate.
+5. **Phase 4A** derives the severe-system scale, measures the lower/upper material trace, and corrects only its first discontinuous stage.
+6. **Phase 4P** makes the corrected model practical with visually-neutral topology, culling, fetch, reuse, and bounded-cost work measured against T130; a lighting proxy is conditional on equivalence.
+7. **T133/T098** revalidate physical size, single-medium continuity, morphology, final-density consumers, and performance before the live visual gate resumes.
+8. **US3** adds predictable mode scaling, LOD, and adaptive performance policy after T099 accepts the visual result.
+9. **US4** exposes bounded evidence for ownership, workload, artifacts, and timing.
+10. **Phase 7** proves Simple Clouds boundaries, legacy fallback, server safety, full regressions, and the post-correction RTX 4070 release gate.
 
 ## Traceability Summary
 
 | Requirement area | Primary tasks |
 |---|---|
-| Connected 3D stages and overlap | T011-T030, T074-T077, T080-T090, T096-T098 |
+| Connected 3D stages and overlap | T011-T030, T074-T077, T080-T090, T096, T124-T126, T129-T133, T098 |
 | Coverage envelope vs. noise-formed body | T100-T102, T107, T110-T114, T118 |
 | Geometric distance field and world-space unions | T104, T107-T109, T111, T118 |
-| Positive morphology criteria and derived thresholds | T100, T102-T106, T118, T098-T099 |
+| Physical severe-system scale and one-medium continuity | T127-T131, T133, T098 |
+| Positive morphology criteria and derived thresholds | T100, T102-T106, T118, T124-T126, T133, T098-T099 |
 | Interior detail erosion | T101, T103, T113, T118 |
-| Bounded descriptor evaluation cost | T119-T123 |
+| Bounded descriptor evaluation cost | T130, T119-T123, T132-T133 |
 | Rain, whiteout, temporal stability | T031-T041, T078-T079, T089, T093-T095, T097-T099 |
 | Descriptor validity, fallback, async, signatures | T079, T087-T088, T091-T092, T096-T097 |
 | Five modes, adaptive quality, LOD | T099 -> T042-T052 |
@@ -553,7 +849,7 @@ Phase 4R may use only the parallelism explicitly marked in T079; its tests compl
 | Simple Clouds ownership | T061-T066 |
 | Legacy fallback | T064-T066 |
 | Automated/visual regression | T067-T069, T072 |
-| RTX 4070 performance | T119-T123 -> T070-T072 |
+| RTX 4070 performance | T130 -> T119-T123 -> T132-T133 -> T070-T072 |
 | Scope and no unrelated redesign | Every implementation task is limited to paths named in `plan.md`; T067-T073 enforce the boundary |
 
 ## Notes
@@ -562,8 +858,9 @@ Phase 4R may use only the parallelism explicitly marked in T079; its tests compl
 - Tests are intentionally placed before their implementation and must fail for the expected missing/incorrect behavior first.
 - Every new geometry regression test must demonstrably fail against the audited implementation before its corresponding fix is implemented; T080 records this gate for Phase 4R and T107 records it for Phase 4S.
 - Phase 4S thresholds come from `validation/morphology-thresholds.md` and are derived from the shader's configured erosion strength, noise amplitude, octave weights, and octave frequencies. Adjusting a threshold to accommodate an observed result, without a recorded model change, violates FR-026.
-- **Ordering rule removed**: the previous rule that no performance work of any kind could begin before T099 no longer applies. Phase 4P runs on its own dependencies. Performance changes stay in separate tasks and commits from visual-correctness changes, and no Phase 4P change may alter the rendered result.
-- T042 remains blocked by T099 because quality-mode scaling is judged against the accepted visual result. The approximately 39 FPS / 23 ms Ultra observation must be re-measured after Phase 4S and Phase 4P.
+- **Renderer-wide gate**: the prior assumption that another local role-geometry iteration should follow a failed T098 is obsolete. T127-T129 must derive physical size and locate the first material discontinuity before T131 changes the responsible stage.
+- **Ordering rule removed**: the previous rule that no performance work of any kind could begin before T099 no longer applies. Phase 4P runs after T130's frozen visual/trace baseline. Performance changes stay in separate tasks and commits from visual-correctness changes, and no Phase 4P change may alter the rendered result.
+- T042 remains blocked by T099 because quality-mode scaling is judged against the accepted visual result. The roughly 80, 100, 140, and 200+ ms raymarch observations must be baselined at T130 and re-measured at T132/T133.
 - Phase 4S and Phase 4P preserve every already validated behavior: server-authoritative weather, forecast behavior, network packets, saved weather state, Simple Clouds ownership, legacy renderer fallback, rain placement, whiteout behavior, history invalidation semantics, and the candidate texture as a scheduling/index hint rather than authoritative geometry.
 - Do not change packet registration, packet encoding, saved-data schemas, forecast orchestration, Simple Clouds managed systems, or unrelated cloud families.
 - Do not perform Minecraft, RenderSystem, render-target, shader, buffer-upload, or OpenGL access from the async worker.

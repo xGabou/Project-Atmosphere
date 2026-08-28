@@ -61,6 +61,27 @@ final class CloudMorphologyGenerators {
             1.00F, 1.02F, 0.98F,
             1.04F, 1.02F
     };
+    // T134 severe-system physical scale. These are source-plan dimensions, not
+    // a uniform post-generation descriptor multiplier. The individual roles
+    // retain their existing BASE -> CORE -> TOWER -> ANVIL topology while the
+    // system occupies the derived 1,200--1,500 block horizontal envelope and
+    // 720--880 block vertical envelope.
+    private static final int STORM_SYSTEM_MEMBER_COUNT = 10;
+    private static final float STORM_SYSTEM_PLAN_RADIUS = 450.0F;
+    private static final float STORM_SYSTEM_GROUP_RADIUS = 400.0F;
+    private static final float STORM_SYSTEM_BASE_DROP = 120.0F;
+    private static final float STORM_SYSTEM_TOP_RISE = 780.0F;
+    private static final float STORM_STABLE_SCALE_MIN = 0.97F;
+    private static final float STORM_STABLE_SCALE_MAX = 1.03F;
+    private static final float STORM_RADIUS_JITTER_MIN = 0.98F;
+    private static final float STORM_RADIUS_JITTER_MAX = 1.02F;
+    // T134: the original downstream anvil endpoint (0.50) left a freshly
+    // spawned, centre-relative descriptor envelope at 1,198.009 blocks in
+    // the controlled suite.  Extending only the downwind source placement to
+    // 0.52 contributes a deterministic outer-envelope margin without
+    // changing any lobe radius, density/noise equation, or vertical profile.
+    private static final float STORM_ANVIL_UPWIND_POSITION = -0.20F;
+    private static final float STORM_ANVIL_DOWNWIND_POSITION = 0.52F;
 
     private CloudMorphologyGenerators() {
     }
@@ -83,6 +104,25 @@ final class CloudMorphologyGenerators {
                 PUFF_RADIAL_MAX,
                 PUFF_ANGULAR_JITTER_RADIANS
         );
+    }
+
+    /** Source-plan contract for T134 severe systems, exposed only to diagnostics. */
+    static StormPhysicalScale stormPhysicalScale() {
+        return new StormPhysicalScale(
+                STORM_SYSTEM_MEMBER_COUNT,
+                STORM_SYSTEM_PLAN_RADIUS,
+                STORM_SYSTEM_GROUP_RADIUS,
+                STORM_SYSTEM_BASE_DROP,
+                STORM_SYSTEM_TOP_RISE
+        );
+    }
+
+    static float stormMatureRadiusLowerBound() {
+        return STORM_STABLE_SCALE_MIN * STORM_RADIUS_JITTER_MIN;
+    }
+
+    static float stormMatureRadiusUpperBound() {
+        return STORM_STABLE_SCALE_MAX * STORM_RADIUS_JITTER_MAX;
     }
 
     private static List<Float> immutableValues(float[] values) {
@@ -151,7 +191,8 @@ final class CloudMorphologyGenerators {
         float radiusJitter = family == CloudMorphologyFamily.TOWER
                 ? 0.96F + random.nextFloat() * 0.08F
                 : family == CloudMorphologyFamily.STORM_ANVIL
-                ? 0.98F + random.nextFloat() * 0.04F
+                ? STORM_RADIUS_JITTER_MIN
+                        + random.nextFloat() * (STORM_RADIUS_JITTER_MAX - STORM_RADIUS_JITTER_MIN)
                 : 0.92F + random.nextFloat() * 0.16F;
         float tier = family == CloudMorphologyFamily.TOWER
                 ? towerTier(clusterIndex, plan.clusterCount())
@@ -168,8 +209,8 @@ final class CloudMorphologyGenerators {
                 : family == CloudMorphologyFamily.STORM_ANVIL
                 ? Mth.lerp(
                     Mth.clamp((scale - 0.72F) / 0.42F, 0.0F, 1.0F),
-                    0.97F,
-                    1.03F
+                    STORM_STABLE_SCALE_MIN,
+                    STORM_STABLE_SCALE_MAX
                 )
                 : scale;
         // Start from the plan radius. Secondary clusters were already created
@@ -267,7 +308,7 @@ final class CloudMorphologyGenerators {
             StormLobeSpec storm = stormLobeSpec(stormPlan, morphologyIndex, (float) centerY);
             float roleTargetRadius = Math.max(
                     8.0F,
-                    shape.getBaseRadius() * 1.08F * storm.radiusMultiplier()
+                    stormPlan.radius() * storm.radiusMultiplier()
             );
             cluster.setVerticalBounds(storm.baseY(), storm.topY());
             cluster.setGrowthTargets(
@@ -361,35 +402,38 @@ final class CloudMorphologyGenerators {
     }
 
     private static SpawnPlan stormAnvilPlan(@NotNull CloudTypeDefinition definition, @NotNull RandomSource random) {
-        CloudShapeProfile shape = definition.getShapeProfile();
-        CloudVisualProfile visual = definition.getVisualProfile();
-        float radius = shape.getBaseRadius() * 1.08F;
-        return plan(definition, random, 7, 11, radius, radius * 2.55F,
-                shape.getBaseOffset(), shape.getTopOffset() * 1.18F,
-                0.58F + visual.getDensityMultiplier() * 0.25F + visual.getPrecipitationCoreStrength() * 0.12F,
-                0.58F + visual.getCoverageMultiplier() * 0.24F,
-                0.18F + visual.getEdgeErosionStrength() * 0.42F);
+        return stormSystemPlan(
+                definition,
+                STORM_SYSTEM_MEMBER_COUNT,
+                random.nextFloat() * (float) (Math.PI * 2.0D)
+        );
     }
 
     static SpawnPlan stormAnvilPlanForCount(
             @NotNull CloudTypeDefinition definition,
             int clusterCount
     ) {
-        CloudShapeProfile shape = definition.getShapeProfile();
+        return stormSystemPlan(definition, Math.max(4, clusterCount), 0.0F);
+    }
+
+    private static SpawnPlan stormSystemPlan(
+            @NotNull CloudTypeDefinition definition,
+            int clusterCount,
+            float orientation
+    ) {
         CloudVisualProfile visual = definition.getVisualProfile();
-        float radius = shape.getBaseRadius() * 1.08F;
         return new SpawnPlan(
                 CloudMorphologyFamily.STORM_ANVIL,
-                Math.max(4, clusterCount),
-                radius,
-                radius * 2.55F,
-                shape.getBaseOffset(),
-                shape.getTopOffset() * 1.18F,
+                clusterCount,
+                STORM_SYSTEM_PLAN_RADIUS,
+                STORM_SYSTEM_GROUP_RADIUS,
+                STORM_SYSTEM_BASE_DROP,
+                STORM_SYSTEM_TOP_RISE,
                 0.58F + visual.getDensityMultiplier() * 0.25F
                         + visual.getPrecipitationCoreStrength() * 0.12F,
                 0.58F + visual.getCoverageMultiplier() * 0.24F,
                 0.18F + visual.getEdgeErosionStrength() * 0.42F,
-                0.0F
+                orientation
         );
     }
 
@@ -652,18 +696,18 @@ final class CloudMorphologyGenerators {
         int towerStart = baseCount + coreCount;
         switch (stage) {
             case BASE -> {
-                radiusMultiplier = 1.22F;
+                radiusMultiplier = 1.16F;
                 baseY = centerY - plan.baseDrop();
-                topY = centerY + plan.topRise() * 0.38F;
+                topY = centerY + plan.topRise() * 0.42F;
             }
             case CORE -> {
                 int ordinal = Math.max(0, clusterIndex - baseCount);
                 float progress = coreCount <= 1
                         ? 0.0F
                         : (float) ordinal / (float) (coreCount - 1);
-                radiusMultiplier = Mth.lerp(progress, 0.98F, 0.88F);
-                baseY = centerY - plan.topRise() * 0.18F;
-                topY = centerY + plan.topRise() * Mth.lerp(progress, 0.48F, 0.52F);
+                radiusMultiplier = Mth.lerp(progress, 0.56F, 0.52F);
+                baseY = centerY - plan.topRise() * 0.06F;
+                topY = centerY + plan.topRise() * Mth.lerp(progress, 0.30F, 0.32F);
             }
             case TOWER -> {
                 int towerCount = Math.max(1, anvilStart - towerStart);
@@ -671,14 +715,17 @@ final class CloudMorphologyGenerators {
                 float progress = towerCount <= 1
                         ? 0.0F
                         : (float) ordinal / (float) (towerCount - 1);
-                radiusMultiplier = Mth.lerp(progress, 0.94F, 0.72F);
-                baseY = centerY - plan.topRise() * 0.20F;
-                topY = centerY + plan.topRise() * Mth.lerp(progress, 0.58F, 0.72F);
+                radiusMultiplier = Mth.lerp(progress, 0.35F, 0.24F);
+                baseY = centerY - plan.topRise() * 0.13F;
+                topY = centerY + plan.topRise() * Mth.lerp(progress, 0.34F, 0.30F);
             }
             case ANVIL -> {
-                radiusMultiplier = 0.92F;
-                baseY = centerY - plan.topRise() * 0.05F;
-                topY = centerY + plan.topRise() * 0.80F;
+                // This allowance includes the existing 0.97--1.03 mature
+                // scale and 0.98--1.02 descriptor jitter. It preserves the
+                // T127 minimum system footprint even at their lower bound.
+                radiusMultiplier = 1.10F;
+                baseY = centerY - plan.topRise() * 0.12F;
+                topY = centerY + plan.topRise() * 0.15F;
             }
             default -> throw new IllegalStateException("Unexpected storm lobe stage " + stage);
         }
@@ -1087,6 +1134,23 @@ final class CloudMorphologyGenerators {
         }
     }
 
+    record StormPhysicalScale(
+            int memberCount,
+            float planRadius,
+            float groupRadius,
+            float baseDrop,
+            float topRise
+    ) {
+        StormPhysicalScale {
+            if (memberCount < 4 || !Float.isFinite(planRadius) || planRadius <= 0.0F
+                    || !Float.isFinite(groupRadius) || groupRadius <= 0.0F
+                    || !Float.isFinite(baseDrop) || baseDrop <= 0.0F
+                    || !Float.isFinite(topRise) || topRise <= 0.0F) {
+                throw new IllegalArgumentException("Invalid storm physical-scale contract");
+            }
+        }
+    }
+
     private static Vec3 stormCell(Vec3 origin, SpawnPlan plan, int clusterIndex, RandomSource random) {
         CloudMorphologyMembership.Stage stage = new CloudMorphologyMembership(
                 null,
@@ -1104,12 +1168,16 @@ final class CloudMorphologyGenerators {
             float along01 = anvilCount <= 1
                     ? 0.5F
                     : (float) anvilIndex / (float) (anvilCount - 1);
-            float along = plan.groupRadius() * Mth.lerp(along01, -0.12F, 0.32F)
+            float along = plan.groupRadius() * Mth.lerp(
+                    along01,
+                    STORM_ANVIL_UPWIND_POSITION,
+                    STORM_ANVIL_DOWNWIND_POSITION
+            )
                     + (random.nextFloat() - 0.5F) * plan.groupRadius() * 0.025F;
             float cross = (float) Math.sin(along01 * Math.PI * 2.0D)
                     * plan.groupRadius() * 0.18F
                     + (random.nextFloat() - 0.5F) * plan.groupRadius() * 0.025F;
-            float y = plan.topRise() * (0.40F + along01 * 0.025F)
+            float y = plan.topRise() * (0.78F + along01 * 0.025F)
                     + (random.nextFloat() - 0.5F) * 3.0F;
             return origin.add(along, y, cross);
         }
@@ -1132,8 +1200,8 @@ final class CloudMorphologyGenerators {
                 float progress = coreCount <= 1
                         ? 0.0F
                         : (float) ordinal / (float) (coreCount - 1);
-                distanceScale = Mth.lerp(progress, 0.07F, 0.05F);
-                heightScale = Mth.lerp(progress, 0.06F, 0.14F);
+                distanceScale = Mth.lerp(progress, 0.06F, 0.04F);
+                heightScale = Mth.lerp(progress, 0.18F, 0.25F);
                 shearScale = Mth.lerp(progress, 0.02F, 0.035F);
             }
             case TOWER -> {
@@ -1142,8 +1210,8 @@ final class CloudMorphologyGenerators {
                 float progress = towerCount <= 1
                         ? 0.0F
                         : (float) ordinal / (float) (towerCount - 1);
-                distanceScale = Mth.lerp(progress, 0.055F, 0.035F);
-                heightScale = Mth.lerp(progress, 0.14F, 0.34F);
+                distanceScale = Mth.lerp(progress, 0.045F, 0.030F);
+                heightScale = Mth.lerp(progress, 0.36F, 0.56F);
                 shearScale = Mth.lerp(progress, 0.04F, 0.075F);
             }
             default -> throw new IllegalStateException("Unexpected lower storm stage " + stage);

@@ -1,7 +1,7 @@
 # Specification Quality Checklist: Native Storm Rendering
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-08-17 | **Re-validated**: 2026-08-19 (storm density architecture correction)
+**Created**: 2026-08-17 | **Re-validated**: 2026-08-19 (renderer-wide scale, material-continuity, and performance gate)
 **Feature**: [Native Storm Rendering specification](../spec.md)
 
 ## Content Quality
@@ -35,7 +35,7 @@
    implementation, live-render audit, and runtime findings.
 2. No clarification markers are required; the agreed full redesign, quality-mode support, Ultra
    performance target, compatibility boundaries, and out-of-scope systems are explicit.
-3. **Re-validation 2026-08-19.** FR-021, FR-022, FR-025, and FR-027 name rendering-model concepts
+3. **Re-validation 2026-08-19.** FR-021, FR-022, FR-025, FR-027, and FR-028 through FR-031 name rendering-model concepts
    (coverage envelope, volumetric noise remapping, geometric distance field, descriptor evaluation
    cost) that are more implementation-level than the rest of this specification. This is deliberate
    and directed by the feature owner: these are binding architecture constraints, not free
@@ -48,3 +48,7 @@
 5. Thresholds behind SC-012, SC-013, and SC-014 are derived from the rendering model in
    `validation/morphology-thresholds.md`, satisfying SC-016. No threshold is set to make a test
    pass.
+6. The renderer-wide correction gate adds a measurable severe-system scale derivation (FR-028,
+   SC-018), an interval-bounded vertical material trace (FR-029, SC-019), and visual-neutral
+   performance evidence (FR-030, SC-020). They deliberately prevent another under-specified
+   geometry adjustment; no clarification marker is required.

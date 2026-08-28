@@ -24,7 +24,13 @@ public enum VolumetricCloudRaymarchDebugView {
     FINE_STEP_ALPHA(17, "fine_step_alpha"),
     FINE_DENSITY_QUADRATURE(18, "fine_density_quadrature"),
     FINE_LIGHTING_QUADRATURE(19, "fine_lighting_quadrature"),
-    FINE_WEIGHTED_SOURCE(20, "fine_weighted_source");
+    FINE_WEIGHTED_SOURCE(20, "fine_weighted_source"),
+    /** On-demand four-pass native-storm material trace; never a production view. */
+    STORM_MATERIAL_TRACE(21, "storm_material_trace"),
+    /** On-demand workload channels: primary steps, descriptor evals/fetches, T122 avoided fetches. */
+    STORM_WORKLOAD_PRIMARY(22, "storm_workload_primary"),
+    /** On-demand workload channels: light evals, empty rejects/exits, T121 conservative skips. */
+    STORM_WORKLOAD_SECONDARY(23, "storm_workload_secondary");
 
     private final int shaderId;
     private final String serializedName;

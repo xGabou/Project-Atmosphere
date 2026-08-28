@@ -319,6 +319,9 @@ tasks.register('stormDensityThresholdSandbox', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormDensityThresholdSandbox'
     workingDir = project.rootDir
+    if (project.hasProperty('stormNoiseArgs')) {
+        args project.property('stormNoiseArgs').toString().split(' ')
+    }
 }
 
 tasks.register('stormMorphologySandbox', JavaExec) {
@@ -331,6 +334,45 @@ tasks.register('stormMorphologySandbox', JavaExec) {
     // -Pphase4s.failFirst=true reproduces the recorded fail-first evidence
     // against the audited pre-correction composition.
     systemProperty 'phase4s.failFirst', (project.findProperty('phase4s.failFirst') ?: 'false')
+}
+
+tasks.register('stormMacroCoherenceSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs the live-calibrated deterministic macro-coherence validation (T124).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormMorphologySandbox'
+    workingDir = project.rootDir
+    systemProperty 't124.only', 'true'
+}
+
+tasks.register('stormRoleEnvelopeSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs the live-calibrated deterministic role-envelope transition validation (T125).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormMorphologySandbox'
+    workingDir = project.rootDir
+    systemProperty 't125.only', 'true'
+}
+
+tasks.register('stormStructuralContinuitySandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs the live 3c039aa7 structural-continuity validation (T126).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormMorphologySandbox'
+    workingDir = project.rootDir
+    systemProperty 't126.only', 'true'
+}
+
+tasks.register('stormMaterialContinuityDiagnosticsSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'Runs the deterministic <=16-block vertical storm material trace (T128).'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormMaterialContinuityDiagnosticsSandbox'
+    workingDir = project.rootDir
 }
 
 tasks.register('architectureBoundaryCheck') {
@@ -371,6 +413,7 @@ tasks.named('check').configure {
     dependsOn 'volumetricStabilityDiagnosticsSandbox'
     dependsOn 'stormDensityThresholdSandbox'
     dependsOn 'stormMorphologySandbox'
+    dependsOn 'stormMaterialContinuityDiagnosticsSandbox'
     dependsOn 'stormVolumetricGeometrySandbox'
 }
 

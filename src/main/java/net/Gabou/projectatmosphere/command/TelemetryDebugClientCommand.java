@@ -24,6 +24,7 @@ import net.Gabou.projectatmosphere.clouds.client.debug.CloudDebugStateInitialize
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CloudWeatherMapRenderer;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.PuffLobeSpatialIndex;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormGeometryBuildCoordinator;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormTopologyMode;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudFrameDiagnostics;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudDebugConfig;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudRenderHook;
@@ -143,6 +144,47 @@ public class TelemetryDebugClientCommand {
                                                 ctx.getSource(),
                                                 IntegerArgumentType.getInteger(ctx, "frames")
                                         ))))
+                        .then(Commands.literal("stormMaterialTrace")
+                                .executes(ctx -> sendStormMaterialTrace(ctx.getSource()))
+                                .then(Commands.argument("yStart", FloatArgumentType.floatArg())
+                                        .then(Commands.argument("yEnd", FloatArgumentType.floatArg())
+                                                .executes(ctx -> requestStormMaterialTrace(
+                                                        ctx.getSource(),
+                                                        FloatArgumentType.getFloat(ctx, "yStart"),
+                                                        FloatArgumentType.getFloat(ctx, "yEnd")
+                                                )))))
+                        .then(Commands.literal("stormPerformanceBaseline")
+                                .executes(ctx -> sendStormPerformanceBaseline(ctx.getSource()))
+                                .then(Commands.literal("begin")
+                                        .executes(ctx -> beginStormPerformanceBaseline(ctx.getSource())))
+                                .then(Commands.literal("capture")
+                                        .then(Commands.literal("side")
+                                                .executes(ctx -> captureStormPerformanceBaseline(
+                                                        ctx.getSource(), "side")))
+                                        .then(Commands.literal("far")
+                                                .executes(ctx -> captureStormPerformanceBaseline(
+                                                        ctx.getSource(), "far")))
+                                        .then(Commands.literal("below")
+                                                .executes(ctx -> captureStormPerformanceBaseline(
+                                                        ctx.getSource(), "below")))
+                                        .then(Commands.literal("above")
+                                                .executes(ctx -> captureStormPerformanceBaseline(
+                                                        ctx.getSource(), "above")))))
+                        .then(Commands.literal("stormWorkload")
+                                .executes(ctx -> sendStormWorkload(ctx.getSource()))
+                                .then(Commands.literal("capture")
+                                        .then(Commands.literal("side")
+                                                .executes(ctx -> requestStormWorkload(ctx.getSource(), "side")))
+                                        .then(Commands.literal("far")
+                                                .executes(ctx -> requestStormWorkload(ctx.getSource(), "far")))
+                                        .then(Commands.literal("below")
+                                                .executes(ctx -> requestStormWorkload(ctx.getSource(), "below")))
+                                        .then(Commands.literal("above")
+                                                .executes(ctx -> requestStormWorkload(ctx.getSource(), "above")))))
+                        .then(Commands.literal("stormPerformanceSuite")
+                                .executes(ctx -> beginStormPerformanceSuite(ctx.getSource()))
+                                .then(Commands.literal("status")
+                                        .executes(ctx -> sendStormPerformanceSuite(ctx.getSource()))))
                         .then(Commands.literal("puffIndex")
                                 .executes(ctx -> verifyVolumetricPuffIndex(ctx.getSource())))
                         .then(Commands.literal("renderState")
@@ -200,6 +242,14 @@ public class TelemetryDebugClientCommand {
                                                  ctx.getSource(), VolumetricPuffShapeMode.DIRECT_ONLY))))
                         .then(buildVolumetricPuffDensityCommand())
                         .then(buildVolumetricPuffTierFilterCommand())
+                        .then(Commands.literal("stormTopology")
+                                .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
+                                .then(Commands.literal("compact")
+                                        .executes(ctx -> setStormTopologyMode(
+                                                ctx.getSource(), StormTopologyMode.COMPACT)))
+                                .then(Commands.literal("legacy_scan")
+                                        .executes(ctx -> setStormTopologyMode(
+                                                ctx.getSource(), StormTopologyMode.LEGACY_SCAN))))
                          .then(Commands.literal("history")
                                  .executes(ctx -> sendVolumetricDebugStatus(ctx.getSource()))
                                  .then(Commands.literal("on")
@@ -291,6 +341,96 @@ public class TelemetryDebugClientCommand {
                 false
         );
         return result.startsWith("requested") ? 1 : 0;
+    }
+
+    private static int requestStormMaterialTrace(
+            CommandSourceStack source,
+            float yStart,
+            float yEnd
+    ) {
+        Vec3 position = source.getPosition();
+        String result = VolumetricCloudFrameDiagnostics.requestStormMaterialTrace(
+                position.x, position.z, yStart, yEnd
+        );
+        source.sendSuccess(
+                () -> Component.literal("Storm material trace " + result
+                        + ". The trace is frozen to the published descriptor group's resolved centre; "
+                        + "the player may move after acquisition starts. Wait four rendered frames, then "
+                        + "retrieve it with /pa system volumetric diagnostics stormMaterialTrace."),
+                false
+        );
+        return result.startsWith("acquiring") ? 1 : 0;
+    }
+
+    private static int sendStormMaterialTrace(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal(VolumetricCloudFrameDiagnostics.stormMaterialTraceLatest()),
+                false
+        );
+        return 1;
+    }
+
+    private static int beginStormPerformanceBaseline(CommandSourceStack source) {
+        Vec3 position = source.getPosition();
+        String result = VolumetricCloudFrameDiagnostics.beginStormPerformanceBaseline(
+                position.x, position.y, position.z
+        );
+        source.sendSuccess(() -> Component.literal(result), false);
+        return result.startsWith("T130 frozen baseline fixture") ? 1 : 0;
+    }
+
+    private static int captureStormPerformanceBaseline(CommandSourceStack source, String viewpoint) {
+        Vec3 position = source.getPosition();
+        var rotation = source.getRotation();
+        String result = VolumetricCloudFrameDiagnostics.captureStormPerformanceBaseline(
+                viewpoint, position.x, position.y, position.z, rotation.y, rotation.x
+        );
+        source.sendSuccess(
+                () -> Component.literal("T130 " + result
+                        + ". Keep this fixed pose and facing while the eight timestamp samples and "
+                        + "fence-gated visual reference are acquired; then query stormPerformanceBaseline."),
+                false
+        );
+        return result.startsWith("acquiring") ? 1 : 0;
+    }
+
+    private static int sendStormPerformanceBaseline(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal(VolumetricCloudFrameDiagnostics.stormPerformanceBaselineLatest()),
+                false
+        );
+        return 1;
+    }
+
+    private static int sendStormWorkload(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal(VolumetricCloudFrameDiagnostics.stormWorkloadLatest()),
+                false
+        );
+        return 1;
+    }
+
+    private static int requestStormWorkload(CommandSourceStack source, String view) {
+        String result = VolumetricCloudFrameDiagnostics.requestStormWorkloadCapture(view);
+        source.sendSuccess(() -> Component.literal("T123 " + result
+                + "; wait two rendered frames, then query stormWorkload."), false);
+        return result.startsWith("acquiring") ? 1 : 0;
+    }
+
+    private static int beginStormPerformanceSuite(CommandSourceStack source) {
+        Vec3 position = source.getPosition();
+        String result = VolumetricCloudFrameDiagnostics.beginStormPerformanceSuite(
+                position.x, position.y, position.z
+        );
+        source.sendSuccess(() -> Component.literal(result), false);
+        return result.startsWith("acquiring") ? 1 : 0;
+    }
+
+    private static int sendStormPerformanceSuite(CommandSourceStack source) {
+        source.sendSuccess(
+                () -> Component.literal(VolumetricCloudFrameDiagnostics.stormPerformanceSuiteLatest()), false
+        );
+        return 1;
     }
 
     private static int verifyVolumetricPuffIndex(CommandSourceStack source) {
@@ -386,6 +526,17 @@ public class TelemetryDebugClientCommand {
         source.sendSuccess(
                 () -> Component.literal("Volumetric cloud debug history " + (enabled ? "on" : "off")),
                 false);
+        return 1;
+    }
+
+    private static int setStormTopologyMode(CommandSourceStack source, StormTopologyMode mode) {
+        VolumetricCloudDebugConfig.setStormTopologyMode(mode);
+        VolumetricCloudRenderer.invalidateHistory();
+        source.sendSuccess(
+                () -> Component.literal("T119 storm topology A/B mode " + mode.serializedName()
+                        + " (diagnostic only; compact remains the default)"),
+                false
+        );
         return 1;
     }
 

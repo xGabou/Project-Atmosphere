@@ -69,6 +69,7 @@ public final class CloudMorphologyTopologySandbox {
         validateStructuredPuffProfileOrdering();
         validatePuffRetargetPreservesRadiusRatios();
         validateStormAnvilTopology();
+        validateStormPhysicalScale();
 
         CloudMorphologyGenerators.PuffTopologyParameters puff =
                 CloudMorphologyGenerators.puffTopologyParameters();
@@ -259,6 +260,415 @@ public final class CloudMorphologyTopologySandbox {
                     first.groupRadius() * 0.14D
             );
         }
+    }
+
+    /**
+     * T134 guards the derived physical scale at the source-plan level.  These
+     * bounds are evaluated from the same roles, envelopes, and positions that
+     * the spawner supplies to descriptors; no renderer multiplier participates.
+     */
+    /** T127 "Height / footprint" target band. */
+    private static final double ASPECT_RATIO_MINIMUM = 0.55D;
+    private static final double ASPECT_RATIO_MAXIMUM = 0.70D;
+    /** T127 "ANVIL span" target band, in blocks. */
+    private static final double ANVIL_SPAN_MINIMUM = 1150.0D;
+    private static final double ANVIL_SPAN_MAXIMUM = 1450.0D;
+
+    /**
+     * Fail-first coverage for the two T133 guards. A guard that never rejects
+     * anything is not a guard, so this proves each band rejects the specific
+     * value that motivated it before the live samples are allowed to pass it.
+     */
+    private static void validateT133GuardsRejectKnownViolations() {
+        // The hole recorded in validation/t134-severe-system-scale.md: the worst
+        // combination the pre-T133 footprint and height guards permitted.
+        requireRejected("aspect ratio guard", 880.0D / 1200.0D,
+                ASPECT_RATIO_MINIMUM, ASPECT_RATIO_MAXIMUM);
+        // Below the band, the other side of the same guard.
+        requireRejected("aspect ratio guard", 720.0D / 1500.0D,
+                ASPECT_RATIO_MINIMUM, ASPECT_RATIO_MAXIMUM);
+        // The widest-single-lobe misreading of the ANVIL row.
+        requireRejected("anvil span guard", 990.0D,
+                ANVIL_SPAN_MINIMUM, ANVIL_SPAN_MAXIMUM);
+        requireRejected("anvil span guard", 1500.0D,
+                ANVIL_SPAN_MINIMUM, ANVIL_SPAN_MAXIMUM);
+        System.out.println(
+                "T133_GUARD_FAIL_FIRST|aspectRatio=rejects(0.7333,0.4800)|anvilSpan=rejects(990.0,1500.0)");
+    }
+
+    /** Asserts a guard band actually rejects a value that must not pass. */
+    private static void requireRejected(
+            String label, double actual, double minimum, double maximum) {
+        try {
+            requireRange(label, actual, minimum, maximum);
+        } catch (IllegalStateException expected) {
+            return;
+        }
+        throw new IllegalStateException(
+                label + " failed to reject out-of-contract value " + actual
+                        + " against band " + minimum + ".." + maximum);
+    }
+
+    /**
+     * T098 phase 4 evidence: how often the 48-block smooth-union blend cap
+     * saturates at T134 severe scale, and by how much.
+     *
+     * <p>The shader's ordered union blends consecutive descriptors with
+     * {@code clamp(min(previousRadius, lobeRadius) * factor, 4, 48)}, where the
+     * factor is 0.60 for CORE/TOWER and ANVIL/ANVIL pairs and 0.25 otherwise,
+     * and the per-lobe radius is {@code min(majorRadius, minorRadius)}. This
+     * reports the requested and effective blend for every consecutive pair so
+     * the visual evidence can be read against real numbers rather than a guess.
+     * It is a report, not an acceptance gate - whether saturation is a visual
+     * defect is T098's judgement, not this sandbox's.
+     */
+    private static void reportStormBlendSaturation() {
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault("cumulonimbus_calvus");
+        int pairs = 0;
+        int saturated = 0;
+        double minRequested = Double.POSITIVE_INFINITY;
+        double maxRequested = Double.NEGATIVE_INFINITY;
+        double sumRequested = 0.0D;
+        double minRatio = Double.POSITIVE_INFINITY;
+        for (int sample = 0; sample < 128; sample++) {
+            RandomSource random = RandomSource.create(0x543039385354524DL + sample * 0x9E3779B9L);
+            CloudMorphologyGenerators.SpawnPlan plan =
+                    CloudMorphologyGenerators.createSpawnPlan(definition, random);
+            Vec3 origin = new Vec3(0.0D, 256.0D, 0.0D);
+            double previousRadius = 0.0D;
+            CloudMorphologyMembership.Stage previousStage = null;
+            for (int index = 0; index < plan.clusterCount(); index++) {
+                Vec3 center = index == 0
+                        ? origin
+                        : CloudMorphologyGenerators.createClusterCenter(origin, plan, index, random);
+                CloudMorphologyGenerators.StormLobeSpec spec =
+                        CloudMorphologyGenerators.stormLobeSpec(plan, index, (float) center.y);
+                // The shader's per-lobe radius is min(major, minor); the spec's
+                // radiusMultiplier scales the plan radius for both axes here, so
+                // the isotropic source radius is the same quantity.
+                double lobeRadius = plan.radius() * spec.radiusMultiplier();
+                if (previousStage != null) {
+                    boolean coreTower =
+                            (isCoreOrTower(previousStage) && isCoreOrTower(spec.stage()))
+                                    || (previousStage == CloudMorphologyMembership.Stage.ANVIL
+                                            && spec.stage() == CloudMorphologyMembership.Stage.ANVIL);
+                    double factor = coreTower ? 0.60D : 0.25D;
+                    double smaller = Math.min(previousRadius, lobeRadius);
+                    double requested = smaller * factor;
+                    double effective = Math.max(4.0D, Math.min(requested, 48.0D));
+                    pairs++;
+                    if (requested > 48.0D) {
+                        saturated++;
+                    }
+                    minRequested = Math.min(minRequested, requested);
+                    maxRequested = Math.max(maxRequested, requested);
+                    sumRequested += requested;
+                    minRatio = Math.min(minRatio, effective / requested);
+                }
+                previousRadius = lobeRadius;
+                previousStage = spec.stage();
+            }
+        }
+        System.out.printf(
+                Locale.ROOT,
+                "T098_BLEND_SATURATION|pairs=%d|saturated=%d(%.1f%%)|requestedBlocks=%.2f..%.2f"
+                        + "|meanRequested=%.2f|cap=48.00|worstEffectiveOverRequested=%.4f%n",
+                pairs, saturated, 100.0D * saturated / Math.max(1, pairs),
+                minRequested, maxRequested, sumRequested / Math.max(1, pairs), minRatio);
+    }
+
+    private static boolean isCoreOrTower(CloudMorphologyMembership.Stage stage) {
+        return stage == CloudMorphologyMembership.Stage.CORE
+                || stage == CloudMorphologyMembership.Stage.TOWER;
+    }
+
+    private static void validateStormPhysicalScale() {
+        validateT133GuardsRejectKnownViolations();
+        reportStormBlendSaturation();
+        CloudMorphologyGenerators.StormPhysicalScale scale =
+                CloudMorphologyGenerators.stormPhysicalScale();
+        requireRange("storm physical member count", scale.memberCount(), 10, 10);
+        requireRange("storm physical plan radius", scale.planRadius(), 450.0D, 450.0D);
+        requireRange("storm physical group radius", scale.groupRadius(), 400.0D, 400.0D);
+        requireRange("storm physical base drop", scale.baseDrop(), 120.0D, 120.0D);
+        requireRange("storm physical top rise", scale.topRise(), 780.0D, 780.0D);
+        double matureRadiusLowerBound = CloudMorphologyGenerators.stormMatureRadiusLowerBound();
+        double matureRadiusUpperBound = CloudMorphologyGenerators.stormMatureRadiusUpperBound();
+        double minimumResolvedCentreLowerFootprint = Double.POSITIVE_INFINITY;
+        double maximumResolvedCentreUpperFootprint = Double.NEGATIVE_INFINITY;
+        double minimumAnvilSpan = Double.POSITIVE_INFINITY;
+        double maximumAnvilSpan = Double.NEGATIVE_INFINITY;
+        double minimumAnvilUnionSpan = Double.POSITIVE_INFINITY;
+        double maximumAnvilUnionSpan = Double.NEGATIVE_INFINITY;
+        double minimumAnvilOverBase = Double.POSITIVE_INFINITY;
+        double maximumAnvilOverBase = Double.NEGATIVE_INFINITY;
+        double minimumAnvilUnionOverBase = Double.POSITIVE_INFINITY;
+        double maximumAnvilUnionOverBase = Double.NEGATIVE_INFINITY;
+        int anvilMemberCountSeen = 0;
+        double minimumAspectPlan = Double.POSITIVE_INFINITY;
+        double maximumAspectPlan = Double.NEGATIVE_INFINITY;
+        double minimumAspectLower = Double.POSITIVE_INFINITY;
+        double maximumAspectLower = Double.NEGATIVE_INFINITY;
+        double minimumAspectUpper = Double.POSITIVE_INFINITY;
+        double maximumAspectUpper = Double.NEGATIVE_INFINITY;
+
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault("cumulonimbus_calvus");
+        for (int sample = 0; sample < 128; sample++) {
+            RandomSource random = RandomSource.create(0x543133345343414CL + sample * 0x9E3779B9L);
+            CloudMorphologyGenerators.SpawnPlan plan =
+                    CloudMorphologyGenerators.createSpawnPlan(definition, random);
+            requireRange("storm physical spawned count", plan.clusterCount(), 10, 10);
+            requireRange("storm physical spawned radius", plan.radius(), 450.0D, 450.0D);
+            requireRange("storm physical spawned group radius", plan.groupRadius(), 400.0D, 400.0D);
+            requireRange("storm physical spawned base drop", plan.baseDrop(), 120.0D, 120.0D);
+            requireRange("storm physical spawned top rise", plan.topRise(), 780.0D, 780.0D);
+
+            Vec3 origin = new Vec3(0.0D, 256.0D, 0.0D);
+            double minX = Double.POSITIVE_INFINITY;
+            double maxX = Double.NEGATIVE_INFINITY;
+            double minZ = Double.POSITIVE_INFINITY;
+            double maxZ = Double.NEGATIVE_INFINITY;
+            double matureMinX = Double.POSITIVE_INFINITY;
+            double matureMaxX = Double.NEGATIVE_INFINITY;
+            double matureMinZ = Double.POSITIVE_INFINITY;
+            double matureMaxZ = Double.NEGATIVE_INFINITY;
+            double matureMaxMinX = Double.POSITIVE_INFINITY;
+            double matureMaxMaxX = Double.NEGATIVE_INFINITY;
+            double matureMaxMinZ = Double.POSITIVE_INFINITY;
+            double matureMaxMaxZ = Double.NEGATIVE_INFINITY;
+            // The runtime performance fixture resolves its group centre from
+            // the arithmetic mean of the emitted descriptor centres, then
+            // measures the outer radial support from that point.  The
+            // source-plan bounding box below is necessary but not sufficient:
+            // a wind-biased anvil can satisfy it while the actual diagnostic
+            // footprint remains just below the T134 lower limit.
+            double[] memberCenterX = new double[plan.clusterCount()];
+            double[] memberCenterZ = new double[plan.clusterCount()];
+            double[] memberSupport = new double[plan.clusterCount()];
+            double minY = Double.POSITIVE_INFINITY;
+            double maxY = Double.NEGATIVE_INFINITY;
+            double baseDiameter = 0.0D;
+            double coreDiameter = 0.0D;
+            double lowerTowerDiameter = 0.0D;
+            double upperTowerDiameter = 0.0D;
+            double anvilThickness = 0.0D;
+            double anvilSpan = 0.0D;
+            double anvilMinX = Double.POSITIVE_INFINITY;
+            double anvilMaxX = Double.NEGATIVE_INFINITY;
+            double anvilMinZ = Double.POSITIVE_INFINITY;
+            double anvilMaxZ = Double.NEGATIVE_INFINITY;
+            int anvilMembers = 0;
+
+            for (int index = 0; index < plan.clusterCount(); index++) {
+                Vec3 center = index == 0
+                        ? origin
+                        : CloudMorphologyGenerators.createClusterCenter(origin, plan, index, random);
+                CloudMorphologyGenerators.StormLobeSpec spec =
+                        CloudMorphologyGenerators.stormLobeSpec(plan, index, (float) center.y);
+                double support = plan.radius() * spec.radiusMultiplier();
+                memberCenterX[index] = center.x;
+                memberCenterZ[index] = center.z;
+                memberSupport[index] = support;
+                minX = Math.min(minX, center.x - support);
+                maxX = Math.max(maxX, center.x + support);
+                minZ = Math.min(minZ, center.z - support);
+                maxZ = Math.max(maxZ, center.z + support);
+                double lowerMatureSupport = support * matureRadiusLowerBound;
+                double upperMatureSupport = support * matureRadiusUpperBound;
+                matureMinX = Math.min(matureMinX, center.x - lowerMatureSupport);
+                matureMaxX = Math.max(matureMaxX, center.x + lowerMatureSupport);
+                matureMinZ = Math.min(matureMinZ, center.z - lowerMatureSupport);
+                matureMaxZ = Math.max(matureMaxZ, center.z + lowerMatureSupport);
+                matureMaxMinX = Math.min(matureMaxMinX, center.x - upperMatureSupport);
+                matureMaxMaxX = Math.max(matureMaxMaxX, center.x + upperMatureSupport);
+                matureMaxMinZ = Math.min(matureMaxMinZ, center.z - upperMatureSupport);
+                matureMaxMaxZ = Math.max(matureMaxMaxZ, center.z + upperMatureSupport);
+                minY = Math.min(minY, spec.baseY());
+                maxY = Math.max(maxY, spec.topY());
+
+                switch (spec.stage()) {
+                    case BASE -> baseDiameter = Math.max(baseDiameter, support * 2.0D);
+                    case CORE -> coreDiameter = Math.max(coreDiameter, support * 2.0D);
+                    case TOWER -> {
+                        if (lowerTowerDiameter == 0.0D) {
+                            lowerTowerDiameter = support * 2.0D;
+                        } else {
+                            upperTowerDiameter = support * 2.0D;
+                        }
+                    }
+                    case ANVIL -> {
+                        anvilThickness = Math.max(anvilThickness, spec.topY() - spec.baseY());
+                        // Horizontal span of the canopy, measured the same way
+                        // every other role diameter here is: outer radial
+                        // support of the widest ANVIL member.
+                        anvilSpan = Math.max(anvilSpan, support * 2.0D);
+                        // The canopy is a union of several ANVIL lobes at
+                        // different centres, so its structural span is the
+                        // union extent, not the widest single lobe.
+                        anvilMinX = Math.min(anvilMinX, center.x - support);
+                        anvilMaxX = Math.max(anvilMaxX, center.x + support);
+                        anvilMinZ = Math.min(anvilMinZ, center.z - support);
+                        anvilMaxZ = Math.max(anvilMaxZ, center.z + support);
+                        anvilMembers++;
+                    }
+                    default -> throw new IllegalStateException("unexpected storm physical role " + spec.stage());
+                }
+            }
+
+            requireRange("storm physical footprint", Math.max(maxX - minX, maxZ - minZ), 1200.0D, 1500.0D);
+            requireRange(
+                    "storm physical mature footprint lower bound",
+                    Math.max(matureMaxX - matureMinX, matureMaxZ - matureMinZ),
+                    1200.0D,
+                    1500.0D
+            );
+            requireRange(
+                    "storm physical mature footprint upper bound",
+                    Math.max(matureMaxMaxX - matureMaxMinX, matureMaxMaxZ - matureMaxMinZ),
+                    1200.0D,
+                    1500.0D
+            );
+            double resolvedCenterX = 0.0D;
+            double resolvedCenterZ = 0.0D;
+            for (int index = 0; index < plan.clusterCount(); index++) {
+                resolvedCenterX += memberCenterX[index];
+                resolvedCenterZ += memberCenterZ[index];
+            }
+            resolvedCenterX /= plan.clusterCount();
+            resolvedCenterZ /= plan.clusterCount();
+            double resolvedLowerRadius = 0.0D;
+            double resolvedUpperRadius = 0.0D;
+            for (int index = 0; index < plan.clusterCount(); index++) {
+                double centerDistance = Math.hypot(
+                        memberCenterX[index] - resolvedCenterX,
+                        memberCenterZ[index] - resolvedCenterZ
+                );
+                resolvedLowerRadius = Math.max(
+                        resolvedLowerRadius,
+                        centerDistance + memberSupport[index] * matureRadiusLowerBound
+                );
+                resolvedUpperRadius = Math.max(
+                        resolvedUpperRadius,
+                        centerDistance + memberSupport[index] * matureRadiusUpperBound
+                );
+            }
+            requireRange(
+                    // The prior 1,252.902-block deterministic lower envelope
+                    // produced the 1,198.009-block controlled live capture.
+                    // 1,255 is the smallest whole-block source guard that
+                    // clears the 1,200-block live contract after that measured
+                    // source-to-runtime loss; it is not a new visual target.
+                    "storm physical resolved-centre source guard",
+                    resolvedLowerRadius * 2.0D,
+                    1255.0D,
+                    1500.0D
+            );
+            requireRange(
+                    "storm physical resolved-centre mature footprint upper bound",
+                    resolvedUpperRadius * 2.0D,
+                    1200.0D,
+                    1500.0D
+            );
+            minimumResolvedCentreLowerFootprint = Math.min(
+                    minimumResolvedCentreLowerFootprint,
+                    resolvedLowerRadius * 2.0D
+            );
+            maximumResolvedCentreUpperFootprint = Math.max(
+                    maximumResolvedCentreUpperFootprint,
+                    resolvedUpperRadius * 2.0D
+            );
+            requireRange("storm physical height", maxY - minY, 720.0D, 880.0D);
+            requireRange("storm physical base diameter", baseDiameter, 900.0D, 1100.0D);
+            requireRange("storm physical core diameter", coreDiameter, 420.0D, 520.0D);
+            requireRange("storm physical lower tower diameter", lowerTowerDiameter, 280.0D, 360.0D);
+            requireRange("storm physical upper tower diameter", upperTowerDiameter, 180.0D, 250.0D);
+            requireRange("storm physical anvil thickness", anvilThickness, 150.0D, 220.0D);
+
+            double height = maxY - minY;
+            double planFootprint = Math.max(maxX - minX, maxZ - minZ);
+            double anvilUnionSpan = Math.max(anvilMaxX - anvilMinX, anvilMaxZ - anvilMinZ);
+            anvilMemberCountSeen = anvilMembers;
+
+            // T133 guard A - ANVIL horizontal span.  T127 records the canopy
+            // target as 1,150-1,450 blocks and, in the same row, as 1.20-1.35
+            // of BASE.  The canopy is a union of ANVIL_MEMBERS lobes at
+            // different centres, so the structural span is the union extent:
+            // the widest single lobe (990) satisfies neither the absolute
+            // target nor the BASE relationship (0.948), while the union
+            // satisfies both.  Both halves of the row are asserted, so the
+            // interpretation cannot silently drift.
+            requireRange("storm physical anvil span", anvilUnionSpan,
+                    ANVIL_SPAN_MINIMUM, ANVIL_SPAN_MAXIMUM);
+            requireRange("storm physical anvil span over base",
+                    anvilUnionSpan / baseDiameter, 1.20D, 1.35D);
+
+            // T133 guard B - system aspect ratio.  T127's "Height / footprint"
+            // row records 0.55-0.70.  Asserting footprint and height
+            // independently left the worst permitted combination (height 880,
+            // footprint 1200, ratio 0.733) outside that band, which is the hole
+            // recorded in validation/t134-severe-system-scale.md.  All three
+            // footprint readings are constrained so no reading can drift out.
+            requireRange("storm physical aspect ratio (plan footprint)",
+                    (maxY - minY) / Math.max(maxX - minX, maxZ - minZ),
+                    ASPECT_RATIO_MINIMUM, ASPECT_RATIO_MAXIMUM);
+            requireRange("storm physical aspect ratio (resolved-centre lower)",
+                    (maxY - minY) / (resolvedLowerRadius * 2.0D),
+                    ASPECT_RATIO_MINIMUM, ASPECT_RATIO_MAXIMUM);
+            requireRange("storm physical aspect ratio (resolved-centre upper)",
+                    (maxY - minY) / (resolvedUpperRadius * 2.0D),
+                    ASPECT_RATIO_MINIMUM, ASPECT_RATIO_MAXIMUM);
+            minimumAnvilSpan = Math.min(minimumAnvilSpan, anvilSpan);
+            maximumAnvilSpan = Math.max(maximumAnvilSpan, anvilSpan);
+            minimumAnvilUnionSpan = Math.min(minimumAnvilUnionSpan, anvilUnionSpan);
+            maximumAnvilUnionSpan = Math.max(maximumAnvilUnionSpan, anvilUnionSpan);
+            minimumAnvilOverBase = Math.min(minimumAnvilOverBase, anvilSpan / baseDiameter);
+            maximumAnvilOverBase = Math.max(maximumAnvilOverBase, anvilSpan / baseDiameter);
+            minimumAnvilUnionOverBase =
+                    Math.min(minimumAnvilUnionOverBase, anvilUnionSpan / baseDiameter);
+            maximumAnvilUnionOverBase =
+                    Math.max(maximumAnvilUnionOverBase, anvilUnionSpan / baseDiameter);
+            minimumAspectPlan = Math.min(minimumAspectPlan, height / planFootprint);
+            maximumAspectPlan = Math.max(maximumAspectPlan, height / planFootprint);
+            minimumAspectLower = Math.min(minimumAspectLower, height / (resolvedLowerRadius * 2.0D));
+            maximumAspectLower = Math.max(maximumAspectLower, height / (resolvedLowerRadius * 2.0D));
+            minimumAspectUpper = Math.min(minimumAspectUpper, height / (resolvedUpperRadius * 2.0D));
+            maximumAspectUpper = Math.max(maximumAspectUpper, height / (resolvedUpperRadius * 2.0D));
+        }
+        System.out.printf(
+                Locale.ROOT,
+                "T133_ASPECT_CONTRACT|band=%.2f..%.2f|widestLobeSpan=%.3f..%.3f"
+                        + "|aspectPlan=%.4f..%.4f"
+                        + "|aspectResolvedLower=%.4f..%.4f|aspectResolvedUpper=%.4f..%.4f%n",
+                ASPECT_RATIO_MINIMUM, ASPECT_RATIO_MAXIMUM,
+                minimumAnvilSpan, maximumAnvilSpan,
+                minimumAspectPlan, maximumAspectPlan,
+                minimumAspectLower, maximumAspectLower,
+                minimumAspectUpper, maximumAspectUpper);
+        System.out.printf(
+                Locale.ROOT,
+                "T133_ANVIL_CONTRACT|band=%.0f..%.0f|widestLobe=%.3f..%.3f|unionSpan=%.3f..%.3f"
+                        + "|anvilMembers=%d|widestOverBase=%.4f..%.4f|unionOverBase=%.4f..%.4f%n",
+                ANVIL_SPAN_MINIMUM, ANVIL_SPAN_MAXIMUM,
+                minimumAnvilSpan, maximumAnvilSpan,
+                minimumAnvilUnionSpan, maximumAnvilUnionSpan,
+                anvilMemberCountSeen,
+                minimumAnvilOverBase, maximumAnvilOverBase,
+                minimumAnvilUnionOverBase, maximumAnvilUnionOverBase);
+        System.out.printf(
+                Locale.ROOT,
+                "T134_SCALE_CONTRACT|members=%d|planRadius=%.1f|groupRadius=%.1f|baseDrop=%.1f|topRise=%.1f|footprint=1200..1500|height=720..880%n",
+                scale.memberCount(),
+                scale.planRadius(),
+                scale.groupRadius(),
+                scale.baseDrop(),
+                scale.topRise()
+        );
+        System.out.printf(
+                Locale.ROOT,
+                "T134_RESOLVED_CENTRE_ENVELOPE|matureLowerMin=%.3f|matureUpperMax=%.3f%n",
+                minimumResolvedCentreLowerFootprint,
+                maximumResolvedCentreUpperFootprint
+        );
     }
 
     private static void requireVecBits(String label, Vec3 actual, Vec3 expected) {

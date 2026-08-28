@@ -57,6 +57,11 @@ public final class VolumetricCloudRenderer {
         return lastGpuMilliseconds;
     }
 
+    /** Identifies a fresh completed GPU timestamp result without using a frame-time proxy. */
+    static long lastGpuTimingSample() {
+        return GPU_TIMER.getLastResultSerial();
+    }
+
     public static float governorStepScale() {
         return GOVERNOR.stepScale();
     }
@@ -188,7 +193,10 @@ public final class VolumetricCloudRenderer {
         } else if (cameraCloudDensity > 0.12F) {
             denseCameraResolution = true;
         }
-        float resolutionScale = denseCameraResolution
+        float diagnosticResolutionScale = VolumetricCloudDebugConfig.fixedResolutionScale();
+        float resolutionScale = Float.isFinite(diagnosticResolutionScale)
+                ? diagnosticResolutionScale
+                : denseCameraResolution
                 ? Math.min(profile.resolutionScale(), 0.50F)
                 : profile.resolutionScale();
         lastResolutionScale = resolutionScale;
@@ -333,7 +341,16 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("WindVec").set(windVec.x, windVec.y, windVec.z);
         shader.safeGetUniform("MaterialOffset").set(materialOffsetX, materialOffsetZ);
         shader.safeGetUniform("MaterialFrameDelta").set(materialFrameDeltaX, materialFrameDeltaZ);
-        shader.safeGetUniform("WorldTime").set(worldTimeTicks);
+        // T132 Option B: a deterministic reference capture renders every frame
+        // of its A/B comparison at one fixed clock, because WorldTime feeds the
+        // precipitation shaft domain and would otherwise animate between passes.
+        // The override lives in the diagnostic; the world clock is untouched and
+        // every ordinary frame still uploads the live value.
+        float liveWorldTimeTicks = worldTimeTicks;
+        boolean worldTimePinned = StormReferenceImageCapture.worldTimePinned();
+        float effectiveWorldTimeTicks =
+                StormReferenceImageCapture.effectiveWorldTime(liveWorldTimeTicks);
+        shader.safeGetUniform("WorldTime").set(effectiveWorldTimeTicks);
         long uploadedFrameIndex = frameIndex;
         float uploadedFrameIndexValue = (float) (uploadedFrameIndex % 1024L);
         shader.safeGetUniform("FrameIndex").set(uploadedFrameIndexValue);
@@ -362,8 +379,27 @@ public final class VolumetricCloudRenderer {
                 ? safeTuning.historyBlend() * historyConfidence
                 : 0.0F;
         shader.safeGetUniform("HistoryBlend").set(uploadedHistoryBlend);
-        VolumetricCloudRaymarchDebugView debugView = VolumetricCloudDebugConfig.raymarchDebugView();
+        VolumetricCloudRaymarchDebugView debugView = StormMaterialRuntimeTrace.active()
+                ? VolumetricCloudRaymarchDebugView.STORM_MATERIAL_TRACE
+                : StormWorkloadRuntimeCapture.active()
+                    ? StormWorkloadRuntimeCapture.view()
+                    : VolumetricCloudDebugConfig.raymarchDebugView();
         shader.safeGetUniform("DebugView").set(debugView.shaderId());
+        shader.safeGetUniform("StormTopologyMode").set(
+                VolumetricCloudDebugConfig.stormTopologyMode().shaderId()
+        );
+        // T133 / SC-020: zero outside a diagnostic capture, so ordinary frames
+        // take the production optimized paths.
+        shader.safeGetUniform("PaDiagnosticOptimizationMode").set(
+                VolumetricCloudDebugConfig.optimizationDiagnosticMode().shaderFlags()
+        );
+        shader.safeGetUniform("StormTraceOrigin").set(
+                StormMaterialRuntimeTrace.x(), StormMaterialRuntimeTrace.z()
+        );
+        shader.safeGetUniform("StormTraceYStart").set(StormMaterialRuntimeTrace.yStart());
+        shader.safeGetUniform("StormTraceYInterval").set(StormMaterialRuntimeTrace.interval());
+        shader.safeGetUniform("StormTraceSamples").set(StormMaterialRuntimeTrace.samples());
+        shader.safeGetUniform("StormTraceStage").set(StormMaterialRuntimeTrace.stage());
         shader.safeGetUniform("DensityMul").set(safeTuning.densityMul());
         shader.safeGetUniform("CoverageMul").set(safeTuning.coverageMul());
         shader.safeGetUniform("ExtinctionScale").set(safeTuning.extinctionScale());
@@ -392,7 +428,9 @@ public final class VolumetricCloudRenderer {
         lastDrawInputs = LastDrawInputs.capture(
                 uploadedFrameIndex,
                 uploadedFrameIndexValue,
-                worldTimeTicks,
+                effectiveWorldTimeTicks,
+                liveWorldTimeTicks,
+                worldTimePinned,
                 worldTimeAffectsDensity,
                 projection,
                 viewRotation,
@@ -563,7 +601,11 @@ public final class VolumetricCloudRenderer {
             UniformComponentSignatures observationUniformComponents,
             long frameIndex,
             float frameIndexValue,
+            /** The clock actually uploaded to the shader for this draw. */
             float worldTimeTicks,
+            /** The live world clock, retained for auditability while pinned. */
+            float liveWorldTimeTicks,
+            boolean worldTimePinned,
             boolean worldTimeAffectsDensity,
             float cameraCloudDensity,
             float materialOffsetX,
@@ -588,11 +630,20 @@ public final class VolumetricCloudRenderer {
             boolean historyValid,
             float historyBlend,
             VolumetricCloudRaymarchDebugView debugView,
+            StormTopologyMode stormTopologyMode,
+            /** T133: the optimization mode this frame was actually drawn with. */
+            StormOptimizationDiagnosticMode optimizationDiagnosticMode,
             float densityMul,
             float coverageMul,
             float extinctionScale,
             int funnelCount,
-            long funnelSignature
+            long funnelSignature,
+            // T132 attribution only. These mirror the LightDir uniform already
+            // uploaded to the production shader; they are appended after every
+            // signature field so no existing uniform signature changes.
+            float lightDirX,
+            float lightDirY,
+            float lightDirZ
     ) {
         private static final long FNV_OFFSET = 0xcbf29ce484222325L;
         private static final long FNV_PRIME = 0x100000001b3L;
@@ -601,7 +652,7 @@ public final class VolumetricCloudRenderer {
                 UniformComponentSignatures.EMPTY,
                 UniformComponentSignatures.EMPTY,
                 -1L,
-                0.0F, 0.0F, false,
+                0.0F, 0.0F, 0.0F, false, false,
                 0.0F,
                 0.0F, 0.0F, 0.0F, 0.0F,
                 0.0F, 0.0F, 0.0F,
@@ -611,14 +662,19 @@ public final class VolumetricCloudRenderer {
                 0, 0, 0, 0, 0.0F,
                 false, 0.0F,
                 VolumetricCloudRaymarchDebugView.FINAL,
+                StormTopologyMode.COMPACT,
+                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
                 0.0F, 0.0F, 0.0F,
-                0, 0L
+                0, 0L,
+                0.0F, 0.0F, 0.0F
         );
 
         private static LastDrawInputs capture(
                 long frameIndex,
                 float frameIndexValue,
                 float worldTimeTicks,
+                float liveWorldTimeTicks,
+                boolean worldTimePinned,
                 boolean worldTimeAffectsDensity,
                 Matrix4f projection,
                 Matrix4f viewRotation,
@@ -650,7 +706,11 @@ public final class VolumetricCloudRenderer {
         ) {
             long funnelSignature = funnelSignature(funnels);
             boolean captureComponents =
-                    VolumetricStabilityDiagnostics.captureUniformComponentsForNextFrame();
+                    VolumetricStabilityDiagnostics.captureUniformComponentsForNextFrame()
+                            // T132: a deterministic reference frame retains the
+                            // same named component hashes so PASS A and PASS B
+                            // can be diffed component-by-component.
+                            || StormReferenceImageCapture.active();
             UniformComponentSignatures comparisonComponents = captureComponents
                     ? UniformComponentSignatures.capture(
                             projection, viewRotation, inverseProjection, inverseViewRotation,
@@ -719,6 +779,8 @@ public final class VolumetricCloudRenderer {
                     frameIndex,
                     frameIndexValue,
                     worldTimeTicks,
+                    liveWorldTimeTicks,
+                    worldTimePinned,
                     worldTimeAffectsDensity,
                     cameraCloudDensity,
                     materialOffsetX,
@@ -743,11 +805,16 @@ public final class VolumetricCloudRenderer {
                     historyValid,
                     historyBlend,
                     debugView,
+                    VolumetricCloudDebugConfig.stormTopologyMode(),
+                    VolumetricCloudDebugConfig.optimizationDiagnosticMode(),
                     tuning.densityMul(),
                     tuning.coverageMul(),
                     tuning.extinctionScale(),
                     funnels.count(),
-                    funnelSignature
+                    funnelSignature,
+                    lighting.lightDirection().x,
+                    lighting.lightDirection().y,
+                    lighting.lightDirection().z
             );
         }
 

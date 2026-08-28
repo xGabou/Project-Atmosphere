@@ -25,11 +25,13 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 final class StormDensityModel {
     /**
      * Base-noise domain scale used for descriptor-owned storms. One texture
-     * tile therefore spans {@code 1 / 0.0052 = 192.3} blocks, so the base
-     * Worley octaves (periods 8/16/32) have 24.0, 12.0 and 6.0 block
-     * wavelengths.
+     * tile therefore spans {@code 1 / 0.0025 = 400} blocks, so the base
+     * Worley octaves (periods 8/16/32) have 50, 25 and 12.5 block
+     * wavelengths. The measured combined carrier feature is about 109.4
+     * blocks, which is large enough to form primary billows inside the live
+     * 110-block tower instead of re-carving it into fingers.
      */
-    static final double STORM_BASE_NOISE_SCALE = 0.0052D;
+    static final double STORM_BASE_NOISE_SCALE = 0.0025D;
 
     /**
      * Detail-noise domain scale. One tile spans {@code 1 / 0.022 = 45.45}
@@ -63,6 +65,24 @@ final class StormDensityModel {
      */
     static final double CORE_FILL = StormMorphologyThresholds.CORE_FILL;
 
+    /** p05 erosion bite used to retain mass for the real live strength range. */
+    private static final double LIVE_P05_EROSION_BITE = STORM_EROSION
+            * (1.0D - StormMorphologyThresholds.DETAIL_FBM_P05);
+
+    /** Headroom above the mathematically exact p05 survival boundary. */
+    private static final double LIVE_STRENGTH_FILL_HEADROOM = 0.021D;
+
+    /**
+     * The structural silhouette is measured at 0.10 density by T124-T126.
+     * A deeply covered, connected envelope must retain at least that visible
+     * mass through the p05 erosion bite even when its normalized base carrier
+     * reaches zero; otherwise one legitimate low carrier trough becomes a
+     * false horizontal material split.
+     */
+    private static final double STRUCTURAL_CONTINUITY_DENSITY = 0.10D;
+    private static final double STRUCTURAL_CONTINUITY_COVERAGE = 0.82D;
+    private static final double STRUCTURAL_CONTINUITY_STRENGTH = 0.84D;
+
     private StormDensityModel() {
     }
 
@@ -70,13 +90,61 @@ final class StormDensityModel {
     // Noise domains (mirror of the GLSL helpers)
     // -----------------------------------------------------------------
 
+    /**
+     * Legacy fixed domain-warp amplitude, in texture tiles. Shared by the
+     * non-storm cloud families, whose behaviour this feature does not change.
+     */
+    static final double LEGACY_WARP_AMPLITUDE = 0.31D;
+
+    /**
+     * Magnitude of the domain warp's wave-number vectors, in radians per
+     * block. The three warp axes have nearly equal magnitude; this is the
+     * first, {@code |(0.00173, 0.00091, -0.00127)|}.
+     */
+    static final double WARP_WAVE_NUMBER = 0.00233D;
+
+    /**
+     * Largest tolerated ratio of warp-induced domain distortion to the domain
+     * scale itself.
+     *
+     * <p>The warp adds {@code amplitude * sin(k . p)} to a domain that
+     * otherwise advances at {@code scale} per block, so it distorts the
+     * sampling Jacobian by {@code amplitude * |k| / scale}. Because the warp's
+     * own wavelength (about 3600 blocks) is an order of magnitude larger than
+     * a storm, that distortion is effectively a *constant directional shear*
+     * across one storm rather than a varying churn - it stretches the noise
+     * along a fixed axis, which reads as radial fingers and streaking.
+     *
+     * <p>0.08 matches what the detail domain already applies, so storms are
+     * not held to a stricter standard than the rest of the renderer; it simply
+     * stops the warp from growing without bound as the storm domain scale is
+     * lowered.
+     */
+    static final double MAX_WARP_DISTORTION = 0.08D;
+
+    /** Warp amplitude that holds {@link #MAX_WARP_DISTORTION} at this domain scale. */
+    static double proportionalWarpAmplitude(double scale) {
+        return Math.min(LEGACY_WARP_AMPLITUDE, MAX_WARP_DISTORTION * scale / WARP_WAVE_NUMBER);
+    }
+
     static void baseNoiseDomain(double x, double y, double z, double scale, double[] out) {
+        baseNoiseDomain(x, y, z, scale, proportionalWarpAmplitude(scale), out);
+    }
+
+    static void baseNoiseDomain(
+            double x,
+            double y,
+            double z,
+            double scale,
+            double warpAmplitude,
+            double[] out
+    ) {
         double rx = x * 0.8138D + y * 0.2962D - z * 0.5000D;
         double ry = -x * 0.1401D + y * 0.9408D + z * 0.3085D;
         double rz = x * 0.5630D - y * 0.1677D + z * 0.8090D;
-        out[0] = rx * scale + warpX(x, y, z) * 0.31D;
-        out[1] = ry * scale + warpY(x, y, z) * 0.31D;
-        out[2] = rz * scale + warpZ(x, y, z) * 0.31D;
+        out[0] = rx * scale + warpX(x, y, z) * warpAmplitude;
+        out[1] = ry * scale + warpY(x, y, z) * warpAmplitude;
+        out[2] = rz * scale + warpZ(x, y, z) * warpAmplitude;
     }
 
     static void detailNoiseDomain(double x, double y, double z, double[] out) {
@@ -146,19 +214,87 @@ final class StormDensityModel {
      *
      * <p>At {@code coverage == 0} the lower bound is 1.0 and nothing survives.
      * As coverage rises the bound falls, admitting progressively more of the
-     * base field, and at full coverage it reaches {@code -CORE_FILL} so the
-     * convective core stays dense while still varying with the base field.
+     * base field. At full coverage the strength-aware fill keeps weaker live
+     * BASE/ANVIL descriptors connected without changing their authority over
+     * coverage, while the full-strength floor remains {@code CORE_FILL}.
      * The partial derivative with respect to {@code baseField} is
      * {@code 1 / (1 - lowerBound)}, which is strictly positive for every
      * coverage value - the interior is never noise-independent.
      */
     static double stormBody(double coverage, double baseField) {
-        double lowerBound = coverageLowerBound(coverage);
+        return stormBody(coverage, 1.0D, baseField);
+    }
+
+    /**
+     * Strength-aware body remap. Descriptor strength remains authoritative
+     * coverage: it is not normalized away. It only selects the minimum fill
+     * needed for a weak live lobe to retain mass at its own envelope ceiling.
+     */
+    static double stormBody(double coverage, double envelopeStrength, double baseField) {
+        return stormBody(coverage, envelopeStrength, baseField, false);
+    }
+
+    static double stormBody(
+            double coverage,
+            double envelopeStrength,
+            double baseField,
+            boolean embeddedConvectiveOverlap
+    ) {
+        double lowerBound = coverageLowerBound(coverage, envelopeStrength, embeddedConvectiveOverlap);
         return clamp01((baseField - lowerBound) / Math.max(1.0D - lowerBound, 1.0E-4D));
     }
 
     static double coverageLowerBound(double coverage) {
-        return lerp(clamp01(coverage), 1.0D, -CORE_FILL);
+        return coverageLowerBound(coverage, 1.0D);
+    }
+
+    static double coverageLowerBound(double coverage, double envelopeStrength) {
+        return coverageLowerBound(coverage, envelopeStrength, false);
+    }
+
+    static double coverageLowerBound(
+            double coverage,
+            double envelopeStrength,
+            boolean embeddedConvectiveOverlap
+    ) {
+        return lerp(clamp01(coverage), 1.0D,
+                -(embeddedConvectiveOverlap
+                        ? coreFillForCoverageAndStrength(coverage, envelopeStrength)
+                        : coreFillForEnvelopeStrength(envelopeStrength)));
+    }
+
+    static double coreFillForEnvelopeStrength(double envelopeStrength) {
+        double strength = Math.max(clamp01(envelopeStrength), 1.0E-4D);
+        double required = 1.0D / (strength * (1.0D - LIVE_P05_EROSION_BITE)) - 1.0D;
+        return Math.max(CORE_FILL, required + LIVE_STRENGTH_FILL_HEADROOM);
+    }
+
+    /**
+     * Extends the live-strength derivation to the actual, already-strength-
+     * weighted coverage at a sample. This is not a density normalization:
+     * strength still limits coverage, and the remap remains monotonic with a
+     * nonzero base-field derivative. It only prevents a zero base carrier from
+     * deleting visible mass in a deep continuous envelope.
+     */
+    static double coreFillForCoverageAndStrength(double coverage, double envelopeStrength) {
+        double normalizedCoverage = clamp01(coverage);
+        double strengthFill = coreFillForEnvelopeStrength(envelopeStrength);
+        double normalizedStrength = clamp01(envelopeStrength);
+        if (normalizedCoverage <= STRUCTURAL_CONTINUITY_COVERAGE
+                || normalizedStrength <= STRUCTURAL_CONTINUITY_STRENGTH) {
+            return strengthFill;
+        }
+        double safeCoverage = Math.max(normalizedCoverage, 1.0E-4D);
+        double retainedBody = STRUCTURAL_CONTINUITY_DENSITY + LIVE_P05_EROSION_BITE;
+        double continuityRequired = 1.0D / (safeCoverage * (1.0D - retainedBody)) - 1.0D;
+        double continuityFill = Math.max(strengthFill,
+                continuityRequired + LIVE_STRENGTH_FILL_HEADROOM);
+        return lerp(
+                smoothstep(STRUCTURAL_CONTINUITY_COVERAGE, 0.90D, normalizedCoverage)
+                        * smoothstep(STRUCTURAL_CONTINUITY_STRENGTH, 0.87D, normalizedStrength),
+                strengthFill,
+                continuityFill
+        );
     }
 
     /** Sensitivity of body density to the base field at this coverage. */
@@ -191,10 +327,29 @@ final class StormDensityModel {
 
     /** Full stages 5 and 6 for one sample. */
     static double finalDensity(double coverage, double baseField, double detailFbm) {
+        return finalDensity(coverage, 1.0D, baseField, detailFbm);
+    }
+
+    static double finalDensity(
+            double coverage,
+            double envelopeStrength,
+            double baseField,
+            double detailFbm
+    ) {
+        return finalDensity(coverage, envelopeStrength, baseField, detailFbm, false);
+    }
+
+    static double finalDensity(
+            double coverage,
+            double envelopeStrength,
+            double baseField,
+            double detailFbm,
+            boolean embeddedConvectiveOverlap
+    ) {
         if (coverage <= 0.0D) {
             return 0.0D;
         }
-        return erode(stormBody(coverage, baseField), detailFbm);
+        return erode(stormBody(coverage, envelopeStrength, baseField, embeddedConvectiveOverlap), detailFbm);
     }
 
     // -----------------------------------------------------------------

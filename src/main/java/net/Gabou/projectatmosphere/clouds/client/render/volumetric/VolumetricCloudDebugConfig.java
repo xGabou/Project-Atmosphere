@@ -32,10 +32,21 @@ public final class VolumetricCloudDebugConfig {
     // but use real fringe heights in the production path.
     private static volatile boolean sentinelHeightsEnabled;
     private static volatile boolean fullResolutionEnabled;
+    // Diagnostic-only target override. Normal rendering leaves this NaN and
+    // continues to use the adaptive dense-camera policy unchanged.
+    private static volatile float fixedResolutionScale = Float.NaN;
     private static volatile float weatherCoverageScale = 1.0F;
     private static volatile int coveragePretestSamples = 6;
     private static volatile float coveragePretestThreshold = 0.004F;
     private static volatile int coveragePretestDilation;
+    private static volatile StormTopologyMode stormTopologyMode = StormTopologyMode.COMPACT;
+    /**
+     * T133 / SC-020. Never diagnostic outside a deliberate capture: the suite
+     * sets an OFF arm and restores this before the view ends, and
+     * {@link #resetDefaults()} restores it on every session/world transition.
+     */
+    private static volatile StormOptimizationDiagnosticMode optimizationDiagnosticMode =
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
 
     private VolumetricCloudDebugConfig() {
     }
@@ -62,6 +73,16 @@ public final class VolumetricCloudDebugConfig {
 
     public static void setFullResolutionEnabled(boolean enabled) {
         fullResolutionEnabled = enabled;
+    }
+
+    public static float fixedResolutionScale() {
+        return fixedResolutionScale;
+    }
+
+    public static void setFixedResolutionScale(float scale) {
+        fixedResolutionScale = Float.isFinite(scale)
+                ? Math.max(0.25F, Math.min(1.0F, scale))
+                : Float.NaN;
     }
 
     public static boolean coveragePretestEnabled() {
@@ -188,6 +209,23 @@ public final class VolumetricCloudDebugConfig {
         coveragePretestDilation = Math.max(0, Math.min(2, dilation));
     }
 
+    public static StormTopologyMode stormTopologyMode() {
+        return stormTopologyMode;
+    }
+
+    public static void setStormTopologyMode(StormTopologyMode mode) {
+        stormTopologyMode = mode == null ? StormTopologyMode.COMPACT : mode;
+    }
+
+    public static StormOptimizationDiagnosticMode optimizationDiagnosticMode() {
+        return optimizationDiagnosticMode;
+    }
+
+    public static void setOptimizationDiagnosticMode(StormOptimizationDiagnosticMode mode) {
+        optimizationDiagnosticMode =
+                mode == null ? StormOptimizationDiagnosticMode.NORMAL_PRODUCTION : mode;
+    }
+
     /**
      * Returns every comparison switch to the production baseline. Debug state
      * is process-static, so session/world/backend transitions must call this
@@ -206,10 +244,13 @@ public final class VolumetricCloudDebugConfig {
         raymarchDebugView = VolumetricCloudRaymarchDebugView.FINAL;
         sentinelHeightsEnabled = false;
         fullResolutionEnabled = false;
+        fixedResolutionScale = Float.NaN;
         weatherCoverageScale = 1.0F;
         coveragePretestSamples = 6;
         coveragePretestThreshold = 0.004F;
         coveragePretestDilation = 0;
+        stormTopologyMode = StormTopologyMode.COMPACT;
+        optimizationDiagnosticMode = StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
     }
 
     /** Pure reset-contract check for the standalone renderer sandbox. */
@@ -226,10 +267,12 @@ public final class VolumetricCloudDebugConfig {
         raymarchDebugView = VolumetricCloudRaymarchDebugView.CURRENT_ONLY;
         sentinelHeightsEnabled = true;
         fullResolutionEnabled = true;
+        fixedResolutionScale = 0.75F;
         weatherCoverageScale = 2.0F;
         coveragePretestSamples = 12;
         coveragePretestThreshold = 0.02F;
         coveragePretestDilation = 2;
+        stormTopologyMode = StormTopologyMode.LEGACY_SCAN;
         resetDefaults();
         if (!depthCompositeEnabled
                 || !sceneRayLimitEnabled
@@ -243,10 +286,12 @@ public final class VolumetricCloudDebugConfig {
                 || raymarchDebugView != VolumetricCloudRaymarchDebugView.FINAL
                 || sentinelHeightsEnabled
                 || fullResolutionEnabled
+                || Float.isFinite(fixedResolutionScale)
                 || weatherCoverageScale != 1.0F
                 || coveragePretestSamples != 6
                 || coveragePretestThreshold != 0.004F
-                || coveragePretestDilation != 0) {
+                || coveragePretestDilation != 0
+                || stormTopologyMode != StormTopologyMode.COMPACT) {
             throw new IllegalStateException("volumetric debug defaults did not reset exactly");
         }
     }
@@ -267,6 +312,7 @@ public final class VolumetricCloudDebugConfig {
                 + "\nraymarchView=" + raymarchDebugView.serializedName()
                 + "\nsentinelHeights=" + (sentinelHeightsEnabled ? "on" : "off")
                 + "\nfullres=" + (fullResolutionEnabled ? "on" : "off")
-                + "\nweatherCoverageScale=" + weatherCoverageScale;
+                + "\nweatherCoverageScale=" + weatherCoverageScale
+                + "\nstormTopology=" + stormTopologyMode.serializedName();
     }
 }

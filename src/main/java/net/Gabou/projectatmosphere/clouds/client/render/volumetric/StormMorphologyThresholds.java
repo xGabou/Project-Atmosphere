@@ -53,16 +53,15 @@ final class StormMorphologyThresholds {
     /**
      * Coverage remap fill at full coverage.
      *
-     * <p>Derivation: at full coverage the storm core must survive worst-case
-     * erosion without a hole. The weakest core sample has
-     * {@code baseField = 0} (the p05 point of the normalized carrier) and the
-     * deepest erosion bite is
-     * {@code STORM_EROSION * (1 - DETAIL_FBM_P05)}. Requiring
-     * {@code body(0) > bite} gives
-     * {@code CORE_FILL / (1 + CORE_FILL) > 0.44 * (1 - 0.3568) = 0.2830},
-     * hence {@code CORE_FILL > 0.3948}. Rounding up to the next twentieth
-     * leaves headroom for 8-bit noise quantization and ray-integration
-     * smoothing without inflating the core toward uniform density.
+     * <p>Derivation uses the weakest measured live descriptor strength rather
+     * than assuming its coverage can reach 1.0. At its envelope ceiling
+     * {@code s = 0.7231}, with {@code baseField = 0} and the deepest erosion
+     * bite {@code b = STORM_EROSION * (1 - DETAIL_FBM_P05)}, survival requires
+     * {@code 1 - 1 / ((1 + CORE_FILL) * s) > b}. Thus
+     * {@code fill(s) > 1 / (s * (1 - b)) - 1 = 0.928...}. `CORE_FILL` is the
+     * full-strength floor; the strength-aware remap supplies 0.95 at the
+     * weakest live ANVIL, preserving descriptor coverage differences rather
+     * than globally normalizing them.
      */
     static final double CORE_FILL = 0.45D;
 

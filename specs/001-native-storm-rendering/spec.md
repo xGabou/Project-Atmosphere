@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-17
 
-**Status**: Revised — 2026-08-19 storm density architecture correction
+**Status**: Revised — 2026-08-19 renderer-wide scale, material-continuity, and performance audit
 
 **Revision**: The 2026-08-19 correction supersedes the earlier morphology acceptance model. The
 previous criteria described only the *absence* of artifacts, so a smooth balloon-shaped storm could
@@ -12,6 +12,27 @@ satisfy every one of them while still failing the intended result. This revision
 measurable morphology requirements (FR-021 through FR-027, SC-011 through SC-017) and changes the
 storm density architecture so that descriptor geometry is a bounded coverage envelope and the
 volumetric noise field forms the visible storm body.
+
+**Current correction gate**: T098 morphology tuning is paused. The native storm is now capable of
+cloud-like multi-scale structure. Its physical scale was corrected by the accepted T134 severe-system
+derivation; its lower and upper regions may still read as separate visual materials. No further role-local geometry correction may
+be accepted until a representative vertical material trace attributes that separation to a specific
+pipeline stage. Foundational, visually neutral performance architecture may proceed in parallel
+with that measurement; quality reductions remain out of scope before T098/T099.
+
+**Status 2026-08-21**: T119, T121, T122, and T123 are accepted from the controlled two-pass compact
+fixture evidence: conservative rejections, exact avoided descriptor fetches, and actual
+primary/light/termination workload counters executed in every view while fixture, pose, governor,
+resolution, topology, and configured controls matched. This is not a historical pre/post timing
+claim. **T134 is accepted**: the separately derived source-plan severe-system scale was implemented
+and confirmed by controlled live SIDE/FAR/BELOW/ABOVE evidence on fixture
+`66a15248-6262-441d-bc42-60e2d4e6b4e5` (fingerprint `16536fe1abb39ea0`, `descriptors=10`,
+`height=865.31018`, `footprintDiameter=1238.61042`, compact topology, `structuralChanged=false`).
+
+Because T134 changed the physical dimensions of every severe system, T132 has been rebased onto a
+fresh post-T134 controlled reference and a fresh post-T134 material trace; the pre-T134 T130 and
+T121--T123 fixtures are historical record only. SC-018's three reference viewing distances and the
+aspect-ratio/ANVIL-span guards are carried into T133. T098 and T099 remain blocked by T133.
 
 **Input**: User description: "Redesign Project Atmosphere's native severe-cloud rendering so storms are genuinely volumetric, visually stable, performant across quality modes, and compatible with the existing authoritative weather architecture and optional integrations."
 
@@ -28,8 +49,9 @@ the native renderer from meeting the project's central visual goal even though t
 weather state and lighting systems are functioning.
 
 **Independent Test**: Spawn or locate a severe native storm and inspect it from below, beside,
-inside, and above. The storm delivers value if its stages remain connected and curved without the
-known wall, slab, cutoff, or overlap-seam artifacts.
+inside, and above at the documented near-horizon distances. The storm delivers value if it reads as
+one large severe weather system, rather than a compact isolated object or two vertically stacked
+cloud materials, while retaining the known artifact protections.
 
 **Acceptance Scenarios**:
 
@@ -55,6 +77,14 @@ known wall, slab, cutoff, or overlap-seam artifacts.
    volumetric noise field changes and the storm's coverage envelope is held fixed, **Then** the
    visible density at that interior point changes, proving the interior is formed by noise rather
    than by envelope geometry alone.
+7. **Given** a mature severe storm viewed from each documented several-hundred-block reference
+   distance, **When** its horizon footprint, vertical span, aspect ratio, and role spans are
+   measured, **Then** it meets the pre-derived severe-system scale target and visually dominates
+   its surrounding horizon rather than reading as a compact cloudlet.
+8. **Given** a vertical transect through a severe storm's lower base, core, tower, and anvil,
+   **When** coverage, final density, noise, erosion, extinction, optical depth, and lighting are
+   inspected together, **Then** the visual medium changes continuously or each measured transition
+   is attributable to an intended physical cause rather than an unaccounted role boundary.
 
 ---
 
@@ -134,6 +164,9 @@ final output and can detect capacity or performance fallback without enabling no
    **Then** cloud structure, precipitation, and final composition can be inspected independently.
 3. **Given** normal gameplay with diagnostics unused, **When** storms render, **Then** diagnostic
    facilities do not produce sustained log noise or significant additional work.
+4. **Given** a reported lower-to-upper material separation, **When** a maintainer captures the
+   documented centre-line trace, **Then** the report identifies the first discontinuous rendering
+   stage and distinguishes geometry, density/noise, optical depth, lighting, or sampling cause.
 
 ### Edge Cases
 
@@ -237,6 +270,29 @@ final output and can detect capacity or performance fallback without enabling no
   the corrected density model, and descriptor group topology, lighting sampling, and descriptor
   texture access MUST be structured so that the corrected model is practical at the supported
   quality modes.
+- **FR-028**: A mature severe storm MUST be specified and validated as a severe weather *system*,
+  not a compact cloud object. Before changing dimensions, the feature MUST derive and record a
+  physical-scale target covering total horizontal footprint, base/core/tower/anvil spans, total
+  height, aspect ratio, descriptor count relative to occupied volume, and the relation of every
+  noise wavelength to that target. The target MUST require clear horizon dominance at multiple
+  documented viewing distances of several hundred blocks; uniform descriptor scaling without this
+  analysis is prohibited.
+- **FR-029**: BASE, CORE, TOWER, and ANVIL MUST present as one continuous volumetric medium.
+  Their semantic roles may alter geometry but MUST NOT independently select a visual material. A
+  representative vertical trace MUST record, at regular world-height intervals, active roles,
+  coverage, final density, base noise, detail erosion, extinction, light optical depth, direct
+  light, ambient light, and final rendered contribution. A material-continuity correction MUST be
+  based on the first measured discontinuity in that trace, not on another unmeasured overlap or
+  union-radius adjustment.
+- **FR-030**: Foundational storm-performance architecture MAY proceed before T098/T099 only when
+  it is visually neutral and retains the Phase 4S density composition and ownership boundaries.
+  It MUST prioritize bounded group topology, descriptor admission/culling, empty-space rejection,
+  reuse of already-computed envelope or density facts, bounded descriptor access, early ray
+  termination, and an equivalent low-cost lighting-support path. Quality reductions or substitutions
+  that change the rendered result remain separately validated work.
+- **FR-031**: Physical-scale, material-continuity, morphology, rain/whiteout parity, and
+  performance evidence MUST be revalidated together before T098 resumes. T099 remains blocked by
+  the renewed T098 visual acceptance gate, and quality-mode work remains blocked by T099.
 
 ### Scope Boundaries
 
@@ -245,6 +301,8 @@ final output and can detect capacity or performance fallback without enabling no
 - Native severe-cloud structure and silhouette.
 - Severe-cloud overlap, evolution, precipitation, temporal stability, and camera-density parity.
 - Existing quality-mode scalability and cloud-rendering diagnostics.
+- Physical severe-storm scale derivation, vertical material-continuity attribution, and visually
+  neutral storm-performance architecture required to make the corrected renderer practical.
 - Regression protection for renderer ownership and optional Simple Clouds operation.
 
 **Out of scope**:
@@ -258,6 +316,8 @@ final output and can detect capacity or performance fallback without enabling no
 - Retiring the entire legacy Field renderer before its agreed stable-release rollback window ends.
 - Changing existing save or network formats unless later planning proves a compatible change is
   unavoidable and separately approved.
+- Quality reductions, new quality-mode policy, or image-changing performance substitutions before
+  measured material-continuity evidence identifies and closes the current architecture gate.
 
 ### Key Entities
 
@@ -323,6 +383,17 @@ final output and can detect capacity or performance fallback without enabling no
   rendering model in the feature validation documentation.
 - **SC-017**: Storm descriptor evaluation stays within its documented per-sample and per-frame
   bound in the reference validation scene, measured with the existing storm diagnostics.
+- **SC-018**: Before any physical-size correction is accepted, 100% of the documented severe-storm
+  fixtures meet their recorded footprint, height, role-span, aspect-ratio, descriptor-density, and
+  multi-scale wavelength targets at each of the three reference viewing distances.
+- **SC-019**: The vertical material diagnostic samples the complete required field set at no more
+  than 16-block intervals through every role transition, identifies any first discontinuity, and
+  the corrected fixture has no unaccounted lower/upper material split in all reviewed FAR, SIDE,
+  BELOW, and ABOVE captures.
+- **SC-020**: Before T098 resumes, the reference viewpoint matrix records storm raymarch cost,
+  primary/light-cone descriptor work, early-rejection rate, and termination behavior; every
+  approved foundational optimization preserves the comparison image within its documented
+  visually-neutral tolerance and reduces or bounds the measured work it owns.
 
 ## Assumptions
 
@@ -337,6 +408,8 @@ final output and can detect capacity or performance fallback without enabling no
   shader pack, native renderer, and approximately 2000 blocks of cloud visibility.
 - Performance validation uses a controlled world and repeatable severe storm so unrelated game or
   mod load does not invalidate comparisons.
+- The severe-system physical targets and pre-T098 performance budget are derived from the current
+  live fixture and the reference-horizon validation route before production constants are changed.
 - Existing unrelated working-tree changes are preserved throughout this feature.
 
 ## Obsolete Assumptions (superseded 2026-08-19)
@@ -360,3 +433,11 @@ The following assumptions were held by the pre-correction design and are no long
   correctness work required by the corrected density model, including architectural work needed to
   make that model practical, is no longer blocked by the morphology validation gate. Performance
   changes remain separated from visual-correctness changes.
+- **Role-envelope overlap is sufficient evidence that one storm will read as one material.**
+  Superseded: geometry continuity does not prove continuity through density formation, optical
+  depth, or lighting; the complete vertical material trace is now required (FR-029).
+- **The current few-hundred-block storm footprint is an adequate severe-storm scale.** Superseded:
+  physical system scale, role spans, and wavelength relationships require an explicit derivation
+  before another geometry adjustment (FR-028).
+- **Repeated local role tuning is an acceptable way to resolve a visual seam.** Superseded:
+  subsequent correction is gated on measured pipeline attribution (FR-029).

@@ -115,6 +115,68 @@ public final class VolumetricCloudFrameDiagnostics {
         return VolumetricStabilityDiagnostics.requestCapture(frames);
     }
 
+    public static String requestStormMaterialTrace(double x, double z, float yStart, float yEnd) {
+        return StormMaterialRuntimeTrace.request(x, z, yStart, yEnd);
+    }
+
+    public static String stormMaterialTraceLatest() {
+        return StormMaterialRuntimeTrace.latest();
+    }
+
+    public static String requestStormWorkloadCapture(String view) {
+        return StormWorkloadRuntimeCapture.request(view);
+    }
+
+    public static String stormWorkloadLatest() {
+        return StormWorkloadRuntimeCapture.latest();
+    }
+
+    public static String beginStormPerformanceSuite(double x, double y, double z) {
+        return StormPerformanceSuite.begin(x, y, z);
+    }
+
+    public static String stormPerformanceSuiteLatest() {
+        return StormPerformanceSuite.latest();
+    }
+
+    public static void tryCaptureStormWorkload(RenderTarget cloudTarget) {
+        StormWorkloadRuntimeCapture.capture(cloudTarget);
+    }
+
+    public static void tryCaptureStormReferenceImage(RenderTarget cloudTarget) {
+        StormReferenceImageCapture.capture(cloudTarget);
+    }
+
+    public static void tickT132AutoDriver() {
+        StormT132AutoDriver.tick();
+    }
+
+    public static void tryCaptureStormMaterialTrace(RenderTarget cloudTarget) {
+        StormMaterialRuntimeTrace.capture(cloudTarget);
+    }
+
+    public static String beginStormPerformanceBaseline(double x, double y, double z) {
+        return StormPerformanceBaseline.begin(x, y, z);
+    }
+
+    public static String captureStormPerformanceBaseline(
+            String viewpoint, double x, double y, double z, float yaw, float pitch
+    ) {
+        return StormPerformanceBaseline.capture(viewpoint, x, y, z, yaw, pitch);
+    }
+
+    public static String stormPerformanceBaselineLatest() {
+        return StormPerformanceBaseline.latest();
+    }
+
+    public static void observeStormPerformanceBaseline(RenderTarget cloudTarget) {
+        StormPerformanceBaseline.observe(cloudTarget);
+    }
+
+    public static void observeStormPerformanceSuite(RenderTarget cloudTarget) {
+        StormPerformanceSuite.observe(cloudTarget);
+    }
+
     public static void pollStabilityCapture() {
         VolumetricStabilityDiagnostics.poll();
     }

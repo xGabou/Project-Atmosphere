@@ -32,15 +32,16 @@ Sample set: 262 144 deterministic points (seed `0x57011CE5`) across a 2048 × 32
 |---|---|---|
 | `E` | `STORM_EROSION`, erosion amplitude for descriptor-owned storms | `0.44` |
 | `w1, w2, w3` | detail FBM octave weights | `0.625`, `0.25`, `0.125` |
-| `baseScale` | storm base-noise domain scale | `0.0052` block⁻¹ |
+| `baseScale` | storm base-noise domain scale | `0.0025` block⁻¹ |
 | `detailScale` | detail-noise domain scale | `0.022` block⁻¹ |
 | base octave periods | Worley FBM periods in the base volume | `8, 16, 32` |
 | detail octave periods | Worley FBM periods in the detail volume | `2, 4, 8` |
 
-Derived wavelengths: one base tile spans `1/0.0052 = 192.3` blocks, so the base octaves have
-**24.0 / 12.0 / 6.0** block wavelengths. One detail tile spans `1/0.022 = 45.45` blocks, so the
+Derived wavelengths: one base tile spans `1/0.0025 = 400` blocks, so the base octaves have
+**50.0 / 25.0 / 12.5** block wavelengths. One detail tile spans `1/0.022 = 45.45` blocks, so the
 detail octaves have **22.7 / 11.4 / 5.7** block wavelengths, each itself a three-octave FBM reaching
-down to **1.4** blocks. The final density therefore carries structure from 24 blocks to 1.4 blocks.
+down to **1.4** blocks. The final density therefore carries primary base billows at 50 blocks,
+secondary base billows at 25 and 12.5 blocks, and surface breakup from 22.7 down to 1.4 blocks.
 
 ## Measured noise statistics
 
@@ -65,23 +66,70 @@ standard deviation is 0.3294. This is the same convention the PUFF path already 
 Measured detail band shares track the nominal weight-squared shares (`0.833 / 0.133 / 0.033`)
 closely, confirming the octaves have comparable per-channel variance.
 
+### T124 correction re-measurement (base scale `0.0025`)
+
+The scale and warp correction was remeasured rather than assumed statistically unchanged. The fresh
+262,144-sample run produced detail FBM SD **0.0742**, detail p05 **0.3568**, carrier p05/p95
+**0.7121 / 0.8453**, normalized base-field SD **0.3287**, low-FBM SD **0.0790**, and detail shares
+**0.8520 / 0.1225 / 0.0255**. All remain inside the recorded ±0.010 measurement tolerance; no
+statistical validation threshold was manually retuned. The change is spatial: the measured dominant
+base feature increased from **52.6** to **109.4 blocks**.
+
 ## Derived model constants
 
-### `CORE_FILL = 0.45`
+### Strength-aware `CORE_FILL`
 
-The coverage remap lower bound is `mix(1.0, -CORE_FILL, coverage)`. At full coverage the weakest
-core sample has `baseField = 0` and receives the deepest erosion bite:
+The coverage remap lower bound remains monotonic in coverage, but its fill is selected from the
+smooth-union envelope strength rather than assuming every descriptor reaches 1.0. The live T124
+fixture has strengths `0.7832/0.8792` (BASE), `0.9485/1.0000` (CORE), `0.9700/0.9539` (TOWER), and
+`0.8222/0.7231/0.7851/0.7992` (ANVIL). At a descriptor's own coverage ceiling `s`, the weakest
+base-noise point is retained when:
 
 ```text
 bite      = E * (1 - detailFbm_p05) = 0.44 * (1 - 0.3568) = 0.2830
-body(0)   = CORE_FILL / (1 + CORE_FILL)
-require     body(0) > bite
-=>        CORE_FILL > bite / (1 - bite) = 0.3948
+body(0,s) = 1 - 1 / ((1 + fill(s)) * s)
+require     body(0,s) > bite
+=>        fill(s) > 1 / (s * (1 - bite)) - 1
 ```
 
-`0.45` is the next twentieth above the minimum. The sandbox additionally asserts
-`CORE_FILL < 0.3948 + 0.10`, so the constant cannot be raised until the core saturates toward
-uniform density — the failure mode this whole correction exists to prevent.
+The full-strength floor is `CORE_FILL = 0.45`. The remap uses the larger of that floor and the
+strength-specific bound plus `0.021` headroom. The weakest live ANVIL (`s = 0.7231`) therefore uses
+`0.9498`, just above its derived `0.9289` minimum; a full-strength CORE remains at `0.45`. This
+retains authoritative role differences in coverage and avoids globally increasing `cell.density`
+or flattening all descriptors to one strength. T100 verifies every role remains positive after the
+p05 erosion bite and that no effective fill exceeds its derived minimum by 0.10.
+
+### T131 embedded-convective retention
+
+T128 measured a separate failure mode at Y=272: BASE, CORE, and TOWER coverage was continuous and
+increased, but the normalized base field reached zero and drove final density below the 0.10
+silhouette occupancy level. The strength-only derivation protects a descriptor at its own coverage
+ceiling; it does not prove that a deep, multi-role overlap retains visible mass at its actual,
+already-strength-weighted coverage.
+
+For a simultaneous BASE+CORE+TOWER overlap only, the remap therefore also derives:
+
+```text
+required body = 0.10 + p05 erosion bite
+fill >= 1 / (coverage * (1 - required body)) - 1
+```
+
+It engages continuously only above coverage 0.82 and strength 0.84. It does not change descriptor
+coverage authority, the base-noise derivative, erosion, or any outer BASE/ANVIL sample. The
+complete before/after trace is recorded in `validation/t128-t131-material-continuity.md`.
+
+### Macro scale and proportional domain warp (T124)
+
+The old `0.0052` base scale measured a **52.6-block** dominant carrier feature. That is less than
+half of the narrowest live tower's 116-block width, so the base field re-carved the macro envelope.
+At `0.0025`, the measured feature is **109.4 blocks**. T124 requires at least 85% of that tower width
+(98.6 blocks), so the failure is reproducible and the correction is not accepted by a threshold
+change.
+
+The fixed 0.31-tile warp induced about 13.9% directional distortion at the old scale. The storm-only
+warp is now `min(0.31, 0.08 * scale / 0.00233)`: `0.0858` tiles at the new scale, holding the intended
+8% maximum while leaving the legacy warp unchanged for non-storm cloud families. Java and GLSL use
+the same rotation, warp vectors, scale, cap, and amplitude equation.
 
 ### `MIN_OCCUPIED_REGION_SD = 0.1148` (SC-012)
 

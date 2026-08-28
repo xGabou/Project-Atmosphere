@@ -53,19 +53,19 @@ void independentRoleProfile(
         out float profileRadius,
         out float shearProgress) {
     if (role == 0) {
-        profileRadius = mix(0.98, 0.52, height01)
-            + 0.12 * pow(sin(PI * height01), 0.70);
+        profileRadius = mix(0.84, 0.58, height01)
+            + 0.22 * pow(sin(PI * height01), 0.70);
         shearProgress = height01 * 0.12;
     } else if (role == 1) {
         profileRadius = mix(0.84, 0.56, height01)
             + 0.18 * pow(sin(PI * height01), 0.65);
         shearProgress = smoothstep(0.0, 1.0, height01) * 0.35;
     } else if (role == 2) {
-        profileRadius = mix(0.74, 0.48, height01)
-            + 0.22 * pow(sin(PI * height01), 0.65);
+        profileRadius = mix(1.25, 0.60, height01)
+            + 0.18 * pow(sin(PI * height01), 0.65);
         shearProgress = pow(height01, 1.6);
     } else {
-        profileRadius = mix(0.32, 1.0, smoothstep(0.0, 0.62, height01))
+        profileRadius = mix(0.70, 2.10, smoothstep(0.0, 0.62, height01))
             + 0.08 * pow(sin(PI * height01), 0.55)
             - 0.10 * smoothstep(0.88, 1.0, height01);
         shearProgress = smoothstep(0.0, 0.65, height01);
@@ -80,10 +80,20 @@ float independentLobeDistance(int descriptorIndex, vec3 p) {
     vec4 shearMedia = FixtureShearMedia[descriptorIndex];
     int role = int(FixtureMeta[descriptorIndex].y + 0.5);
 
-    float span = max(positionHeight.w - positionHeight.z, 1.0);
-    float centreY = (positionHeight.z + positionHeight.w) * 0.5;
+    float roleBaseY = positionHeight.z;
+    float roleTopY = positionHeight.w;
+    if (role == 1) {
+        roleTopY += 32.0;
+    } else if (role == 2) {
+        roleBaseY -= 28.0;
+    } else if (role == 3) {
+        roleBaseY -= 12.0;
+        roleTopY += 16.0;
+    }
+    float span = max(roleTopY - roleBaseY, 1.0);
+    float centreY = (roleBaseY + roleTopY) * 0.5;
     float halfSpan = span * 0.5;
-    float height01 = clamp((p.y - positionHeight.z) / span, 0.0, 1.0);
+    float height01 = clamp((p.y - roleBaseY) / span, 0.0, 1.0);
 
     float profileRadius;
     float shearProgress;
@@ -95,6 +105,9 @@ float independentLobeDistance(int descriptorIndex, vec3 p) {
         -local.x * radiusRotation.z + local.y * radiusRotation.w
     );
     vec2 radii = max(radiusRotation.xy * profileRadius, vec2(1.0));
+    if (role == 3) {
+        radii.y *= 1.56;
+    }
     float radial = length(oriented / radii);
     float groupOffset = max(FixtureMeta[descriptorIndex].x, 0.0) * 997.0;
     vec3 warp = independentDomainWarp(
@@ -120,8 +133,10 @@ float independentEdgeWidth(int descriptorIndex) {
     int role = int(FixtureMeta[descriptorIndex].y + 0.5);
     float edgeSoftness = FixtureShearMedia[descriptorIndex].w;
     float normalized = role == 3
-        ? max(0.12, edgeSoftness * 1.25)
-        : max(0.06, edgeSoftness * 0.62);
+        ? max(0.12, edgeSoftness * 1.65)
+        : (role == 0
+            ? max(0.06, edgeSoftness * 0.66)
+            : max(0.06, edgeSoftness * 0.62));
     return max(
         MIN_EDGE_BLOCKS,
         normalized * min(
@@ -168,6 +183,7 @@ void independentGroupField(
     groupMinimumRadius = 1000000.0;
     found = false;
     float previousRadius = 0.0;
+    int previousRole = -1;
     for (int descriptorIndex = 0; descriptorIndex < FIXTURE_LOBES; descriptorIndex++) {
         if (int(FixtureMeta[descriptorIndex].x + 0.5) != groupSlot) {
             continue;
@@ -175,6 +191,7 @@ void independentGroupField(
         // No lobe is skipped for evaluating to zero density.
         float lobeDistance = independentLobeDistance(descriptorIndex, p);
         float lobeRadius = independentSmallerRadius(descriptorIndex);
+        int lobeRole = int(FixtureMeta[descriptorIndex].y + 0.5);
         float lobeStrength = saturate(FixtureShearMedia[descriptorIndex].z);
         float lobeSoftness = independentEdgeWidth(descriptorIndex);
         if (!found) {
@@ -183,13 +200,18 @@ void independentGroupField(
             groupSoftness = lobeSoftness;
             found = true;
         } else {
-            float blend = independentBlend(previousRadius, lobeRadius, LOBE_BLEND_FRACTION);
+            bool coreTower = ((previousRole == 1 || previousRole == 2)
+                    && (lobeRole == 1 || lobeRole == 2))
+                || (previousRole == 3 && lobeRole == 3);
+            float blend = independentBlend(
+                previousRadius, lobeRadius, coreTower ? 0.60 : LOBE_BLEND_FRACTION);
             float mixFactor = independentBlendFactor(groupDistance, lobeDistance, blend);
             groupDistance = independentSmoothMinimum(groupDistance, lobeDistance, blend);
             groupStrength = mix(lobeStrength, groupStrength, mixFactor);
             groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
         }
         previousRadius = lobeRadius;
+        previousRole = lobeRole;
         groupMinimumRadius = min(groupMinimumRadius, lobeRadius);
     }
 }

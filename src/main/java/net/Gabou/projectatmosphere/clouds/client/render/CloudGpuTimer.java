@@ -20,6 +20,7 @@ public final class CloudGpuTimer {
     private int activeIndex = -1;
     private long frameSerial;
     private long lastResultFrame = -1L;
+    private long lastResultSerial;
     private boolean active;
     private boolean supported = true;
     private boolean hasResult;
@@ -87,6 +88,7 @@ public final class CloudGpuTimer {
                 lastMilliseconds = (float) (Math.max(0L, endNs - startNs) * NS_TO_MS);
                 hasResult = true;
                 lastResultFrame = submittedFrames[i];
+                lastResultSerial++;
                 inFlight[i] = false;
             }
         } catch (Throwable throwable) {
@@ -123,6 +125,11 @@ public final class CloudGpuTimer {
         return pending;
     }
 
+    /** Monotonically advances only when a new timestamp-pair result is available. */
+    public long getLastResultSerial() {
+        return lastResultSerial;
+    }
+
     /** Releases timestamp-query objects so a renderer reload cannot leak GL names. */
     public void close() {
         if (!RenderSystem.isOnRenderThreadOrInit()) {
@@ -144,6 +151,7 @@ public final class CloudGpuTimer {
         activeIndex = -1;
         frameSerial = 0L;
         lastResultFrame = -1L;
+        lastResultSerial = 0L;
         active = false;
         supported = true;
         hasResult = false;

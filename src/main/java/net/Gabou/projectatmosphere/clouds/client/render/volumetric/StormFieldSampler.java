@@ -114,6 +114,12 @@ final class StormFieldSampler {
         return StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
     }
 
+    /** Strength chosen by the same smooth unions as the descriptor envelope. */
+    double envelopeStrengthAt(List<StormLobeDescriptor> lobes, double x, double y, double z) {
+        return composition == Composition.AUDITED_PHASE_4R
+                ? 1.0D : StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+    }
+
     // -----------------------------------------------------------------
     // Stage 5 and 6 inputs
     // -----------------------------------------------------------------
@@ -183,10 +189,19 @@ final class StormFieldSampler {
      * fixed and perturb another.
      */
     double densityFromFields(double coverage, double baseField, double detailFbm) {
+        return densityFromFields(coverage, 1.0D, baseField, detailFbm);
+    }
+
+    double densityFromFields(
+            double coverage,
+            double envelopeStrength,
+            double baseField,
+            double detailFbm
+    ) {
         if (composition == Composition.AUDITED_PHASE_4R) {
             return auditedDensity(coverage, detailFbm);
         }
-        return StormDensityModel.finalDensity(coverage, baseField, detailFbm);
+        return StormDensityModel.finalDensity(coverage, envelopeStrength, baseField, detailFbm);
     }
 
     /**
@@ -216,7 +231,16 @@ final class StormFieldSampler {
             return 0.0D;
         }
         noiseFieldsAt(x, y, z, fields);
-        return densityFromFields(coverage, fields[0], fields[1]);
+        double envelopeStrength = envelopeStrengthAt(lobes, x, y, z);
+        return composition == Composition.AUDITED_PHASE_4R
+                ? densityFromFields(coverage, envelopeStrength, fields[0], fields[1])
+                : StormDensityModel.finalDensity(
+                        coverage,
+                        envelopeStrength,
+                        fields[0],
+                        fields[1],
+                        StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z)
+                );
     }
 
     double densityAt(StormLobeDescriptor[] lobes, double x, double y, double z) {
@@ -225,6 +249,7 @@ final class StormFieldSampler {
             return 0.0D;
         }
         noiseFieldsAt(x, y, z, fields);
-        return densityFromFields(coverage, fields[0], fields[1]);
+        return densityFromFields(coverage,
+                StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z), fields[0], fields[1]);
     }
 }

@@ -180,6 +180,91 @@ envelope:
 - Descriptor group topology may be precomputed and supplied to the shader as compact metadata; that
   metadata is acceleration only and never defines density.
 
+## C9a. T121 conservative descriptor rejection: proof and workload comparison
+
+T121 permits skipping a descriptor's exact SDF **only** where a mathematically derived lower bound
+proves the lobe cannot affect coverage, final density, the active role mask, or local-height
+output. This section records that proof, as required by T121. It adds no approximation: every
+skipped descriptor is one whose exact contribution is provably the identity.
+
+### The lower bound
+
+`stormVerticalDistanceLowerBound(p, positionHeight, role)` in
+`src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` returns
+
+```text
+capDistance = abs(p.y - centreY) - (roleTopY - roleBaseY) * 0.5
+```
+
+Its `roleBaseY` / `roleTopY` come from `stormDescriptorVerticalBounds()`, the **same** helper the
+exact SDF uses, so the bound is taken against the identical role-handoff-extended vertical span
+rather than a second approximate height profile.
+
+`directStormLobeDistanceFromData()` returns
+
+```text
+length(max(vec2(roundedWall, roundedCap), 0.0)) + min(max(roundedWall, roundedCap), 0.0) - rounding
+```
+
+with `roundedCap = capDistance + rounding`. When the point lies vertically outside the span,
+`capDistance > 0`, hence `roundedCap > rounding > 0`, hence
+
+```text
+SDF >= length(vec2(max(roundedWall, 0.0), roundedCap)) - rounding >= roundedCap - rounding = capDistance
+```
+
+The rounded-box fillet moves the surface inward, and the `morphologyWarp` term perturbs only
+`radial`, which reaches the result through `max(roundedWall, 0.0)` and can therefore only increase
+it. So `SDF >= stormVerticalDistanceLowerBound(...)` holds unconditionally. **The bound is
+independent of descriptor size and remains valid at the accepted T134 severe-system scale.**
+
+### The rejection guard and why each consumer is unaffected
+
+The sole rejection branch in `directStormGroupField()` is
+
+```glsl
+if (started && verticalLowerBound > max(lobeSoftness, groupDistance + STORM_MAX_BLEND_BLOCKS))
+```
+
+Write `d` for the lobe's exact distance, so `d >= verticalLowerBound`.
+
+| Consumer | Why the skip is exact |
+|---|---|
+| Ordered smooth union | `stormLobeBlendRadius()` is `clamp(smaller * f, STORM_MIN_BLEND_BLOCKS, STORM_MAX_BLEND_BLOCKS)`, so `blend <= STORM_MAX_BLEND_BLOCKS = 48` **for any radius**. With `d > groupDistance + 48 >= groupDistance + blend`, the polynomial smooth minimum's `h = saturate(0.5 + 0.5 * (d - groupDistance) / blend)` saturates to exactly `1`, and `mix(d, groupDistance, 1) - blend * 1 * (1 - 1) = groupDistance`. Bit-exact identity. |
+| `groupStrength`, `groupSoftness` | Both are mixed by `stormBlendFactor(groupDistance, d, blend)`, which is the same saturating expression and is therefore exactly `1`; `mix(lobeStrength, groupStrength, 1) = groupStrength`. |
+| `groupActiveRoleMask` | The mask is set only when `d <= lobeSoftness`. The guard requires `verticalLowerBound > lobeSoftness`, so `d > lobeSoftness` and the mask cannot change. |
+| Weighted local height | `heightContribution = 1.0 - smoothstep(0.0, lobeSoftness, d)`, which is exactly `0` for `d > lobeSoftness`. Neither `heightWeight` nor `heightAccum` moves. |
+| `groupMinimumRadius` | Updated **before** the branch, so the later group-level blend radius is unchanged. |
+| `ownsGroup` | Computed **before** the branch from the descriptor's ownership ellipse, so descriptor-ownership fallback is unchanged. |
+| Ordered chain state | `previousRadius` and `previousRole` are assigned **inside** the branch, so the next descriptor's blend radius is chosen exactly as it would have been. |
+
+The guard also requires `started`, so the first descriptor of a group is never skipped and
+`groupDistance` is always a real accumulated distance when the comparison is made.
+
+### Retained full evaluation
+
+`cloudDensity()` is retained in full for lighting taps. No lighting-support proxy is implemented,
+and any future proxy stays blocked until it proves frozen-image and material-trace equivalence.
+
+### Per-view workload comparison
+
+Executed under `stormPerformanceSuite` with the fixture, poses, governor scale `0.50000`,
+resolution scale `0.75000`, compact topology, and configured ray/light steps held equal across
+PASS A and PASS B. `conservativeDescriptorRejects` was positive in every one of SIDE, FAR, BELOW,
+and ABOVE in both passes, with `structuralChanged=false` throughout; the complete primary-ray,
+descriptor-evaluation, descriptor-fetch, light-density, empty-space, and termination counters were
+read back from the diagnostic shader frames. The counter increments solely at this vertical-cap
+branch and is deliberately distinct from the primary-ray `emptySpaceRejects` counter.
+
+No historical pre-T121 percentage is asserted, because those counters did not exist before T123.
+
+**Comparison basis notice (2026-08-21)**: the accepted T121--T123 execution evidence was collected
+on the pre-T134 compact fixture `66b2c85a-aa93-4d18-b428-ac546e280c02`
+(fingerprint `459873e8d8c8425a`). The proof above does not depend on descriptor scale, so the
+acceptance stands, but T132's visual and material neutrality evidence must be re-collected on a
+fresh post-T134 fixture. See `validation/t128-t131-material-continuity.md`, section "T132 rebase
+notice", and the revised T132 criteria in `tasks.md`.
+
 ## C9b. Shader validation
 
 The independent parity fixture is a separate GLSL program and cannot catch an error elsewhere in the

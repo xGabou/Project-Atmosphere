@@ -421,6 +421,9 @@ public final class VolumetricCloudRenderHook {
             CameraCloudDensityTracker.update(0.0F);
         }
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
+        VolumetricCloudFrameDiagnostics.tryCaptureStormMaterialTrace(cloudTarget);
+        VolumetricCloudFrameDiagnostics.tryCaptureStormWorkload(cloudTarget);
+        VolumetricCloudFrameDiagnostics.tryCaptureStormReferenceImage(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryDispatchStabilityCapture(
                 cloudTarget,
                 sceneDepth,
@@ -449,6 +452,10 @@ public final class VolumetricCloudRenderHook {
                 renderCells,
                 composited
         );
+        VolumetricCloudFrameDiagnostics.observeStormPerformanceBaseline(cloudTarget);
+        // Diagnostic-only controller: composes the already-rendered workload
+        // and baseline captures without changing the production render path.
+        VolumetricCloudFrameDiagnostics.observeStormPerformanceSuite(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryDispatchCumulusStageCapture(
                 weather,
                 frameCounter,

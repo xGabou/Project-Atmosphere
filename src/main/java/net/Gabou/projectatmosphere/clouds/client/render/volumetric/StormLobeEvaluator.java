@@ -84,10 +84,12 @@ final class StormLobeEvaluator {
             double worldY,
             double worldZ
     ) {
-        double height = Math.max(lobe.topY() - lobe.baseY(), 1.0D);
-        double centerY = (lobe.baseY() + lobe.topY()) * 0.5D;
+        double roleBaseY = roleBaseY(lobe);
+        double roleTopY = roleTopY(lobe);
+        double height = Math.max(roleTopY - roleBaseY, 1.0D);
+        double centerY = (roleBaseY + roleTopY) * 0.5D;
         double halfHeight = height * 0.5D;
-        double vertical01 = clamp01((worldY - lobe.baseY()) / height);
+        double vertical01 = clamp01((worldY - roleBaseY) / height);
 
         double profileRadius = profileRadius(lobe.role(), vertical01);
         double shearProgress = shearProgress(lobe.role(), vertical01);
@@ -97,7 +99,8 @@ final class StormLobeEvaluator {
         double orientedX = localX * lobe.cosOrientation() + localZ * lobe.sinOrientation();
         double orientedZ = -localX * lobe.sinOrientation() + localZ * lobe.cosOrientation();
         double major = Math.max(1.0D, lobe.majorRadius() * profileRadius);
-        double minor = Math.max(1.0D, lobe.minorRadius() * profileRadius);
+        double minor = Math.max(1.0D, lobe.minorRadius() * profileRadius
+                * (lobe.role() == StormLobeDescriptor.Role.ANVIL ? 1.56D : 1.0D));
 
         double radial = Math.sqrt(orientedX * orientedX / (major * major)
                 + orientedZ * orientedZ / (minor * minor));
@@ -174,7 +177,8 @@ final class StormLobeEvaluator {
         double orientedX = localX * lobe.cosOrientation() + localZ * lobe.sinOrientation();
         double orientedZ = -localX * lobe.sinOrientation() + localZ * lobe.cosOrientation();
         double major = Math.max(1.0D, lobe.majorRadius() * profileRadius);
-        double minor = Math.max(1.0D, lobe.minorRadius() * profileRadius);
+        double minor = Math.max(1.0D, lobe.minorRadius() * profileRadius
+                * (lobe.role() == StormLobeDescriptor.Role.ANVIL ? 1.56D : 1.0D));
         double radial = Math.sqrt(orientedX * orientedX / (major * major)
                 + orientedZ * orientedZ / (minor * minor));
         radial += coherentMorphologyWarp(lobe, worldX, worldY, worldZ) * 0.08D;
@@ -216,6 +220,7 @@ final class StormLobeEvaluator {
             double groupStrength = 0.0D;
             double groupSoftness = 0.0D;
             double previousLobeRadius = 0.0D;
+            StormLobeDescriptor previousLobe = null;
             double minimumGroupRadius = Double.POSITIVE_INFINITY;
             for (int index = 0; index < lobes.size(); index++) {
                 StormLobeDescriptor lobe = lobes.get(index);
@@ -234,13 +239,14 @@ final class StormLobeEvaluator {
                     groupStrength = lobeStrength;
                     groupSoftness = lobeSoftness;
                 } else {
-                    double blend = lobeBlendRadius(previousLobeRadius, lobeRadius);
+                    double blend = lobeBlendRadius(previousLobe, lobe);
                     double mix = blendFactor(groupDistance, lobeDistance, blend);
                     groupDistance = smoothMinimum(groupDistance, lobeDistance, blend);
                     groupStrength = lerp(mix, lobeStrength, groupStrength);
                     groupSoftness = lerp(mix, lobeSoftness, groupSoftness);
                 }
                 previousLobeRadius = lobeRadius;
+                previousLobe = lobe;
                 minimumGroupRadius = Math.min(minimumGroupRadius, lobeRadius);
             }
             if (groupDistance == NO_FIELD) {
@@ -282,6 +288,7 @@ final class StormLobeEvaluator {
             double groupStrength = 0.0D;
             double groupSoftness = 0.0D;
             double previousLobeRadius = 0.0D;
+            StormLobeDescriptor previousLobe = null;
             double minimumGroupRadius = Double.POSITIVE_INFINITY;
             for (StormLobeDescriptor lobe : lobes) {
                 if (!lobe.groupId().equals(identity.groupId())) {
@@ -296,13 +303,14 @@ final class StormLobeEvaluator {
                     groupStrength = lobeStrength;
                     groupSoftness = lobeSoftness;
                 } else {
-                    double blend = lobeBlendRadius(previousLobeRadius, lobeRadius);
+                    double blend = lobeBlendRadius(previousLobe, lobe);
                     double mix = blendFactor(groupDistance, lobeDistance, blend);
                     groupDistance = smoothMinimum(groupDistance, lobeDistance, blend);
                     groupStrength = lerp(mix, lobeStrength, groupStrength);
                     groupSoftness = lerp(mix, lobeSoftness, groupSoftness);
                 }
                 previousLobeRadius = lobeRadius;
+                previousLobe = lobe;
                 minimumGroupRadius = Math.min(minimumGroupRadius, lobeRadius);
             }
             if (groupDistance == NO_FIELD) {
@@ -322,6 +330,156 @@ final class StormLobeEvaluator {
             previousGroupRadius = minimumGroupRadius;
         }
         return envelopeFromDistance(stormDistance, stormSoftness, stormStrength);
+    }
+
+    /**
+     * Continuous descriptor strength selected by the same two smooth unions
+     * that select the coverage envelope. This remains an envelope input; it
+     * never replaces final noise-formed density.
+     */
+    static double envelopeStrengthAt(
+            List<StormLobeDescriptor> lobes,
+            double worldX,
+            double worldY,
+            double worldZ
+    ) {
+        double stormDistance = NO_FIELD;
+        double stormStrength = 0.0D;
+        double previousGroupRadius = 0.0D;
+        for (int first = 0; first < lobes.size(); first++) {
+            StormLobeDescriptor identity = lobes.get(first);
+            if (hasEarlierGroup(lobes, first, identity)) {
+                continue;
+            }
+            double groupDistance = NO_FIELD;
+            double groupStrength = 0.0D;
+            double previousLobeRadius = 0.0D;
+            StormLobeDescriptor previousLobe = null;
+            double minimumGroupRadius = Double.POSITIVE_INFINITY;
+            for (StormLobeDescriptor lobe : lobes) {
+                if (!lobe.groupId().equals(identity.groupId())) {
+                    continue;
+                }
+                double lobeDistance = signedDistanceAt(lobe, worldX, worldY, worldZ);
+                double lobeRadius = smallerRadius(lobe);
+                double lobeStrength = envelopeStrength(lobe);
+                if (groupDistance == NO_FIELD) {
+                    groupDistance = lobeDistance;
+                    groupStrength = lobeStrength;
+                } else {
+                    double blend = lobeBlendRadius(previousLobe, lobe);
+                    double mix = blendFactor(groupDistance, lobeDistance, blend);
+                    groupDistance = smoothMinimum(groupDistance, lobeDistance, blend);
+                    groupStrength = lerp(mix, lobeStrength, groupStrength);
+                }
+                previousLobeRadius = lobeRadius;
+                previousLobe = lobe;
+                minimumGroupRadius = Math.min(minimumGroupRadius, lobeRadius);
+            }
+            if (groupDistance == NO_FIELD) {
+                continue;
+            }
+            if (stormDistance == NO_FIELD) {
+                stormDistance = groupDistance;
+                stormStrength = groupStrength;
+            } else {
+                double blend = groupBlendRadius(previousGroupRadius, minimumGroupRadius);
+                double mix = blendFactor(stormDistance, groupDistance, blend);
+                stormDistance = smoothMinimum(stormDistance, groupDistance, blend);
+                stormStrength = lerp(mix, groupStrength, stormStrength);
+            }
+            previousGroupRadius = minimumGroupRadius;
+        }
+        return clamp01(stormStrength);
+    }
+
+    /**
+     * Per-sample active-role mask. It is a composition fact, not a role
+     * material selector: it identifies the deep BASE+CORE+TOWER overlap where
+     * a zero carrier must not split one connected convective column.
+     */
+    static int activeRoleMaskAt(
+            List<StormLobeDescriptor> lobes,
+            double worldX,
+            double worldY,
+            double worldZ
+    ) {
+        int mask = 0;
+        for (StormLobeDescriptor lobe : lobes) {
+            if (signedDistanceAt(lobe, worldX, worldY, worldZ) <= edgeWidthBlocks(lobe)) {
+                mask |= 1 << lobe.role().gpuId();
+            }
+        }
+        return mask;
+    }
+
+    static boolean hasEmbeddedConvectiveOverlap(
+            List<StormLobeDescriptor> lobes,
+            double worldX,
+            double worldY,
+            double worldZ
+    ) {
+        int required = (1 << StormLobeDescriptor.Role.BASE.gpuId())
+                | (1 << StormLobeDescriptor.Role.CORE.gpuId())
+                | (1 << StormLobeDescriptor.Role.TOWER.gpuId());
+        return (activeRoleMaskAt(lobes, worldX, worldY, worldZ) & required) == required;
+    }
+
+    /** Allocation-free array variant used by published render snapshots. */
+    static double envelopeStrengthAt(
+            StormLobeDescriptor[] lobes,
+            double worldX,
+            double worldY,
+            double worldZ
+    ) {
+        double stormDistance = NO_FIELD;
+        double stormStrength = 0.0D;
+        double previousGroupRadius = 0.0D;
+        for (int first = 0; first < lobes.length; first++) {
+            StormLobeDescriptor identity = lobes[first];
+            if (hasEarlierGroup(lobes, first, identity)) {
+                continue;
+            }
+            double groupDistance = NO_FIELD;
+            double groupStrength = 0.0D;
+            double previousLobeRadius = 0.0D;
+            StormLobeDescriptor previousLobe = null;
+            double minimumGroupRadius = Double.POSITIVE_INFINITY;
+            for (StormLobeDescriptor lobe : lobes) {
+                if (!lobe.groupId().equals(identity.groupId())) {
+                    continue;
+                }
+                double lobeDistance = signedDistanceAt(lobe, worldX, worldY, worldZ);
+                double lobeRadius = smallerRadius(lobe);
+                double lobeStrength = envelopeStrength(lobe);
+                if (groupDistance == NO_FIELD) {
+                    groupDistance = lobeDistance;
+                    groupStrength = lobeStrength;
+                } else {
+                    double blend = lobeBlendRadius(previousLobe, lobe);
+                    double mix = blendFactor(groupDistance, lobeDistance, blend);
+                    groupDistance = smoothMinimum(groupDistance, lobeDistance, blend);
+                    groupStrength = lerp(mix, lobeStrength, groupStrength);
+                }
+                previousLobeRadius = lobeRadius;
+                previousLobe = lobe;
+                minimumGroupRadius = Math.min(minimumGroupRadius, lobeRadius);
+            }
+            if (groupDistance == NO_FIELD) {
+                continue;
+            }
+            if (stormDistance == NO_FIELD) {
+                stormDistance = groupDistance;
+                stormStrength = groupStrength;
+            } else {
+                double blend = groupBlendRadius(previousGroupRadius, minimumGroupRadius);
+                double mix = blendFactor(stormDistance, groupDistance, blend);
+                stormDistance = smoothMinimum(stormDistance, groupDistance, blend);
+                stormStrength = lerp(mix, groupStrength, stormStrength);
+            }
+            previousGroupRadius = minimumGroupRadius;
+        }
+        return clamp01(stormStrength);
     }
 
     /**
@@ -345,6 +503,7 @@ final class StormLobeEvaluator {
             }
             double groupDistance = NO_FIELD;
             double previousLobeRadius = 0.0D;
+            StormLobeDescriptor previousLobe = null;
             double minimumGroupRadius = Double.POSITIVE_INFINITY;
             for (StormLobeDescriptor lobe : lobes) {
                 if (!lobe.groupId().equals(identity.groupId())) {
@@ -355,8 +514,9 @@ final class StormLobeEvaluator {
                 groupDistance = groupDistance == NO_FIELD
                         ? lobeDistance
                         : smoothMinimum(groupDistance, lobeDistance,
-                                lobeBlendRadius(previousLobeRadius, lobeRadius));
+                                lobeBlendRadius(previousLobe, lobe));
                 previousLobeRadius = lobeRadius;
+                previousLobe = lobe;
                 minimumGroupRadius = Math.min(minimumGroupRadius, lobeRadius);
             }
             if (groupDistance == NO_FIELD) {
@@ -528,9 +688,16 @@ final class StormLobeEvaluator {
 
     /** Envelope boundary half-width in blocks for this descriptor. */
     static double edgeWidthBlocks(StormLobeDescriptor lobe) {
-        double normalized = lobe.role() == StormLobeDescriptor.Role.ANVIL
-                ? Math.max(0.12D, lobe.edgeSoftness() * 1.25D)
-                : Math.max(0.06D, lobe.edgeSoftness() * 0.62D);
+        double normalized = switch (lobe.role()) {
+            // The live anvil strengths are deliberately below the core.
+            // Give that wide canopy a real spatial boundary rather than
+            // letting the strength-weighted iso contour discard its rim.
+            case ANVIL -> Math.max(0.12D, lobe.edgeSoftness() * 1.65D);
+            // A slightly wider physical BASE boundary prevents a hard lateral
+            // top-cap handoff outside the smaller core envelope.
+            case BASE -> Math.max(0.06D, lobe.edgeSoftness() * 0.66D);
+            default -> Math.max(0.06D, lobe.edgeSoftness() * 0.62D);
+        };
         return Math.max(MIN_EDGE_BLOCKS, normalized * smallerRadius(lobe) * EDGE_SOFTNESS_BLOCKS);
     }
 
@@ -544,6 +711,34 @@ final class StormLobeEvaluator {
                 ? secondRadius
                 : Math.min(firstRadius, secondRadius);
         return clamp(smaller * LOBE_BLEND_FRACTION, MIN_BLEND_BLOCKS, MAX_BLEND_BLOCKS);
+    }
+
+    /**
+     * CORE and TOWER are a single developing convective column, and the
+     * ANVIL descriptors are one coherent canopy rather than decorative
+     * lobes. Their wider, role-specific unions soften those handoffs; BASE
+     * pairings retain the audited blend.
+     */
+    static double lobeBlendRadius(StormLobeDescriptor first, StormLobeDescriptor second) {
+        if (first == null) {
+            return lobeBlendRadius(0.0D, smallerRadius(second));
+        }
+        double fraction = isConvectiveColumnPair(first, second) ? 0.60D : LOBE_BLEND_FRACTION;
+        return clamp(
+                Math.min(smallerRadius(first), smallerRadius(second)) * fraction,
+                MIN_BLEND_BLOCKS,
+                MAX_BLEND_BLOCKS
+        );
+    }
+
+    private static boolean isConvectiveColumnPair(StormLobeDescriptor first, StormLobeDescriptor second) {
+        boolean firstColumn = first.role() == StormLobeDescriptor.Role.CORE
+                || first.role() == StormLobeDescriptor.Role.TOWER;
+        boolean secondColumn = second.role() == StormLobeDescriptor.Role.CORE
+                || second.role() == StormLobeDescriptor.Role.TOWER;
+        return (firstColumn && secondColumn)
+                || (first.role() == StormLobeDescriptor.Role.ANVIL
+                    && second.role() == StormLobeDescriptor.Role.ANVIL);
     }
 
     static double groupBlendRadius(double firstRadius, double secondRadius) {
@@ -609,15 +804,47 @@ final class StormLobeEvaluator {
 
     static double profileRadius(StormLobeDescriptor.Role role, double vertical01) {
         return switch (role) {
-            case BASE -> lerp(vertical01, 0.98D, 0.52D)
-                    + 0.12D * Math.pow(Math.sin(Math.PI * vertical01), 0.70D);
+            // Narrow the immediate underside slightly while retaining a broad
+            // lower-middle shelf. This gives the primary base field room to
+            // form billows instead of exposing one smooth rounded balloon.
+            case BASE -> lerp(vertical01, 0.84D, 0.58D)
+                    + 0.22D * Math.pow(Math.sin(Math.PI * vertical01), 0.70D);
             case CORE -> lerp(vertical01, 0.84D, 0.56D)
                     + 0.18D * Math.pow(Math.sin(Math.PI * vertical01), 0.65D);
-            case TOWER -> lerp(vertical01, 0.74D, 0.48D)
-                    + 0.22D * Math.pow(Math.sin(Math.PI * vertical01), 0.65D);
-            case ANVIL -> lerp(smoothstep(0.0D, 0.62D, vertical01), 0.32D, 1.0D)
+            // A materially broad root remains inside the core through its
+            // upper half, then tapers continuously rather than pinching into
+            // a separate upper mass.
+            case TOWER -> lerp(vertical01, 1.25D, 0.60D)
+                    + 0.18D * Math.pow(Math.sin(Math.PI * vertical01), 0.65D);
+            // A mature anvil begins while the tower is still present and its
+            // wide profile retains the actual descriptor-strength differences.
+            case ANVIL -> lerp(smoothstep(0.0D, 0.62D, vertical01), 0.70D, 2.10D)
                     + 0.08D * Math.pow(Math.sin(Math.PI * vertical01), 0.55D)
                     - 0.10D * smoothstep(0.88D, 1.0D, vertical01);
+        };
+    }
+
+    /**
+     * Role-envelope handoff bounds in world blocks. The descriptor endpoints
+     * remain authoritative anchors, while these bounded extensions make the
+     * semantically continuous CORE→TOWER→ANVIL transitions occupy an actual
+     * vertical interval rather than touching only at caps.
+     */
+    static double roleBaseY(StormLobeDescriptor lobe) {
+        return switch (lobe.role()) {
+            case TOWER -> lobe.baseY() - 28.0D;
+            case ANVIL -> lobe.baseY() - 12.0D;
+            default -> lobe.baseY();
+        };
+    }
+
+    static double roleTopY(StormLobeDescriptor lobe) {
+        return switch (lobe.role()) {
+            case CORE -> lobe.topY() + 32.0D;
+            // Keep the lateral canopy substantial through the measured upper
+            // role transition instead of collapsing at a thin cap.
+            case ANVIL -> lobe.topY() + 16.0D;
+            default -> lobe.topY();
         };
     }
 

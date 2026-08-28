@@ -79,8 +79,14 @@ public final class CloudNoiseTextureManager {
             baseTextureId = uploadedBase;
             detailTextureId = uploadedDetail;
             blueNoiseTextureId = uploadedBlue;
-            basePixels = null;
-            detailPixels = null;
+            // The base and detail volumes are NOT released after upload. They
+            // are the authoritative source for the CPU mirror of the storm
+            // density composition, which whiteout, camera density and rain
+            // support all read; releasing them silently degraded that mirror
+            // to constant median noise while the GPU sampled the real field,
+            // so the two disagreed about where the storm was. Retaining them
+            // costs about 8.1 MB, the same data the GPU already holds.
+            // Blue noise is GPU-only dither and is still released.
             bluePixels = null;
             ProjectAtmosphere.LOGGER.info(
                     "[VolumetricClouds] noise textures ready base={} detail={} blue={}",

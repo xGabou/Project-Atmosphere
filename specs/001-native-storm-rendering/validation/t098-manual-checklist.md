@@ -3,7 +3,10 @@
 **Feature**: `001-native-storm-rendering`
 **Prepared**: 2026-08-19
 **Status**: awaiting manual capture — **T098 is not complete**
-**Gate**: T118 passed, so the reopened T098 may now be collected.
+**Gate**: **T133**, not T118. T118 is retained Phase 4S evidence and no longer unblocks this task.
+T098 may only be collected after T133 passes, which in turn requires T132 on a fresh post-T134
+reference. Do not collect these captures before then; they would record pre-T133 geometry.
+**Updated**: 2026-08-21 (T134 accepted; T132 rebased onto a post-T134 reference).
 
 T098 is judged against the **revised two-part** morphology criteria. Artifact absence alone is no
 longer sufficient: all nine positive features must be present *and* all eight rejected forms absent.
@@ -192,3 +195,244 @@ Delete those three once T098 records its calibration, or fold the report into th
 diagnostic capture when US4 implements
 `contracts/storm-render-diagnostics.md`. It does no per-frame work and holds no state, so leaving it
 in place until then costs nothing.
+
+---
+
+# T098 live capture results - 2026-08-27 - REJECTED
+
+**T098 is NOT accepted.** Three fresh severe fixtures were captured automatically after T133 closed.
+All three show the same structural failure. T099 remains blocked.
+
+## Capture automation
+
+`StormT098CaptureDriver` (test-only, inert without `run/t098-captures.txt`) rides on the accepted
+T132/T133 auto-driver: it captures after the suite and material trace have validated the fixture, so
+the screenshots and the numeric evidence describe one storm. It puts the camera in spectator, hides
+the HUD, enlarges the window to 1600x900, and writes the checklist's seven required views plus
+NEAR-EDGE with the fixture id, fingerprint, scale and density calibration logged beside each frame.
+It changes no renderer state and captures ordinary production frames - no debug view, no diagnostic
+optimization mode.
+
+Two infrastructure faults were found and fixed before any frame counted as evidence: the suite's
+BELOW pose drops a survival player out of the world (every frame recorded a death screen), and the
+capture poses had to be clamped above the void floor.
+
+## Fixtures
+
+| # | Fixture | Fingerprint | baseY | topY | Horizontal radius | Descriptors | Roles |
+|---|---|---|---:|---:|---:|---:|---|
+| 1 | `142bca36` | `fb48f5ae77e3f55b` | 136.0 | 1001.1 | 648.2 | 10 | - |
+| 2 | `cf410ea8` | `671f4fa2bc595da4` | 136.0 | ~1001 | ~650 | 10 | - |
+| 3 | `aa731334` | `18a3ff07f5437a6a` | 136.0 | 1001.1 | 664.9 | 10 | base=2, core=2, tower=2, anvil=4 |
+
+Density calibration at SIDE on fixture 3: `cell.density min=0.7944 max=0.9861 mean=0.8764`
+(fixture reference 0.92), `noiseBaked=true`, `distance=1130m`.
+
+## What the captures show
+
+**The storm reads as a mushroom, not a cumulonimbus.** In all three fixtures the SIDE and LATERAL
+views show:
+
+- a large, smooth, banded dome occupying the anvil band;
+- a thin, wispy, largely broken neck below it;
+- a small ragged lower blob, visibly **detached** from the dome;
+- **concentric horizontal banding** across the dome's side, regular and arc-shaped.
+
+The middle of the column is essentially empty even though `core=2` and `tower=2` descriptors are
+present and adopted. The descriptors exist; they are not producing visible body.
+
+Not everything failed. The ABOVE capture is genuinely good: the anvil top surface shows real
+multi-scale billowing, ragged irregular edges, and surface variation at several spatial frequencies.
+The noise, erosion and detail work is doing its job. **The failure is vertical continuity and
+descriptor joining, not surface detail.**
+
+## Checklist grading
+
+Frequency: **3 of 3 fixtures**, identical failure.
+
+### Positive half (FR-023) - all nine required
+
+| # | Criterion | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Broad continuous lower cloud base | **FAIL** | small ragged detached blob, SIDE/LATERAL, 3/3 |
+| 2 | Dense convective/core region | **FAIL** | no readable core; the middle of the column is empty |
+| 3 | Vertical tower emerging naturally from the base | **FAIL** | absent; only wisps between base and anvil |
+| 4 | Progressive vertical narrowing | **FAIL** | no tower present to narrow |
+| 5 | Broad upper anvil | **PASS** | present and broad in all three |
+| 6 | Multi-scale billowing | **PASS** | clear on ABOVE |
+| 7 | Surface variation at multiple spatial frequencies | **PASS** | clear on ABOVE |
+| 8 | Irregular but coherent silhouette curvature | **FAIL** | ABOVE is ragged and good, but the dome's side reads smooth and banded |
+| 9 | Continuous transitions between base, tower, core, anvil | **FAIL** | visible gap between base and anvil, 3/3 |
+
+**Six of nine positive criteria absent. T098 is not passable while any positive item is absent.**
+
+### Negative half (FR-024) - none may be present
+
+| # | Rejected form | Present? | Evidence |
+|---|---|---|---|
+| 1 | Large smooth balloon surfaces | **PRESENT** | the anvil dome |
+| 2 | Large regions of visually uniform density | **PRESENT** | INSIDE is a near-uniform field |
+| 3 | Visible ellipsoid or sphere primitives | **PRESENT** | the dome reads as one ellipsoid |
+| 4 | Isolated ears or bulb protrusions | not observed | - |
+| 5 | Descriptor seams | **PRESENT** | concentric banding across the dome, 3/3 |
+| 6 | Rectangular or vertical walls | not observed | - |
+| 7 | Flat slabs | **arguably present** | the banding reads as stacked layers |
+| 8 | Uniformly smooth silhouettes | **partially present** | dome side smooth; anvil top correctly ragged |
+
+### Inconclusive captures
+
+`3_UNDER` is **INCONCLUSIVE** in all three fixtures: the altitude clamp that keeps the camera above
+the void floor places it in ground-level haze rather than beneath a readable base. This is a
+limitation of the capture pose, not a verdict on the storm; the UNDER criterion needs a reworked pose
+before it can be graded.
+
+## 48-block blend cap: PARTIAL
+
+Measured over 1,152 consecutive descriptor pairs across 128 deterministic T134 plans
+(`CloudMorphologyTopologySandbox.reportStormBlendSaturation()`):
+
+| Metric | Value |
+|---|---|
+| Pairs | 1,152 |
+| **Saturated at the 48-block cap** | **1,024 (88.9%)** |
+| Requested blend | 27.00 - 297.00 blocks |
+| Mean requested blend | 156.80 blocks |
+| Worst effective / requested | **0.1616** |
+
+So the role-specific formulas ask for a mean 157-block join and the cap delivers 48 - on average
+**3.3x too narrow**, worst case **6.2x**. The cap was introduced 2026-08-19 (commit `a681240`),
+**before** T134 tripled severe scale on 2026-08-21, and was never re-derived afterwards.
+
+This also sits against the written contract. `contracts/storm-density-composition.md` C3 requires that
+"each blend radius is derived from the smaller participating lobe's world-space radius". With the cap
+binding on 88.9% of pairs the blend is a **constant 48**, not a value derived from the participating
+radius, so the delivered behaviour no longer matches the contract at T134 scale.
+
+**Verdict: PARTIAL, not CONFIRMED.** The saturation is real, it is severe, and the visual signature -
+primitives that fail to merge, visible joins, stacked appearance - is exactly what an undersized blend
+produces. But it is **not proven sufficient**: the gap between the base and the anvil spans hundreds
+of blocks, and widening a join from 48 to 157 blocks would not bridge that alone. The middle of the
+column is empty even though CORE and TOWER descriptors are present and adopted, which points at
+descriptor vertical coverage, envelope strength, or erosion survival in the CORE/TOWER band as a
+second, independent contributor.
+
+**No production change was made.** Phase 6 authorises a blend correction only if live evidence
+confirms the cap causes the failure; the evidence shows it is consistent with part of the failure,
+not that it is the cause. `STORM_MAX_BLEND_BLOCKS` remains `48`.
+
+## Status
+
+**T098 REJECTED. T099 remains blocked.** The accepted T132/T133/T134 architecture is not
+contradicted by this result: scale, determinism, material continuity and optimization neutrality all
+remain accepted. What fails is the visible morphology those systems compose.
+
+SC-006 / T070 performance debt remains separate and open.
+
+---
+
+# T098 root cause - 2026-08-28 - carrier normalisation vs base-noise wavelength
+
+**T098 remains REJECTED.** The missing CORE/TOWER body has been traced to a single first failing
+stage. No production change was made: correcting it requires either a morphology-wide change or a
+subjective visual decision, both outside the authorised scope.
+
+## Two hypotheses were tested and FALSIFIED
+
+**Hypothesis A - CORE/TOWER geometry absent.** Falsified. `StormT098RoleOccupancy` measured the live
+adopted system on a 24-block grid (116,964 samples, fixture `38bc5412`). CORE and TOWER envelopes are
+present and strong:
+
+| Role | Envelope-visible voxels | Mean envelope | Max envelope | Visible Y |
+|---|---:|---:|---:|---|
+| BASE | 72,980 | 0.3883 | 0.8985 | 136 - 712 |
+| CORE | 14,449 | 0.4409 | **1.0000** | 304 - 784 |
+| TOWER | 7,478 | **0.5395** | 0.9681 | 376 - 928 |
+| ANVIL | 143,834 | 0.3391 | 0.6543 | 592 - 976 |
+
+CORE and TOWER have the *highest* mean and max envelope of any role. Their descriptor strengths are
+also the highest (CORE `density=1.0000`, TOWER `0.9045`/`0.9681`, against BASE `0.857`/`0.899` and
+ANVIL `0.798`-`0.811`). Neither geometry nor strength is the problem.
+
+**Hypothesis B - T131 no longer engages at T134 scale.** Falsified. T131 requires BASE, CORE and
+TOWER to cover the sample simultaneously; that condition was derived on a pre-T134 column spanning
+Y 224-508, and the T134 column is 865 blocks tall, so it was reasonable to suspect the triple overlap
+had been pulled apart. It has not. The vertical profile shows all three roles present from Y 376 to
+Y 760, and the production trace shows `activeRoleMask=7` with `bodyAfter` (0.382) exceeding
+`bodyBefore` (0.292) at Y 376-472. **T131 engages exactly where designed and adds body.** It simply
+cannot compensate for a base field that is already zero.
+
+## First failing stage: carrier -> baseField normalisation
+
+From the production shader material trace on the same fixture:
+
+| Y | coverage | strength | carrierRaw | **baseField** | erosion | **density** |
+|---:|---:|---:|---:|---:|---:|---:|
+| 136 | 0.456 | 0.870 | 0.824 | **0.936** | 0.233 | **0.998** |
+| 184 | 0.641 | 0.870 | 0.736 | **0.083** | 0.269 | **0.000** |
+| 232 | 0.789 | 0.870 | 0.709 | **0.000** | 0.256 | **0.000** |
+| 344 | 0.870 | 0.870 | 0.689 | **0.000** | 0.285 | **0.009** |
+| 376 | 0.884 | 0.884 | 0.663 | **0.000** | 0.200 | 0.247 |
+| 520 | 0.984 | 0.984 | 0.828 | **0.953** | 0.223 | **0.945** |
+| 536 | 0.963 | 0.963 | 0.834 | **0.983** | 0.201 | **0.988** |
+
+Coverage and strength are high through the whole convective column. `carrierRaw` never fails - it
+stays in 0.66-0.83 everywhere. **`baseField` is what collapses**, and it collapses before erosion,
+before T131's remap, and before any lighting stage.
+
+The cause is arithmetic:
+
+    stormBaseField(carrier) = smoothstep(STORM_CARRIER_P05, STORM_CARRIER_P95, carrier)
+    STORM_CARRIER_P05 = 0.7128
+    STORM_CARRIER_P95 = 0.8451
+
+Those are the measured p05/p95 of the Perlin-Worley carrier
+(`validation/morphology-thresholds.md`). Any carrier below **0.7128 maps to exactly zero**. The
+mid-column carrier sits at 0.663-0.75 - straddling and mostly below that floor - so the entire
+cross-section is zeroed there, while the base (0.824) and the upper column (0.828-0.834) survive.
+
+## Why the mid-column carrier is systematically low
+
+The carrier trend is not scatter. It falls smoothly from 0.824 at Y136 to 0.689 at Y344 and rises
+again to 0.834 at Y536: **one full noise cycle**.
+
+`baseNoiseDomain()` maps world position by `rotated * STORM_BASE_NOISE_SCALE` with
+`STORM_BASE_NOISE_SCALE = 0.0025`, so the carrier texture's world-space repeat period is
+`1 / 0.0025 = 400` blocks. The rotation's vertical component is `0.9408`, giving an effective
+**vertical period of about 426 blocks**.
+
+The T134 severe column is **865 blocks** tall - **2.03 carrier periods**. The carrier therefore dips
+below p05 in a horizontal band roughly every 426 blocks, zeroing `baseField` across the whole
+cross-section at those heights and slicing the system into vertically separated masses. That is
+exactly the captured silhouette: a surviving base, a dead middle, and a surviving anvil.
+
+Before T134 the column was about 284 blocks - **less than one carrier period** - so no interior dead
+band could form inside a storm and the calibration was sound.
+
+This was foreseen. `validation/renderer-wide-architecture-audit.md` line 471 records that the base
+wavelengths "were calibrated for the current envelope. They must be re-evaluated after a derived
+system scale so billows remain primary/secondary structure and erosion remains surface breakup."
+T134's task text likewise says to retain them "unless remeasurement proves a change is required."
+**The remeasurement was never done. This is that remeasurement, and it proves a change is required.**
+
+## Why no fix was applied
+
+Every available correction is either morphology-wide or a subjective visual choice:
+
+1. **Raise `STORM_BASE_NOISE_SCALE`** so the period shrinks relative to the storm (0.0025 -> 0.005
+   gives about 4 cycles at 213 blocks). This is the direct fix for the measured cause, but it changes
+   billow size for **every cloud type**, not just severe storms, and how large billows should read is
+   an aesthetic decision.
+2. **Lower or widen `STORM_CARRIER_P05`/`P95`.** Removes the dead band by letting low carrier through,
+   but changes density everywhere and weakens the measured normalisation the thresholds document
+   derives.
+3. **Extend T131-style retention** beyond the BASE/CORE/TOWER triple overlap to the whole convective
+   column. Targeted, but it is a second material-composition special case layered on the first.
+
+The authorisation boundary permits a narrow correction only when it does not broadly retune
+morphology. All three cross that line, so this stops here for a decision.
+
+## Status
+
+**T098 REJECTED, root cause proven. T099 blocked.** `STORM_MAX_BLEND_BLOCKS` remains `48` and was not
+touched; it stays a separate, later question. No accepted T132/T133/T134 evidence is contradicted -
+this is a material-stage calibration that T134 invalidated and nobody remeasured.

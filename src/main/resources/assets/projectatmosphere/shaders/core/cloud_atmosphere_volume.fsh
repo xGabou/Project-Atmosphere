@@ -79,22 +79,39 @@ const float STORM_LOBE_BLEND_FRACTION = 0.25;
 const float STORM_GROUP_BLEND_FRACTION = 0.18;
 const float STORM_MIN_BLEND_BLOCKS = 4.0;
 const float STORM_MAX_BLEND_BLOCKS = 48.0;
+// T133 / SC-020.  T121's rejection also has to prove the lobe cannot set a
+// groupActiveRoleMask bit, which happens when lobeDistance <= lobeSoftness.
+// The guard tests verticalLowerBound, but the mask tests the SDF, and the two
+// differ by up to ~3.8e-6 blocks of float32 rounding in the SDF tail.  At
+// softness magnitudes (11-100 blocks) one float32 ULP is ~1e-6, so that
+// shortfall is representable there and a rejected lobe could still have
+// satisfied lobeDistance <= lobeSoftness - a discrete divergence, unlike the
+// blend term where one ULP at union distances is far coarser than the
+// shortfall and the smooth union is provably unaffected.  Derived and proven
+// in StormVolumetricGeometrySandbox validateT121SoftnessBoundary(); it only
+// raises the rejection threshold, so it can only reject fewer lobes, and it
+// changes no density, geometry, blend, softness or union equation.
+const float STORM_T121_SOFTNESS_MARGIN_BLOCKS = 0.0009765625;
 // Measured 5th/95th percentiles of the Perlin-Worley carrier over the storm
 // sampling domain. The raw carrier is strongly high-biased, so it is
 // normalized onto its own usable range before the coverage remap.
 const float STORM_CARRIER_P05 = 0.7128;
 const float STORM_CARRIER_P95 = 0.8451;
-// Coverage remap fill at full coverage. Derived so the weakest core sample
-// survives the deepest erosion bite without a hole:
-//   bite = 0.44 * (1 - detailFbm_p05 0.3568) = 0.2830
-//   CORE_FILL > bite / (1 - bite) = 0.3948
+// Full-strength coverage-remap floor. Weak live descriptor strengths receive
+// only their mathematically necessary additional fill, so coverage authority
+// is retained instead of flattening all roles to one density.
 const float STORM_CORE_FILL = 0.45;
+const float STORM_STRUCTURAL_CONTINUITY_DENSITY = 0.10;
+const float STORM_STRUCTURAL_CONTINUITY_COVERAGE = 0.82;
+const float STORM_STRUCTURAL_CONTINUITY_STRENGTH = 0.84;
+const float STORM_P05_EROSION_BITE = 0.283008;
+const float STORM_LIVE_STRENGTH_FILL_HEADROOM = 0.021;
 // Detail erosion amplitude. Unchanged from the pre-correction storm value;
 // what changed is that it now reaches the storm interior.
 const float STORM_EROSION = 0.44;
-// Storm base-noise domain scale: one tile spans 1/0.0052 = 192.3 blocks, so
-// the base Worley octaves have 24.0/12.0/6.0 block wavelengths.
-const float STORM_BASE_NOISE_SCALE = 0.0052;
+// Storm base-noise domain scale: one tile spans 400 blocks, so the base Worley
+// octaves have 50.0/25.0/12.5 block wavelengths.
+const float STORM_BASE_NOISE_SCALE = 0.0025;
 
 uniform vec3 LightDir;
 uniform vec3 LightColor;
@@ -126,6 +143,52 @@ uniform int CoveragePretestDilation;
 uniform int HistoryValid;
 uniform float HistoryBlend;
 uniform int DebugView;
+uniform int StormTopologyMode;
+
+// T133 / SC-020 diagnostic optimization mode.  Zero is NORMAL_PRODUCTION and
+// is the only value the renderer uploads outside a deliberate diagnostic
+// capture, so ordinary frames take exactly the optimized paths they took
+// before this uniform existed.  The OFF arms exist solely to prove, against an
+// unoptimized but mathematically identical execution, that the production ON
+// paths preserve the image.  They change no equation, no sample position, no
+// jitter sequence and no texture content: only whether an optimization is
+// used.
+const int PA_OPT_NORMAL_PRODUCTION = 0;
+const int PA_OPT_T121_OFF = 1;
+const int PA_OPT_T122_OFF = 2;
+uniform int PaDiagnosticOptimizationMode;
+
+/** True when T121's conservative rejection must be bypassed. */
+bool paT121Off() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T121_OFF) != 0;
+}
+
+/** True when T122's descriptor-fetch reuse must be bypassed. */
+bool paT122Off() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T122_OFF) != 0;
+}
+
+// T123: emitted only by the two on-demand workload views. FINAL frames retain
+// the normal colour/history path and never read these values back.
+int paPrimaryRaySteps = 0;
+int paDescriptorEvaluations = 0;
+int paDescriptorTextureFetches = 0;
+int paAvoidedDescriptorTextureFetches = 0;
+int paLightMarchDensityEvaluations = 0;
+int paEmptySpaceRejects = 0;
+int paEarlyTerminations = 0;
+int paConservativeDescriptorRejects = 0;
+
+bool paWorkloadCaptureActive() {
+    return DebugView == 22 || DebugView == 23;
+}
+// T128 on-demand centre-line trace uniforms. They are inert unless DebugView
+// is STORM_MATERIAL_TRACE (21), so they never affect production rendering.
+uniform vec2 StormTraceOrigin;
+uniform float StormTraceYStart;
+uniform float StormTraceYInterval;
+uniform int StormTraceSamples;
+uniform int StormTraceStage;
 
 uniform float DensityMul;
 uniform float CoverageMul;
@@ -172,6 +235,27 @@ vec3 baseNoiseDomain(vec3 worldPos, float scale) {
         dot(worldPos, vec3(0.5630, -0.1677, 0.8090))
     );
     return rotated * scale + lowFrequencyDomainWarp(worldPos) * 0.31;
+}
+
+// Storm primary billows use the same world-space warp function as Java, but
+// scale its amplitude with the noise domain. A fixed 0.31 tile offset became
+// a near-constant directional shear when the storm base domain was enlarged.
+// The clamp preserves legacy behaviour for other cloud families while holding
+// storm distortion to 8% of its sampling Jacobian.
+vec3 stormBaseNoiseDomain(vec3 worldPos) {
+    vec3 rotated = vec3(
+        dot(worldPos, vec3(0.8138, 0.2962, -0.5000)),
+        dot(worldPos, vec3(-0.1401, 0.9408, 0.3085)),
+        dot(worldPos, vec3(0.5630, -0.1677, 0.8090))
+    );
+    const float WARP_WAVE_NUMBER = 0.00233;
+    const float MAX_WARP_DISTORTION = 0.08;
+    float warpAmplitude = min(
+        0.31,
+        MAX_WARP_DISTORTION * STORM_BASE_NOISE_SCALE / WARP_WAVE_NUMBER
+    );
+    return rotated * STORM_BASE_NOISE_SCALE
+        + lowFrequencyDomainWarp(worldPos) * warpAmplitude;
 }
 
 vec3 detailNoiseDomain(vec3 worldPos) {
@@ -436,6 +520,9 @@ vec4 stormCandidatesAt(vec2 worldXZ) {
 }
 
 vec4 stormDescriptorTexel(int descriptorIndex, int texelIndex) {
+    if (paWorkloadCaptureActive()) {
+        paDescriptorTextureFetches++;
+    }
     return texelFetch(StormDescriptorSampler, ivec2(texelIndex, descriptorIndex), 0);
 }
 
@@ -446,8 +533,8 @@ void stormRoleProfile(
         out float verticalShape,
         out float shearProgress) {
     if (role == 0) {
-        profileRadius = mix(0.98, 0.52, height01)
-            + 0.12 * pow(sin(PI * height01), 0.70);
+        profileRadius = mix(0.84, 0.58, height01)
+            + 0.22 * pow(sin(PI * height01), 0.70);
         verticalShape = smoothstep(0.0, 0.08, height01)
             * (1.0 - smoothstep(0.48, 1.0, height01));
         shearProgress = height01 * 0.12;
@@ -458,19 +545,56 @@ void stormRoleProfile(
             * (1.0 - smoothstep(0.62, 1.0, height01));
         shearProgress = smoothstep(0.0, 1.0, height01) * 0.35;
     } else if (role == 2) {
-        profileRadius = mix(0.74, 0.48, height01)
-            + 0.22 * pow(sin(PI * height01), 0.65);
+        // Broad root across the core's upper half before continuous tapering.
+        // Keep this mirrored with StormLobeEvaluator.
+        profileRadius = mix(1.25, 0.60, height01)
+            + 0.18 * pow(sin(PI * height01), 0.65);
         verticalShape = smoothstep(0.0, 0.28, height01)
             * (1.0 - smoothstep(0.72, 1.0, height01));
         shearProgress = pow(height01, 1.6);
     } else {
-        profileRadius = mix(0.32, 1.0, smoothstep(0.0, 0.62, height01))
+        // Broaden the anvil's root and canopy for a tower-fed upper deck;
+        // sampled descriptor strength remains authoritative for coverage.
+        profileRadius = mix(0.70, 2.10, smoothstep(0.0, 0.62, height01))
             + 0.08 * pow(sin(PI * height01), 0.55)
             - 0.10 * smoothstep(0.88, 1.0, height01);
         verticalShape = smoothstep(0.0, 0.35, height01)
             * (1.0 - smoothstep(0.76, 1.0, height01));
         shearProgress = smoothstep(0.0, 0.65, height01);
     }
+}
+
+// The authored vertical endpoints are shared by the exact lobe SDF and by
+// T121's conservative rejection.  Keeping the role handoff extension in one
+// place makes the rejection a lower bound on the exact same geometry rather
+// than a second, approximate height profile.
+void stormDescriptorVerticalBounds(
+        vec4 positionHeight,
+        int role,
+        out float roleBaseY,
+        out float roleTopY) {
+    roleBaseY = positionHeight.z;
+    roleTopY = positionHeight.w;
+    if (role == 1) {
+        roleTopY += 32.0;
+    } else if (role == 2) {
+        roleBaseY -= 28.0;
+    } else if (role == 3) {
+        roleBaseY -= 12.0;
+        roleTopY += 16.0;
+    }
+}
+
+// The rounded lobe SDF is always at least this far from a point vertically
+// outside its role-specific cap interval.  It deliberately ignores horizontal
+// distance, so it can only reject a descriptor that is provably unable to
+// affect the smooth union, role mask, or weighted local height.
+float stormVerticalDistanceLowerBound(vec3 p, vec4 positionHeight, int role) {
+    float roleBaseY;
+    float roleTopY;
+    stormDescriptorVerticalBounds(positionHeight, role, roleBaseY, roleTopY);
+    float centreY = (roleBaseY + roleTopY) * 0.5;
+    return abs(p.y - centreY) - (roleTopY - roleBaseY) * 0.5;
 }
 
 // Signed geometric distance from p to this lobe's surface, in world-space
@@ -486,25 +610,26 @@ void stormRoleProfile(
 //
 // Returns +1e9 for an unused descriptor slot so a sentinel can never pull the
 // union toward world origin.
-float directStormLobeDistance(vec3 p, int descriptorIndex, out int groupSlotOut, out int roleOut) {
-    vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
-    vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
-    vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
-    vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
-    groupSlotOut = -1;
-    roleOut = -1;
-    if (lifecycleRole.w < -0.5) {
-        return 1.0e9;
+float directStormLobeDistanceFromData(
+        vec3 p,
+        vec4 positionHeight,
+        vec4 radiusRotation,
+        vec4 shearMedia,
+        int groupSlot,
+        int role) {
+    if (paWorkloadCaptureActive()) {
+        paDescriptorEvaluations++;
     }
-    int packedGroupRole = int(floor(lifecycleRole.w + 0.5));
-    int role = packedGroupRole - (packedGroupRole / 8) * 8;
-    groupSlotOut = packedGroupRole / 8;
-    roleOut = role;
 
-    float height = max(positionHeight.w - positionHeight.z, 1.0);
-    float centerY = (positionHeight.z + positionHeight.w) * 0.5;
+    // Bounded role handoffs use the stored endpoints as anchors, then extend
+    // only the semantic transition side so the stages overlap over height.
+    float roleBaseY;
+    float roleTopY;
+    stormDescriptorVerticalBounds(positionHeight, role, roleBaseY, roleTopY);
+    float height = max(roleTopY - roleBaseY, 1.0);
+    float centerY = (roleBaseY + roleTopY) * 0.5;
     float halfHeight = height * 0.5;
-    float height01 = clamp((p.y - positionHeight.z) / height, 0.0, 1.0);
+    float height01 = clamp((p.y - roleBaseY) / height, 0.0, 1.0);
 
     float profileRadius;
     float verticalShape;
@@ -517,8 +642,14 @@ float directStormLobeDistance(vec3 p, int descriptorIndex, out int groupSlotOut,
         -local.x * radiusRotation.z + local.y * radiusRotation.w
     );
     vec2 radii = max(radiusRotation.xy * profileRadius, vec2(1.0));
+    // The supplied anvil ellipses are intentionally wind-aligned. Widen only
+    // their short horizontal axis so four members read as one lateral canopy
+    // from FAR/BELow views instead of a thin directional ribbon.
+    if (role == 3) {
+        radii.y *= 1.56;
+    }
     float radial = length(oriented / radii);
-    float groupOffset = float(max(groupSlotOut, 0)) * 997.0;
+    float groupOffset = float(max(groupSlot, 0)) * 997.0;
     vec3 morphologyWarp = lowFrequencyDomainWarp(
         p * 2.3 + vec3(groupOffset, groupOffset * 0.61, -groupOffset * 0.73)
     );
@@ -539,6 +670,30 @@ float directStormLobeDistance(vec3 p, int descriptorIndex, out int groupSlotOut,
     return length(outside) + min(max(roundedWall, roundedCap), 0.0) - rounding;
 }
 
+// Retained for consumers that do not already have the descriptor in
+// registers. The primary storm-group evaluation uses the FromData form below
+// so its four fetched texels are evaluated once rather than re-fetched by the
+// exact SDF and softness calculation (T122).
+float directStormLobeDistance(vec3 p, int descriptorIndex, out int groupSlotOut, out int roleOut) {
+    vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+    vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
+    vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+    vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+    groupSlotOut = -1;
+    roleOut = -1;
+    if (lifecycleRole.w < -0.5) {
+        return 1.0e9;
+    }
+    int packedTopology = int(floor(lifecycleRole.w + 0.5));
+    int role = packedTopology - (packedTopology / 8) * 8;
+    int groupSlot = packedTopology / (8 * 64 * 64);
+    groupSlotOut = groupSlot;
+    roleOut = role;
+    return directStormLobeDistanceFromData(
+        p, positionHeight, radiusRotation, shearMedia, groupSlot, role
+    );
+}
+
 float stormSmallerRadius(int descriptorIndex) {
     vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
     return min(radiusRotation.x, radiusRotation.y);
@@ -548,10 +703,17 @@ float stormSmallerRadius(int descriptorIndex) {
 // units has no consistent spatial meaning: it varies with the local density
 // gradient rather than with distance, which is why the previous form
 // over-smoothed broad lobes while leaving creases between narrow ones.
-float stormLobeBlendRadius(float firstRadius, float secondRadius) {
+float stormLobeBlendRadius(
+        float firstRadius,
+        float secondRadius,
+        int firstRole,
+        int secondRole) {
     float smaller = firstRadius <= 0.0 ? secondRadius : min(firstRadius, secondRadius);
+    bool coreTower = ((firstRole == 1 || firstRole == 2)
+            && (secondRole == 1 || secondRole == 2))
+        || (firstRole == 3 && secondRole == 3);
     return clamp(
-        smaller * STORM_LOBE_BLEND_FRACTION,
+        smaller * (coreTower ? 0.60 : STORM_LOBE_BLEND_FRACTION),
         STORM_MIN_BLEND_BLOCKS,
         STORM_MAX_BLEND_BLOCKS
     );
@@ -582,15 +744,24 @@ float stormSmoothMinimum(float first, float second, float blendRadius) {
 }
 
 // Envelope boundary half-width in blocks for one descriptor.
-float stormEdgeWidthBlocks(int descriptorIndex, int role) {
-    vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
-    float edgeSoftness = stormDescriptorTexel(descriptorIndex, 2).w;
+float stormEdgeWidthBlocksFromData(vec4 radiusRotation, vec4 shearMedia, int role) {
+    float edgeSoftness = shearMedia.w;
     float normalized = role == 3
-        ? max(0.12, edgeSoftness * 1.25)
-        : max(0.06, edgeSoftness * 0.62);
+        ? max(0.12, edgeSoftness * 1.65)
+        : (role == 0
+            ? max(0.06, edgeSoftness * 0.66)
+            : max(0.06, edgeSoftness * 0.62));
     return max(
         STORM_MIN_EDGE_BLOCKS,
         normalized * min(radiusRotation.x, radiusRotation.y)
+    );
+}
+
+float stormEdgeWidthBlocks(int descriptorIndex, int role) {
+    return stormEdgeWidthBlocksFromData(
+        stormDescriptorTexel(descriptorIndex, 1),
+        stormDescriptorTexel(descriptorIndex, 2),
+        role
     );
 }
 
@@ -607,12 +778,55 @@ float stormEnvelopeFromDistance(float distanceBlocks, float softnessBlocks, floa
 // descriptor geometry. The derivative with respect to the base field is
 // 1 / (1 - lowerBound), strictly positive at every coverage value, so the
 // storm interior is never noise-independent.
-float stormCoverageLowerBound(float coverage) {
-    return mix(1.0, -STORM_CORE_FILL, saturate(coverage));
+float stormCoreFillForStrength(float envelopeStrength) {
+    float strength = max(saturate(envelopeStrength), 0.0001);
+    float required = 1.0 / (strength * (1.0 - STORM_P05_EROSION_BITE)) - 1.0;
+    return max(STORM_CORE_FILL, required + STORM_LIVE_STRENGTH_FILL_HEADROOM);
 }
 
-float stormBody(float coverage, float baseField) {
-    float lowerBound = stormCoverageLowerBound(coverage);
+float stormCoreFillForCoverageAndStrength(float coverage, float envelopeStrength) {
+    float normalizedCoverage = saturate(coverage);
+    float strengthFill = stormCoreFillForStrength(envelopeStrength);
+    float normalizedStrength = saturate(envelopeStrength);
+    if (normalizedCoverage <= STORM_STRUCTURAL_CONTINUITY_COVERAGE
+            || normalizedStrength <= STORM_STRUCTURAL_CONTINUITY_STRENGTH) {
+        return strengthFill;
+    }
+    float retainedBody = STORM_STRUCTURAL_CONTINUITY_DENSITY + STORM_P05_EROSION_BITE;
+    float continuityRequired = 1.0 / max(
+        normalizedCoverage * (1.0 - retainedBody),
+        0.0001
+    ) - 1.0;
+    float continuityFill = max(
+        strengthFill,
+        continuityRequired + STORM_LIVE_STRENGTH_FILL_HEADROOM
+    );
+    return mix(
+        strengthFill,
+        continuityFill,
+        smoothstep(STORM_STRUCTURAL_CONTINUITY_COVERAGE, 0.90, normalizedCoverage)
+            * smoothstep(STORM_STRUCTURAL_CONTINUITY_STRENGTH, 0.87, normalizedStrength)
+    );
+}
+
+float stormCoverageLowerBound(
+        float coverage,
+        float envelopeStrength,
+        bool embeddedConvectiveOverlap) {
+    float fill = embeddedConvectiveOverlap
+        ? stormCoreFillForCoverageAndStrength(coverage, envelopeStrength)
+        : stormCoreFillForStrength(envelopeStrength);
+    return mix(1.0, -fill,
+        saturate(coverage));
+}
+
+float stormBody(
+        float coverage,
+        float envelopeStrength,
+        float baseField,
+        bool embeddedConvectiveOverlap) {
+    float lowerBound = stormCoverageLowerBound(
+        coverage, envelopeStrength, embeddedConvectiveOverlap);
     return saturate((baseField - lowerBound) / max(1.0 - lowerBound, 0.0001));
 }
 
@@ -630,33 +844,65 @@ bool stormDescriptorIsValid(int descriptorIndex) {
 int stormDescriptorGroupSlot(int descriptorIndex) {
     // `packed` is a GLSL layout qualifier on the runtime compiler. Keep the
     // exact group/role decode, but avoid using that reserved identifier.
-    int encodedGroupRole = int(floor(stormDescriptorTexel(descriptorIndex, 3).w + 0.5));
-    return clamp(encodedGroupRole / 8, 0, MAX_STORM_GROUPS - 1);
+    int topology = int(floor(stormDescriptorTexel(descriptorIndex, 3).w + 0.5));
+    return clamp(topology / (8 * 64 * 64), 0, MAX_STORM_GROUPS - 1);
 }
 
-int stormGroupFirstIndex(int witnessIndex, int groupSlot) {
-    int first = witnessIndex;
-    for (int offset = 1; offset < MAX_STORM_LOBES; offset++) {
-        int index = witnessIndex - offset;
-        if (index < 0 || !stormDescriptorIsValid(index)
-                || stormDescriptorGroupSlot(index) != groupSlot) {
+int stormDescriptorMemberIndex(int descriptorIndex) {
+    int topology = int(floor(stormDescriptorTexel(descriptorIndex, 3).w + 0.5));
+    return (topology / 8) - (topology / (8 * 64)) * 64;
+}
+
+int stormDescriptorMemberCount(int descriptorIndex) {
+    int topology = int(floor(stormDescriptorTexel(descriptorIndex, 3).w + 0.5));
+    return ((topology / (8 * 64)) - (topology / (8 * 64 * 64)) * 64) + 1;
+}
+
+// T119 A/B reference only. This faithfully recreates the previous bounded
+// group-range discovery: both endpoints scan the descriptor texture. It is
+// never selected by default and has no density authority of its own.
+int stormGroupFirstIndexLegacy(int groupSlot) {
+    int first = StormLobeCount;
+    for (int index = 0; index < MAX_STORM_LOBES; index++) {
+        if (index >= StormLobeCount) {
             break;
         }
-        first = index;
+        if (stormDescriptorIsValid(index) && stormDescriptorGroupSlot(index) == groupSlot) {
+            first = min(first, index);
+        }
     }
     return first;
 }
 
-int stormGroupEndIndex(int firstIndex, int groupSlot) {
-    int end = firstIndex;
-    for (int offset = 0; offset < MAX_STORM_LOBES; offset++) {
-        int index = firstIndex + offset;
-        if (!stormDescriptorIsValid(index) || stormDescriptorGroupSlot(index) != groupSlot) {
+int stormGroupEndIndexLegacy(int groupSlot) {
+    int endIndex = 0;
+    for (int index = 0; index < MAX_STORM_LOBES; index++) {
+        if (index >= StormLobeCount) {
             break;
         }
-        end = index + 1;
+        if (stormDescriptorIsValid(index) && stormDescriptorGroupSlot(index) == groupSlot) {
+            endIndex = max(endIndex, index + 1);
+        }
     }
-    return end;
+    return endIndex;
+}
+
+int stormGroupFirstIndex(int witnessIndex, int groupSlot) {
+    if (StormTopologyMode == 1) {
+        return stormGroupFirstIndexLegacy(groupSlot);
+    }
+    // T119: CPU build ordering is group-contiguous and the witness carries
+    // its member index/count. Derive the exact range without a 64-slot scan.
+    return max(0, witnessIndex - stormDescriptorMemberIndex(witnessIndex));
+}
+
+int stormGroupEndIndex(int witnessIndex, int groupSlot) {
+    if (StormTopologyMode == 1) {
+        return stormGroupEndIndexLegacy(groupSlot);
+    }
+    return min(StormLobeCount,
+        stormGroupFirstIndex(witnessIndex, groupSlot)
+            + stormDescriptorMemberCount(witnessIndex));
 }
 
 void directStormGroupField(
@@ -668,19 +914,22 @@ void directStormGroupField(
         out float groupStrength,
         out float groupSoftness,
         out float groupHeight01,
+        out int groupActiveRoleMask,
         out bool ownsGroup) {
     groupDistance = 1.0e9;
     groupMinimumRadius = 1000000.0;
     groupStrength = 0.0;
     groupSoftness = 0.0;
     groupHeight01 = 0.0;
+    groupActiveRoleMask = 0;
     ownsGroup = false;
     bool started = false;
     float previousRadius = 0.0;
+    int previousRole = -1;
     float heightWeight = 0.0;
     float heightAccum = 0.0;
     int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
-    int endIndex = stormGroupEndIndex(firstIndex, groupSlot);
+    int endIndex = stormGroupEndIndex(witnessIndex, groupSlot);
     for (int descriptorIndex = firstIndex; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
         if (descriptorIndex >= endIndex) {
             break;
@@ -688,6 +937,12 @@ void directStormGroupField(
         vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
         vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
         vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(lifecycleRole.w + 0.5));
+        int lobeRole = packedTopology - (packedTopology / 8) * 8;
         vec2 ownershipCenter = positionHeight.xy + shearMedia.xy * 0.5;
         float extentX = length(vec2(
             radiusRotation.x * radiusRotation.w,
@@ -700,19 +955,78 @@ void directStormGroupField(
         vec2 ownershipRadii = max(vec2(extentX, extentZ) * 1.85, vec2(1.0));
         ownsGroup = ownsGroup || length((p.xz - ownershipCenter) / ownershipRadii) <= 1.0;
 
-        int lobeGroupSlot;
-        int lobeRole;
-        float lobeDistance = directStormLobeDistance(p, descriptorIndex, lobeGroupSlot, lobeRole);
-        if (lobeRole < 0) {
+        float lobeRadius = min(radiusRotation.x, radiusRotation.y);
+        // T122 OFF re-issues the two texel fetches the reuse form avoids and
+        // then applies the identical FromData equation to the refetched
+        // values.  Same texture, same descriptor index, same texel indices, so
+        // the refetched values are bit-identical to the ones in registers -
+        // this is the real pre-reuse work, not a copy of the ON result.
+        float lobeSoftness = paT122Off()
+            ? stormEdgeWidthBlocks(descriptorIndex, lobeRole)
+            : stormEdgeWidthBlocksFromData(radiusRotation, shearMedia, lobeRole);
+        // T122: the FromData softness form consumes the two descriptor texels
+        // already fetched above.  Count those two precise wrapper fetches that
+        // are avoided; this is a diagnostic-only counter, not an estimate
+        // derived from descriptor evaluations.
+        if (paWorkloadCaptureActive() && !paT122Off()) {
+            paAvoidedDescriptorTextureFetches += 2;
+        }
+        groupMinimumRadius = min(groupMinimumRadius, lobeRadius);
+        float verticalLowerBound = stormVerticalDistanceLowerBound(
+            p, positionHeight, lobeRole
+        );
+        // A smooth minimum is exactly unchanged once the incoming distance is
+        // more than its blend radius beyond the current union.  The global
+        // maximum is used here instead of a guessed local value.  Requiring
+        // the same bound to clear softness also proves this lobe cannot alter
+        // the active role mask or height weighting.  Preserve previous role /
+        // radius because the existing ordered union uses them to choose the
+        // next lobe's exact blend radius.
+        // T121 OFF evaluates every lobe the conservative bound would have
+        // rejected, through the identical exact SDF and the identical ordered
+        // smooth union.  Nothing else about the loop changes, so any image
+        // difference between the arms is attributable to the rejection alone.
+        if (started && !paT121Off() && verticalLowerBound > max(
+                lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
+                groupDistance + STORM_MAX_BLEND_BLOCKS)) {
+            // T121: this is the sole conservative vertical-cap branch.  It
+            // skips the exact descriptor SDF only after its lower bound proves
+            // that the lobe cannot contribute to the ordered smooth union.
+            if (paWorkloadCaptureActive()) {
+                paConservativeDescriptorRejects++;
+            }
+            previousRadius = lobeRadius;
+            previousRole = lobeRole;
             continue;
         }
+
+        // T122: the exact SDF consumes the same four texels already resident
+        // in registers rather than invoking its fetch wrapper again.
+        if (paWorkloadCaptureActive() && !paT122Off()) {
+            paAvoidedDescriptorTextureFetches += 4;
+        }
+        // T122 OFF refetches the three texels the exact SDF consumes and
+        // passes the refetched values into the same equation, in the same
+        // order, with the same groupSlot and role already decoded above.
+        float lobeDistance = paT122Off()
+            ? directStormLobeDistanceFromData(
+                p,
+                stormDescriptorTexel(descriptorIndex, 0),
+                stormDescriptorTexel(descriptorIndex, 1),
+                stormDescriptorTexel(descriptorIndex, 2),
+                groupSlot,
+                lobeRole)
+            : directStormLobeDistanceFromData(
+                p, positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole
+            );
         // Every lobe of the group contributes. A lobe is never dropped because
         // its local density evaluates to zero: that is exactly the region
         // where a smooth union needs its distance, and dropping it is what
         // made blends collapse into visible primitive intersections.
-        float lobeRadius = stormSmallerRadius(descriptorIndex);
         float lobeStrength = saturate(shearMedia.z);
-        float lobeSoftness = stormEdgeWidthBlocks(descriptorIndex, lobeRole);
+        if (lobeDistance <= lobeSoftness) {
+            groupActiveRoleMask |= 1 << lobeRole;
+        }
         float localHeight01 = clamp(
             (p.y - positionHeight.z) / max(positionHeight.w - positionHeight.z, 1.0),
             0.0,
@@ -724,14 +1038,14 @@ void directStormGroupField(
             groupSoftness = lobeSoftness;
             started = true;
         } else {
-            float blend = stormLobeBlendRadius(previousRadius, lobeRadius);
+            float blend = stormLobeBlendRadius(previousRadius, lobeRadius, previousRole, lobeRole);
             float mixFactor = stormBlendFactor(groupDistance, lobeDistance, blend);
             groupDistance = stormSmoothMinimum(groupDistance, lobeDistance, blend);
             groupStrength = mix(lobeStrength, groupStrength, mixFactor);
             groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
         }
         previousRadius = lobeRadius;
-        groupMinimumRadius = min(groupMinimumRadius, lobeRadius);
+        previousRole = lobeRole;
         float heightContribution = 1.0 - smoothstep(0.0, lobeSoftness, lobeDistance);
         heightWeight += heightContribution;
         heightAccum += localHeight01 * heightContribution;
@@ -751,7 +1065,12 @@ void directStormGroupField(
 // Returns the bounded COVERAGE ENVELOPE, not a visible density. The visible
 // storm body is formed from this envelope by the base-noise remap and the
 // multi-scale erosion in cloudDensity().
-float directStormShape(vec3 p, out bool ownsDescriptorGroup, out float dominantHeight01) {
+float directStormShape(
+        vec3 p,
+        out bool ownsDescriptorGroup,
+        out float dominantHeight01,
+        out float envelopeStrength,
+        out int activeRoleMask) {
     // Compact bit mask instead of a bool[MAX_STORM_GROUPS]. The array form
     // cost an allocation and an 8-iteration clear loop on every density
     // sample, and indexed writes into a local array defeat register
@@ -766,6 +1085,8 @@ float directStormShape(vec3 p, out bool ownsDescriptorGroup, out float dominantH
     float nearestGroupDistance = 1.0e9;
     ownsDescriptorGroup = false;
     dominantHeight01 = 0.0;
+    envelopeStrength = 0.0;
+    activeRoleMask = 0;
     vec4 candidates = stormCandidatesAt(p.xz);
     for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
         int witnessIndex = decodeStormCandidate(candidates, rank);
@@ -783,12 +1104,14 @@ float directStormShape(vec3 p, out bool ownsDescriptorGroup, out float dominantH
         float groupStrength;
         float groupSoftness;
         float groupHeight01;
+        int groupActiveRoleMask;
         bool ownsGroup;
         directStormGroupField(
             p, witnessIndex, groupSlot,
             groupDistance, groupMinimumRadius, groupStrength, groupSoftness,
-            groupHeight01, ownsGroup
+            groupHeight01, groupActiveRoleMask, ownsGroup
         );
+        activeRoleMask |= groupActiveRoleMask;
         ownsDescriptorGroup = ownsDescriptorGroup || ownsGroup;
         if (groupDistance > 1.0e8) {
             continue;
@@ -814,6 +1137,7 @@ float directStormShape(vec3 p, out bool ownsDescriptorGroup, out float dominantH
     if (!started) {
         return 0.0;
     }
+    envelopeStrength = stormStrength;
     return stormEnvelopeFromDistance(stormDistance, stormSoftness, stormStrength);
 }
 
@@ -822,7 +1146,7 @@ float directStormShape(vec3 p, out bool ownsDescriptorGroup, out float dominantH
 float stormBaseCarrierAt(vec3 samplePos, float mipBias, out float detailFbm) {
     vec4 baseNoise = texture(
         BaseNoiseSampler,
-        baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE),
+        stormBaseNoiseDomain(samplePos),
         mipBias
     );
     float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
@@ -842,7 +1166,10 @@ float directStormFinalDensity(
         float mipBias,
         out bool ownsDescriptorGroup,
         out float dominantHeight01) {
-    float coverage = directStormShape(p, ownsDescriptorGroup, dominantHeight01);
+    float envelopeStrength;
+    int activeRoleMask;
+    float coverage = directStormShape(
+        p, ownsDescriptorGroup, dominantHeight01, envelopeStrength, activeRoleMask);
     if (coverage <= 0.0) {
         return 0.0;
     }
@@ -850,7 +1177,9 @@ float directStormFinalDensity(
     samplePos.xz -= MaterialOffset;
     float detailFbm;
     float carrier = stormBaseCarrierAt(samplePos, mipBias, detailFbm);
-    float body = stormBody(coverage, stormBaseField(carrier));
+    bool embeddedConvectiveOverlap = (activeRoleMask & 7) == 7;
+    float body = stormBody(
+        coverage, envelopeStrength, stormBaseField(carrier), embeddedConvectiveOverlap);
     return max(body - (1.0 - detailFbm) * STORM_EROSION, 0.0);
 }
 
@@ -860,7 +1189,7 @@ bool stormGroupSegmentMayIntersect(
         int witnessIndex,
         int groupSlot) {
     int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
-    int endIndex = stormGroupEndIndex(firstIndex, groupSlot);
+    int endIndex = stormGroupEndIndex(witnessIndex, groupSlot);
     vec3 segment = segmentEnd - segmentStart;
     float segmentLengthSquared = max(dot(segment, segment), 0.0001);
     for (int index = firstIndex; index < MAX_STORM_LOBES; index++) {
@@ -2054,8 +2383,8 @@ bool directStormLocalBaseAt(vec2 worldXZ, out float attachY, out float supportY)
         if (lifecycleRole.w < -0.5) {
             continue;
         }
-        int packedGroupRole = int(floor(lifecycleRole.w + 0.5));
-        int role = packedGroupRole - (packedGroupRole / 8) * 8;
+        int packedTopology = int(floor(lifecycleRole.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
         if (role != 0) {
             continue;
         }
@@ -2381,10 +2710,18 @@ float cloudDensity(
 
     bool directStormOwned = false;
     float directStormHeight01 = h01;
+    float directStormStrength = 0.0;
+    int directStormActiveRoleMask = 0;
     // Bounded COVERAGE ENVELOPE, not a density. The visible storm body is
     // formed from it below by the base-noise remap and multi-scale erosion.
     float directStormCoverage = StormLobeCount > 0
-        ? directStormShape(p, directStormOwned, directStormHeight01)
+        ? directStormShape(
+            p,
+            directStormOwned,
+            directStormHeight01,
+            directStormStrength,
+            directStormActiveRoleMask
+        )
         : 0.0;
     // Only a valid uploaded descriptor group may suppress the legacy family
     // fallback. A global descriptor count, raster storm category, or candidate
@@ -2562,7 +2899,13 @@ float cloudDensity(
             // the descriptors themselves. Treating the envelope as the body is
             // what produced a smooth balloon that passed every
             // artifact-absence check.
-            cloud = stormBody(cloud, stormBaseField(baseCarrier));
+            bool embeddedConvectiveOverlap = (directStormActiveRoleMask & 7) == 7;
+            cloud = stormBody(
+                cloud,
+                directStormStrength,
+                stormBaseField(baseCarrier),
+                embeddedConvectiveOverlap
+            );
         }
 
         if (PuffDensityStage == 3) {
@@ -2742,6 +3085,9 @@ float lightMarchOpticalDepth(
         // while the whiteout already hides distant cone detail. Preserve light
         // direction with one detached forward probe and analytically extend its
         // optical path instead of flattening the interior to a constant colour.
+        if (paWorkloadCaptureActive()) {
+            paLightMarchDensityEvaluations++;
+        }
         float forwardDensity = cloudDensity(
             p + LightDir * 28.0,
             1.2,
@@ -2778,6 +3124,9 @@ float lightMarchOpticalDepth(
         // fine streak noise would otherwise be paid at every light tap and
         // would over-darken the parent cloud.
         pos += LightDir * stepLength;
+        if (paWorkloadCaptureActive()) {
+            paLightMarchDensityEvaluations++;
+        }
         float density = cloudDensity(pos + offset, float(i) * 0.6, i < 2, false, false);
         opticalDepth += density * stepLength;
         if (cameraStartsInsideSlab && opticalDepth * ExtinctionScale >= 28.0) {
@@ -3005,7 +3354,7 @@ float lightMarchOpticalDepthWithoutDetail(
     return opticalDepth;
 }
 
-vec3 evaluateLightingFromOpticalDepth(
+vec3 evaluateLightingComponents(
         float opticalDepth,
         float localDensity,
         float h01ForAmbient,
@@ -3014,7 +3363,10 @@ vec3 evaluateLightingFromOpticalDepth(
         float localStorm,
         float materialDarkness,
         float rainFraction,
-        out float diagnosticLightOpticalDepth) {
+        out float diagnosticLightOpticalDepth,
+        out float diagnosticDirectContribution,
+        out float diagnosticAmbientContribution,
+        out float diagnosticPhaseShadow) {
     // Multi-scattering octaves (Hillaire): each octave sees weaker extinction
     // and a flatter phase, which keeps thick storm cores luminous.
     float scatter = 0.0;
@@ -3081,6 +3433,13 @@ vec3 evaluateLightingFromOpticalDepth(
         * (1.0 - rainFraction * 0.78);
     vec3 radiance = sunTerm + ambient * 0.86 + LightColor * sunTint * silver * 0.48;
 
+    diagnosticDirectContribution = dot(
+        sunTerm + LightColor * sunTint * silver * 0.48,
+        vec3(0.2126, 0.7152, 0.0722)
+    );
+    diagnosticAmbientContribution = dot(ambient * 0.86, vec3(0.2126, 0.7152, 0.0722));
+    diagnosticPhaseShadow = scatter * powderTerm * directTransmission;
+
     vec3 rainTint = mix(vec3(0.76, 0.80, 0.86), vec3(0.48, 0.54, 0.64), NightFactor);
     radiance *= mix(vec3(1.0), rainTint, rainFraction * 0.50);
     radiance = max(radiance, vec3(0.0));
@@ -3089,6 +3448,35 @@ vec3 evaluateLightingFromOpticalDepth(
     // while keeping the final LDR composite bounded.
     float toneExposure = mix(1.30, 1.48, NightFactor);
     return vec3(1.0) - exp(-radiance * toneExposure);
+}
+
+vec3 evaluateLightingFromOpticalDepth(
+        float opticalDepth,
+        float localDensity,
+        float h01ForAmbient,
+        float cosTheta,
+        float distance01,
+        float localStorm,
+        float materialDarkness,
+        float rainFraction,
+        out float diagnosticLightOpticalDepth) {
+    float ignoredDirect;
+    float ignoredAmbient;
+    float ignoredPhaseShadow;
+    return evaluateLightingComponents(
+        opticalDepth,
+        localDensity,
+        h01ForAmbient,
+        cosTheta,
+        distance01,
+        localStorm,
+        materialDarkness,
+        rainFraction,
+        diagnosticLightOpticalDepth,
+        ignoredDirect,
+        ignoredAmbient,
+        ignoredPhaseShadow
+    );
 }
 
 vec3 sampleLighting(
@@ -3124,6 +3512,80 @@ vec3 sampleLighting(
         rainFraction,
         diagnosticLightOpticalDepth
     );
+}
+
+// Emits four exact, raw shader stages across horizontal trace stripes. The
+// Java on-demand capture reads one texel per stripe from the cloud target.
+// This bypasses neither descriptor ownership nor texture sampling; it invokes
+// the same direct-storm functions used by cloudDensity and lighting.
+vec4 stormMaterialTraceAt(vec3 p, int stage) {
+    bool owned = false;
+    float height01 = 0.0;
+    float strength = 0.0;
+    int roleMask = 0;
+    float coverage = StormLobeCount > 0
+        ? directStormShape(p, owned, height01, strength, roleMask)
+        : 0.0;
+    vec3 samplePos = p;
+    samplePos.xz -= MaterialOffset;
+    vec4 baseNoise = texture(
+        BaseNoiseSampler, baseNoiseDomain(samplePos, STORM_BASE_NOISE_SCALE), 0.0
+    );
+    float lowFbm = baseNoise.g * 0.625 + baseNoise.b * 0.25 + baseNoise.a * 0.125;
+    float carrierRaw = saturate(remap(baseNoise.r, -(1.0 - lowFbm), 1.0, 0.0, 1.0));
+    float baseField = stormBaseField(carrierRaw);
+    bool embedded = (roleMask & 7) == 7;
+    // directStormShape exposes roles whose lobe-softness region was inspected.
+    // That is useful to its smooth union, but it is not an active contribution
+    // when the final envelope is zero. T128 exports the latter separately.
+    int activeRoleMask = coverage > 0.001 && owned ? roleMask : 0;
+    float bodyBefore = owned ? stormBody(coverage, strength, baseField, false) : 0.0;
+    float bodyAfter = owned ? stormBody(coverage, strength, baseField, embedded) : 0.0;
+    vec3 detailPos = detailNoiseDomain(samplePos) + (baseNoise.gbr - 0.5) * 0.18;
+    vec4 detail = texture(DetailNoiseSampler, detailPos, 0.0);
+    float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
+    float erosion = (1.0 - detailFbm) * STORM_EROSION;
+    float bodyEroded = max(bodyAfter - erosion, 0.0);
+    float materialFactor = mix(1.0, 1.18, 0.72 * (1.0 - saturate(height01)) * 0.6)
+        * mix(0.90, 1.10, 0.78)
+        * (1.0 + 0.68 * (1.0 - saturate(height01)) * 0.32);
+    float density = owned ? bodyEroded * materialFactor * 0.73 * DensityMul : 0.0;
+    bool cameraStartsInsideSlab = CameraPos.y >= SlabBaseY && CameraPos.y <= SlabTopY;
+    bool cameraInsideCloud = cloudDensity(CameraPos, 0.0, false, true, false) > 0.12;
+    vec3 traceViewDirection = normalize(p - CameraPos);
+    float lightOd = lightMarchOpticalDepth(
+        p, density, cameraStartsInsideSlab, cameraInsideCloud
+    ) * ExtinctionScale;
+    float direct;
+    float ambient;
+    float phaseShadow;
+    float ignoredRecordedOd;
+    vec3 radiance = evaluateLightingComponents(
+        lightOd,
+        density,
+        height01,
+        dot(traceViewDirection, LightDir),
+        saturate(length(p - CameraPos) / max(MaxRenderDistance, 1.0)),
+        1.0,
+        0.0,
+        0.0,
+        ignoredRecordedOd,
+        direct,
+        ambient,
+        phaseShadow
+    );
+    if (stage == 0) {
+        return vec4(coverage, strength, carrierRaw, baseField);
+    }
+    if (stage == 1) {
+        return vec4(bodyBefore, bodyAfter, erosion, density);
+    }
+    if (stage == 2) {
+        return vec4(height01, density * ExtinctionScale, lightOd, direct);
+    }
+    int traceFlags = activeRoleMask + (owned ? 16 : 0);
+    return vec4(ambient, phaseShadow, dot(radiance, vec3(0.2126, 0.7152, 0.0722)),
+        float(traceFlags) / 31.0);
 }
 
 // Diagnostic-only segment-sample integrator for DebugViews 11, 12 and 14-20.
@@ -3391,6 +3853,20 @@ float precipitationRayPadding() {
 // ---------------------------------------------------------------------------
 
 void main() {
+    if (DebugView == 21) {
+        int traceSample = clamp(
+            int(floor(texCoord.x * float(max(StormTraceSamples, 1)))),
+            0,
+            max(StormTraceSamples - 1, 0)
+        );
+        float traceY = StormTraceYStart + float(traceSample) * StormTraceYInterval;
+        fragColor = stormMaterialTraceAt(
+            vec3(StormTraceOrigin.x, traceY, StormTraceOrigin.y),
+            StormTraceStage
+        );
+        gl_FragDepth = 1.0;
+        return;
+    }
     vec2 ndc = texCoord * 2.0 - 1.0;
     vec4 clipDir = vec4(ndc, -1.0, 1.0);
     vec4 viewDir4 = InvProjMat * clipDir;
@@ -3566,7 +4042,13 @@ void main() {
 
     for (int i = 0; i < MAX_STEPS; i++) {
         if (t >= t1 || transmittance < 0.015) {
+            if (transmittance < 0.015 && paWorkloadCaptureActive()) {
+                paEarlyTerminations++;
+            }
             break;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryRaySteps++;
         }
         bool fine = sinceHit < 6;
         float distanceGrowth = 1.0 + (t / max(MaxRenderDistance, 1.0)) * 2.2;
@@ -3616,6 +4098,9 @@ void main() {
                 && FunnelCount == 0) {
             float coverageSignal = sampleWeather(p.xz).r * CoverageMul;
             if (coverageSignal <= 0.001 && !localRainSegment) {
+                if (paWorkloadCaptureActive()) {
+                    paEmptySpaceRejects++;
+                }
                 lastClearT = t;
                 hasClearBracket = true;
                 sinceHit++;
@@ -4327,6 +4812,30 @@ void main() {
     }
     float resultDepth = currentCloudHit ? depthAt(relRepresentative) : 1.0;
     float resultDepthDerivative = currentCloudHit ? fwidth(resultDepth) : 0.0;
+
+    // Counter channels are unpremultiplied floating-point integers. The
+    // on-demand readback sums them across the target, so this path is never
+    // composited or used as temporal history.
+    if (DebugView == 22) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paPrimaryRaySteps),
+            float(paDescriptorEvaluations),
+            float(paDescriptorTextureFetches),
+            float(paAvoidedDescriptorTextureFetches)
+        );
+        return;
+    }
+    if (DebugView == 23) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paLightMarchDensityEvaluations),
+            float(paEmptySpaceRejects),
+            float(paEarlyTerminations),
+            float(paConservativeDescriptorRejects)
+        );
+        return;
+    }
 
     if (DebugView == 5) {
         if (!currentCloudHit) {

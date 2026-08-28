@@ -15,6 +15,7 @@ import net.Gabou.projectatmosphere.registry.ModParticles;
 import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkyEffectController;
 import net.Gabou.projectatmosphere.client.render.sky.SkyEffectState;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudFrameDiagnostics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -39,6 +40,10 @@ public class ClientTickHandler {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
+        // Marker-gated test infrastructure must also run at the title screen:
+        // it is responsible for creating and opening its own fresh fixture.
+        // The call is inert during normal play.
+        VolumetricCloudFrameDiagnostics.tickT132AutoDriver();
         boolean simpleCloudsLoaded = AtmosphereCloudServices.isSimpleCloudsLoaded();
         if (simpleCloudsLoaded) {
             ClientHurricaneStateCache.tick(mc.level);

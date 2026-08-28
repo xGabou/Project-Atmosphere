@@ -31,6 +31,9 @@ public record StormLobeDescriptor(
 ) {
     public static final int TEXELS_PER_DESCRIPTOR = 4;
     public static final int FLOATS_PER_DESCRIPTOR = TEXELS_PER_DESCRIPTOR * 4;
+    private static final int ROLE_PACK_BASE = 8;
+    private static final int MEMBER_INDEX_PACK_BASE = 64;
+    private static final int MEMBER_COUNT_PACK_BASE = 64;
     public static final Comparator<StormLobeDescriptor> STABLE_IDENTITY_ORDER =
             Comparator.comparing(StormLobeDescriptor::groupId)
                     .thenComparingInt(StormLobeDescriptor::memberIndex)
@@ -137,9 +140,9 @@ public record StormLobeDescriptor(
             float[] texels,
             int offset
     ) {
-        int packedGroupRole = Math.round(texels[offset + 15]);
-        int groupSlot = Math.max(0, packedGroupRole / 8);
-        Role role = Role.fromGpuId(Math.floorMod(packedGroupRole, 8));
+        int topology = Math.round(texels[offset + 15]);
+        int groupSlot = unpackGroupSlot(topology);
+        Role role = Role.fromGpuId(unpackRole(topology));
         return new StormLobeDescriptor(
                 identity.fieldId(), identity.groupId(), identity.memberIndex(), identity.memberCount(),
                 groupSlot, role,
@@ -157,8 +160,43 @@ public record StormLobeDescriptor(
                 && memberIndex == other.memberIndex;
     }
 
+    /**
+     * Compact, exact group topology consumed by the shader. The existing
+     * metadata texel now carries group slot, member count, member index, and
+     * role, letting a candidate witness derive its contiguous descriptor range
+     * in O(1) rather than scanning up to 64 descriptors at every density and
+     * cone sample.
+     */
     public float packedGroupRole() {
-        return groupSlot * 8.0F + role.gpuId();
+        return packTopology(groupSlot, memberCount, memberIndex, role.gpuId());
+    }
+
+    static int packTopology(int groupSlot, int memberCount, int memberIndex, int role) {
+        int safeGroup = Math.max(0, Math.min(groupSlot, StormLobeSpatialIndex.MAX_GROUPS - 1));
+        int safeCount = Math.max(1, Math.min(memberCount, MEMBER_COUNT_PACK_BASE));
+        int safeIndex = Math.max(0, Math.min(memberIndex, safeCount - 1));
+        int safeRole = Math.max(0, Math.min(role, ROLE_PACK_BASE - 1));
+        return (((safeGroup * MEMBER_COUNT_PACK_BASE + (safeCount - 1))
+                * MEMBER_INDEX_PACK_BASE + safeIndex)
+                * ROLE_PACK_BASE + safeRole);
+    }
+
+    static int unpackRole(int topology) {
+        return Math.floorMod(topology, ROLE_PACK_BASE);
+    }
+
+    static int unpackMemberIndex(int topology) {
+        return Math.floorMod(topology / ROLE_PACK_BASE, MEMBER_INDEX_PACK_BASE);
+    }
+
+    static int unpackMemberCount(int topology) {
+        return Math.floorMod(topology / (ROLE_PACK_BASE * MEMBER_INDEX_PACK_BASE),
+                MEMBER_COUNT_PACK_BASE) + 1;
+    }
+
+    static int unpackGroupSlot(int topology) {
+        return Math.max(0, topology / (ROLE_PACK_BASE * MEMBER_INDEX_PACK_BASE
+                * MEMBER_COUNT_PACK_BASE));
     }
 
     public void writeTexels(float[] destination, int offset) {
@@ -217,7 +255,12 @@ public record StormLobeDescriptor(
         destination[offset + 12] = clamp01(cell.seed01());
         destination[offset + 13] = clamp01(cell.lifecycleStage());
         destination[offset + 14] = clamp01(cell.verticalDevelopment());
-        destination[offset + 15] = groupSlot * 8.0F + role.gpuId();
+        destination[offset + 15] = packTopology(
+                groupSlot,
+                cell.morphologyMemberCount(),
+                cell.morphologyMemberIndex(),
+                role.gpuId()
+        );
     }
 
     private static float clamp01(float value) {
