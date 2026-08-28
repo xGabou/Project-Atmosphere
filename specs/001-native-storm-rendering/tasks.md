@@ -175,7 +175,20 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 ### Revalidation Gate
 
 - [X] T097 Run the corrected morphology, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, precipitation, and acceleration regressions plus the US1/US2 sandboxes; record passing results in `specs/001-native-storm-rendering/validation/phase4r-automated.md` and verify each T080 expected failure is closed without weakening assertions (depends on T081-T096) [SC-001-SC-004, SC-010]
-**T098 erosion hypothesis FALSIFIED 2026-08-28.** Measured per-role on real T134 geometry:
+**T098 root cause 2026-08-28: T127's proportional contract is violated and internally
+inconsistent.** Every absolute role diameter passes its T127 range (BASE 1044, CORE 504, lower
+TOWER 315, upper TOWER 216, ANVIL 1270-1287), but T127's stated *relationships* were never
+guarded and two fail: **lower TOWER/CORE = 0.625** against 0.65-0.75, and **ANVIL/upper TOWER =
+5.917** against 3.5-5.0. That is why T134 passed while T098 failed - only the diameters were
+checked. The contract is also inconsistent: upper TOWER <= 250 with the 3.5-5.0 relationship
+caps the anvil at 1250, but the anvil range reaches 1450 and the generator delivers 1278, so no
+admissible upper TOWER can satisfy it. Sensitivity shows widening the column is the only
+effective lever (share 6.49% -> 24.62%) while anvil reduction is nearly inert (-> 7.62%), and
+vertical band coverage is unchanged at 11/19 throughout - the column is thin, not broken. Two
+valid resolutions remain and choosing between them is a morphology decision. **No production
+change was made.** See `validation/t098-manual-checklist.md`.
+
+**Superseded - T098 erosion hypothesis FALSIFIED 2026-08-28.** Measured per-role on real T134 geometry:
 TOWER is the **least**-eroded role (mean body 0.7032, erosion/body 0.327, erosion>=body 5.7%,
 density-visible 93.3%), while BASE and ANVIL lose ~44% of samples outright. Erosion is not
 erasing the tower; scaling erosion by body would inflate the base and anvil instead. The real

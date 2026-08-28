@@ -63,6 +63,7 @@ public final class StormVolumetricGeometrySandbox {
         validateT132Attribution();
         reportT098CarrierDistribution();
         reportT098ErosionVersusBody();
+        reportT098ProportionSensitivity();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -1529,6 +1530,148 @@ public final class StormVolumetricGeometrySandbox {
                 rx * 0.022D + wx * 0.43D + (baseSample[1] - 0.5D) * 0.18D,
                 ry * 0.022D + wy * 0.43D + (baseSample[2] - 0.5D) * 0.18D,
                 rz * 0.022D + wz * 0.43D + (baseSample[0] - 0.5D) * 0.18D};
+    }
+
+
+    /**
+     * T098 phase 2/3: sensitivity of the central-column mass to the role
+     * diameters, and to the anvil span.
+     *
+     * <p>Every role already sits inside its T127 range, so the imbalance lives
+     * in the composed proportion, which the contract never constrains. This
+     * scales CORE and TOWER radii - and separately the ANVIL - on the real T134
+     * descriptor set and measures what each does to occupied volume, to the
+     * central column's share, and to the anvil-to-tower dominance.
+     *
+     * <p>Occupied volume is measured on the density field, not the envelope, so
+     * it reflects material a ray would actually integrate.
+     */
+    private static void reportT098ProportionSensitivity() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        System.out.println("T098_SENSITIVITY|scaling CORE+TOWER radii, then ANVIL radii"
+                + "|metric=density-visible voxels (>=0.02)");
+        double[] columnScales = {1.00D, 1.15D, 1.30D, 1.45D, 1.60D, 1.80D};
+        for (double scale : columnScales) {
+            measureProportion(baseVolume, detailVolume, scale, 1.00D);
+        }
+        double[] anvilScales = {0.90D, 0.80D, 0.70D};
+        for (double scale : anvilScales) {
+            measureProportion(baseVolume, detailVolume, 1.00D, scale);
+        }
+        // The combination class the brief asks for: modest column growth with a
+        // modest anvil reduction.
+        measureProportion(baseVolume, detailVolume, 1.30D, 0.90D);
+        measureProportion(baseVolume, detailVolume, 1.45D, 0.85D);
+    }
+
+    /** One proportion candidate, measured through the production density chain. */
+    private static void measureProportion(
+            byte[] baseVolume, byte[] detailVolume, double columnScale, double anvilScale) {
+        java.util.List<StormLobeDescriptor> lobes = new ArrayList<>();
+        for (StormLobeDescriptor lobe : severeFixture38bc5412()) {
+            double factor = switch (lobe.role()) {
+                case CORE, TOWER -> columnScale;
+                case ANVIL -> anvilScale;
+                default -> 1.0D;
+            };
+            lobes.add(new StormLobeDescriptor(
+                    lobe.fieldId(), lobe.groupId(), lobe.memberIndex(), lobe.memberCount(),
+                    lobe.groupSlot(), lobe.role(), lobe.centerX(), lobe.centerZ(),
+                    lobe.baseY(), lobe.topY(),
+                    (float) (lobe.majorRadius() * factor), (float) (lobe.minorRadius() * factor),
+                    lobe.sinOrientation(), lobe.cosOrientation(), lobe.shearX(), lobe.shearZ(),
+                    lobe.density(), lobe.edgeSoftness(), lobe.seed01(), lobe.lifecycleStage(),
+                    lobe.verticalDevelopment(), lobe.detailWeight()));
+        }
+
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+        long[] visible = new long[4];
+        double step = 24.0D;
+        double footprintMax = 0.0D;
+        // Vertical continuity of the central column, in 48-block bands.
+        int bands = 0;
+        int bandsWithColumn = 0;
+        int longestGap = 0;
+        int currentGap = 0;
+
+        for (double y = 136.0D; y <= 1000.0D; y += 48.0D) {
+            bands++;
+            long columnHere = 0L;
+            for (double yy = y; yy < y + 48.0D && yy <= 1000.0D; yy += step) {
+                for (double x = -800.0D; x <= 800.0D; x += step) {
+                    for (double z = -800.0D; z <= 800.0D; z += step) {
+                        int owner = -1;
+                        double bestEnvelope = 0.0D;
+                        for (StormLobeDescriptor lobe : lobes) {
+                            double envelope = StormLobeEvaluator.envelopeFromDistance(
+                                    StormLobeEvaluator.signedDistanceAt(lobe, x, yy, z),
+                                    StormLobeEvaluator.edgeWidthBlocks(lobe),
+                                    StormLobeEvaluator.envelopeStrength(lobe));
+                            if (envelope > bestEnvelope) {
+                                bestEnvelope = envelope;
+                                owner = lobe.role().gpuId();
+                            }
+                        }
+                        if (owner < 0) {
+                            continue;
+                        }
+                        double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, yy, z);
+                        if (coverage <= 0.0D) {
+                            continue;
+                        }
+                        double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, yy, z);
+                        boolean embedded =
+                                StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, yy, z);
+                        double[] uvw = baseDomain(x, yy, z, 0.0025D);
+                        CloudNoiseFieldModel.sampleBase(
+                                baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                        double lowFbm = StormDensityModel.lowFbm(
+                                baseSample[1], baseSample[2], baseSample[3]);
+                        double baseField = StormDensityModel.stormBaseField(
+                                StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                        double[] duvw = detailDomain(x, yy, z, baseSample);
+                        CloudNoiseFieldModel.sampleDetail(
+                                detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                        double detailFbm = StormDensityModel.detailFbm(
+                                detailSample[0], detailSample[1], detailSample[2]);
+                        double density = StormDensityModel.finalDensity(
+                                coverage, strength, baseField, detailFbm, embedded);
+                        if (density >= 0.02D) {
+                            visible[owner]++;
+                            footprintMax = Math.max(footprintMax, 2.0D * Math.hypot(x, z));
+                            if (owner == 1 || owner == 2) {
+                                columnHere++;
+                            }
+                        }
+                    }
+                }
+            }
+            // A band counts as carrying the column only if it has real material.
+            if (columnHere >= 8L) {
+                bandsWithColumn++;
+                currentGap = 0;
+            } else {
+                currentGap++;
+                longestGap = Math.max(longestGap, currentGap);
+            }
+        }
+
+        long column = visible[1] + visible[2];
+        long mass = visible[0] + visible[3];
+        long total = column + mass;
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_PROPORTION|columnScale=%.2f|anvilScale=%.2f"
+                        + "|base=%-6d|core=%-6d|tower=%-6d|anvil=%-6d"
+                        + "|columnShare=%.2f%%|massOverColumn=%.1f:1|anvilOverTower=%.1f:1"
+                        + "|columnBands=%d/%d|longestColumnGap=%d|footprint=%.0f%n",
+                columnScale, anvilScale,
+                visible[0], visible[1], visible[2], visible[3],
+                total == 0L ? 0.0D : 100.0D * column / total,
+                column == 0L ? 0.0D : (double) mass / column,
+                visible[2] == 0L ? 0.0D : (double) visible[3] / visible[2],
+                bandsWithColumn, bands, longestGap, footprintMax);
     }
 
     private static int connectedComponents(boolean[][] occupied) {

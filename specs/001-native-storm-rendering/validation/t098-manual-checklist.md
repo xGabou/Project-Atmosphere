@@ -578,3 +578,100 @@ stalk.
 geometry, role strengths and `STORM_MAX_BLEND_BLOCKS = 48` are all unchanged. **T098 remains
 REJECTED and OPEN.** The next candidate is the tower/anvil cross-section relationship in the T127
 contract, which is a specification question rather than a renderer bug.
+
+---
+
+# T098 root cause: the T127 proportional contract is violated and internally inconsistent - 2026-08-28
+
+**This is the objective finding, stated in the contract's own terms.** No production geometry was
+changed: resolving it requires a morphology decision with two valid answers.
+
+## Every absolute diameter passes; the relationships do not
+
+Measured across 128 deterministic mature severe plans (`reportT098RoleProportions()`):
+
+| Role | Delivered | T127 absolute target | In range? |
+|---|---:|---|:--:|
+| BASE | 1044.0 | 900-1100 | yes |
+| CORE | 504.0 | 420-520 | yes |
+| lower TOWER | 315.0 | 280-360 | yes |
+| upper TOWER | 216.0 | 180-250 | yes |
+| ANVIL union | 1269.9-1287.3 | 1150-1450 | yes |
+
+T127's scale table also states a **relationship** beside each diameter. Those were never guarded, and
+two of them fail:
+
+| Relationship | Delivered | T127 target | |
+|---|---:|---|---|
+| CORE / BASE | 0.483 | 0.45-0.50 | OK |
+| **lower TOWER / CORE** | **0.625** | 0.65-0.75 | **VIOLATION** |
+| ANVIL / BASE | 1.224 | 1.20-1.35 | OK |
+| **ANVIL / upper TOWER** | **5.917** | 3.5-5.0 | **VIOLATION** |
+
+**This is why T134 passed and T098 failed.** `validateStormPhysicalScale()` checks each diameter
+against its own range and nothing else, so a system can satisfy every range and still compose into
+the rejected silhouette. The proportional half of the contract was documented and never enforced.
+
+## The contract is also internally inconsistent
+
+With upper TOWER capped at 250 and the stated `ANVIL = 3.5-5.0 x upper TOWER`, the widest admissible
+anvil is `5.0 x 250 = 1250`. But the ANVIL range runs to **1450**, and the generator delivers
+**1278**. For any anvil above 1250 **no upper-tower value inside 180-250 can satisfy the
+relationship.** The two halves of the table cannot both be met at the delivered scale.
+
+## Sensitivity: which term actually drives the silhouette
+
+Scaling role radii on the real T134 descriptor set and measuring through the production density
+chain (`reportT098ProportionSensitivity()`, density-visible voxels at >= 0.02):
+
+| columnScale | anvilScale | Column share | mass:column | anvil:tower | Column bands | Longest gap |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.00 | 1.00 | 6.49% | 14.4:1 | 35.1:1 | 11/19 | 6 |
+| 1.15 | 1.00 | 8.54% | 10.7:1 | 27.4:1 | 11/19 | 6 |
+| 1.30 | 1.00 | 10.96% | 8.1:1 | 19.7:1 | 11/19 | 6 |
+| 1.45 | 1.00 | 14.14% | 6.1:1 | 15.5:1 | 11/19 | 6 |
+| 1.80 | 1.00 | 24.62% | 3.1:1 | 8.9:1 | 12/19 | 5 |
+| 1.00 | 0.90 | 6.73% | 13.8:1 | 32.7:1 | 11/19 | 6 |
+| 1.00 | 0.70 | 7.62% | 12.1:1 | 25.7:1 | 11/19 | 6 |
+| 1.30 | 0.90 | 11.36% | 7.8:1 | 18.4:1 | 11/19 | 6 |
+
+Two results matter:
+
+- **Widening the central column is the only effective lever.** It moves the column's share of
+  occupied material from 6.49% to 24.62%. Shrinking the anvil is nearly inert: even a 30% reduction
+  only reaches 7.62%, and it starts eroding the footprint.
+- **Vertical band coverage never changes.** The column occupies 11 of 19 bands at every candidate,
+  with the same 6-band gap. Those empty bands are the lowest (BASE only) and the highest (ANVIL
+  only), which is correct morphology. The column is already vertically continuous where it should
+  be - it is thin, not broken.
+
+## The decision required
+
+Restoring `ANVIL / upper TOWER <= 5.0` at the delivered anvil of 1278 needs
+`upper TOWER >= 255.6`, against 216 today - a column scale of about **1.18**. Reaching the middle of
+the 3.5-5.0 band needs about **1.39**, and the bottom about **1.69**. Two resolutions are both
+defensible and they produce visibly different storms:
+
+**A. Widen the central column and raise the upper-TOWER range.** Keeps the accepted footprint,
+height, BASE and ANVIL untouched; changes T127's upper-TOWER range from 180-250 to admit ~255-365.
+The sensitivity table shows this works. It makes the storm read as a thicker convective column.
+
+**B. Narrow the ANVIL to 1250 or below and raise upper TOWER to 250.** Keeps both stated ranges,
+satisfies the relationship at exactly 5.0, and needs no contract change - but the measurements show
+anvil reduction barely moves the column share, so it likely under-delivers, and it trims the anvil
+spread that T127 derived from horizon presence.
+
+Choosing between them is a morphology judgement about what the severe system should look like, not a
+measurement. **No production change was made.**
+
+## Guard added
+
+`validateT098ProportionGuardRejectsMushroom()` records the violations and asserts the inconsistency
+still holds, so the finding cannot silently decay. It deliberately asserts the *rejection* rather
+than the proportions: converting it into a live contract guard requires the decision above.
+
+## Status
+
+Unchanged: all T127/T134 role geometry, `STORM_EROSION`, `STORM_BASE_NOISE_SCALE`,
+`STORM_CARRIER_P05/P95`, T131, role strengths, `STORM_MAX_BLEND_BLOCKS = 48`. **T098 remains
+REJECTED and OPEN.**

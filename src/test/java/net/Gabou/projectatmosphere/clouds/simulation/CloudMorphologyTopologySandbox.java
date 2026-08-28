@@ -382,9 +382,195 @@ public final class CloudMorphologyTopologySandbox {
                 || stage == CloudMorphologyMembership.Stage.TOWER;
     }
 
+    /**
+     * T098 phase 1: the delivered role proportions of a mature severe system.
+     *
+     * <p>T127 states each role's diameter as an independent range. T098's live
+     * evidence shows those ranges compose into a 21:1 mass-to-column ratio, so
+     * this reports the ratios themselves - the quantity the contract never
+     * constrained - alongside the raw diameters the guards do check.
+     *
+     * <p>Report only; what the ratios should be is a T098/T127 decision.
+     */
+    private static void reportT098RoleProportions() {
+        CloudTypeDefinition definition = CloudTypeRegistry.getOrDefault("cumulonimbus_calvus");
+        double baseMin = Double.POSITIVE_INFINITY;
+        double baseMax = Double.NEGATIVE_INFINITY;
+        double coreMin = Double.POSITIVE_INFINITY;
+        double coreMax = Double.NEGATIVE_INFINITY;
+        double lowerMin = Double.POSITIVE_INFINITY;
+        double lowerMax = Double.NEGATIVE_INFINITY;
+        double upperMin = Double.POSITIVE_INFINITY;
+        double upperMax = Double.NEGATIVE_INFINITY;
+        double anvilMin = Double.POSITIVE_INFINITY;
+        double anvilMax = Double.NEGATIVE_INFINITY;
+        double coreOverBaseMin = Double.POSITIVE_INFINITY;
+        double coreOverBaseMax = Double.NEGATIVE_INFINITY;
+        double lowerOverBaseMin = Double.POSITIVE_INFINITY;
+        double lowerOverBaseMax = Double.NEGATIVE_INFINITY;
+        double upperOverBaseMin = Double.POSITIVE_INFINITY;
+        double upperOverBaseMax = Double.NEGATIVE_INFINITY;
+        double anvilOverBaseMin = Double.POSITIVE_INFINITY;
+        double anvilOverBaseMax = Double.NEGATIVE_INFINITY;
+        double anvilOverUpperMin = Double.POSITIVE_INFINITY;
+        double anvilOverUpperMax = Double.NEGATIVE_INFINITY;
+
+        for (int sample = 0; sample < 128; sample++) {
+            RandomSource random = RandomSource.create(0x543039385250524FL + sample * 0x9E3779B9L);
+            CloudMorphologyGenerators.SpawnPlan plan =
+                    CloudMorphologyGenerators.createSpawnPlan(definition, random);
+            Vec3 origin = new Vec3(0.0D, 256.0D, 0.0D);
+            double base = 0.0D;
+            double core = 0.0D;
+            double lower = 0.0D;
+            double upper = 0.0D;
+            double anvilMinX = Double.POSITIVE_INFINITY;
+            double anvilMaxX = Double.NEGATIVE_INFINITY;
+            double anvilMinZ = Double.POSITIVE_INFINITY;
+            double anvilMaxZ = Double.NEGATIVE_INFINITY;
+            for (int index = 0; index < plan.clusterCount(); index++) {
+                Vec3 center = index == 0
+                        ? origin
+                        : CloudMorphologyGenerators.createClusterCenter(origin, plan, index, random);
+                CloudMorphologyGenerators.StormLobeSpec spec =
+                        CloudMorphologyGenerators.stormLobeSpec(plan, index, (float) center.y);
+                double support = plan.radius() * spec.radiusMultiplier();
+                switch (spec.stage()) {
+                    case BASE -> base = Math.max(base, support * 2.0D);
+                    case CORE -> core = Math.max(core, support * 2.0D);
+                    case TOWER -> {
+                        if (lower == 0.0D) {
+                            lower = support * 2.0D;
+                        } else {
+                            upper = support * 2.0D;
+                        }
+                    }
+                    case ANVIL -> {
+                        anvilMinX = Math.min(anvilMinX, center.x - support);
+                        anvilMaxX = Math.max(anvilMaxX, center.x + support);
+                        anvilMinZ = Math.min(anvilMinZ, center.z - support);
+                        anvilMaxZ = Math.max(anvilMaxZ, center.z + support);
+                    }
+                    default -> {
+                    }
+                }
+            }
+            double anvil = Math.max(anvilMaxX - anvilMinX, anvilMaxZ - anvilMinZ);
+            baseMin = Math.min(baseMin, base);
+            baseMax = Math.max(baseMax, base);
+            coreMin = Math.min(coreMin, core);
+            coreMax = Math.max(coreMax, core);
+            lowerMin = Math.min(lowerMin, lower);
+            lowerMax = Math.max(lowerMax, lower);
+            upperMin = Math.min(upperMin, upper);
+            upperMax = Math.max(upperMax, upper);
+            anvilMin = Math.min(anvilMin, anvil);
+            anvilMax = Math.max(anvilMax, anvil);
+            coreOverBaseMin = Math.min(coreOverBaseMin, core / base);
+            coreOverBaseMax = Math.max(coreOverBaseMax, core / base);
+            lowerOverBaseMin = Math.min(lowerOverBaseMin, lower / base);
+            lowerOverBaseMax = Math.max(lowerOverBaseMax, lower / base);
+            upperOverBaseMin = Math.min(upperOverBaseMin, upper / base);
+            upperOverBaseMax = Math.max(upperOverBaseMax, upper / base);
+            anvilOverBaseMin = Math.min(anvilOverBaseMin, anvil / base);
+            anvilOverBaseMax = Math.max(anvilOverBaseMax, anvil / base);
+            anvilOverUpperMin = Math.min(anvilOverUpperMin, anvil / upper);
+            anvilOverUpperMax = Math.max(anvilOverUpperMax, anvil / upper);
+        }
+
+        System.out.printf(Locale.ROOT,
+                "T098_ROLE_DIAMETERS|base=%.1f..%.1f|core=%.1f..%.1f|lowerTower=%.1f..%.1f"
+                        + "|upperTower=%.1f..%.1f|anvilUnion=%.1f..%.1f%n",
+                baseMin, baseMax, coreMin, coreMax, lowerMin, lowerMax,
+                upperMin, upperMax, anvilMin, anvilMax);
+        System.out.printf(Locale.ROOT,
+                "T098_ROLE_RATIOS|core/base=%.3f..%.3f|lowerTower/base=%.3f..%.3f"
+                        + "|upperTower/base=%.3f..%.3f|anvil/base=%.3f..%.3f"
+                        + "|anvil/upperTower=%.2f..%.2f%n",
+                coreOverBaseMin, coreOverBaseMax, lowerOverBaseMin, lowerOverBaseMax,
+                upperOverBaseMin, upperOverBaseMax, anvilOverBaseMin, anvilOverBaseMax,
+                anvilOverUpperMin, anvilOverUpperMax);
+        System.out.printf(Locale.ROOT,
+                "T098_T127_TARGETS|base=900..1100|core=420..520|lowerTower=280..360"
+                        + "|upperTower=180..250|anvilSpan=1150..1450%n");
+    }
+
+    /**
+     * T098 phase 4: fail-first evidence for the role-proportion guards T127
+     * specifies but never enforced.
+     *
+     * <p>T127's scale table states relationships beside each diameter - CORE is
+     * 0.45-0.50 of BASE, lower TOWER 0.65-0.75 of CORE, ANVIL 1.20-1.35 of BASE
+     * and 3.5-5.0 of upper TOWER. Only the absolute diameters were ever guarded,
+     * so a system whose every diameter is in range can still compose into the
+     * mushroom silhouette T098 rejected. This proves the relationship bands
+     * reject the delivered proportions, so the guard cannot be added later
+     * without the contract decision being made first.
+     *
+     * <p>It deliberately asserts the *rejection*, not the proportions: turning
+     * these into live assertions requires choosing a resolution for the
+     * inconsistency documented in `t098-manual-checklist.md`.
+     */
+    private static void validateT098ProportionGuardRejectsMushroom() {
+        // The delivered mature severe system, measured by reportT098RoleProportions().
+        double base = 1044.0D;
+        double core = 504.0D;
+        double lowerTower = 315.0D;
+        double upperTower = 216.0D;
+        double anvil = 1278.0D;
+
+        // Relationships that hold today.
+        requireWithin("T127 core/base", core / base, 0.45D, 0.50D);
+        requireWithin("T127 anvil/base", anvil / base, 1.20D, 1.35D);
+
+        // Relationships T127 states and the delivered system violates.
+        requireOutside("T127 lowerTower/core", lowerTower / core, 0.65D, 0.75D);
+        requireOutside("T127 anvil/upperTower", anvil / upperTower, 3.5D, 5.0D);
+
+        // The inconsistency itself: with upper TOWER capped at 250 the 3.5-5.0
+        // relationship cannot admit an anvil above 1250, yet the anvil range
+        // reaches 1450 and the generator delivers 1278.
+        double widestAnvilSatisfiable = 5.0D * 250.0D;
+        if (widestAnvilSatisfiable >= 1450.0D) {
+            throw new IllegalStateException("T127 anvil range and upper-tower range are no "
+                    + "longer in tension; the recorded inconsistency may have been resolved");
+        }
+        if (anvil <= widestAnvilSatisfiable) {
+            throw new IllegalStateException("delivered anvil no longer exceeds the widest span "
+                    + "the upper-tower range can satisfy; re-derive the T098 proportion finding");
+        }
+
+        System.out.printf(Locale.ROOT,
+                "T098_PROPORTION_GUARD|coreOverBase=%.3f OK|anvilOverBase=%.3f OK"
+                        + "|lowerTowerOverCore=%.3f VIOLATES 0.65-0.75"
+                        + "|anvilOverUpperTower=%.3f VIOLATES 3.5-5.0"
+                        + "|widestAnvilSatisfiableWithUpperTower250=%.0f|deliveredAnvil=%.0f%n",
+                core / base, anvil / base, lowerTower / core, anvil / upperTower,
+                widestAnvilSatisfiable, anvil);
+    }
+
+    /** Asserts a measured ratio sits inside a stated contract band. */
+    private static void requireWithin(String label, double actual, double low, double high) {
+        if (actual < low || actual > high) {
+            throw new IllegalStateException(
+                    label + " expected " + low + ".." + high + " actual=" + actual);
+        }
+    }
+
+    /** Asserts a measured ratio sits outside a stated contract band. */
+    private static void requireOutside(String label, double actual, double low, double high) {
+        if (actual >= low && actual <= high) {
+            throw new IllegalStateException(
+                    label + " is now inside " + low + ".." + high + " (actual=" + actual
+                            + "); the T098 proportion finding needs re-deriving");
+        }
+    }
+
     private static void validateStormPhysicalScale() {
         validateT133GuardsRejectKnownViolations();
         reportStormBlendSaturation();
+        reportT098RoleProportions();
+        validateT098ProportionGuardRejectsMushroom();
         CloudMorphologyGenerators.StormPhysicalScale scale =
                 CloudMorphologyGenerators.stormPhysicalScale();
         requireRange("storm physical member count", scale.memberCount(), 10, 10);
