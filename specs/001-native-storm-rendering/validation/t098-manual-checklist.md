@@ -1308,3 +1308,102 @@ The next isolated blocker is the fine-march budget - `MAX_STEPS` against
 `./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
 T076 GLSL parity, T111 shader compilation, the T098 extent guard still
 selective at 0.750, and the new march guard.
+
+
+## T098 campaign after the promotion correction (2026-08-31)
+
+Result: **the marcher is fixed, T098 still fails visually.** T098 stays open, the
+remaining defect is identified below, and no new hypothesis was started.
+
+### Step 3: the SIDE waist ray now reaches material
+
+`firstFineT` only says where the march stops stepping coarsely; it does not say
+whether the ray ever arrived. `firstMaterialT` is the t of the first sample with
+density >= 0.02:
+
+| factor | firstMaterialT before | after | refFirstT | iters to material | exhausted | depth after |
+|---|---|---:|---:|---:|---|---:|
+| 1.12 waist | 438.4 | 439.2 | 436.0 | 68 (was 125) | yes | 61.9 |
+| 1.40 waist | never (-1) | 621.8 | 620.0 | 83 | yes | 48.8 |
+| 1.60 waist | never (-1) | 754.5 | 752.0 | 91 | yes | 39.8 |
+| 1.70 waist | never (-1) | **820.1** | 818.0 | 94 | yes | 36.8 |
+| 2.00 waist | never (-1) | 1015.3 | 1016.0 | 101 | yes | 32.2 |
+| 2.60 waist | never (-1) | 1451.2 | 1450.0 | 124 | yes | 7.9 |
+| 1.70 baseControl | 685.9 | 683.3 | 684.0 | 58 (was 75) | yes | 95.3 |
+| 1.70 anvilControl | 618.7 | 619.5 | 620.0 | 54 (was 86) | yes | 73.6 |
+
+False negatives are **zero on every ray at every distance**, before and after.
+The requested confirmation holds: the SIDE waist ray reaches real material at
+t = 820.1 against a reference 818.0, rather than never arriving.
+
+### Step 4: performance is redistributed, not reduced
+
+An earlier prediction in this investigation - that the probe would remove about
+110 wasted fine samples and be a clear net win - is **wrong**, and the step
+counts say so. At the 1.70x waist ray, fine steps fall only 122 to 116, coarse
+steps rise 6 to 12, and the probe adds about 20 union evaluations. The loop
+always runs its 128 iterations; what changes is that they are spent on material
+instead of empty space.
+
+Live GPU medians, indicative only because the fixtures and poses differ between
+runs: pre-fix peaks 217/220 and 210/216 ms, post-fix peaks 184/188 ms, with the
+lower and mid poses comparable (65 to 61, 128 to 140, 157 to 160). No material
+regression; possibly a modest improvement at the heaviest poses. A controlled
+same-fixture GPU A/B was not run.
+
+### Step 6: five fresh fixtures, all still failing
+
+| run | group | topY | result |
+|---|---|---:|---|
+| camp1 | faea3aea | 1002.03 | FAIL - two masses, coherent base, small connecting nub |
+| camp2 | 86b96f54 | 1000.95 | FAIL - same pattern |
+| camp3 | 55dafb12 | 1000.67 | FAIL - dark convective cap now visible on the base, gap remains |
+| camp5 | 07604303 | 1002.26 | FAIL - lower mass small and split in two |
+| ladder | dd0a9879 | - | FAIL - coherent base with upward structure, gap remains |
+
+camp4 was a lost run: its log is two lines, the client never started. It is a
+launch failure, not a fixture failure.
+
+Against the nine positive criteria, the picture is unchanged from the
+2026-08-30 campaign except that the base is now coherent rather than shredded
+and a convective cap is visible on some fixtures. Criteria 5, 6 and 7 pass on
+the anvil; 1, 2, 3, 4, 8 and 9 still fail. FAR is still empty.
+
+### The remaining defect, quantified
+
+The march now arrives, but arrives too late to integrate anything. At 1.70x it
+reaches material at iteration 94 of 128, leaving 34 fine steps of 3.536 blocks -
+about 120 blocks - against roughly 600 blocks of storm along that ray. It
+therefore samples the first fifth of the column and recovers 36.8 of 270.8
+reference optical depth. That is barely opaque, which is exactly what the frames
+show: a nub rather than a column.
+
+Two things consume the budget:
+
+1. **The approach zone.** The safe advance is
+   `unionDistance - StormWidestEdgeBlocks`, and that widest value is 164.6
+   blocks, set by BASE. The march is therefore locked into fine stepping within
+   164.6 blocks of any envelope - about 47 fine steps - even when the ray is
+   heading for the TOWER, whose own softness is only about 50. Bounding by the
+   softness of the group actually being approached would return roughly 33
+   iterations. Making that safe is the delicate part, since the bound must still
+   cover every group admitted at that point.
+
+2. **The budget ceiling.** `MAX_STEPS` 128 at `exteriorFineStep` 3.536 is 452
+   blocks of total fine reach, which is less than a severe storm's depth at
+   grading distance. This is not a defect; it is a budget that was never sized
+   for this storm scale, and changing it is a larger decision than a promotion
+   rule.
+
+FAR remains unexplained by this model, which predicts 7.9 optical depth at 2.60x
+where the live frame is empty. At least one further mechanism gates that
+distance; it was not investigated.
+
+### Status
+
+T098 remains **OPEN**. T099 remains blocked. `STORM_MAX_BLEND_BLOCKS = 48` is
+still not the next blocker.
+
+`./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
+T076 GLSL parity, T111 shader compilation, the T098 extent guard selective at
+0.750, and the march guard.
