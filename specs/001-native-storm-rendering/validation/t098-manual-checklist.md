@@ -996,3 +996,104 @@ yet have a connected body for seams to appear on.
 Regression after the campaign: `./gradlew check build` BUILD SUCCESSFUL, 40
 invariants passed, 0 failures, including T076 GLSL parity, T111 shader
 compilation, T098 extent and proportion guards, and the T134 scale contract.
+
+
+## T098 role-density composition investigation (2026-08-31)
+
+Result: the hypothesis is **falsified**. Role strength and material composition
+are not where the column is lost. The loss is view-dependent and occurs after
+`finalDensity`. Per the brief's stop condition 2, no material-composition
+change was made.
+
+### Production role strengths (live, fixture 9294726d)
+
+| role | member | density = strength | major | vertical span |
+|---|---|---:|---:|---|
+| BASE | 0 / 1 | 0.8471 / 0.8142 | 533.0 / 523.3 | 136-584 / 150-597 |
+| CORE | 2 / 3 | **1.0000 / 1.0000** | 298.9 / 271.9 | 349-630 / 402-698 |
+| TOWER | 4 / 5 | 0.9659 / 0.9745 | 222.4 / 188.1 | 435-802 / 593-929 |
+| ANVIL | 6-9 | 0.7954-0.8168 | 478-515 | 772-1000 |
+
+CORE sits at the 1.0 ceiling and TOWER just below it; BASE and ANVIL are the
+weakest roles in the storm. The column is the strongest material in the system
+and has no upward headroom, so the Phase 3 sweep has no admissible upward arm
+and "raise CORE/TOWER strength" is not an available lever.
+
+### The column is healthy at every density stage
+
+Offline integrated density by band, replacing the earlier thresholded cell
+counts which measured presence rather than quantity:
+
+| band | mean density | p50 | axis optical depth |
+|---|---:|---:|---:|
+| y296 BASE | 0.4548 | 0.4649 | 460.4 |
+| y616 | 0.4660 | 0.4751 | 267.8 |
+| y680 waist | 0.4932 | 0.5152 | 293.4 |
+| y712 waist | 0.5024 | 0.5381 | 199.5 |
+| y904 ANVIL | 0.4449 | 0.4634 | 825.2 |
+
+The waist carries the highest mean density in the storm. An optical depth of
+200-293 is overwhelmingly opaque; roughly 5 suffices.
+
+The production shader agrees. Its own T128 material trace on the live fixture
+reports, at the waist, coverage 0.966-0.974, bodyAfter 0.39-0.95, density
+0.81-0.91 at y680-712, and an activeRoleMask progressing 1 -> 3 -> 7 -> 15 as
+BASE, CORE, TOWER and ANVIL hand off. Retention through
+envelope -> coverage -> bodyBefore -> T131 bodyAfter -> erosion -> finalDensity
+shows no disproportionate CORE/TOWER loss at any stage.
+
+The offline fixture was re-verified against the live descriptors before relying
+on it: BASE 0.857/0.899 vs live 0.847/0.814, CORE 1.000/1.000 vs 1.000/1.000,
+TOWER 0.905/0.968 vs 0.966/0.975, radii within a few blocks.
+
+### Where it is actually lost: view dependence
+
+The column renders correctly at close range and degrades with camera distance,
+holding the fixture and every material input fixed:
+
+| view | distance (x horizontalRadius) | column |
+|---|---|---|
+| NEAR_EDGE | 1.12 (737 blocks) | substantial, well-detailed, reaches the anvil |
+| LADDER 1.20 | 789 | substantial, thin gap opening |
+| LADDER 1.40 | 921 | present, gap widened, top fragmenting |
+| LADDER 1.60 | 1053 | present but detached |
+| SIDE | 1.70 (1118) | clean sky |
+| LATERAL A/B | 1.90 (1250) | clean sky |
+| FAR | 2.60 (1710) | storm entirely absent |
+
+At SIDE the waist band y600-772 subtends about 8.7 degrees, roughly 112 pixels
+of a 900-pixel frame, so this is not angular resolution.
+
+Two candidate rendering causes were tested and both falsified:
+
+- Frame-time governor. Every frame of the 2026-08-30 campaign ran with
+  CloudFrameTimeGovernor saturated at its MIN_SCALE of 0.5, halving the march
+  step budget. A capture-only pin holding the scale at 1.0 did not restore the
+  column at 1.7x. The pin is marker-gated and test-only; its activation was not
+  independently logged, so treat this arm as indicative rather than conclusive.
+- T121 conservative rejection. At the waist the column lobes are inside their
+  own vertical spans, so verticalLowerBound is about 0 and the rejection cannot
+  fire.
+
+### The next target
+
+The remaining candidate is the exterior coarse-to-fine march transition: for
+near-horizontal exterior rays the march advances on coarseStep, capped at
+min(112, fineStep * 16) and grown by distanceGrowth = 1 + (t /
+MaxRenderDistance) * 2.2, and only switches to fineStep when
+directStormSegmentMayIntersect reports a hit. Near-horizontal rays are exactly
+the ones aimed at the waist, and they traverse the longest slab span. If that
+segment test misses the column for those rays, the march steps over material
+the density field contains - which is precisely the observed signature.
+
+This is a raymarch/acceleration question, not a morphology or material one, and
+it was not pursued here.
+
+### Status
+
+T098 remains OPEN. T099 remains blocked. STORM_MAX_BLEND_BLOCKS = 48 is still
+not the next blocker.
+
+No production morphology, material, carrier, erosion or T131 behaviour was
+changed. ./gradlew check build BUILD SUCCESSFUL, 40 invariants, 0 failures; the
+ANVIL vertical-extent guard remains selective at 0.750 against its 1.000 bound.

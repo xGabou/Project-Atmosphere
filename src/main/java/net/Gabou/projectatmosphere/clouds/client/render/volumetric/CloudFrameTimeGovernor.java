@@ -16,12 +16,26 @@ public final class CloudFrameTimeGovernor {
     private int underBudgetFrames;
 
     /**
+     * Test-only pin. T098's acceptance captures are static poses whose whole
+     * purpose is to judge what the renderer produces, but the governor had
+     * saturated at MIN_SCALE for every frame of the 2026-08-30 campaign, so
+     * those captures measured the governor's worst quality rather than the
+     * renderer. Pinning holds the scale for the duration of a capture set.
+     * Only {@code StormT098CaptureDriver} sets this, and only behind its
+     * marker file.
+     */
+    private Float pinnedStepScale;
+
+    /**
      * Feeds one GPU timing sample and returns the current step scale.
      *
      * @param gpuMilliseconds last measured raymarch GPU time, or negative when unavailable
      * @return step budget multiplier in [0.5, 1.0]
      */
     public float update(float gpuMilliseconds) {
+        if (pinnedStepScale != null) {
+            return pinnedStepScale;
+        }
         if (gpuMilliseconds < 0.0F) {
             return stepScale;
         }
@@ -47,7 +61,17 @@ public final class CloudFrameTimeGovernor {
     }
 
     public float stepScale() {
-        return stepScale;
+        return pinnedStepScale != null ? pinnedStepScale : stepScale;
+    }
+
+    /** Test-only: holds the step scale at {@code scale} until {@link #unpin()}. */
+    public void pin(float scale) {
+        pinnedStepScale = Math.max(MIN_SCALE, Math.min(1.0F, scale));
+    }
+
+    /** Test-only: releases a {@link #pin(float)} and resumes normal governing. */
+    public void unpin() {
+        pinnedStepScale = null;
     }
 
     public void reset() {

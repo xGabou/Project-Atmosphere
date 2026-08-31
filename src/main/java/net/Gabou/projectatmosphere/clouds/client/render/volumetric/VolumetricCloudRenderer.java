@@ -66,6 +66,20 @@ public final class VolumetricCloudRenderer {
         return GOVERNOR.stepScale();
     }
 
+    /**
+     * Test-only: holds the frame-time governor's step scale for T098 capture
+     * sets, which are static poses whose purpose is to judge the renderer, not
+     * the governor's load response.
+     */
+    public static void pinStepScaleForCaptures(float scale) {
+        GOVERNOR.pin(scale);
+    }
+
+    /** Test-only: releases {@link #pinStepScaleForCaptures(float)}. */
+    public static void releaseStepScalePin() {
+        GOVERNOR.unpin();
+    }
+
     public static float lastResolutionScale() {
         return lastResolutionScale;
     }

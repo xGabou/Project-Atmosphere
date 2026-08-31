@@ -169,6 +169,19 @@ public final class StormT098CaptureDriver {
         built.add(new Shot("7_LATERAL_B", centreX, midY, centreZ + radius * 1.9D,
                 "same storm 90 degrees around: descriptor seams, silhouette stability"));
         // 8 NEAR-EDGE: just outside the body, where the fine detail octaves resolve.
+        // T098 distance ladder. NEAR_EDGE at 1.12x radius shows a substantial
+        // billowing column; SIDE at 1.7x and LATERAL at 1.9x show clean sky in
+        // the same place, on the same fixture, with the production shader's own
+        // material trace reporting density 0.81-0.91 there. That is a
+        // view-dependent loss, not a morphology or material one, so these frames
+        // hold everything fixed except camera distance and bracket where the
+        // column stops being drawn.
+        for (double factor : new double[] {1.20D, 1.30D, 1.40D, 1.50D, 1.60D, 1.80D}) {
+            built.add(new Shot(
+                    String.format(java.util.Locale.ROOT, "9_LADDER_%03d", (int) (factor * 100.0D)),
+                    centreX + radius * factor, baseY + height * 0.55D, centreZ,
+                    "T098 distance ladder at waist height, factor " + factor));
+        }
         built.add(new Shot("8_NEAR_EDGE", centreX + radius * 1.12D, baseY + height * 0.55D, centreZ,
                 "fine detail octaves at the outer boundary"));
         return List.copyOf(built);
@@ -185,6 +198,11 @@ public final class StormT098CaptureDriver {
         if (captureModeApplied) {
             return;
         }
+        // The 2026-08-30 campaign ran with the frame-time governor saturated at
+        // its MIN_SCALE of 0.5 for every captured frame, so those captures
+        // recorded the governor's worst march quality rather than the
+        // renderer's output. These are static poses, so hold the scale.
+        VolumetricCloudRenderer.pinStepScaleForCaptures(1.0F);
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         if (player == null || player.connection == null) {
@@ -219,6 +237,7 @@ public final class StormT098CaptureDriver {
         if (!captureModeApplied) {
             return;
         }
+        VolumetricCloudRenderer.releaseStepScalePin();
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.options.hideGui = originalHideGui;
         LocalPlayer player = minecraft.player;

@@ -70,6 +70,7 @@ public final class StormVolumetricGeometrySandbox {
         reportT098AnvilSoftnessSweep();
         reportT098SoftnessVersusHeight();
         validateT098EnvelopeBoundedByExtent();
+        reportT098OpticalProfile();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -2388,6 +2389,111 @@ public final class StormVolumetricGeometrySandbox {
                 "T098_EXTENT_GUARD|worstSoftnessOverHalfHeight=%.3f (%s)|bound=1.000"
                         + "|rejectsPreFixAnvil=%.3f|PASSED%n",
                 worst, worstLabel, preFixAnvilSoftness / preFixAnvilHalfHeight);
+    }
+
+
+    /**
+     * T098 phase 2/5: integrated density by height, not thresholded presence.
+     *
+     * <p>The earlier vertical profile counted cells above density 0.02, which
+     * measures whether material exists, not how much. A band can be "occupied"
+     * across its whole width at a density the raymarch renders as nearly
+     * transparent, which is exactly the discrepancy to explain: the offline
+     * field shows a continuous column while the live image shows clean sky.
+     *
+     * <p>This reports mean and summed finalDensity per band, the density
+     * distribution, and a horizontal optical depth - the integral of density
+     * along a straight ray crossing the band through the storm axis, which is
+     * what a SIDE view actually accumulates.
+     */
+    private static void reportT098OpticalProfile() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double step = 16.0D;
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+
+        System.out.println("T098_OPTICAL|y|cells>=0.02|meanDensityOverCells|sumDensity"
+                + "|p50|p90|maxDensity|axisOpticalDepth|dominantRole");
+        for (double y = 136.0D; y <= 1000.0D; y += 32.0D) {
+            java.util.List<Double> densities = new ArrayList<>();
+            double sum = 0.0D;
+            double maxDensity = 0.0D;
+            long[] byRole = new long[4];
+            // Optical depth along the z=0 line through the storm axis, which is
+            // what a SIDE ray crossing this band integrates.
+            double axisDepth = 0.0D;
+            for (double x = -900.0D; x <= 900.0D; x += step) {
+                for (double z = -900.0D; z <= 900.0D; z += step) {
+                    double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+                    if (coverage <= 0.0D) {
+                        continue;
+                    }
+                    double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                    boolean embedded =
+                            StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                    double[] uvw = baseDomain(x, y, z, 0.0025D);
+                    CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                    double lowFbm = StormDensityModel.lowFbm(
+                            baseSample[1], baseSample[2], baseSample[3]);
+                    double baseField = StormDensityModel.stormBaseField(
+                            StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    double detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    double density = StormDensityModel.finalDensity(
+                            coverage, strength, baseField, detailFbm, embedded);
+                    if (density <= 0.0D) {
+                        continue;
+                    }
+                    sum += density;
+                    maxDensity = Math.max(maxDensity, density);
+                    if (Math.abs(z) < step * 0.5D) {
+                        axisDepth += density * step;
+                    }
+                    if (density >= 0.02D) {
+                        densities.add(density);
+                        int owner = -1;
+                        double best = 0.0D;
+                        for (StormLobeDescriptor lobe : lobes) {
+                            double envelope = StormLobeEvaluator.envelopeFromDistance(
+                                    StormLobeEvaluator.signedDistanceAt(lobe, x, y, z),
+                                    StormLobeEvaluator.edgeWidthBlocks(lobe),
+                                    StormLobeEvaluator.envelopeStrength(lobe));
+                            if (envelope > best) {
+                                best = envelope;
+                                owner = lobe.role().gpuId();
+                            }
+                        }
+                        if (owner >= 0) {
+                            byRole[owner]++;
+                        }
+                    }
+                }
+            }
+            java.util.Collections.sort(densities);
+            int dominant = 0;
+            for (int r = 1; r < 4; r++) {
+                if (byRole[r] > byRole[dominant]) {
+                    dominant = r;
+                }
+            }
+            String[] names = {"BASE", "CORE", "TOWER", "ANVIL"};
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_OPTICAL|%7.1f|%9d|%8.4f|%10.1f|%7.4f|%7.4f|%7.4f|%9.1f|%s%n",
+                    y, densities.size(),
+                    densities.isEmpty() ? 0.0D
+                            : densities.stream().mapToDouble(Double::doubleValue).sum()
+                                    / densities.size(),
+                    sum,
+                    densities.isEmpty() ? 0.0D : densities.get(densities.size() / 2),
+                    densities.isEmpty() ? 0.0D : densities.get((int) (densities.size() * 0.9D)),
+                    maxDensity, axisDepth,
+                    densities.isEmpty() ? "none" : names[dominant]);
+        }
     }
 
     private static int largestComponent(boolean[][] occupied) {
