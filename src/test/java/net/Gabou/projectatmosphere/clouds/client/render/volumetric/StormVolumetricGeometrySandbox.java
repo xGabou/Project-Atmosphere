@@ -71,6 +71,7 @@ public final class StormVolumetricGeometrySandbox {
         reportT098SoftnessVersusHeight();
         validateT098EnvelopeBoundedByExtent();
         reportT098OpticalProfile();
+        reportT098WebbingExcess();
         reportT098MarchSimulation();
         validateT098MarchReachesMaterial();
         if (Boolean.getBoolean("phase4r.failFirst")) {
@@ -2535,7 +2536,7 @@ public final class StormVolumetricGeometrySandbox {
                 + "|coarseSegs|fineSegs|firstFineT|refFirstT|falseNegSegs|falseNegBlocks"
                 + "|iters|exhausted|sdfEvals|marchedDepth|refDepth"
                 + "|firstMaterialT|itersToMaterial");
-        for (int strategy = 0; strategy < 4; strategy++) {
+        for (int strategy = 0; strategy < 8; strategy++) {
             for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D, 2.60D}) {
                 simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
                         factor, 680.0D, "waist", strategy);
@@ -2643,6 +2644,36 @@ public final class StormVolumetricGeometrySandbox {
                     // the ray has made real forward progress.
                     allow = false;
                 }
+                if (strategy >= 4) {
+                    // Per-descriptor clearance. All ten descriptors - BASE,
+                    // CORE, TOWER and ANVIL - live in one group, so a per-GROUP
+                    // bound takes the group's widest softness and is identical
+                    // to the global one. Per descriptor is the granularity that
+                    // actually differs: a ray approaching TOWER is bounded by
+                    // TOWER's own 49.7 rather than BASE's 164.6.
+                    //
+                    // Every lobe must individually clear, not just the nearest:
+                    // d_i(q) >= d_i(p) - L for every i, so the bound is the
+                    // minimum over descriptors. The smooth union additionally
+                    // creates material in the blend webbing between lobes, which
+                    // no single lobe's envelope covers, so a blend allowance is
+                    // subtracted as well and swept here rather than assumed.
+                    sdfEvals++;
+                    double[] blendAllowance = {0.0D, 24.0D, 48.0D, 96.0D};
+                    double clearance = Double.POSITIVE_INFINITY;
+                    for (StormLobeDescriptor lobe : lobes) {
+                        double lobeDistance = StormLobeEvaluator.signedDistanceAt(lobe,
+                                camX + dirX * t, camY + dirY * t, camZ + dirZ * t);
+                        clearance = Math.min(clearance,
+                                lobeDistance - StormLobeEvaluator.edgeWidthBlocks(lobe));
+                    }
+                    double safe = clearance - blendAllowance[strategy - 4];
+                    if (safe > fineStep) {
+                        allow = false;
+                        stepLength = Math.min(Math.min(safe, coarseStepCap), t1 - t);
+                        segEnd = t + stepLength;
+                    }
+                }
                 if (strategy == 3) {
                     // E: the union SDF is the distance to the envelope surface.
                     // envelopeFromDistance fades coverage over +/- softness, so
@@ -2728,7 +2759,8 @@ public final class StormVolumetricGeometrySandbox {
             }
         }
 
-        String[] names = {"current", "B_window", "C_cooldown", "E_sdf"};
+        String[] names = {"current", "B_window", "C_cooldown", "E_sdf",
+                "perDesc_b0", "perDesc_b24", "perDesc_b48", "perDesc_b96"};
         System.out.printf(java.util.Locale.ROOT,
                 "T098_MARCH|%-10s|%.2f|%-12s|%7.1f|%6.1f|%6d|%6d|%8.1f|%8.1f|%6d|%9.1f"
                         + "|%5d|%8s|%8d|%9.1f|%9.1f|%9.1f|%6d%n",
@@ -2848,11 +2880,23 @@ public final class StormVolumetricGeometrySandbox {
         // Optical depth of about 5 is already opaque, so this is a generous
         // margin over "the column is drawn at all".
         double opaqueDepth = 5.0D;
+        // Strategy 6 is the production rule: per-descriptor clearance minus the
+        // STORM_MAX_BLEND_BLOCKS webbing allowance. Strategy 3 is the previous
+        // global StormWidestEdgeBlocks bound, kept as a comparison arm because
+        // a per-GROUP bound would have been identical to it - every descriptor
+        // in this fixture shares one group. Strategy 0 is the pre-promotion-fix
+        // behaviour.
         for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D}) {
             double[] fixed = marchOutcome(baseVolume, detailVolume, lobes,
+                    centreX, centreZ, 657.8D, factor, 680.0D, 6);
+            double[] global = marchOutcome(baseVolume, detailVolume, lobes,
                     centreX, centreZ, 657.8D, factor, 680.0D, 3);
             double[] legacy = marchOutcome(baseVolume, detailVolume, lobes,
                     centreX, centreZ, 657.8D, factor, 680.0D, 0);
+            if (fixed[2] <= global[2]) {
+                throw new IllegalStateException("the per-descriptor bound is no better than "
+                        + "the global one at " + factor + "x: " + fixed[2] + " vs " + global[2]);
+            }
             if (fixed[0] > 0.0D) {
                 throw new IllegalStateException("T098 promotion probe skipped material at "
                         + factor + "x: " + fixed[0] + " segments, " + fixed[1] + " blocks");
@@ -2868,7 +2912,8 @@ public final class StormVolumetricGeometrySandbox {
             }
         }
         System.out.println("T098_MARCH_GUARD|falseNegatives=0 at every distance"
-                + "|fixed rule reaches opaque material 1.12x-2.00x"
+                + "|per-descriptor rule reaches opaque material 1.12x-2.00x"
+                + "|and beats the global bound at every distance"
                 + "|pre-fix rule still starves from 1.40x|PASSED");
     }
 
@@ -2896,6 +2941,56 @@ public final class StormVolumetricGeometrySandbox {
                 Double.parseDouble(fields[11].trim()),
                 Double.parseDouble(fields[15].trim())
         };
+    }
+
+
+    /**
+     * T098: how far the smooth union pulls the surface past the nearest lobe.
+     *
+     * <p>The per-descriptor advance bounds every lobe individually, but the
+     * ordered smooth union is below each input distance, so material exists in
+     * the webbing between lobes that no single lobe's envelope covers. The
+     * advance must subtract that excess. stormSmoothMinimum subtracts
+     * r*h*(1-h), at most r/4 per union, and nine sequential lobe unions inside
+     * one group make the analytic worst case far looser than reality. This
+     * measures the excess directly, so the allowance is derived rather than
+     * guessed.
+     */
+    private static void reportT098WebbingExcess() {
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double worst = 0.0D;
+        double worstY = 0.0D;
+        long samples = 0L;
+        java.util.List<Double> excesses = new ArrayList<>();
+        for (double y = 136.0D; y <= 1010.0D; y += 24.0D) {
+            for (double x = -1000.0D; x <= 1000.0D; x += 24.0D) {
+                for (double z = -1000.0D; z <= 1000.0D; z += 48.0D) {
+                    double nearest = Double.POSITIVE_INFINITY;
+                    for (StormLobeDescriptor lobe : lobes) {
+                        nearest = Math.min(nearest,
+                                StormLobeEvaluator.signedDistanceAt(lobe, x, y, z));
+                    }
+                    double union = StormLobeEvaluator.unionDistanceAt(lobes, x, y, z);
+                    double excess = nearest - union;
+                    samples++;
+                    if (excess > 0.0D) {
+                        excesses.add(excess);
+                    }
+                    if (excess > worst) {
+                        worst = excess;
+                        worstY = y;
+                    }
+                }
+            }
+        }
+        java.util.Collections.sort(excesses);
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_WEBBING|samples=%d|positiveExcess=%d|p50=%.2f|p99=%.2f|max=%.2f"
+                        + "|worstAtY=%.0f|analyticPerUnionCap=%.1f%n",
+                samples, excesses.size(),
+                excesses.isEmpty() ? 0.0D : excesses.get(excesses.size() / 2),
+                excesses.isEmpty() ? 0.0D : excesses.get((int) (excesses.size() * 0.99D)),
+                worst, worstY, 48.0D / 4.0D);
     }
 
     private static int largestComponent(boolean[][] occupied) {

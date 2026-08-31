@@ -44,11 +44,6 @@ uniform float SlabTopY;
 uniform float MaxPrecipitation;
 uniform int PuffLobeCount;
 uniform int StormLobeCount;
-// Widest envelope boundary over every uploaded descriptor, in blocks. The
-// coverage envelope fades over plus/minus its softness, so material can begin
-// this far outside the union surface; T098's promotion probe subtracts it to
-// keep the advance a true lower bound on the distance to any material.
-uniform float StormWidestEdgeBlocks;
 uniform int PuffShapeMode; // 0=fallback, 1=legacy hybrid, 2=direct-only diagnostic
 uniform int PuffDensityStage; // 0=final, 1=analytic-all, 2=analytic-indexed, 3=envelope, 4=pre-erosion, 7=continuous-all, 12=carrier-billow
 uniform int PuffTierFilter; // -1=all, 0=base, 1=middle, 2=crown, 3=legacy/unknown
@@ -938,7 +933,13 @@ void directStormGroupField(
         out float groupSoftness,
         out float groupHeight01,
         out int groupActiveRoleMask,
-        out bool ownsGroup) {
+        out bool ownsGroup,
+        out float groupMinClearance) {
+    // T098: the smallest (lobeDistance - lobeSoftness) in this group. Every
+    // lobe must individually clear before the march may advance, because
+    // d_i(q) >= d_i(p) - L for each i, so the minimum is the binding one - not
+    // the nearest lobe.
+    groupMinClearance = 1.0e9;
     groupDistance = 1.0e9;
     groupMinimumRadius = 1000000.0;
     groupStrength = 0.0;
@@ -1020,6 +1021,11 @@ void directStormGroupField(
             if (paWorkloadCaptureActive()) {
                 paConservativeDescriptorRejects++;
             }
+            // T098: a rejected lobe still bounds the safe advance.
+            // verticalLowerBound is a lower bound on this lobe's true distance,
+            // so using it here can only understate the clearance.
+            groupMinClearance = min(
+                groupMinClearance, verticalLowerBound - lobeSoftness);
             previousRadius = lobeRadius;
             previousRole = lobeRole;
             continue;
@@ -1044,6 +1050,7 @@ void directStormGroupField(
             : directStormLobeDistanceFromData(
                 p, positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole
             );
+        groupMinClearance = min(groupMinClearance, lobeDistance - lobeSoftness);
         // Every lobe of the group contributes. A lobe is never dropped because
         // its local density evaluates to zero: that is exactly the region
         // where a smooth union needs its distance, and dropping it is what
@@ -1096,16 +1103,18 @@ float directStormShape(
         out float dominantHeight01,
         out float envelopeStrength,
         out int activeRoleMask,
-        out float unionDistanceBlocks) {
+        out float unionDistanceBlocks,
+        out float minDescriptorClearance) {
     // Compact bit mask instead of a bool[MAX_STORM_GROUPS]. The array form
     // cost an allocation and an 8-iteration clear loop on every density
     // sample, and indexed writes into a local array defeat register
     // allocation on several drivers. Group slots are 0..7, so one int holds
     // the whole visitation set.
     int groupVisited = 0;
-    // T098 promotion policy reads this. It is the value the envelope mapping
-    // below already consumes, published rather than recomputed.
+    // T098 promotion policy reads these. They are values the union below
+    // already computes, published rather than recomputed.
     unionDistanceBlocks = 1.0e9;
+    minDescriptorClearance = 1.0e9;
     float stormDistance = 1.0e9;
     float stormStrength = 0.0;
     float stormSoftness = 0.0;
@@ -1135,11 +1144,13 @@ float directStormShape(
         float groupHeight01;
         int groupActiveRoleMask;
         bool ownsGroup;
+        float groupMinClearance;
         directStormGroupField(
             p, witnessIndex, groupSlot,
             groupDistance, groupMinimumRadius, groupStrength, groupSoftness,
-            groupHeight01, groupActiveRoleMask, ownsGroup
+            groupHeight01, groupActiveRoleMask, ownsGroup, groupMinClearance
         );
+        minDescriptorClearance = min(minDescriptorClearance, groupMinClearance);
         activeRoleMask |= groupActiveRoleMask;
         ownsDescriptorGroup = ownsDescriptorGroup || ownsGroup;
         if (groupDistance > 1.0e8) {
@@ -1199,9 +1210,10 @@ float directStormFinalDensity(
     float envelopeStrength;
     int activeRoleMask;
     float paUnionDistanceUnusedA;
+    float paClearanceUnusedA;
     float coverage = directStormShape(
         p, ownsDescriptorGroup, dominantHeight01, envelopeStrength, activeRoleMask,
-        paUnionDistanceUnusedA);
+        paUnionDistanceUnusedA, paClearanceUnusedA);
     if (coverage <= 0.0) {
         return 0.0;
     }
@@ -2747,6 +2759,7 @@ float cloudDensity(
     // Bounded COVERAGE ENVELOPE, not a density. The visible storm body is
     // formed from it below by the base-noise remap and multi-scale erosion.
     float paUnionDistanceUnusedB;
+    float paClearanceUnusedB;
     float directStormCoverage = StormLobeCount > 0
         ? directStormShape(
             p,
@@ -2754,7 +2767,8 @@ float cloudDensity(
             directStormHeight01,
             directStormStrength,
             directStormActiveRoleMask,
-            paUnionDistanceUnusedB
+            paUnionDistanceUnusedB,
+            paClearanceUnusedB
         )
         : 0.0;
     // Only a valid uploaded descriptor group may suppress the legacy family
@@ -3558,9 +3572,10 @@ vec4 stormMaterialTraceAt(vec3 p, int stage) {
     float strength = 0.0;
     int roleMask = 0;
     float paUnionDistanceUnusedC;
+    float paClearanceUnusedC;
     float coverage = StormLobeCount > 0
         ? directStormShape(p, owned, height01, strength, roleMask,
-            paUnionDistanceUnusedC)
+            paUnionDistanceUnusedC, paClearanceUnusedC)
         : 0.0;
     vec3 samplePos = p;
     samplePos.xz -= MaterialOffset;
@@ -4140,10 +4155,24 @@ void main() {
             float paProbeStrength;
             int paProbeRoleMask;
             float paUnionDistance;
+            float paMinClearance;
             directStormShape(
                 p, paProbeOwned, paProbeHeight01, paProbeStrength, paProbeRoleMask,
-                paUnionDistance);
-            float paSafeAdvance = paUnionDistance - StormWidestEdgeBlocks;
+                paUnionDistance, paMinClearance);
+            // Per descriptor, not per group and not global. Every descriptor in
+            // this fixture - BASE, CORE, TOWER and ANVIL - belongs to one
+            // group, so a per-group bound would take the group's widest
+            // softness and be identical to the global 164.6 that BASE sets.
+            // Bounding each descriptor by its own
+            // softness lets a ray approaching TOWER use TOWER's 49.7.
+            //
+            // The ordered smooth union sits below every input distance, so
+            // material also exists in the webbing between lobes that no single
+            // lobe's envelope covers. Measured over 130536 samples that excess
+            // peaks at 24.56 blocks, against an analytic per-union cap of
+            // STORM_MAX_BLEND_BLOCKS/4 = 12; subtracting the full blend cap
+            // leaves roughly a factor of two in hand.
+            float paSafeAdvance = paMinClearance - STORM_MAX_BLEND_BLOCKS;
             if (paSafeAdvance > fineStep) {
                 stepLength = min(min(paSafeAdvance, coarseStepCap), t1 - t);
             } else {
