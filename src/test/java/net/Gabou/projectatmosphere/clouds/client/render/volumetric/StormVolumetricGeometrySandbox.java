@@ -2533,7 +2533,8 @@ public final class StormVolumetricGeometrySandbox {
 
         System.out.println("T098_MARCH|strategy|factor|label|distance|targetY"
                 + "|coarseSegs|fineSegs|firstFineT|refFirstT|falseNegSegs|falseNegBlocks"
-                + "|iters|exhausted|sdfEvals|marchedDepth|refDepth");
+                + "|iters|exhausted|sdfEvals|marchedDepth|refDepth"
+                + "|firstMaterialT|itersToMaterial");
         for (int strategy = 0; strategy < 4; strategy++) {
             for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D, 2.60D}) {
                 simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
@@ -2603,6 +2604,10 @@ public final class StormVolumetricGeometrySandbox {
         int iterations = 0;
         int sdfEvals = 0;
         double firstFineT = -1.0D;
+        // Step 3: where the march actually samples material, not merely where it
+        // stops stepping coarsely.
+        double firstMaterialT = -1.0D;
+        int itersBeforeMaterial = -1;
         int falseNegSegs = 0;
         double falseNegBlocks = 0.0D;
         double marchedDepth = 0.0D;
@@ -2691,6 +2696,10 @@ public final class StormVolumetricGeometrySandbox {
                         camX + dirX * t, camY + dirY * t, camZ + dirZ * t);
                 marchedDepth += d * stepLength;
                 if (d >= 0.02D) {
+                    if (firstMaterialT < 0.0D) {
+                        firstMaterialT = t;
+                        itersBeforeMaterial = iterations;
+                    }
                     sinceHit = 0;
                     fineWindowStart = t;
                     promotionSuppressedUntil = -1.0D;
@@ -2722,10 +2731,11 @@ public final class StormVolumetricGeometrySandbox {
         String[] names = {"current", "B_window", "C_cooldown", "E_sdf"};
         System.out.printf(java.util.Locale.ROOT,
                 "T098_MARCH|%-10s|%.2f|%-12s|%7.1f|%6.1f|%6d|%6d|%8.1f|%8.1f|%6d|%9.1f"
-                        + "|%5d|%8s|%8d|%9.1f|%9.1f%n",
+                        + "|%5d|%8s|%8d|%9.1f|%9.1f|%9.1f|%6d%n",
                 names[strategy], factor, label, radius * factor, targetY,
                 coarseSegs, fineSegs, firstFineT, refFirst, falseNegSegs, falseNegBlocks,
-                iterations, exhausted ? "YES" : "no", sdfEvals, marchedDepth, refDepth);
+                iterations, exhausted ? "YES" : "no", sdfEvals, marchedDepth, refDepth,
+                firstMaterialT, itersBeforeMaterial);
     }
 
     /** The widest envelope boundary in the set, an upper bound on material reach. */
