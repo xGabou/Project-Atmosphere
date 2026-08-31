@@ -900,3 +900,99 @@ rather than another independent range, and carries the pre-fix witness
 T098 remains **OPEN**. The fix is proven offline and in regression, but the
 live visual campaign (>=5 fresh severe fixtures through the controlled views)
 has not been re-run. T098 must not be marked passed until it has.
+
+## T098 live acceptance campaign, post envelope-extent fix (2026-08-30)
+
+Six autoruns across six world seeds, yielding **five distinct fresh severe
+fixtures** (two runs converged on the same storm). Every run reached
+`T132_AUTORUN_FINISHED outcome=complete` with 10 descriptors and all 8
+controlled views captured.
+
+| run | seed | group | fingerprint | topY | horizontalRadius | height |
+|---|---:|---|---|---:|---:|---:|
+| fx1 | 5510001 | 9294726d | 97d76671 | 999.68 | 657.85 | 863.7 |
+| fx2 | 5525838 | ae4aef49 | 43aff062 | 1001.82 | 685.02 | 865.8 |
+| fx3 | 5533757 | 72259f41 | c2b11ff2 | 1002.38 | 686.25 | 866.4 |
+| fx4 | 5541676 | 72259f41 | c2b11ff2 | — duplicate of fx3 — | | |
+| fx5 | 5549595 | d266f801 | 6fae8172 | 1000.82 | 677.07 | 864.8 |
+| fx6 | 918273645 | 6e8e8c73 | aca5f0ad | 1002.15 | 675.53 | 866.2 |
+
+All heights sit inside T134's 720-880 and all footprints inside 1200-1500.
+
+### Phase 5: the 0.75 extent bound is selective, with a thin margin
+
+Pooled over all six runs, 60 live descriptors. Ratio is the unclamped
+`edgeWidthBlocks` over the lobe's own half-height, measured before the clamp:
+
+| role | count | clamped | min | median | max |
+|---|---:|---:|---:|---:|---:|
+| BASE | 12 | **0** | 0.710 | 0.720 | 0.736 |
+| CORE | 12 | **0** | 0.443 | 0.506 | 0.523 |
+| TOWER | 12 | **0** | 0.228 | 0.246 | 0.258 |
+| ANVIL | 24 | **24** | 2.149 | 2.255 | 2.312 |
+
+The bound behaves exactly as intended: it binds 24 of 24 ANVIL descriptors and
+0 of 36 BASE/CORE/TOWER descriptors. **It did not affect BASE, CORE or TOWER on
+any fresh fixture.**
+
+The margin is nonetheless thin and should be treated as a known risk rather
+than a comfortable separation: worst-case BASE reached 0.736 against the 0.75
+bound, a margin of 0.014 (1.9%). Across 12 live BASE descriptors from five
+independent worlds it was never crossed. The constant was not tuned.
+
+### Phase 4: visual grading - FAIL on all five fixtures
+
+Every fixture reads as **two cleanly separated masses**: an anvil dome above, a
+fragmented base below, and clear sky between them with no connecting column.
+
+| criterion | fx1 | fx2 | fx3 | fx5 | fx6 |
+|---|---|---|---|---|---|
+| 1 broad connected lower base | FAIL | FAIL | FAIL | FAIL | FAIL |
+| 2 dense convective core | FAIL | FAIL | FAIL | FAIL | FAIL |
+| 3 towers emerging from base | FAIL | FAIL | FAIL | FAIL | FAIL |
+| 4 progressive vertical narrowing | FAIL | FAIL | FAIL | FAIL | FAIL |
+| 5 broad upper anvil | PASS | PASS | PASS | PASS | PASS |
+| 6 multi-scale billowing | PASS (anvil) | PASS | PASS | PASS | PASS |
+| 7 multi-frequency surface variation | PASS (anvil) | PASS | PASS | PASS | PASS |
+| 8 coherent silhouette curvature | FAIL | FAIL | FAIL | FAIL | FAIL |
+| 9 continuous role transitions | FAIL | FAIL | FAIL | FAIL | FAIL |
+
+Rejected forms observed on every fixture: detached upper mass, detached lower
+base, mushroom / two-separated-masses, radial shredding of the base,
+recognisable ellipsoid, uniformly smooth anvil silhouette.
+
+Two views were inconclusive for capture-pose reasons, not morphology: **FAR**
+is empty because the framing distance (horizontalRadius x 2.6, about 1710
+blocks here) exceeds volumetric render range, and **UNDER** puts the camera
+inside mountainside terrain because `MINIMUM_CAMERA_Y = 70` is too low for
+these worlds. ABOVE, SIDE and both LATERAL views were fully usable and are what
+the grading rests on.
+
+### What the fix did and did not do
+
+It did what it was measured to do. The anvil's sub-canopy haze is gone: the gap
+between the masses is now clean sky rather than the shredded confetti the
+pre-fix captures showed, and the clamp statistics confirm every anvil boundary
+is now bounded by its own extent.
+
+It did not make the storm read as one system, because removing the haze
+revealed that nothing else occupies that space. ABOVE shows the anvil's own
+surface carrying genuine multi-scale billowing, so the noise and detail
+pipeline is working; the failure is that **CORE and TOWER produce almost no
+visible density**, consistent with the earlier offline measurement of 4,635
+CORE+TOWER visible voxels against 21,521 for BASE alone. The previous anvil
+skirt was visually masking that absence.
+
+The remaining blocker is therefore in role density/strength composition, not in
+envelope extent and not in descriptor allocation. Per the campaign brief this
+is recorded, not acted on.
+
+### Status
+
+T098 remains **OPEN** - CASE D. T099 remains blocked.
+`STORM_MAX_BLEND_BLOCKS = 48` is **not** the next blocker: the storm does not
+yet have a connected body for seams to appear on.
+
+Regression after the campaign: `./gradlew check build` BUILD SUCCESSFUL, 40
+invariants passed, 0 failures, including T076 GLSL parity, T111 shader
+compilation, T098 extent and proportion guards, and the T134 scale contract.

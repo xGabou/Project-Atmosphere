@@ -281,6 +281,36 @@ final class StormT132AutoDriver {
     }
 
     /**
+     * The world seed for the automated run.
+     *
+     * <p>Defaults to the long-standing fixed seed, so T132 and T133 acceptance
+     * runs reproduce exactly as before. The T098 live campaign needs fresh
+     * severe fixtures rather than repeated draws from one world, so a seed may
+     * be supplied as the first line of the autorun marker. Anything
+     * unparseable falls back to the fixed seed rather than silently
+     * randomising an acceptance run.
+     */
+    private static long autorunWorldSeed() {
+        try {
+            for (String line : Files.readAllLines(MARKER)) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                    continue;
+                }
+                long seed = Long.parseLong(trimmed);
+                ProjectAtmosphere.LOGGER.info(
+                        "T132_AUTORUN_INFRA world seed overridden by marker: {}", seed);
+                return seed;
+            }
+        } catch (Exception exception) {
+            ProjectAtmosphere.LOGGER.info(
+                    "T132_AUTORUN_INFRA marker carries no usable seed ({}); using the fixed seed",
+                    exception.getClass().getSimpleName());
+        }
+        return 0x544132L;
+    }
+
+    /**
      * Creates a level through Minecraft's normal {@code WorldOpenFlows}; no UI
      * automation or copied old-version template is involved.  The marker keeps
      * this path test-only and the two owned save names prevent accidental user
@@ -303,7 +333,7 @@ final class StormT132AutoDriver {
                     true,
                     new GameRules(),
                     WorldDataConfiguration.DEFAULT);
-            WorldOptions options = new WorldOptions(0x544132L, true, false);
+            WorldOptions options = new WorldOptions(autorunWorldSeed(), true, false);
             minecraft.createWorldOpenFlows().createFreshLevel(
                     StormT132WorldFixture.SOURCE_WORLD_ID,
                     settings,

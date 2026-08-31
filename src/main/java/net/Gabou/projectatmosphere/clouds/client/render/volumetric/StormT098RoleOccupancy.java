@@ -37,6 +37,78 @@ final class StormT098RoleOccupancy {
      * descriptor producing it, so a role that contributes nothing anywhere shows
      * as a zero rather than being hidden inside a combined group total.
      */
+
+    /**
+     * T098 phase 5: per-descriptor envelope-extent clamp statistics.
+     *
+     * <p>edgeWidthBlocks bounds the coverage boundary by a fraction of the
+     * lobe's own half-height, because envelopeFromDistance fades over plus/minus
+     * that width isotropically while the width itself is derived from a
+     * horizontal extent. The bound is intended to be selective: pathological
+     * wide-and-flat descriptors bind, ordinary roles do not.
+     *
+     * <p>That selectivity was characterised against a single transcribed
+     * fixture, where the closest non-ANVIL case was BASE at 0.73 against a bound
+     * of 0.75 - a narrow margin. This reports the unclamped ratio and the bind
+     * decision for every live descriptor so fresh fixtures either confirm the
+     * separation or show it collapsing, without anyone having to infer it from
+     * the rendered image.
+     */
+    private static void appendEnvelopeExtentStatistics(
+            StringBuilder out, StormLobeDescriptor[] descriptors) {
+        out.append("--- envelope extent clamp (T098 phase 5) ---\n");
+        out.append("role|member|unclampedSoftness|halfHeight|ratio|bound|clamped\n");
+
+        java.util.EnumMap<StormLobeDescriptor.Role, double[]> stats =
+                new java.util.EnumMap<>(StormLobeDescriptor.Role.class);
+        java.util.EnumMap<StormLobeDescriptor.Role, Integer> bound =
+                new java.util.EnumMap<>(StormLobeDescriptor.Role.class);
+        java.util.EnumMap<StormLobeDescriptor.Role, java.util.List<Double>> ratios =
+                new java.util.EnumMap<>(StormLobeDescriptor.Role.class);
+
+        for (StormLobeDescriptor descriptor : descriptors) {
+            // The unclamped width is what edgeWidthBlocks would have returned
+            // before the extent bound, recomputed here rather than stored so the
+            // two cannot drift apart silently.
+            double normalized = switch (descriptor.role()) {
+                case ANVIL -> Math.max(0.12D, descriptor.edgeSoftness() * 1.65D);
+                case BASE -> Math.max(0.06D, descriptor.edgeSoftness() * 0.66D);
+                default -> Math.max(0.06D, descriptor.edgeSoftness() * 0.62D);
+            };
+            double unclamped = normalized
+                    * Math.min(descriptor.majorRadius(), descriptor.minorRadius());
+            double halfHeight = Math.max(
+                    StormLobeEvaluator.roleTopY(descriptor)
+                            - StormLobeEvaluator.roleBaseY(descriptor), 1.0D) * 0.5D;
+            double ratio = unclamped / halfHeight;
+            double applied = StormLobeEvaluator.edgeWidthBlocks(descriptor);
+            boolean clamped = applied < unclamped - 1.0E-4D;
+
+            out.append(String.format(java.util.Locale.ROOT,
+                    "%s|%d|%.1f|%.1f|%.3f|%.1f|%s%n",
+                    descriptor.role(), descriptor.memberIndex(), unclamped, halfHeight,
+                    ratio, applied, clamped ? "YES" : "no"));
+
+            ratios.computeIfAbsent(descriptor.role(), key -> new ArrayList<>()).add(ratio);
+            bound.merge(descriptor.role(), clamped ? 1 : 0, Integer::sum);
+            stats.computeIfAbsent(descriptor.role(), key -> new double[] {0.0D});
+        }
+
+        out.append("roleSummary|role|count|clamped|minRatio|medianRatio|maxRatio\n");
+        for (StormLobeDescriptor.Role role : StormLobeDescriptor.Role.values()) {
+            java.util.List<Double> values = ratios.get(role);
+            if (values == null || values.isEmpty()) {
+                continue;
+            }
+            java.util.Collections.sort(values);
+            out.append(String.format(java.util.Locale.ROOT,
+                    "roleSummary|%s|%d|%d|%.3f|%.3f|%.3f%n",
+                    role, values.size(), bound.getOrDefault(role, 0),
+                    values.get(0), values.get(values.size() / 2),
+                    values.get(values.size() - 1)));
+        }
+    }
+
     static String describe() {
         StormRenderSnapshot snapshot = StormGeometryBuildCoordinator.snapshot();
         StormLobeDescriptor[] descriptors = snapshot.descriptorsUnsafe();
@@ -46,6 +118,8 @@ final class StormT098RoleOccupancy {
             out.append("no descriptor-owned storm is currently adopted.\n");
             return out.toString();
         }
+
+        appendEnvelopeExtentStatistics(out, descriptors);
 
         List<StormLobeDescriptor> lobes = new ArrayList<>(descriptors.length);
         double minY = Double.POSITIVE_INFINITY;
