@@ -2535,7 +2535,7 @@ public final class StormVolumetricGeometrySandbox {
         System.out.println("T098_MARCH|strategy|factor|label|distance|targetY"
                 + "|coarseSegs|fineSegs|firstFineT|refFirstT|falseNegSegs|falseNegBlocks"
                 + "|iters|exhausted|sdfEvals|marchedDepth|refDepth"
-                + "|firstMaterialT|itersToMaterial");
+                + "|firstMaterialT|itersToMaterial|refMaterialSpan|itersNeeded");
         for (int strategy = 0; strategy < 8; strategy++) {
             for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D, 2.60D}) {
                 simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
@@ -2596,6 +2596,12 @@ public final class StormVolumetricGeometrySandbox {
         }
         if (intervalStart >= 0.0D) {
             refIntervals.add(new double[] {intervalStart, t1});
+        }
+        // Total blocks of material the ray actually crosses, which is what the
+        // fine budget would have to cover to integrate the storm fully.
+        double refMaterialSpan = 0.0D;
+        for (double[] interval : refIntervals) {
+            refMaterialSpan += interval[1] - interval[0];
         }
 
         double t = 0.0D;
@@ -2763,11 +2769,16 @@ public final class StormVolumetricGeometrySandbox {
                 "perDesc_b0", "perDesc_b24", "perDesc_b48", "perDesc_b96"};
         System.out.printf(java.util.Locale.ROOT,
                 "T098_MARCH|%-10s|%.2f|%-12s|%7.1f|%6.1f|%6d|%6d|%8.1f|%8.1f|%6d|%9.1f"
-                        + "|%5d|%8s|%8d|%9.1f|%9.1f|%9.1f|%6d%n",
+                        + "|%5d|%8s|%8d|%9.1f|%9.1f|%9.1f|%6d|%9.1f|%6d%n",
                 names[strategy], factor, label, radius * factor, targetY,
                 coarseSegs, fineSegs, firstFineT, refFirst, falseNegSegs, falseNegBlocks,
                 iterations, exhausted ? "YES" : "no", sdfEvals, marchedDepth, refDepth,
-                firstMaterialT, itersBeforeMaterial);
+                firstMaterialT, itersBeforeMaterial,
+                refMaterialSpan,
+                // Fine steps needed to cross that material, plus the iterations
+                // this ray already spent arriving.
+                itersBeforeMaterial < 0 ? -1
+                        : itersBeforeMaterial + (int) Math.ceil(refMaterialSpan / fineStep));
     }
 
     /** The widest envelope boundary in the set, an upper bound on material reach. */

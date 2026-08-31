@@ -1407,3 +1407,134 @@ still not the next blocker.
 `./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
 T076 GLSL parity, T111 shader compilation, the T098 extent guard selective at
 0.750, and the march guard.
+
+
+## T098 per-descriptor approach bound (2026-08-31)
+
+Result: **CASE B**. The tighter bound is implemented, conservative and
+measurably better, but the march still exhausts because the fine budget is
+about half what a severe ray needs. Stopping here; `MAX_STEPS` was not changed.
+
+### The per-group plan cannot work, and why
+
+Every descriptor in a severe system belongs to **one group**: the live dump
+reports `group 9294726d, members=10, roles[base=2,core=2,tower=2,anvil=4]`. A
+per-group bound therefore takes that group's widest softness - BASE's 164.6 -
+which is exactly the global `StormWidestEdgeBlocks` it was meant to replace.
+Per group and global are the same number here.
+
+Per **descriptor** is the granularity that differs, and it is what was
+implemented: a ray approaching TOWER is bounded by TOWER's own 49.7 rather than
+BASE's 164.6.
+
+### Formula, and why it stays conservative
+
+Old, global:
+
+    safeAdvance = unionDistance - max_over_all_descriptors(edgeWidth)
+                = unionDistance - 164.6
+
+New, per descriptor:
+
+    safeAdvance = min_over_descriptors(lobeDistance_i - lobeSoftness_i)
+                  - STORM_MAX_BLEND_BLOCKS
+
+Two properties carry it.
+
+**Every descriptor must clear, not the nearest.** Material at q requires
+`d_i(q) < s_i` for some i, and `d_i(q) >= d_i(p) - L`, so if every descriptor
+satisfies `d_i(p) - s_i > L` then none can contribute inside the advance. The
+minimum is the binding term. This answers the multi-candidate question without
+needing a group-selection rule at all: taking the minimum over descriptors is
+automatically correct across any number of groups, and choosing the nearest
+group would not have been.
+
+**The webbing allowance is measured, not assumed.** The ordered smooth union
+sits below every input distance, so material exists between lobes that no single
+lobe's envelope covers. `reportT098WebbingExcess` measures that excess directly
+as nearest-lobe distance minus union distance over 130,536 samples:
+
+| p50 | p99 | max | worst at | analytic per-union cap |
+|---:|---:|---:|---|---:|
+| 5.14 | 17.57 | **24.56** | y=640 (the waist) | 12.0 |
+
+`STORM_MAX_BLEND_BLOCKS` = 48 is the architectural cap on blend radius and
+leaves roughly a factor of two over the measured maximum. A 24-block allowance
+would have been just short of it.
+
+T121-rejected lobes still bound the advance: the rejection branch returns before
+the exact SDF is evaluated, but it has already proven the lobe's
+`verticalLowerBound` exceeds its softness, and that is a lower bound on the true
+distance, so using it there can only understate the clearance.
+
+### Measured, same rays
+
+Waist, global bound to per-descriptor:
+
+| factor | iters to material | depth | | |
+|---|---|---|---|---|
+| | global | perDesc | global | perDesc |
+| 1.12 | 68 | 64 | 61.9 | 65.6 |
+| 1.40 | 83 | 66 | 48.8 | 62.2 |
+| 1.60 | 91 | 70 | 39.8 | 54.9 |
+| **1.70** | **94** | **72** | **36.8** | **51.2** |
+| 2.00 | 101 | 83 | 32.2 | 42.9 |
+| 2.60 | 124 | 111 | 7.9 | 27.1 |
+| baseControl | 58 | 67 | 95.3 | 92.4 |
+| anvilControl | 54 | 47 | 73.6 | 90.2 |
+
+At 1.70x the recovery is **22 iterations**, not the ~30 hoped for. A
+no-allowance arm recovered 40 (54 iterations, depth 71.1) and also showed zero
+false negatives on these rays, but it has no margin for the webbing and was not
+taken.
+
+False negatives are **zero at every distance for every variant tested**,
+including the no-allowance arm. This was verified offline on one transcribed
+fixture; the live campaign is the only cross-check across fixtures.
+
+### Why this is CASE B: the budget, not the bound
+
+| ray | material span | iters to arrive | iters remaining | fine reach remaining | iters needed |
+|---|---:|---:|---:|---:|---:|
+| 1.70x waist | 670 | 72 | 56 | 198 | **262** |
+| 1.12x waist | 616 | 64 | 64 | 226 | 239 |
+| 2.60x waist | 504 | 111 | 17 | 60 | 254 |
+| 1.70x BASE | 968 | 67 | 61 | 216 | 341 |
+| 1.70x ANVIL | 1066 | 47 | 81 | 286 | 349 |
+
+The budget is `MAX_STEPS` 128 at `exteriorFineStep` 3.536 = **452 blocks of
+total fine reach**, against 504 to 1066 blocks of material along these rays.
+
+**Even with a perfect promotion rule that arrives in zero iterations**, crossing
+the 1.70x waist's 670 blocks needs 190 fine steps - already more than the whole
+128-iteration budget. No approach-bound refinement can close that. The budget is
+short by roughly a factor of two for the waist and a factor of 2.7 for the
+controls.
+
+### Performance
+
+GPU medians on the ladder run: 74.0, 138.5, 173.0, 201.5, 210.2 ms, against the
+previous run's 60.6, 139.7, 159.8, 184.4, 188.1. Different fixture and poses, so
+this is indicative only, but there is no evidence of a win and some of a small
+cost. Probe union evaluations per ray are 15 to 23, similar to before; fine
+samples fall slightly (116 to 113 at 1.70x) and coarse rise (12 to 15). As with
+the previous promotion fix, work is redistributed rather than removed.
+
+### Live
+
+Ladder fixture 40c5cc00 at 1.70x still shows two separated masses. The lower
+mass carries more structure and a brighter cap than before, but the waist is not
+continuous. FAR remains empty and was not investigated, per the task.
+
+### Status
+
+T098 remains **OPEN**. T099 remains blocked. `STORM_MAX_BLEND_BLOCKS = 48` is
+still not the next blocker, and it is now load-bearing as the webbing allowance.
+
+The next decision is explicit and is not a bug fix: the fine-march budget.
+Integrating a representative severe ray needs roughly 262 iterations at the
+current fine step, or an equivalent increase in `exteriorFineStep` with the
+attendant loss of surface detail, or an adaptive scheme that spends fine steps
+only inside material. That is a design decision, not a defect.
+
+`./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures.
