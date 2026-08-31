@@ -174,6 +174,20 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
+**T098 2026-08-30: live acceptance campaign run; result CASE D, task stays OPEN.** The envelope
+extent bound (0.75 x half-height) was validated live across five distinct fresh severe fixtures
+(9294726d, ae4aef49, 72259f41, d266f801, 6e8e8c73). The bound is selective as designed: over 60 live
+descriptors it binds 24/24 ANVIL and 0/36 BASE/CORE/TOWER, so it did not affect ordinary roles;
+worst-case BASE reached 0.736 against the 0.75 bound, a 1.9% margin, never crossed. The constant was
+not tuned. Visually T098 still FAILS on all five: each reads as two cleanly separated masses with no
+connecting column. Criteria 5/6/7 pass on the anvil, 1/2/3/4/8/9 fail. The fix removed the anvil's
+sub-canopy haze - the gap is clean sky rather than shredded confetti - but that revealed nothing else
+occupies the space: CORE and TOWER produce almost no visible density (4,635 visible voxels against
+BASE's 21,521), and the skirt had been masking it. The next blocker is role density/strength
+composition, NOT envelope extent, NOT descriptor allocation, and NOT STORM_MAX_BLEND_BLOCKS - there
+is no connected body yet for seams to appear on. Evidence in
+`validation/t098-manual-checklist.md`.
+
 - [X] T097 Run the corrected morphology, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, precipitation, and acceleration regressions plus the US1/US2 sandboxes; record passing results in `specs/001-native-storm-rendering/validation/phase4r-automated.md` and verify each T080 expected failure is closed without weakening assertions (depends on T081-T096) [SC-001-SC-004, SC-010]
 **T098 2026-08-28: ANVIL/BASE falsified; structural limit reached.** Sweeping ANVIL/BASE from
 1.239 down to 0.933 - an anvil narrower than the base, outside T127 entirely - moves column share
