@@ -1727,3 +1727,97 @@ originates at or before the march.
 
 `./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
 T076 GLSL parity, T111 shader compilation, and both T098 guards.
+
+
+## T098 production-march divergence: not isolated (2026-08-31)
+
+Result: **the first divergent branch was not found.** Several candidates were
+ruled out and one long-standing piece of evidence turned out not to mean what it
+has been taken to mean. No production behaviour was changed.
+
+### Correction: the T128 trace is not evidence about the production density path
+
+Across several sessions the T128 material trace has been cited as proof that the
+production shader has density 0.81-0.91 at the waist. That trace is produced by
+`stormMaterialTraceAt`, which calls `directStormShape` and forms body and
+erosion directly.
+
+Production density comes from `cloudDensity`, which calls `directStormShape` and
+then applies gates and terms the trace helper never runs. **The trace is
+evidence about the descriptor field, not about what production integrates.** Any
+argument of the form "the shader's own trace says material is there, so the loss
+must be later" was resting on that conflation, including the reasoning that
+motivated this task.
+
+### Production march state machine, in execution order
+
+Per iteration:
+
+1. `if (t >= t1 || transmittance < 0.015) break;`
+2. `fine = sinceHit < 6`
+3. `distanceGrowth = 1 + (t / MaxRenderDistance) * 2.2`
+4. `stepLength = fine ? fineStep : min(coarseStep * distanceGrowth, coarseStepCap)`
+5. puff segment test may promote to fine
+6. storm segment test may promote to fine, now refined by the per-descriptor
+   clearance probe
+7. **weather-gated empty-space skip**, only when `!fine`:
+   `sampleWeather(p.xz).r * CoverageMul <= 0.001 && !localRainSegment` skips the
+   whole segment
+8. `bodyDensity = cloudDensity(p, ...)`, `density = bodyDensity + rainDensity`
+9. `stepTrans = exp(-density * ExtinctionScale * stepLength)`,
+   `transmittance *= stepTrans`
+
+Inside `cloudDensity` the storm path is additionally gated by:
+
+    if (coverage <= 0.008 && funnel <= 0.001 && !precipitationCandidate
+            && directStormCoverage <= 0.001) return 0.0;
+
+    insideShapeBounds = directStormAvailable ? true : ...
+    if (insideShapeBounds
+            && (coverage > 0.008 || directStormCoverage > 0.001)
+            && (morphologyCategoryValid || directStormAvailable)) { ... }
+
+where `coverage` is the **weather map** value, `smoothstep(0.012, 0.42,
+coverageSignal)`, and `directStormAvailable` is `ownsDescriptorGroup`.
+
+### Ruled out
+
+- **`ownsDescriptorGroup` / `ownsGroup`.** Purely horizontal:
+  `length((p.xz - ownershipCenter) / ownershipRadii) <= 1.0` with
+  `ownershipRadii = extent * 1.85`. Generous, XZ-only, and satisfied at the
+  storm centre where the waist sits.
+- **Weather coverage multiplying the storm body.**
+  `envelopeCoverage = directStormAvailable ? 1.0 : ...`, so when the storm owns
+  the point the weather value does not scale its density.
+- **Gap location.** `pitchTo` aims at `(baseY + topY) / 2`, which equals the
+  SIDE shot's own y, so the camera is exactly horizontal and screen centre is
+  world y 568. At 1118 blocks with a 70 degree vertical FOV over 900 px, the
+  waist band y600-772 lands at screen y 317-429, which is where the observed gap
+  is. The gap really is the waist - an assumption previously carried unverified.
+
+### A failed approach, recorded so it is not repeated
+
+`STORM_WORKLOAD_PRIMARY` and `STORM_WORKLOAD_SECONDARY` (DebugView 22 and 23)
+looked like a free per-pixel map of descriptor evaluations and empty-space
+rejects. They are not usable that way: both `return` before compositing, as
+their own comment states, so a screenshot captures the composed scene and both
+frames come back at 57,573 bytes - the empty-sky size. They are readback-only,
+through `StormWorkloadRuntimeCapture`.
+
+### What is still needed
+
+A genuine per-iteration production trace along a **view ray**. The existing T128
+readback traces a vertical line at one XZ through a helper that bypasses
+`cloudDensity`; neither property is what this needs. The next step is either a
+debug view that encodes march state into a *composited* colour, or extending the
+T128 readback to walk an arbitrary ray through the production `cloudDensity`
+path.
+
+Until that exists, the weather-gated empty-space skip remains the leading
+untested candidate, and it remains untested rather than implicated.
+
+### Status
+
+T098 remains **OPEN**. T099 remains blocked. No production code changed.
+
+`./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures.
