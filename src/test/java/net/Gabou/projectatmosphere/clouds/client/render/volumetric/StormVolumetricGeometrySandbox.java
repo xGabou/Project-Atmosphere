@@ -72,6 +72,7 @@ public final class StormVolumetricGeometrySandbox {
         validateT098EnvelopeBoundedByExtent();
         reportT098OpticalProfile();
         reportT098MarchSimulation();
+        validateT098MarchReachesMaterial();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -2530,24 +2531,26 @@ public final class StormVolumetricGeometrySandbox {
         centreZ /= lobes.size();
         double radius = 657.8D;
 
-        System.out.println("T098_MARCH|factor|label|distance|targetY|coarseSegs|fineSegs"
-                + "|firstFineT|refFirstT|falseNegSegs|falseNegBlocks"
-                + "|iters|exhausted|marchedDepth|refDepth");
-        for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D, 2.60D}) {
+        System.out.println("T098_MARCH|strategy|factor|label|distance|targetY"
+                + "|coarseSegs|fineSegs|firstFineT|refFirstT|falseNegSegs|falseNegBlocks"
+                + "|iters|exhausted|sdfEvals|marchedDepth|refDepth");
+        for (int strategy = 0; strategy < 4; strategy++) {
+            for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D, 2.60D}) {
+                simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
+                        factor, 680.0D, "waist", strategy);
+            }
             simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
-                    factor, 680.0D, "waist");
+                    1.70D, 300.0D, "baseControl", strategy);
+            simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
+                    1.70D, 900.0D, "anvilControl", strategy);
         }
-        simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
-                1.70D, 300.0D, "baseControl");
-        simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
-                1.70D, 900.0D, "anvilControl");
     }
 
     /** One ray, marched with the production rules and scored against a reference. */
     private static void simulateRay(
             byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
             double centreX, double centreZ, double radius,
-            double factor, double targetY, String label) {
+            double factor, double targetY, String label, int strategy) {
         double camX = centreX + radius * factor;
         double camY = (136.0D + 1000.0D) * 0.5D;
         double camZ = centreZ;
@@ -2598,11 +2601,19 @@ public final class StormVolumetricGeometrySandbox {
         int coarseSegs = 0;
         int fineSegs = 0;
         int iterations = 0;
+        int sdfEvals = 0;
         double firstFineT = -1.0D;
         int falseNegSegs = 0;
         double falseNegBlocks = 0.0D;
         double marchedDepth = 0.0D;
         boolean exhausted = false;
+        // Strategy B/C state: where the current fine window began, and the t
+        // before which re-promotion is suppressed.
+        double fineWindowStart = -1.0D;
+        double promotionSuppressedUntil = -1.0D;
+        final double FINE_WINDOW_BLOCKS = 64.0D;
+        final double COOLDOWN_BLOCKS = 96.0D;
+
         for (int i = 0; i < maxSteps; i++) {
             iterations++;
             if (t >= t1) {
@@ -2616,14 +2627,61 @@ public final class StormVolumetricGeometrySandbox {
             stepLength = Math.min(stepLength, t1 - t);
             double segStart = t;
             double segEnd = t + stepLength;
+            boolean promoted = false;
+
             if (!fine && stormSegmentMayIntersect(lobes,
                     camX + dirX * segStart, camY + dirY * segStart, camZ + dirZ * segStart,
                     camX + dirX * segEnd, camY + dirY * segEnd, camZ + dirZ * segEnd)) {
-                sinceHit = 0;
-                fine = true;
-                stepLength = Math.min(fineStep, t1 - t);
-                segEnd = t + stepLength;
+                boolean allow = true;
+                if (strategy == 2 && t < promotionSuppressedUntil) {
+                    // C: cooldown - the same broad bound may not re-promote until
+                    // the ray has made real forward progress.
+                    allow = false;
+                }
+                if (strategy == 3) {
+                    // E: the union SDF is the distance to the envelope surface.
+                    // envelopeFromDistance fades coverage over +/- softness, so
+                    // material extends up to one softness OUTSIDE that surface;
+                    // subtracting the group's widest softness makes the advance
+                    // a true lower bound on the distance to any material.
+                    sdfEvals++;
+                    double safe = StormLobeEvaluator.unionDistanceAt(lobes,
+                            camX + dirX * t, camY + dirY * t, camZ + dirZ * t)
+                            - widestSoftness(lobes);
+                    if (safe > fineStep) {
+                        allow = false;
+                        stepLength = Math.min(Math.min(safe, coarseStepCap), t1 - t);
+                        segEnd = t + stepLength;
+                    }
+                }
+                if (allow) {
+                    sinceHit = 0;
+                    fine = true;
+                    promoted = true;
+                    stepLength = Math.min(fineStep, t1 - t);
+                    segEnd = t + stepLength;
+                    if (fineWindowStart < 0.0D) {
+                        fineWindowStart = t;
+                    }
+                }
             }
+
+            if (fine && strategy == 1) {
+                // B: bound the fine window by physical distance, then force
+                // coarse progress even while still inside the broad bound.
+                if (fineWindowStart < 0.0D) {
+                    fineWindowStart = t;
+                }
+                if (t - fineWindowStart > FINE_WINDOW_BLOCKS) {
+                    fine = false;
+                    sinceHit = 6;
+                    fineWindowStart = -1.0D;
+                    stepLength = Math.min(
+                            Math.min(coarseStep * distanceGrowth, coarseStepCap), t1 - t);
+                    segEnd = t + stepLength;
+                }
+            }
+
             if (fine) {
                 fineSegs++;
                 if (firstFineT < 0.0D) {
@@ -2634,8 +2692,13 @@ public final class StormVolumetricGeometrySandbox {
                 marchedDepth += d * stepLength;
                 if (d >= 0.02D) {
                     sinceHit = 0;
+                    fineWindowStart = t;
+                    promotionSuppressedUntil = -1.0D;
                 } else {
                     sinceHit++;
+                    if (strategy == 2 && sinceHit >= 6) {
+                        promotionSuppressedUntil = t + COOLDOWN_BLOCKS;
+                    }
                 }
             } else {
                 coarseSegs++;
@@ -2656,12 +2719,22 @@ public final class StormVolumetricGeometrySandbox {
             }
         }
 
+        String[] names = {"current", "B_window", "C_cooldown", "E_sdf"};
         System.out.printf(java.util.Locale.ROOT,
-                "T098_MARCH|%.2f|%-12s|%7.1f|%6.1f|%6d|%6d|%8.1f|%8.1f|%6d|%9.1f"
-                        + "|%5d|%8s|%9.1f|%9.1f%n",
-                factor, label, radius * factor, targetY, coarseSegs, fineSegs,
-                firstFineT, refFirst, falseNegSegs, falseNegBlocks,
-                iterations, exhausted ? "YES" : "no", marchedDepth, refDepth);
+                "T098_MARCH|%-10s|%.2f|%-12s|%7.1f|%6.1f|%6d|%6d|%8.1f|%8.1f|%6d|%9.1f"
+                        + "|%5d|%8s|%8d|%9.1f|%9.1f%n",
+                names[strategy], factor, label, radius * factor, targetY,
+                coarseSegs, fineSegs, firstFineT, refFirst, falseNegSegs, falseNegBlocks,
+                iterations, exhausted ? "YES" : "no", sdfEvals, marchedDepth, refDepth);
+    }
+
+    /** The widest envelope boundary in the set, an upper bound on material reach. */
+    private static double widestSoftness(java.util.List<StormLobeDescriptor> lobes) {
+        double widest = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            widest = Math.max(widest, StormLobeEvaluator.edgeWidthBlocks(lobe));
+        }
+        return widest;
     }
 
     /** Mirrors the shader's stormGroupSegmentMayIntersect bounding-sphere test. */
@@ -2717,6 +2790,102 @@ public final class StormVolumetricGeometrySandbox {
         double detailFbm = StormDensityModel.detailFbm(
                 detailSample[0], detailSample[1], detailSample[2]);
         return StormDensityModel.finalDensity(coverage, strength, baseField, detailFbm, embedded);
+    }
+
+
+    /**
+     * T098 phase 8: the promotion policy must reach material without skipping any.
+     *
+     * <p>Two properties, both required, and neither implied by the other.
+     *
+     * <p>Conservative correctness: no coarse advance may step over an interval
+     * the reference traversal says contains storm material. The segment test was
+     * already conservative - it produced zero false negatives at every traced
+     * distance - and the refinement must not spend that. The advance subtracts
+     * the widest envelope boundary from the union distance, because
+     * stormEnvelopeFromDistance fades coverage over plus or minus a
+     * descriptor's softness and material can therefore begin that far outside
+     * the union surface. Dropping that subtraction is not a theoretical
+     * concern: it measured 2 to 6 skipped segments and up to 84 blocks of
+     * missed material on these same rays.
+     *
+     * <p>Bounded progress: a conservative false positive must not consume the
+     * whole march budget before the storm. The pre-fix rule treated "this
+     * segment may intersect" as "fine march from here", and since the group
+     * bounding spheres reach about 615 blocks for ANVIL and 698 for BASE, the
+     * SIDE waist ray promoted at t=339 against first material at t=818. Six
+     * fine steps then one coarse iteration still inside the same sphere
+     * re-promoted immediately, so every iteration advanced one fine step and
+     * MAX_STEPS ran out having accumulated exactly zero optical depth.
+     *
+     * <p>This asserts the old rule still starves and the new rule does not, so
+     * the guard cannot pass by reverting to the behaviour it was written
+     * against.
+     */
+    private static void validateT098MarchReachesMaterial() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+
+        // Optical depth of about 5 is already opaque, so this is a generous
+        // margin over "the column is drawn at all".
+        double opaqueDepth = 5.0D;
+        for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D}) {
+            double[] fixed = marchOutcome(baseVolume, detailVolume, lobes,
+                    centreX, centreZ, 657.8D, factor, 680.0D, 3);
+            double[] legacy = marchOutcome(baseVolume, detailVolume, lobes,
+                    centreX, centreZ, 657.8D, factor, 680.0D, 0);
+            if (fixed[0] > 0.0D) {
+                throw new IllegalStateException("T098 promotion probe skipped material at "
+                        + factor + "x: " + fixed[0] + " segments, " + fixed[1] + " blocks");
+            }
+            if (fixed[2] < opaqueDepth) {
+                throw new IllegalStateException("T098 promotion probe did not reach opaque "
+                        + "material at " + factor + "x: depth " + fixed[2]);
+            }
+            if (factor >= 1.40D && legacy[2] >= opaqueDepth) {
+                throw new IllegalStateException("the pre-fix promotion rule no longer starves "
+                        + "at " + factor + "x (depth " + legacy[2]
+                        + "); re-derive the T098 starvation finding");
+            }
+        }
+        System.out.println("T098_MARCH_GUARD|falseNegatives=0 at every distance"
+                + "|fixed rule reaches opaque material 1.12x-2.00x"
+                + "|pre-fix rule still starves from 1.40x|PASSED");
+    }
+
+    /** Runs one ray and returns {falseNegSegs, falseNegBlocks, marchedDepth}. */
+    private static double[] marchOutcome(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double radius,
+            double factor, double targetY, int strategy) {
+        java.io.PrintStream previous = System.out;
+        java.io.ByteArrayOutputStream sink = new java.io.ByteArrayOutputStream();
+        System.setOut(new java.io.PrintStream(sink));
+        try {
+            simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
+                    factor, targetY, "guard", strategy);
+        } finally {
+            System.setOut(previous);
+        }
+        String[] fields = sink.toString().trim().split("\\|");
+        // Column order: 0 tag, 1 strategy, 2 factor, 3 label, 4 distance,
+        // 5 targetY, 6 coarseSegs, 7 fineSegs, 8 firstFineT, 9 refFirstT,
+        // 10 falseNegSegs, 11 falseNegBlocks, 12 iters, 13 exhausted,
+        // 14 sdfEvals, 15 marchedDepth, 16 refDepth.
+        return new double[] {
+                Double.parseDouble(fields[10].trim()),
+                Double.parseDouble(fields[11].trim()),
+                Double.parseDouble(fields[15].trim())
+        };
     }
 
     private static int largestComponent(boolean[][] occupied) {

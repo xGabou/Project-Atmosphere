@@ -44,6 +44,11 @@ uniform float SlabTopY;
 uniform float MaxPrecipitation;
 uniform int PuffLobeCount;
 uniform int StormLobeCount;
+// Widest envelope boundary over every uploaded descriptor, in blocks. The
+// coverage envelope fades over plus/minus its softness, so material can begin
+// this far outside the union surface; T098's promotion probe subtracts it to
+// keep the advance a true lower bound on the distance to any material.
+uniform float StormWidestEdgeBlocks;
 uniform int PuffShapeMode; // 0=fallback, 1=legacy hybrid, 2=direct-only diagnostic
 uniform int PuffDensityStage; // 0=final, 1=analytic-all, 2=analytic-indexed, 3=envelope, 4=pre-erosion, 7=continuous-all, 12=carrier-billow
 uniform int PuffTierFilter; // -1=all, 0=base, 1=middle, 2=crown, 3=legacy/unknown
@@ -991,6 +996,7 @@ void directStormGroupField(
             paAvoidedDescriptorTextureFetches += 2;
         }
         groupMinimumRadius = min(groupMinimumRadius, lobeRadius);
+
         float verticalLowerBound = stormVerticalDistanceLowerBound(
             p, positionHeight, lobeRole
         );
@@ -1089,13 +1095,17 @@ float directStormShape(
         out bool ownsDescriptorGroup,
         out float dominantHeight01,
         out float envelopeStrength,
-        out int activeRoleMask) {
+        out int activeRoleMask,
+        out float unionDistanceBlocks) {
     // Compact bit mask instead of a bool[MAX_STORM_GROUPS]. The array form
     // cost an allocation and an 8-iteration clear loop on every density
     // sample, and indexed writes into a local array defeat register
     // allocation on several drivers. Group slots are 0..7, so one int holds
     // the whole visitation set.
     int groupVisited = 0;
+    // T098 promotion policy reads this. It is the value the envelope mapping
+    // below already consumes, published rather than recomputed.
+    unionDistanceBlocks = 1.0e9;
     float stormDistance = 1.0e9;
     float stormStrength = 0.0;
     float stormSoftness = 0.0;
@@ -1157,6 +1167,7 @@ float directStormShape(
         return 0.0;
     }
     envelopeStrength = stormStrength;
+    unionDistanceBlocks = stormDistance;
     return stormEnvelopeFromDistance(stormDistance, stormSoftness, stormStrength);
 }
 
@@ -1187,8 +1198,10 @@ float directStormFinalDensity(
         out float dominantHeight01) {
     float envelopeStrength;
     int activeRoleMask;
+    float paUnionDistanceUnusedA;
     float coverage = directStormShape(
-        p, ownsDescriptorGroup, dominantHeight01, envelopeStrength, activeRoleMask);
+        p, ownsDescriptorGroup, dominantHeight01, envelopeStrength, activeRoleMask,
+        paUnionDistanceUnusedA);
     if (coverage <= 0.0) {
         return 0.0;
     }
@@ -2733,13 +2746,15 @@ float cloudDensity(
     int directStormActiveRoleMask = 0;
     // Bounded COVERAGE ENVELOPE, not a density. The visible storm body is
     // formed from it below by the base-noise remap and multi-scale erosion.
+    float paUnionDistanceUnusedB;
     float directStormCoverage = StormLobeCount > 0
         ? directStormShape(
             p,
             directStormOwned,
             directStormHeight01,
             directStormStrength,
-            directStormActiveRoleMask
+            directStormActiveRoleMask,
+            paUnionDistanceUnusedB
         )
         : 0.0;
     // Only a valid uploaded descriptor group may suppress the legacy family
@@ -3542,8 +3557,10 @@ vec4 stormMaterialTraceAt(vec3 p, int stage) {
     float height01 = 0.0;
     float strength = 0.0;
     int roleMask = 0;
+    float paUnionDistanceUnusedC;
     float coverage = StormLobeCount > 0
-        ? directStormShape(p, owned, height01, strength, roleMask)
+        ? directStormShape(p, owned, height01, strength, roleMask,
+            paUnionDistanceUnusedC)
         : 0.0;
     vec3 samplePos = p;
     samplePos.xz -= MaterialOffset;
@@ -4100,11 +4117,42 @@ void main() {
                     p,
                     CameraPos + rayDir * (t + stepLength)
                 )) {
-            sinceHit = 0;
-            fine = true;
-            stepLength = fineStep
-                * (cameraInsideCloud ? distanceGrowth : 1.0);
-            stepLength = min(stepLength, t1 - t);
+            // T098. The segment test is conservative and correct - it produced
+            // zero false negatives at every traced distance - but its group
+            // bounding spheres are ~615 blocks for ANVIL and ~698 for BASE, so
+            // "may intersect" fires hundreds of blocks before any material.
+            // Treating that as "fine march from here" starved the ray: six fine
+            // steps, then a coarse iteration still inside the same sphere that
+            // immediately re-promoted, so every iteration advanced one fine step
+            // and MAX_STEPS ran out before the storm. Measured on the live
+            // fixture, the SIDE waist ray promoted at t=339 against first
+            // material at t=818 and accumulated zero density.
+            //
+            // Refine the broad candidate with the exact union distance before
+            // committing to fine mode. Material exists only where the coverage
+            // envelope is positive, and stormEnvelopeFromDistance fades over
+            // plus/minus the softness, so material cannot begin closer than
+            // unionDistance - widestEdge. Advancing by that is a lower bound on
+            // the distance to any material and therefore skips none; the
+            // segment test itself is unchanged and still gates every promotion.
+            bool paProbeOwned;
+            float paProbeHeight01;
+            float paProbeStrength;
+            int paProbeRoleMask;
+            float paUnionDistance;
+            directStormShape(
+                p, paProbeOwned, paProbeHeight01, paProbeStrength, paProbeRoleMask,
+                paUnionDistance);
+            float paSafeAdvance = paUnionDistance - StormWidestEdgeBlocks;
+            if (paSafeAdvance > fineStep) {
+                stepLength = min(min(paSafeAdvance, coarseStepCap), t1 - t);
+            } else {
+                sinceHit = 0;
+                fine = true;
+                stepLength = fineStep
+                    * (cameraInsideCloud ? distanceGrowth : 1.0);
+                stepLength = min(stepLength, t1 - t);
+            }
         }
         vec3 segmentEnd = CameraPos + rayDir * (t + stepLength);
         bool localRainSegment = PuffDensityStage == 0

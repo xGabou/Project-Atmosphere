@@ -1207,3 +1207,104 @@ still not the next blocker.
 
 No production code changed. `./gradlew check` passes with 40 invariants and 0
 failures.
+
+
+## T098 raymarch promotion correction (2026-08-31)
+
+Result: **CASE B**. The promotion defect was real, is fixed, and is guarded.
+Material reach is restored and measurably improved on screen, but T098 still
+does not pass: the waist is not continuous at the 1.70x SIDE pose and FAR is
+still empty. No further hypothesis was started.
+
+### The starvation mechanism
+
+`fine = sinceHit < 6` gives six fine steps of 3.536 blocks, then one coarse
+iteration. That coarse iteration is still inside the same group bounding sphere
+- about 615 blocks for ANVIL and 698 for BASE - so `directStormSegmentMayIntersect`
+fires again and re-promotes with `stepLength = fineStep`. The coarse step is
+therefore never actually taken inside the bound: every iteration advances 3.536
+blocks, and the `MAX_STEPS` = 128 cap yields 452 blocks of total reach.
+
+The segment test is not at fault. It is conservative and produced zero false
+negatives at every traced distance. The fault was treating "this segment may
+intersect storm" as "fine march from here until material is found".
+
+### The correction
+
+When the segment test fires, refine the broad candidate with the exact union
+distance before committing to fine mode:
+
+    safeAdvance = unionDistance - StormWidestEdgeBlocks
+    if (safeAdvance > fineStep) advance coarsely by min(safeAdvance, coarseStepCap)
+    else promote to fine
+
+`unionDistance` is published from `directStormShape`, which already computes it
+for the envelope mapping, so no new field evaluation is introduced beyond the
+probe itself. `StormWidestEdgeBlocks` is the widest envelope boundary over all
+uploaded descriptors, computed on the CPU.
+
+Subtracting it is what makes the advance conservative rather than merely
+plausible: `stormEnvelopeFromDistance` fades coverage over plus or minus a
+descriptor's softness, so material can begin one softness outside the union
+surface. Omitting the subtraction is not a theoretical concern - measured on
+these same rays it produced 2 to 6 skipped segments and up to 84 blocks of
+missed material. With it, false negatives are zero everywhere.
+
+The segment test itself is unchanged and still gates every promotion, so the
+conservative bound is not weakened.
+
+### Measured, same fixture, same rays
+
+| factor | marchedDepth before | after | refDepth | falseNeg after |
+|---|---:|---:|---:|---:|
+| 1.12 waist | 6.3 | 61.9 | 255.6 | 0 |
+| 1.40 waist | 0.0 | 48.8 | 254.1 | 0 |
+| 1.60 waist | 0.0 | 39.8 | 269.9 | 0 |
+| 1.70 waist | 0.0 | 36.8 | 270.8 | 0 |
+| 2.00 waist | 0.0 | 32.2 | 277.1 | 0 |
+| 2.60 waist | 0.0 | 7.9 | 210.5 | 0 |
+| 1.70 baseControl | 88.5 | 95.3 | 430.0 | 0 |
+| 1.70 anvilControl | 40.2 | 73.6 | 590.4 | 0 |
+
+`firstFineT` moved from hundreds of blocks early to near the material, and the
+probe costs about 20 union evaluations per ray while removing roughly 110
+wasted fine density samples, each of which performed two 3-D noise fetches.
+
+### Live result, and why this is CASE B not CASE A
+
+On the fixed ladder fixture the SIDE view is visibly better: the lower mass is
+coherent rather than shredded and an upward connecting structure appears. But
+the waist is still not continuous, and FAR remains empty.
+
+The offline numbers already predicted a partial result. At 1.70x the recovered
+optical depth is 36.8 against a reference of 270.8 - opaque, but only 14% of
+the available material - and every ray still reports `exhausted`. The binding
+constraint is now the fine-march budget itself: `MAX_STEPS` 128 at
+`exteriorFineStep` 3.536 is 452 blocks of fine reach, while the storm presents
+roughly 600 blocks of material along a SIDE waist ray. Even ideal promotion
+cannot integrate that within the budget.
+
+FAR is not explained by this model at all. The simulation predicts 7.9 optical
+depth at 2.60x, which should be faintly visible, and the live frame is empty.
+The simulation omits the weather-map empty-space skip and the transmittance
+early-exit and uses a synthetic ray span, so at least one further mechanism
+gates that distance. It was not investigated.
+
+### Guard
+
+`validateT098MarchReachesMaterial` asserts both properties and carries the
+pre-fix witness: false negatives must be zero at every distance, the fixed rule
+must reach opaque material from 1.12x to 2.00x, and the pre-fix rule must still
+starve from 1.40x, so the guard cannot pass by reverting.
+
+### Status
+
+T098 remains **OPEN**. T099 remains blocked. `STORM_MAX_BLEND_BLOCKS = 48` is
+still not the next blocker.
+
+The next isolated blocker is the fine-march budget - `MAX_STEPS` against
+`exteriorFineStep` - plus whatever additionally gates FAR.
+
+`./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
+T076 GLSL parity, T111 shader compilation, the T098 extent guard still
+selective at 0.750, and the new march guard.

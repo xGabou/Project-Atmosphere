@@ -334,6 +334,8 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
         shader.safeGetUniform("StormLobeCount").set(StormGeometryBuildCoordinator.lobeCount());
+        shader.safeGetUniform("StormWidestEdgeBlocks")
+                .set(StormGeometryBuildCoordinator.widestEdgeBlocks());
         shader.safeGetUniform("PuffShapeMode").set(PuffLobeSpatialIndex.effectiveShapeMode().shaderId());
         shader.safeGetUniform("PuffDensityStage").set(
                 VolumetricCloudDebugConfig.puffDensityStage().shaderId()

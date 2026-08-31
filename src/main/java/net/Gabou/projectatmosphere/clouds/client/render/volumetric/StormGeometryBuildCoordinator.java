@@ -79,6 +79,29 @@ public final class StormGeometryBuildCoordinator {
         return adopted == null ? 0 : adopted.descriptorCount();
     }
 
+    /**
+     * The widest coverage-envelope boundary over the adopted descriptors, in
+     * blocks.
+     *
+     * <p>T098's raymarch promotion probe subtracts this from the union distance
+     * so the resulting advance is a lower bound on the distance to any
+     * material: {@code stormEnvelopeFromDistance} fades coverage over plus or
+     * minus a descriptor's softness, so material can begin that far outside the
+     * union surface. Taking the maximum over every uploaded descriptor keeps
+     * the bound valid regardless of which group the ray approaches.
+     */
+    public static float widestEdgeBlocks() {
+        StormRenderSnapshot snapshot = publishedSnapshot;
+        if (snapshot == null) {
+            return 0.0F;
+        }
+        float widest = 0.0F;
+        for (StormLobeDescriptor descriptor : snapshot.descriptorsUnsafe()) {
+            widest = Math.max(widest, (float) StormLobeEvaluator.edgeWidthBlocks(descriptor));
+        }
+        return widest;
+    }
+
     public static StormRenderSnapshot snapshot() {
         return publishedSnapshot;
     }
