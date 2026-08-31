@@ -75,7 +75,13 @@ public final class StormT098CaptureDriver {
     }
 
     /** One named viewpoint from the T098 checklist. */
-    private record Shot(String name, double x, double y, double z, String intent) {
+    private record Shot(
+            String name, double x, double y, double z, String intent,
+            VolumetricCloudRaymarchDebugView view) {
+        Shot(String name, double x, double y, double z, String intent) {
+            this(name, x, y, z, intent, VolumetricCloudRaymarchDebugView.FINAL);
+        }
+
     }
 
     public static boolean active() {
@@ -204,6 +210,21 @@ public final class StormT098CaptureDriver {
                     centreX + radius * factor, baseY + height * 0.55D, centreZ,
                     "T098 distance ladder at waist height, factor " + factor));
         }
+        // T098 post-integration stage isolation, all at the SIDE pose so the
+        // only variable is which stage of the pipeline is displayed. FINAL is
+        // already captured as 2_SIDE; these are the stages before it.
+        built.add(new Shot("A_SIDE_CURRENT_ONLY",
+                centreX + radius * 1.7D, midY, centreZ,
+                "raw current-frame march result, history bypassed",
+                VolumetricCloudRaymarchDebugView.CURRENT_ONLY));
+        built.add(new Shot("B_SIDE_HISTORY_ONLY",
+                centreX + radius * 1.7D, midY, centreZ,
+                "temporal history only",
+                VolumetricCloudRaymarchDebugView.HISTORY_ONLY));
+        built.add(new Shot("C_SIDE_HISTORY_REJECTION",
+                centreX + radius * 1.7D, midY, centreZ,
+                "history acceptance/rejection classification",
+                VolumetricCloudRaymarchDebugView.HISTORY_REJECTION));
         built.add(new Shot("8_NEAR_EDGE", centreX + radius * 1.12D, baseY + height * 0.55D, centreZ,
                 "fine detail octaves at the outer boundary"));
         return List.copyOf(built);
@@ -264,6 +285,8 @@ public final class StormT098CaptureDriver {
         }
         VolumetricCloudRenderer.releaseStepScalePin();
         VolumetricCloudRenderer.setDiagnosticStepBudget(0);
+        VolumetricCloudDebugConfig.setRaymarchDebugView(
+                VolumetricCloudRaymarchDebugView.FINAL);
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.options.hideGui = originalHideGui;
         LocalPlayer player = minecraft.player;
@@ -305,6 +328,10 @@ public final class StormT098CaptureDriver {
                 }
             }
             case MOVE -> {
+                // T098 stage isolation: the view must be active for the whole
+                // settle window, not just the grab, or the captured frame is
+                // still the previous stage's.
+                VolumetricCloudDebugConfig.setRaymarchDebugView(shot.view());
                 float yaw = yawTo(shot.x(), shot.z(),
                         StormPerformanceBaseline.suiteFixture() == null ? shot.x()
                                 : StormPerformanceBaseline.suiteFixture().centerX(),

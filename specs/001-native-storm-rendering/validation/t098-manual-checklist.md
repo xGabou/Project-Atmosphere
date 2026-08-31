@@ -1642,3 +1642,88 @@ and the 384-step arms.
 
 `./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
 T076 GLSL parity, T111 shader compilation, and both T098 guards.
+
+
+## T098 post-integration stage isolation (2026-08-31)
+
+Result: **the first divergence is the raw march output itself.** History,
+composition and upsampling are all exonerated. The premise of this
+investigation - that the defect lies after or around accumulated ray alpha - is
+falsified. Stopping at the first divergence, per the task's own rule.
+
+### Method
+
+The renderer already carries the stage views this needed, so no new
+instrumentation was written. Three frames were captured at the identical SIDE
+pose on one adopted storm (group 6db90898), varying only which pipeline stage is
+displayed:
+
+| frame | `DebugView` | stage |
+|---|---:|---|
+| `2_SIDE` | 0 FINAL | fully composed |
+| `A_SIDE_CURRENT_ONLY` | 1 | `result = currentResult`, history bypassed |
+| `B_SIDE_HISTORY_ONLY` | 2 | history buffer only |
+| `C_SIDE_HISTORY_REJECTION` | 3 | acceptance/rejection classification |
+
+The view is applied at MOVE and held for the whole settle window, so the
+captured frame is genuinely that stage rather than the previous one.
+
+### Result
+
+| frame | bytes | content |
+|---|---:|---|
+| `2_SIDE` FINAL | 423,159 | anvil, gap, base |
+| `A_SIDE_CURRENT_ONLY` | 422,211 | **the same anvil, the same gap, the same base** |
+| `B_SIDE_HISTORY_ONLY` | 57,573 | empty sky |
+
+`CURRENT_ONLY` and `FINAL` are the same image to within jitter. The column is
+already missing in the raw current-frame march, before any temporal or
+composite stage runs.
+
+`HISTORY_ONLY` is 57,573 bytes, the same size as a known-empty sky frame,
+because the capture driver calls `invalidateHistory()` on every camera move.
+History is therefore empty at capture time and contributes nothing - which is
+exactly why `FINAL` matches `CURRENT_ONLY`.
+
+**Caveat on the history result.** These captures deliberately clear history per
+shot, so this exonerates history *for these frames* only. A history defect that
+appears in steady-state gameplay would not show here. That was not the question
+being asked, but the exoneration should not be read wider than the evidence.
+
+### What this establishes, and what it overturns
+
+Everything downstream of the march is ruled out: temporal history, reprojection,
+the composite equation, the paired colour-depth upsampling at the 0.75 render
+scale. None of them can be responsible for a column that is already absent when
+they receive it.
+
+It also overturns the reasoning that motivated this task. The offline march
+model predicted, from the renderer's own integration semantics, that the SIDE
+waist ray accumulates optical depth 5.89 and therefore alpha 0.997. Production
+renders sky there. Since the divergence is inside the march, **the offline march
+model is what is wrong**, not a later stage. T076 GLSL parity covers the density
+function, not the march loop, so it never constrained this.
+
+The one march component the offline model has never reproduced is the
+weather-gated empty-space skip:
+
+    if (!analyticPuffDiagnostic && !fine && FunnelCount == 0) {
+        float coverageSignal = sampleWeather(p.xz).r * CoverageMul;
+        if (coverageSignal <= 0.001 && !localRainSegment) { skip the segment }
+    }
+
+That is named here as the obvious next place to look, not as a proven cause. It
+is not straightforwardly sufficient on its own: the base and the anvil render
+from nearly the same XZ column as the waist, so a weather map that zeroed the
+storm's footprint would have removed all three.
+
+### Status
+
+T098 remains **OPEN**. T099 remains blocked. No production code changed in this
+session beyond the diagnostic capture frames.
+
+FAR remains empty and unexplained, now also in the `CURRENT_ONLY` arm, so it too
+originates at or before the march.
+
+`./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
+T076 GLSL parity, T111 shader compilation, and both T098 guards.
