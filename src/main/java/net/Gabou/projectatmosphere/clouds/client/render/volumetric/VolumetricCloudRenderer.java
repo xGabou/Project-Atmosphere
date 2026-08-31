@@ -67,6 +67,24 @@ public final class VolumetricCloudRenderer {
     }
 
     /**
+     * T098 phase 1 control arm, in raymarch iterations. Zero is production and
+     * leaves the shader's MAX_STEPS cap untouched; a positive value raises the
+     * cap so budget exhaustion can be removed as a variable while every other
+     * march rule stays fixed. Set only by the marker-gated capture driver.
+     */
+    private static int diagnosticStepBudget;
+
+    /** Test-only: see {@link #diagnosticStepBudget}. */
+    public static void setDiagnosticStepBudget(int steps) {
+        diagnosticStepBudget = Math.max(0, Math.min(384, steps));
+    }
+
+    /** Test-only: the step budget currently forced, or zero for production. */
+    public static int diagnosticStepBudget() {
+        return diagnosticStepBudget;
+    }
+
+    /**
      * Test-only: holds the frame-time governor's step scale for T098 capture
      * sets, which are static poses whose purpose is to judge the renderer, not
      * the governor's load response.
@@ -334,6 +352,7 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
         shader.safeGetUniform("StormLobeCount").set(StormGeometryBuildCoordinator.lobeCount());
+        shader.safeGetUniform("PaDiagnosticStepBudget").set(diagnosticStepBudget);
         shader.safeGetUniform("PuffShapeMode").set(PuffLobeSpatialIndex.effectiveShapeMode().shaderId());
         shader.safeGetUniform("PuffDensityStage").set(
                 VolumetricCloudDebugConfig.puffDensityStage().shaderId()

@@ -87,6 +87,28 @@ public final class StormT098CaptureDriver {
         return enabled && state == State.DONE;
     }
 
+    /**
+     * Optional raymarch step budget from the capture marker's first line.
+     *
+     * <p>Zero, absent or unparseable means production. This exists so the
+     * T098 control arm can remove budget exhaustion as a variable without
+     * changing any production default.
+     */
+    private static int markerStepBudget() {
+        try {
+            for (String line : Files.readAllLines(MARKER)) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                    continue;
+                }
+                return Integer.parseInt(trimmed);
+            }
+        } catch (Exception exception) {
+            return 0;
+        }
+        return 0;
+    }
+
     private static boolean markerPresent() {
         if (!checkedMarker) {
             checkedMarker = true;
@@ -203,6 +225,9 @@ public final class StormT098CaptureDriver {
         // recorded the governor's worst march quality rather than the
         // renderer's output. These are static poses, so hold the scale.
         VolumetricCloudRenderer.pinStepScaleForCaptures(1.0F);
+        // T098 phase 1: an optional step-budget control arm, read from the
+        // capture marker's first line. Absent or unparseable means production.
+        VolumetricCloudRenderer.setDiagnosticStepBudget(markerStepBudget());
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         if (player == null || player.connection == null) {
@@ -238,6 +263,7 @@ public final class StormT098CaptureDriver {
             return;
         }
         VolumetricCloudRenderer.releaseStepScalePin();
+        VolumetricCloudRenderer.setDiagnosticStepBudget(0);
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.options.hideGui = originalHideGui;
         LocalPlayer player = minecraft.player;
@@ -332,6 +358,10 @@ public final class StormT098CaptureDriver {
                     target.toAbsolutePath());
             // The checklist wants the density calibration recorded with each
             // frame, taken from the same camera position as the shot.
+            ProjectAtmosphere.LOGGER.info(
+                    "T098_CAPTURE_CONTROLS shot={} stepScale={} diagnosticStepBudget={}",
+                    shot.name(), VolumetricCloudRenderer.governorStepScale(),
+                    VolumetricCloudRenderer.diagnosticStepBudget());
             ProjectAtmosphere.LOGGER.info("T098_CAPTURE_DENSITY shot={} {}",
                     shot.name(),
                     StormDensityCalibrationReport.describe(shot.x(), shot.y(), shot.z()));

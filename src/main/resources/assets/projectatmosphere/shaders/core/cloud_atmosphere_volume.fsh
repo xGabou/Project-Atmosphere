@@ -44,6 +44,11 @@ uniform float SlabTopY;
 uniform float MaxPrecipitation;
 uniform int PuffLobeCount;
 uniform int StormLobeCount;
+// T098 phase 1 control arm. Zero means production: the loop caps at MAX_STEPS
+// exactly as before. A positive value raises the cap so budget exhaustion can
+// be removed as a variable while every other rule stays fixed. Set only by the
+// marker-gated capture driver; never a production default.
+uniform int PaDiagnosticStepBudget;
 uniform int PuffShapeMode; // 0=fallback, 1=legacy hybrid, 2=direct-only diagnostic
 uniform int PuffDensityStage; // 0=final, 1=analytic-all, 2=analytic-indexed, 3=envelope, 4=pre-erosion, 7=continuous-all, 12=carrier-billow
 uniform int PuffTierFilter; // -1=all, 0=base, 1=middle, 2=crown, 3=legacy/unknown
@@ -211,6 +216,9 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 const int MAX_STEPS = 128;
+// Ceiling for the T098 diagnostic budget arm. Only PaDiagnosticStepBudget can
+// reach above MAX_STEPS, and only up to here.
+const int PA_MAX_DIAGNOSTIC_STEPS = 384;
 const int MAX_LIGHT_STEPS = 8;
 const float PI = 3.14159265;
 
@@ -4024,6 +4032,9 @@ void main() {
             + jitterFrame * 0.61803398875
     );
 
+    int paStepCap = PaDiagnosticStepBudget > 0
+        ? min(PaDiagnosticStepBudget, PA_MAX_DIAGNOSTIC_STEPS)
+        : MAX_STEPS;
     int stepBudget = int(float(clamp(RaymarchSteps, 8, MAX_STEPS)) * clamp(StepScale, 0.4, 1.0));
     stepBudget = clamp(stepBudget, 8, MAX_STEPS);
     float span = t1 - t0;
@@ -4091,7 +4102,7 @@ void main() {
     float stratusMaterialRelief = 0.0;
     float stratusSurfaceSide = 0.0;
 
-    for (int i = 0; i < MAX_STEPS; i++) {
+    for (int i = 0; i < paStepCap; i++) {
         if (t >= t1 || transmittance < 0.015) {
             if (transmittance < 0.015 && paWorkloadCaptureActive()) {
                 paEarlyTerminations++;

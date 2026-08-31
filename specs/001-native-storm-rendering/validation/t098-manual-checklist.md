@@ -1538,3 +1538,107 @@ attendant loss of surface detail, or an adaptive scheme that spends fine steps
 only inside material. That is a design decision, not a defect.
 
 `./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures.
+
+
+## T098 march-budget control arm (2026-08-31)
+
+Result: **CASE C**. Raising the raymarch budget does not restore the column.
+March depth is falsified as the cause, by two independent signals. No adaptive
+scheme was designed and no new hypothesis was started.
+
+### The control
+
+`PaDiagnosticStepBudget` is a marker-gated uniform read from the first line of
+`run/t098-captures.txt`. Zero is production and leaves the `MAX_STEPS` cap
+exactly as before; a positive value raises the loop cap up to
+`PA_MAX_DIAGNOSTIC_STEPS` = 384 while every other march rule stays fixed.
+
+Both arms now log their experimental controls with every frame, which settles
+the governor question left open on 2026-08-31:
+
+    T098_CAPTURE_CONTROLS shot=2_SIDE stepScale=1.0 diagnosticStepBudget=0
+    T098_CAPTURE_CONTROLS shot=2_SIDE stepScale=1.0 diagnosticStepBudget=384
+
+`stepScale=1.0` in both confirms the capture-mode governor pin is actually
+active. The earlier "indicative, not authoritative" caveat on the governor arm
+is now resolved: the governor was pinned, and the column still failed.
+
+### Result: no change, at no cost
+
+| arm | budget | SIDE result |
+|---|---:|---|
+| arm_prod, group 5aebcc4e | 128 | anvil tendril, rising cap on the base, gap |
+| arm_384, group dc42cf06 | 384 | anvil tendril, rising cap on the base, gap |
+
+The two frames are near-identical. Both are better than the pre-fix campaign -
+the per-descriptor bound is visibly working, and there is now a descending
+tendril from the anvil and a bright cap on the base - but neither is a
+connected column.
+
+GPU medians are effectively unchanged:
+
+| arm | medians (ms) |
+|---|---|
+| 128 | 73.7, 139.5, 165.2, 207.1, 217.1 |
+| 384 | 72.7, 147.5, 182.1, 205.4, 216.7 |
+
+**Tripling the budget changed neither the image nor the cost.** That is the
+decisive point: if the rays were budget-limited, 384 iterations would have cost
+materially more than 128. They do not, so the rays are not consuming the extra
+iterations - they are terminating for another reason, either the
+`transmittance < 0.015` early exit or reaching `t1`.
+
+FAR is unchanged and still empty in both arms (57573 and 57570 bytes, both
+plain sky).
+
+Caveat: the two arms adopted different storms (5aebcc4e and dc42cf06) because
+adoption timing varies per run even at a fixed seed. The qualitative structure
+is the same in both, and the GPU equality is fixture-independent, but this is
+not a strict same-fixture A/B.
+
+### Integration semantics, and the arithmetic that predicted this
+
+Each fine sample contributes
+`stepTrans = exp(-density * ExtinctionScale * stepLength)`, accumulated as
+`transmittance *= stepTrans`, with `alpha = saturate(1 - transmittance)` and an
+early exit at `transmittance < 0.015`. **`stepLength` is correctly included**,
+so the diagnostic optical depth converts directly to rendered alpha.
+
+`ExtinctionScale` is about 0.115, derived from the production T128 trace where
+density 0.812 maps to extinction 0.09338. So:
+
+| state | diagnostic depth | optical depth | predicted alpha |
+|---|---:|---:|---:|
+| pre-promotion-fix | 0.0 | 0.00 | 0.000 |
+| promotion fix | 36.8 | 4.23 | 0.985 |
+| per-descriptor | 51.2 | 5.89 | 0.997 |
+
+The renderer's own integration already predicted that the current column should
+be essentially opaque at SIDE. It is not. That tension is what the budget arm
+tested, and the arm falsified budget as the explanation: the rays already
+accumulate enough alpha, so more iterations cannot help.
+
+### What this leaves
+
+The storm's material is correct, the field carries a 480-600 block connected
+column at the waist, the production shader's own trace reports density 0.81-0.91
+there, the march now reaches that material with zero false negatives, and the
+accumulated alpha is enough to be opaque - yet the pixels in the waist band are
+sky.
+
+The next divergence is therefore between "the ray accumulates alpha" and "the
+pixel shows cloud", which is a different part of the pipeline from anything
+examined so far: the early-exit condition, the ray span `t1`, or the
+composite/history stage. Not investigated here.
+
+### Status
+
+T098 remains **OPEN**. T099 remains blocked. `STORM_MAX_BLEND_BLOCKS = 48`
+remains load-bearing as the webbing allowance and is still not the next blocker.
+`MAX_STEPS` stays at 128 - the arm shows raising it buys nothing.
+
+FAR remains a separate unresolved renderer issue: empty in both the production
+and the 384-step arms.
+
+`./gradlew check build` BUILD SUCCESSFUL, 41 invariants, 0 failures, including
+T076 GLSL parity, T111 shader compilation, and both T098 guards.
