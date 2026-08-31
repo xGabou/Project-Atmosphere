@@ -1097,3 +1097,113 @@ not the next blocker.
 No production morphology, material, carrier, erosion or T131 behaviour was
 changed. ./gradlew check build BUILD SUCCESSFUL, 40 invariants, 0 failures; the
 ANVIL vertical-extent guard remains selective at 0.750 against its 1.000 bound.
+
+
+## T098 raymarch-transition investigation (2026-08-31)
+
+Result for the stated hypothesis: **falsified, CASE C**. The coarse march does
+not skip past the column. `directStormSegmentMayIntersect` produced **zero
+false negatives** on every traced ray at every distance.
+
+The investigation did find the real divergence, and it is the opposite defect:
+a false positive that exhausts the march's iteration budget in empty space.
+
+### The march state machine, as implemented
+
+Per iteration, in order:
+
+1. `if (t >= t1 || transmittance < 0.015) break;`
+2. `fine = sinceHit < 6`
+3. `distanceGrowth = 1 + (t / MaxRenderDistance) * 2.2`
+4. `stepLength = fine ? fineStep : min(coarseStep * distanceGrowth, coarseStepCap)`
+5. if `!fine` and the puff segment test fires: `sinceHit = 0`, `fine = true`
+6. if `!fine` and `directStormSegmentMayIntersect(p, p + step)` fires:
+   `sinceHit = 0`, `fine = true`, `stepLength = fineStep`
+7. if `!fine` and `sampleWeather(p.xz).r * CoverageMul <= 0.001`: skip the
+   segment entirely
+8. otherwise sample
+
+Production values for the captured configuration: ULTRA `raymarchSteps` 96,
+governor `stepScale` 0.5, so `stepBudget` 48; `exteriorFineStep` =
+`2.5 * sqrt(96/48)` = 3.536; `coarseStep` = `max(2000/48 * 1.5, 3.536*3)` =
+62.5; `coarseStepCap` = `min(112, 3.536*16)` = **56.57**; `MAX_STEPS` = 128;
+`MaxRenderDistance` = 2000 (config `cloudRenderDistance`).
+
+`stormGroupSegmentMayIntersect` is genuinely conservative: for every descriptor
+in the group it takes the closest point on the segment and compares against a
+bounding sphere of radius `hypot(max(major, minor) * 1.24 + |shear| + 2,
+halfHeight + 2)`. Because it is segment-wide, the `groupVisited` dedup in
+`directStormSegmentMayIntersect` is sound - re-testing the same group at
+another sample fraction cannot change the answer.
+
+### Measured: zero false negatives, catastrophic false positives
+
+Offline replication of the production march against the live descriptors,
+scored per coarse segment versus a 2-block reference traversal:
+
+| factor | distance | firstFineT | refFirstT | falseNeg | marchedDepth | refDepth | exhausted |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 1.12 waist | 736.7 | 0.0 | 436 | 0 | 6.3 | 255.6 | YES |
+| 1.40 waist | 920.9 | 169.7 | 620 | 0 | 0.0 | 254.1 | YES |
+| 1.60 waist | 1052.5 | 282.8 | 752 | 0 | 0.0 | 269.9 | YES |
+| 1.70 waist | 1118.3 | 339.4 | 818 | 0 | 0.0 | 270.8 | YES |
+| 2.00 waist | 1315.6 | 565.7 | 1016 | 0 | 0.0 | 277.1 | YES |
+| 2.60 waist | 1710.3 | 961.7 | 1450 | 0 | 0.0 | 210.5 | YES |
+| 1.70 baseControl | 1118.3 | 452.5 | 684 | 0 | 88.5 | 430.0 | YES |
+| 1.70 anvilControl | 1118.3 | 339.4 | 620 | 0 | 40.2 | 590.4 | YES |
+
+`firstFineT` is the first t at which the march enters fine stepping;
+`refFirstT` is the first t at which the reference finds density >= 0.02.
+
+The march enters fine stepping **hundreds of blocks before any material** - at
+t=339 when material starts at t=818 for the SIDE waist ray. The bounding
+spheres are enormous: about 698 blocks for BASE (533 * 1.24 = 661 horizontal
+against halfHeight 224) and about 615 for ANVIL. Any ray within that radius of
+a descriptor centre is promoted.
+
+Once promoted the march cannot recover. `fine = sinceHit < 6` gives six fine
+steps of 3.536 blocks, then one coarse iteration whose segment test is still
+inside the same bounding sphere and immediately re-promotes. Net progress is
+about 3 blocks per iteration, so the `MAX_STEPS` = 128 cap yields roughly 390
+blocks of reach. **Every ray reports `exhausted=YES`, and every waist ray at or
+beyond 1.40x accumulates exactly zero density.**
+
+This reproduces the observed ladder exactly. At 1.12x the budget just reaches
+material at 436 and returns a faint 6.3 of optical depth; by 1.40x it falls
+short and returns 0.0; at 1.70x and beyond it is hopeless.
+
+The controls show the defect is not column-specific. BASE captures 88.5 of 430
+reference optical depth (21%) and ANVIL 40.2 of 590 (7%). They render at all
+only because they are wide enough that many rays begin inside them.
+
+### Consequence for the T098 history
+
+The storm has been materially correct throughout. Six successive morphology and
+material hypotheses failed because none of them was the defect: at the
+distances used for visual grading the march never arrives at the storm. The
+1.70x SIDE and 1.90x LATERAL poses sit past the point where the budget runs
+out, and the 1.12x NEAR_EDGE pose - the one that always looked healthy - is the
+only one inside it.
+
+### Not fixed here
+
+Phase 9 authorises a correction when false negatives are measured. There are
+none, so the authorisation condition is not met and, per CASE C, no fix was
+attempted and no further hypothesis was started.
+
+The narrow correction this points to, for a future session, is the promotion
+rule rather than the intersection test: promote to fine only when the segment
+is near actual material rather than inside a bounding sphere sized to the whole
+descriptor, and/or prevent the six-step fine window from being re-armed while
+the reference distance to material is still large. Any such change must be
+measured against the same false-positive and false-negative classification, and
+against the T119/T121/T122/T123 workload counters, since reducing false
+positives should *reduce* cost rather than raise it.
+
+### Status
+
+T098 remains **OPEN**. T099 remains blocked. `STORM_MAX_BLEND_BLOCKS = 48` is
+still not the next blocker.
+
+No production code changed. `./gradlew check` passes with 40 invariants and 0
+failures.

@@ -71,6 +71,7 @@ public final class StormVolumetricGeometrySandbox {
         reportT098SoftnessVersusHeight();
         validateT098EnvelopeBoundedByExtent();
         reportT098OpticalProfile();
+        reportT098MarchSimulation();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
@@ -2494,6 +2495,228 @@ public final class StormVolumetricGeometrySandbox {
                     maxDensity, axisDepth,
                     densities.isEmpty() ? "none" : names[dominant]);
         }
+    }
+
+
+    /**
+     * T098 phase 2/3: replicate the production exterior raymarch offline and
+     * classify each coarse segment against a high-resolution reference.
+     *
+     * <p>The live fixture renders a substantial column at 1.12x horizontalRadius
+     * and clean sky at 1.70x, while the density field and the production
+     * shader's own material trace both report dense, opaque material at the
+     * waist. That isolates the loss to the march. This mirrors the shader's
+     * control flow - fine = sinceHit below 6, coarse step capped and grown by
+     * distance, the storm segment test promoting a segment to fine - and, for
+     * every coarse segment, asks a dense reference traversal whether that
+     * interval actually contained storm material.
+     *
+     * <p>Parameters are production values for the captured configuration: ULTRA
+     * raymarchSteps 96, governor stepScale 0.5, so budget 48, exteriorFineStep
+     * 2.5 * sqrt(96/48) = 3.536, coarseStepCap min(112, 3.536*16) = 56.57,
+     * MAX_STEPS 128, MaxRenderDistance 2000.
+     */
+    private static void reportT098MarchSimulation() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+        double radius = 657.8D;
+
+        System.out.println("T098_MARCH|factor|label|distance|targetY|coarseSegs|fineSegs"
+                + "|firstFineT|refFirstT|falseNegSegs|falseNegBlocks"
+                + "|iters|exhausted|marchedDepth|refDepth");
+        for (double factor : new double[] {1.12D, 1.40D, 1.60D, 1.70D, 2.00D, 2.60D}) {
+            simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
+                    factor, 680.0D, "waist");
+        }
+        simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
+                1.70D, 300.0D, "baseControl");
+        simulateRay(baseVolume, detailVolume, lobes, centreX, centreZ, radius,
+                1.70D, 900.0D, "anvilControl");
+    }
+
+    /** One ray, marched with the production rules and scored against a reference. */
+    private static void simulateRay(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double radius,
+            double factor, double targetY, String label) {
+        double camX = centreX + radius * factor;
+        double camY = (136.0D + 1000.0D) * 0.5D;
+        double camZ = centreZ;
+        double dirX = centreX - camX;
+        double dirY = targetY - camY;
+        double dirZ = 0.0D;
+        double dirLength = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+        dirX /= dirLength;
+        dirY /= dirLength;
+        dirZ /= dirLength;
+
+        final double maxRenderDistance = 2000.0D;
+        final double fineStep = 3.5355339D;
+        final double coarseStepCap = Math.min(112.0D, fineStep * 16.0D);
+        final int stepBudget = 48;
+        final int maxSteps = 128;
+        double t1 = maxRenderDistance;
+        double baseStep = t1 / stepBudget;
+        double coarseStep = Math.max(baseStep * 1.5D, fineStep * 3.0D);
+
+        double refFirst = -1.0D;
+        double refDepth = 0.0D;
+        double refStep = 2.0D;
+        java.util.List<double[]> refIntervals = new ArrayList<>();
+        double intervalStart = -1.0D;
+        for (double s = 0.0D; s <= t1; s += refStep) {
+            double d = sampleRayDensity(baseVolume, detailVolume, lobes,
+                    camX + dirX * s, camY + dirY * s, camZ + dirZ * s);
+            if (d >= 0.02D) {
+                if (refFirst < 0.0D) {
+                    refFirst = s;
+                }
+                if (intervalStart < 0.0D) {
+                    intervalStart = s;
+                }
+                refDepth += d * refStep;
+            } else if (intervalStart >= 0.0D) {
+                refIntervals.add(new double[] {intervalStart, s});
+                intervalStart = -1.0D;
+            }
+        }
+        if (intervalStart >= 0.0D) {
+            refIntervals.add(new double[] {intervalStart, t1});
+        }
+
+        double t = 0.0D;
+        int sinceHit = 6;
+        int coarseSegs = 0;
+        int fineSegs = 0;
+        int iterations = 0;
+        double firstFineT = -1.0D;
+        int falseNegSegs = 0;
+        double falseNegBlocks = 0.0D;
+        double marchedDepth = 0.0D;
+        boolean exhausted = false;
+        for (int i = 0; i < maxSteps; i++) {
+            iterations++;
+            if (t >= t1) {
+                break;
+            }
+            boolean fine = sinceHit < 6;
+            double distanceGrowth = 1.0D + (t / maxRenderDistance) * 2.2D;
+            double stepLength = fine
+                    ? fineStep
+                    : Math.min(coarseStep * distanceGrowth, coarseStepCap);
+            stepLength = Math.min(stepLength, t1 - t);
+            double segStart = t;
+            double segEnd = t + stepLength;
+            if (!fine && stormSegmentMayIntersect(lobes,
+                    camX + dirX * segStart, camY + dirY * segStart, camZ + dirZ * segStart,
+                    camX + dirX * segEnd, camY + dirY * segEnd, camZ + dirZ * segEnd)) {
+                sinceHit = 0;
+                fine = true;
+                stepLength = Math.min(fineStep, t1 - t);
+                segEnd = t + stepLength;
+            }
+            if (fine) {
+                fineSegs++;
+                if (firstFineT < 0.0D) {
+                    firstFineT = t;
+                }
+                double d = sampleRayDensity(baseVolume, detailVolume, lobes,
+                        camX + dirX * t, camY + dirY * t, camZ + dirZ * t);
+                marchedDepth += d * stepLength;
+                if (d >= 0.02D) {
+                    sinceHit = 0;
+                } else {
+                    sinceHit++;
+                }
+            } else {
+                coarseSegs++;
+                double overlap = 0.0D;
+                for (double[] interval : refIntervals) {
+                    overlap += Math.max(0.0D,
+                            Math.min(segEnd, interval[1]) - Math.max(segStart, interval[0]));
+                }
+                if (overlap > 0.0D) {
+                    falseNegSegs++;
+                    falseNegBlocks += overlap;
+                }
+                sinceHit++;
+            }
+            t += stepLength;
+            if (i == maxSteps - 1 && t < t1) {
+                exhausted = true;
+            }
+        }
+
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_MARCH|%.2f|%-12s|%7.1f|%6.1f|%6d|%6d|%8.1f|%8.1f|%6d|%9.1f"
+                        + "|%5d|%8s|%9.1f|%9.1f%n",
+                factor, label, radius * factor, targetY, coarseSegs, fineSegs,
+                firstFineT, refFirst, falseNegSegs, falseNegBlocks,
+                iterations, exhausted ? "YES" : "no", marchedDepth, refDepth);
+    }
+
+    /** Mirrors the shader's stormGroupSegmentMayIntersect bounding-sphere test. */
+    private static boolean stormSegmentMayIntersect(
+            java.util.List<StormLobeDescriptor> lobes,
+            double ax, double ay, double az, double bx, double by, double bz) {
+        double sx = bx - ax;
+        double sy = by - ay;
+        double sz = bz - az;
+        double lengthSquared = Math.max(sx * sx + sy * sy + sz * sz, 0.0001D);
+        for (StormLobeDescriptor lobe : lobes) {
+            double cx = lobe.centerX() + lobe.shearX() * 0.5D;
+            double cy = (lobe.baseY() + lobe.topY()) * 0.5D;
+            double cz = lobe.centerZ() + lobe.shearZ() * 0.5D;
+            double horizontal = Math.max(lobe.majorRadius(), lobe.minorRadius()) * 1.24D
+                    + Math.hypot(lobe.shearX(), lobe.shearZ()) + 2.0D;
+            double halfHeight = (lobe.topY() - lobe.baseY()) * 0.5D + 2.0D;
+            double boundRadius = Math.hypot(horizontal, halfHeight);
+            double along = Math.max(0.0D, Math.min(1.0D,
+                    ((cx - ax) * sx + (cy - ay) * sy + (cz - az) * sz) / lengthSquared));
+            double px = ax + sx * along;
+            double py = ay + sy * along;
+            double pz = az + sz * along;
+            double dx = px - cx;
+            double dy = py - cy;
+            double dz = pz - cz;
+            if (Math.sqrt(dx * dx + dy * dy + dz * dz) <= boundRadius) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** finalDensity at one world point, using the production model. */
+    private static double sampleRayDensity(
+            byte[] baseVolume, byte[] detailVolume,
+            java.util.List<StormLobeDescriptor> lobes, double x, double y, double z) {
+        double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+        if (coverage <= 0.0D) {
+            return 0.0D;
+        }
+        double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+        boolean embedded = StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+        double[] uvw = baseDomain(x, y, z, 0.0025D);
+        CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+        double lowFbm = StormDensityModel.lowFbm(baseSample[1], baseSample[2], baseSample[3]);
+        double baseField = StormDensityModel.stormBaseField(
+                StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+        double[] duvw = detailDomain(x, y, z, baseSample);
+        CloudNoiseFieldModel.sampleDetail(detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+        double detailFbm = StormDensityModel.detailFbm(
+                detailSample[0], detailSample[1], detailSample[2]);
+        return StormDensityModel.finalDensity(coverage, strength, baseField, detailFbm, embedded);
     }
 
     private static int largestComponent(boolean[][] occupied) {
