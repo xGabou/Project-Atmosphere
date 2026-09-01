@@ -174,6 +174,31 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
+**T098 2026-09-01: ANVIL optical-surface investigation returns CASE C again, one stage further in -
+the surface is structured and the self-shadow pins it flat. No production change. Task stays OPEN.**
+Measuring surface displacement rather than interior variance overturns the balloon premise a second
+time. The alpha=0.5 surface carries **58.375 blocks RMS relief** at SIDE and 27.724 at ABOVE, and no
+stage collapses on the way there: envelope 116.006, first non-zero density 49.812, alpha10 53.645,
+alpha50 58.375, alpha90 80.502. Resolved by scale the relief is 20.0/32.3/58.7/92.3/111.7 blocks at
+12/24/48/96/192-block windows - about 3/5/11/22/43 output pixels at SIDE - so macro, meso and fine
+bands are all present. Per role the anvil's surface (43.264 RMS) is nearly as rough as BASE (50.216)
+and rougher than TOWER (21.734), yet only BASE reads billowy, so the difference is not the surface.
+**Erosion is confirmed to be the wrong lever**: it contributes only **3.9-6.7 blocks** of surface
+displacement at every scale - roughly one pixel - while changing interior density substantially
+(finalDensity CV 0.589). The loss is in shading. Modelling the production light cone exactly (8 taps,
+14-block first step x1.42, cone offsets, erosion on the first two taps only): light optical depth at
+the visible surface is **median 16.425** (mean 17.040, p95 37.891) where about 4.6 already gives 1%
+transmission, and **83.57% of surface points receive less than 1% direct light**. Feeding that through
+the real three-octave scatter, beer-powder, ambient-retention and filmic tone chain gives surface
+luminance p05 **0.40731**, p50 **0.41366**, p95 0.75211: at least 45% of the canopy sits within 0.007
+luminance - **under two levels of 255** - of the ambient floor, which has no spatial variation. The
+model reproduces the render: sampled anvil pixels measure RGB (85,107,144), luminance 0.412, against
+the modelled p50 of 0.414. **The next isolated blocker is the lighting / self-shadow response**, and
+surface relief must NOT be increased to compensate. PHASE 8 candidate D is now unblocked for the next
+pass but CASE C requires stopping before it. The 4-px reconstruction beat remains a separate defect
+and is not yet the sole blocker. `./gradlew check` and `./gradlew build` pass. Evidence in
+`validation/t098-anvil-optical-surface.md`.
+
 **T098 2026-09-01: ANVIL investigation returns CASE C - the contrast is lost in integration, not in
 the density field. No production change. Task stays OPEN.** The premise that the anvil's density is
 uniform is false. Measured over five deterministic realizations of the T134 severe fixture, interior

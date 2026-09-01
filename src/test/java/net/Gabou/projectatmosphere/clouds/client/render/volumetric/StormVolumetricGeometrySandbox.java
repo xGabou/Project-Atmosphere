@@ -64,6 +64,7 @@ public final class StormVolumetricGeometrySandbox {
         reportT098CarrierDistribution();
         reportT098ErosionVersusBody();
         reportT098AnvilSurfaceStructure();
+        reportT098AnvilOpticalSurface();
         reportT098VerticalWidthProfile();
         reportT098TransitionCandidates();
         reportT098PercolationWidth();
@@ -3808,6 +3809,758 @@ public final class StormVolumetricGeometrySandbox {
                     "T098_ANVIL_ALPHA|%-5s|%5d|%.4f|%.6f|%.4f|%.6f|%6.2f|%6.2f%n",
                     view, n, mean, var, mean > 1.0E-6D ? Math.sqrt(var) / mean : 0.0D,
                     delta, 100.0D * high / n, 100.0D * low / n);
+        }
+    }
+
+
+    // ------------------------------------------------------------------
+    // T098 ANVIL optical surface
+    // ------------------------------------------------------------------
+
+    /**
+     * One view ray's optical-surface record: the depths at which accumulated
+     * alpha crosses each threshold, and the field values at the alpha=0.5
+     * point, which is the locus a viewer actually reads as the surface.
+     */
+    private record T098Surface(
+            boolean valid, double tFirst, double t10, double t50, double t90, double t985,
+            double tEnvelope, double envelopeAtT50, double bodyAtT50, double detailAtT50,
+            double densityAtT50, double lightOpticalDepth, int roleAtT50) {
+        static final T098Surface INVALID = new T098Surface(false, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, -1);
+    }
+
+    /** Production light direction from the frozen noon fixture. */
+    private static final double[] T098_LIGHT_DIR = {-0.60D, 0.79D, 0.12D};
+
+    /**
+     * The production light cone, modelled exactly: eight taps, 14-block first
+     * step growing by 1.42, a fixed golden-angle cone offset, and detail
+     * erosion only on the first two taps.
+     */
+    private static double t098LightOpticalDepth(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double x, double y, double z) {
+        double opticalDepth = 0.0D;
+        double stepLength = 14.0D;
+        double px = x;
+        double py = y;
+        double pz = z;
+        for (int i = 0; i < 8; i++) {
+            double ang = i * 2.399963D;
+            double spread = (i + 0.5D) * 0.28D;
+            double ox = Math.cos(ang) * spread * stepLength * 0.24D;
+            double oy = 0.35D * Math.sin(ang * 1.7D) * spread * stepLength * 0.24D;
+            double oz = Math.sin(ang) * spread * stepLength * 0.24D;
+            px += T098_LIGHT_DIR[0] * stepLength;
+            py += T098_LIGHT_DIR[1] * stepLength;
+            pz += T098_LIGHT_DIR[2] * stepLength;
+            double cloud = i < 2
+                    ? sampleRayDensity(baseVolume, detailVolume, lobes,
+                            px + ox, py + oy, pz + oz)
+                    : sampleRayBodyNoErosion(baseVolume, lobes, px + ox, py + oy, pz + oz);
+            opticalDepth += cloud * T098_ANVIL_DENSITY_SCALE * stepLength;
+            stepLength *= 1.42D;
+        }
+        return opticalDepth * T098_ANVIL_EXTINCTION;
+    }
+
+    /** The body before detail erosion, which is what light taps 2..7 sample. */
+    private static double sampleRayBodyNoErosion(
+            byte[] baseVolume, java.util.List<StormLobeDescriptor> lobes,
+            double x, double y, double z) {
+        double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+        if (coverage <= 0.0D) {
+            return 0.0D;
+        }
+        double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+        boolean embedded = StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+        double[] baseSample = new double[4];
+        double[] uvw = baseDomain(x, y, z, 0.0025D);
+        CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+        double lowFbm = StormDensityModel.lowFbm(baseSample[1], baseSample[2], baseSample[3]);
+        double baseField = StormDensityModel.stormBaseField(
+                StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+        return StormDensityModel.stormBody(coverage, strength, baseField, embedded);
+    }
+
+    /**
+     * Marches one ray and returns where the accumulated alpha crosses each
+     * threshold.
+     *
+     * @param arm 0 = production, 1 = erosion disabled, 2 = envelope body only
+     */
+    private static T098Surface t098MarchSurface(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double ox, double oy, double oz, double dx, double dy, double dz,
+            double span, int arm, boolean wantLight) {
+        final double step = 2.5D;
+        double transmittance = 1.0D;
+        double tFirst = -1.0D;
+        double tEnvelope = -1.0D;
+        double t10 = -1.0D;
+        double t50 = -1.0D;
+        double t90 = -1.0D;
+        double t985 = -1.0D;
+        double envelopeAt = 0.0D;
+        double bodyAt = 0.0D;
+        double detailAt = 0.0D;
+        double densityAt = 0.0D;
+        int roleAt = -1;
+        double[] baseSample = new double[4];
+        double[] detailSample = new double[4];
+
+        for (double t = 0.0D; t <= span; t += step) {
+            double x = ox + dx * t;
+            double y = oy + dy * t;
+            double z = oz + dz * t;
+            double coverage = StormLobeEvaluator.coverageEnvelopeAt(lobes, x, y, z);
+            if (tEnvelope < 0.0D && coverage >= 0.50D) {
+                tEnvelope = t;
+            }
+            double cloud = 0.0D;
+            double baseField = 0.0D;
+            double detailFbm = 1.0D;
+            double body = 0.0D;
+            if (coverage > 0.0D) {
+                double strength = StormLobeEvaluator.envelopeStrengthAt(lobes, x, y, z);
+                boolean embedded =
+                        StormLobeEvaluator.hasEmbeddedConvectiveOverlap(lobes, x, y, z);
+                double[] uvw = baseDomain(x, y, z, 0.0025D);
+                CloudNoiseFieldModel.sampleBase(baseVolume, uvw[0], uvw[1], uvw[2], baseSample);
+                double lowFbm = StormDensityModel.lowFbm(
+                        baseSample[1], baseSample[2], baseSample[3]);
+                baseField = StormDensityModel.stormBaseField(
+                        StormDensityModel.baseCarrier(baseSample[0], lowFbm));
+                body = StormDensityModel.stormBody(coverage, strength, baseField, embedded);
+                if (arm == 2) {
+                    cloud = body;
+                } else if (arm == 1) {
+                    cloud = body;
+                } else {
+                    double[] duvw = detailDomain(x, y, z, baseSample);
+                    CloudNoiseFieldModel.sampleDetail(
+                            detailVolume, duvw[0], duvw[1], duvw[2], detailSample);
+                    detailFbm = StormDensityModel.detailFbm(
+                            detailSample[0], detailSample[1], detailSample[2]);
+                    cloud = StormDensityModel.erode(body, detailFbm);
+                }
+            }
+            if (cloud > 0.0006D && tFirst < 0.0D) {
+                tFirst = t;
+            }
+            transmittance *= Math.exp(
+                    -cloud * T098_ANVIL_DENSITY_SCALE * T098_ANVIL_EXTINCTION * step);
+            double alpha = 1.0D - transmittance;
+            if (t10 < 0.0D && alpha >= 0.10D) {
+                t10 = t;
+            }
+            if (t50 < 0.0D && alpha >= 0.50D) {
+                t50 = t;
+                envelopeAt = coverage;
+                bodyAt = body;
+                detailAt = detailFbm;
+                densityAt = cloud;
+                double best = 0.0D;
+                for (StormLobeDescriptor lobe : lobes) {
+                    double e = StormLobeEvaluator.envelopeFromDistance(
+                            StormLobeEvaluator.signedDistanceAt(lobe, x, y, z),
+                            StormLobeEvaluator.edgeWidthBlocks(lobe),
+                            StormLobeEvaluator.envelopeStrength(lobe));
+                    if (e > best) {
+                        best = e;
+                        roleAt = lobe.role().gpuId();
+                    }
+                }
+            }
+            if (t90 < 0.0D && alpha >= 0.90D) {
+                t90 = t;
+            }
+            if (alpha >= 0.985D) {
+                t985 = t;
+                break;
+            }
+        }
+        if (t50 < 0.0D) {
+            return T098Surface.INVALID;
+        }
+        double light = 0.0D;
+        if (wantLight) {
+            light = t098LightOpticalDepth(baseVolume, detailVolume, lobes,
+                    ox + dx * t50, oy + dy * t50, oz + dz * t50);
+        }
+        return new T098Surface(true, tFirst, t10, t50, t90, t985, tEnvelope,
+                envelopeAt, bodyAt, detailAt, densityAt, light, roleAt);
+    }
+
+    /** RMS of a grid after removing a wide moving-average trend, plus percentiles. */
+    private static double[] t098Relief(double[][] grid, boolean[][] valid, int window) {
+        int rows = grid.length;
+        int cols = grid[0].length;
+        java.util.List<Double> residuals = new ArrayList<>();
+        double neighbourDelta = 0.0D;
+        int neighbourPairs = 0;
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (!valid[r][c]) {
+                    continue;
+                }
+                double sum = 0.0D;
+                int n = 0;
+                for (int rr = Math.max(0, r - window); rr <= Math.min(rows - 1, r + window); rr++) {
+                    for (int cc = Math.max(0, c - window);
+                            cc <= Math.min(cols - 1, c + window); cc++) {
+                        if (valid[rr][cc]) {
+                            sum += grid[rr][cc];
+                            n++;
+                        }
+                    }
+                }
+                if (n < 4) {
+                    continue;
+                }
+                residuals.add(grid[r][c] - sum / n);
+                if (c + 1 < cols && valid[r][c + 1]) {
+                    neighbourDelta += Math.abs(grid[r][c + 1] - grid[r][c]);
+                    neighbourPairs++;
+                }
+            }
+        }
+        if (residuals.size() < 16) {
+            return new double[] {0, 0, 0, 0, 0};
+        }
+        java.util.Collections.sort(residuals);
+        double mean = 0.0D;
+        for (double v : residuals) {
+            mean += v;
+        }
+        mean /= residuals.size();
+        double sq = 0.0D;
+        for (double v : residuals) {
+            sq += (v - mean) * (v - mean);
+        }
+        double rms = Math.sqrt(sq / residuals.size());
+        return new double[] {rms, residuals.get((int) (residuals.size() * 0.05)),
+                residuals.get((int) (residuals.size() * 0.95)),
+                neighbourPairs > 0 ? neighbourDelta / neighbourPairs : 0.0D,
+                residuals.size()};
+    }
+
+    /** Dominant wavelength of a grid's residual, along rows, in world blocks. */
+    private static double t098DominantWavelength(
+            double[][] grid, boolean[][] valid, double spacing, int window) {
+        int rows = grid.length;
+        int cols = grid[0].length;
+        int maxLag = Math.min(60, cols / 3);
+        double[] sum = new double[maxLag + 1];
+        int[] used = new int[maxLag + 1];
+        for (int r = 0; r < rows; r++) {
+            java.util.List<Double> line = new ArrayList<>();
+            for (int c = 0; c < cols; c++) {
+                if (!valid[r][c]) {
+                    line.clear();
+                    continue;
+                }
+                line.add(grid[r][c]);
+            }
+            if (line.size() < 40) {
+                continue;
+            }
+            double[] v = new double[line.size()];
+            for (int i = 0; i < v.length; i++) {
+                v[i] = line.get(i);
+            }
+            double[] detr = new double[v.length];
+            for (int i = 0; i < v.length; i++) {
+                int a = Math.max(0, i - window);
+                int b = Math.min(v.length - 1, i + window);
+                double s = 0.0D;
+                for (int k = a; k <= b; k++) {
+                    s += v[k];
+                }
+                detr[i] = v[i] - s / (b - a + 1);
+            }
+            double mean = 0.0D;
+            for (double d : detr) {
+                mean += d;
+            }
+            mean /= detr.length;
+            double var = 0.0D;
+            for (double d : detr) {
+                var += (d - mean) * (d - mean);
+            }
+            var /= detr.length;
+            if (var < 1.0E-12D) {
+                continue;
+            }
+            for (int lag = 1; lag <= maxLag && lag < detr.length; lag++) {
+                double acc = 0.0D;
+                int pairs = 0;
+                for (int i = 0; i + lag < detr.length; i++) {
+                    acc += (detr[i] - mean) * (detr[i + lag] - mean);
+                    pairs++;
+                }
+                sum[lag] += (acc / pairs) / var;
+                used[lag]++;
+            }
+        }
+        for (int lag = 1; lag <= maxLag; lag++) {
+            if (used[lag] > 0 && sum[lag] / used[lag] < 0.3679D) {
+                return lag * spacing;
+            }
+        }
+        return -1.0D;
+    }
+
+    /**
+     * T098: what actually controls the anvil's visible surface.
+     *
+     * <p>The anvil is opaque after about 75 blocks of a 1015-block chord, so
+     * interior density variance cannot reach the image. The shape a viewer
+     * reads is the locus where accumulated alpha first becomes significant.
+     * This measures that surface directly: where each alpha threshold is
+     * crossed, how much the alpha=0.5 surface deviates from the smooth
+     * geometric shell, how far detail erosion moves it, and how much the
+     * production light cone's optical depth varies across it.
+     */
+    private static void reportT098AnvilOpticalSurface() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        double anvilBase = 1.0E9D;
+        double anvilTop = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+            if (lobe.role().gpuId() == 3) {
+                anvilBase = Math.min(anvilBase, lobe.baseY());
+                anvilTop = Math.max(anvilTop, lobe.topY());
+            }
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+
+        final double spacing = 6.0D;
+        String[] armNames = {"production", "erosionOff", "bodyOnly"};
+
+        System.out.println("T098_SURFACE|view|arm|rays|meanT50|reliefRmsBlocks|reliefP05"
+                + "|reliefP95|neighbourDeltaBlocks|dominantWavelengthBlocks"
+                + "|meanRampT10toT90|meanEnvelopeToAlpha50");
+        double[] productionRelief = new double[2];
+        for (String view : new String[] {"SIDE", "ABOVE"}) {
+            for (int arm = 0; arm < armNames.length; arm++) {
+                int rows;
+                int cols;
+                if ("SIDE".equals(view)) {
+                    rows = (int) ((anvilTop + 60.0D - (anvilBase - 60.0D)) / spacing);
+                    cols = (int) (1000.0D / spacing);
+                } else {
+                    rows = (int) (1000.0D / spacing);
+                    cols = (int) (1000.0D / spacing);
+                }
+                double[][] t50 = new double[rows][cols];
+                double[][] tFirst = new double[rows][cols];
+                double[][] tEnv = new double[rows][cols];
+                double[][] t10 = new double[rows][cols];
+                double[][] t90 = new double[rows][cols];
+                boolean[][] valid = new boolean[rows][cols];
+                double rampSum = 0.0D;
+                double envelopeToAlphaSum = 0.0D;
+                int n = 0;
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        T098Surface s;
+                        if ("SIDE".equals(view)) {
+                            double y = anvilBase - 60.0D + r * spacing;
+                            double z = centreZ - 500.0D + c * spacing;
+                            s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                                    centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D,
+                                    1800.0D, arm, false);
+                        } else {
+                            double x = centreX - 500.0D + r * spacing;
+                            double z = centreZ - 500.0D + c * spacing;
+                            s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                                    x, anvilTop + 300.0D, z, 0.0D, -1.0D, 0.0D,
+                                    900.0D, arm, false);
+                        }
+                        if (!s.valid()) {
+                            continue;
+                        }
+                        valid[r][c] = true;
+                        t50[r][c] = s.t50();
+                        tFirst[r][c] = s.tFirst();
+                        tEnv[r][c] = s.tEnvelope();
+                        t10[r][c] = s.t10();
+                        t90[r][c] = s.t90();
+                        n++;
+                        if (s.t90() > 0.0D && s.t10() > 0.0D) {
+                            rampSum += s.t90() - s.t10();
+                        }
+                        if (s.tEnvelope() > 0.0D) {
+                            envelopeToAlphaSum += s.t50() - s.tEnvelope();
+                        }
+                    }
+                }
+                if (n < 100) {
+                    continue;
+                }
+                double[] relief = t098Relief(t50, valid, 6);
+                double wavelength = t098DominantWavelength(t50, valid, spacing, 6);
+                double meanT50 = 0.0D;
+                int m = 0;
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        if (valid[r][c]) {
+                            meanT50 += t50[r][c];
+                            m++;
+                        }
+                    }
+                }
+                meanT50 /= Math.max(1, m);
+                System.out.printf(java.util.Locale.ROOT,
+                        "T098_SURFACE|%-5s|%-11s|%6d|%8.1f|%8.3f|%8.2f|%8.2f|%8.3f"
+                                + "|%10.1f|%9.2f|%9.2f%n",
+                        view, armNames[arm], n, meanT50, relief[0], relief[1], relief[2],
+                        relief[3], wavelength, rampSum / Math.max(1, n),
+                        envelopeToAlphaSum / Math.max(1, n));
+                if (arm == 0) {
+                    productionRelief["SIDE".equals(view) ? 0 : 1] = relief[0];
+                }
+                if (arm == 0) {
+                    double[] envRelief = t098Relief(tEnv, valid, 6);
+                    double[] firstRelief = t098Relief(tFirst, valid, 6);
+                    double[] r10 = t098Relief(t10, valid, 6);
+                    double[] r90 = t098Relief(t90, valid, 6);
+                    System.out.printf(java.util.Locale.ROOT,
+                            "T098_SURFACE_STAGE|%-5s|envelope=%.3f|firstDensity=%.3f"
+                                    + "|alpha10=%.3f|alpha50=%.3f|alpha90=%.3f%n",
+                            view, envRelief[0], firstRelief[0], r10[0], relief[0], r90[0]);
+                }
+            }
+        }
+        reportT098AnvilLightResponse(baseVolume, detailVolume, lobes, centreX, centreZ,
+                anvilBase, anvilTop);
+        reportT098AnvilShadingResponse(baseVolume, detailVolume, lobes, centreX, centreZ,
+                anvilBase, anvilTop);
+        reportT098SurfaceReliefSpectrum(baseVolume, detailVolume, lobes, centreX, centreZ,
+                anvilBase, anvilTop);
+        reportT098SurfaceByRole(baseVolume, detailVolume, lobes, centreX, centreZ);
+    }
+
+    /** PHASE 7: does the production light cone respond to the surface it sits on? */
+    private static void reportT098AnvilLightResponse(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double anvilBase, double anvilTop) {
+        final double spacing = 8.0D;
+        java.util.List<Double> light = new ArrayList<>();
+        java.util.List<Double> depth = new ArrayList<>();
+        double neighbour = 0.0D;
+        int pairs = 0;
+        Double previous = null;
+        for (double y = anvilBase - 40.0D; y <= anvilTop + 40.0D; y += spacing) {
+            previous = null;
+            for (double z = centreZ - 400.0D; z <= centreZ + 400.0D; z += spacing) {
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, true);
+                if (!s.valid()) {
+                    previous = null;
+                    continue;
+                }
+                light.add(s.lightOpticalDepth());
+                depth.add(s.t50());
+                if (previous != null) {
+                    neighbour += Math.abs(s.lightOpticalDepth() - previous);
+                    pairs++;
+                }
+                previous = s.lightOpticalDepth();
+            }
+        }
+        if (light.size() < 100) {
+            return;
+        }
+        java.util.List<Double> sorted = new ArrayList<>(light);
+        java.util.Collections.sort(sorted);
+        double mean = 0.0D;
+        for (double v : light) {
+            mean += v;
+        }
+        mean /= light.size();
+        double var = 0.0D;
+        for (double v : light) {
+            var += (v - mean) * (v - mean);
+        }
+        var /= light.size();
+        // What the shading actually is: exp(-opticalDepth) is the direct light
+        // reaching the surface point.
+        java.util.List<Double> transmit = new ArrayList<>();
+        for (double v : light) {
+            transmit.add(Math.exp(-v));
+        }
+        java.util.Collections.sort(transmit);
+        double tMean = 0.0D;
+        for (double v : transmit) {
+            tMean += v;
+        }
+        tMean /= transmit.size();
+        double tVar = 0.0D;
+        for (double v : transmit) {
+            tVar += (v - tMean) * (v - tMean);
+        }
+        tVar /= transmit.size();
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_LIGHT|points=%d|meanOpticalDepth=%.3f|p05=%.3f|p50=%.3f|p95=%.3f"
+                        + "|variance=%.4f|neighbourDelta=%.4f%n",
+                light.size(), mean, sorted.get((int) (sorted.size() * 0.05)),
+                sorted.get(sorted.size() / 2), sorted.get((int) (sorted.size() * 0.95)),
+                var, pairs > 0 ? neighbour / pairs : 0.0D);
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_LIGHT_TRANSMITTANCE|meanDirectLight=%.5f|p05=%.5f|p50=%.5f"
+                        + "|p95=%.5f|variance=%.8f|cv=%.5f|pctBelow0.01=%.2f%n",
+                tMean, transmit.get((int) (transmit.size() * 0.05)),
+                transmit.get(transmit.size() / 2),
+                transmit.get((int) (transmit.size() * 0.95)), tVar,
+                tMean > 1.0E-9D ? Math.sqrt(tVar) / tMean : 0.0D,
+                100.0D * transmit.stream().filter(v -> v < 0.01D).count() / transmit.size());
+    }
+
+
+    // Frozen-noon fixture values, read from the live capture status line:
+    // lightColor=(1.00,0.97,0.90) ambTop=(0.48,0.64,1.00) ambBot=(0.30,0.34,0.41).
+    private static final double T098_LIGHT_LUM = 0.2126 * 1.00 + 0.7152 * 0.97 + 0.0722 * 0.90;
+    private static final double T098_AMBIENT_TOP_LUM =
+            0.2126 * 0.48 + 0.7152 * 0.64 + 0.0722 * 1.00;
+    /** SIDE view direction (-1,0,0) against the fixture light direction. */
+    private static final double T098_COS_THETA = 0.60D;
+
+    private static double t098HenyeyGreenstein(double cosTheta, double g) {
+        double g2 = g * g;
+        return (1.0D - g2)
+                / (4.0D * Math.PI * Math.pow(Math.max(1.0D + g2 - 2.0D * g * cosTheta, 1.0E-4D), 1.5D));
+    }
+
+    private static double t098DualLobePhase(double cosTheta) {
+        return StormDensityModel.lerp(0.72D,
+                t098HenyeyGreenstein(cosTheta, -0.18D),
+                t098HenyeyGreenstein(cosTheta, 0.62D));
+    }
+
+    /**
+     * The production radiance for one surface point, as a luminance.
+     *
+     * <p>Reproduces {@code evaluateLightingComponents} exactly for the terms
+     * that depend on the light cone: the three-octave scatter approximation,
+     * the beer-powder term, ambient retention keyed on direct transmission, and
+     * the filmic tone curve. Storm darkening, underside shading and rain are
+     * held at their neutral values, so this isolates how much of the anvil's
+     * brightness variation the light cone can produce.
+     */
+    private static double t098SurfaceLuminance(double opticalDepth, double localDensity) {
+        double scatter = 0.0D;
+        double scatterWeight = 0.0D;
+        double a = 1.0D;
+        double b = 1.0D;
+        for (int o = 0; o < 3; o++) {
+            double phase = StormDensityModel.lerp(a, 0.0795775D, t098DualLobePhase(T098_COS_THETA));
+            scatter += b * phase * Math.exp(-opticalDepth * a);
+            scatterWeight += b;
+            a *= 0.42D;
+            b *= 0.52D;
+        }
+        scatter /= Math.max(scatterWeight, 1.0E-4D);
+        double powder = 1.0D - Math.exp(-localDensity * 24.0D);
+        double powderTerm = StormDensityModel.lerp(
+                StormDensityModel.clamp01(T098_COS_THETA * 0.5D + 0.5D) * 0.72D,
+                1.0D, StormDensityModel.clamp01(powder * 1.35D));
+        double directTransmission = Math.exp(-opticalDepth);
+        double sunTerm = T098_LIGHT_LUM * scatter * powderTerm * (4.0D * Math.PI);
+        double ambientRetention = 0.74D;
+        double ambient = T098_AMBIENT_TOP_LUM
+                * StormDensityModel.lerp(directTransmission, ambientRetention, 1.0D);
+        double radiance = sunTerm + ambient * 0.86D;
+        return 1.0D - Math.exp(-radiance * 1.30D);
+    }
+
+    /**
+     * PHASE 7: how much brightness variation the production light cone can
+     * actually produce across the anvil's optical surface.
+     */
+    private static void reportT098AnvilShadingResponse(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double anvilBase, double anvilTop) {
+        final double spacing = 8.0D;
+        java.util.List<Double> luminance = new ArrayList<>();
+        java.util.List<Double> scatterOnly = new ArrayList<>();
+        double neighbour = 0.0D;
+        int pairs = 0;
+        Double previous;
+        for (double y = anvilBase - 40.0D; y <= anvilTop + 40.0D; y += spacing) {
+            previous = null;
+            for (double z = centreZ - 400.0D; z <= centreZ + 400.0D; z += spacing) {
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, true);
+                if (!s.valid()) {
+                    previous = null;
+                    continue;
+                }
+                double lum = t098SurfaceLuminance(s.lightOpticalDepth(), s.densityAtT50());
+                luminance.add(lum);
+                scatterOnly.add(Math.exp(-s.lightOpticalDepth() * 0.1764D));
+                if (previous != null) {
+                    neighbour += Math.abs(lum - previous);
+                    pairs++;
+                }
+                previous = lum;
+            }
+        }
+        if (luminance.size() < 100) {
+            return;
+        }
+        java.util.List<Double> sorted = new ArrayList<>(luminance);
+        java.util.Collections.sort(sorted);
+        double mean = 0.0D;
+        for (double v : luminance) {
+            mean += v;
+        }
+        mean /= luminance.size();
+        double var = 0.0D;
+        for (double v : luminance) {
+            var += (v - mean) * (v - mean);
+        }
+        var /= luminance.size();
+        double sMean = 0.0D;
+        for (double v : scatterOnly) {
+            sMean += v;
+        }
+        sMean /= scatterOnly.size();
+        double sVar = 0.0D;
+        for (double v : scatterOnly) {
+            sVar += (v - sMean) * (v - sMean);
+        }
+        sVar /= scatterOnly.size();
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_SHADING|points=%d|meanLuminance=%.5f|p05=%.5f|p50=%.5f|p95=%.5f"
+                        + "|variance=%.8f|cv=%.5f|neighbourDelta=%.5f|range8bit=%.2f%n",
+                luminance.size(), mean, sorted.get((int) (sorted.size() * 0.05)),
+                sorted.get(sorted.size() / 2), sorted.get((int) (sorted.size() * 0.95)),
+                var, mean > 1.0E-9D ? Math.sqrt(var) / mean : 0.0D,
+                pairs > 0 ? neighbour / pairs : 0.0D,
+                255.0D * (sorted.get((int) (sorted.size() * 0.95))
+                        - sorted.get((int) (sorted.size() * 0.05))));
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_SURFACE_SCATTER_OCTAVE|meanThirdOctave=%.5f|variance=%.8f|cv=%.5f%n",
+                sMean, sVar, sMean > 1.0E-9D ? Math.sqrt(sVar) / sMean : 0.0D);
+    }
+
+    /**
+     * Relief of the alpha=0.5 surface resolved by scale, so "rough" and
+     * "billowy" are not confused. A wide detrend window keeps large features in
+     * the residual; a narrow one keeps only fine ones.
+     */
+    private static void reportT098SurfaceReliefSpectrum(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double anvilBase, double anvilTop) {
+        final double spacing = 6.0D;
+        // Interior of the canopy only, so silhouette curvature cannot masquerade
+        // as surface relief.
+        int rows = (int) ((anvilTop - 30.0D - (anvilBase + 30.0D)) / spacing);
+        int cols = (int) (600.0D / spacing);
+        double[][] t50 = new double[rows][cols];
+        boolean[][] valid = new boolean[rows][cols];
+        double[][] t50NoErosion = new double[rows][cols];
+        boolean[][] validNoErosion = new boolean[rows][cols];
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                double y = anvilBase + 30.0D + r * spacing;
+                double z = centreZ - 300.0D + c * spacing;
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, false);
+                if (s.valid()) {
+                    valid[r][c] = true;
+                    t50[r][c] = s.t50();
+                }
+                T098Surface e = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 1, false);
+                if (e.valid()) {
+                    validNoErosion[r][c] = true;
+                    t50NoErosion[r][c] = e.t50();
+                }
+            }
+        }
+        System.out.println("T098_SURFACE_SPECTRUM|windowBlocks|reliefRmsProduction"
+                + "|reliefRmsErosionOff|erosionContributionBlocks|projectedPxAtSide");
+        // At the SIDE pose the storm's 864-block height spans about 195 px.
+        final double blocksPerPixel = 864.0D / 195.0D;
+        for (int window : new int[] {2, 4, 8, 16, 32}) {
+            double[] a = t098Relief(t50, valid, window);
+            double[] b = t098Relief(t50NoErosion, validNoErosion, window);
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_SURFACE_SPECTRUM|%12.0f|%18.3f|%18.3f|%24.3f|%17.2f%n",
+                    window * spacing, a[0], b[0], a[0] - b[0], (window * spacing) / blocksPerPixel);
+        }
+    }
+
+    /** Optical-surface relief per role, from one SIDE sweep of the whole storm. */
+    private static void reportT098SurfaceByRole(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ) {
+        final double spacing = 6.0D;
+        String[] roleNames = {"BASE", "CORE", "TOWER", "ANVIL"};
+        java.util.List<java.util.List<double[]>> byRole = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            byRole.add(new ArrayList<>());
+        }
+        for (double y = 140.0D; y <= 1010.0D; y += spacing) {
+            java.util.List<double[]> row = new ArrayList<>();
+            for (double z = centreZ - 450.0D; z <= centreZ + 450.0D; z += spacing) {
+                T098Surface s = t098MarchSurface(baseVolume, detailVolume, lobes,
+                        centreX + 900.0D, y, z, -1.0D, 0.0D, 0.0D, 1800.0D, 0, false);
+                if (s.valid() && s.roleAtT50() >= 0) {
+                    byRole.get(s.roleAtT50()).add(new double[] {y, z, s.t50()});
+                }
+            }
+        }
+        System.out.println("T098_SURFACE_ROLE|role|points|reliefRmsBlocks|neighbourDeltaBlocks");
+        for (int role = 0; role < 4; role++) {
+            java.util.List<double[]> pts = byRole.get(role);
+            if (pts.size() < 200) {
+                continue;
+            }
+            // Relief against a local mean over neighbours within 40 blocks.
+            double sq = 0.0D;
+            int n = 0;
+            double neighbour = 0.0D;
+            int pairs = 0;
+            for (int i = 0; i < pts.size(); i++) {
+                double sum = 0.0D;
+                int m = 0;
+                for (int j = Math.max(0, i - 12); j < Math.min(pts.size(), i + 13); j++) {
+                    if (Math.abs(pts.get(j)[0] - pts.get(i)[0]) < 0.1D
+                            && Math.abs(pts.get(j)[1] - pts.get(i)[1]) <= 42.0D) {
+                        sum += pts.get(j)[2];
+                        m++;
+                    }
+                }
+                if (m < 4) {
+                    continue;
+                }
+                double residual = pts.get(i)[2] - sum / m;
+                sq += residual * residual;
+                n++;
+                if (i + 1 < pts.size() && Math.abs(pts.get(i + 1)[0] - pts.get(i)[0]) < 0.1D
+                        && Math.abs(pts.get(i + 1)[1] - pts.get(i)[1]) <= spacing + 0.1D) {
+                    neighbour += Math.abs(pts.get(i + 1)[2] - pts.get(i)[2]);
+                    pairs++;
+                }
+            }
+            if (n < 100) {
+                continue;
+            }
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_SURFACE_ROLE|%-5s|%7d|%14.3f|%18.3f%n",
+                    roleNames[role], n, Math.sqrt(sq / n),
+                    pairs > 0 ? neighbour / pairs : 0.0D);
         }
     }
 
