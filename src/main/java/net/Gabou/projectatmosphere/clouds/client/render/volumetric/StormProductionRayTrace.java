@@ -63,6 +63,13 @@ final class StormProductionRayTrace {
     static final int ARM_NO_WEATHER_SKIP = 2;
 
     private static final double DENSITY_THRESHOLD = 0.0008D;
+    /**
+     * Below this the descriptor envelope is the fade at a lobe's outer edge,
+     * where stormBody mapping it to nothing is correct rather than a defect.
+     * Classifying such a sample as the first production loss would bury the
+     * real one, which is what an earlier revision of this report did.
+     */
+    private static final float MATERIAL_ENVELOPE_FLOOR = 0.05F;
     private static final Path OUTPUT_ROOT = Path.of("t098-raytrace");
 
     // Per-iteration march flags. Mirrors PA_MR_* in the shader.
@@ -1033,16 +1040,61 @@ final class StormProductionRayTrace {
                     }
                 }
             }
-            // Class B..E: cloudDensity ran on live descriptor material and
-            // returned nothing. Report the first gate that zeroed it.
+            // Does this ray produce ANY material at all? That question has to
+            // come before any per-sample gate scan. stormBody is a remap, not a
+            // pass-through: over much of a descriptor envelope it correctly maps
+            // a low envelope value to nothing, which is what makes the body
+            // noise-formed instead of a balloon. Treating one such sample as
+            // "the first production loss" reports a defect on every ray,
+            // including the BASE and ANVIL controls that render perfectly - an
+            // earlier revision of this classifier did exactly that.
+            boolean anyMaterial = false;
+            for (int i = 0; i < MAX_STEPS; i++) {
+                if (armA.executed(i) && armA.density(i) > DENSITY_THRESHOLD) {
+                    anyMaterial = true;
+                    break;
+                }
+            }
+            if (anyMaterial) {
+                StringBuilder out = new StringBuilder("--- FIRST LOSS")
+                        .append("\nclass=F cloudDensity returns healthy density;")
+                        .append(" no gate inside it loses this ray's material")
+                        .append("\nfinalAlpha=").append(fmt(armA.finalAlpha()))
+                        .append(" peakDensity=").append(fmt(peakDensity(armA)));
+                boolean lossFound = false;
+                if (armA.depthSaturated() && armA.currentCloudHit()) {
+                    lossFound = true;
+                    out.append("\nLOSS IS AFTER THE MARCH: the alpha-weighted representative")
+                            .append(" point is at t=").append(fmt(armA.representativeT()))
+                            .append(", beyond the projection far plane, so its depth clamps to")
+                            .append(" the composite's 1.0 miss sentinel and")
+                            .append(" cloud_field_composite.fsh discards the texel whatever its")
+                            .append(" alpha. This march contributes nothing to the image.");
+                }
+                if (armA.terminationReason() == 0 && armA.finalTransmittance() > 0.05F) {
+                    lossFound = true;
+                    out.append("\nMARCH BUDGET EXHAUSTED: the ray reached the ")
+                            .append(armA.stepCap())
+                            .append("-iteration cap with transmittance ")
+                            .append(fmt(armA.finalTransmittance()))
+                            .append(" still unabsorbed, so the alpha it did integrate (")
+                            .append(fmt(armA.finalAlpha()))
+                            .append(") understates the material along it.");
+                }
+                if (!lossFound) {
+                    out.append("\nNo loss on this ray: it integrated to the transmittance")
+                            .append(" floor and publishes a compositable depth.");
+                }
+                return out.toString();
+            }
+
+            // Only now, with no material anywhere on the ray, is a per-sample
+            // gate scan meaningful.
             for (int i = 0; i < MAX_STEPS; i++) {
                 if (!armA.executed(i) || (armA.flags(i) & MR_CLOUD_DENSITY_CALLED) == 0) {
                     continue;
                 }
-                if (armA.directStormShape(i) <= 0.001F) {
-                    continue;
-                }
-                if (armA.bodyDensity(i) > DENSITY_THRESHOLD) {
+                if (armA.directStormShape(i) <= MATERIAL_ENVELOPE_FLOOR) {
                     continue;
                 }
                 int cdFlags = armA.cdFlags(i);
@@ -1071,8 +1123,8 @@ final class StormProductionRayTrace {
                             + " envelopeCoverage=" + fmt(armA.cdEnvelopeCoverage(i));
                 } else if (armA.afterStormBody(i) <= DENSITY_THRESHOLD) {
                     cls = "E";
-                    gate = "stormBody remap zeroed the envelope: before="
-                            + fmt(armA.afterEnvelope(i))
+                    gate = "stormBody remap zeroed the envelope everywhere on this ray:"
+                            + " before=" + fmt(armA.afterEnvelope(i))
                             + " strength=" + fmt(armA.directStormStrength(i));
                 } else if (armA.afterErosion(i) <= DENSITY_THRESHOLD) {
                     cls = "E";
@@ -1091,18 +1143,6 @@ final class StormProductionRayTrace {
                         + ", " + fmt(armA.relZ(i)) + ")"
                         + "\ngate=" + gate;
             }
-            boolean anyMaterial = false;
-            for (int i = 0; i < MAX_STEPS; i++) {
-                if (armA.executed(i) && armA.density(i) > DENSITY_THRESHOLD) {
-                    anyMaterial = true;
-                    break;
-                }
-            }
-            if (anyMaterial) {
-                return "--- FIRST LOSS"
-                        + "\nclass=F cloudDensity returns healthy density; no gate loss on this ray"
-                        + "\nfinalAlpha=" + fmt(armA.finalAlpha());
-            }
             boolean anyDescriptorField = false;
             for (int i = 0; i < MAX_STEPS; i++) {
                 if (armA.executed(i) && armA.directStormShape(i) > 0.001F) {
@@ -1117,6 +1157,16 @@ final class StormProductionRayTrace {
                         : " the marcher never sampled a point with a non-zero descriptor field")
                     + "\ncloudDensity was called on "
                     + countCalls(armA) + " of " + armA.iterationsExecuted() + " iterations";
+        }
+
+        private static float peakDensity(Trace trace) {
+            float peak = 0.0F;
+            for (int i = 0; i < MAX_STEPS; i++) {
+                if (trace.executed(i)) {
+                    peak = Math.max(peak, trace.density(i));
+                }
+            }
+            return peak;
         }
 
         private static int countCalls(Trace trace) {
