@@ -78,6 +78,7 @@
     { "name": "StormTraceSamples", "type": "int", "count": 1, "values": [ 2 ] },
     { "name": "StormTraceStage", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaLegacyHitDepth", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaLegacyFinePromotion", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaRayTraceMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaRayTraceNdc", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
     { "name": "PaRayTraceFragCoord", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },

@@ -15,6 +15,13 @@ public final class VolumetricCloudDebugConfig {
      * two comparison shots and clears it immediately after.
      */
     private static volatile boolean t098LegacyHitDepth;
+    /**
+     * T098 evidence arm. When true the marcher restores the pre-fix promotion,
+     * which spent one march iteration per fine sample while crossing empty
+     * coverage envelope. It exists so the cost and the image of the two
+     * policies can be compared on one fixture in one run.
+     */
+    private static volatile boolean t098LegacyFinePromotion;
     private static volatile boolean depthCompositeEnabled = true;
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
@@ -58,6 +65,14 @@ public final class VolumetricCloudDebugConfig {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
 
     private VolumetricCloudDebugConfig() {
+    }
+
+    public static boolean t098LegacyFinePromotion() {
+        return t098LegacyFinePromotion;
+    }
+
+    public static void setT098LegacyFinePromotion(boolean enabled) {
+        t098LegacyFinePromotion = enabled;
     }
 
     public static boolean t098LegacyHitDepth() {

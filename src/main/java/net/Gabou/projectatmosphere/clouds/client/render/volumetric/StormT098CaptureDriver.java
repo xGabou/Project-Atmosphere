@@ -93,19 +93,26 @@ public final class StormT098CaptureDriver {
     private record Shot(
             String name, double x, double y, double z, String intent,
             VolumetricCloudRaymarchDebugView view, boolean rayTrace,
-            boolean legacyHitDepth) {
+            boolean legacyHitDepth, boolean legacyFinePromotion) {
         Shot(String name, double x, double y, double z, String intent) {
-            this(name, x, y, z, intent, VolumetricCloudRaymarchDebugView.FINAL, false, false);
+            this(name, x, y, z, intent, VolumetricCloudRaymarchDebugView.FINAL,
+                    false, false, false);
         }
 
         Shot(String name, double x, double y, double z, String intent,
                 VolumetricCloudRaymarchDebugView view) {
-            this(name, x, y, z, intent, view, false, false);
+            this(name, x, y, z, intent, view, false, false, false);
         }
 
         Shot(String name, double x, double y, double z, String intent,
                 VolumetricCloudRaymarchDebugView view, boolean rayTrace) {
-            this(name, x, y, z, intent, view, rayTrace, false);
+            this(name, x, y, z, intent, view, rayTrace, false, false);
+        }
+
+        Shot(String name, double x, double y, double z, String intent,
+                VolumetricCloudRaymarchDebugView view, boolean rayTrace,
+                boolean legacyHitDepth) {
+            this(name, x, y, z, intent, view, rayTrace, legacyHitDepth, false);
         }
     }
 
@@ -271,6 +278,27 @@ public final class StormT098CaptureDriver {
                 centreX + radius * 2.6D, midY, centreZ,
                 "FAR after-image paired with E, identical except for the correction",
                 VolumetricCloudRaymarchDebugView.CURRENT_ONLY));
+        // T098 promotion-policy cost pair. Four views, each captured twice on
+        // one fixture with only the promotion policy differing, so the GPU time
+        // and march work of the two policies are compared like for like.
+        double[][] perfPoses = {
+                {centreX + radius * 1.7D, midY, centreZ},
+                {centreX + radius * 2.6D, midY, centreZ},
+                {centreX + radius * 0.6D, topY + Math.max(120.0D, height * 0.45D), centreZ},
+                {centreX, Math.max(baseY - Math.max(90.0D, height * 0.35D), MINIMUM_CAMERA_Y),
+                        centreZ}
+        };
+        String[] perfNames = {"SIDE", "FAR", "ABOVE", "BELOW"};
+        for (int index = 0; index < perfPoses.length; index++) {
+            built.add(new Shot("P_" + perfNames[index] + "_LEGACY_PROMOTION",
+                    perfPoses[index][0], perfPoses[index][1], perfPoses[index][2],
+                    "cost of the pre-fix promotion policy",
+                    VolumetricCloudRaymarchDebugView.FINAL, false, false, true));
+            built.add(new Shot("P_" + perfNames[index] + "_CORRECTED_PROMOTION",
+                    perfPoses[index][0], perfPoses[index][1], perfPoses[index][2],
+                    "cost of the bounded empty-span scan",
+                    VolumetricCloudRaymarchDebugView.FINAL));
+        }
         built.add(new Shot("8_NEAR_EDGE", centreX + radius * 1.12D, baseY + height * 0.55D, centreZ,
                 "fine detail octaves at the outer boundary"));
         return List.copyOf(built);
@@ -341,6 +369,7 @@ public final class StormT098CaptureDriver {
         }
         captureModeApplied = false;
         VolumetricCloudDebugConfig.setT098LegacyHitDepth(false);
+        VolumetricCloudDebugConfig.setT098LegacyFinePromotion(false);
         ProjectAtmosphere.LOGGER.info("T098_CAPTURE_MODE restored");
     }
 
@@ -382,6 +411,8 @@ public final class StormT098CaptureDriver {
                 // Held for the whole settle window, not just the grab, so the
                 // captured frame really is that arm's.
                 VolumetricCloudDebugConfig.setT098LegacyHitDepth(shot.legacyHitDepth());
+                VolumetricCloudDebugConfig.setT098LegacyFinePromotion(
+                        shot.legacyFinePromotion());
                 float yaw = yawTo(shot.x(), shot.z(),
                         StormPerformanceBaseline.suiteFixture() == null ? shot.x()
                                 : StormPerformanceBaseline.suiteFixture().centerX(),
@@ -477,10 +508,12 @@ public final class StormT098CaptureDriver {
             // frame, taken from the same camera position as the shot.
             ProjectAtmosphere.LOGGER.info(
                     "T098_CAPTURE_CONTROLS shot={} stepScale={} diagnosticStepBudget={}"
-                            + " legacyHitDepth={}",
+                            + " legacyHitDepth={} legacyFinePromotion={} gpuMs={}",
                     shot.name(), VolumetricCloudRenderer.governorStepScale(),
                     VolumetricCloudRenderer.diagnosticStepBudget(),
-                    VolumetricCloudDebugConfig.t098LegacyHitDepth());
+                    VolumetricCloudDebugConfig.t098LegacyHitDepth(),
+                    VolumetricCloudDebugConfig.t098LegacyFinePromotion(),
+                    fmt(VolumetricCloudRenderer.lastGpuMilliseconds()));
             ProjectAtmosphere.LOGGER.info("T098_CAPTURE_DENSITY shot={} {}",
                     shot.name(),
                     StormDensityCalibrationReport.describe(shot.x(), shot.y(), shot.z()));

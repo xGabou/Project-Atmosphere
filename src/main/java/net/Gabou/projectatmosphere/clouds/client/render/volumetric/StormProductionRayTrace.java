@@ -47,7 +47,7 @@ final class StormProductionRayTrace {
     /** Must match MAX_STEPS in cloud_atmosphere_volume.fsh. */
     static final int MAX_STEPS = 128;
     /** Must match PA_TRACE_STAGES in cloud_atmosphere_volume.fsh. */
-    static final int STAGES = 21;
+    static final int STAGES = 22;
     /** Row that echoes the fragment's own column and row; see the shader. */
     private static final int ECHO_STAGE = 15;
 
@@ -719,6 +719,20 @@ final class StormProductionRayTrace {
 
         boolean currentCloudHit() {
             return at(20, 0, 2) > 0.5F;
+        }
+
+        /** Probes taken by the bounded empty-span scan on this iteration. */
+        float scanProbes(int i) {
+            return values[21][i][0];
+        }
+
+        /** Distance the scan proved empty at the fine march's own resolution. */
+        float scanAdvance(int i) {
+            return values[21][i][1];
+        }
+
+        boolean scanFoundMaterial(int i) {
+            return values[21][i][2] > 0.5F;
         }
 
         /**

@@ -225,6 +225,9 @@ uniform int StormTraceStage;
 // T098 evidence arm only: 1 restores the pre-fix hit depth. Zero in
 // production, so the corrected bound below is what every ordinary frame uses.
 uniform int PaLegacyHitDepth;
+// T098 evidence arm only: 1 restores the pre-fix promotion, which consumed a
+// march iteration per fine sample across empty envelope. Zero in production.
+uniform int PaLegacyFinePromotion;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
 uniform vec2 PaRayTraceFragCoord;
@@ -348,6 +351,10 @@ float paMrStepBudget = 0.0;
 // What the march hands to the composite. The composite treats a cloud texel
 // whose depth is 1.0 as "no cloud" regardless of its alpha, so these three
 // decide whether an opaque march result survives at all.
+float paMrScanProbes = 0.0;
+float paMrScanAdvance = 0.0;
+float paMrScanHitMaterial = 0.0;
+float paMrScanSpan = 0.0;
 float paMrRepresentativeT = 0.0;
 // Published as one minus the depth. Half float resolves 5e-4 steps next to
 // 1.0 but is exact next to 0, and the whole question is whether the depth is
@@ -384,7 +391,11 @@ const int PA_MAX_DIAGNOSTIC_STEPS = 384;
 // Field groups published by the production ray trace. One row per group, one
 // column per march iteration; the record is therefore exactly
 // MAX_STEPS * PA_TRACE_STAGES texels and cannot grow with the scene.
-const int PA_TRACE_STAGES = 21;
+const int PA_TRACE_STAGES = 22;
+// Probes in one bounded empty-span scan. The coarse stride is capped at
+// sixteen fine steps, so sixteen probes on the fine lattice cover a whole
+// candidate span; the loop is a compile-time bound and adds no memory.
+const int PA_EMPTY_SPAN_PROBES = 16;
 // The deepest depth a cloud HIT may publish. 1.0 is reserved as the composite's
 // miss sentinel, so a hit must stay strictly below it; see the T098 note at
 // resultDepth. Chosen above the 0.99999 history-confidence cutoff so that
@@ -473,9 +484,12 @@ vec4 paTraceRecordTexel() {
         return vec4(CameraPos.x, CameraPos.y, CameraPos.z, float(HistoryValid));
     } else if (paTraceStage == 19) {
         return vec4(ExtinctionScale, DensityMul, CoverageMul, float(UseSceneDepth));
+    } else if (paTraceStage == 20) {
+        return vec4(paMrRepresentativeT, paMrOneMinusResultDepth,
+            paMrCurrentCloudHit, paMrNdcDepthExcess);
     }
-    return vec4(paMrRepresentativeT, paMrOneMinusResultDepth,
-        paMrCurrentCloudHit, paMrNdcDepthExcess);
+    return vec4(paMrScanProbes, paMrScanAdvance, paMrScanHitMaterial,
+        paMrScanSpan);
 }
 
 /**
@@ -4605,14 +4619,86 @@ void main() {
                 }
                 stepLength = min(min(paSafeAdvance, coarseStepCap), t1 - t);
             } else {
-                if (paCap) {
-                    paMrFlags |= PA_MR_STORM_FORCED_FINE;
-                }
-                sinceHit = 0;
-                fine = true;
-                stepLength = fineStep
+                // T098, second divergence. Inside the conservative clearance the
+                // ray must SAMPLE at fine resolution, but it does not have to
+                // spend a march ITERATION per sample, and the two were the same
+                // thing here. The coverage envelope becomes non-zero long before
+                // the noise-formed body does - measured on the live SIDE waist
+                // ray, the envelope opens near t=700 and the first sample above
+                // the density threshold is near t=830 - so the ray was taking
+                // 2.5-block steps through roughly 200 blocks that carry no
+                // material. That cost a mean of 66 of the 128 iterations on
+                // waist rays, and three of six traced waist rays then hit the
+                // cap with up to 0.55 transmittance unabsorbed.
+                //
+                // Probe forward instead, on exactly the lattice the fine march
+                // would have sampled, inside this one iteration. If every probe
+                // is empty the span is empty at the march's own resolution and
+                // the ray crosses it in one iteration rather than sixteen. This
+                // is not a weakening of the conservative test: the samples taken
+                // are the same samples, so anything the fine march would have
+                // found is still found. Dropping the scan and trusting the
+                // bracket refinement alone is what is unsafe - measured offline
+                // it skipped material on every ray, 1.4 to 39.2 blocks of it.
+                float paScanStep = fineStep
                     * (cameraInsideCloud ? distanceGrowth : 1.0);
-                stepLength = min(stepLength, t1 - t);
+                // The evidence arm takes no probes, so the scan cannot advance
+                // and the branch below falls through to a single fine step -
+                // exactly the pre-fix behaviour.
+                float paScanSpan = PaLegacyFinePromotion != 0
+                    ? 0.0
+                    : min(coarseStepCap, t1 - t);
+                float paLastEmptyOffset = 0.0;
+                float paScanProbeCount = 0.0;
+                bool paScanFoundMaterial = false;
+                for (int paProbe = 1; paProbe <= PA_EMPTY_SPAN_PROBES; paProbe++) {
+                    float paProbeOffset = float(paProbe) * paScanStep;
+                    if (paProbeOffset > paScanSpan) {
+                        break;
+                    }
+                    float paProbeT = t + paProbeOffset;
+                    paScanProbeCount = float(paProbe);
+                    float paProbeDensity = cloudDensity(
+                        CameraPos + rayDir * paProbeT,
+                        0.0,
+                        DetailQuality > 0,
+                        paProbeT < 220.0 && !cameraInsideCloud,
+                        false
+                    );
+                    if (paProbeDensity > 0.0008) {
+                        paScanFoundMaterial = true;
+                        break;
+                    }
+                    paLastEmptyOffset = paProbeOffset;
+                }
+                if (paCap) {
+                    paMrScanProbes = paScanProbeCount;
+                    paMrScanAdvance = paLastEmptyOffset;
+                    paMrScanHitMaterial = paScanFoundMaterial ? 1.0 : 0.0;
+                    paMrScanSpan = paScanSpan;
+                }
+                if (paLastEmptyOffset > paScanStep) {
+                    // Crossed in one iteration, having sampled every fine-lattice
+                    // point in it. Material found at the next probe still enters
+                    // fine mode, so the following iterations integrate it.
+                    stepLength = min(paLastEmptyOffset, t1 - t);
+                    if (paScanFoundMaterial) {
+                        if (paCap) {
+                            paMrFlags |= PA_MR_STORM_FORCED_FINE;
+                        }
+                        sinceHit = 0;
+                        fine = true;
+                    } else if (paCap) {
+                        paMrFlags |= PA_MR_STORM_SAFE_ADVANCE;
+                    }
+                } else {
+                    if (paCap) {
+                        paMrFlags |= PA_MR_STORM_FORCED_FINE;
+                    }
+                    sinceHit = 0;
+                    fine = true;
+                    stepLength = min(paScanStep, t1 - t);
+                }
             }
         }
         vec3 segmentEnd = CameraPos + rayDir * (t + stepLength);

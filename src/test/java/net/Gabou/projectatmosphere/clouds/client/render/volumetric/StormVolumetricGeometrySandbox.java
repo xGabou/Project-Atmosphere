@@ -73,6 +73,8 @@ public final class StormVolumetricGeometrySandbox {
         reportT098OpticalProfile();
         reportT098WebbingExcess();
         reportT098MarchSimulation();
+        reportT098PromotionPolicySweep();
+        validateT098PromotionBudget();
         validateT098MarchReachesMaterial();
         validateT098CloudHitDepthNeverSaturates();
         if (Boolean.getBoolean("phase4r.failFirst")) {
@@ -2638,6 +2640,526 @@ public final class StormVolumetricGeometrySandbox {
      * 2.5 * sqrt(96/48) = 3.536, coarseStepCap min(112, 3.536*16) = 56.57,
      * MAX_STEPS 128, MaxRenderDistance 2000.
      */
+
+    // ------------------------------------------------------------------
+    // T098 promotion-policy sweep
+    // ------------------------------------------------------------------
+
+    /**
+     * Production density threshold, expressed on the value {@link
+     * StormDensityModel#finalDensity} returns.
+     *
+     * <p>The shader tests {@code density > 0.0008} after multiplying the eroded
+     * body by the descriptor-owned material terms (energy 0.72, condensate
+     * 0.78, precipitation 0.68 at the mid-height the waist rays cross), the
+     * 0.73 family scale and DensityMul 1.44922, which together come to 1.287.
+     * The offline model stops at the eroded body, so the equivalent cut is
+     * 0.0008 / 1.287.
+     */
+    private static final double T098_MATERIAL_CLOUD_THRESHOLD = 0.0008D / 1.287D;
+
+    /** Live capture configuration: ULTRA, stepScale 1.0, exteriorFineStep 2.5. */
+    private static final double T098_FINE_STEP = 2.5D;
+    private static final int T098_STEP_BUDGET = 96;
+    private static final int T098_MAX_STEPS = 128;
+    private static final double T098_MAX_RENDER_DISTANCE = 2000.0D;
+    private static final double T098_EXTINCTION_SCALE = 0.11499D;
+    /** Descriptor-owned material terms and family scale, as above. */
+    private static final double T098_DENSITY_SCALE = 1.287D;
+
+    /** One marched ray under one promotion policy. */
+    private record T098MarchResult(
+            String policy, String label, double factor,
+            int iterations, int emptyFineIterations, double emptyFineBlocks,
+            int densityEvaluations, int promotionProbes,
+            double firstMaterialT, int iterationsAtFirstMaterial,
+            int iterationsRemainingAtMaterial,
+            double finalTransmittance, double finalAlpha,
+            boolean stepCapped, int falseNegativeSegments, double falseNegativeBlocks,
+            double referenceFirstMaterialT, double referenceAlpha) {
+    }
+
+    /**
+     * T098 second divergence: the promotion policy spends the march budget in
+     * empty coverage envelope before any density exists.
+     *
+     * <p>Measured on the live production traces: the conservative per-descriptor
+     * clearance promotes a SIDE waist ray to sustained fine marching around
+     * t=280, the coverage envelope only becomes non-zero near t=700, and the
+     * first sample that clears the density threshold is near t=830. Between 36
+     * and 79 march iterations - a mean of 66 on waist rays - are spent taking
+     * 2.5-block steps through envelope that carries no material, and three of
+     * six traced waist rays then hit the 128-iteration cap with up to 0.55
+     * transmittance still unabsorbed.
+     *
+     * <p>This sweep runs the production march rules offline against a 1-block
+     * reference traversal and scores each candidate promotion policy on both
+     * properties that matter: it must skip no material the production fine
+     * march would have sampled, and it must reach material with enough budget
+     * left to converge.
+     */
+    private static void reportT098PromotionPolicySweep() {
+        byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
+        byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
+        java.util.List<StormLobeDescriptor> lobes = severeFixture38bc5412();
+        double centreX = 0.0D;
+        double centreZ = 0.0D;
+        for (StormLobeDescriptor lobe : lobes) {
+            centreX += lobe.centerX();
+            centreZ += lobe.centerZ();
+        }
+        centreX /= lobes.size();
+        centreZ /= lobes.size();
+        double radius = 657.8D;
+
+        System.out.println("T098_POLICY|policy|label|factor|iters|emptyFineIters|emptyFineBlocks"
+                + "|densityEvals|promoProbes|firstMaterialT|itersAtMaterial|itersLeft"
+                + "|finalTrans|finalAlpha|stepCapped|falseNegSegs|falseNegBlocks"
+                + "|refFirstT|refAlpha");
+        java.util.List<T098MarchResult> all = new ArrayList<>();
+        // production      - the shipped policy
+        // production384   - the same policy given three times the iteration
+        //                   budget, as a truth arm for what the ray should
+        //                   converge to at 128 steps (PHASE 7; MAX_STEPS is
+        //                   NOT changed in production)
+        // scan16          - candidate: probe the candidate span on the fine
+        //                   march's own lattice inside one iteration
+        // scan-coarse2    - control: the same scan at twice the fine spacing,
+        //                   included to show what losing sampling resolution
+        //                   costs rather than assuming the spacing is safe
+        // bisectOnly      - control: drop the forced fine promotion entirely
+        //                   and rely on the bracket refinement alone
+        for (String policy : new String[] {
+                "production", "production384", "scan16", "scan-coarse2", "bisectOnly"}) {
+            for (double factor : new double[] {1.12D, 1.40D, 1.70D, 1.90D, 2.60D}) {
+                all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                        radius, factor, 680.0D, "waist", policy));
+            }
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 300.0D, "baseControl", policy));
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 900.0D, "anvilControl", policy));
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 500.0D, "lowerTower", policy));
+            all.add(simulateT098Ray(baseVolume, detailVolume, lobes, centreX, centreZ,
+                    radius, 1.70D, 800.0D, "upperTower", policy));
+        }
+        for (T098MarchResult r : all) {
+            System.out.printf(java.util.Locale.ROOT,
+                    "T098_POLICY|%-10s|%-12s|%.2f|%4d|%5d|%9.1f|%6d|%5d|%9.1f|%5d|%5d"
+                            + "|%8.4f|%8.4f|%6s|%4d|%8.1f|%9.1f|%8.4f%n",
+                    r.policy(), r.label(), r.factor(), r.iterations(),
+                    r.emptyFineIterations(), r.emptyFineBlocks(), r.densityEvaluations(),
+                    r.promotionProbes(), r.firstMaterialT(), r.iterationsAtFirstMaterial(),
+                    r.iterationsRemainingAtMaterial(), r.finalTransmittance(),
+                    r.finalAlpha(), r.stepCapped() ? "YES" : "no",
+                    r.falseNegativeSegments(), r.falseNegativeBlocks(),
+                    r.referenceFirstMaterialT(), r.referenceAlpha());
+        }
+        T098_POLICY_RESULTS.clear();
+        T098_POLICY_RESULTS.addAll(all);
+    }
+
+    private static final java.util.List<T098MarchResult> T098_POLICY_RESULTS = new ArrayList<>();
+
+    /**
+     * Marches one ray under the production rules, with the promotion policy
+     * selected by {@code policy}, and scores it against a 1-block reference.
+     *
+     * <p>The model carries the parts of the production loop that decide the
+     * outcome: fine/coarse selection from {@code sinceHit}, the conservative
+     * per-descriptor clearance advance, the four-bisection bracket refinement a
+     * coarse step performs when it lands in material, exponential extinction
+     * with the production scale, the 0.015 transmittance floor and the
+     * 128-iteration cap. The outer weather-gated empty-space skip is not
+     * modelled; the live A/B falsified it as a factor on these rays, and it can
+     * only remove samples in empty space that this model already sees as empty.
+     */
+    private static T098MarchResult simulateT098Ray(
+            byte[] baseVolume, byte[] detailVolume, java.util.List<StormLobeDescriptor> lobes,
+            double centreX, double centreZ, double radius,
+            double factor, double targetY, String label, String policy) {
+        double camX = centreX + radius * factor;
+        double camY = (136.0D + 1000.0D) * 0.5D;
+        double camZ = centreZ;
+        double dirX = centreX - camX;
+        double dirY = targetY - camY;
+        double dirZ = 0.0D;
+        double dirLength = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+        dirX /= dirLength;
+        dirY /= dirLength;
+        dirZ /= dirLength;
+
+        final int maxSteps = "production384".equals(policy) ? 384 : T098_MAX_STEPS;
+        final double t1 = T098_MAX_RENDER_DISTANCE;
+        final double fineStep = T098_FINE_STEP;
+        final double probeSpacing = "scan-coarse2".equals(policy)
+                ? T098_FINE_STEP * 2.0D
+                : T098_FINE_STEP;
+        final boolean scanning = policy.startsWith("scan");
+        final double coarseStepCap = Math.min(112.0D, fineStep * 16.0D);
+        final double baseStep = t1 / T098_STEP_BUDGET;
+        final double coarseStep = Math.max(baseStep * 1.5D, fineStep * 3.0D);
+
+        // Reference traversal at one block, and the alpha a ray that sampled
+        // every block would accumulate.
+        double referenceFirstT = -1.0D;
+        double referenceTransmittance = 1.0D;
+        java.util.List<double[]> referenceIntervals = new ArrayList<>();
+        double intervalStart = -1.0D;
+        final double referenceStep = 1.0D;
+        for (double s = 0.0D; s <= t1; s += referenceStep) {
+            double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                    camX + dirX * s, camY + dirY * s, camZ + dirZ * s);
+            boolean material = cloud > T098_MATERIAL_CLOUD_THRESHOLD;
+            if (material) {
+                if (referenceFirstT < 0.0D) {
+                    referenceFirstT = s;
+                }
+                if (intervalStart < 0.0D) {
+                    intervalStart = s;
+                }
+                referenceTransmittance *= Math.exp(
+                        -cloud * T098_DENSITY_SCALE * T098_EXTINCTION_SCALE * referenceStep);
+            } else if (intervalStart >= 0.0D) {
+                referenceIntervals.add(new double[] {intervalStart, s});
+                intervalStart = -1.0D;
+            }
+        }
+        if (intervalStart >= 0.0D) {
+            referenceIntervals.add(new double[] {intervalStart, t1});
+        }
+
+        double t = 0.0D;
+        int sinceHit = 100;
+        int iterations = 0;
+        int emptyFineIterations = 0;
+        double emptyFineBlocks = 0.0D;
+        int densityEvaluations = 0;
+        int promotionProbes = 0;
+        double firstMaterialT = -1.0D;
+        int iterationsAtFirstMaterial = -1;
+        int falseNegativeSegments = 0;
+        double falseNegativeBlocks = 0.0D;
+        double transmittance = 1.0D;
+        boolean lastClearValid = true;
+        double lastClearT = 0.0D;
+        boolean stepCapped = false;
+
+        for (int i = 0; i < maxSteps; i++) {
+            iterations = i + 1;
+            if (t >= t1 || transmittance < 0.015D) {
+                break;
+            }
+            boolean fine = sinceHit < 6;
+            double stepLength = fine
+                    ? fineStep
+                    : Math.min(coarseStep * (1.0D + (t / T098_MAX_RENDER_DISTANCE) * 2.2D),
+                            coarseStepCap);
+            stepLength = Math.min(stepLength, t1 - t);
+
+            if (!fine && stormSegmentMayIntersect(lobes,
+                    camX + dirX * t, camY + dirY * t, camZ + dirZ * t,
+                    camX + dirX * (t + stepLength), camY + dirY * (t + stepLength),
+                    camZ + dirZ * (t + stepLength))) {
+                promotionProbes++;
+                double clearance = Double.POSITIVE_INFINITY;
+                for (StormLobeDescriptor lobe : lobes) {
+                    clearance = Math.min(clearance,
+                            StormLobeEvaluator.signedDistanceAt(lobe,
+                                    camX + dirX * t, camY + dirY * t, camZ + dirZ * t)
+                                    - StormLobeEvaluator.edgeWidthBlocks(lobe));
+                }
+                double safeAdvance = clearance - 48.0D;
+                if (safeAdvance > fineStep) {
+                    stepLength = Math.min(Math.min(safeAdvance, coarseStepCap), t1 - t);
+                } else if ("bisectOnly".equals(policy)) {
+                    // Take the ordinary coarse stride and let the four-bisection
+                    // bracket refinement localize any material it lands in.
+                    stepLength = Math.min(Math.min(
+                            coarseStep * (1.0D + (t / T098_MAX_RENDER_DISTANCE) * 2.2D),
+                            coarseStepCap), t1 - t);
+                } else if (scanning) {
+                    // Bounded empty-span scan. Sampling at fine resolution is
+                    // required; consuming a march iteration per sample is not.
+                    // Probe forward on the SAME lattice the fine march would
+                    // have used, inside this one iteration, and cross the whole
+                    // span at once when every probe is empty.
+                    double scanSpan = Math.min(coarseStepCap, t1 - t);
+                    int probeCount = (int) Math.min(16.0D, Math.floor(scanSpan / probeSpacing));
+                    double lastEmpty = 0.0D;
+                    boolean hitMaterial = false;
+                    for (int probe = 1; probe <= probeCount; probe++) {
+                        double probeT = t + probe * probeSpacing;
+                        densityEvaluations++;
+                        double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                                camX + dirX * probeT, camY + dirY * probeT, camZ + dirZ * probeT);
+                        if (cloud > T098_MATERIAL_CLOUD_THRESHOLD) {
+                            hitMaterial = true;
+                            break;
+                        }
+                        lastEmpty = probe * probeSpacing;
+                    }
+                    if (hitMaterial && lastEmpty <= fineStep) {
+                        sinceHit = 0;
+                        fine = true;
+                        stepLength = Math.min(fineStep, t1 - t);
+                    } else if (lastEmpty > fineStep) {
+                        // Provably empty at the march's own sampling resolution.
+                        stepLength = Math.min(lastEmpty, t1 - t);
+                        if (hitMaterial) {
+                            // Material begins at the next probe; enter fine so
+                            // the following iterations integrate it.
+                            sinceHit = 0;
+                            fine = true;
+                        }
+                    } else {
+                        sinceHit = 0;
+                        fine = true;
+                        stepLength = Math.min(fineStep, t1 - t);
+                    }
+                } else {
+                    sinceHit = 0;
+                    fine = true;
+                    stepLength = Math.min(fineStep, t1 - t);
+                }
+            }
+
+            double segStart = t;
+            double segEnd = t + stepLength;
+            densityEvaluations++;
+            double cloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                    camX + dirX * t, camY + dirY * t, camZ + dirZ * t);
+            double density = cloud * T098_DENSITY_SCALE;
+            boolean material = cloud > T098_MATERIAL_CLOUD_THRESHOLD;
+
+            if (!material) {
+                // Any reference material inside a step the march did not sample
+                // at fine resolution is a false negative.
+                if (stepLength > fineStep * 1.001D) {
+                    double overlap = 0.0D;
+                    for (double[] interval : referenceIntervals) {
+                        overlap += Math.max(0.0D,
+                                Math.min(segEnd, interval[1]) - Math.max(segStart, interval[0]));
+                    }
+                    if (overlap > 0.0D) {
+                        falseNegativeSegments++;
+                        falseNegativeBlocks += overlap;
+                    }
+                }
+                if (fine) {
+                    emptyFineIterations++;
+                    emptyFineBlocks += stepLength;
+                }
+                lastClearT = t;
+                lastClearValid = true;
+                sinceHit++;
+                t += stepLength;
+                continue;
+            }
+
+            if (!fine) {
+                // Production's four-bisection bracket refinement.
+                double bracketLow = lastClearValid ? lastClearT : Math.max(0.0D, t - stepLength);
+                double bracketHigh = t;
+                for (int refinement = 0; refinement < 4; refinement++) {
+                    double mid = 0.5D * (bracketLow + bracketHigh);
+                    densityEvaluations++;
+                    double midCloud = sampleRayDensity(baseVolume, detailVolume, lobes,
+                            camX + dirX * mid, camY + dirY * mid, camZ + dirZ * mid);
+                    if (midCloud > T098_MATERIAL_CLOUD_THRESHOLD) {
+                        bracketHigh = mid;
+                    } else {
+                        bracketLow = mid;
+                    }
+                }
+                lastClearT = bracketLow;
+                t = 0.5D * (bracketLow + bracketHigh);
+                sinceHit = 0;
+                continue;
+            }
+
+            if (firstMaterialT < 0.0D) {
+                firstMaterialT = t;
+                iterationsAtFirstMaterial = iterations;
+            }
+            sinceHit = 0;
+            transmittance *= Math.exp(-density * T098_EXTINCTION_SCALE * stepLength);
+            t += stepLength;
+        }
+        if (iterations >= maxSteps && t < t1 && transmittance >= 0.015D) {
+            stepCapped = true;
+        }
+
+        return new T098MarchResult(policy, label, factor, iterations,
+                emptyFineIterations, emptyFineBlocks, densityEvaluations, promotionProbes,
+                firstMaterialT, iterationsAtFirstMaterial,
+                iterationsAtFirstMaterial < 0 ? 0 : iterations - iterationsAtFirstMaterial,
+                transmittance, 1.0D - transmittance, stepCapped,
+                falseNegativeSegments, falseNegativeBlocks,
+                referenceFirstT, 1.0D - referenceTransmittance);
+    }
+
+
+    /**
+     * T098 second divergence: a conservative promotion must not spend the march
+     * budget in empty coverage envelope.
+     *
+     * <p>Two properties, both required.
+     *
+     * <p><b>Conservative correctness.</b> The policy may not step over material
+     * the production fine march would have sampled. This is measured against a
+     * one-block reference traversal, and the {@code bisectOnly} control - which
+     * drops the forced fine promotion and trusts the four-bisection bracket
+     * refinement alone - is run alongside precisely because it looks reasonable
+     * and is not: it skips material on every ray in the fixture.
+     *
+     * <p><b>Bounded progress.</b> The shipped policy takes one march iteration
+     * per fine sample, so crossing the empty envelope between the coverage
+     * opening and the first material costs tens of iterations. On this fixture
+     * it leaves two of nine rays never reaching material at all inside 128
+     * iterations, and four step-capped. The replacement samples the same
+     * lattice inside one iteration, so the ray arrives at material with budget
+     * left to converge.
+     *
+     * <p>The guard fails under the old policy: it requires the shipped-policy
+     * arm to exhibit the starvation, so it cannot pass against the behaviour it
+     * was written for, and it requires the corrected arm to converge to the
+     * same alpha as a 384-iteration truth arm of the old policy without
+     * skipping material.
+     */
+    private static void validateT098PromotionBudget() {
+        require(!T098_POLICY_RESULTS.isEmpty(),
+                "the T098 promotion policy sweep produced no rays");
+
+        java.util.List<T098MarchResult> shipped = new ArrayList<>();
+        java.util.List<T098MarchResult> corrected = new ArrayList<>();
+        java.util.List<T098MarchResult> truth = new ArrayList<>();
+        java.util.List<T098MarchResult> bisectOnly = new ArrayList<>();
+        for (T098MarchResult r : T098_POLICY_RESULTS) {
+            switch (r.policy()) {
+                case "production" -> shipped.add(r);
+                case "scan16" -> corrected.add(r);
+                case "production384" -> truth.add(r);
+                case "bisectOnly" -> bisectOnly.add(r);
+                default -> {
+                }
+            }
+        }
+        require(shipped.size() == corrected.size() && shipped.size() == truth.size()
+                        && !shipped.isEmpty(),
+                "the promotion sweep arms do not cover the same rays");
+
+        // Fail-first: the shipped policy must actually exhibit the defect.
+        int shippedStepCapped = 0;
+        int shippedNeverReached = 0;
+        int shippedEmptyFine = 0;
+        for (T098MarchResult r : shipped) {
+            if (r.stepCapped()) {
+                shippedStepCapped++;
+            }
+            if (r.firstMaterialT() < 0.0D) {
+                shippedNeverReached++;
+            }
+            shippedEmptyFine += r.emptyFineIterations();
+        }
+        require(shippedStepCapped > 0,
+                "the shipped promotion policy step-caps no ray in this fixture;"
+                        + " this guard would pass against the behaviour it was written for");
+        require(shippedNeverReached > 0,
+                "the shipped promotion policy reaches material on every ray here;"
+                        + " the starvation this guard exists for is not reproduced");
+
+        // The control that looks safe and is not.
+        int bisectSkips = 0;
+        for (T098MarchResult r : bisectOnly) {
+            bisectSkips += r.falseNegativeSegments();
+        }
+        require(bisectSkips > 0,
+                "the bracket-refinement-only control skipped no material, so this"
+                        + " guard no longer demonstrates why the scan is required");
+
+        int correctedEmptyFine = 0;
+        int correctedStepCapped = 0;
+        for (T098MarchResult r : corrected) {
+            correctedEmptyFine += r.emptyFineIterations();
+            if (r.stepCapped()) {
+                correctedStepCapped++;
+            }
+            require(r.falseNegativeSegments() == 0,
+                    "the corrected promotion policy skipped " + r.falseNegativeSegments()
+                            + " material segment(s) on " + r.label() + " at "
+                            + r.factor() + "x, totalling "
+                            + String.format(java.util.Locale.ROOT, "%.1f",
+                                    r.falseNegativeBlocks()) + " blocks");
+            require(r.firstMaterialT() >= 0.0D,
+                    "the corrected promotion policy never reached material on "
+                            + r.label() + " at " + r.factor() + "x");
+        }
+        require(correctedStepCapped == 0,
+                "the corrected promotion policy still step-caps "
+                        + correctedStepCapped + " of " + corrected.size() + " rays");
+
+        // Material entry and converged opacity must agree with the truth arm,
+        // which runs the OLD policy with three times the budget.
+        double worstEntryError = 0.0D;
+        double worstAlphaError = 0.0D;
+        for (int i = 0; i < corrected.size(); i++) {
+            T098MarchResult c = corrected.get(i);
+            T098MarchResult t = truth.get(i);
+            require(c.label().equals(t.label()) && c.factor() == t.factor(),
+                    "the corrected and truth arms are not aligned ray for ray");
+            worstEntryError = Math.max(worstEntryError,
+                    Math.abs(c.firstMaterialT() - t.firstMaterialT()));
+            worstAlphaError = Math.max(worstAlphaError,
+                    Math.abs(c.finalAlpha() - t.finalAlpha()));
+        }
+        System.out.printf(java.util.Locale.ROOT,
+                "T098_PROMOTION|rays=%d|shippedStepCapped=%d|shippedNeverReached=%d"
+                        + "|shippedEmptyFineIters=%d|correctedEmptyFineIters=%d"
+                        + "|correctedStepCapped=%d|bisectOnlySkippedSegments=%d"
+                        + "|worstEntryErrorBlocks=%.2f|worstAlphaError=%.5f%n",
+                corrected.size(), shippedStepCapped, shippedNeverReached,
+                shippedEmptyFine, correctedEmptyFine, correctedStepCapped, bisectSkips,
+                worstEntryError, worstAlphaError);
+
+        require(worstEntryError <= T098_FINE_STEP + 0.001D,
+                "the corrected policy enters material " + worstEntryError
+                        + " blocks from where the old policy does with an unbounded budget;"
+                        + " one fine step is the most the entry may move");
+        require(worstAlphaError <= 0.01D,
+                "the corrected policy converges to a different opacity than the"
+                        + " unbounded-budget truth arm; worst alpha error " + worstAlphaError);
+        require(correctedEmptyFine * 4 < shippedEmptyFine,
+                "the corrected policy does not materially reduce empty fine iterations: "
+                        + correctedEmptyFine + " against " + shippedEmptyFine);
+
+        // The production shader must actually carry the scan.
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        require(shader.contains("const int PA_EMPTY_SPAN_PROBES = 16;"),
+                "the bounded empty-span scan probe count is missing or no longer 16");
+        require(shader.contains("for (int paProbe = 1; paProbe <= PA_EMPTY_SPAN_PROBES; paProbe++)"),
+                "the empty-span scan loop is missing or no longer bounded by a constant");
+        require(shader.contains("float paProbeOffset = float(paProbe) * paScanStep;")
+                        && shader.contains("float paScanStep = fineStep"),
+                "the empty-span scan no longer probes on the fine march's own lattice");
+        require(shader.contains("const int MAX_STEPS = 128;"),
+                "MAX_STEPS is no longer 128; this correction must not buy budget");
+        require(shader.contains("PaLegacyFinePromotion != 0"),
+                "the promotion evidence arm is no longer gated by its uniform");
+        require(!VolumetricCloudDebugConfig.t098LegacyFinePromotion(),
+                "the promotion evidence arm is enabled by default");
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.json");
+        require(shaderJson.contains(
+                        "{ \"name\": \"PaLegacyFinePromotion\", \"type\": \"int\", \"count\": 1, \"values\": [ 0 ] }"),
+                "the promotion evidence arm does not default to off");
+
+        System.out.println("PHASE4T_RESULT|T098 promotion reaches material within budget"
+                + "|PASSED|invariant satisfied");
+    }
+
     private static void reportT098MarchSimulation() {
         byte[] baseVolume = CloudNoiseFieldModel.bakeBase();
         byte[] detailVolume = CloudNoiseFieldModel.bakeDetail();
