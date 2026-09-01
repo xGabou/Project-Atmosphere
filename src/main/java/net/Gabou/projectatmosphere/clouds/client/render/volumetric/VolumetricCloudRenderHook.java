@@ -421,6 +421,7 @@ public final class VolumetricCloudRenderHook {
             CameraCloudDensityTracker.update(0.0F);
         }
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
+        StormT135PerformanceProfile.observeFrame(mainTarget.width, mainTarget.height);
         VolumetricCloudFrameDiagnostics.tryCaptureStormProductionRayTrace(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormMaterialTrace(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormWorkload(cloudTarget);

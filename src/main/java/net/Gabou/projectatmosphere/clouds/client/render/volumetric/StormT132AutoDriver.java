@@ -50,6 +50,16 @@ final class StormT132AutoDriver {
      * the run is exactly the established T132/T133 sequence.
      */
     private static final Path RAYTRACE_MARKER = Path.of("t098-raytrace.txt");
+    /**
+     * T135 marker. When present the run performs the five-mode performance
+     * sweep before the T098 captures, at the SC-006 reference resolution.
+     */
+    private static final Path T135_MARKER = Path.of("t135-performance.txt");
+    /** SC-006 states its total-frame budget at this resolution. */
+    private static final int T135_WIDTH = 1920;
+    private static final int T135_HEIGHT = 1080;
+    /** Frames held after a teleport before the first mode is sampled. */
+    private static final int T135_POSE_SETTLE_FRAMES = 120;
     private static final Pattern BASE_TOP =
             Pattern.compile("baseTop=(-?[0-9.]+)\\.\\.(-?[0-9.]+)");
 
@@ -73,6 +83,7 @@ final class StormT132AutoDriver {
         BOOTSTRAP_RESTORE, BOOTSTRAP_WAIT_RESTORED, WAIT_WORLD, SPAWN_STORM, WAIT_ADOPT, WAIT_MATURE, BEGIN_SUITE, POLL_SUITE,
         BEGIN_TRACE, POLL_TRACE,
         RAYTRACE_FIXTURE,
+        T135_PREPARE, T135_MOVE, T135_SETTLE, T135_SAMPLE, T135_REPORT,
         BEGIN_T098, POLL_T098, DONE
     }
 
@@ -138,6 +149,23 @@ final class StormT132AutoDriver {
     private static boolean rayTraceRunRequested() {
         return Files.exists(RAYTRACE_MARKER);
     }
+
+    private static boolean performanceRunRequested() {
+        return Files.exists(T135_MARKER);
+    }
+
+    /** The five shipped quality modes, in ascending cost order. */
+    private static final AtmoCommonConfig.CloudRaymarchQuality[] T135_MODES = {
+            AtmoCommonConfig.CloudRaymarchQuality.LOW,
+            AtmoCommonConfig.CloudRaymarchQuality.LOW_24,
+            AtmoCommonConfig.CloudRaymarchQuality.MEDIUM,
+            AtmoCommonConfig.CloudRaymarchQuality.HIGH,
+            AtmoCommonConfig.CloudRaymarchQuality.ULTRA
+    };
+    private static final String[] T135_POSES = {"SIDE", "FAR", "BELOW", "ABOVE", "CLEAR"};
+    private static int t135PoseIndex;
+    private static int t135ModeIndex;
+    private static int t135SettleFrames;
 
     private static void tickInWorld(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
@@ -280,10 +308,128 @@ final class StormT132AutoDriver {
                         player.getX(), player.getY(), player.getZ());
                 if (StormPerformanceBaseline.suiteFixture() != null) {
                     ProjectAtmosphere.LOGGER.info("T098_RAYTRACE fixture resolved: {}", begun);
-                    advance(Phase.BEGIN_T098);
+                    advance(performanceRunRequested() ? Phase.T135_PREPARE : Phase.BEGIN_T098);
                 } else if (stageFrames > ADOPT_TIMEOUT_FRAMES) {
                     finish("raytrace_fixture_failed:" + begun);
                 }
+            }
+            case T135_PREPARE -> {
+                // The budget contract is stated at 1920x1080, so the sweep is
+                // measured there rather than converted from another resolution.
+                try {
+                    com.mojang.blaze3d.systems.RenderSystem.recordRenderCall(() ->
+                            org.lwjgl.glfw.GLFW.glfwSetWindowSize(
+                                    minecraft.getWindow().getWindow(),
+                                    T135_WIDTH, T135_HEIGHT));
+                } catch (Throwable throwable) {
+                    ProjectAtmosphere.LOGGER.warn(
+                            "T135_PROFILE window resize failed: {}", throwable.toString());
+                }
+                // The fixture pins the resolution scale to 0.75 so the capture
+                // set is stationary. A budget contract per quality mode has to
+                // measure each mode's OWN resolution scale, so the pin is
+                // released for the sweep and reapplied before the captures.
+                restoreFixtureResolutionControl();
+                StormT135PerformanceProfile.reset();
+                t135PoseIndex = 0;
+                t135ModeIndex = 0;
+                ProjectAtmosphere.LOGGER.info(
+                        "T135_PROFILE_BEGIN poses={} modes={} target={}x{}",
+                        T135_POSES.length, T135_MODES.length, T135_WIDTH, T135_HEIGHT);
+                advance(Phase.T135_MOVE);
+            }
+            case T135_MOVE -> {
+                StormPerformanceBaseline.SuiteFixture fixture =
+                        StormPerformanceBaseline.suiteFixture();
+                if (fixture == null) {
+                    finish("t135_fixture_lost");
+                    return;
+                }
+                double radius = fixture.horizontalRadius();
+                double midY = (fixture.baseY() + fixture.topY()) * 0.5D;
+                double height = Math.max(1.0D, fixture.topY() - fixture.baseY());
+                double x = fixture.centerX();
+                double y = midY;
+                double z = fixture.centerZ();
+                switch (T135_POSES[t135PoseIndex]) {
+                    case "SIDE" -> x = fixture.centerX() + radius * 1.7D;
+                    case "FAR" -> x = fixture.centerX() + radius * 2.6D;
+                    case "BELOW" -> {
+                        y = Math.max(fixture.baseY() - Math.max(90.0D, height * 0.35D), 70.0D);
+                    }
+                    case "ABOVE" -> {
+                        x = fixture.centerX() + radius * 0.6D;
+                        y = fixture.topY() + Math.max(120.0D, height * 0.45D);
+                    }
+                    default -> {
+                        // Clear-weather context: far enough that the storm is not
+                        // in frame, so the non-cloud remainder is measurable
+                        // against a scene the storm does not dominate.
+                        x = fixture.centerX() + radius * 12.0D;
+                        y = midY;
+                    }
+                }
+                float yaw = (float) (Math.toDegrees(Math.atan2(
+                        fixture.centerZ() - z, fixture.centerX() - x)) - 90.0D);
+                float pitch = 0.0F;
+                if ("ABOVE".equals(T135_POSES[t135PoseIndex])
+                        || "BELOW".equals(T135_POSES[t135PoseIndex])) {
+                    double dy = midY - y;
+                    double horizontal = Math.hypot(fixture.centerX() - x, fixture.centerZ() - z);
+                    pitch = horizontal < 1.0D
+                            ? (dy >= 0.0D ? -89.0F : 89.0F)
+                            : (float) -Math.toDegrees(Math.atan2(dy, horizontal));
+                }
+                player.connection.sendCommand(String.format(Locale.ROOT,
+                        "tp @s %.5f %.5f %.5f %.3f %.3f", x, y, z, yaw, pitch));
+                t135SettleFrames = 0;
+                advance(Phase.T135_SETTLE);
+            }
+            case T135_SETTLE -> {
+                if (++t135SettleFrames >= T135_POSE_SETTLE_FRAMES) {
+                    advance(Phase.T135_SAMPLE);
+                }
+            }
+            case T135_SAMPLE -> {
+                if (StormT135PerformanceProfile.active()) {
+                    return;
+                }
+                if (t135ModeIndex >= T135_MODES.length) {
+                    t135ModeIndex = 0;
+                    t135PoseIndex++;
+                    if (t135PoseIndex >= T135_POSES.length) {
+                        advance(Phase.T135_REPORT);
+                    } else {
+                        advance(Phase.T135_MOVE);
+                    }
+                    return;
+                }
+                AtmoCommonConfig.CloudRaymarchQuality quality = T135_MODES[t135ModeIndex];
+                AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(quality);
+                StormT135PerformanceProfile.begin(T135_POSES[t135PoseIndex], quality);
+                t135ModeIndex++;
+            }
+            case T135_REPORT -> {
+                StringBuilder out = new StringBuilder("T135_PROFILE_COMPLETE cells="
+                        + StormT135PerformanceProfile.results().size());
+                for (StormT135PerformanceProfile.Cell cell
+                        : StormT135PerformanceProfile.results()) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT135_CELL|%s|%s|%d|%.3f|%dx%d|%dx%d|%d"
+                                    + "|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f",
+                            cell.pose(), cell.mode(), cell.raymarchSteps(),
+                            cell.resolutionScale(), cell.frameWidth(), cell.frameHeight(),
+                            cell.cloudWidth(), cell.cloudHeight(),
+                            cell.samples(), cell.cloudP50(), cell.cloudP95(),
+                            cell.frameP50(), cell.frameP95(), cell.remainderP50(),
+                            cell.cloudMean()));
+                }
+                ProjectAtmosphere.LOGGER.info(out.toString());
+                // Restore the acceptance configuration for the capture set.
+                AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(
+                        AtmoCommonConfig.CloudRaymarchQuality.ULTRA);
+                applyFixtureResolutionControl();
+                advance(Phase.BEGIN_T098);
             }
             case BEGIN_T098 -> {
                 String begun = StormT098CaptureDriver.begin();

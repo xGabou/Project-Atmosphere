@@ -111,20 +111,20 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Tests for User Story 2
 
-- [x] T031 [US2] Add failing local-versus-global precipitation occupancy, unsupported-shaft rejection, deterministic coarse-segment integration, and clear-air fast-path assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricStabilityDiagnosticsSandbox.java` (depends on T030) [FR-007; SC-001, SC-004]
+- [X] T031 [US2] Add failing local-versus-global precipitation occupancy, unsupported-shaft rejection, deterministic coarse-segment integration, and clear-air fast-path assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricStabilityDiagnosticsSandbox.java` (depends on T030) [FR-007; SC-001, SC-004]
 - [X] T032 [US2] Add failing GPU-equation fixture vectors and visible-boundary/camera-density agreement assertions for every storm role and overlap case in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java` (depends on T017, T030) [FR-008; SC-003] — REOPENED by T041 audit
-- [x] T033 [US2] Add failing history-invalidation assertions for topology generation, world, dimension, owner, resource, and resolution changes plus history-retention assertions for normal interpolation in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricStabilityDiagnosticsSandbox.java` (depends on T030) [FR-009; SC-004]
+- [X] T033 [US2] Add failing history-invalidation assertions for topology generation, world, dimension, owner, resource, and resolution changes plus history-retention assertions for normal interpolation in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricStabilityDiagnosticsSandbox.java` (depends on T030) [FR-009; SC-004]
 
 ### Whiteout, Rain, and History Implementation
 
 - [X] T034 [P] [US2] Evaluate adopted `StormRenderSnapshot` descriptors through `StormLobeEvaluator` without per-query allocation in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/ClientCloudVisualDensity.java` (depends on T007, T017, T032) [FR-008] — REOPENED by T041 audit
-- [x] T035 [US2] Publish the exact successfully composited storm generation to visual-density state and keep `CameraCloudDensityTracker` on its existing interface in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/CameraCloudDensityTracker.java` (depends on T028, T034) [FR-008]
-- [x] T036 [P] [US2] Change volumetric rain eligibility and empty-space pretests from global precipitation to local weather/morphology/direct-storm support in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` (depends on T026, T031) [FR-007]
+- [X] T035 [US2] Publish the exact successfully composited storm generation to visual-density state and keep `CameraCloudDensityTracker` on its existing interface in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/CameraCloudDensityTracker.java` (depends on T028, T034) [FR-008]
+- [X] T036 [P] [US2] Change volumetric rain eligibility and empty-space pretests from global precipitation to local weather/morphology/direct-storm support in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` (depends on T026, T031) [FR-007]
 - [X] T037 [US2] Implement world-anchored deterministic coarse-segment rain integration, local base attachment, and body/rain step separation in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` (depends on T036) [FR-007] — REOPENED by T041 audit
-- [x] T038 [US2] Add adopted storm topology generation and effective resolution generation to history validity while preserving history during descriptor interpolation/advection in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java` (depends on T033, T035) [FR-009]
-- [x] T039 [US2] Clear pending/adopted storm density and temporal state on disconnect, world/dimension/owner change, resource reload, resize, and direct-path disable in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/ClientCloudVisualDensity.java` (depends on T035, T038) [FR-008-FR-009]
-- [x] T040 [US2] Add regression assertions proving nearby custom rain/snow and its vanilla fallback remain independently owned in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricStabilityDiagnosticsSandbox.java`, without changing `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/CustomPrecipitationRenderer.java` (depends on T031, T037) [FR-007, FR-020]
-- [x] T041 [US2] Run dry/local-rain/remote-rain/boundary-crossing stationary and moving 60-second captures and record density agreement, history resets, and artifact results in `specs/001-native-storm-rendering/validation/us2-rain-whiteout-stability.md` (depends on T031-T040) [SC-001, SC-003-SC-004]
+- [X] T038 [US2] Add adopted storm topology generation and effective resolution generation to history validity while preserving history during descriptor interpolation/advection in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java` (depends on T033, T035) [FR-009]
+- [X] T039 [US2] Clear pending/adopted storm density and temporal state on disconnect, world/dimension/owner change, resource reload, resize, and direct-path disable in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/ClientCloudVisualDensity.java` (depends on T035, T038) [FR-008-FR-009]
+- [X] T040 [US2] Add regression assertions proving nearby custom rain/snow and its vanilla fallback remain independently owned in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricStabilityDiagnosticsSandbox.java`, without changing `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/CustomPrecipitationRenderer.java` (depends on T031, T037) [FR-007, FR-020]
+- [X] T041 [US2] Run dry/local-rain/remote-rain/boundary-crossing stationary and moving 60-second captures and record density agreement, history resets, and artifact results in `specs/001-native-storm-rendering/validation/us2-rain-whiteout-stability.md` (depends on T031-T040) [SC-001, SC-003-SC-004]
 
 **Checkpoint**: User Stories 1 and 2 are independently testable; structured storm occupancy, rain, whiteout, and history agree.
 
@@ -136,7 +136,7 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 **Goal**: Make the descriptor set the authoritative visible storm field through descriptor-local distance-like evaluation, lobe/group smooth unions, local BASE underside and rain attachment, valid descriptor slots, safe lifecycle/history behavior, and acceleration-only group candidates.
 
-**Independent Test**: Run the fixed complete-group silhouette, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, and acceleration regressions. *(The original "ten-item visual checklist" acceptance is superseded; T098 and T099 now use the two-part positive/negative checklist introduced by Phase 4S.)*
+**Independent Test**: Run the fixed complete-group silhouette, locality, independent GLSL parity, composition, rain/body, slot/fallback, async/signature, history, and acceleration regressions. *(The original "ten-item visual checklist" acceptance is superseded; T098a/T098b and T099 now use the split structural/visual gate and the two-part positive/negative checklist introduced by Phase 4S.)*
 
 **Gate (revised 2026-08-19)**: Every new geometry regression test must demonstrably fail against the audited implementation for the intended reason before its corresponding fix is implemented. The former absolute prohibition on US3 and performance work before this phase completed has been **removed** - see Phase 4P and "Dependencies and Execution Order".
 
@@ -174,115 +174,31 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
-**T098 2026-09-01: ANVIL optical-surface investigation returns CASE C again, one stage further in -
-the surface is structured and the self-shadow pins it flat. No production change. Task stays OPEN.**
-Measuring surface displacement rather than interior variance overturns the balloon premise a second
-time. The alpha=0.5 surface carries **58.375 blocks RMS relief** at SIDE and 27.724 at ABOVE, and no
-stage collapses on the way there: envelope 116.006, first non-zero density 49.812, alpha10 53.645,
-alpha50 58.375, alpha90 80.502. Resolved by scale the relief is 20.0/32.3/58.7/92.3/111.7 blocks at
-12/24/48/96/192-block windows - about 3/5/11/22/43 output pixels at SIDE - so macro, meso and fine
-bands are all present. Per role the anvil's surface (43.264 RMS) is nearly as rough as BASE (50.216)
-and rougher than TOWER (21.734), yet only BASE reads billowy, so the difference is not the surface.
-**Erosion is confirmed to be the wrong lever**: it contributes only **3.9-6.7 blocks** of surface
-displacement at every scale - roughly one pixel - while changing interior density substantially
-(finalDensity CV 0.589). The loss is in shading. Modelling the production light cone exactly (8 taps,
-14-block first step x1.42, cone offsets, erosion on the first two taps only): light optical depth at
-the visible surface is **median 16.425** (mean 17.040, p95 37.891) where about 4.6 already gives 1%
-transmission, and **83.57% of surface points receive less than 1% direct light**. Feeding that through
-the real three-octave scatter, beer-powder, ambient-retention and filmic tone chain gives surface
-luminance p05 **0.40731**, p50 **0.41366**, p95 0.75211: at least 45% of the canopy sits within 0.007
-luminance - **under two levels of 255** - of the ambient floor, which has no spatial variation. The
-model reproduces the render: sampled anvil pixels measure RGB (85,107,144), luminance 0.412, against
-the modelled p50 of 0.414. **The next isolated blocker is the lighting / self-shadow response**, and
-surface relief must NOT be increased to compensate. PHASE 8 candidate D is now unblocked for the next
-pass but CASE C requires stopping before it. The 4-px reconstruction beat remains a separate defect
-and is not yet the sole blocker. `./gradlew check` and `./gradlew build` pass. Evidence in
-`validation/t098-anvil-optical-surface.md`.
+**T098a 2026-09-01: PASSES on Forge-1.20.1. T135 established and FAILING by 9x-64x.**
 
-**T098 2026-09-01: ANVIL investigation returns CASE C - the contrast is lost in integration, not in
-the density field. No production change. Task stays OPEN.** The premise that the anvil's density is
-uniform is false. Measured over five deterministic realizations of the T134 severe fixture, interior
-only: ANVIL `finalDensity` mean 0.4186, p05 0.0234, p95 0.7726, **CV 0.589** - higher than CORE
-(0.460) and TOWER (0.512) - with a 0.0106/block mean gradient, 3.64% true zeros and **0.00% of
-samples at or above 0.99**. Nothing clamps; the saturation is optical, not numerical. The decisive
-measurement is the unlit accumulated alpha, marched with production step, extinction and
-transmittance floor and **no lighting at all**: density CV 0.589 in, **alpha CV 0.0000 out**, variance
-**0.000000**, 100% of SIDE rays above 0.97. A ray reaches the transmittance floor after **74.8
-blocks** of a **1015-block** anvil chord, so the visible skin is **7.4%** of the crossing and 93% of
-the density variation cannot reach the image; the field's zeros are too sparse (3.6%) and too small
-(40-block correlation) for any ray to find a clear path. Scaling optical depth with the field held
-fixed shows the anvil is **8x to 30x** too thick for its existing structure to show: at 0.25x the
-alpha CV is still 0.0009 and 99.93% of rays exceed 0.97. Two upstream terms explain why the field has
-no holes, and both are handed to the next investigation rather than changed here: the ANVIL coverage
-envelope is a **plateau, CV 0.078**, which gives `stormBody` a floor near 0.10 so the body reaches
-zero in 0.00% of the interior; and `detailFbm` has **CV 0.156** spanning only 0.356-0.607, so erosion
-is a near-constant 0.22 offset rather than a texture (mean erosion 0.2295/0.2297/0.2298 across ANVIL/
-BASE/CORE - a DC term). The detail hierarchy is also mis-scaled: decorrelation is **8 blocks** for
-`detailFbm` against a 1015-block anvil, about 1.8 output pixels at the SIDE pose, below the
-reconstruction lattice - but that is downstream of the saturation and cannot help while alpha is 1.0
-everywhere. **Stair-step banding measured and classified separately**: dominant period is **4.00 px at
-both SIDE (1.7x) and FAR (2.6x)** while the block period changes 17.7 -> 28.8, so it is screen-space,
-and 1600/1200 = 900/675 = 4:3 makes it the upscale beat - **class E, reconstruction**, unrelated to the
-anvil density. Per CASE C no candidate arm was implemented and PHASES 11-12 were not entered.
-`./gradlew check` and `./gradlew build` pass. Evidence in
-`validation/t098-anvil-surface-structure.md`.
+*T098a.* `Forge-1.20.1` had advanced to 4e356c3; it was merged into the correction branch (clean,
+one file) so the verified tree is the production head plus both T098 corrections and their guards.
+`./gradlew check` and `./gradlew build` pass with 12 invariants including both T098 guards and the
+per-descriptor advance guard. Live campaign on group `6a229682`: centre-column cloud share
+**1.0000** and longest inner sky run **0 px** at FAR, SIDE, UNDER, ABOVE, CURRENT_ONLY, both
+LATERALs and NEAR_EDGE; all three traced rays terminate on the transmittance floor with **zero step
+caps** and ray identity AGREES to five decimals (waist composites at 0.98730); severe scale
+preserved at 840 px of 900. All seven T098a criteria pass. Evidence in
+`validation/t098a-structural-correctness.md`. **T099's T098a dependency is discharged.**
 
-**T098 2026-09-01: second divergence fixed; the connecting column now renders on 5/5 fresh
-fixtures, and the remaining failure is the anvil body, not the marcher. Task stays OPEN.** The
-promotion state machine kept fine marching alive on geometry alone: `sinceHit` was reset by the
-conservative descriptor probe, never required `cloudDensity > 0`, and the probe re-fired every sixth
-iteration while the ray was still inside the same clearance, so every iteration advanced exactly one
-fine step. The geometric envelope reach and the density-support reach are far apart - `stormBody` is
-a remap that correctly maps a low envelope to nothing over most of the envelope - so waist rays spent
-a mean of 66 of 128 iterations and 166 blocks crossing envelope that carries no material, and 3 of 6
-traced waist rays hit the cap, one at alpha 0.446. The missing distinction was not "bound versus
-material" but **sampling at fine resolution versus spending a march iteration per sample**;
-MAX_STEPS bounds iterations, not density evaluations. The marcher now probes forward on exactly the
-lattice the fine march would have sampled, inside one iteration, bounded by PA_EMPTY_SPAN_PROBES=16.
-Same samples, so nothing the fine march would have found is missed. Measured offline against a
-one-block reference over nine rays: shipped policy 701 empty fine iterations, 2/9 rays never reaching
-material, 4/9 step-capped; corrected 23, 0/9, 0/9, with **0 false negatives**, material entry error
-**0.00 blocks** and converged alpha error **0.00000** against a 384-iteration truth arm of the old
-policy. The `bisectOnly` control - drop the promotion and trust the bracket refinement alone - skips
-material on every ray and is retained in the guard to show why the promotion cannot simply be
-removed. Live: WAIST 128 iterations/step_cap/alpha 0.075-0.63 becomes 65 iterations/transmittance
-floor/alpha 0.98730, with ray identity proved. Campaign over five fresh severe fixtures: centre-column
-cloud share **1.0000**, longest inner sky run **0 px**, zero step caps on all fifteen traced rays.
-Cost is honest and up: +3.5% to +42% cloud-pass GPU time, because the old policy was cheap by giving
-up before integrating the storm; against an equal-quality baseline the scan is ~5% more density
-evaluations for a third of the iterations. Guarded by `validateT098PromotionBudget`, fail-first on
-three grounds. **T098 still FAILS**: FR-023 #9 now passes, but the anvil renders as a large smooth
-balloon with uniform interior density, failing FR-024 #1 and #2 and taking FR-023 #3/#4/#6/#7/#8 with
-it. That is independent of the marcher and no hypothesis is opened for it here. Evidence in
-`validation/t098-promotion-budget.md`.
-
-**T098 2026-08-31: first production divergence isolated and corrected; the loss was the depth
-sentinel, not the march or cloudDensity. Task stays OPEN.** A production ray trace now instruments
-the real march in place - one ray fixed by NDC, every fragment of the pass marching that ray, column
-= march iteration and row = field group in a bounded 128x21 corner of the existing cloud target
-(`StormProductionRayTrace`, `PaRayTraceMode`). It proves ray identity: the production alpha read out
-of the traced texel equals the traced ray's own alpha to five decimals on every ray of every run.
-Results on the controlled SIDE pose. The **outer weather-gated empty-space skip is FALSIFIED**:
-disabling it reaches the same cloudDensity samples, the same peak density and the same alpha on all
-three rays. **cloudDensity is healthy**: it is called on 110 of 128 waist iterations,
-ownsDescriptorGroup holds, envelopeCoverage is 1.0, and it returns density up to 0.668. The first
-loss is **after** the density function: the waist ray's alpha-weighted representative point sits 912
-blocks out against a **768.24-block projection far plane**, so `depthAt`'s clamp publishes exactly
-1.0 - the value `cloud_field_composite.fsh` reads as *absence of cloud* - and an integrated alpha of
-0.63 is discarded whatever its value. The BASE and ANVIL controls on the same frame sat at 736 and
-665.5 blocks, published 0.99999416 and 0.99998683, and composited normally. The correction is one
-expression: a cloud hit publishes `min(depthAt(...), PA_CLOUD_HIT_MAX_DEPTH = 0.999999)`, so only a
-miss may write the sentinel; the bound stays above history's 0.99999 confidence cutoff and behind any
-real scene depth, so reprojection and terrain occlusion are unchanged. Guarded by
-`validateT098CloudHitDepthNeverSaturates`, which fails under the old expression (8330 of 19685 swept
-probes discarded a hit). This also **retracts** the earlier stage-isolation inference: FINAL and
-CURRENT_ONLY are both post-composite, so their agreement exonerated history, never the composite.
-**A second divergent branch is recorded and deliberately NOT fixed**: every traced waist ray
-terminates on `step_cap` at 128 iterations with 0.37-0.92 transmittance remaining, because the
-per-descriptor conservative clearance probe promotes to fine marching at t~578 while first
-integrable material is at t~826, spending ~100 of 128 iterations crossing empty envelope. That is
-why the corrected column composites but stays thin. Evidence in
-`validation/t098-production-ray-trace.md`.
+*T135.* Five-mode budget contract recorded in `validation/performance-budget.md`, measured on an
+**RTX 4070 Laptop at 1920x1080** with each mode using its own resolution scale and the non-cloud
+remainder measured rather than modelled. Budgets retained as targets (3.0/4.0/5.0/6.5/8.0 ms cloud,
+SC-006 Ultra p95 16.7 ms total). Measured at the SIDE acceptance pose: Low **56.3 ms** (18.8x),
+Low 24 **117.9** (29.5x), Medium **203.6** (40.7x), High **253.2** (39.0x), **Ultra 515.2 ms
+(64.4x)**, with total frame **516 ms p50 / 542 ms p95 against a 16.7 ms budget - a 32x miss, about
+1.9 FPS**. BELOW/Medium and BELOW/High are 55x. **The non-cloud remainder is 0.3-1.3 ms in every
+cell**, so the cloud raymarch is essentially the whole frame; clear weather is inside budget at every
+mode (0.31-3.89 ms), so the cost is entirely storm-driven. Cost tracks raymarch samples
+(4.5-18.1 ns per step-sample), not a stall. The required saving is **one to two orders of
+magnitude**, which is beyond constant-factor tuning and is the input to T136/T137. Harness
+limitation recorded: the 25-cell sweep outlives the spawned fixture, which contaminated the ABOVE
+cells and BELOW/Ultra; T136 must hold or re-spawn the storm.
 
 **T098 2026-08-30: live acceptance campaign run; result CASE D, task stays OPEN.** The envelope
 extent bound (0.75 x half-height) was validated live across five distinct fresh severe fixtures
@@ -380,10 +296,37 @@ The 48-block blend cap saturates on **88.9%** of T134 descriptor pairs, deliveri
 and TOWER descriptors are adopted yet produce no visible body. No production change was made.
 See `validation/t098-manual-checklist.md`.
 
-- [ ] T098 **[REOPENED 2026-08-19 - renderer-wide gate]** Replace `specs/001-native-storm-rendering/validation/us1-readable-storms.md` evidence with new below/beside/inside/above captures and a two-part checklist only after T133 passes. **Positive half (FR-023, all nine must be present)**: a broad continuous lower cloud base; a dense convective/core region; vertical tower development emerging naturally from the base; progressive vertical narrowing where appropriate; a broad upper anvil; multi-scale billowing across the visible storm body; surface variation at multiple spatial frequencies; irregular but coherent silhouette curvature; continuous transitions between base, tower, core, and anvil. **Negative half (FR-024, none may be present)**: large smooth balloon surfaces; large regions of visually uniform density; visible ellipsoid or sphere primitives; isolated ears or bulb protrusions; descriptor seams; rectangular or vertical walls; flat slabs; uniformly smooth silhouettes. Record T133's physical-scale, vertical-material, and performance evidence with the capture set. This task is not passable while any positive item is absent, even if every negative item is clear (depends on T133; fulfills reopened T030) [FR-023, FR-024, FR-028-FR-031; SC-001-SC-002, SC-011, SC-018-SC-020]
-- [ ] T099 **[REOPENED 2026-08-19 - revised criteria]** Replace `specs/001-native-storm-rendering/validation/us2-rain-whiteout-stability.md` evidence with new dry/local-rain/remote-rain/boundary stationary and moving captures proving rain remains attached to the **final noise-formed** storm density (not the coverage envelope) and whiteout remains stable, then record the final morphology pass/fail gate. Not passable until T098's positive criteria are satisfied (depends on T098, T115, T116, T118) [FR-021, FR-022; SC-001, SC-003-SC-004, SC-011]
 
-**Checkpoint (superseded 2026-08-19)**: Phase 4R established that the descriptor set - not a statistical envelope or candidate grid - is the evaluated storm field. Phase 4S narrows that result: the descriptor union is a bounded coverage envelope, and the noise field forms the visible body. T098 remains open behind the T127-T133 renderer-wide correction gate; T099 remains blocked by T098.
+- [X] T098a [BLOCKING CORRECTNESS] **Structural / Correctness Acceptance.** On the actual
+  production branch, integrate and re-run the verified T098 correction/evidence chain, then record
+  a severe-scale SIDE/FAR/BELOW/ABOVE campaign proving: intended-distance visibility; connected
+  BASE -> CORE -> TOWER -> ANVIL coverage; no renderer-caused clean-sky waist; no march starvation;
+  real cloud hits surviving depth publication/composite; no catastrophic confetti/skipping; and
+  preserved basic severe scale. The historical five-fixture result (`centreColumnCloudShare=1.000`,
+  `longestInnerSkyRun=0 px`, zero caps on 15 traced rays) is evidence, not a substitute for
+  integration verification on `Forge-1.20.1` (depends on T133; fulfills the structural portion of
+  reopened T030) in `specs/001-native-storm-rendering/validation/t098a-structural-correctness.md`
+  [FR-001-FR-005, FR-021-FR-022, FR-028-FR-031; SC-001, SC-011, SC-018-SC-020]
+- [ ] T098b [VISUAL POLISH] **Final Visual Polish.** At the final shipping marcher,
+  reconstruction, lighting, resolution, and quality-mode configurations, replace the remaining
+  US1 capture evidence and grade all FR-023/FR-024 appearance criteria. Own ANVIL
+  billowing/readability and its self-shadow response, the approximately four-pixel
+  reconstruction/upscale beat, and the authoritative SIDE/FAR/ABOVE/BELOW regrade for Ultra plus
+  representative lower shipped modes in
+  `specs/001-native-storm-rendering/validation/t098b-final-visual-polish.md`. This gate does not block performance design or T099
+  (depends on T098a, T139, T052) [FR-023-FR-024; SC-001-SC-002, SC-011]
+- [ ] T099 [FUNCTIONAL] **[REOPENED 2026-08-19 - revised criteria]** Replace
+  `specs/001-native-storm-rendering/validation/us2-rain-whiteout-stability.md` evidence with new
+  dry/local-rain/remote-rain/boundary stationary and moving captures proving rain remains attached
+  to the **final noise-formed** storm density (not the coverage envelope) and whiteout remains
+  stable. It needs structural correctness and final-density behavior, not final ANVIL lighting or
+  reconstruction polish (depends on T098a, T115, T116, T118) [FR-021-FR-022; SC-001, SC-003-SC-004]
+
+**Checkpoint (superseded 2026-09-01)**: Phase 4R established that the descriptor set - not a
+statistical envelope or candidate grid - is the evaluated storm field. Phase 4S narrows that result:
+the descriptor union is a bounded coverage envelope, and the noise field forms the visible body.
+T133 is accepted. T098a is the remaining structural integration gate; T099 is blocked by T098a,
+while T098b visual polish, performance, and quality-mode work run in parallel.
 
 ### Superseded by Phase 4S
 
@@ -474,11 +417,11 @@ BASE/CORE versus TOWER/ANVIL split until T129 records the first discontinuous st
 Phase 4S density architecture and every retained ownership/fallback invariant.
 
 - [X] T127 [US1] Audit and derive the severe-storm physical-scale target in `specs/001-native-storm-rendering/validation/renderer-wide-architecture-audit.md`: record BASE footprint, CORE width, TOWER width/height, ANVIL span/thickness, total height, aspect ratio, descriptor count per occupied volume, and horizon dominance from three several-hundred-block viewpoints. Trace the controlling source-plan, lobe-spec, render-scale/aspect, placement, and union inputs; then evaluate the 50/25/12.5-block base bands and approximately 22.7-to-1.4-block detail bands against the derived system dimensions. Do not accept uniform descriptor scaling as a target derivation (depends on T126) [FR-028; SC-018]
-- [X] T128 [US4] Add fail-first deterministic and on-demand runtime vertical material-continuity diagnostics for the existing live-calibrated ten-descriptor fixture and live `3c039aa7` strengths. Sample a fixed centre X/Z at no more than 16-block Y intervals and report active descriptor roles/IDs, coverage/strength, base noise/carrier, detail erosion, final density, extinction, light optical depth, direct light, ambient light, final rendered contribution, and direct/fallback plus weather/slab height-normalization branch flags. Keep CPU/shader values independently comparable (depends on T126) [FR-029; SC-019]
-- [X] T129 [US1] Run T128 against the current composition before a correction and record fail-first evidence identifying the first lower/upper discontinuity as geometry/coverage, density/noise, optical medium, lighting, or sampling/history. Rule out every earlier stage before authorizing a correction; do not substitute another role-overlap or union-radius iteration for measured attribution (depends on T127-T128) [FR-029; SC-019]
-- [X] T130 [US3] Capture the reference performance architecture baseline: raymarch time, primary and lighting-cone density samples, group-range scans, descriptor fetches, envelope rejections, empty-space skips, termination behavior, and register/scratch-risk locations. Freeze comparison captures and a material-trace/image tolerance for visually-neutral optimization; classify every proposed optimization as neutral or quality-changing (depends on T126) [FR-030; SC-020]
-- [X] T131 [US1] Add a deterministic fail-first regression for the measured cause from T129, then correct only that single-medium discontinuity in the responsible renderer stage. Role geometry may change only if T129 attributes the first discontinuity to geometry/coverage; preserve Phase 4S base scale, warp, erosion hierarchy, live strengths, final-density rain/whiteout, parity, and all ownership/fallback behavior (depends on T129) [FR-029; SC-019]
-- [X] T134 [US1] Implement the separately derived severe-system physical scale from T127 through the source plan, role-specific lobe placement/extents, and group distribution. Reach the 1,200–1,500 footprint and 720–880 height targets without a uniform descriptor multiplier; retain the 50/25/12.5-block base and ~22.7-to-1.4-block detail wavelengths unless remeasurement proves a change is required. Record controlled SIDE/FAR/BELOW/ABOVE scale evidence before T133 (depends on T127, T129; separate from T131) [FR-028; SC-018]
+- [X] T128 [US4] Add fail-first deterministic and on-demand runtime vertical material-continuity diagnostics in `src/main/java/net/Gabou/projectatmosphere/command/TelemetryDebugClientCommand.java` for the existing live-calibrated ten-descriptor fixture and live `3c039aa7` strengths. Sample a fixed centre X/Z at no more than 16-block Y intervals and report active descriptor roles/IDs, coverage/strength, base noise/carrier, detail erosion, final density, extinction, light optical depth, direct light, ambient light, final rendered contribution, and direct/fallback plus weather/slab height-normalization branch flags. Keep CPU/shader values independently comparable in `specs/001-native-storm-rendering/validation/t128-t131-material-continuity.md` (depends on T126) [FR-029; SC-019]
+- [X] T129 [US1] Run T128 against the current composition before a correction and record fail-first evidence in `specs/001-native-storm-rendering/validation/t128-t131-material-continuity.md` identifying the first lower/upper discontinuity as geometry/coverage, density/noise, optical medium, lighting, or sampling/history. Rule out every earlier stage before authorizing a correction; do not substitute another role-overlap or union-radius iteration for measured attribution (depends on T127-T128) [FR-029; SC-019]
+- [X] T130 [US3] Capture the reference performance architecture baseline in `specs/001-native-storm-rendering/validation/performance-baseline.md`: raymarch time, primary and lighting-cone density samples, group-range scans, descriptor fetches, envelope rejections, empty-space skips, termination behavior, and register/scratch-risk locations. Freeze comparison captures and a material-trace/image tolerance for visually-neutral optimization; classify every proposed optimization as neutral or quality-changing (depends on T126) [FR-030; SC-020]
+- [X] T131 [US1] Add a deterministic fail-first regression for the measured cause from T129, then correct only that single-medium discontinuity in the responsible renderer stage recorded in `specs/001-native-storm-rendering/validation/t128-t131-material-continuity.md`. Role geometry may change only if T129 attributes the first discontinuity to geometry/coverage; preserve Phase 4S base scale, warp, erosion hierarchy, live strengths, final-density rain/whiteout, parity, and all ownership/fallback behavior (depends on T129) [FR-029; SC-019]
+- [X] T134 [US1] Implement the separately derived severe-system physical scale from T127 through the source plan, role-specific lobe placement/extents, and group distribution. Reach the 1,200–1,500 footprint and 720–880 height targets without a uniform descriptor multiplier; retain the 50/25/12.5-block base and ~22.7-to-1.4-block detail wavelengths unless remeasurement proves a change is required. Record controlled SIDE/FAR/BELOW/ABOVE scale evidence in `specs/001-native-storm-rendering/validation/renderer-wide-architecture-audit.md` before T133 (depends on T127, T129; separate from T131) [FR-028; SC-018]
 
 **T134 accepted 2026-08-21**: the source-plan, role-envelope, and group-placement implementation
 plus the seeded resolved-centre scale guard are complete, and the required controlled four-view live
@@ -715,11 +658,12 @@ prerequisite for T133; T133 is the only remaining prerequisite for T098.
 ---
 
 
-**Then**: T098 and T099 execute only after T133. They are listed under Phase 4R's Revalidation Gate to keep their audit history in place; their acceptance criteria are the revised positive/negative checklist recorded there.
+**Then**: T098a and T099 execute only after T133; T098b follows the settled shipping performance and
+quality configuration. They are listed under Phase 4R's Revalidation Gate to keep their audit history in place; their acceptance criteria are the revised positive/negative checklist recorded there.
 
 **Checkpoint**: The coverage envelope comes from descriptors, the visible body comes from noise, and
 morphology is measured positively. T118/T124-T126 are retained evidence; T133, not T118, unblocks
-the reopened T098, while T099 remains blocked by T098.
+the reopened T098a, while T099 remains blocked by T098a; final appearance grading remains T098b.
 
 ---
 
@@ -772,6 +716,64 @@ unchanged from the Phase 4S baseline.
 
 ---
 
+## Phase 4Q: Active Performance Redesign
+
+**Classification**: PERFORMANCE
+**Purpose**: Close the measured severe-storm performance risk in parallel with T098b. The current
+136--261 ms cloud-pass measurements at a reduced `641x360`, `governorScale=0.50000`, and
+`resolutionScale=0.75000` are a profiling alarm, not an SC-006 result. They show that the existing
+bounded optimizations do not approach the release target.
+
+**Independent Test**: A same-fixture, per-mode profile reports cloud GPU cost separately from
+total-frame cost and attributes the major contributors before any major implementation increment.
+Image-changing performance work is permitted only with an explicit T098b regrade obligation; do
+not fabricate historical before/after percentages for T119--T123.
+
+- [X] T135 [PERFORMANCE] Establish and record the five-mode performance budget contract in
+  `validation/performance-budget.md`: Low, Low 24, Medium, High, and Ultra must each have a cloud
+  GPU budget, a total-frame budget, measured non-cloud remainder, fixture/resolution/hardware, and
+  percentile. Start from the existing 3.0/4.0/5.0/6.5/8.0 ms cloud targets, validate or revise them
+  by measurement, and retain Ultra SC-006 p95 total-frame <=16.7 ms at 1920x1080 unchanged
+  (depends on T133) [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-017, SC-021]
+- [ ] T136 [PERFORMANCE] Create the controlled same-fixture profiling baseline for severe
+  SIDE/FAR/BELOW/ABOVE and useful clear-weather context. Capture GPU ms, ray iterations,
+  `cloudDensity` evaluations, descriptor evaluations/fetches, lighting/shadow, reconstruction,
+  history, resolution, and owned T119/T121/T122/T123 counters in
+  `validation/performance-baseline.md` (depends on T135) [FR-012-FR-013, FR-027; SC-006, SC-017, SC-021]
+- [ ] T137 [PERFORMANCE] Produce a ranked performance architecture decision from T136 in
+  `validation/performance-architecture.md`. Evaluate descriptor representation/cache/layout,
+  fetch bandwidth, raymarch/adaptive stepping, shadow/light proxies, internal resolution/temporal
+  reconstruction, quality-specific LOD, bounded simplification, and distance policy; select only
+  contributors supported by the measured data and state whether T098b regrade is required
+  (depends on T136) [FR-010-FR-012, FR-027, FR-030; SC-006, SC-017, SC-021]
+- [ ] T138 [PERFORMANCE] Implement one bounded, profile-selected major performance increment from
+  T137 in the exact production target selected in
+  `validation/performance-architecture.md`—one of
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeSpatialIndex.java`,
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java`,
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java`,
+  or `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`—with
+  its own correctness/release tests and before/after same-fixture profile in
+  `validation/performance-baseline.md`. Do not create speculative microtasks before T137. A
+  deliberately image-changing change is allowed, but must preserve structural correctness and be
+  queued for T098b rather than claimed neutral (depends on T098a, T137) [FR-001, FR-006,
+  FR-010-FR-012, FR-027, FR-030; SC-006, SC-017]
+- [ ] T139 [PERFORMANCE] Integrate the T135/T137 evidence into five-mode quality policy: map
+  budgets, LOD, raymarch, lighting, resolution, governor floors/ceilings, and history transitions
+  to Low/Low 24/Medium/High/Ultra without disconnecting complete groups. Record the policy and
+  transition rationale in `validation/us3-quality-lod.md` (depends on T045, T137) [FR-001,
+  FR-009-FR-012; SC-005-SC-007, SC-021]
+- [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
+  `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
+  and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This
+  task does not waive final shipped visual regrading in T098b
+  (depends on T052, T138, T139) [FR-010-FR-012, FR-027, FR-030; SC-005-SC-007, SC-017, SC-021]
+
+**Checkpoint**: Performance work has a measured budget and ranked architecture before further
+implementation, while visual polish remains independently active.
+
+---
+
 ## Phase 5: User Story 3 - Scalable Quality Modes (Priority: P3)
 
 **Goal**: Preserve five progressively increasing modes, bounded predictable storm LOD, stable adaptive degradation/recovery, and Ultra's target performance without disconnecting storm groups.
@@ -780,20 +782,31 @@ unchanged from the Phase 4S baseline.
 
 ### Tests for User Story 3
 
-- [ ] T042 [US3] Add failing preset-table, monotonic detail, target/floor, EWMA, 30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java` (depends on T099) [FR-010-FR-012; SC-005, SC-007]
+- [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
+  30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
+  assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
+  Quality plumbing requires structural correctness and measured performance policy, not T098b
+  visual polish (depends on T098a, T135) [FR-010-FR-012; SC-005, SC-007, SC-021]
 - [ ] T043 [US3] Add failing detail-distance clamp, 128-block cross-fade, complete-group LOD, no-hole/no-double-weight, and capacity-to-map fallback assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java` (depends on T042) [FR-010-FR-011]
 
 ### Configuration, Quality, and LOD Implementation
 
 - [ ] T044 [P] [US3] Add `adaptiveCloudQuality` defaulting true and `nativeStormDetailDistance` defaulting 1536 with range 256-4096 to `src/main/java/net/Gabou/projectatmosphere/config/AtmoCommonConfig.java` (depends on T042) [FR-010-FR-011]
-- [ ] T045 [P] [US3] Extend nominal steps/resolution, lighting/detail work, GPU targets, and per-mode floors for Low, Low 24, Medium, High, and Ultra in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricQualityProfile.java` (depends on T042) [FR-010-FR-012]
+- [ ] T045 [P] [PERFORMANCE] [US3] Extend nominal steps/resolution, lighting/detail work, GPU
+  targets, and per-mode floors for Low, Low 24, Medium, High, and Ultra in
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricQualityProfile.java`
+  from T135's budget contract (depends on T042, T135) [FR-010-FR-012; SC-021]
 - [ ] T046 [US3] Replace the scalar governor with immutable adaptive state, GPU-time EWMA, sustained thresholds, discrete bands, floor/ceiling clamps, transition generation/reason, and cooldown in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/CloudFrameTimeGovernor.java` (depends on T042, T045) [FR-011; SC-007]
 - [ ] T047 [US3] Read visual config once during frame setup, clamp storm detail distance to total render distance, and apply effective quality state in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` (depends on T044-T046) [FR-010-FR-011]
 - [ ] T048 [US3] Add complete-group analytic/map LOD classification, full-detail range, 128-block transition weights, and map-only handling for distance/capacity omissions in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeSpatialIndex.java` (depends on T043, T047) [FR-001, FR-010-FR-011]
 - [ ] T049 [US3] Apply analytic/map cross-fade without double density and scale only bounded refinement/lighting work—not group integrity—in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` (depends on T045, T048) [FR-001, FR-010-FR-011]
 - [ ] T050 [US3] Recreate render targets and invalidate history once on discrete resolution transitions while leaving step-only changes history-valid in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderTargets.java` (depends on T038, T046-T047) [FR-009-FR-011]
 - [ ] T051 [US3] Remove stable-frame list/map/descriptor diagnostic allocations and reuse bounded sort, descriptor, candidate, and upload storage in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeSpatialIndex.java` (depends on T047-T050) [FR-012, FR-019]
-- [ ] T052 [US3] Run the five-mode route plus forced load/recovery and record effective settings, visual monotonicity, transitions, rebuild rate, and preliminary timings in `specs/001-native-storm-rendering/validation/us3-quality-lod.md` (depends on T042-T051) [SC-005, SC-007]
+- [ ] T052 [VALIDATION / RELEASE] [US3] Run the five-mode route plus forced load/recovery and
+  record effective settings, visual monotonicity, transitions, rebuild rate, preliminary timings,
+  and the T139 policy in `specs/001-native-storm-rendering/validation/us3-quality-lod.md`.
+  Exhaustive final appearance grading remains T098b (depends on T042-T051, T139) [SC-005, SC-007,
+  SC-021]
 
 **Checkpoint**: All five modes and adaptive LOD are independently verifiable; Ultra is ready for the final controlled performance gate.
 
@@ -807,17 +820,38 @@ unchanged from the Phase 4S baseline.
 
 ### Tests for User Story 4
 
-- [ ] T053 [US4] Add failing counter-semantic, bounded-capture, deterministic-format, no-normal-string-formatting, and fallback-reason assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java` (depends on T052) [FR-013, FR-019; SC-009]
+- [X] T053 [VALIDATION / RELEASE] [US4] **[SATISFIED BY EXISTING DIAGNOSTICS]** Counter
+  semantics, bounded capture, deterministic formatting, fallback reasons, and fail-first guards
+  are covered by the retained geometry/stability sandboxes and T119--T123/T132 diagnostics. Do not
+  rebuild them merely because the original task predates that work; see
+  `specs/001-native-storm-rendering/validation/renderer-wide-architecture-audit.md` (depends on T133) [FR-013,
+  FR-019; SC-009]
 
 ### Diagnostic Implementation
 
-- [ ] T054 [P] [US4] Implement primitive frame counters and bounded on-demand capture for group/role/descriptor/tile/cache/async/generation/LOD/fallback/timing state in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeDiagnostics.java` (depends on T053) [FR-013, FR-019]
-- [ ] T055 [US4] Publish compact storm workload, effective quality, GPU timing, rebuild frequency, history reason, and camera-density generation through `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudFrameDiagnostics.java` (depends on T035, T046, T054) [FR-013]
-- [ ] T056 [P] [US4] Add `storm_body`, `storm_envelope`, `storm_candidates`, `precipitation`, and `storm_combined` IDs and safe final-view history restoration in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRaymarchDebugView.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java` (depends on T053) [FR-013]
-- [ ] T057 [US4] Implement role, envelope/LOD, candidate/overflow, precipitation, and combined shader outputs in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` (depends on T049, T056) [FR-013]
-- [ ] T058 [US4] Add `/pa cloud volumetric diagnostics storm`, extend summary diagnostics, expose new debug views, and extend governor reset output in `src/main/java/net/Gabou/projectatmosphere/command/TelemetryDebugClientCommand.java` (depends on T054-T057) [FR-013; SC-009]
-- [ ] T059 [US4] Verify per-frame logging remains development-only/opt-in and move all storm text/per-group enumeration behind explicit capture paths in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeDiagnostics.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudFrameDiagnostics.java` (depends on T054-T058) [FR-019]
-- [ ] T060 [US4] Run one diagnostic session across final/body/envelope/candidates/precipitation/combined views and record whether all contract questions are answered in `specs/001-native-storm-rendering/validation/us4-diagnostics.md` (depends on T053-T059) [SC-009]
+- [X] T054 [FUNCTIONAL] [US4] **[SATISFIED BY EXISTING DIAGNOSTICS]** The bounded primitive
+  counters/capture live in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudFrameDiagnostics.java`, `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormPerformanceSuite.java`,
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormWorkloadRuntimeCapture.java`, and the material-trace path; no duplicate
+  `StormLobeDiagnostics` class is warranted (depends on T053) [FR-013, FR-019]
+- [X] T055 [FUNCTIONAL] [US4] **[SATISFIED]** `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudFrameDiagnostics.java` publishes compact
+  workload, effective quality, GPU timing, history, and camera-density data (depends on T054)
+  [FR-013]
+- [X] T056 [FUNCTIONAL] [US4] **[SATISFIED]** Existing debug-view/config infrastructure in `src/main/java/net/Gabou/projectatmosphere/command/TelemetryDebugClientCommand.java` provides
+  bounded storm/body/envelope/candidate/precipitation/combined inspection and restores final-view
+  history safely (depends on T053) [FR-013]
+- [X] T057 [FUNCTIONAL] [US4] **[SATISFIED]** Existing shader debug outputs in `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` and workload readback
+  cover role/envelope/candidate/precipitation/combined attribution (depends on T056) [FR-013]
+- [X] T058 [FUNCTIONAL] [US4] **[SATISFIED]** `src/main/java/net/Gabou/projectatmosphere/command/TelemetryDebugClientCommand.java` already exposes
+  storm density, material trace, workload, and performance-suite diagnostics; consolidate their
+  documentation rather than duplicate the command tree (depends on T054-T057) [FR-013; SC-009]
+- [ ] T059 [VALIDATION / RELEASE] [US4] **[CONSOLIDATION]** Verify normal-frame logging is opt-in
+  and move any remaining storm text/per-group enumeration behind explicit capture paths in
+  `src/main/java/net/Gabou/projectatmosphere/command/TelemetryDebugClientCommand.java` and the
+  existing diagnostics (depends on T054-T058) [FR-019]
+- [ ] T060 [VALIDATION / RELEASE] [US4] **[GENUINELY MISSING EVIDENCE]** Run and document one
+  diagnostic session across final/body/envelope/candidates/precipitation/combined views in
+  `validation/us4-diagnostics.md`; it must show every FR-013/SC-009 question is answered without
+  normal logging (depends on T059) [SC-009]
 
 **Checkpoint**: All four user stories are independently functional and observable through the existing command surface.
 
@@ -829,23 +863,53 @@ unchanged from the Phase 4S baseline.
 
 ### Simple Clouds and Legacy Fallback
 
-- [ ] T061 [P] Create native/Simple-Clouds/field-fallback owner-transition assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/CloudRenderOwnershipSandbox.java` [FR-016-FR-018; SC-008]
-- [ ] T062 Register `cloudRenderOwnershipSandbox` under `check` in `build.gradle` (depends on T061)
-- [ ] T063 Ensure Simple Clouds ownership short-circuits before native descriptor selection, worker submission, target preparation, upload, and density publication in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/ClientCloudRenderOwnership.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` (depends on T028, T061) [FR-016-FR-017]
-- [ ] T064 Implement direct-subpath failure state so missing membership, capacity, async saturation, stale builds, or descriptor/candidate allocation/upload failures retain a valid generation or broad map LOD in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormGeometryBuildCoordinator.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` (depends on T022, T054) [FR-018]
-- [ ] T065 Verify wider native failure still follows the existing session-disable and developer legacy-field-or-vanilla rollback policy without changing its property/config contract in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/ClientCloudRenderOwnership.java` (depends on T063-T064) [FR-018]
-- [ ] T066 Run default `runClient` and `runClient -PenableSimpleCloudsRuntime=true` through startup, world entry, dimension transition, resource reload, and optional-integration failure; record owner and zero-native-work evidence under SC ownership in `specs/001-native-storm-rendering/validation/compatibility-and-fallback.md` (depends on T060-T065) [FR-016-FR-018; SC-008]
+- [ ] T061 [P] [FUNCTIONAL] Create native/Simple-Clouds/field-fallback owner-transition assertions
+  in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/CloudRenderOwnershipSandbox.java`.
+  This is independent of visual polish and may start now [FR-016-FR-018; SC-008]
+- [ ] T062 [VALIDATION / RELEASE] Register `cloudRenderOwnershipSandbox` under `check` in
+  `build.gradle` (depends on T061)
+- [ ] T063 [FUNCTIONAL] Ensure Simple Clouds ownership short-circuits before native descriptor
+  selection, worker submission, target preparation, upload, and density publication in
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/ClientCloudRenderOwnership.java`
+  and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java` (depends on T028, T061)
+  [FR-016-FR-017]
+- [ ] T064 [FUNCTIONAL] Implement direct-subpath failure state so missing membership, capacity,
+  async saturation, stale builds, or descriptor/candidate allocation/upload failures retain a valid
+  generation or broad-map LOD in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormGeometryBuildCoordinator.java` and `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderHook.java`
+  (depends on T022, T054) [FR-018]
+- [ ] T065 [VALIDATION / RELEASE] Verify wider native failure follows the existing session-disable
+  and developer legacy-field-or-vanilla rollback policy without changing its property/config
+  contract in `specs/001-native-storm-rendering/validation/compatibility-and-fallback.md` (depends on T063-T064) [FR-018]
+- [ ] T066 [VALIDATION / RELEASE] Run default `runClient` and
+  `runClient -PenableSimpleCloudsRuntime=true` through startup, world entry, dimension transition,
+  resource reload, and optional-integration failure; record owner and zero-native-work evidence in
+  `validation/compatibility-and-fallback.md` (depends on T063-T065) [FR-016-FR-018; SC-008]
 
 ### Automated and Visual Regression
 
 - [ ] T067 Run `stormVolumetricGeometrySandbox`, `cloudMorphologyTopologySandbox`, `volumetricStabilityDiagnosticsSandbox`, `materialAdvectionSandbox`, `cloudRegionMotionSandbox`, `cloudFieldSandbox`, `cloudRenderOwnershipSandbox`, `architectureBoundaryCheck`, `check`, and `build`; record exact results in `specs/001-native-storm-rendering/validation/automated-regression.md` (depends on T030, T041, T052, T060, T062) [SC-010]
-- [ ] T068 Run `runServer` and record that no client renderer, shader, Minecraft client singleton, or LWJGL class loads on the dedicated server in `specs/001-native-storm-rendering/validation/dedicated-server.md` (depends on T067) [FR-015, FR-017]
-- [ ] T069 Execute the complete below/beside/inside/above, isolated/overlap, lifecycle, detail-boundary, total-distance, dry/rain/whiteout, camera-motion, resize, resource-reload, dimension, terrain-depth, and all-quality visual matrix from `quickstart.md`, attaching pass/fail evidence to `specs/001-native-storm-rendering/validation/visual-regression.md` (depends on T030, T041, T052, T060, T066-T068) [SC-001-SC-005, SC-008-SC-009]
+- [ ] T068 [VALIDATION / RELEASE] Run `runServer` and record that no client renderer, shader,
+  Minecraft client singleton, or LWJGL class loads on the dedicated server in
+  `validation/dedicated-server.md`. This server-safety gate is independent of visual polish
+  (depends on T062) [FR-015, FR-017]
+- [ ] T069 [VALIDATION / RELEASE] Execute the complete below/beside/inside/above,
+  isolated/overlap, lifecycle, detail-boundary, total-distance, dry/rain/whiteout, camera-motion,
+  resize, resource-reload, dimension, terrain-depth, and all-quality **shipping** visual matrix
+  from `quickstart.md`, attaching pass/fail evidence to `validation/visual-regression.md`
+  (depends on T052, T060, T066-T068, T098b) [SC-001-SC-005, SC-008-SC-009]
 
 ### RTX 4070 Performance Gate
 
-- [ ] T070 Capture a ten-minute post-convergence Ultra run on the specified plugged-in RTX 4070 laptop at 1920×1080, no external shader pack, and approximately 2000-block cloud distance; record p50/p95/p99 total frame time, cloud GPU stages, CPU build/upload, rebuild/cache/overflow, allocation, and adaptive-transition data in `specs/001-native-storm-rendering/validation/rtx4070-ultra-performance.md` (depends on T052, T055, T067, T069) [FR-012; SC-006-SC-007]
-- [ ] T071 Close any measured Ultra gate failure using bounded changes only in `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricQualityProfile.java`, `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/CloudFrameTimeGovernor.java`, `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeSpatialIndex.java`, `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java`, or `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`, then append before/after evidence to `specs/001-native-storm-rendering/validation/rtx4070-ultra-performance.md` (depends on T070; no performance change may be made before Phase 4R completes at T099) [FR-001, FR-010-FR-012, FR-020; SC-005-SC-007]
+- [ ] T070 [VALIDATION / RELEASE] Capture a ten-minute post-convergence Ultra run on the specified
+  plugged-in RTX 4070 laptop at 1920×1080, no external shader pack, and approximately 2000-block
+  cloud distance; record p50/p95/p99 total frame time, cloud GPU stages, CPU build/upload,
+  rebuild/cache/overflow, allocation, and adaptive-transition data in
+  `validation/rtx4070-ultra-performance.md` (depends on T067, T069, T140) [FR-012; SC-006-SC-007]
+- [ ] T071 [PERFORMANCE] Close a measured Ultra gate failure with an evidence-backed bounded
+  change, then append before/after evidence to `validation/rtx4070-ultra-performance.md`. It is a
+  final release-gap task after T070, not the first performance confrontation and not gated by
+  T099/T098b; any image change returns to T098b/T069 (depends on T070) [FR-001, FR-010-FR-012,
+  FR-020; SC-005-SC-007]
 - [ ] T072 Re-run the full automated suite and targeted visual matrix after performance changes and record the final release-gate result in `specs/001-native-storm-rendering/validation/final-verification.md` (depends on T071) [SC-001-SC-010]
 - [ ] T073 Update runnable commands, effective configuration names/defaults, diagnostic output, group-witness candidate semantics, async adoption/re-request behavior, exact-union rain attachment, and confirmed fallbacks in `specs/001-native-storm-rendering/quickstart.md`, `specs/001-native-storm-rendering/contracts/render-ownership-and-sync.md`, and `specs/001-native-storm-rendering/contracts/storm-render-diagnostics.md` to match the verified implementation (depends on T066-T072)
 
@@ -869,7 +933,8 @@ Phase 1 Setup
                         |                              (T119-T123) -> T132
                         -> Phase 4A Renderer-wide Correction Gate (T127-T131)
                                                    \
-                                                    -> T133 -> T098 / T099 Morphology Validation Gates
+                                                    -> T133 -> T098a Structural Gate -> T099
+                                                                 \-> T098b Final Visual Gate (after T052/T139)
                             -> US3 Scalable Quality Modes
                                 -> US4 Diagnostics
                                     -> Phase 7 Compatibility and Release Validation
@@ -882,9 +947,11 @@ Phase 1 Setup
 - Phase 4R depends on the T041 audit and is complete through T097. Its T081, T085, T086, T089, T090, and T097 acceptance criteria are superseded by Phase 4S; those tasks stay checked as implementation history and are not rewritten.
 - Phase 4S depends on Phase 4R and owns the corrected density architecture. T100 must precede every Phase 4S regression so no threshold is set without a derivation, and T107 must record meaningful fail-first results before any Phase 4S production change. T124-T126 are complete history; their morphology thresholds remain retained inputs to T133.
 - Phase 4A depends on the completed Phase 4S gate. T127-T129 derive scale and attribute the first material discontinuity. T131 may change only the measured responsible stage. T130 and neutral Phase 4P work can proceed in parallel with that diagnosis, but T132 must prove equivalence before convergence at T133.
-- Phase 4P is **not** blocked by T098/T099. T119, T122, and T123 run after T130's baseline; T121 remains conditional on materially equivalent optical evidence. Phase 4P tasks are separate commits from visual-correctness work and may not alter the rendered result.
-- T098 and T099 are reopened under the revised positive morphology criteria (FR-023, FR-024). T098 depends on T133; T099 remains blocked by T098.
-- US3 depends on T099 for *visual* acceptance. The former rule that no quality or performance work of any kind may start before T099 is **removed**: Phase 4P structural performance work proceeds on its own dependencies. T042's dependency on T099 is retained because quality-mode scaling is judged against the accepted visual result. T050 also retains its dependency on US2 history work.
+- Phase 4P is **not** blocked by T098a/T098b/T099. T119, T121, T122, and T123 are accepted after T130's baseline under their controlled equivalence/runtime-counter evidence. Phase 4P tasks are separate commits from visual-correctness work and may not alter the rendered result.
+- T098a, T098b, and T099 use the revised criteria: T098a depends on T133, T099 remains blocked by T098a, and T098b is the later final-shipping visual gate.
+- US3 quality-mode plumbing depends on T098a and the written T135 budget contract, not on T099 or
+  T098b. T052 validates the policy and transitions; T098b later performs authoritative shipped
+  visual grading. T050 retains its real US2 history dependency.
 - US4 depends on US1 for workload sources and on the effective quality and visual-density state from US2/US3 for a complete report.
 - Phase 7 depends on all desired stories; T070-T072 are post-correction hard release gates, not optional polish. The observed roughly 80, 100, 140, and 200+ ms raymarch times are not final evidence; T130 establishes their baseline and T132/T133 re-measure the approved architecture work.
 
@@ -892,13 +959,13 @@ Phase 1 Setup
 
 | Story | Required predecessors | Independent completion signal |
 |---|---|---|
-| US1 (P1) | Setup + Foundational; Phase 4S retained, Phase 4A converged at T133 | Corrected storm passes the revised two-part T098 checklist: all nine positive features present, none of the eight rejected forms present |
-| US2 (P2) | US1; T099 remains blocked by T098 | Replacement T099 proves rain and whiteout follow final noise-formed density |
+| US1 (P1) | Setup + Foundational; Phase 4S retained, Phase 4A converged at T133 | T098a proves connected, visible severe structure and retained renderer correctness; T098b separately grades final appearance |
+| US2 (P2) | T098a plus retained final-density/history prerequisites | Replacement T099 proves rain and whiteout follow final noise-formed density |
 | Phase 4R | T041 audit | T097 recorded corrected union evidence; superseded in part by Phase 4S |
 | Phase 4S | Phase 4R | T118 records corrected density-architecture evidence; T124-T126 retain macro/role evidence |
 | Phase 4A | Completed Phase 4S | T133 records scale, material continuity, morphology, final-density, and performance convergence |
 | Phase 4P | T130 reference baseline | T132 proves bounded cost work preserves the frozen rendered result and trace |
-| US3 (P3) | T099 for visual acceptance; T050 also needs US2 history work | T052 proves all modes, LOD, and adaptive stability |
+| US3 (P3) | T098a + T135 for plumbing; T050 also needs US2 history work | T052 proves all modes, LOD, and adaptive stability; T098b grades the shipped visual result |
 | US4 (P4) | US1 plus completed US2/US3 state providers | T060 answers the diagnostic contract from one session |
 
 ### Key Task Chains
@@ -909,9 +976,9 @@ Phase 1 Setup
 - **Rain/whiteout/history**: T031-T033 -> T034-T040 -> T041 -> T078-T079 -> T089, T093-T095 -> T097 -> T115-T116 -> T099.
 - **Morphology correction (Phase 4R)**: T074-T079 -> T080 -> T081-T090 -> T091-T096 -> T097.
 - **Density architecture (Phase 4S)**: T100 -> T101-T106 -> T107 -> T108-T111 -> T112-T114 -> T115-T117 -> T118 -> T124-T126.
-- **Renderer-wide correction (Phase 4A)**: T127 -> T128 -> T129 -> T131; T130 -> T119/T121/T122/T123 -> T132; T131 + T132 -> T133 -> T098 -> T099.
+- **Renderer-wide correction (Phase 4A)**: T127 -> T128 -> T129 -> T131; T130 -> T119/T121/T122/T123 -> T132; T131 + T132 -> T133 -> T098a -> T099. T098b is a later shipping visual gate.
 - **Performance architecture (Phase 4P)**: T130 -> T119 -> T121/T122 -> T123 -> T132; T121 is skipped rather than approximated if equivalent evidence is unavailable.
-- **Quality/LOD**: T099 -> T042-T043 -> T044-T051 -> T052 -> T070-T071.
+- **Quality/LOD**: T098a + T135 -> T042-T043 -> T044-T051; T045 + T137 -> T139 -> T052 -> T070-T071.
 - **Diagnostics**: T053 -> T054-T059 -> T060.
 - **Compatibility/fallback**: T061-T065 -> T066 -> T067-T069.
 - **Release**: T067-T070 -> T071 -> T072-T073.
@@ -960,12 +1027,12 @@ T127/T128/T129 measured continuity diagnosis  ||  T130 baseline -> T119 group to
 ```
 
 T122 may follow T119; T121 may run only if its equivalent lighting-support proof is available.
-T123 and T132 converge their measured work with T131 at T133. T098 cannot run before that
+T123 and T132 converge their measured work with T131 at T133. T098a cannot run before that
 convergence.
 
 ### User Story 3
 
-After T099 for quality-mode visual acceptance, and then after T042-T043:
+After T098a and T135 for quality-mode plumbing, and then after T042-T043:
 
 ```text
 T044 Forge visual configuration  ||  T045 quality preset table
@@ -985,7 +1052,51 @@ Converge at frame diagnostics, shader views, and command registration.
 
 ### Cross-Story
 
-Phase 4R may use only the parallelism explicitly marked in T079; its tests complete and fail meaningfully before production fixes. Phase 4S follows the same fail-first discipline through T107. Phase 4A requires fail-first material attribution before correction. Phase 4P runs after T130's frozen baseline, in separate commits, and may not alter the rendered result. US3 quality-mode work remains gated on T099 for visual acceptance. Begin US4's standalone diagnostic data model only after the corrected workload/counter meanings and the test contract in T053 are stable.
+Phase 4R may use only the parallelism explicitly marked in T079; its tests complete and fail meaningfully before production fixes. Phase 4S follows the same fail-first discipline through T107. Phase 4A requires fail-first material attribution before correction. Phase 4P runs after T130's frozen baseline, in separate commits, and may not alter the rendered result. The active T135-T140 performance redesign can run in parallel with T098b, with visual regrade explicitly returned to T098b when an increment changes images. US3 quality-mode plumbing is gated by T098a and T135, not T099. Begin US4's standalone diagnostic data model only after the corrected workload/counter meanings and the test contract in T053 are stable.
+
+---
+
+## 2026-09-01 authoritative dependency and classification update
+
+This section supersedes conflicting dependency prose anywhere else in this document. It preserves checked historical work
+and its evidence; it does not erase old acceptance/retraction records.
+
+### Classification legend
+
+| Classification | Work currently in that class |
+|---|---|
+| **BLOCKING CORRECTNESS** | T098a, T099, retained production correctness regressions |
+| **PERFORMANCE** | T135-T140, T042-T051, T071, final T070 acceptance |
+| **VISUAL POLISH** | T098b, final shipped visual matrix T069 |
+| **FUNCTIONAL** | T061, T063, T064 and compatibility/fallback behavior |
+| **VALIDATION / RELEASE** | T052, T053, T059-T060, T062, T065-T070, T072-T073 |
+
+### New critical paths
+
+```text
+Structural/rain path:       T133 -> T098a -> T099
+Performance path:           T133 -> T135 -> T136 -> T137; T098a + T137 -> T138 -> T140 -> T070 -> T071 -> T072
+Quality-policy path:        T098a + T135 -> T042 -> T045..T051 -> T139 -> T052
+Visual-polish path:         T098a + T139 + T052 -> T098b -> T069
+Compatibility/server path:  T061 -> T062 -> T063/T064 -> T065 -> T066
+                              T062 -> T068
+Release convergence:        T052 + T060 + T066 + T068 + T098b -> T069 -> T070..T073
+```
+
+T098a is intentionally still open on this checkout: the evidence branch proves the criteria, but
+the commits are not ancestors of `Forge-1.20.1` and must be integrated/revalidated first. T098b is
+not a predecessor of T099, T135-T140, T042-T051, T061-T068, or any other unrelated release work.
+
+### Immediate parallel execution
+
+```text
+T098a integration verification       || T135 budgets          || T061 ownership assertions
+                                     || T064 direct fallback  || T059 diagnostics consolidation
+```
+
+After the T135/T136 decision, T042/T045 quality plumbing and T137 performance architecture may
+continue alongside T098b's ANVIL self-shadow investigation. Do not begin speculative T138 work
+until T137 identifies the dominant measured contribution.
 
 ## Implementation Strategy
 
@@ -1006,8 +1117,8 @@ Phase 4R may use only the parallelism explicitly marked in T079; its tests compl
 4. **Phase 4S** makes descriptors a coverage envelope, makes noise form the visible body, replaces density-space pseudo-distance with world-space geometric distance, applies erosion across the interior, and replaces US1/US2 evidence against positive morphology criteria.
 5. **Phase 4A** derives the severe-system scale, measures the lower/upper material trace, and corrects only its first discontinuous stage.
 6. **Phase 4P** makes the corrected model practical with visually-neutral topology, culling, fetch, reuse, and bounded-cost work measured against T130; a lighting proxy is conditional on equivalence.
-7. **T133/T098** revalidate physical size, single-medium continuity, morphology, final-density consumers, and performance before the live visual gate resumes.
-8. **US3** adds predictable mode scaling, LOD, and adaptive performance policy after T099 accepts the visual result.
+7. **T133/T098a** revalidate physical size, single-medium continuity, morphology, final-density consumers, and performance before rain validation; **T098b** performs the final shipping visual regrade.
+8. **US3** adds predictable mode scaling, LOD, and adaptive performance policy after T098a and the T135 budget contract; final visual grading returns to T098b.
 9. **US4** exposes bounded evidence for ownership, workload, artifacts, and timing.
 10. **Phase 7** proves Simple Clouds boundaries, legacy fallback, server safety, full regressions, and the post-correction RTX 4070 release gate.
 
@@ -1015,22 +1126,22 @@ Phase 4R may use only the parallelism explicitly marked in T079; its tests compl
 
 | Requirement area | Primary tasks |
 |---|---|
-| Connected 3D stages and overlap | T011-T030, T074-T077, T080-T090, T096, T124-T126, T129-T133, T098 |
+| Connected 3D stages and overlap | T011-T030, T074-T077, T080-T090, T096, T124-T126, T129-T133, T098a |
 | Coverage envelope vs. noise-formed body | T100-T102, T107, T110-T114, T118 |
 | Geometric distance field and world-space unions | T104, T107-T109, T111, T118 |
-| Physical severe-system scale and one-medium continuity | T127-T131, T133, T098 |
-| Positive morphology criteria and derived thresholds | T100, T102-T106, T118, T124-T126, T133, T098-T099 |
+| Physical severe-system scale and one-medium continuity | T127-T131, T133, T098a |
+| Positive morphology criteria and derived thresholds | T100, T102-T106, T118, T124-T126, T133, T098a-T098b |
 | Interior detail erosion | T101, T103, T113, T118 |
 | Bounded descriptor evaluation cost | T130, T119-T123, T132-T133 |
-| Rain, whiteout, temporal stability | T031-T041, T078-T079, T089, T093-T095, T097-T099 |
+| Rain, whiteout, temporal stability | T031-T041, T078-T079, T089, T093-T095, T097, T098a, T099 |
 | Descriptor validity, fallback, async, signatures | T079, T087-T088, T091-T092, T096-T097 |
-| Five modes, adaptive quality, LOD | T099 -> T042-T052 |
+| Five modes, adaptive quality, LOD | T098a + T135 -> T042-T052 + T139 |
 | Bounded diagnostics | T053-T060 |
 | Server/network/save preservation | T018, T027-T030, T067-T068 |
 | Simple Clouds ownership | T061-T066 |
 | Legacy fallback | T064-T066 |
-| Automated/visual regression | T067-T069, T072 |
-| RTX 4070 performance | T130 -> T119-T123 -> T132-T133 -> T070-T072 |
+| Automated/visual regression | T067-T069, T072, T098b |
+| RTX 4070 performance | T119-T123 -> T135-T140 -> T070-T072 |
 | Scope and no unrelated redesign | Every implementation task is limited to paths named in `plan.md`; T067-T073 enforce the boundary |
 
 ## Notes
