@@ -174,6 +174,34 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
+**T098 2026-09-01: ANVIL investigation returns CASE C - the contrast is lost in integration, not in
+the density field. No production change. Task stays OPEN.** The premise that the anvil's density is
+uniform is false. Measured over five deterministic realizations of the T134 severe fixture, interior
+only: ANVIL `finalDensity` mean 0.4186, p05 0.0234, p95 0.7726, **CV 0.589** - higher than CORE
+(0.460) and TOWER (0.512) - with a 0.0106/block mean gradient, 3.64% true zeros and **0.00% of
+samples at or above 0.99**. Nothing clamps; the saturation is optical, not numerical. The decisive
+measurement is the unlit accumulated alpha, marched with production step, extinction and
+transmittance floor and **no lighting at all**: density CV 0.589 in, **alpha CV 0.0000 out**, variance
+**0.000000**, 100% of SIDE rays above 0.97. A ray reaches the transmittance floor after **74.8
+blocks** of a **1015-block** anvil chord, so the visible skin is **7.4%** of the crossing and 93% of
+the density variation cannot reach the image; the field's zeros are too sparse (3.6%) and too small
+(40-block correlation) for any ray to find a clear path. Scaling optical depth with the field held
+fixed shows the anvil is **8x to 30x** too thick for its existing structure to show: at 0.25x the
+alpha CV is still 0.0009 and 99.93% of rays exceed 0.97. Two upstream terms explain why the field has
+no holes, and both are handed to the next investigation rather than changed here: the ANVIL coverage
+envelope is a **plateau, CV 0.078**, which gives `stormBody` a floor near 0.10 so the body reaches
+zero in 0.00% of the interior; and `detailFbm` has **CV 0.156** spanning only 0.356-0.607, so erosion
+is a near-constant 0.22 offset rather than a texture (mean erosion 0.2295/0.2297/0.2298 across ANVIL/
+BASE/CORE - a DC term). The detail hierarchy is also mis-scaled: decorrelation is **8 blocks** for
+`detailFbm` against a 1015-block anvil, about 1.8 output pixels at the SIDE pose, below the
+reconstruction lattice - but that is downstream of the saturation and cannot help while alpha is 1.0
+everywhere. **Stair-step banding measured and classified separately**: dominant period is **4.00 px at
+both SIDE (1.7x) and FAR (2.6x)** while the block period changes 17.7 -> 28.8, so it is screen-space,
+and 1600/1200 = 900/675 = 4:3 makes it the upscale beat - **class E, reconstruction**, unrelated to the
+anvil density. Per CASE C no candidate arm was implemented and PHASES 11-12 were not entered.
+`./gradlew check` and `./gradlew build` pass. Evidence in
+`validation/t098-anvil-surface-structure.md`.
+
 **T098 2026-09-01: second divergence fixed; the connecting column now renders on 5/5 fresh
 fixtures, and the remaining failure is the anvil body, not the marcher. Task stays OPEN.** The
 promotion state machine kept fine marching alive on geometry alone: `sinceHit` was reset by the
