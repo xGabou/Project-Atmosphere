@@ -174,6 +174,35 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
+**T098 2026-09-01: second divergence fixed; the connecting column now renders on 5/5 fresh
+fixtures, and the remaining failure is the anvil body, not the marcher. Task stays OPEN.** The
+promotion state machine kept fine marching alive on geometry alone: `sinceHit` was reset by the
+conservative descriptor probe, never required `cloudDensity > 0`, and the probe re-fired every sixth
+iteration while the ray was still inside the same clearance, so every iteration advanced exactly one
+fine step. The geometric envelope reach and the density-support reach are far apart - `stormBody` is
+a remap that correctly maps a low envelope to nothing over most of the envelope - so waist rays spent
+a mean of 66 of 128 iterations and 166 blocks crossing envelope that carries no material, and 3 of 6
+traced waist rays hit the cap, one at alpha 0.446. The missing distinction was not "bound versus
+material" but **sampling at fine resolution versus spending a march iteration per sample**;
+MAX_STEPS bounds iterations, not density evaluations. The marcher now probes forward on exactly the
+lattice the fine march would have sampled, inside one iteration, bounded by PA_EMPTY_SPAN_PROBES=16.
+Same samples, so nothing the fine march would have found is missed. Measured offline against a
+one-block reference over nine rays: shipped policy 701 empty fine iterations, 2/9 rays never reaching
+material, 4/9 step-capped; corrected 23, 0/9, 0/9, with **0 false negatives**, material entry error
+**0.00 blocks** and converged alpha error **0.00000** against a 384-iteration truth arm of the old
+policy. The `bisectOnly` control - drop the promotion and trust the bracket refinement alone - skips
+material on every ray and is retained in the guard to show why the promotion cannot simply be
+removed. Live: WAIST 128 iterations/step_cap/alpha 0.075-0.63 becomes 65 iterations/transmittance
+floor/alpha 0.98730, with ray identity proved. Campaign over five fresh severe fixtures: centre-column
+cloud share **1.0000**, longest inner sky run **0 px**, zero step caps on all fifteen traced rays.
+Cost is honest and up: +3.5% to +42% cloud-pass GPU time, because the old policy was cheap by giving
+up before integrating the storm; against an equal-quality baseline the scan is ~5% more density
+evaluations for a third of the iterations. Guarded by `validateT098PromotionBudget`, fail-first on
+three grounds. **T098 still FAILS**: FR-023 #9 now passes, but the anvil renders as a large smooth
+balloon with uniform interior density, failing FR-024 #1 and #2 and taking FR-023 #3/#4/#6/#7/#8 with
+it. That is independent of the marcher and no hypothesis is opened for it here. Evidence in
+`validation/t098-promotion-budget.md`.
+
 **T098 2026-08-31: first production divergence isolated and corrected; the loss was the depth
 sentinel, not the march or cloudDensity. Task stays OPEN.** A production ray trace now instruments
 the real march in place - one ray fixed by NDC, every fragment of the pass marching that ray, column
