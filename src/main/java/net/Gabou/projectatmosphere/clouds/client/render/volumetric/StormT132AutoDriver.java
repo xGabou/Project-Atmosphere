@@ -42,6 +42,14 @@ import java.util.regex.Pattern;
  */
 final class StormT132AutoDriver {
     private static final Path MARKER = Path.of("t132-autorun.txt");
+    /**
+     * T098 production ray trace marker. When present the run goes straight
+     * from a matured fixture to the SIDE ray trace and then to the T098
+     * captures, skipping the T132 performance suite and the T128 centre-line
+     * trace, neither of which the ray-trace investigation consumes. Absent,
+     * the run is exactly the established T132/T133 sequence.
+     */
+    private static final Path RAYTRACE_MARKER = Path.of("t098-raytrace.txt");
     private static final Pattern BASE_TOP =
             Pattern.compile("baseTop=(-?[0-9.]+)\\.\\.(-?[0-9.]+)");
 
@@ -63,7 +71,9 @@ final class StormT132AutoDriver {
     private enum Phase {
         IDLE, BOOTSTRAP_PREPARE, BOOTSTRAP_WAIT_SOURCE, BOOTSTRAP_UNLOAD_SOURCE,
         BOOTSTRAP_RESTORE, BOOTSTRAP_WAIT_RESTORED, WAIT_WORLD, SPAWN_STORM, WAIT_ADOPT, WAIT_MATURE, BEGIN_SUITE, POLL_SUITE,
-        BEGIN_TRACE, POLL_TRACE, BEGIN_T098, POLL_T098, DONE
+        BEGIN_TRACE, POLL_TRACE,
+        RAYTRACE_FIXTURE,
+        BEGIN_T098, POLL_T098, DONE
     }
 
     private static Phase phase = Phase.IDLE;
@@ -125,6 +135,10 @@ final class StormT132AutoDriver {
         }
     }
 
+    private static boolean rayTraceRunRequested() {
+        return Files.exists(RAYTRACE_MARKER);
+    }
+
     private static void tickInWorld(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
         if (player == null || player.connection == null) {
@@ -179,12 +193,12 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "T132_AUTORUN storm mature: topologyGeneration={} stable for {} frames",
                             generation, stableGenerationFrames);
-                    advance(Phase.BEGIN_SUITE);
+                    advance(rayTraceRunRequested() ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
                 if (stageFrames > MATURE_TIMEOUT_FRAMES) {
                     ProjectAtmosphere.LOGGER.info(
                             "T132_AUTORUN storm never matured; proceeding at generation {}", generation);
-                    advance(Phase.BEGIN_SUITE);
+                    advance(rayTraceRunRequested() ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
             }
             case BEGIN_SUITE -> {
@@ -253,6 +267,22 @@ final class StormT132AutoDriver {
                     advance(Phase.BEGIN_T098);
                 } else if (stageFrames > STAGE_TIMEOUT_FRAMES) {
                     finish("trace_timeout:" + latest);
+                }
+            }
+            case RAYTRACE_FIXTURE -> {
+                // The ray trace addresses the storm by its published geometry,
+                // so it needs the same resolved fixture the captures use. This
+                // resolves it without running the timing suite; the trace
+                // itself is taken inside the capture set, at the capture pose
+                // and the capture render target, so the traced ray and the
+                // captured frame cannot differ in configuration.
+                String begun = VolumetricCloudFrameDiagnostics.beginStormPerformanceBaseline(
+                        player.getX(), player.getY(), player.getZ());
+                if (StormPerformanceBaseline.suiteFixture() != null) {
+                    ProjectAtmosphere.LOGGER.info("T098_RAYTRACE fixture resolved: {}", begun);
+                    advance(Phase.BEGIN_T098);
+                } else if (stageFrames > ADOPT_TIMEOUT_FRAMES) {
+                    finish("raytrace_fixture_failed:" + begun);
                 }
             }
             case BEGIN_T098 -> {

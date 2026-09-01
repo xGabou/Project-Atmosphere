@@ -74,11 +74,131 @@ public final class StormVolumetricGeometrySandbox {
         reportT098WebbingExcess();
         reportT098MarchSimulation();
         validateT098MarchReachesMaterial();
+        validateT098CloudHitDepthNeverSaturates();
         if (Boolean.getBoolean("phase4r.failFirst")) {
             runPhase4RFailFirst();
         } else {
             runPhase4RCorrected();
         }
+    }
+
+
+    /**
+     * T098 defect boundary: a cloud HIT must never publish the composite's
+     * "no cloud" depth sentinel.
+     *
+     * <p>Measured on the live SIDE waist ray with the production ray trace: the
+     * march integrated alpha 0.63 over material whose alpha-weighted
+     * representative point sat 912 blocks away, while the cloud pass was drawn
+     * with the scene projection whose far plane is 768.24 blocks. {@code
+     * depthAt} clamps to [0, 1], so that representative point published depth
+     * exactly 1.0. {@code cloud_field_composite.fsh} reads a cloud texel as
+     * carrying no cloud when its depth is not below 1.0 - {@code hasDepth =
+     * depths[i] < 1.0}, then {@code selectedDepth >= 1.0} discards - so every
+     * bit of that alpha was thrown away and the storm rendered as clear sky.
+     * The BASE and ANVIL controls on the same frame sat at 736 and 665.5
+     * blocks, inside the far plane, published 0.99999416 and 0.99998683, and
+     * were composited normally.
+     *
+     * <p>The volume is marched to MaxRenderDistance, which is a cloud setting
+     * unrelated to the scene frustum, so this is not an exotic case: it is
+     * every storm whose material centroid lies past the render distance. This
+     * check sweeps representative distances across the far plane for several
+     * render distances and requires that a hit is always composited. The old
+     * expression is evaluated alongside and must fail the same sweep, so the
+     * regression cannot silently pass on the behaviour it was written for.
+     */
+    private static void validateT098CloudHitDepthNeverSaturates() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String constantKey = "const float PA_CLOUD_HIT_MAX_DEPTH = ";
+        int constantAt = shader.indexOf(constantKey);
+        require(constantAt >= 0, "PA_CLOUD_HIT_MAX_DEPTH is missing from the production shader");
+        float hitMaxDepth = Float.parseFloat(shader.substring(
+                constantAt + constantKey.length(), shader.indexOf(';', constantAt)).trim());
+        require(hitMaxDepth < 1.0F,
+                "PA_CLOUD_HIT_MAX_DEPTH must be below the composite's 1.0 miss sentinel");
+        require(hitMaxDepth >= 0.99999F,
+                "PA_CLOUD_HIT_MAX_DEPTH below 0.99999 would change history depth confidence,"
+                        + " which this correction must leave alone");
+        require(shader.contains("min(depthAt(relRepresentative), PA_CLOUD_HIT_MAX_DEPTH)"),
+                "the cloud hit depth is no longer bounded away from the composite's sentinel");
+
+        // The before/after evidence arm must stay diagnostic-only: production
+        // frames take the corrected bound, never the saturating one.
+        require(shader.contains("PaLegacyHitDepth != 0"),
+                "the T098 legacy-depth evidence arm is no longer gated by its uniform");
+        String shaderJson = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.json");
+        require(shaderJson.contains(
+                        "{ \"name\": \"PaLegacyHitDepth\", \"type\": \"int\", \"count\": 1, \"values\": [ 0 ] }"),
+                "the T098 legacy-depth arm does not default to off");
+        require(!VolumetricCloudDebugConfig.t098LegacyHitDepth(),
+                "the T098 legacy-depth evidence arm is enabled by default");
+
+        String composite = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_field_composite.fsh");
+        require(composite.contains("bool hasDepth = depths[i] < 1.0;")
+                        && composite.contains("selectedDepth >= 1.0"),
+                "the composite no longer treats depth 1.0 as absence of cloud;"
+                        + " this guard's premise must be re-derived");
+
+        long probes = 0L;
+        long correctedDiscards = 0L;
+        long legacyDiscards = 0L;
+        String firstLegacyWitness = "";
+        for (int renderChunks : new int[] {8, 12, 16, 24, 32}) {
+            // Minecraft's own projection far plane for that render distance.
+            float far = renderChunks * 16.0F * 4.0F;
+            float near = 0.05F;
+            for (double representativeT = 32.0D; representativeT <= 2000.0D;
+                    representativeT += 0.5D) {
+                // A view-axis point at this distance, through the standard
+                // OpenGL perspective depth mapping the cloud pass inherits.
+                // View space looks down -Z, so a point straight ahead at this
+                // distance has viewZ = -representativeT and clipW = +distance.
+                double clipZ = representativeT * (far + near) / (far - near)
+                        - 2.0D * far * near / (far - near);
+                double clipW = representativeT;
+                double ndcDepth = clipZ / Math.max(Math.abs(clipW), 0.00001D);
+                float clamped = (float) Math.max(0.0D, Math.min(1.0D, ndcDepth * 0.5D + 0.5D));
+                float corrected = Math.min(clamped, hitMaxDepth);
+                probes++;
+                if (clamped >= 1.0F) {
+                    legacyDiscards++;
+                    if (firstLegacyWitness.isEmpty()) {
+                        firstLegacyWitness = "renderChunks=" + renderChunks
+                                + " far=" + far
+                                + " representativeT=" + representativeT
+                                + " legacyDepth=" + clamped;
+                    }
+                }
+                if (corrected >= 1.0F) {
+                    correctedDiscards++;
+                }
+            }
+        }
+        System.out.printf(
+                "T098_HIT_DEPTH|probes=%d|legacyDiscardedHits=%d|correctedDiscardedHits=%d%n",
+                probes, legacyDiscards, correctedDiscards);
+        require(probes > 15_000L, "the hit-depth sweep did not cover enough of the range");
+        require(legacyDiscards > 0L,
+                "the pre-fix expression discarded no hit anywhere in the sweep;"
+                        + " this regression would pass against the behaviour it was written for");
+        System.out.println("T098_HIT_DEPTH_LEGACY_WITNESS|" + firstLegacyWitness);
+        require(correctedDiscards == 0L,
+                "a cloud hit still publishes the composite's miss sentinel in "
+                        + correctedDiscards + " of " + probes + " probes");
+
+        // The correction must not make a cloud visible through terrain. The
+        // composite keeps a texel only when its depth is at or in front of the
+        // scene depth, and that comparison is unchanged by the bound.
+        float sceneDepthInFront = 0.98F;
+        require(hitMaxDepth > sceneDepthInFront,
+                "the bounded cloud depth would draw in front of nearer scene geometry");
+
+        System.out.println(
+                "PHASE4T_RESULT|T098 cloud hit depth never saturates|PASSED|invariant satisfied");
     }
 
     /**

@@ -6,6 +6,15 @@ package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
  * for A/B tests; no simulation, tuning, or generation state reads them.
  */
 public final class VolumetricCloudDebugConfig {
+    /**
+     * T098 evidence arm. When true the cloud pass restores the pre-fix
+     * behaviour in which a hit's depth could saturate to the composite's miss
+     * sentinel. It exists so a before/after image pair can be captured on one
+     * fixture, at one pose, in one run, differing only in the corrected line.
+     * Never enabled by production; the T098 capture set turns it on for its
+     * two comparison shots and clears it immediately after.
+     */
+    private static volatile boolean t098LegacyHitDepth;
     private static volatile boolean depthCompositeEnabled = true;
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
@@ -49,6 +58,14 @@ public final class VolumetricCloudDebugConfig {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
 
     private VolumetricCloudDebugConfig() {
+    }
+
+    public static boolean t098LegacyHitDepth() {
+        return t098LegacyHitDepth;
+    }
+
+    public static void setT098LegacyHitDepth(boolean enabled) {
+        t098LegacyHitDepth = enabled;
     }
 
     public static boolean depthCompositeEnabled() {

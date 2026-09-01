@@ -54,8 +54,15 @@ public final class StormT098CaptureDriver {
     /** Frames to let a respawn and gamemode change land before the first move. */
     private static final int PREPARE_FRAMES = 60;
 
+    /**
+     * Frames the ray trace may occupy before the capture set gives up on it.
+     * The trace itself needs one frame per arm per pixel; this only bounds a
+     * failure.
+     */
+    private static final int RAYTRACE_TIMEOUT_FRAMES = 600;
+
     private enum State {
-        IDLE, PREPARE, MOVE, SETTLE, GRAB, DONE
+        IDLE, PREPARE, MOVE, SETTLE, GRAB, DONE, RAYTRACE
     }
 
     private static State state = State.IDLE;
@@ -70,18 +77,36 @@ public final class StormT098CaptureDriver {
     private static boolean captureModeApplied;
     private static boolean originalHideGui;
     private static int prepareFrames;
+    private static int rayTraceFrames;
 
     private StormT098CaptureDriver() {
     }
 
-    /** One named viewpoint from the T098 checklist. */
+    /**
+     * One named viewpoint from the T098 checklist.
+     *
+     * @param rayTrace when true, the T098 production ray trace runs immediately
+     *                 after this frame is grabbed, at this pose and on this
+     *                 render target, so the trace and the image describe the
+     *                 same rendered pixels.
+     */
     private record Shot(
             String name, double x, double y, double z, String intent,
-            VolumetricCloudRaymarchDebugView view) {
+            VolumetricCloudRaymarchDebugView view, boolean rayTrace,
+            boolean legacyHitDepth) {
         Shot(String name, double x, double y, double z, String intent) {
-            this(name, x, y, z, intent, VolumetricCloudRaymarchDebugView.FINAL);
+            this(name, x, y, z, intent, VolumetricCloudRaymarchDebugView.FINAL, false, false);
         }
 
+        Shot(String name, double x, double y, double z, String intent,
+                VolumetricCloudRaymarchDebugView view) {
+            this(name, x, y, z, intent, view, false, false);
+        }
+
+        Shot(String name, double x, double y, double z, String intent,
+                VolumetricCloudRaymarchDebugView view, boolean rayTrace) {
+            this(name, x, y, z, intent, view, rayTrace, false);
+        }
     }
 
     public static boolean active() {
@@ -216,7 +241,7 @@ public final class StormT098CaptureDriver {
         built.add(new Shot("A_SIDE_CURRENT_ONLY",
                 centreX + radius * 1.7D, midY, centreZ,
                 "raw current-frame march result, history bypassed",
-                VolumetricCloudRaymarchDebugView.CURRENT_ONLY));
+                VolumetricCloudRaymarchDebugView.CURRENT_ONLY, true));
         built.add(new Shot("B_SIDE_HISTORY_ONLY",
                 centreX + radius * 1.7D, midY, centreZ,
                 "temporal history only",
@@ -225,6 +250,27 @@ public final class StormT098CaptureDriver {
                 centreX + radius * 1.7D, midY, centreZ,
                 "history acceptance/rejection classification",
                 VolumetricCloudRaymarchDebugView.HISTORY_REJECTION));
+        // T098 depth-sentinel evidence pair. Same fixture, same poses, same
+        // frame configuration as 2_SIDE and 1_FAR above; the only difference is
+        // that a cloud hit is allowed to publish the composite's miss sentinel
+        // again, as it did before the correction. D/E are therefore the direct
+        // before-images for 2_SIDE and 1_FAR.
+        built.add(new Shot("D_SIDE_LEGACY_HIT_DEPTH",
+                centreX + radius * 1.7D, midY, centreZ,
+                "SIDE with the pre-fix saturating hit depth restored",
+                VolumetricCloudRaymarchDebugView.CURRENT_ONLY, false, true));
+        built.add(new Shot("E_FAR_LEGACY_HIT_DEPTH",
+                centreX + radius * 2.6D, midY, centreZ,
+                "FAR with the pre-fix saturating hit depth restored",
+                VolumetricCloudRaymarchDebugView.CURRENT_ONLY, false, true));
+        built.add(new Shot("F_SIDE_CORRECTED",
+                centreX + radius * 1.7D, midY, centreZ,
+                "SIDE after-image paired with D, identical except for the correction",
+                VolumetricCloudRaymarchDebugView.CURRENT_ONLY));
+        built.add(new Shot("G_FAR_CORRECTED",
+                centreX + radius * 2.6D, midY, centreZ,
+                "FAR after-image paired with E, identical except for the correction",
+                VolumetricCloudRaymarchDebugView.CURRENT_ONLY));
         built.add(new Shot("8_NEAR_EDGE", centreX + radius * 1.12D, baseY + height * 0.55D, centreZ,
                 "fine detail octaves at the outer boundary"));
         return List.copyOf(built);
@@ -294,6 +340,7 @@ public final class StormT098CaptureDriver {
             player.connection.sendCommand("gamemode creative");
         }
         captureModeApplied = false;
+        VolumetricCloudDebugConfig.setT098LegacyHitDepth(false);
         ProjectAtmosphere.LOGGER.info("T098_CAPTURE_MODE restored");
     }
 
@@ -332,6 +379,9 @@ public final class StormT098CaptureDriver {
                 // settle window, not just the grab, or the captured frame is
                 // still the previous stage's.
                 VolumetricCloudDebugConfig.setRaymarchDebugView(shot.view());
+                // Held for the whole settle window, not just the grab, so the
+                // captured frame really is that arm's.
+                VolumetricCloudDebugConfig.setT098LegacyHitDepth(shot.legacyHitDepth());
                 float yaw = yawTo(shot.x(), shot.z(),
                         StormPerformanceBaseline.suiteFixture() == null ? shot.x()
                                 : StormPerformanceBaseline.suiteFixture().centerX(),
@@ -352,6 +402,25 @@ public final class StormT098CaptureDriver {
             }
             case GRAB -> {
                 grab(minecraft, shot);
+                if (shot.rayTrace()) {
+                    // The production ray trace runs here, immediately after the
+                    // frame it explains, at the same pose, the same render
+                    // target and the same debug view. Taking it anywhere else
+                    // lets the traced ray and the captured pixel differ in
+                    // configuration, which is exactly the confusion this
+                    // investigation has to avoid.
+                    String requested = StormProductionRayTrace.requestStormColumn(
+                            minecraft,
+                            StormPerformanceBaseline.suiteFixture(),
+                            shot.name() + '-' + fixtureGroupId.substring(0, 8));
+                    ProjectAtmosphere.LOGGER.info(
+                            "T098_RAYTRACE requested at shot={}: {}", shot.name(), requested);
+                    if (requested.startsWith("acquiring")) {
+                        rayTraceFrames = 0;
+                        state = State.RAYTRACE;
+                        return;
+                    }
+                }
                 shotIndex++;
                 state = shotIndex >= shots.size() ? State.DONE : State.MOVE;
                 if (state == State.DONE) {
@@ -363,6 +432,27 @@ public final class StormT098CaptureDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "T098_CAPTURE_COMPLETE group={} shots={} output={}",
                             fixtureGroupId, shots.size(), outputDirectory.toAbsolutePath());
+                }
+            }
+            case RAYTRACE -> {
+                String latest = StormProductionRayTrace.latest();
+                boolean finished = !StormProductionRayTrace.active();
+                if (finished) {
+                    ProjectAtmosphere.LOGGER.info("T098_RAYTRACE_REPORT\n{}", latest);
+                }
+                if (finished || ++rayTraceFrames > RAYTRACE_TIMEOUT_FRAMES) {
+                    if (!finished) {
+                        ProjectAtmosphere.LOGGER.warn(
+                                "T098_RAYTRACE timed out: {}", latest);
+                    }
+                    shotIndex++;
+                    state = shotIndex >= shots.size() ? State.DONE : State.MOVE;
+                    if (state == State.DONE) {
+                        restoreCaptureMode();
+                        ProjectAtmosphere.LOGGER.info(
+                                "T098_CAPTURE_COMPLETE group={} shots={} output={}",
+                                fixtureGroupId, shots.size(), outputDirectory.toAbsolutePath());
+                    }
                 }
             }
             default -> {
@@ -386,9 +476,11 @@ public final class StormT098CaptureDriver {
             // The checklist wants the density calibration recorded with each
             // frame, taken from the same camera position as the shot.
             ProjectAtmosphere.LOGGER.info(
-                    "T098_CAPTURE_CONTROLS shot={} stepScale={} diagnosticStepBudget={}",
+                    "T098_CAPTURE_CONTROLS shot={} stepScale={} diagnosticStepBudget={}"
+                            + " legacyHitDepth={}",
                     shot.name(), VolumetricCloudRenderer.governorStepScale(),
-                    VolumetricCloudRenderer.diagnosticStepBudget());
+                    VolumetricCloudRenderer.diagnosticStepBudget(),
+                    VolumetricCloudDebugConfig.t098LegacyHitDepth());
             ProjectAtmosphere.LOGGER.info("T098_CAPTURE_DENSITY shot={} {}",
                     shot.name(),
                     StormDensityCalibrationReport.describe(shot.x(), shot.y(), shot.z()));

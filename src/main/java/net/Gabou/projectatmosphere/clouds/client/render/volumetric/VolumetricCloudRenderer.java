@@ -47,6 +47,15 @@ public final class VolumetricCloudRenderer {
     private static boolean denseCameraResolution;
     private static int fragmentTextureUnits = -1;
     private static boolean renderedProductionFrame;
+    /**
+     * The exact transform the last draw uploaded. Diagnostics that must
+     * address a specific rendered pixel project through this rather than
+     * rebuilding a camera matrix that might not match the shader's.
+     */
+    private static final Matrix4f lastCloudProjection = new Matrix4f();
+    private static final Matrix4f lastViewRotation = new Matrix4f();
+    private static final Vector3f lastCameraPosition = new Vector3f();
+    private static boolean lastTransformValid;
     private static VolumetricHistoryValidity.Key previousHistoryKey = VolumetricHistoryValidity.Key.EMPTY;
     private static volatile boolean historyResetBeforeNextComposite;
 
@@ -146,6 +155,55 @@ public final class VolumetricCloudRenderer {
     }
 
     /** Immutable values from the most recent successful shader upload. */
+    /** True once a cloud draw has uploaded a transform this session. */
+    public static boolean lastTransformValid() {
+        return lastTransformValid;
+    }
+
+    /**
+     * Projects a world position to the normalized device coordinates the cloud
+     * shader would give it, using the last uploaded transform. Returns null
+     * when no draw has happened yet or the point is behind the camera.
+     */
+    public static Vector3f projectWorldToNdc(double worldX, double worldY, double worldZ) {
+        if (!lastTransformValid) {
+            return null;
+        }
+        org.joml.Vector4f clip = new org.joml.Vector4f(
+                (float) (worldX - lastCameraPosition.x),
+                (float) (worldY - lastCameraPosition.y),
+                (float) (worldZ - lastCameraPosition.z),
+                1.0F
+        );
+        lastViewRotation.transform(clip);
+        lastCloudProjection.transform(clip);
+        if (clip.w <= 0.0001F) {
+            return null;
+        }
+        return new Vector3f(clip.x / clip.w, clip.y / clip.w, clip.z / clip.w);
+    }
+
+    public static Vector3f lastCameraPosition() {
+        return new Vector3f(lastCameraPosition);
+    }
+
+    /**
+     * Near and far planes of the transform the cloud pass was last drawn with.
+     * The volume is marched out to MaxRenderDistance, which is independent of
+     * this frustum, so a cloud can be integrated well beyond the far plane -
+     * and any depth written for such a point saturates.
+     */
+    public static float[] lastProjectionNearFar() {
+        if (!lastTransformValid) {
+            return new float[] {Float.NaN, Float.NaN};
+        }
+        float m22 = lastCloudProjection.m22();
+        float m32 = lastCloudProjection.m32();
+        float near = m32 / (m22 - 1.0F);
+        float far = m32 / (m22 + 1.0F);
+        return new float[] {near, far};
+    }
+
     public static LastDrawInputs lastDrawInputs() {
         return lastDrawInputs;
     }
@@ -338,6 +396,10 @@ public final class VolumetricCloudRenderer {
         shader.setSampler("HistorySampler", historyValid ? historyTarget.getColorTextureId() : 0);
         shader.setSampler("HistoryDepthSampler", historyValid ? historyTarget.getDepthTextureId() : 0);
 
+        lastCloudProjection.set(projection);
+        lastViewRotation.set(viewRotation);
+        lastCameraPosition.set(cameraPos);
+        lastTransformValid = true;
         shader.safeGetUniform("CloudProjMat").set(projection);
         shader.safeGetUniform("ViewRotMat").set(viewRotation);
         shader.safeGetUniform("InvProjMat").set(invProj);
@@ -433,6 +495,18 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("StormTraceYInterval").set(StormMaterialRuntimeTrace.interval());
         shader.safeGetUniform("StormTraceSamples").set(StormMaterialRuntimeTrace.samples());
         shader.safeGetUniform("StormTraceStage").set(StormMaterialRuntimeTrace.stage());
+        // T098 production ray trace. Zero for every ordinary frame: the shader
+        // reaches no recording write and marches the fragment's own ray.
+        StormProductionRayTrace.resolveAgainst(cloudTarget);
+        shader.safeGetUniform("PaLegacyHitDepth").set(
+                VolumetricCloudDebugConfig.t098LegacyHitDepth() ? 1 : 0);
+        shader.safeGetUniform("PaRayTraceMode").set(StormProductionRayTrace.shaderMode());
+        shader.safeGetUniform("PaRayTraceNdc").set(
+                StormProductionRayTrace.ndcX(), StormProductionRayTrace.ndcY()
+        );
+        shader.safeGetUniform("PaRayTraceFragCoord").set(
+                StormProductionRayTrace.fragCoordX(), StormProductionRayTrace.fragCoordY()
+        );
         shader.safeGetUniform("DensityMul").set(safeTuning.densityMul());
         shader.safeGetUniform("CoverageMul").set(safeTuning.coverageMul());
         shader.safeGetUniform("ExtinctionScale").set(safeTuning.extinctionScale());
@@ -494,7 +568,10 @@ public final class VolumetricCloudRenderer {
                 safeFunnels
         );
 
-        renderedProductionFrame = debugView == VolumetricCloudRaymarchDebugView.FINAL;
+        // A ray-trace pass writes a diagnostic record, not an image. It must
+        // never become the next frame's history.
+        renderedProductionFrame = debugView == VolumetricCloudRaymarchDebugView.FINAL
+                && !StormProductionRayTrace.active();
         if (renderedProductionFrame) {
             prevProj.set(projection);
             prevViewRot.set(viewRotation);

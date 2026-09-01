@@ -199,6 +199,168 @@ uniform float StormTraceYInterval;
 uniform int StormTraceSamples;
 uniform int StormTraceStage;
 
+// ---------------------------------------------------------------------------
+// T098 production ray trace
+// ---------------------------------------------------------------------------
+//
+// One exact view ray, marched by the REAL production loop below, with every
+// iteration's branch decisions and every cloudDensity gate published. This is
+// not a re-implementation: the loop, the promotions, the weather skip and
+// cloudDensity are the production code, and the recorder is a set of writes
+// guarded by `paTraceCapture`, which can only become true when
+// PaRayTraceMode != 0. With the mode at its default 0 no guarded write is
+// reachable and the rendered result is bit-identical to an uninstrumented
+// build.
+//
+// Transport: the traced ray is fixed by PaRayTraceNdc / PaRayTraceFragCoord,
+// so every fragment of the trace pass marches the SAME ray. A fragment's own
+// gl_FragCoord selects which record it publishes - column x is the march
+// iteration index, row y is the field group - and every fragment outside the
+// MAX_STEPS x PA_TRACE_STAGES corner returns black. Bounded by construction:
+// no buffers, no loops over the record, no unbounded memory.
+//
+// PaRayTraceMode: 0 = off (production), 1 = arm A (unmodified production),
+// 2 = arm B (outer weather-gated empty-space skip disabled for this pass
+// only; every cloudDensity gate stays intact).
+// T098 evidence arm only: 1 restores the pre-fix hit depth. Zero in
+// production, so the corrected bound below is what every ordinary frame uses.
+uniform int PaLegacyHitDepth;
+uniform int PaRayTraceMode;
+uniform vec2 PaRayTraceNdc;
+uniform vec2 PaRayTraceFragCoord;
+
+bool paRayTraceActive() {
+    return PaRayTraceMode != 0;
+}
+
+bool paRayTraceWeatherSkipDisabled() {
+    return PaRayTraceMode == 2;
+}
+
+// The view sample the whole shader must use. In production these are the
+// fragment's own coordinates; in a trace pass they are the traced pixel's, so
+// scene depth and the blue-noise search phase belong to the traced ray rather
+// than to the record cell that publishes it.
+vec2 paViewTexCoord = vec2(0.0);
+vec2 paViewFragCoord = vec2(0.0);
+
+// True only while the production cloudDensity call of the recorded iteration
+// is on the stack.
+bool paTraceCapture = false;
+
+// cloudDensity internals, in evaluation order.
+float paCdCoverageSignal = 0.0;
+float paCdCoverage = 0.0;
+float paCdDirectStormCoverage = 0.0;
+float paCdDirectStormStrength = 0.0;
+float paCdDirectStormHeight01 = 0.0;
+float paCdDirectStormRoleMask = 0.0;
+float paCdUnionDistance = 0.0;
+float paCdMacroShape = 0.0;
+float paCdEnvelopeCoverage = 0.0;
+float paCdAfterEnvelope = 0.0;
+float paCdAfterStormBody = 0.0;
+float paCdAfterErosion = 0.0;
+float paCdAfterMaterial = 0.0;
+float paCdFamilyScale = 0.0;
+int paCdFlags = 0;
+
+const int PA_CD_ENTERED = 1;
+const int PA_CD_OWNS_DESCRIPTOR_GROUP = 2;
+const int PA_CD_EARLY_COVERAGE_REJECT = 4;
+const int PA_CD_INSIDE_SHAPE_BOUNDS = 8;
+const int PA_CD_BODY_BLOCK_ENTERED = 16;
+const int PA_CD_MORPHOLOGY_CATEGORY_VALID = 32;
+const int PA_CD_STORM_PROFILE = 64;
+const int PA_CD_DIRECT_STORM_COVERAGE_POSITIVE = 128;
+const int PA_CD_WEATHER_COVERAGE_POSITIVE = 256;
+const int PA_CD_EROSION_APPLIED = 512;
+const int PA_CD_EMBEDDED_CONVECTIVE_OVERLAP = 1024;
+const int PA_CD_DESCRIPTOR_CANDIDATE_FOUND = 2048;
+
+// Per-iteration march record.
+float paMrTBefore = 0.0;
+float paMrTAfter = 0.0;
+float paMrStepLength = 0.0;
+float paMrWorldX = 0.0;
+float paMrWorldY = 0.0;
+float paMrWorldZ = 0.0;
+float paMrSinceHit = 0.0;
+float paMrUnionDistance = 0.0;
+float paMrMinClearance = 0.0;
+float paMrSafeAdvance = 0.0;
+float paMrOuterCoverageSignal = -1.0;
+float paMrBodyDensity = 0.0;
+float paMrRainDensity = 0.0;
+float paMrDensity = 0.0;
+float paMrExtinction = 0.0;
+float paMrStepTrans = 1.0;
+float paMrTransmittanceBefore = 1.0;
+float paMrTransmittanceAfter = 1.0;
+float paMrAccumR = 0.0;
+float paMrAccumG = 0.0;
+float paMrAccumB = 0.0;
+int paMrFlags = 0;
+
+const int PA_MR_EXECUTED = 1;
+const int PA_MR_FINE_AT_ENTRY = 2;
+const int PA_MR_FINE_FINAL = 4;
+const int PA_MR_PUFF_PROMOTED = 8;
+const int PA_MR_STORM_SEGMENT_MAY_INTERSECT = 16;
+const int PA_MR_STORM_SAFE_ADVANCE = 32;
+const int PA_MR_STORM_FORCED_FINE = 64;
+const int PA_MR_WEATHER_SKIP_ELIGIBLE = 128;
+const int PA_MR_WEATHER_SKIP_TAKEN = 256;
+const int PA_MR_CLOUD_DENSITY_CALLED = 512;
+const int PA_MR_LOCAL_RAIN_SEGMENT = 1024;
+const int PA_MR_DENSITY_ABOVE_THRESHOLD = 2048;
+const int PA_MR_BRACKET_REFINED = 4096;
+const int PA_MR_INTEGRATED = 8192;
+const int PA_MR_CAMERA_INSIDE_CLOUD = 16384;
+const int PA_MR_PRECIPITATION_SAMPLE = 32768;
+
+// Whole-ray summary.
+int paTraceIteration = -1;
+int paTraceStage = -1;
+float paMrIterationsExecuted = 0.0;
+// 0 = step cap reached, 1 = t >= t1, 2 = transmittance floor,
+// 3 = slab miss, 4 = scene depth closed the interval,
+// 5 = whole-ray coverage pretest rejected the ray.
+float paMrTerminationReason = 0.0;
+float paMrT0 = 0.0;
+float paMrT1 = 0.0;
+float paMrRayDirX = 0.0;
+float paMrRayDirY = 0.0;
+float paMrRayDirZ = 0.0;
+float paMrFineStep = 0.0;
+float paMrCoarseStep = 0.0;
+float paMrCoarseStepCap = 0.0;
+float paMrBaseStep = 0.0;
+float paMrOriginJitter = 0.0;
+float paMrFinalTransmittance = 1.0;
+float paMrFinalAccumR = 0.0;
+float paMrFinalAccumG = 0.0;
+float paMrFinalAccumB = 0.0;
+// March budget, published because a ray that runs out of iterations before it
+// reaches material is indistinguishable from a ray that found none.
+float paMrStepCap = 0.0;
+float paMrStepBudget = 0.0;
+// What the march hands to the composite. The composite treats a cloud texel
+// whose depth is 1.0 as "no cloud" regardless of its alpha, so these three
+// decide whether an opaque march result survives at all.
+float paMrRepresentativeT = 0.0;
+// Published as one minus the depth. Half float resolves 5e-4 steps next to
+// 1.0 but is exact next to 0, and the whole question is whether the depth is
+// exactly 1.0 or merely close to it.
+float paMrOneMinusResultDepth = 0.0;
+float paMrCurrentCloudHit = 0.0;
+// How far the representative point's NDC depth overshoots the far plane.
+// Published as the excess over 1.0, which half float resolves exactly next to
+// zero; a positive value means the point is outside the frustum, which is what
+// forces the clamped depth to exactly 1.0.
+float paMrNdcDepthExcess = 0.0;
+
+
 uniform float DensityMul;
 uniform float CoverageMul;
 uniform float ExtinctionScale;
@@ -219,6 +381,111 @@ const int MAX_STEPS = 128;
 // Ceiling for the T098 diagnostic budget arm. Only PaDiagnosticStepBudget can
 // reach above MAX_STEPS, and only up to here.
 const int PA_MAX_DIAGNOSTIC_STEPS = 384;
+// Field groups published by the production ray trace. One row per group, one
+// column per march iteration; the record is therefore exactly
+// MAX_STEPS * PA_TRACE_STAGES texels and cannot grow with the scene.
+const int PA_TRACE_STAGES = 21;
+// The deepest depth a cloud HIT may publish. 1.0 is reserved as the composite's
+// miss sentinel, so a hit must stay strictly below it; see the T098 note at
+// resultDepth. Chosen above the 0.99999 history-confidence cutoff so that
+// reprojection behaviour is unchanged, and far enough below 1.0 to survive
+// 24-bit depth quantization (one step is about 6e-8).
+const float PA_CLOUD_HIT_MAX_DEPTH = 0.999999;
+
+/**
+ * The trace target is the production RGBA16F cloud buffer, so every published
+ * field has to survive half float. Two rules follow and both are honoured
+ * below: bit fields are split into 8-bit halves, which half float represents
+ * exactly, and distances are published camera-relative so they stay inside the
+ * range where half float still resolves under a block.
+ */
+float paTraceByteLow(int bits) {
+    return float(bits & 255);
+}
+
+float paTraceByteHigh(int bits) {
+    return float((bits >> 8) & 255);
+}
+
+/** Half float saturates at 65504; 1.0e9 sentinels must not become infinity. */
+float paTraceFinite(float value) {
+    return min(value, 60000.0);
+}
+
+/**
+ * The published trace texel: column = march iteration, row = field group.
+ * Rows 0..8 are per-iteration; rows 9..15 are whole-ray identity and are
+ * constant across the row, so the decoder may read them from any column.
+ */
+vec4 paTraceRecordTexel() {
+    if (paTraceStage == 0) {
+        return vec4(paMrTBefore, paMrTAfter, paMrStepLength,
+            paTraceByteLow(paMrFlags));
+    } else if (paTraceStage == 1) {
+        return vec4(paMrWorldX, paMrWorldY, paMrWorldZ, paMrSinceHit);
+    } else if (paTraceStage == 2) {
+        return vec4(paTraceFinite(paMrUnionDistance),
+            paTraceFinite(paMrMinClearance), paMrSafeAdvance,
+            paMrOuterCoverageSignal);
+    } else if (paTraceStage == 3) {
+        return vec4(paCdDirectStormCoverage, paCdDirectStormStrength,
+            paCdDirectStormHeight01, paCdDirectStormRoleMask);
+    } else if (paTraceStage == 4) {
+        return vec4(paCdCoverageSignal, paCdCoverage, paCdEnvelopeCoverage,
+            paCdMacroShape);
+    } else if (paTraceStage == 5) {
+        return vec4(paCdAfterEnvelope, paCdAfterStormBody, paCdAfterErosion,
+            paCdAfterMaterial);
+    } else if (paTraceStage == 6) {
+        return vec4(paMrBodyDensity, paMrRainDensity, paMrDensity,
+            paMrExtinction);
+    } else if (paTraceStage == 7) {
+        return vec4(paMrStepTrans, paMrTransmittanceBefore,
+            paMrTransmittanceAfter, paTraceByteLow(paCdFlags));
+    } else if (paTraceStage == 8) {
+        return vec4(paMrAccumR, paMrAccumG, paMrAccumB,
+            paTraceByteHigh(paMrFlags));
+    } else if (paTraceStage == 9) {
+        return vec4(paMrIterationsExecuted, paMrTerminationReason,
+            1.0 - paMrFinalTransmittance, paMrFinalTransmittance);
+    } else if (paTraceStage == 10) {
+        return vec4(paMrRayDirX, paMrRayDirY, paMrRayDirZ, paMrT0);
+    } else if (paTraceStage == 11) {
+        return vec4(paMrT1, paMrFineStep, paMrCoarseStep, paMrCoarseStepCap);
+    } else if (paTraceStage == 12) {
+        return vec4(paMrBaseStep, paMrOriginJitter, float(StormLobeCount),
+            float(PaRayTraceMode));
+    } else if (paTraceStage == 13) {
+        return vec4(PaRayTraceNdc.x, PaRayTraceNdc.y, PaRayTraceFragCoord.x,
+            PaRayTraceFragCoord.y);
+    } else if (paTraceStage == 14) {
+        return vec4(paMrFinalAccumR, paMrFinalAccumG, paMrFinalAccumB,
+            paTraceByteHigh(paCdFlags));
+    } else if (paTraceStage == 15) {
+        return vec4(paTraceFinite(paCdUnionDistance), paCdFamilyScale,
+            float(paTraceIteration), float(paTraceStage));
+    } else if (paTraceStage == 16) {
+        return vec4(paMrStepCap, paMrStepBudget, float(RaymarchSteps), StepScale);
+    } else if (paTraceStage == 17) {
+        return vec4(ExteriorFineStep, MaxRenderDistance, float(DetailQuality),
+            CameraCloudDensity);
+    } else if (paTraceStage == 18) {
+        return vec4(CameraPos.x, CameraPos.y, CameraPos.z, float(HistoryValid));
+    } else if (paTraceStage == 19) {
+        return vec4(ExtinctionScale, DensityMul, CoverageMul, float(UseSceneDepth));
+    }
+    return vec4(paMrRepresentativeT, paMrOneMinusResultDepth,
+        paMrCurrentCloudHit, paMrNdcDepthExcess);
+}
+
+/**
+ * Records how the ray ended and returns the texel to publish. fragColor is
+ * declared below, so the caller performs the write.
+ */
+vec4 paTraceRecordTexelWithTermination(int terminationReason) {
+    paMrTerminationReason = float(terminationReason);
+    return paTraceRecordTexel();
+}
 const int MAX_LIGHT_STEPS = 8;
 const float PI = 3.14159265;
 
@@ -2785,11 +3052,31 @@ float cloudDensity(
     bool directStormAvailable = directStormOwned;
     stormProfile = stormProfile || directStormAvailable;
 
+    if (paTraceCapture) {
+        paCdFlags = PA_CD_ENTERED
+            | (directStormAvailable ? PA_CD_OWNS_DESCRIPTOR_GROUP : 0)
+            | (morphologyCategoryValid ? PA_CD_MORPHOLOGY_CATEGORY_VALID : 0)
+            | (stormProfile ? PA_CD_STORM_PROFILE : 0)
+            | (directStormCoverage > 0.001 ? PA_CD_DIRECT_STORM_COVERAGE_POSITIVE : 0)
+            | (coverage > 0.008 ? PA_CD_WEATHER_COVERAGE_POSITIVE : 0)
+            | (paUnionDistanceUnusedB < 1.0e8 ? PA_CD_DESCRIPTOR_CANDIDATE_FOUND : 0);
+        paCdCoverageSignal = coverageSignal;
+        paCdCoverage = coverage;
+        paCdDirectStormCoverage = directStormCoverage;
+        paCdDirectStormStrength = directStormStrength;
+        paCdDirectStormHeight01 = directStormHeight01;
+        paCdDirectStormRoleMask = float(directStormActiveRoleMask);
+        paCdUnionDistance = paUnionDistanceUnusedB;
+    }
+
     bool precipitationCandidate = includePrecipitation
         && MaxPrecipitation > 0.02
         && p.y < SlabBaseY + 48.0;
     if (coverage <= 0.008 && funnel <= 0.001 && !precipitationCandidate
             && directStormCoverage <= 0.001) {
+        if (paTraceCapture) {
+            paCdFlags |= PA_CD_EARLY_COVERAGE_REJECT;
+        }
         return 0.0;
     }
 
@@ -2833,9 +3120,15 @@ float cloudDensity(
         : useCumulusStructure || directPuffAvailable
             ? p.y > SlabBaseY - 2.0 && p.y < SlabTopY + 2.0
             : h01 > -0.02 && h01 < 1.02;
+    if (paTraceCapture && insideShapeBounds) {
+        paCdFlags |= PA_CD_INSIDE_SHAPE_BOUNDS;
+    }
     if (insideShapeBounds
             && (coverage > 0.008 || directStormCoverage > 0.001)
             && (morphologyCategoryValid || directStormAvailable)) {
+        if (paTraceCapture) {
+            paCdFlags |= PA_CD_BODY_BLOCK_ENTERED;
+        }
         float anvil = stormProfile
             ? smoothstep(0.62, 0.94, saturate(h01))
                 * energy * (0.20 + verticalDevelopment * 0.42)
@@ -2944,6 +3237,18 @@ float cloudDensity(
         }
         cloud = macroShape * envelopeCoverage;
 
+        if (paTraceCapture) {
+            paCdMacroShape = macroShape;
+            paCdEnvelopeCoverage = envelopeCoverage;
+            paCdAfterEnvelope = cloud;
+            // Not every branch below runs. Seed the later stage records with
+            // the value that reaches them, so an untouched stage reads as
+            // "unchanged" rather than as zero.
+            paCdAfterStormBody = cloud;
+            paCdAfterErosion = cloud;
+            paCdAfterMaterial = cloud;
+        }
+
         if (directStormAvailable) {
             // STAGE 5 - base volumetric noise remapping.
             //
@@ -2962,6 +3267,14 @@ float cloudDensity(
                 stormBaseField(baseCarrier),
                 embeddedConvectiveOverlap
             );
+            if (paTraceCapture) {
+                paCdAfterStormBody = cloud;
+                paCdAfterErosion = cloud;
+                paCdAfterMaterial = cloud;
+                if (embeddedConvectiveOverlap) {
+                    paCdFlags |= PA_CD_EMBEDDED_CONVECTIVE_OVERLAP;
+                }
+            }
         }
 
         if (PuffDensityStage == 3) {
@@ -3035,6 +3348,11 @@ float cloudDensity(
                 float erosionFloor = stormProfile ? 0.42 : 0.68;
                 cloud *= clamp(edgeRetention, erosionFloor, 1.0);
             }
+            if (paTraceCapture) {
+                paCdFlags |= PA_CD_EROSION_APPLIED;
+                paCdAfterErosion = cloud;
+                paCdAfterMaterial = cloud;
+            }
         }
 
         // Storm cells hold more condensed water low in the cloud.
@@ -3071,6 +3389,9 @@ float cloudDensity(
         cloud *= directStormAvailable
             ? 1.0
             : smoothstep(0.010, 0.080, coverageMod);
+        if (paTraceCapture) {
+            paCdAfterMaterial = cloud;
+        }
         if (PuffDensityStage == 4) {
             return useDirectPuff
                 ? max(cloud, 0.0) * 0.88 * DensityMul
@@ -3102,6 +3423,9 @@ float cloudDensity(
         familyDensityScale = 0.74;
     }
     float density = (max(cloud, 0.0) * familyDensityScale + rainShaft) * DensityMul;
+    if (paTraceCapture) {
+        paCdFamilyScale = familyDensityScale;
+    }
     if (PuffDensityStage == 5 || PuffDensityStage == 6) {
         // These causal cuts isolate cloud-body sources.  Funnel/rain density is
         // intentionally excluded even if a future fixture contains either.
@@ -3882,16 +4206,22 @@ float sceneRayLimit(vec3 rayDir, float fallback) {
     if (UseSceneDepth == 0) {
         return fallback;
     }
-    float sceneDepth = texture(SceneDepthSampler, texCoord).r;
+    float sceneDepth = texture(SceneDepthSampler, paViewTexCoord).r;
     if (sceneDepth >= 0.99999) {
         return fallback;
     }
-    vec4 clip = vec4(texCoord * 2.0 - 1.0, sceneDepth * 2.0 - 1.0, 1.0);
+    vec4 clip = vec4(paViewTexCoord * 2.0 - 1.0, sceneDepth * 2.0 - 1.0, 1.0);
     vec4 view = InvProjMat * clip;
     view /= max(abs(view.w), 0.00001);
     vec4 worldRel = InvViewRotMat * vec4(view.xyz, 0.0);
     float sceneT = dot(worldRel.xyz, rayDir);
     return min(fallback, max(0.0, sceneT - 0.3));
+}
+
+/** depthAt without its clamp, so the trace can see the point leave the frustum. */
+float paRawNdcDepth(vec3 relPos) {
+    vec4 clip = CloudProjMat * ViewRotMat * vec4(relPos, 1.0);
+    return clip.z / max(abs(clip.w), 0.00001);
 }
 
 float depthAt(vec3 relPos) {
@@ -3912,6 +4242,24 @@ float precipitationRayPadding() {
 // ---------------------------------------------------------------------------
 
 void main() {
+    // Every fragment of a trace pass marches the traced ray, not its own. The
+    // view sample is therefore the traced pixel's, and only the published
+    // record varies across the fragment grid.
+    paViewTexCoord = paRayTraceActive()
+        ? PaRayTraceNdc * 0.5 + 0.5
+        : texCoord;
+    paViewFragCoord = paRayTraceActive()
+        ? PaRayTraceFragCoord
+        : gl_FragCoord.xy;
+    if (paRayTraceActive()) {
+        paTraceIteration = int(gl_FragCoord.x);
+        paTraceStage = int(gl_FragCoord.y);
+        if (paTraceIteration >= MAX_STEPS || paTraceStage >= PA_TRACE_STAGES) {
+            fragColor = vec4(0.0);
+            gl_FragDepth = 1.0;
+            return;
+        }
+    }
     if (DebugView == 21) {
         int traceSample = clamp(
             int(floor(texCoord.x * float(max(StormTraceSamples, 1)))),
@@ -3926,7 +4274,7 @@ void main() {
         gl_FragDepth = 1.0;
         return;
     }
-    vec2 ndc = texCoord * 2.0 - 1.0;
+    vec2 ndc = paRayTraceActive() ? PaRayTraceNdc : (texCoord * 2.0 - 1.0);
     vec4 clipDir = vec4(ndc, -1.0, 1.0);
     vec4 viewDir4 = InvProjMat * clipDir;
     vec3 viewDir = normalize(viewDir4.xyz / max(abs(viewDir4.w), 0.00001));
@@ -3955,15 +4303,36 @@ void main() {
     t1 = min(t1, MaxRenderDistance);
     bool cameraStartsInsideSlab = t0 <= 1.0;
     bool cameraInsideCloud = cameraStartsInsideSlab && CameraCloudDensity > 0.08;
+    if (paRayTraceActive()) {
+        paMrRayDirX = rayDir.x;
+        paMrRayDirY = rayDir.y;
+        paMrRayDirZ = rayDir.z;
+        paMrT0 = t0;
+        paMrT1 = t1;
+        paMrFlags = cameraInsideCloud ? PA_MR_CAMERA_INSIDE_CLOUD : 0;
+    }
 
     if (t1 <= t0) {
+        if (paRayTraceActive()) {
+            fragColor = paTraceRecordTexelWithTermination(3);
+            gl_FragDepth = 1.0;
+            return;
+        }
         gl_FragDepth = 1.0;
         fragColor = vec4(0.0);
         return;
     }
 
     t1 = sceneRayLimit(rayDir, t1);
+    if (paRayTraceActive()) {
+        paMrT1 = t1;
+    }
     if (t1 <= t0) {
+        if (paRayTraceActive()) {
+            fragColor = paTraceRecordTexelWithTermination(4);
+            gl_FragDepth = 1.0;
+            return;
+        }
         gl_FragDepth = 1.0;
         fragColor = vec4(0.0);
         return;
@@ -4007,6 +4376,11 @@ void main() {
         }
     }
     if (!anyCoverage) {
+        if (paRayTraceActive()) {
+            fragColor = paTraceRecordTexelWithTermination(5);
+            gl_FragDepth = 1.0;
+            return;
+        }
         gl_FragDepth = 1.0;
         fragColor = vec4(0.0);
         return;
@@ -4019,13 +4393,13 @@ void main() {
     // confirmed a clear/material bracket, animate only the sub-step integration
     // phase so temporal history still accumulates finer samples.
     ivec2 blueSize = textureSize(BlueNoiseSampler, 0);
-    vec2 searchBlueUv = gl_FragCoord.xy / vec2(blueSize);
+    vec2 searchBlueUv = paViewFragCoord / vec2(blueSize);
     float searchBlue = texture(BlueNoiseSampler, searchBlueUv).r;
     float jitterFrame = HistoryValid == 1 && HistoryBlend > 0.001
         ? FrameIndex
         : 0.0;
     vec2 integrationBlueUv = (
-        gl_FragCoord.xy + vec2(jitterFrame * 17.0, jitterFrame * 29.0)
+        paViewFragCoord + vec2(jitterFrame * 17.0, jitterFrame * 29.0)
     ) / vec2(blueSize);
     float integrationBlue = fract(
         texture(BlueNoiseSampler, integrationBlueUv).r
@@ -4062,6 +4436,15 @@ void main() {
         span
     );
     float t = t0 + searchBlue * originJitterDistance;
+    if (paRayTraceActive()) {
+        paMrStepCap = float(paStepCap);
+        paMrStepBudget = float(stepBudget);
+        paMrFineStep = fineStep;
+        paMrCoarseStep = coarseStep;
+        paMrCoarseStepCap = coarseStepCap;
+        paMrBaseStep = baseStep;
+        paMrOriginJitter = searchBlue * originJitterDistance;
+    }
     float lastClearT = t0;
     bool hasClearBracket = true;
     float transmittance = 1.0;
@@ -4107,12 +4490,26 @@ void main() {
             if (transmittance < 0.015 && paWorkloadCaptureActive()) {
                 paEarlyTerminations++;
             }
+            if (paRayTraceActive()) {
+                paMrTerminationReason = transmittance < 0.015 ? 2.0 : 1.0;
+            }
             break;
         }
         if (paWorkloadCaptureActive()) {
             paPrimaryRaySteps++;
         }
+        // Recording arm for this iteration. False for every fragment whose
+        // column is not this iteration, and unreachable at all in production.
+        bool paCap = paRayTraceActive() && i == paTraceIteration;
+        if (paRayTraceActive()) {
+            paMrIterationsExecuted = float(i + 1);
+        }
         bool fine = sinceHit < 6;
+        if (paCap) {
+            paMrTBefore = t;
+            paMrSinceHit = float(sinceHit);
+            paMrFlags |= PA_MR_EXECUTED | (fine ? PA_MR_FINE_AT_ENTRY : 0);
+        }
         float distanceGrowth = 1.0 + (t / max(MaxRenderDistance, 1.0)) * 2.2;
         float stepLength = fine
             ? fineStep * (cameraInsideCloud ? distanceGrowth : 1.0)
@@ -4121,6 +4518,15 @@ void main() {
         stepLength = min(stepLength, t1 - t);
 
         vec3 p = CameraPos + rayDir * t;
+        if (paCap) {
+            // Camera-relative. World coordinates can reach five digits, where
+            // half float quantizes to multiples of eight blocks; the offset is
+            // bounded by MaxRenderDistance and stays sub-block. The decoder
+            // adds the camera position back at full precision.
+            paMrWorldX = p.x - CameraPos.x;
+            paMrWorldY = p.y - CameraPos.y;
+            paMrWorldZ = p.z - CameraPos.z;
+        }
         if (!fine
                 && PuffShapeMode != 0
                 && PuffLobeCount > 0
@@ -4128,6 +4534,9 @@ void main() {
                     p,
                     CameraPos + rayDir * (t + stepLength)
                 )) {
+            if (paCap) {
+                paMrFlags |= PA_MR_PUFF_PROMOTED;
+            }
             // Switch within this iteration. The former continue consumed one
             // of the fixed 128 iterations without advancing t; repeated empty
             // AABB entries could exhaust the march before the ray endpoint.
@@ -4184,9 +4593,21 @@ void main() {
             // STORM_MAX_BLEND_BLOCKS/4 = 12; subtracting the full blend cap
             // leaves roughly a factor of two in hand.
             float paSafeAdvance = paMinClearance - STORM_MAX_BLEND_BLOCKS;
+            if (paCap) {
+                paMrFlags |= PA_MR_STORM_SEGMENT_MAY_INTERSECT;
+                paMrUnionDistance = paUnionDistance;
+                paMrMinClearance = paMinClearance;
+                paMrSafeAdvance = paSafeAdvance;
+            }
             if (paSafeAdvance > fineStep) {
+                if (paCap) {
+                    paMrFlags |= PA_MR_STORM_SAFE_ADVANCE;
+                }
                 stepLength = min(min(paSafeAdvance, coarseStepCap), t1 - t);
             } else {
+                if (paCap) {
+                    paMrFlags |= PA_MR_STORM_FORCED_FINE;
+                }
                 sinceHit = 0;
                 fine = true;
                 stepLength = fineStep
@@ -4197,6 +4618,11 @@ void main() {
         vec3 segmentEnd = CameraPos + rayDir * (t + stepLength);
         bool localRainSegment = PuffDensityStage == 0
             && rainSegmentMayContribute(p, segmentEnd);
+        if (paCap) {
+            paMrStepLength = stepLength;
+            paMrFlags |= (fine ? PA_MR_FINE_FINAL : 0)
+                | (localRainSegment ? PA_MR_LOCAL_RAIN_SEGMENT : 0);
+        }
         // Empty exterior coarse samples need only the weather occupancy fetch.
         // This offsets the extra surface samples without reviving the old
         // non-conservative whole-ray coverage pretest.
@@ -4204,9 +4630,21 @@ void main() {
                 && !fine
                 && FunnelCount == 0) {
             float coverageSignal = sampleWeather(p.xz).r * CoverageMul;
-            if (coverageSignal <= 0.001 && !localRainSegment) {
+            if (paCap) {
+                paMrFlags |= PA_MR_WEATHER_SKIP_ELIGIBLE;
+                paMrOuterCoverageSignal = coverageSignal;
+            }
+            // Arm B of the T098 weather-skip A/B removes ONLY this outer skip.
+            // Every cloudDensity gate, including its own weather coverage cut,
+            // stays exactly as production evaluates it.
+            if (coverageSignal <= 0.001 && !localRainSegment
+                    && !paRayTraceWeatherSkipDisabled()) {
                 if (paWorkloadCaptureActive()) {
                     paEmptySpaceRejects++;
+                }
+                if (paCap) {
+                    paMrFlags |= PA_MR_WEATHER_SKIP_TAKEN;
+                    paMrTAfter = t + stepLength;
                 }
                 lastClearT = t;
                 hasClearBracket = true;
@@ -4223,11 +4661,22 @@ void main() {
         // Body sampling keeps its adaptive fine/coarse state. Rain is a
         // separate deterministic segment integral and can never force the
         // body marcher into a fine-step curtain below the cloud.
+        paTraceCapture = paCap;
         float bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+        paTraceCapture = false;
         float rainDensity = localRainSegment
             ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
             : 0.0;
         float density = bodyDensity + rainDensity;
+        if (paCap) {
+            paMrFlags |= PA_MR_CLOUD_DENSITY_CALLED
+                | (density > 0.0008 ? PA_MR_DENSITY_ABOVE_THRESHOLD : 0);
+            paMrBodyDensity = bodyDensity;
+            paMrRainDensity = rainDensity;
+            paMrDensity = density;
+            paMrTransmittanceBefore = transmittance;
+            paMrTAfter = t + stepLength;
+        }
 
         if (DebugView == 17
                 && primaryQuadratureValid
@@ -4379,12 +4828,19 @@ void main() {
                 lastClearT = bracketLow;
                 t = mix(bracketLow, bracketHigh, integrationBlue);
                 sinceHit = 0;
+                if (paCap) {
+                    paMrFlags |= PA_MR_BRACKET_REFINED;
+                    paMrTAfter = t;
+                }
                 continue;
             }
             // Shafts stay on coarse strides. Their broad envelope and streak
             // noise do not need cloud-surface resolution, and keeping the fine
             // state here multiplies their cost by the full 180-block depth.
             sinceHit = precipitationSample ? 100 : 0;
+            if (paCap && precipitationSample) {
+                paMrFlags |= PA_MR_PRECIPITATION_SAMPLE;
+            }
 
             float h01 = directPuffBody
                 ? directPuffHeight01
@@ -4547,6 +5003,10 @@ void main() {
 
             float extinction = density * ExtinctionScale;
             float stepTrans = exp(-extinction * stepLength);
+            if (paCap) {
+                paMrExtinction = extinction;
+                paMrStepTrans = stepTrans;
+            }
             float diagnosticLightOpticalDepth = 0.0;
             vec3 radiance = sampleLighting(
                 p,
@@ -4879,12 +5339,25 @@ void main() {
             }
 
             transmittance *= stepTrans;
+            if (paCap) {
+                paMrFlags |= PA_MR_INTEGRATED;
+                paMrTransmittanceAfter = transmittance;
+                paMrAccumR = accumulated.r;
+                paMrAccumG = accumulated.g;
+                paMrAccumB = accumulated.b;
+            }
         } else {
             lastClearT = t;
             hasClearBracket = true;
             sinceHit++;
+            if (paCap) {
+                paMrTransmittanceAfter = transmittance;
+            }
         }
         t += stepLength;
+        if (paCap) {
+            paMrTAfter = t;
+        }
     }
 
     float alpha = saturate(1.0 - transmittance);
@@ -4917,7 +5390,43 @@ void main() {
         );
         result.rgb = straightColour * result.a;
     }
-    float resultDepth = currentCloudHit ? depthAt(relRepresentative) : 1.0;
+    // T098. Depth 1.0 is the composite's "no cloud here" sentinel: it drops
+    // any cloud texel whose depth is 1.0 whatever its alpha. The volume is
+    // marched to MaxRenderDistance, which is a cloud setting and has nothing
+    // to do with the scene projection, so the representative point of a
+    // perfectly ordinary distant storm can lie beyond the far plane - 912
+    // blocks against a 768-block far plane on the measured SIDE waist ray -
+    // and depthAt's clamp then returns exactly that sentinel. The march had
+    // integrated alpha 0.63 and the composite discarded all of it, which is
+    // why a storm that the marcher renders opaque appears as clear sky.
+    //
+    // A hit therefore publishes a depth strictly below the sentinel. The bound
+    // stays above the 0.99999 that history already treats as unreliable, so
+    // temporal reprojection is unaffected, and it stays behind any real scene
+    // depth, so the composite's occlusion test still hides these clouds behind
+    // terrain exactly as before. Only the miss case may write 1.0.
+    float resultDepth = currentCloudHit
+        ? (PaLegacyHitDepth != 0
+            ? depthAt(relRepresentative)
+            : min(depthAt(relRepresentative), PA_CLOUD_HIT_MAX_DEPTH))
+        : 1.0;
+    if (paRayTraceActive()) {
+        // Published after the march and after the depth the composite will
+        // read, but before temporal history and before upsampling, so the
+        // record is the current frame's own march result together with the two
+        // values that decide whether it survives composition.
+        paMrFinalTransmittance = transmittance;
+        paMrFinalAccumR = accumulated.r;
+        paMrFinalAccumG = accumulated.g;
+        paMrFinalAccumB = accumulated.b;
+        paMrRepresentativeT = representativeT;
+        paMrOneMinusResultDepth = 1.0 - resultDepth;
+        paMrCurrentCloudHit = currentCloudHit ? 1.0 : 0.0;
+        paMrNdcDepthExcess = paRawNdcDepth(relRepresentative) - 1.0;
+        fragColor = paTraceRecordTexel();
+        gl_FragDepth = 1.0;
+        return;
+    }
     float resultDepthDerivative = currentCloudHit ? fwidth(resultDepth) : 0.0;
 
     // Counter channels are unpremultiplied floating-point integers. The

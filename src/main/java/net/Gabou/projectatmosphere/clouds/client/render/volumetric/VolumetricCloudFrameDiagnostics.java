@@ -155,6 +155,39 @@ public final class VolumetricCloudFrameDiagnostics {
         StormMaterialRuntimeTrace.capture(cloudTarget);
     }
 
+    public static void tryCaptureStormProductionRayTrace(RenderTarget cloudTarget) {
+        StormProductionRayTrace.capture(cloudTarget);
+    }
+
+    /**
+     * T098 production ray trace. Each requested pixel is traced twice: arm A is
+     * unmodified production, arm B disables only the outer weather-gated
+     * empty-space skip.
+     */
+    public static String requestStormProductionRayTrace(
+            String setLabel,
+            java.util.List<int[]> pixels,
+            java.util.List<String> labels,
+            int frameWidth,
+            int frameHeight) {
+        java.util.List<StormProductionRayTrace.Pixel> targets = new java.util.ArrayList<>();
+        for (int index = 0; index < pixels.size(); index++) {
+            int[] pixel = pixels.get(index);
+            targets.add(new StormProductionRayTrace.Pixel(
+                    index < labels.size() ? labels.get(index) : ("pixel" + index),
+                    pixel[0], pixel[1]));
+        }
+        return StormProductionRayTrace.request(setLabel, targets, frameWidth, frameHeight);
+    }
+
+    public static String stormProductionRayTraceLatest() {
+        return StormProductionRayTrace.latest();
+    }
+
+    public static boolean stormProductionRayTraceActive() {
+        return StormProductionRayTrace.active();
+    }
+
     public static String beginStormPerformanceBaseline(double x, double y, double z) {
         return StormPerformanceBaseline.begin(x, y, z);
     }

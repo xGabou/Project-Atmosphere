@@ -174,6 +174,34 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
+**T098 2026-08-31: first production divergence isolated and corrected; the loss was the depth
+sentinel, not the march or cloudDensity. Task stays OPEN.** A production ray trace now instruments
+the real march in place - one ray fixed by NDC, every fragment of the pass marching that ray, column
+= march iteration and row = field group in a bounded 128x21 corner of the existing cloud target
+(`StormProductionRayTrace`, `PaRayTraceMode`). It proves ray identity: the production alpha read out
+of the traced texel equals the traced ray's own alpha to five decimals on every ray of every run.
+Results on the controlled SIDE pose. The **outer weather-gated empty-space skip is FALSIFIED**:
+disabling it reaches the same cloudDensity samples, the same peak density and the same alpha on all
+three rays. **cloudDensity is healthy**: it is called on 110 of 128 waist iterations,
+ownsDescriptorGroup holds, envelopeCoverage is 1.0, and it returns density up to 0.668. The first
+loss is **after** the density function: the waist ray's alpha-weighted representative point sits 912
+blocks out against a **768.24-block projection far plane**, so `depthAt`'s clamp publishes exactly
+1.0 - the value `cloud_field_composite.fsh` reads as *absence of cloud* - and an integrated alpha of
+0.63 is discarded whatever its value. The BASE and ANVIL controls on the same frame sat at 736 and
+665.5 blocks, published 0.99999416 and 0.99998683, and composited normally. The correction is one
+expression: a cloud hit publishes `min(depthAt(...), PA_CLOUD_HIT_MAX_DEPTH = 0.999999)`, so only a
+miss may write the sentinel; the bound stays above history's 0.99999 confidence cutoff and behind any
+real scene depth, so reprojection and terrain occlusion are unchanged. Guarded by
+`validateT098CloudHitDepthNeverSaturates`, which fails under the old expression (8330 of 19685 swept
+probes discarded a hit). This also **retracts** the earlier stage-isolation inference: FINAL and
+CURRENT_ONLY are both post-composite, so their agreement exonerated history, never the composite.
+**A second divergent branch is recorded and deliberately NOT fixed**: every traced waist ray
+terminates on `step_cap` at 128 iterations with 0.37-0.92 transmittance remaining, because the
+per-descriptor conservative clearance probe promotes to fine marching at t~578 while first
+integrable material is at t~826, spending ~100 of 128 iterations crossing empty envelope. That is
+why the corrected column composites but stays thin. Evidence in
+`validation/t098-production-ray-trace.md`.
+
 **T098 2026-08-30: live acceptance campaign run; result CASE D, task stays OPEN.** The envelope
 extent bound (0.75 x half-height) was validated live across five distinct fresh severe fixtures
 (9294726d, ae4aef49, 72259f41, d266f801, 6e8e8c73). The bound is selective as designed: over 60 live
