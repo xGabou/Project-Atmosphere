@@ -83,7 +83,8 @@ final class StormT132AutoDriver {
         BOOTSTRAP_RESTORE, BOOTSTRAP_WAIT_RESTORED, WAIT_WORLD, SPAWN_STORM, WAIT_ADOPT, WAIT_MATURE, BEGIN_SUITE, POLL_SUITE,
         BEGIN_TRACE, POLL_TRACE,
         RAYTRACE_FIXTURE,
-        T135_PREPARE, T135_MOVE, T135_SETTLE, T135_SAMPLE, T135_RESPAWN, T135_REPORT,
+        T135_PREPARE, T135_MOVE, T135_SETTLE, T135_SAMPLE, T135_COUNTERS,
+        T135_RESPAWN, T135_REPORT,
         BEGIN_T098, POLL_T098, DONE
     }
 
@@ -175,7 +176,32 @@ final class StormT132AutoDriver {
     private static int t135ModeIndex;
     private static int t135SettleFrames;
     private static int t135CellRetries;
+    /** 0 production, 1 constant lighting, 2 T122 descriptor refetch. */
+    private static int t135Arm;
     private static boolean t135LightingArm;
+    private static String t135CounterLabel = "";
+    private static boolean t135CountersRequested;
+
+    private static String t135ArmName() {
+        return switch (t135Arm) {
+            case 1 -> "constantLighting";
+            case 2 -> "t122Refetch";
+            default -> "production";
+        };
+    }
+
+    /**
+     * The attribution arms, applied for the SIDE and PLAY_NEAR poses only. The
+     * T122 arm re-issues the six descriptor texel fetches per lobe that
+     * production keeps in registers, so the GPU-time difference is the marginal
+     * cost of descriptor fetches measured directly rather than estimated.
+     */
+    private static void applyT135Arm() {
+        VolumetricCloudDebugConfig.setT136ConstantLighting(t135Arm == 1);
+        VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(t135Arm == 2
+                ? StormOptimizationDiagnosticMode.T122_OFF
+                : StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
+    }
     /** Retries allowed per cell before it is abandoned as unmeasurable. */
     private static final int T135_MAX_CELL_RETRIES = 2;
 
@@ -462,17 +488,19 @@ final class StormT132AutoDriver {
                 }
                 t135CellRetries = 0;
                 if (t135ModeIndex >= T135_MODES.length) {
-                    if (!t135LightingArm && "SIDE".equals(T135_POSES[t135PoseIndex])) {
-                        // Lighting attribution: repeat SIDE with the light cone
-                        // replaced by a constant so the difference is its share.
-                        t135LightingArm = true;
+                    boolean attributionPose = "SIDE".equals(T135_POSES[t135PoseIndex])
+                            || "PLAY_NEAR".equals(T135_POSES[t135PoseIndex]);
+                    if (attributionPose && t135Arm < 2) {
+                        t135Arm++;
                         t135ModeIndex = 0;
-                        VolumetricCloudDebugConfig.setT136ConstantLighting(true);
+                        applyT135Arm();
                         ProjectAtmosphere.LOGGER.info(
-                                "T136_PROFILE lighting attribution arm begins at SIDE");
+                                "T136_PROFILE attribution arm {} begins at {}",
+                                t135ArmName(), T135_POSES[t135PoseIndex]);
                         return;
                     }
-                    VolumetricCloudDebugConfig.setT136ConstantLighting(false);
+                    t135Arm = 0;
+                    applyT135Arm();
                     t135LightingArm = false;
                     t135ModeIndex = 0;
                     t135PoseIndex++;
@@ -486,11 +514,54 @@ final class StormT132AutoDriver {
                 AtmoCommonConfig.CloudRaymarchQuality quality = T135_MODES[t135ModeIndex];
                 AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(quality);
                 if (!StormT135PerformanceProfile.begin(T135_POSES[t135PoseIndex], quality,
-                        t135LightingArm ? "constantLighting" : "production")) {
+                        t135ArmName())) {
+                    // A refusal consumes a retry. Without this the sweep loops
+                    // between refusing and respawning forever, which is exactly
+                    // how PLAY_MID/Ultra, PLAY_HIGH and CLEAR were lost.
+                    if (++t135CellRetries > T135_MAX_CELL_RETRIES) {
+                        ProjectAtmosphere.LOGGER.warn(
+                                "T136_PROFILE abandoning {}/{}: fixture never became"
+                                        + " measurable after {} attempts",
+                                T135_POSES[t135PoseIndex], quality, t135CellRetries);
+                        t135CellRetries = 0;
+                        t135ModeIndex++;
+                        return;
+                    }
                     advance(Phase.T135_RESPAWN);
                     return;
                 }
+                t135CounterLabel = T135_POSES[t135PoseIndex] + "|" + t135ArmName()
+                        + "|" + quality.name();
                 t135ModeIndex++;
+                t135CountersRequested = false;
+                advance(Phase.T135_COUNTERS);
+            }
+            case T135_COUNTERS -> {
+                // The timing sample must finish before the two counter frames
+                // run, because those frames render a diagnostic view and would
+                // otherwise pollute the timing they belong to.
+                if (StormT135PerformanceProfile.active()) {
+                    return;
+                }
+                if (!t135CountersRequested) {
+                    t135CountersRequested = true;
+                    VolumetricCloudFrameDiagnostics.requestStormWorkloadCapture("side");
+                    return;
+                }
+                if (VolumetricCloudFrameDiagnostics.stormWorkloadActive()) {
+                    if (stageFrames > 600) {
+                        ProjectAtmosphere.LOGGER.warn(
+                                "T136_COUNTERS timed out for {}", t135CounterLabel);
+                        advance(Phase.T135_SAMPLE);
+                    }
+                    return;
+                }
+                String line = VolumetricCloudFrameDiagnostics.stormWorkloadResultLine();
+                if (line != null) {
+                    ProjectAtmosphere.LOGGER.info("T136_COUNTERS cell={} {}",
+                            t135CounterLabel, line);
+                }
+                advance(Phase.T135_SAMPLE);
             }
             case T135_RESPAWN -> {
                 // Deterministic re-adoption: spawn, wait for descriptors, then

@@ -127,6 +127,17 @@ public final class VolumetricCloudFrameDiagnostics {
         return StormWorkloadRuntimeCapture.request(view);
     }
 
+    /** T136: the counter readback for the cell just measured, or null. */
+    public static String stormWorkloadResultLine() {
+        StormWorkloadRuntimeCapture.WorkloadResult result =
+                StormWorkloadRuntimeCapture.latestResult();
+        return result == null ? null : result.format();
+    }
+
+    public static boolean stormWorkloadActive() {
+        return StormWorkloadRuntimeCapture.active();
+    }
+
     public static String stormWorkloadLatest() {
         return StormWorkloadRuntimeCapture.latest();
     }

@@ -91,9 +91,13 @@ public final class StormT135PerformanceProfile {
             return false;
         }
         int descriptors = StormGeometryBuildCoordinator.lobeCount();
-        if (descriptors <= 0) {
-            // Refusing to start is the point: a cell measured against an absent
-            // fixture is worse than a missing cell.
+        // Clear weather legitimately has no descriptors, and demanding some
+        // there would reject the one scenario that measures the non-cloud
+        // remainder against no storm at all. Storm scenarios still require a
+        // fixture, because a storm cell measured against an absent storm is
+        // worse than a missing cell.
+        boolean clearScenario = pose != null && pose.startsWith("CLEAR");
+        if (!clearScenario && descriptors <= 0) {
             ProjectAtmosphere.LOGGER.warn(
                     "T136_PROFILE refusing to sample {}/{} with {} descriptors",
                     pose, quality, descriptors);
@@ -165,7 +169,8 @@ public final class StormT135PerformanceProfile {
             finish(frameWidth, frameHeight);
             return;
         }
-        if (StormGeometryBuildCoordinator.lobeCount() < requiredDescriptors) {
+        if (requiredDescriptors > 0
+                && StormGeometryBuildCoordinator.lobeCount() < requiredDescriptors) {
             ProjectAtmosphere.LOGGER.warn(
                     "T136_PROFILE {}/{} contaminated: descriptors fell {} -> {} after {} samples",
                     poseName, mode, requiredDescriptors,

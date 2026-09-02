@@ -174,6 +174,54 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
+**Rank 2 (per-sample descriptor cost) 2026-09-01: MEASURED AND REJECTED - CASE C. Production shader
+unchanged; proceed to rank 1.** T137 ranked descriptor cost second at 1.5-3x and flagged the estimate
+as its weakest. Closing that gap removed the case for the optimization rather than confirming it.
+*Harness:* workload counters wired per cell, the zero-descriptor refusal path now consumes a bounded
+retry (the bug that lost PLAY_MID/Ultra, PLAY_HIGH and CLEAR), CLEAR scenarios accept descriptors=0
+while storm scenarios still require them to hold, per-pose re-resolution preserved, and two
+diagnostic-only arms added. *Structure:* descriptor data is four texels per lobe in a single **4 KB**
+texture, and T122 already implemented load-once-and-reuse - it avoids 116M of what would be 351M
+fetches. The remaining redundancy is texel 3 of the witness being read **five times per group pass**,
+about 19 removable fetches per `directStormShape`. Measured at SIDE/Low: 13.4 steps per pixel, 13.4
+descriptor evaluations per step, **10.09 fetches per evaluation, 235M fetches per frame**. *Decisive
+experiment:* the existing T122 arm re-issues six fetches per lobe with identical arithmetic and
+output, so +49% fetch volume measures what fetches cost. Same run, same pose: SIDE +20.6 to +27.4%,
+**PLAY_NEAR/Ultra only +4.9%**. Fetch elasticity is ~0.47 at stress framing and **~0.10 in
+representative gameplay** - the texture is L1-resident, so these are cache hits, not bandwidth.
+Removing the achievable 19% of fetches is worth **1.10x at SIDE and 1.02x at PLAY_NEAR**, against an
+estimate of 1.5-3x. Not implemented, per the instruction not to build machinery for a small
+theoretical gain. *Also measured:* lighting is 18-20% at stress framing but only **6.5-11.4% in
+representative gameplay**, so rank 4's ceiling is 1.10x there, not 1.29x. Together descriptor fetches
+and lighting are under 20% of PLAY_NEAR/Ultra - **over 80% is the per-pixel march**, which is what
+rank 1 attacks. Revised stack **10-24x** (was 27-40x). Representative gameplay needs 12.6x and still
+closes; the parked stress case needs 120x and does not. SC-006 is not rescoped. Evidence in
+`validation/performance-descriptor-cost.md`.
+
+**Rank 2 (per-sample descriptor cost) 2026-09-01: MEASURED AND REJECTED - CASE C. Production shader
+unchanged; proceed to rank 1.** T137 ranked descriptor cost second at 1.5-3x and flagged the estimate
+as its weakest. Closing that gap removed the case for the optimization rather than confirming it.
+*Harness:* workload counters wired per cell, the zero-descriptor refusal path now consumes a bounded
+retry (the bug that lost PLAY_MID/Ultra, PLAY_HIGH and CLEAR), CLEAR scenarios accept descriptors=0
+while storm scenarios still require them to hold, per-pose re-resolution preserved, and two
+diagnostic-only arms added. *Structure:* descriptor data is four texels per lobe in a single **4 KB**
+texture, and T122 already implemented load-once-and-reuse - it avoids 116M of what would be 351M
+fetches. The remaining redundancy is texel 3 of the witness being read **five times per group pass**,
+about 19 removable fetches per `directStormShape`. Measured at SIDE/Low: 13.4 steps per pixel, 13.4
+descriptor evaluations per step, **10.09 fetches per evaluation, 235M fetches per frame**. *Decisive
+experiment:* the existing T122 arm re-issues six fetches per lobe with identical arithmetic and
+output, so +49% fetch volume measures what fetches cost. Same run, same pose: SIDE +20.6 to +27.4%,
+**PLAY_NEAR/Ultra only +4.9%**. Fetch elasticity is ~0.47 at stress framing and **~0.10 in
+representative gameplay** - the texture is L1-resident, so these are cache hits, not bandwidth.
+Removing the achievable 19% of fetches is worth **1.10x at SIDE and 1.02x at PLAY_NEAR**, against an
+estimate of 1.5-3x. Not implemented, per the instruction not to build machinery for a small
+theoretical gain. *Also measured:* lighting is 18-20% at stress framing but only **6.5-11.4% in
+representative gameplay**, so rank 4's ceiling is 1.10x there, not 1.29x. Together descriptor fetches
+and lighting are under 20% of PLAY_NEAR/Ultra - **over 80% is the per-pixel march**, which is what
+rank 1 attacks. Revised stack **10-24x** (was 27-40x). Representative gameplay needs 12.6x and still
+closes; the parked stress case needs 120x and does not. SC-006 is not rescoped. Evidence in
+`validation/performance-descriptor-cost.md`.
+
 **T136/T137 2026-09-01: representative gameplay is 2-13x over budget; the parked severe worst case is
 70-125x. Cost is pixel-bound. No implementation.**
 
