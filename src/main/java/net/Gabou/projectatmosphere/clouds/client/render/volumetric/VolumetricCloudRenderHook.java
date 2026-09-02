@@ -142,6 +142,17 @@ public final class VolumetricCloudRenderHook {
         }
     }
 
+    /**
+     * Frames the volumetric pass has actually presented. The capture and
+     * autorun drivers run on the client tick, which is 20 Hz and independent of
+     * how long a frame takes; at the resolution ladder's most expensive arm a
+     * frame costs over a second, so a tick-counted settle window can elapse
+     * before a single new frame has been drawn.
+     */
+    public static long presentedFrames() {
+        return frameCounter;
+    }
+
     private static void renderFrame(RenderLevelStageEvent event, Minecraft minecraft, ClientLevel level) {
         frameCounter++;
         float partialTick = event.getPartialTick();

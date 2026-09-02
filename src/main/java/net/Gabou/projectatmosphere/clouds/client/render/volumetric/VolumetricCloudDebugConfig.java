@@ -47,6 +47,13 @@ public final class VolumetricCloudDebugConfig {
     private static volatile VolumetricPuffDensityStage puffDensityStage = VolumetricPuffDensityStage.FINAL;
     private static volatile VolumetricPuffTierFilter puffTierFilter = VolumetricPuffTierFilter.ALL;
     private static volatile boolean historyEnabled = true;
+    /**
+     * Rank 1 reconstruction arm. False keeps the shipped composite accumulation
+     * unchanged; true selects the coverage-alpha reconstruction, which removes
+     * the resolution-scale beat by separating the silhouette's coverage from
+     * the depth-aware colour accumulation. Diagnostic until T138 promotes it.
+     */
+    private static volatile boolean coverageAlphaReconstruction;
     private static volatile VolumetricCloudRaymarchDebugView raymarchDebugView =
             VolumetricCloudRaymarchDebugView.FINAL;
     // Fixed empty-map base/top sentinels bleed into cloud fringes through the
@@ -187,6 +194,14 @@ public final class VolumetricCloudDebugConfig {
 
     public static void setPuffTierFilter(VolumetricPuffTierFilter filter) {
         puffTierFilter = filter == null ? VolumetricPuffTierFilter.ALL : filter;
+    }
+
+    public static boolean coverageAlphaReconstruction() {
+        return coverageAlphaReconstruction;
+    }
+
+    public static void setCoverageAlphaReconstruction(boolean enabled) {
+        coverageAlphaReconstruction = enabled;
     }
 
     public static boolean historyEnabled() {

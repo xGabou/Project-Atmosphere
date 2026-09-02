@@ -1,6 +1,7 @@
 package net.Gabou.projectatmosphere.clouds.client.render.volumetric;
 
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
+import net.Gabou.projectatmosphere.clouds.client.render.field.CloudFieldCompositeRenderer;
 import net.Gabou.projectatmosphere.config.AtmoCommonConfig;
 
 import java.util.ArrayList;
@@ -36,6 +37,29 @@ public final class StormT135PerformanceProfile {
     /** Hard ceiling so a stalled cell cannot hang a run. */
     private static final int CELL_TIMEOUT_FRAMES = 600;
 
+    /**
+     * Active per-cell budgets. The T136 five-mode sweep keeps the full 45/120
+     * protocol. The T138 resolution sweep runs forty cells against one live
+     * storm, and a cell at scale 1.00 on the NEAR_EDGE pose presents at under
+     * one frame per second, so a full-length protocol would outlive the fixture
+     * it is measuring. Shortening the sample is a fixture-validity decision,
+     * not a statistical shortcut: a cell that decays mid-sample is still
+     * discarded outright rather than reported.
+     */
+    private static int settleTarget = SETTLE_FRAMES;
+    private static int sampleTarget = SAMPLE_FRAMES;
+
+    /**
+     * Sets the per-cell settle and sample budgets. Both are clamped into the
+     * measurable range; the sample budget never exceeds the fixed sample arrays
+     * and never falls below the 16-sample floor {@code finish} already requires
+     * before a cell may be recorded.
+     */
+    public static synchronized void setCellBudget(int settleFrames, int sampleFrames) {
+        settleTarget = Math.max(0, Math.min(SETTLE_FRAMES, settleFrames));
+        sampleTarget = Math.max(16, Math.min(SAMPLE_FRAMES, sampleFrames));
+    }
+
     private static volatile boolean active;
     private static String poseName = "";
     private static AtmoCommonConfig.CloudRaymarchQuality mode;
@@ -56,6 +80,14 @@ public final class StormT135PerformanceProfile {
     private static String armLabel = "production";
     private static final float[] cloudMilliseconds = new float[SAMPLE_FRAMES];
     private static final float[] frameMilliseconds = new float[SAMPLE_FRAMES];
+    /**
+     * Reconstruction cost. The depth-aware upsample runs at the full display
+     * resolution whatever the cloud target's size, so it is the one term in the
+     * pass that does not shrink with the internal resolution and has to be
+     * measured separately instead of folded into the cloud time.
+     */
+    private static final float[] compositeMilliseconds = new float[SAMPLE_FRAMES];
+    private static float effectiveResolutionScale = Float.NaN;
     private static final List<Cell> results = new ArrayList<>();
 
     private StormT135PerformanceProfile() {
@@ -80,7 +112,10 @@ public final class StormT135PerformanceProfile {
             double frameP50,
             double frameP95,
             double frameMean,
-            double remainderP50
+            double remainderP50,
+            double compositeP50,
+            double compositeP95,
+            float effectiveResolutionScale
     ) {
     }
 
@@ -112,6 +147,7 @@ public final class StormT135PerformanceProfile {
         sampled = 0;
         cellFrames = 0;
         previousFrameNanos = 0L;
+        effectiveResolutionScale = Float.NaN;
         active = true;
         return true;
     }
@@ -183,7 +219,7 @@ public final class StormT135PerformanceProfile {
         if (previous == 0L) {
             return;
         }
-        if (settled < SETTLE_FRAMES) {
+        if (settled < settleTarget) {
             settled++;
             return;
         }
@@ -192,13 +228,22 @@ public final class StormT135PerformanceProfile {
             // The asynchronous timer has no result yet; do not fabricate one.
             return;
         }
+        // The scale actually in force this frame, read from the renderer rather
+        // than from the mode table: a diagnostic override turns the mode's
+        // configured scale into a label instead of a measurement.
+        effectiveResolutionScale = VolumetricCloudRenderer.lastResolutionScale();
         float frameMs = (now - previous) / 1_000_000.0F;
-        if (sampled < SAMPLE_FRAMES) {
+        float compositeMs = CloudFieldCompositeRenderer.lastGpuMilliseconds();
+        if (sampled < sampleTarget) {
             cloudMilliseconds[sampled] = cloudMs;
             frameMilliseconds[sampled] = frameMs;
+            // A pending composite query records as zero rather than as a
+            // fabricated cost. The percentile then understates it, which is the
+            // safe direction for a term used to argue a cost floor.
+            compositeMilliseconds[sampled] = Math.max(0.0F, compositeMs);
             sampled++;
         }
-        if (sampled >= SAMPLE_FRAMES) {
+        if (sampled >= sampleTarget) {
             finish(frameWidth, frameHeight);
         }
     }
@@ -207,8 +252,10 @@ public final class StormT135PerformanceProfile {
         if (sampled >= 16) {
             float[] cloud = Arrays.copyOf(cloudMilliseconds, sampled);
             float[] frame = Arrays.copyOf(frameMilliseconds, sampled);
+            float[] composite = Arrays.copyOf(compositeMilliseconds, sampled);
             Arrays.sort(cloud);
             Arrays.sort(frame);
+            Arrays.sort(composite);
             results.add(new Cell(
                     poseName,
                     armLabel,
@@ -227,7 +274,10 @@ public final class StormT135PerformanceProfile {
                     percentile(frame, 0.50D),
                     percentile(frame, 0.95D),
                     mean(frame),
-                    percentile(frame, 0.50D) - percentile(cloud, 0.50D)
+                    percentile(frame, 0.50D) - percentile(cloud, 0.50D),
+                    percentile(composite, 0.50D),
+                    percentile(composite, 0.95D),
+                    effectiveResolutionScale
             ));
             Cell recorded = results.get(results.size() - 1);
             ProjectAtmosphere.LOGGER.info(
@@ -235,7 +285,9 @@ public final class StormT135PerformanceProfile {
                             + " resolutionScale={} framebuffer={}x{}"
                             + " cloudTarget={}x{} samples={}"
                             + " cloudP50={} cloudP95={} cloudMean={}"
-                            + " frameP50={} frameP95={} frameMean={} remainderP50={}",
+                            + " frameP50={} frameP95={} frameMean={} remainderP50={}"
+                            + " effectiveResolutionScale={}"
+                            + " compositeP50={} compositeP95={}",
                     recorded.pose(), recorded.arm(), recorded.descriptors(),
                     recorded.mode(), recorded.raymarchSteps(),
                     fmt(recorded.resolutionScale()), recorded.frameWidth(),
@@ -243,7 +295,9 @@ public final class StormT135PerformanceProfile {
                     recorded.samples(),
                     fmt(recorded.cloudP50()), fmt(recorded.cloudP95()), fmt(recorded.cloudMean()),
                     fmt(recorded.frameP50()), fmt(recorded.frameP95()), fmt(recorded.frameMean()),
-                    fmt(recorded.remainderP50()));
+                    fmt(recorded.remainderP50()),
+                    fmt(recorded.effectiveResolutionScale()),
+                    fmt(recorded.compositeP50()), fmt(recorded.compositeP95()));
         } else {
             ProjectAtmosphere.LOGGER.warn(
                     "T135_PROFILE pose={} mode={} produced only {} samples; discarded",

@@ -8,6 +8,27 @@
 
 ---
 
+---
+
+> **Correction (T138, 2026-09-02).** Every "storm gameplay" figure in this
+> document is measured at a pose whose frame contains no storm. `PLAY_NEAR`,
+> `PLAY_MID` and `PLAY_HIGH` place the camera 4x, 7x and 5x the storm's
+> horizontal radius away; at T134 severe scale that radius is ~668 blocks, so
+> the nearest of them puts the storm's near edge 2002 blocks out — past the
+> shipped `cloudRenderDistance = 2000`. The captured frames are empty sky and
+> the counters agree (0.09 light-march evaluations per pixel, 99.9 % of steps
+> resolved as empty space). Those cells measure the cost of marching an empty
+> slab with a distant storm's descriptors resident, which is a real and
+> alarming cost but is not storm gameplay.
+>
+> Measured on the same fixture at the same y=120 altitude with the storm in
+> frame: **PLAY_VIS_NEAR (1.6x radius) costs 492.8 ms at Ultra and
+> PLAY_VIS_MID (2.4x radius) 284.4 ms** — 61.6x and 35.5x over the 8 ms cloud
+> budget, against the 12.8x this document reports. See
+> `performance-internal-resolution.md`. T142 restates the budget contract
+> against the corrected poses.
+
+
 ## 1. Harness corrections
 
 T135's sweep was contaminated by fixture decay. Three fixes, all in place for

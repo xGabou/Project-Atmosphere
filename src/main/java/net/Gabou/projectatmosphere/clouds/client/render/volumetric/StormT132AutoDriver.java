@@ -55,6 +55,14 @@ final class StormT132AutoDriver {
      * sweep before the T098 captures, at the SC-006 reference resolution.
      */
     private static final Path T135_MARKER = Path.of("t135-performance.txt");
+    /**
+     * T138 rank-1 marker. When present the sweep walks (pose x internal
+     * resolution) at a fixed ULTRA step budget instead of (pose x quality
+     * mode), so the measured variable is the marched pixel count alone. The
+     * step budget, lighting, descriptor path and fixture are identical in every
+     * arm; only the cloud render target's dimensions change.
+     */
+    private static final Path T138_MARKER = Path.of("t138-resolution.txt");
     /** SC-006 states its total-frame budget at this resolution. */
     private static final int T135_WIDTH = 1920;
     private static final int T135_HEIGHT = 1080;
@@ -152,7 +160,11 @@ final class StormT132AutoDriver {
     }
 
     private static boolean performanceRunRequested() {
-        return Files.exists(T135_MARKER);
+        return Files.exists(T135_MARKER) || resolutionRunRequested();
+    }
+
+    private static boolean resolutionRunRequested() {
+        return Files.exists(T138_MARKER);
     }
 
     /** The five shipped quality modes, in ascending cost order. */
@@ -172,6 +184,110 @@ final class StormT132AutoDriver {
     private static final String[] T135_POSES = {
             "SIDE", "BELOW", "ABOVE", "FAR", "NEAR_EDGE",
             "PLAY_NEAR", "PLAY_MID", "PLAY_HIGH", "CLEAR"};
+    /**
+     * T138 internal-resolution arms, as linear scales of the 1920x1080 display
+     * resolution. 0.75 is the shipped ULTRA scale and is included so the sweep
+     * carries its own baseline rather than borrowing T136's. The targets are
+     * ceil(1920*s) x ceil(1080*s): 1920x1080, 1440x810, 960x540, 720x405 and
+     * 480x270.
+     */
+    private static final float[] T138_SCALES = {1.00F, 0.75F, 0.50F, 0.375F, 0.25F};
+    /**
+     * T138 poses. CLEAR is dropped: it has no storm and therefore no marched
+     * cloud pixels to scale. PLAY_NEAR leads because it is the representative
+     * case the budget has to hold, and the three most expensive severe poses
+     * trail so a decaying fixture costs the least decisive cells first.
+     */
+    private static final String[] T138_DEFAULT_POSES = {
+            "PLAY_NEAR", "SIDE", "FAR", "ABOVE", "BELOW", "NEAR_EDGE",
+            // PLAY_MID and PLAY_HIGH sit 7x and 5x the storm radius away, far
+            // enough that the client stops holding the storm's descriptors.
+            // They are measured last so a pose that cannot keep a fixture
+            // cannot cost the decisive severe and representative cells.
+            "PLAY_MID", "PLAY_HIGH"};
+    /**
+     * The pose list actually swept. Non-comment lines of the T138 marker
+     * override the default, so a follow-up arm can re-aim the sweep without a
+     * recompile - which matters because the first sweep proved the shipped
+     * PLAY_* poses sit outside the 2000-block cloud render distance at T134
+     * storm scale and therefore render no storm at all.
+     */
+    private static String[] T138_POSES = T138_DEFAULT_POSES;
+
+    private static void resolveT138Poses() {
+        try {
+            java.util.List<String> parsed = new java.util.ArrayList<>();
+            for (String line : Files.readAllLines(T138_MARKER)) {
+                String trimmed = line.trim();
+                if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                    parsed.add(trimmed.toUpperCase(Locale.ROOT));
+                }
+            }
+            T138_POSES = parsed.isEmpty()
+                    ? T138_DEFAULT_POSES
+                    : parsed.toArray(new String[0]);
+        } catch (Exception exception) {
+            T138_POSES = T138_DEFAULT_POSES;
+        }
+        ProjectAtmosphere.LOGGER.info("T138_RES poses={}",
+                String.join(",", T138_POSES));
+    }
+    /**
+     * Attempts allowed on one (pose, arm) cell before it is recorded as
+     * unmeasurable and the sweep moves on. Without a bound a pose that can
+     * never hold descriptors respawns forever, which is exactly what the first
+     * T138 attempt did at PLAY_HIGH.
+     */
+    private static final int T138_MAX_ARM_ATTEMPTS = 3;
+    private static int t138ArmAttempts;
+    private static boolean t138CellPending;
+    /**
+     * Poses that also run a history-disabled arm, so the temporal blend's own
+     * cost is measured per resolution instead of assumed constant. Restricted
+     * to the representative pose and the severe reference pose: running it
+     * everywhere would double a sweep that already outlasts its fixture.
+     */
+    private static final String[] T138_HISTORY_ARM_POSES = {"PLAY_NEAR", "SIDE"};
+    private static boolean t138ResolutionRun;
+    private static int t138ScaleIndex;
+    private static boolean t138HistoryArm;
+
+    private static boolean t138HistoryArmPose(String pose) {
+        for (String candidate : T138_HISTORY_ARM_POSES) {
+            if (candidate.equals(pose)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The pose list in force, which differs between the T136 and T138 sweeps. */
+    private static String[] sweepPoses() {
+        return t138ResolutionRun ? T138_POSES : T135_POSES;
+    }
+
+    private static String sweepPose() {
+        String[] poses = sweepPoses();
+        return poses[Math.max(0, Math.min(poses.length - 1, t135PoseIndex))];
+    }
+
+    /**
+     * Applies one T138 arm: the internal resolution under test, and whether the
+     * temporal history blend participates. Both are existing diagnostic
+     * controls; neither changes a density, lighting or morphology equation.
+     */
+    private static void applyT138Arm() {
+        float scale = T138_SCALES[Math.max(0, Math.min(T138_SCALES.length - 1, t138ScaleIndex))];
+        VolumetricCloudDebugConfig.setFixedResolutionScale(scale);
+        VolumetricCloudDebugConfig.setHistoryEnabled(!t138HistoryArm);
+    }
+
+    private static String t138ArmName() {
+        float scale = T138_SCALES[Math.max(0, Math.min(T138_SCALES.length - 1, t138ScaleIndex))];
+        return String.format(Locale.ROOT, "%s@%.3f",
+                t138HistoryArm ? "historyOff" : "production", scale);
+    }
+
     private static int t135PoseIndex;
     private static int t135ModeIndex;
     private static int t135SettleFrames;
@@ -371,9 +487,28 @@ final class StormT132AutoDriver {
                 StormT135PerformanceProfile.reset();
                 t135PoseIndex = 0;
                 t135ModeIndex = 0;
-                ProjectAtmosphere.LOGGER.info(
-                        "T135_PROFILE_BEGIN poses={} modes={} target={}x{}",
-                        T135_POSES.length, T135_MODES.length, T135_WIDTH, T135_HEIGHT);
+                t138ResolutionRun = resolutionRunRequested();
+                t138ScaleIndex = 0;
+                t138HistoryArm = false;
+                if (t138ResolutionRun) {
+                    resolveT138Poses();
+                    // Forty cells against one live storm. The full 45/120
+                    // protocol would outlive the fixture, and a fixture that
+                    // decays mid-cell produces no measurement at all.
+                    StormT135PerformanceProfile.setCellBudget(30, 60);
+                    AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(
+                            AtmoCommonConfig.CloudRaymarchQuality.ULTRA);
+                    applyT138Arm();
+                    ProjectAtmosphere.LOGGER.info(
+                            "T138_RES_BEGIN poses={} scales={} mode=ULTRA steps=96"
+                                    + " target={}x{} historyArmPoses={}",
+                            T138_POSES.length, T138_SCALES.length,
+                            T135_WIDTH, T135_HEIGHT, T138_HISTORY_ARM_POSES.length);
+                } else {
+                    ProjectAtmosphere.LOGGER.info(
+                            "T135_PROFILE_BEGIN poses={} modes={} target={}x{}",
+                            T135_POSES.length, T135_MODES.length, T135_WIDTH, T135_HEIGHT);
+                }
                 advance(Phase.T135_MOVE);
             }
             case T135_MOVE -> {
@@ -398,7 +533,7 @@ final class StormT132AutoDriver {
                 double x = fixture.centerX();
                 double y = midY;
                 double z = fixture.centerZ();
-                switch (T135_POSES[t135PoseIndex]) {
+                switch (sweepPose()) {
                     // A - severe worst case.
                     case "SIDE" -> x = fixture.centerX() + radius * 1.7D;
                     case "FAR" -> x = fixture.centerX() + radius * 2.6D;
@@ -425,6 +560,20 @@ final class StormT132AutoDriver {
                         z = fixture.centerZ() + radius * 3.0D;
                         y = 100.0D;
                     }
+                    // B' - storm gameplay that actually contains a storm. The
+                    // shipped PLAY_* poses were written for a much smaller
+                    // storm; at T134 scale their camera sits beyond the
+                    // 2000-block cloud render distance and the frame is empty
+                    // sky. These keep the gameplay altitude of y=120 and move
+                    // the camera to a distance from which the storm is drawn.
+                    case "PLAY_VIS_NEAR" -> {
+                        x = fixture.centerX() + radius * 1.6D;
+                        y = 120.0D;
+                    }
+                    case "PLAY_VIS_MID" -> {
+                        x = fixture.centerX() + radius * 2.4D;
+                        y = 120.0D;
+                    }
                     case "PLAY_HIGH" -> {
                         x = fixture.centerX() + radius * 5.0D;
                         z = fixture.centerZ() - radius * 2.0D;
@@ -440,9 +589,9 @@ final class StormT132AutoDriver {
                 float yaw = (float) (Math.toDegrees(Math.atan2(
                         fixture.centerZ() - z, fixture.centerX() - x)) - 90.0D);
                 float pitch = 0.0F;
-                if ("ABOVE".equals(T135_POSES[t135PoseIndex])
-                        || "BELOW".equals(T135_POSES[t135PoseIndex])
-                        || T135_POSES[t135PoseIndex].startsWith("PLAY")) {
+                if ("ABOVE".equals(sweepPose())
+                        || "BELOW".equals(sweepPose())
+                        || sweepPose().startsWith("PLAY")) {
                     double dy = midY - y;
                     double horizontal = Math.hypot(fixture.centerX() - x, fixture.centerZ() - z);
                     pitch = horizontal < 1.0D
@@ -461,6 +610,13 @@ final class StormT132AutoDriver {
             }
             case T135_SAMPLE -> {
                 if (StormT135PerformanceProfile.active()) {
+                    return;
+                }
+                if (t138ResolutionRun) {
+                    // The resolution sweep owns its own retry accounting: it
+                    // retries the same arm, not the next one, and abandons an
+                    // arm rather than looping when a pose cannot hold a fixture.
+                    tickResolutionSweep();
                     return;
                 }
                 // A cell rejected for fixture decay is retried against a fresh
@@ -530,7 +686,7 @@ final class StormT132AutoDriver {
                     advance(Phase.T135_RESPAWN);
                     return;
                 }
-                t135CounterLabel = T135_POSES[t135PoseIndex] + "|" + t135ArmName()
+                t135CounterLabel = sweepPose() + "|" + t135ArmName()
                         + "|" + quality.name();
                 t135ModeIndex++;
                 t135CountersRequested = false;
@@ -584,25 +740,37 @@ final class StormT132AutoDriver {
                 }
             }
             case T135_REPORT -> {
-                StringBuilder out = new StringBuilder("T135_PROFILE_COMPLETE cells="
-                        + StormT135PerformanceProfile.results().size());
+                StringBuilder out = new StringBuilder(
+                        (t138ResolutionRun ? "T138_RES_COMPLETE cells=" : "T135_PROFILE_COMPLETE cells=")
+                                + StormT135PerformanceProfile.results().size());
                 for (StormT135PerformanceProfile.Cell cell
                         : StormT135PerformanceProfile.results()) {
                     out.append(String.format(Locale.ROOT,
-                            "%nT135_CELL|%s|%s|%d|%s|%d|%.3f|%dx%d|%dx%d|%d"
-                                    + "|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f",
+                            "%n%s|%s|%s|%d|%s|%d|%.3f|%dx%d|%dx%d|%d|%d"
+                                    + "|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f",
+                            t138ResolutionRun ? "T138_CELL" : "T135_CELL",
                             cell.pose(), cell.arm(), cell.descriptors(),
                             cell.mode(), cell.raymarchSteps(),
-                            cell.resolutionScale(), cell.frameWidth(), cell.frameHeight(),
+                            cell.effectiveResolutionScale(),
+                            cell.frameWidth(), cell.frameHeight(),
                             cell.cloudWidth(), cell.cloudHeight(),
+                            cell.cloudWidth() * cell.cloudHeight(),
                             cell.samples(), cell.cloudP50(), cell.cloudP95(),
                             cell.frameP50(), cell.frameP95(), cell.remainderP50(),
-                            cell.cloudMean()));
+                            cell.compositeP50(), cell.compositeP95()));
                 }
                 ProjectAtmosphere.LOGGER.info(out.toString());
                 // Restore the acceptance configuration for the capture set.
                 AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(
                         AtmoCommonConfig.CloudRaymarchQuality.ULTRA);
+                if (t138ResolutionRun) {
+                    // Hand the capture set an unmodified adaptive scale so
+                    // applyFixtureResolutionControl records the real prior value
+                    // rather than the last arm under test.
+                    VolumetricCloudDebugConfig.setHistoryEnabled(true);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
                 applyFixtureResolutionControl();
                 advance(Phase.BEGIN_T098);
             }
@@ -629,6 +797,85 @@ final class StormT132AutoDriver {
             default -> {
             }
         }
+    }
+
+    /**
+     * One step of the T138 (pose x internal resolution) sweep.
+     *
+     * <p>The quality mode is pinned to ULTRA for every cell, so the step
+     * budget, light-cone taps, detail quality and weather-map size are constant
+     * and the only variable is the cloud render target's dimensions. Poses that
+     * carry the history arm run each scale twice - once with the temporal blend
+     * and once without - which measures the blend's own cost per resolution
+     * rather than inferring it.
+     */
+    private static void tickResolutionSweep() {
+        String pose = sweepPose();
+        // Resolve the cell that just ran before starting another. A cell that
+        // decayed is retried on the SAME arm against a fresh fixture; only an
+        // arm that has exhausted its attempts is skipped, and the arm index
+        // never advances on a cell that was not recorded.
+        if (t138CellPending) {
+            t138CellPending = false;
+            boolean failed = StormT135PerformanceProfile.lastCellContaminated()
+                    || StormGeometryBuildCoordinator.lobeCount() <= 0;
+            if (failed) {
+                if (++t138ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
+                    ProjectAtmosphere.LOGGER.info(
+                            "T138_RES respawning before retrying {}/{} (attempt {})",
+                            pose, t138ArmName(), t138ArmAttempts + 1);
+                    advance(Phase.T135_RESPAWN);
+                    return;
+                }
+                ProjectAtmosphere.LOGGER.warn(
+                        "T138_RES {}/{} unmeasurable after {} attempts; arm skipped",
+                        pose, t138ArmName(), t138ArmAttempts);
+            }
+            t138ArmAttempts = 0;
+            advanceResolutionArm(pose);
+        }
+        if (t138ScaleIndex >= T138_SCALES.length) {
+            t138ScaleIndex = 0;
+            t138HistoryArm = false;
+            t138ArmAttempts = 0;
+            applyT138Arm();
+            t135PoseIndex++;
+            if (t135PoseIndex >= T138_POSES.length) {
+                advance(Phase.T135_REPORT);
+            } else {
+                advance(Phase.T135_MOVE);
+            }
+            return;
+        }
+        applyT138Arm();
+        String arm = t138ArmName();
+        if (!StormT135PerformanceProfile.begin(
+                pose, AtmoCommonConfig.CloudRaymarchQuality.ULTRA, arm)) {
+            if (++t138ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
+                advance(Phase.T135_RESPAWN);
+                return;
+            }
+            ProjectAtmosphere.LOGGER.warn(
+                    "T138_RES {}/{} never became measurable after {} attempts;"
+                            + " arm skipped", pose, arm, t138ArmAttempts);
+            t138ArmAttempts = 0;
+            advanceResolutionArm(pose);
+            return;
+        }
+        t138CellPending = true;
+        t135CounterLabel = pose + "|" + arm + "|ULTRA";
+        t135CountersRequested = false;
+        advance(Phase.T135_COUNTERS);
+    }
+
+    /** Moves to the next history arm, or to the next resolution. */
+    private static void advanceResolutionArm(String pose) {
+        if (t138HistoryArmPose(pose) && !t138HistoryArm) {
+            t138HistoryArm = true;
+            return;
+        }
+        t138HistoryArm = false;
+        t138ScaleIndex++;
     }
 
     /**

@@ -146,6 +146,17 @@ Multiplicative, in the order they should land:
 **Expected cumulative speedup: roughly 27–40x**, with a plausible range of
 15–50x depending on how much reconstruction is acceptable.
 
+> **Retired (T138, 2026-09-02).** Every factor in this table has now been
+> measured or shown unavailable. Stage 1 (descriptor cost) is 1.02–1.10x,
+> not 2.0x. Stage 2 (internal resolution 0.75 → 0.375) is 2.51–3.31x, not
+> 4.0x, because cost scales as pixels^0.69–0.90 rather than linearly.
+> Stage 3 (temporal reconstruction) is not available: the pipeline has no
+> screen-space jitter and no accumulation buffer, so its history cannot
+> add resolution. Stage 4 is ~1.10x. **The measured cumulative path is
+> 5.3x, not 27–40x**, and the requirement it is measured against is 62x,
+> not 12.8x, because §4's representative pose contains no storm. See
+> `performance-internal-resolution.md`.
+
 Against that stack:
 
 | case | current Ultra | at 30x | budget | verdict |

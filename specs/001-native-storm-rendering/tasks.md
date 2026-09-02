@@ -826,7 +826,7 @@ not fabricate historical before/after percentages for T119--T123.
   reconstruction, quality-specific LOD, bounded simplification, and distance policy; select only
   contributors supported by the measured data and state whether T098b regrade is required
   (depends on T136) [FR-010-FR-012, FR-027, FR-030; SC-006, SC-017, SC-021]
-- [ ] T138 [PERFORMANCE] Implement one bounded, profile-selected major performance increment from
+- [X] T138 [PERFORMANCE] Implement one bounded, profile-selected major performance increment from
   T137 in the exact production target selected in
   `validation/performance-architecture.md`—one of
   `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormLobeSpatialIndex.java`,
@@ -838,11 +838,47 @@ not fabricate historical before/after percentages for T119--T123.
   deliberately image-changing change is allowed, but must preserve structural correctness and be
   queued for T098b rather than claimed neutral (depends on T098a, T137) [FR-001, FR-006,
   FR-010-FR-012, FR-027, FR-030; SC-006, SC-017]
+  **Discharged by measurement, with no production change.** Rank 2 was measured
+  and rejected in `validation/performance-descriptor-cost.md` (1.02-1.10x, not
+  1.5-3x). Rank 1 was then measured across five internal resolutions and eight
+  poses in `validation/performance-internal-resolution.md`. Two results decide
+  the task. (a) The `PLAY_NEAR`, `PLAY_MID` and `PLAY_HIGH` poses place the
+  camera 4x, 7x and 5x the storm radius away; at T134 severe scale that is
+  outside the 2000-block `cloudRenderDistance`, so every "representative
+  gameplay" figure in T135/T136/T137 measures an empty sky. With the storm
+  actually in frame at gameplay altitude the representative Ultra cost is
+  492.8 ms, not 102 ms - 61.6x over budget, not 12.8x. (b) Internal resolution
+  returns 4.75x from 0.75 to 0.25 with T098a green at every scale, not the
+  assumed 4x-per-4x-pixels, because cost scales as pixels^0.69-0.90 rather than
+  linearly. The measured cumulative path is 5.3x against ~62x required, so no
+  resolution ladder was adopted: doing so would spend the whole image-quality
+  budget and still miss by 13x. The composite reconstruction is measured
+  sufficient for 0.25 (100% colour/depth pairing, 0.08-0.16 ms, flat) and
+  fundamentally unable to add resolution back (no screen-space jitter, no
+  accumulation). One candidate reconstruction change was implemented, measured
+  inert (<=0.0033% of pixels) and rejected.
 - [ ] T139 [PERFORMANCE] Integrate the T135/T137 evidence into five-mode quality policy: map
   budgets, LOD, raymarch, lighting, resolution, governor floors/ceilings, and history transitions
   to Low/Low 24/Medium/High/Ultra without disconnecting complete groups. Record the policy and
   transition rationale in `validation/us3-quality-lod.md` (depends on T045, T137) [FR-001,
   FR-009-FR-012; SC-005-SC-007, SC-021]
+- [ ] T141 [PERFORMANCE] Measure the per-pixel descriptor **evaluation** cost with a controlled
+  arm before implementing anything against it, and record it in
+  `validation/performance-descriptor-evaluation.md`. T138 measured 397 descriptor SDF evaluations
+  per shaded pixel at the corrected representative pose, with 88% of march steps resolving as empty
+  space and still paying 13.7 evaluations each. The rank-2 rejection measured elasticity against
+  descriptor *fetches* and is silent about evaluations. Hold fixture, pose, resolution and step
+  budget fixed and vary the evaluation count - the `directStormGroupField` candidate rank count, or
+  the T121 conservative bound - then report the elasticity of GPU time against
+  `paDescriptorEvaluations`. Also measure an empty-space early-out: the shipped `PLAY_NEAR` pose
+  spends 90 ms of Ultra cloud time on a frame with no storm in it against 3.9 ms for the same empty
+  sky with no descriptors resident (depends on T138) [FR-012-FR-013, FR-027; SC-006, SC-017]
+- [ ] T142 [PERFORMANCE] Correct the gameplay pose definitions in
+  `validation/performance-budget.md` and `validation/performance-baseline.md`: replace `PLAY_NEAR`,
+  `PLAY_MID` and `PLAY_HIGH` with `PLAY_VIS_NEAR` (1.6x radius, y=120) and `PLAY_VIS_MID` (2.4x
+  radius, y=120), which are inside `cloudRenderDistance` at T134 storm scale, and restate every
+  representative budget multiple against them. The harness already implements both poses
+  (depends on T138) [FR-010-FR-012, FR-027; SC-006, SC-021]
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This
