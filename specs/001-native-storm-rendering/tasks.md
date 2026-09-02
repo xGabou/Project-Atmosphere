@@ -862,7 +862,7 @@ not fabricate historical before/after percentages for T119--T123.
   to Low/Low 24/Medium/High/Ultra without disconnecting complete groups. Record the policy and
   transition rationale in `validation/us3-quality-lod.md` (depends on T045, T137) [FR-001,
   FR-009-FR-012; SC-005-SC-007, SC-021]
-- [ ] T141 [PERFORMANCE] Measure the per-pixel descriptor **evaluation** cost with a controlled
+- [X] T141 [PERFORMANCE] Measure the per-pixel descriptor **evaluation** cost with a controlled
   arm before implementing anything against it, and record it in
   `validation/performance-descriptor-evaluation.md`. T138 measured 397 descriptor SDF evaluations
   per shaded pixel at the corrected representative pose, with 88% of march steps resolving as empty
@@ -873,12 +873,50 @@ not fabricate historical before/after percentages for T119--T123.
   `paDescriptorEvaluations`. Also measure an empty-space early-out: the shipped `PLAY_NEAR` pose
   spends 90 ms of Ultra cloud time on a frame with no storm in it against 3.9 ms for the same empty
   sky with no descriptors resident (depends on T138) [FR-012-FR-013, FR-027; SC-006, SC-017]
-- [ ] T142 [PERFORMANCE] Correct the gameplay pose definitions in
+  **Measured and rejected; no production change.** Recorded in
+  `validation/performance-descriptor-evaluation.md`. A bit-neutral arm doubling the exact
+  descriptor SDF evaluations at unchanged fetch volume (+70.4% evaluations, +0.01% fetches) costs
+  +11.4% at the corrected representative pose: evaluation elasticity is 0.15-0.31, so free
+  descriptor evaluation would buy ~1.19x. The `t121_off` arm independently agrees at 0.19. A
+  strictly tighter conservative bound - horizontal and vertical instead of vertical only, derived
+  from the SDF's own wall expression - rejected only 0.02-1.25% more lobes and cost 4.3-7.6%: a net
+  loss at every pose, because T121's comparison is against the running union distance and therefore
+  cannot reject a far sample at any tightness. The empty-sky control is explained: PLAY_NEAR's
+  99.5 ms against CLEAR's 1.8 ms is per-step descriptor *traversal* overhead, not lobe mathematics -
+  only 6 lobes are visited per pixel there while 24.5 segment tests answer "no" 99.9% of the time.
+  Fetch elasticity is restated at 0.37 representative, not the 0.10 the rank-2 rejection was judged
+  on at the empty-sky pose. CASE B for evaluation cost, CASE C for the early-out.
+- [X] T142 [PERFORMANCE] Correct the gameplay pose definitions in
   `validation/performance-budget.md` and `validation/performance-baseline.md`: replace `PLAY_NEAR`,
   `PLAY_MID` and `PLAY_HIGH` with `PLAY_VIS_NEAR` (1.6x radius, y=120) and `PLAY_VIS_MID` (2.4x
   radius, y=120), which are inside `cloudRenderDistance` at T134 storm scale, and restate every
   representative budget multiple against them. The harness already implements both poses
   (depends on T138) [FR-010-FR-012, FR-027; SC-006, SC-021]
+  **Done.** `validation/performance-pose-definitions.md` is the canonical pose contract: four
+  categories (VISIBLE GAMEPLAY, SEVERE STRUCTURAL, STRESS, CONTROL) plus a superseded list. No
+  historical measurement is deleted or rewritten; the affected cells stay valid as measurements of
+  what they actually rendered, and the representative claims drawn from them are withdrawn. The old
+  PLAY_NEAR framing is retained under its correct label, empty-sky-with-descriptors, because paired
+  with CLEAR it is the most diagnostically valuable control in the set.
+- [ ] T143 [PERFORMANCE] Hoist storm reachability out of the per-step march loop and measure it
+  against the `PLAY_NEAR`/`CLEAR` bracket, recording the result in
+  `validation/performance-traversal-overhead.md`. T141 established that per-step descriptor
+  *traversal* - the candidate-map lookup, descriptor validity and group-slot probes, and the
+  segment test - is what separates an empty sky with descriptors resident (99.5 ms) from the same
+  sky without them (1.8 ms), and that it dominates the per-pixel fetch volume at every pose. Compute
+  once per ray, or once per coarse span, the interval of `t` over which any descriptor-owned lobe
+  can be reached, from the group bounding volumes `stormGroupSegmentMayIntersect` already builds;
+  outside that interval skip the descriptor path entirely, as `StormLobeCount == 0` already does.
+  Measure against the control bracket before implementing anything else: if `PLAY_NEAR` does not
+  collapse toward 1.8 ms the mechanism is misidentified and the task stops. Zero false negatives
+  and T098a remain hard gates (depends on T141) [FR-001, FR-012-FR-013, FR-027; SC-006, SC-017]
+- [ ] T144 [PERFORMANCE] Collapse the redundant per-sample descriptor evaluations. T141 measured
+  **4.35 `directStormShape` calls per `cloudDensity` call** at the corrected representative pose -
+  the density path, the final-density path, the structure path and the safe-advance probe each
+  evaluate the same world point independently. Removing the redundancy is worth roughly 1.14x at the
+  measured evaluation elasticity of 0.16 and is image-neutral when the cached value is the same
+  value. Requires a deterministic equivalence test proving the cached and recomputed unions agree
+  (depends on T141) [FR-012, FR-019, FR-027; SC-017]
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This

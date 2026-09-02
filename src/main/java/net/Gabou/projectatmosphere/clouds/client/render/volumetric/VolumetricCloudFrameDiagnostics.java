@@ -134,6 +134,10 @@ public final class VolumetricCloudFrameDiagnostics {
         return result == null ? null : result.format();
     }
 
+    public static void abortStormWorkloadCapture() {
+        StormWorkloadRuntimeCapture.abort("driver_timeout");
+    }
+
     public static boolean stormWorkloadActive() {
         return StormWorkloadRuntimeCapture.active();
     }

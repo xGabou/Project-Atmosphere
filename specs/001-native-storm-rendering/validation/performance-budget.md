@@ -28,6 +28,9 @@
 > `performance-internal-resolution.md`. T142 restates the budget contract
 > against the corrected poses.
 
+> The canonical pose contract is now `performance-pose-definitions.md` (T142), which categorises every pose and
+> lists what each historical claim becomes. Nothing here is deleted.
+
 
 ## 1. The contract
 

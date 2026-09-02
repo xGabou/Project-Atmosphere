@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 2;
+    private static final int STAGES = 4;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -65,11 +65,36 @@ final class StormWorkloadRuntimeCapture {
         return active != null;
     }
 
+    /**
+     * Abandons an in-flight capture and drops any partial values. A capture the
+     * caller has given up on must not stay active: the next request would be
+     * refused as busy and the stale request would then finish its remaining
+     * stages from frames rendered under a different arm, producing a result
+     * stitched from several configurations.
+     */
+    static synchronized void abort(String reason) {
+        Request request = active;
+        if (request == null) {
+            return;
+        }
+        active = null;
+        latestResult = null;
+        latest = "capture_abandoned:view=" + request.view
+                + " captureToken=" + request.token
+                + " stage=" + request.stage + "/" + STAGES
+                + " reason=" + reason;
+        VolumetricCloudRenderer.invalidateHistory();
+    }
+
     static VolumetricCloudRaymarchDebugView view() {
         Request request = active;
-        return request != null && request.stage == 1
-                ? VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SECONDARY
-                : VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
+        int stage = request == null ? 0 : request.stage;
+        return switch (stage) {
+            case 1 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SECONDARY;
+            case 2 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_TERTIARY;
+            case 3 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_QUATERNARY;
+            default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
+        };
     }
 
     static String latest() {
@@ -118,7 +143,8 @@ final class StormWorkloadRuntimeCapture {
                 VolumetricCloudRenderer.invalidateHistory();
             } else {
                 latest = "acquiring view=" + request.view
-                        + " captureToken=" + request.token + " stage=1/2";
+                        + " captureToken=" + request.token
+                        + " stage=" + request.stage + "/" + STAGES;
             }
         } catch (RuntimeException exception) {
             // A failed capture must leave no result behind. Previously the last
@@ -153,7 +179,9 @@ final class StormWorkloadRuntimeCapture {
             return new WorkloadResult(token, view, width, height,
                     values[1][3], values[0][3],
                     values[0][0], values[0][1], values[0][2],
-                    values[1][0], values[1][1], values[1][2]);
+                    values[1][0], values[1][1], values[1][2],
+                    values[2][0], values[2][1], values[2][2], values[2][3],
+                    values[3][0], values[3][1], values[3][2], values[3][3]);
         }
     }
 
@@ -168,7 +196,11 @@ final class StormWorkloadRuntimeCapture {
             long captureToken, String view, int width, int height,
             double conservativeDescriptorRejects, double avoidedDescriptorTextureFetches,
             double primaryRaySteps, double descriptorEvaluations, double descriptorTextureFetches,
-            double lightMarchDensityEvaluations, double emptySpaceRejects, double earlyTerminations
+            double lightMarchDensityEvaluations, double emptySpaceRejects, double earlyTerminations,
+            double directStormShapeCalls, double groupFieldCalls, double lobesVisited,
+            double cloudDensityCalls,
+            double densityZeroCalls, double segmentTestCalls, double segmentTestPositive,
+            double boxBoundRejects
     ) {
         String format() {
             return "T123 workload view=" + view
@@ -181,7 +213,15 @@ final class StormWorkloadRuntimeCapture {
                     + " descriptorTextureFetches=" + fmt(descriptorTextureFetches)
                     + " lightMarchDensityEvaluations=" + fmt(lightMarchDensityEvaluations)
                     + " emptySpaceRejects=" + fmt(emptySpaceRejects)
-                    + " earlyTerminations=" + fmt(earlyTerminations);
+                    + " earlyTerminations=" + fmt(earlyTerminations)
+                    + " directStormShapeCalls=" + fmt(directStormShapeCalls)
+                    + " groupFieldCalls=" + fmt(groupFieldCalls)
+                    + " lobesVisited=" + fmt(lobesVisited)
+                    + " cloudDensityCalls=" + fmt(cloudDensityCalls)
+                    + " densityZeroCalls=" + fmt(densityZeroCalls)
+                    + " segmentTestCalls=" + fmt(segmentTestCalls)
+                    + " segmentTestPositive=" + fmt(segmentTestPositive)
+                    + " boxBoundRejects=" + fmt(boxBoundRejects);
         }
     }
 

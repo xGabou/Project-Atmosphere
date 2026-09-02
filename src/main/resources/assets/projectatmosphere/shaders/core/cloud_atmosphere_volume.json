@@ -72,6 +72,7 @@
     { "name": "DebugView", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "StormTopologyMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaDiagnosticOptimizationMode", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaDiagnosticEvalEpsilon", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "StormTraceOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
     { "name": "StormTraceYStart", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "StormTraceYInterval", "type": "float", "count": 1, "values": [ 1.0 ] },

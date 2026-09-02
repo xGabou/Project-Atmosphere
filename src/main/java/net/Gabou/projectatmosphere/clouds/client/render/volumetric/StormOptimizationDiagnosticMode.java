@@ -23,7 +23,23 @@ public enum StormOptimizationDiagnosticMode {
     /** T121's conservative descriptor rejection bypassed. */
     T121_OFF(1, "t121_off"),
     /** T122's descriptor-fetch reuse bypassed; the texels are refetched. */
-    T122_OFF(2, "t122_off");
+    T122_OFF(2, "t122_off"),
+    /**
+     * T141: each lobe's exact SDF is evaluated twice on the texels already in
+     * registers. Descriptor evaluations double while descriptor texel fetches
+     * are unchanged, so the GPU-time delta is the marginal cost of descriptor
+     * evaluation - the quantity T122's fetch arm never varied. The second
+     * evaluation is perturbed by a uniform uploaded as exactly zero, so the
+     * result is bit-identical and the image cannot change.
+     */
+    T141_EVAL_AMPLIFY(4, "t141_eval_amplify"),
+    /**
+     * T141: T121's conservative rejection uses a horizontal-and-vertical lower
+     * bound instead of the vertical-only one. The comparison is unchanged, and
+     * the maximum of two valid lower bounds is a valid lower bound, so the arm
+     * can only reject more lobes - never different ones.
+     */
+    T141_BOX_BOUND(8, "t141_box_bound");
 
     private final int shaderFlags;
     private final String serializedName;

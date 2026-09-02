@@ -63,6 +63,12 @@ final class StormT132AutoDriver {
      * arm; only the cloud render target's dimensions change.
      */
     private static final Path T138_MARKER = Path.of("t138-resolution.txt");
+    /**
+     * T141 marker. The sweep walks (pose x descriptor-evaluation arm) at one
+     * fixed resolution and one fixed quality mode, so the measured variable is
+     * descriptor evaluation work alone. Non-comment lines select the poses.
+     */
+    private static final Path T141_MARKER = Path.of("t141-descriptor-eval.txt");
     /** SC-006 states its total-frame budget at this resolution. */
     private static final int T135_WIDTH = 1920;
     private static final int T135_HEIGHT = 1080;
@@ -70,6 +76,13 @@ final class StormT132AutoDriver {
     private static final int T135_POSE_SETTLE_FRAMES = 120;
     private static final Pattern BASE_TOP =
             Pattern.compile("baseTop=(-?[0-9.]+)\\.\\.(-?[0-9.]+)");
+
+    /**
+     * Client ticks a four-stage counter readback may occupy. Each stage needs
+     * one rendered frame, and the expensive arms present at one to two frames
+     * per second while the client still runs ten ticks per frame.
+     */
+    private static final int COUNTER_TIMEOUT_FRAMES = 2400;
 
     /** Frames to let terrain and the cloud field settle before spawning. */
     private static final int WORLD_SETTLE_FRAMES = 400;
@@ -160,11 +173,15 @@ final class StormT132AutoDriver {
     }
 
     private static boolean performanceRunRequested() {
-        return Files.exists(T135_MARKER) || resolutionRunRequested();
+        return Files.exists(T135_MARKER) || resolutionRunRequested() || evaluationRunRequested();
     }
 
     private static boolean resolutionRunRequested() {
         return Files.exists(T138_MARKER);
+    }
+
+    private static boolean evaluationRunRequested() {
+        return Files.exists(T141_MARKER);
     }
 
     /** The five shipped quality modes, in ascending cost order. */
@@ -252,6 +269,66 @@ final class StormT132AutoDriver {
     private static int t138ScaleIndex;
     private static boolean t138HistoryArm;
 
+    /**
+     * T141 descriptor-evaluation arms, all at one resolution and one quality
+     * mode. `production` is the shipped path. `evalAmplify` doubles the exact
+     * SDF evaluations at unchanged fetch volume and unchanged output, so its
+     * GPU-time delta is the marginal cost of descriptor evaluation. `boxBound`
+     * strengthens T121's conservative rejection from a vertical-only bound to a
+     * horizontal-and-vertical one, so its delta is what a tighter conservative
+     * bound is worth. `t122Refetch` is carried forward from the rank-2 arm so
+     * fetch and evaluation elasticity are read off the same fixture.
+     */
+    private static final StormOptimizationDiagnosticMode[] T141_ARMS = {
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
+            StormOptimizationDiagnosticMode.T141_EVAL_AMPLIFY,
+            StormOptimizationDiagnosticMode.T141_BOX_BOUND,
+            StormOptimizationDiagnosticMode.T121_OFF,
+            StormOptimizationDiagnosticMode.T122_OFF
+    };
+    /**
+     * The resolution every T141 cell is measured at. Fixed so evaluation work
+     * is the only variable, and chosen at the shipped Ultra scale so the arms
+     * are comparable with the T136 and T138 records.
+     */
+    private static final float T141_RESOLUTION_SCALE = 0.75F;
+    private static final String[] T141_DEFAULT_POSES = {
+            "PLAY_VIS_NEAR", "PLAY_VIS_MID", "SIDE", "FAR", "ABOVE", "BELOW",
+            "NEAR_EDGE", "PLAY_NEAR", "CLEAR"};
+    private static String[] T141_POSES = T141_DEFAULT_POSES;
+    private static boolean t141EvaluationRun;
+    private static int t141ArmIndex;
+    private static int t141ArmAttempts;
+    private static boolean t141CellPending;
+
+    private static void resolveT141Poses() {
+        try {
+            java.util.List<String> parsed = new java.util.ArrayList<>();
+            for (String line : Files.readAllLines(T141_MARKER)) {
+                String trimmed = line.trim();
+                if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                    parsed.add(trimmed.toUpperCase(Locale.ROOT));
+                }
+            }
+            T141_POSES = parsed.isEmpty() ? T141_DEFAULT_POSES : parsed.toArray(new String[0]);
+        } catch (Exception exception) {
+            T141_POSES = T141_DEFAULT_POSES;
+        }
+        ProjectAtmosphere.LOGGER.info("T141_EVAL poses={} arms={}",
+                String.join(",", T141_POSES), T141_ARMS.length);
+    }
+
+    private static void applyT141Arm() {
+        VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
+        VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                T141_ARMS[Math.max(0, Math.min(T141_ARMS.length - 1, t141ArmIndex))]);
+    }
+
+    private static String t141ArmName() {
+        return T141_ARMS[Math.max(0, Math.min(T141_ARMS.length - 1, t141ArmIndex))]
+                .serializedName();
+    }
+
     private static boolean t138HistoryArmPose(String pose) {
         for (String candidate : T138_HISTORY_ARM_POSES) {
             if (candidate.equals(pose)) {
@@ -263,6 +340,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t141EvaluationRun) {
+            return T141_POSES;
+        }
         return t138ResolutionRun ? T138_POSES : T135_POSES;
     }
 
@@ -490,6 +570,22 @@ final class StormT132AutoDriver {
                 t138ResolutionRun = resolutionRunRequested();
                 t138ScaleIndex = 0;
                 t138HistoryArm = false;
+                t141EvaluationRun = evaluationRunRequested();
+                t141ArmIndex = 0;
+                t141ArmAttempts = 0;
+                t141CellPending = false;
+                if (t141EvaluationRun) {
+                    resolveT141Poses();
+                    StormT135PerformanceProfile.setCellBudget(30, 60);
+                    AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(
+                            AtmoCommonConfig.CloudRaymarchQuality.ULTRA);
+                    applyT141Arm();
+                    ProjectAtmosphere.LOGGER.info(
+                            "T141_EVAL_BEGIN poses={} arms={} mode=ULTRA steps=96"
+                                    + " resolutionScale={} target={}x{}",
+                            T141_POSES.length, T141_ARMS.length,
+                            fmt(T141_RESOLUTION_SCALE), T135_WIDTH, T135_HEIGHT);
+                }
                 if (t138ResolutionRun) {
                     resolveT138Poses();
                     // Forty cells against one live storm. The full 45/120
@@ -612,6 +708,10 @@ final class StormT132AutoDriver {
                 if (StormT135PerformanceProfile.active()) {
                     return;
                 }
+                if (t141EvaluationRun) {
+                    tickEvaluationSweep();
+                    return;
+                }
                 if (t138ResolutionRun) {
                     // The resolution sweep owns its own retry accounting: it
                     // retries the same arm, not the next one, and abandons an
@@ -702,12 +802,24 @@ final class StormT132AutoDriver {
                 if (!t135CountersRequested) {
                     t135CountersRequested = true;
                     VolumetricCloudFrameDiagnostics.requestStormWorkloadCapture("side");
+                    // The timing sample runs inside this phase, so stageFrames
+                    // has already counted every tick of it. At the T141 arms'
+                    // one to two frames per second that is well past the
+                    // timeout before the capture has rendered a single frame,
+                    // which expired every capture and then left the stale
+                    // request active across the next arms. Restart the clock
+                    // where the capture actually begins.
+                    advance(Phase.T135_COUNTERS);
                     return;
                 }
                 if (VolumetricCloudFrameDiagnostics.stormWorkloadActive()) {
-                    if (stageFrames > 600) {
+                    if (stageFrames > COUNTER_TIMEOUT_FRAMES) {
                         ProjectAtmosphere.LOGGER.warn(
                                 "T136_COUNTERS timed out for {}", t135CounterLabel);
+                        // A capture left active would be resumed by the next
+                        // cell and complete from frames of several different
+                        // arms. Abandon it here instead.
+                        VolumetricCloudFrameDiagnostics.abortStormWorkloadCapture();
                         advance(Phase.T135_SAMPLE);
                     }
                     return;
@@ -740,9 +852,13 @@ final class StormT132AutoDriver {
                 }
             }
             case T135_REPORT -> {
+                String completionLabel = t141EvaluationRun
+                        ? "T141_EVAL_COMPLETE cells="
+                        : (t138ResolutionRun
+                            ? "T138_RES_COMPLETE cells="
+                            : "T135_PROFILE_COMPLETE cells=");
                 StringBuilder out = new StringBuilder(
-                        (t138ResolutionRun ? "T138_RES_COMPLETE cells=" : "T135_PROFILE_COMPLETE cells=")
-                                + StormT135PerformanceProfile.results().size());
+                        completionLabel + StormT135PerformanceProfile.results().size());
                 for (StormT135PerformanceProfile.Cell cell
                         : StormT135PerformanceProfile.results()) {
                     out.append(String.format(Locale.ROOT,
@@ -763,12 +879,14 @@ final class StormT132AutoDriver {
                 // Restore the acceptance configuration for the capture set.
                 AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(
                         AtmoCommonConfig.CloudRaymarchQuality.ULTRA);
-                if (t138ResolutionRun) {
+                if (t138ResolutionRun || t141EvaluationRun) {
                     // Hand the capture set an unmodified adaptive scale so
                     // applyFixtureResolutionControl records the real prior value
                     // rather than the last arm under test.
                     VolumetricCloudDebugConfig.setHistoryEnabled(true);
                     VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
                 }
                 applyFixtureResolutionControl();
@@ -863,6 +981,63 @@ final class StormT132AutoDriver {
             return;
         }
         t138CellPending = true;
+        t135CounterLabel = pose + "|" + arm + "|ULTRA";
+        t135CountersRequested = false;
+        advance(Phase.T135_COUNTERS);
+    }
+
+    /**
+     * One step of the T141 (pose x descriptor-evaluation arm) sweep. Resolution
+     * and quality mode are pinned for every cell, so the only variable between
+     * arms is how much descriptor evaluation work the shader performs.
+     */
+    private static void tickEvaluationSweep() {
+        String pose = sweepPose();
+        if (t141CellPending) {
+            t141CellPending = false;
+            boolean failed = StormT135PerformanceProfile.lastCellContaminated()
+                    || (!pose.startsWith("CLEAR")
+                        && StormGeometryBuildCoordinator.lobeCount() <= 0);
+            if (failed) {
+                if (++t141ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
+                    advance(Phase.T135_RESPAWN);
+                    return;
+                }
+                ProjectAtmosphere.LOGGER.warn(
+                        "T141_EVAL {}/{} unmeasurable after {} attempts; arm skipped",
+                        pose, t141ArmName(), t141ArmAttempts);
+            }
+            t141ArmAttempts = 0;
+            t141ArmIndex++;
+        }
+        if (t141ArmIndex >= T141_ARMS.length) {
+            t141ArmIndex = 0;
+            t141ArmAttempts = 0;
+            applyT141Arm();
+            t135PoseIndex++;
+            if (t135PoseIndex >= T141_POSES.length) {
+                advance(Phase.T135_REPORT);
+            } else {
+                advance(Phase.T135_MOVE);
+            }
+            return;
+        }
+        applyT141Arm();
+        String arm = t141ArmName();
+        if (!StormT135PerformanceProfile.begin(
+                pose, AtmoCommonConfig.CloudRaymarchQuality.ULTRA, arm)) {
+            if (++t141ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
+                advance(Phase.T135_RESPAWN);
+                return;
+            }
+            ProjectAtmosphere.LOGGER.warn(
+                    "T141_EVAL {}/{} never became measurable after {} attempts; arm skipped",
+                    pose, arm, t141ArmAttempts);
+            t141ArmAttempts = 0;
+            t141ArmIndex++;
+            return;
+        }
+        t141CellPending = true;
         t135CounterLabel = pose + "|" + arm + "|ULTRA";
         t135CountersRequested = false;
         advance(Phase.T135_COUNTERS);

@@ -811,6 +811,8 @@ public final class StormVolumetricGeometrySandbox {
         require(mutations >= 10,
                 "T123 workload counters were not found; the instrumentation check is vacuous");
         String guard = functionBlock(shader, "bool paWorkloadCaptureActive()");
+        require(guard.contains("DebugView == 24") && guard.contains("DebugView == 25"),
+                "T141's decomposition views are not covered by the workload capture guard");
         require(guard.contains("DebugView == 22") && guard.contains("DebugView == 23"),
                 "T123 workload capture guard is no longer limited to the workload debug views");
         System.out.println("PHASE4T_RESULT|T123 instrumentation only|PASSED|invariant satisfied"
@@ -1106,7 +1108,10 @@ public final class StormVolumetricGeometrySandbox {
                 new StormWorkloadRuntimeCapture.WorkloadResult(
                         41L, "above", 641, 360,
                         70635847.0D, 1941080612.0D, 6714578.0D, 326863346.0D,
-                        2027767531.0D, 21318588.0D, 1488992.0D, 149382.0D);
+                        2027767531.0D, 21318588.0D, 1488992.0D, 149382.0D,
+                        // T141 decomposition channels; freshness is the capture
+                        // token, so their values are immaterial here.
+                        0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
 
         require(StormPerformanceSuite.workloadFreshnessFailure(passA, 41L, "above") == null,
                 "T132 freshness rejected the capture it actually requested");

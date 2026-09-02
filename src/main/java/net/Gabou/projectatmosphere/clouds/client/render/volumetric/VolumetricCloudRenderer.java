@@ -485,6 +485,10 @@ public final class VolumetricCloudRenderer {
         );
         // T133 / SC-020: zero outside a diagnostic capture, so ordinary frames
         // take the production optimized paths.
+        // Uploaded as exactly zero on every frame. T141's evaluation-amplify arm
+        // perturbs its second evaluation by this so the compiler cannot fold
+        // the call away; a zero perturbation keeps the result bit-identical.
+        shader.safeGetUniform("PaDiagnosticEvalEpsilon").set(0.0F);
         shader.safeGetUniform("PaDiagnosticOptimizationMode").set(
                 VolumetricCloudDebugConfig.optimizationDiagnosticMode().shaderFlags()
         );

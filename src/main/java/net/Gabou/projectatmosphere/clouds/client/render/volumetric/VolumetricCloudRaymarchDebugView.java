@@ -30,7 +30,11 @@ public enum VolumetricCloudRaymarchDebugView {
     /** On-demand workload channels: primary steps, descriptor evals/fetches, T122 avoided fetches. */
     STORM_WORKLOAD_PRIMARY(22, "storm_workload_primary"),
     /** On-demand workload channels: light evals, empty rejects/exits, T121 conservative skips. */
-    STORM_WORKLOAD_SECONDARY(23, "storm_workload_secondary");
+    STORM_WORKLOAD_SECONDARY(23, "storm_workload_secondary"),
+    /** T141 channels: storm-shape calls, group-field calls, lobes visited, density calls. */
+    STORM_WORKLOAD_TERTIARY(24, "storm_workload_tertiary"),
+    /** T141 channels: zero-density calls, segment tests, positive segment tests, box rejects. */
+    STORM_WORKLOAD_QUATERNARY(25, "storm_workload_quaternary");
 
     private final int shaderId;
     private final String serializedName;

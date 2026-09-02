@@ -165,7 +165,20 @@ uniform int StormTopologyMode;
 const int PA_OPT_NORMAL_PRODUCTION = 0;
 const int PA_OPT_T121_OFF = 1;
 const int PA_OPT_T122_OFF = 2;
+// T141 measures the cost of descriptor SDF EVALUATION, which the T122 fetch
+// arm never varied. AMPLIFY runs each lobe's exact SDF a second time on the
+// texels already in registers, so evaluation count doubles at unchanged fetch
+// volume; BOX_BOUND replaces T121's vertical-only conservative bound with a
+// full horizontal+vertical one.
+const int PA_OPT_T141_EVAL_AMPLIFY = 4;
+const int PA_OPT_T141_BOX_BOUND = 8;
 uniform int PaDiagnosticOptimizationMode;
+/**
+ * Uploaded as exactly zero. The amplification arm perturbs its extra
+ * evaluation by this, so the compiler cannot prove the second call redundant
+ * and fold it away, while the result stays bit-identical to the first.
+ */
+uniform float PaDiagnosticEvalEpsilon;
 
 /** True when T121's conservative rejection must be bypassed. */
 bool paT121Off() {
@@ -175,6 +188,16 @@ bool paT121Off() {
 /** True when T122's descriptor-fetch reuse must be bypassed. */
 bool paT122Off() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T122_OFF) != 0;
+}
+
+/** True when each lobe's exact SDF is evaluated twice instead of once. */
+bool paT141EvalAmplify() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T141_EVAL_AMPLIFY) != 0;
+}
+
+/** True when the conservative bound is the full box rather than vertical only. */
+bool paT141BoxBound() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T141_BOX_BOUND) != 0;
 }
 
 // T123: emitted only by the two on-demand workload views. FINAL frames retain
@@ -187,9 +210,19 @@ int paLightMarchDensityEvaluations = 0;
 int paEmptySpaceRejects = 0;
 int paEarlyTerminations = 0;
 int paConservativeDescriptorRejects = 0;
+// T141 decomposition. Every one of these is incremented only under a workload
+// view, exactly like the T123 set above.
+int paDirectStormShapeCalls = 0;
+int paGroupFieldCalls = 0;
+int paLobesVisited = 0;
+int paCloudDensityCalls = 0;
+int paDensityZeroCalls = 0;
+int paSegmentTestCalls = 0;
+int paSegmentTestPositive = 0;
+int paBoxBoundRejects = 0;
 
 bool paWorkloadCaptureActive() {
-    return DebugView == 22 || DebugView == 23;
+    return DebugView == 22 || DebugView == 23 || DebugView == 24 || DebugView == 25;
 }
 // T128 on-demand centre-line trace uniforms. They are inert unless DebugView
 // is STORM_MATERIAL_TRACE (21), so they never affect production rendering.
@@ -894,6 +927,90 @@ float stormVerticalDistanceLowerBound(vec3 p, vec4 positionHeight, int role) {
     return abs(p.y - centreY) - (roleTopY - roleBaseY) * 0.5;
 }
 
+// Largest and smallest horizontal profile scale a role's height profile can
+// reach, taken over height01 in [0,1] from stormRoleProfile. The exact SDF
+// scales its ellipse radii by that profile, so a conservative horizontal bound
+// must widen by the maximum and narrow by the minimum.
+void stormRoleRadialProfileRange(int role, out float profileMin, out float profileMax) {
+    if (role == 0) {
+        // mix(0.84, 0.58, h) + 0.22 * sin(PI h)^0.70
+        profileMin = 0.58;
+        profileMax = 1.06;
+    } else if (role == 1) {
+        // mix(0.84, 0.56, h) + 0.18 * sin(PI h)^0.65
+        profileMin = 0.56;
+        profileMax = 1.02;
+    } else if (role == 2) {
+        // mix(1.25, 0.60, h) + 0.18 * sin(PI h)^0.65
+        profileMin = 0.60;
+        profileMax = 1.43;
+    } else {
+        // mix(0.70, 2.10, smoothstep) + 0.08 * sin(PI h)^0.55 - 0.10 * smoothstep
+        profileMin = 0.70;
+        profileMax = 2.18;
+    }
+}
+
+/**
+ * Conservative lower bound on the exact lobe SDF, horizontal and vertical.
+ *
+ * <p>The vertical term is exactly T121's existing slab bound. The horizontal
+ * term is derived from the SDF's own wall expression rather than from the
+ * geometry, because the SDF converts its normalized ellipse coordinate to
+ * blocks by dividing out the gradient magnitude and that conversion is only
+ * exact for a circular section. Writing u = oriented / radii, the SDF's wall
+ * distance is (|u| - 1) * |u| / |u / radii|, and |u| / |u / radii| is bounded
+ * below by the smaller radius, so
+ *
+ *     wall >= (|oriented| / maxRadius - 1) * minRadius
+ *
+ * holds for every eccentricity. Using max/min over the role's whole height
+ * profile removes the height dependence, the full shear magnitude covers every
+ * shear progress in [0,1], the warp allowance covers the +-0.08 the domain warp
+ * can subtract from the normalized radius, and the rounding allowance covers
+ * the fillet the SDF subtracts at the end.
+ *
+ * <p>Returns a value that is never greater than the exact SDF at p, and never
+ * smaller than the vertical-only bound it replaces.
+ */
+float stormLobeDistanceLowerBound(
+        vec3 p,
+        vec4 positionHeight,
+        vec4 radiusRotation,
+        vec4 shearMedia,
+        int role) {
+    float verticalBound = stormVerticalDistanceLowerBound(p, positionHeight, role);
+
+    float profileMin;
+    float profileMax;
+    stormRoleRadialProfileRange(role, profileMin, profileMax);
+    // The anvil widens only its short axis, so it can only enlarge the maximum.
+    float anvilWiden = role == 3 ? 1.56 : 1.0;
+    vec2 widest = max(
+        vec2(radiusRotation.x, radiusRotation.y * anvilWiden) * profileMax, vec2(1.0));
+    vec2 narrowest = max(radiusRotation.xy * profileMin, vec2(1.0));
+    float maxRadius = max(widest.x, widest.y);
+    float minRadius = min(narrowest.x, narrowest.y);
+
+    // The rotation the SDF applies is orthonormal, so |oriented| == |local|.
+    // Subtracting the full shear magnitude covers every shear progress the
+    // role profile can produce.
+    float orientedLength = max(
+        length(p.xz - positionHeight.xy) - length(shearMedia.xy), 0.0);
+    // The domain warp adds dot(warp, vec3(0.45, 0.20, 0.35)) * 0.08 to the
+    // normalized radius, with each component in [-1, 1], so it can subtract at
+    // most 0.08 from it.
+    float normalizedRadius = orientedLength / maxRadius - 0.08;
+    float horizontalBound = normalizedRadius > 1.0
+        ? (normalizedRadius - 1.0) * minRadius - STORM_MIN_EDGE_BLOCKS
+        : -1.0e9;
+
+    // Outside in both axes the true distance is at least the larger of the two
+    // separations; taking the maximum keeps the bound valid and is never worse
+    // than the vertical-only bound it replaces.
+    return max(verticalBound, horizontalBound);
+}
+
 // Signed geometric distance from p to this lobe's surface, in world-space
 // blocks. Negative inside, zero on the surface, positive outside - and valid
 // everywhere outside, including directly above or below the lobe, where a
@@ -1245,11 +1362,17 @@ void directStormGroupField(
     int previousRole = -1;
     float heightWeight = 0.0;
     float heightAccum = 0.0;
+    if (paWorkloadCaptureActive()) {
+        paGroupFieldCalls++;
+    }
     int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
     int endIndex = stormGroupEndIndex(witnessIndex, groupSlot);
     for (int descriptorIndex = firstIndex; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
         if (descriptorIndex >= endIndex) {
             break;
+        }
+        if (paWorkloadCaptureActive()) {
+            paLobesVisited++;
         }
         vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
         vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
@@ -1291,9 +1414,13 @@ void directStormGroupField(
         }
         groupMinimumRadius = min(groupMinimumRadius, lobeRadius);
 
-        float verticalLowerBound = stormVerticalDistanceLowerBound(
-            p, positionHeight, lobeRole
-        );
+        // T141 arm: the same comparison against a strictly tighter lower
+        // bound. max() of two valid lower bounds is a valid lower bound, so
+        // the arm can only reject more, never differently.
+        float verticalLowerBound = paT141BoxBound()
+            ? stormLobeDistanceLowerBound(
+                p, positionHeight, radiusRotation, shearMedia, lobeRole)
+            : stormVerticalDistanceLowerBound(p, positionHeight, lobeRole);
         // A smooth minimum is exactly unchanged once the incoming distance is
         // more than its blend radius beyond the current union.  The global
         // maximum is used here instead of a guessed local value.  Requiring
@@ -1313,6 +1440,17 @@ void directStormGroupField(
             // that the lobe cannot contribute to the ordered smooth union.
             if (paWorkloadCaptureActive()) {
                 paConservativeDescriptorRejects++;
+            }
+            // Rejected by the horizontal term alone: the vertical-only bound
+            // that ships today would have evaluated this lobe exactly. Counting
+            // it separates what the tighter bound adds from what T121 already
+            // achieved.
+            bool paVerticalWouldEvaluate = paT141BoxBound()
+                && stormVerticalDistanceLowerBound(p, positionHeight, lobeRole)
+                    <= max(lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
+                        groupDistance + STORM_MAX_BLEND_BLOCKS);
+            if (paWorkloadCaptureActive() && paVerticalWouldEvaluate) {
+                paBoxBoundRejects++;
             }
             // T098: a rejected lobe still bounds the safe advance.
             // verticalLowerBound is a lower bound on this lobe's true distance,
@@ -1343,6 +1481,17 @@ void directStormGroupField(
             : directStormLobeDistanceFromData(
                 p, positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole
             );
+        if (paT141EvalAmplify()) {
+            // A second exact evaluation of the same lobe, on the texels already
+            // in registers. PaDiagnosticEvalEpsilon is uploaded as exactly
+            // zero, so the value returned is bit-identical and min() is an
+            // identity - but the compiler cannot prove that from a uniform, so
+            // the work is really executed. Descriptor evaluations double;
+            // descriptor texel fetches do not move.
+            lobeDistance = min(lobeDistance, directStormLobeDistanceFromData(
+                p + vec3(PaDiagnosticEvalEpsilon),
+                positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole));
+        }
         groupMinClearance = min(groupMinClearance, lobeDistance - lobeSoftness);
         // Every lobe of the group contributes. A lobe is never dropped because
         // its local density evaluates to zero: that is exactly the region
@@ -1418,6 +1567,9 @@ float directStormShape(
     dominantHeight01 = 0.0;
     envelopeStrength = 0.0;
     activeRoleMask = 0;
+    if (paWorkloadCaptureActive()) {
+        paDirectStormShapeCalls++;
+    }
     vec4 candidates = stormCandidatesAt(p.xz);
     for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
         int witnessIndex = decodeStormCandidate(candidates, rank);
@@ -1554,6 +1706,9 @@ bool stormGroupSegmentMayIntersect(
 }
 
 bool directStormSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
+    if (paWorkloadCaptureActive()) {
+        paSegmentTestCalls++;
+    }
     int groupVisited = 0;
     for (int sample = 0; sample < 3; sample++) {
         float fraction = sample == 0 ? 0.0 : (sample == 1 ? 0.5 : 1.0);
@@ -1571,6 +1726,9 @@ bool directStormSegmentMayIntersect(vec3 segmentStart, vec3 segmentEnd) {
             groupVisited |= groupBit;
             if (stormGroupSegmentMayIntersect(
                     segmentStart, segmentEnd, witnessIndex, groupSlot)) {
+                if (paWorkloadCaptureActive()) {
+                    paSegmentTestPositive++;
+                }
                 return true;
             }
         }
@@ -2934,6 +3092,9 @@ float cloudDensity(
         bool useDetail,
         bool nearCamera,
         bool includePrecipitation) {
+    if (paWorkloadCaptureActive()) {
+        paCloudDensityCalls++;
+    }
     if (PuffDensityStage == 1) {
         // Pure descriptor geometry: no WeatherMap and no candidate texture.
         // Empty descriptors render empty instead of silently falling through.
@@ -3094,6 +3255,11 @@ float cloudDensity(
             && directStormCoverage <= 0.001) {
         if (paTraceCapture) {
             paCdFlags |= PA_CD_EARLY_COVERAGE_REJECT;
+        }
+        if (paWorkloadCaptureActive()) {
+            // The descriptor scan above already ran for this sample and
+            // produced nothing. This is the count the early-out has to remove.
+            paDensityZeroCalls++;
         }
         return 0.0;
     }
@@ -5545,6 +5711,26 @@ void main() {
             float(paEmptySpaceRejects),
             float(paEarlyTerminations),
             float(paConservativeDescriptorRejects)
+        );
+        return;
+    }
+    if (DebugView == 24) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDirectStormShapeCalls),
+            float(paGroupFieldCalls),
+            float(paLobesVisited),
+            float(paCloudDensityCalls)
+        );
+        return;
+    }
+    if (DebugView == 25) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDensityZeroCalls),
+            float(paSegmentTestCalls),
+            float(paSegmentTestPositive),
+            float(paBoxBoundRejects)
         );
         return;
     }
