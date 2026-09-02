@@ -949,7 +949,7 @@ not fabricate historical before/after percentages for T119--T123.
   frame noise floor (0.315%); at the T098a poses the frames are bit-identical and centre-column
   share stays 1.0000 with a 0 px inner sky run. The flag is inverted to `T145_OFF` per the
   T121/T122 precedent so the equivalence stays re-provable.
-- [ ] T144 [PERFORMANCE] Collapse the redundant per-sample descriptor evaluations. T141 measured
+- [X] T144 [PERFORMANCE] Collapse the redundant per-sample descriptor evaluations. T141 measured
   **4.35 `directStormShape` calls per `cloudDensity` call** at the corrected representative pose -
   the density path, the final-density path, the structure path and the safe-advance probe each
   evaluate the same world point independently. Removing the redundancy is worth roughly 1.14x at the
@@ -964,6 +964,18 @@ not fabricate historical before/after percentages for T119--T123.
   considered. First step is a counter measuring how many of the 3.45 are genuinely at the same world
   point, since the four call sites evaluate at different points and only same-point duplicates can
   be collapsed; 1.5x is the ceiling if all are.
+  **Rejected; premise invalidated.** Recorded in `validation/performance-rain-locality.md` section 6.
+  Reading the call sites settles it without another run: in a production frame `directStormShape` is
+  reached from `cloudDensity` at the march sample `p`, from the safe advance at the same `p`, and
+  from `directStormRainSupportAt` at `vec3(worldXZ.x, supportY, worldXZ.y)` - the column's storm base
+  height, not the sample's. The rain-path calls were never repetitions of one point; they are
+  evaluations of different points, and T145 already stopped making the ones locality proves
+  pointless. The genuinely same-point duplicate is the safe advance, 1,299,011 of 61,257,282 shape
+  calls - **2.1%**, worth about 1% at the marginal rate T145 calibrated. That is below the harness's
+  own measurement noise, so the change could not be verified even if made. The residual duplicate
+  between `rainSegmentMayContribute`'s probe and `rainShaftDensityAt`'s first `localRainSupportAt`
+  is real but occurs only on rain-carrying segments; `rainShaftDensityAt`'s own two calls are not
+  duplicates, the second being at the wind-advected source column.
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This

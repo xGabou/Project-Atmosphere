@@ -221,42 +221,62 @@ morphology change.
 
 ---
 
-## 6. Phase 7 — T144's expected benefit, recomputed
+## 6. Phase 7 — T144 reassessed, and rejected
 
 T145 changed the number and distribution of `directStormShape` calls, so T144's
-estimate has to be redone. At PLAY_VIS_NEAR:
+estimate had to be redone. Redoing it invalidated its premise.
 
 | | before T145 | after T145 |
 |---|---|---|
-| `directStormShape` calls per `cloudDensity` call | 4.85 | **3.45** |
+| `directStormShape` calls per `cloudDensity` call | 4.85 | 3.45 |
 | `directStormShape` calls per pixel | 74.0 | 52.6 |
 
-T144 collapses those duplicate evaluations of the same world point to one.
-Collapsing 3.45 to 1 removes ~71 % of the remaining calls, and — using the same
-elasticity model that predicted T145 to within 0.002 — removing a comparable
-share of evaluations and fetches is worth
+T144 was queued to "collapse the ~4.35 repeated `directStormShape` calls per
+density sample". **They are not repetitions.** Reading the call sites settles it
+without another measurement — in a production frame there are exactly three:
 
-    0.65 × 0.16 (evaluations) + 0.65 × 0.37 (fetches) ≈ 0.345  →  ~1.5x
+| site | evaluated at | duplicate of? |
+|---|---|---|
+| `cloudDensity(p)` | `p`, the march sample | — |
+| march safe advance | `p`, the same sample in the same iteration | **yes**, of the above |
+| `directStormFinalDensity` from `directStormRainSupportAt` | `vec3(worldXZ.x, supportY, worldXZ.y)` — the column's *storm base height*, not the sample's | **no**, a different world point |
 
-**T144's ceiling is therefore ~1.5x, not the ~1.14x recorded when only
-evaluation elasticity was considered.** The old figure ignored fetch elasticity,
-which T141 later measured at more than twice the evaluation figure.
+(`stormMaterialTraceAt` is the fourth site and is diagnostic-only, unreachable
+in a production frame.)
 
-**T144 should proceed**, with one caveat to settle first: the four call sites
-evaluate at *different* points — `cloudDensity` at `p`, `directStormRainSupportAt`
-at `(worldXZ, supportY)`, the structure path at `p`, and the safe advance at `p`.
-Only same-point duplicates can be collapsed, so T144's first step is a counter
-that measures how many of the 3.45 are genuinely at the same point. The 1.5x is
-the ceiling if all are; the floor is whatever fraction is.
+The rain path evaluates the storm at the height rain attaches at, which is not
+where the ray is. Those calls were never redundant work on one point; they were
+evaluations of different points that T145 has now stopped making at all where
+locality proves them pointless.
 
----
+Counting what genuinely remains, from the T145 run's own counters at
+PLAY_VIS_NEAR: 61,257,282 shape calls, of which 17,774,513 are `cloudDensity`
+and 1,299,011 are the safe advance. **The same-point duplicate is 1,299,011 —
+2.1 % of all shape calls.** At the marginal rate T145 itself calibrated (29 % of
+calls removed bought 13.3 % of time, so ~0.46 % of time per 1 % of calls), that
+is worth about **1 %**.
+
+A second, smaller duplicate exists and is left unmeasured: `rainSegmentMayContribute`
+probes a segment at fractions 0.2113 and 0.7887, and `rainShaftDensityOverSegment`
+later evaluates `rainShaftDensityAt` at those same two fractions, whose first act
+is the same `localRainSupportAt(p.xz)` call. That one is real, but it occurs only
+on segments that actually carry rain, and `rainShaftDensityAt`'s *own* two
+`localRainSupportAt` calls are **not** duplicates of each other — the second is
+at `p.xz - windDir * fallDistance * 0.14`, the wind-advected source column.
+
+**T144 is rejected.** Its ceiling is roughly 1.01x, it is below the measurement
+noise of the harness that would have to verify it, and implementing an
+unverifiable change to the hottest shader in the renderer is not a trade worth
+making. The earlier ~1.14x figure, and the ~1.5x this document briefly carried
+before the call sites were read, both rested on treating "calls per density
+sample" as a redundancy ratio. It is not one.
 
 ## 7. Phase 8 — updated cumulative path and the Rank 1 decision
 
 | lever | status | value |
 |---|---|---|
 | **T145 — rain locality** | **banked, in production** | **1.154x–1.285x representative** |
-| T144 — duplicate `directStormShape` collapse | queued, recomputed | ~1.5x ceiling |
+| T144 — duplicate `directStormShape` collapse | **rejected**, premise invalidated | ~1.01x |
 | Rank 1 — internal resolution 0.75 → 0.25 | viable, deferred | 4.75x |
 | Rank 2 — descriptor fetches | rejected | ~1.08x |
 | Rank 2b — descriptor evaluations | rejected | ~1.19x ceiling |
@@ -273,20 +293,18 @@ Stacking everything still available at its measured ceiling:
 |---|---|---|---|
 | shipped Ultra, before T145 | — | 505.3 | 63.2x |
 | **+ T145 (banked)** | **1.154x** | **437.8** | **54.7x** |
-| + T144 at its ceiling | 1.5x | 291.9 | 36.5x |
-| + Rank 1 internal resolution 0.25 | 4.75x | 61.4 | 7.7x |
-| + lighting ceiling | 1.10x | 55.9 | 7.0x |
+| + Rank 1 internal resolution 0.25 | 4.75x | 92.2 | 11.5x |
+| + lighting ceiling | 1.10x | 83.8 | 10.5x |
+| + descriptor evaluation and fetch ceilings | 1.19x, 1.08x | 65.2 | **8.2x** |
 
-**Rank 1 must begin after T144.** Even with every remaining image-neutral lever
-taken at its ceiling, representative Ultra lands at 291.9 ms — **36.5x over
-budget**. Image-neutral work cannot close this; only the pixel count can, and
-even that leaves 7.0x. The condition the task set for the Rank 1 decision —
-"if representative Ultra is still nowhere near budget even after all remaining
-image-neutral work, Rank 1 must begin" — is met by a wide margin.
-
-The recommended order is unchanged: finish T144 first, because it is bounded,
-image-neutral and now worth more than previously thought, and because Rank 1's
-measured 4.75x multiplies whatever precedes it.
+**Rank 1 must begin now.** With T144 rejected there is no image-neutral lever
+left above 1.2x. Representative Ultra stands at **437.8 ms, 54.7x over budget**,
+and taking every remaining ceiling — Rank 1's 4.75x, lighting's 1.10x, and the
+already-rejected descriptor evaluation and fetch ceilings — still lands at
+**8.2x over**. The condition the task set for this decision, "if representative
+Ultra is still nowhere near budget even after all remaining image-neutral work,
+Rank 1 must begin", is met by a wide margin: image-neutral work is now
+exhausted, and only the marched pixel count remains.
 
 ---
 
