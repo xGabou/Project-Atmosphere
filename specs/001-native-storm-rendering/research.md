@@ -358,3 +358,42 @@ ones found insufficient.
   correctness phase, and only if the corrected model is otherwise impractical.
 - **Forecast behavior**: unchanged.
 - **Simple Clouds behavior**: unchanged and remains externally owned when selected.
+
+---
+
+## 2026-09-01 planning research update: parallel performance and visual tracks
+
+### Observed state
+
+- T133 is accepted; the earlier OPEN audit entry is retained history.
+- Severe scenes still measure roughly 136--261 ms cloud GPU time at a reduced `641x360` target,
+  `governorScale=0.50000`, and `resolutionScale=0.75000`. This is far from SC-006 but is not an
+  SC-006 total-frame measurement.
+- Descriptor texture fetches track the expensive views more strongly than primary ray steps;
+  descriptor-fetch bandwidth is therefore a leading design hypothesis, not a concluded fix.
+- T119/T121/T122/T123 are banked bounded-work improvements. They neither close SC-006 nor justify
+  a fabricated historical percentage for future work.
+- The T098 evidence chain records five fresh fixtures with a connected centre column
+  (`share=1.0000`, `longest inner sky run=0 px`) and zero caps on fifteen traced rays. The remaining
+  visual issue is ANVIL lighting/self-shadow response; a roughly four-output-pixel reconstruction
+  beat is separate.
+
+### Dependency decision
+
+Split T098: T098a proves structural correctness; T098b grades final shipping appearance. Rain and
+whiteout need T098a plus final-density behavior, not T098b. Performance profiling/design and
+quality-mode plumbing need a structurally valid storm and measured policy, not final ANVIL polish.
+Major image-changing performance work is acceptable only with a mandatory final T098b regrade.
+
+### Branch-integrity decision
+
+The newest structural evidence commits reside on `worktree-t098-production-ray-trace`, not this
+checkout's `Forge-1.20.1` ancestry. Consequently their result is retained as verified evidence but
+T098a remains open until integration and retained-guard verification occur on the production branch.
+This is an integration-state constraint, not a refutation of the five-fixture evidence.
+
+### Historical-attribution correction
+
+The old T128 trace samples `directStormShape`/descriptor material. It does not execute all
+production `cloudDensity` gates and terms, so it cannot prove production march density. Keep it as
+descriptor/material evidence and use production-ray or full-density diagnostics for march claims.

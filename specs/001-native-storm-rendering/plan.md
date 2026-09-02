@@ -32,8 +32,8 @@ pre-T134 T130 fixture `ce4ffed5-14f1-4b78-bec7-059c1985cedb` and the T121--T123 
 `66b2c85a-aa93-4d18-b428-ac546e280c02` can no longer be reproduced, so their frozen visual
 references are historical record only and are not a T132 comparison basis. T132 now requires a
 fresh post-T134 controlled reference plus a fresh post-T134 material trace on the same fixture;
-its full criteria are in `tasks.md` under "T132 revised acceptance criteria". T133 and T098 remain
-unstarted.
+its full criteria are in `tasks.md` under "T132 revised acceptance criteria". T133 is accepted;
+the old monolithic T098 is superseded by T098a structural acceptance and T098b final visual polish.
 
 Correct the implemented native severe-storm path so the descriptor set itself is the evaluated storm field. Each `StormLobeDescriptor` is evaluated independently through the authoritative Java equations and the independently mirrored GLSL equations; lobe distance-like fields are smoothly unioned lobe-to-lobe and then group-to-group. The candidate grid is restored only as a conservative acceleration structure. Keep the existing synchronized `CloudFieldSnapshot` and `CloudMorphologyMembership` inputs, corrected source morphology, four-texel descriptors, stable identity/order, geometry build/snapshot lifecycle, render-thread boundaries, broad-map distant fallback, server authority, packets, saved data, forecast behavior, Simple Clouds ownership, native rollback path, precipitation ownership, and camera-density interfaces.
 
@@ -639,3 +639,131 @@ Every new geometry regression assertion must be run against the audited implemen
 ## Complexity Tracking
 
 No constitution violations require justification.
+
+---
+
+## 2026-09-01 authoritative execution-plan supersession
+
+This section supersedes only the ordering and status statements above that conflict with it. It
+does not rewrite the historical Phase 4R/4S/4A/4P evidence.
+
+### Current evidence and branch boundary
+
+T133 is **accepted**. Its earlier OPEN state remains a historical audit record. T119, T121, T122,
+and T123 remain banked as the bounded-work optimizations they are; their recorded neutrality and
+execution evidence must not be represented as a historical performance percentage.
+
+The current checkout is `Forge-1.20.1` at `4e356c3`. The most recent T098 structural evidence is
+in repository history but not yet an ancestor of this checkout: `29dccf9` (cloud-hit depth),
+`20a7fe5` (fine-promotion/budget correction), `4d82f3f` (anvil density attribution), and
+`902811c` (self-shadow attribution), on `worktree-t098-production-ray-trace`. Planning treats
+that as verified evidence, but does not silently treat unintegrated code as shipped. T098a therefore
+has one explicit integration-and-retained-guard verification before it may close on this branch.
+
+The old T128 material trace remains useful descriptor/material evidence. It samples
+`directStormShape`/descriptor material and is **not** evidence for the complete production
+`cloudDensity` path; the 2026-08-31 retraction in `validation/t098-manual-checklist.md` is
+authoritative for that attribution. Historical records remain intact with that supersession note.
+
+### Reconstructed dependency graph and removed artificial edges
+
+Old critical path:
+
+```text
+T133 -> T098 (all structural + appearance criteria) -> T099 -> T042..T052
+     -> T053..T060 -> T061..T073 -> T070/SC-006
+```
+
+The following edges were artificial rather than correctness dependencies:
+
+- monolithic T098 -> T099: rain/whiteout needs a connected, final-density storm, not final ANVIL
+  lighting or reconstruction polish;
+- monolithic T098/T099 -> performance redesign: the severe workload is itself a release risk and
+  can be profiled without a polished image;
+- T099 -> all US3 plumbing: preset/config/governor/LOD contracts need structural continuity and
+  performance policy, while only final visual grading needs the settled shipped image;
+- T052 -> all US4 work: the diagnostics used to investigate T098 and T119-T123 already implement
+  most of the US4 contract;
+- broad visual/quality dependencies -> server and ownership assertions: these are independent
+  compatibility and release risks.
+
+The retained genuine edges are: production structural correctness before final-density rain/whiteout
+acceptance; a measured performance baseline before choosing major performance implementation;
+settled shipping performance policy before final mode grading; and the full shipped visual matrix
+before the final RTX 4070 release gate.
+
+### T098 split
+
+**T098a — Structural / Correctness Acceptance** proves the renderer fundamentally works. It requires
+the intended severe-scale storm to be visible at grading distances; connected
+BASE -> CORE -> TOWER -> ANVIL coverage; no clean-sky waist caused by renderer loss; no march
+starvation; cloud hits surviving depth publication/composite; no catastrophic confetti/skipping;
+and preserved basic severe scale. It deliberately excludes final ANVIL billowing/lighting,
+reconstruction quality, and subjective final form grading.
+
+Evidence on the non-ancestor T098 evidence branch meets those structural criteria: the five-fixture
+campaign reports centre-column cloud share `1.0000`, longest inner sky run `0 px`, and zero step
+caps on all 15 traced BASE/WAIST/ANVIL rays; the depth-sentinel correction has a fail-first guard.
+The current branch may therefore close T098a after it integrates that exact chain and re-runs the
+retained guards. It is not marked complete merely from this planning update.
+
+**T098b — Final Visual Polish** is the final shipping-configuration regrade. It owns ANVIL
+billowing/readability and self-shadow response, all remaining FR-023/FR-024 appearance criteria,
+the measured approximately four-output-pixel reconstruction/upscale beat, and final
+SIDE/FAR/ABOVE/BELOW grading at final Ultra and representative lower shipped modes. It may run
+alongside performance work but is the final authority after marcher, resolution/reconstruction,
+lighting, and quality policy stabilize.
+
+### New parallel roadmap
+
+```text
+M1  Structural storm acceptance: T098a (integration verification on this branch)
+ |
+ +-- Track A PERFORMANCE: T135 -> T136 -> T137 -> T138 -> T140
+ |                         \-> T045..T052 -> T139 --/
+ +-- Track B VISUAL: T098b ANVIL self-shadow -> reconstruction beat -> final regrade
+ +-- Track C FUNCTIONAL/VALIDATION: T099; US4 consolidation; T061..T068 compatibility/server
+ |
+M3  Quality-mode/performance integration: T042..T052 + T139
+M4  Final shipped-image regrade: T098b + T069
+M5  Release validation: T067/T068/T070..T073, with SC-006 unchanged
+```
+
+### Performance design contract
+
+T135 establishes and records a per-mode budget table. The existing design starting points are
+cloud-GPU targets of Low 3.0 ms, Low 24 4.0 ms, Medium 5.0 ms, High 6.5 ms, and Ultra 8.0 ms;
+T135 must validate or revise them using a measured non-cloud frame remainder. It also records a
+separate total-frame target for every mode and retains Ultra's SC-006 p95 <= 16.7 ms at 1920x1080
+as the non-negotiable release requirement. A target is not changed merely because the current
+implementation misses it.
+
+T136 uses the same controlled severe fixture for SIDE, FAR, BELOW, and ABOVE, with clear-weather
+context where it clarifies overhead. It records GPU time, ray iterations, cloud-density evaluations,
+descriptor evaluations and texture fetches, lighting/shadow, reconstruction/history cost, and
+resolution. The existing 136--261 ms reduced-target severe data is a warning baseline, not an
+SC-006 result. T137 ranks contributors before authorising the bounded T138 implementation increment.
+Candidate designs include descriptor cache/layout and fetch reduction, raymarch/adaptive-step
+restructuring, light/shadow proxies, internal resolution/temporal reconstruction, per-mode LOD,
+bounded descriptor simplification, and distance-dependent sampling. Future image-changing work is
+allowed only with a recorded T098b regrade obligation, not a false pixel-neutrality claim.
+
+### US4 and release-work audit
+
+The current command surface and `VolumetricCloudFrameDiagnostics` already provide bounded workload,
+GPU timing, history/quality state, material traces, storm performance suites, and debug views;
+T119--T123/T132 also added their needed counter semantics. Consequently US4 tasks T053--T058 are
+implementation-satisfied and reclassified in `tasks.md`; T059 is a logging/ownership consolidation
+check and T060 is the one missing documented end-to-end diagnostic session. No duplicate
+`StormLobeDiagnostics` subsystem is planned.
+
+T061/T062 ownership assertions/registration, T063 ownership short-circuit, T064 direct fallback,
+T065 rollback verification, and T068 dedicated-server safety no longer wait for visual polish.
+T069 remains a final shipped visual matrix and T070 remains the final SC-006 measurement, consuming
+the performance-track evidence rather than discovering the problem for the first time.
+
+### Constitution re-check
+
+PASS. The parallel graph changes sequencing and evidence obligations only. It adds no runtime
+dependency, second weather authority, server/client boundary violation, unbounded work, or
+unapproved rendering change.

@@ -16,6 +16,7 @@ import net.Gabou.projectatmosphere.util.AsyncAtmosphereService;
 import net.Gabou.projectatmosphere.compat.sky.AtmosphereSkyEffectController;
 import net.Gabou.projectatmosphere.client.render.sky.SkyEffectState;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.VolumetricCloudFrameDiagnostics;
+import net.Gabou.projectatmosphere.client.screen.TfcSeasonConflictScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -40,6 +41,11 @@ public class ClientTickHandler {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
+        // Run at the title screen before normal client work or the test
+        // auto-driver can launch a world with an invalid TFC season setup.
+        if (TfcSeasonConflictScreen.presentIfNeeded(mc)) {
+            return;
+        }
         // Marker-gated test infrastructure must also run at the title screen:
         // it is responsible for creating and opening its own fresh fixture.
         // The call is inert during normal play.

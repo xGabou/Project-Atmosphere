@@ -4,7 +4,22 @@
 
 **Created**: 2026-08-17
 
-**Status**: Revised — 2026-08-19 renderer-wide scale, material-continuity, and performance audit
+**Status**: Revised — 2026-09-01 parallel correctness, performance, and visual-quality roadmap
+
+> **2026-09-01 planning supersession.** The project no longer serializes all performance and
+> quality-mode work behind one monolithic visual T098 gate. T098 is split into **T098a —
+> Structural / Correctness Acceptance** and **T098b — Final Visual Polish**. T098a is the
+> prerequisite for rain/whiteout acceptance (T099); T098b is the authoritative final regrade of
+> the shipping marcher, reconstruction, lighting, and quality settings. Performance design,
+> profiling, quality-mode plumbing, diagnostics consolidation, and independent compatibility work
+> run in parallel with T098b. SC-006 is unchanged and is not weakened by this ordering change.
+
+> **Evidence/integration boundary.** The latest structural campaign is present in repository
+> history on `worktree-t098-production-ray-trace` (`29dccf9`, `20a7fe5`, `4d82f3f`, `902811c`),
+> rather than as ancestors of this checkout's `Forge-1.20.1` HEAD. Its evidence establishes the
+> proposed T098a criteria, but this branch may mark T098a complete only after that exact production
+> correction/evidence chain is integrated and its retained guards are re-run. This preserves an
+> honest current-branch acceptance state without discarding the historical result.
 
 **Revision**: The 2026-08-19 correction supersedes the earlier morphology acceptance model. The
 previous criteria described only the *absence* of artifacts, so a smooth balloon-shaped storm could
@@ -32,7 +47,8 @@ and confirmed by controlled live SIDE/FAR/BELOW/ABOVE evidence on fixture
 Because T134 changed the physical dimensions of every severe system, T132 has been rebased onto a
 fresh post-T134 controlled reference and a fresh post-T134 material trace; the pre-T134 T130 and
 T121--T123 fixtures are historical record only. SC-018's three reference viewing distances and the
-aspect-ratio/ANVIL-span guards are carried into T133. T098 and T099 remain blocked by T133.
+aspect-ratio/ANVIL-span guards are carried into T133. **T133 is accepted**; its historical OPEN
+record remains an audit trail, not the current gate. T099 now depends on T098a, not T098b.
 
 **Input**: User description: "Redesign Project Atmosphere's native severe-cloud rendering so storms are genuinely volumetric, visually stable, performant across quality modes, and compatible with the existing authoritative weather architecture and optional integrations."
 
@@ -284,15 +300,18 @@ final output and can detect capacity or performance fallback without enabling no
   light, ambient light, and final rendered contribution. A material-continuity correction MUST be
   based on the first measured discontinuity in that trace, not on another unmeasured overlap or
   union-radius adjustment.
-- **FR-030**: Foundational storm-performance architecture MAY proceed before T098/T099 only when
-  it is visually neutral and retains the Phase 4S density composition and ownership boundaries.
-  It MUST prioritize bounded group topology, descriptor admission/culling, empty-space rejection,
-  reuse of already-computed envelope or density facts, bounded descriptor access, early ray
-  termination, and an equivalent low-cost lighting-support path. Quality reductions or substitutions
-  that change the rendered result remain separately validated work.
-- **FR-031**: Physical-scale, material-continuity, morphology, rain/whiteout parity, and
-  performance evidence MUST be revalidated together before T098 resumes. T099 remains blocked by
-  the renewed T098 visual acceptance gate, and quality-mode work remains blocked by T099.
+- **FR-030**: Performance budgets, profiling, and architecture design MAY proceed after T133 in
+  parallel with T098a/T098b. Major performance implementation begins after T098a establishes
+  structural correctness. It MUST retain the Phase 4S density composition and ownership boundaries,
+  begin from measured workload, and prioritize bounded descriptor access/fetches, raymarch and
+  lighting cost, adaptive stepping, reconstruction, internal resolution, and quality-mode-specific
+  LOD. A change may alter the image only when it is explicitly routed to T098b's final
+  shipping-configuration regrade; SC-006 MUST NOT be weakened.
+- **FR-031**: Physical scale, material continuity, rain/whiteout parity, retained regressions, and
+  performance evidence remain required release inputs. T099 depends on T098a structural correctness
+  and final-density behavior, not T098b polish. Quality-mode plumbing/configuration/governor/LOD
+  may proceed with performance design; final visual acceptance for shipped modes remains part of
+  T098b and release validation.
 
 ### Scope Boundaries
 
@@ -390,10 +409,17 @@ final output and can detect capacity or performance fallback without enabling no
   than 16-block intervals through every role transition, identifies any first discontinuity, and
   the corrected fixture has no unaccounted lower/upper material split in all reviewed FAR, SIDE,
   BELOW, and ABOVE captures.
-- **SC-020**: Before T098 resumes, the reference viewpoint matrix records storm raymarch cost,
-  primary/light-cone descriptor work, early-rejection rate, and termination behavior; every
-  approved foundational optimization preserves the comparison image within its documented
-  visually-neutral tolerance and reduces or bounds the measured work it owns.
+- **SC-020**: Before T098a structural acceptance, the reference viewpoint matrix records storm
+  raymarch cost, primary/light-cone descriptor work, early-rejection rate, and termination behavior;
+  every approved foundational optimization in that gate preserves the comparison image within its
+  documented visually-neutral tolerance and reduces or bounds the measured work it owns. Later
+  measured performance redesign is governed by T098b regrading rather than a fabricated neutrality
+  claim.
+- **SC-021**: The performance track MUST maintain a written budget table for Low, Low 24, Medium,
+  High, and Ultra that separates cloud GPU budget from total-frame budget, records the measured
+  non-cloud remainder, and identifies the fixture, resolution, hardware, and percentile used.
+  Ultra's total-frame requirement remains SC-006; lower-mode budgets may be revised only through
+  documented measured evidence, never by silently weakening SC-006.
 
 ## Assumptions
 
