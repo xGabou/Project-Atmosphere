@@ -44,7 +44,11 @@ public final class StormT098CaptureDriver {
      * The internal-resolution arms, matching the T138 performance sweep exactly
      * so a frame and a millisecond figure describe the same configuration.
      */
-    private static final float[] RESOLUTION_LADDER = {1.00F, 0.75F, 0.50F, 0.375F, 0.25F};
+    // Shipped Ultra scale first. It is the scale every performance A/B is
+    // measured at, so an interrupted set still yields the comparable pair, and
+    // the 1.00 arm - which renders over a second per frame and has tripped the
+    // display driver's timeout - is left until last.
+    private static final float[] RESOLUTION_LADDER = {0.75F, 0.50F, 0.375F, 0.25F, 1.00F};
 
     /**
      * Frames held between a shot's two frames when it carries a temporal pair.
@@ -537,7 +541,8 @@ public final class StormT098CaptureDriver {
         VolumetricCloudDebugConfig.setT098LegacyFinePromotion(false);
         VolumetricCloudDebugConfig.setT136ConstantLighting(false);
         CloudFieldVolumeRenderConfig.setCompositeDebugMode(CloudFieldCompositeDebugMode.FINAL);
-        VolumetricCloudDebugConfig.setCoverageAlphaReconstruction(false);
+        VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
         if (Float.isFinite(originalLadderResolutionScale) || resolutionLadder) {
             VolumetricCloudDebugConfig.setFixedResolutionScale(originalLadderResolutionScale);
             originalLadderResolutionScale = Float.NaN;
@@ -651,7 +656,8 @@ public final class StormT098CaptureDriver {
                 // The candidate reconstruction is captured on the same pose,
                 // the same scale and the same fixture as the shipped one, so
                 // the pair differs only in the composite's alpha term.
-                VolumetricCloudDebugConfig.setCoverageAlphaReconstruction(true);
+                VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                        StormOptimizationDiagnosticMode.T145_OFF);
                 reconstructionFrames = 0;
                 state = State.RECONSTRUCTION_ARM;
             }
@@ -659,7 +665,7 @@ public final class StormT098CaptureDriver {
                 if (++reconstructionFrames < AUX_VIEW_FRAMES) {
                     return;
                 }
-                grab(minecraft, shot, "_RECON");
+                grab(minecraft, shot, "_ARM");
                 reconstructionFrames = 0;
                 state = State.RECONSTRUCTION_PAIR;
             }
@@ -667,8 +673,9 @@ public final class StormT098CaptureDriver {
                 if (++reconstructionFrames < TEMPORAL_PAIR_FRAMES) {
                     return;
                 }
-                grab(minecraft, shot, "_RECON_T" + TEMPORAL_PAIR_FRAMES);
-                VolumetricCloudDebugConfig.setCoverageAlphaReconstruction(false);
+                grab(minecraft, shot, "_ARM_T" + TEMPORAL_PAIR_FRAMES);
+                VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                        StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                 shotIndex++;
                 state = shotIndex >= shots.size() ? State.DONE : State.MOVE;
                 if (state == State.DONE) {

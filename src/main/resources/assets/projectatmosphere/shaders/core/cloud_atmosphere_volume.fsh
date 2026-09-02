@@ -176,6 +176,13 @@ const int PA_OPT_T141_BOX_BOUND = 8;
 // ray-invariant horizontal bound over every resident descriptor, tested per
 // sample instead of a candidate-map walk and a per-descriptor segment test.
 const int PA_OPT_T143_REACHABILITY = 16;
+// T145 gates the per-step rain probe on precipitation locality before it can
+// enter descriptor traversal, on two independent conservative conditions: the
+// probe height against an upper bound on where rain can attach, and the column
+// against the union of the descriptors' own ownership ellipses. It is
+// production behaviour; the flag is the OFF arm that restores the unguarded
+// path so the equivalence stays re-provable.
+const int PA_OPT_T145_OFF = 32;
 uniform int PaDiagnosticOptimizationMode;
 /**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
@@ -208,6 +215,34 @@ bool paT141BoxBound() {
 bool paT143Reachability() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T143_REACHABILITY) != 0;
 }
+
+/** True when T145's precipitation-locality gate must be bypassed. */
+bool paT145Off() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T145_OFF) != 0;
+}
+
+/** True when the rain probe's precipitation-locality gate is active. */
+bool paT145RainLocality() {
+    return !paT145Off();
+}
+
+/**
+ * Ray-invariant rain locality, built once per fragment.
+ *
+ * <p>{@code paRainAttachTop} is an upper bound on the height rain can attach
+ * at from descriptor-owned storms: directStormLocalBaseAt returns a
+ * support-weighted average of the BASE descriptors' own base heights, and a
+ * convex combination can never exceed their maximum. A negative sentinel means
+ * no BASE descriptor is resident.
+ *
+ * <p>{@code paRainOwnRadius} bounds the union of the ownership ellipses
+ * directStormGroupField tests. That test is purely horizontal, has no softness,
+ * blend or warp term, and uses a fixed 1.85 factor - which is why a bound on it
+ * is tight where T143's bound on the signed distance field was not.
+ */
+float paRainAttachTop = -1.0e9;
+vec2 paRainOwnCentre = vec2(0.0);
+float paRainOwnRadius = -1.0;
 
 /**
  * Ray-invariant horizontal bound on every resident descriptor's reach, in
@@ -1247,6 +1282,58 @@ float stormEdgeWidthBlocks(int descriptorIndex, int role) {
  * further from the union of those discs than that cannot receive a non-zero
  * contribution from any descriptor at any height.
  */
+/**
+ * Builds the ray-invariant rain locality bounds. Cheap: one texel per
+ * descriptor for the topology, three more only for the ownership extent.
+ */
+void paBuildRainLocality() {
+    paRainAttachTop = -1.0e9;
+    paRainOwnRadius = -1.0;
+    if (!paT145RainLocality() || StormLobeCount <= 0) {
+        return;
+    }
+    vec2 minimum = vec2(1.0e18);
+    vec2 maximum = vec2(-1.0e18);
+    bool any = false;
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(lifecycleRole.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        if (role == 0) {
+            // Only BASE members contribute to the attachment height.
+            paRainAttachTop = max(paRainAttachTop, positionHeight.z);
+        }
+        // Exactly directStormGroupField's ownership ellipse, bounded by its
+        // larger semi-axis so the disc is a superset of the ellipse.
+        float extentX = length(vec2(
+            radiusRotation.x * radiusRotation.w,
+            radiusRotation.y * radiusRotation.z));
+        float extentZ = length(vec2(
+            radiusRotation.x * radiusRotation.z,
+            radiusRotation.y * radiusRotation.w));
+        vec2 ownershipRadii = max(vec2(extentX, extentZ) * 1.85, vec2(1.0));
+        float ownershipReach = max(ownershipRadii.x, ownershipRadii.y);
+        vec2 centre = positionHeight.xy + shearMedia.xy * 0.5;
+        minimum = min(minimum, centre - vec2(ownershipReach));
+        maximum = max(maximum, centre + vec2(ownershipReach));
+        any = true;
+    }
+    if (!any) {
+        return;
+    }
+    paRainOwnCentre = (minimum + maximum) * 0.5;
+    paRainOwnRadius = length(maximum - paRainOwnCentre);
+}
+
 void paBuildStormReachability() {
     paStormReachRadius = -1.0;
     if (!paT143Reachability() || StormLobeCount <= 0) {
@@ -3085,6 +3172,17 @@ float localRainSupportAt(
     attachY = weatherBaseY;
     float stormBaseY = weatherBaseY;
     bool directStormOwned = false;
+    // T145. The expensive descriptor path exists only to learn whether this
+    // column is descriptor-owned, because ownership overrides the raster
+    // precipitation below. A column outside every ownership ellipse cannot be
+    // owned, so when the raster precipitation is also absent the function's own
+    // early-out below is already decided and the traversal is pure waste.
+    if (paT145RainLocality()
+            && precipitation <= 0.02
+            && paRainOwnRadius >= 0.0
+            && distance(worldXZ, paRainOwnCentre) > paRainOwnRadius) {
+        return 0.0;
+    }
     float directSupport = directStormRainSupportAt(
         worldXZ, stormBaseY, directStormOwned
     );
@@ -3115,6 +3213,20 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
     for (int sampleIndex = 0; sampleIndex < 2; sampleIndex++) {
         float along = sampleIndex == 0 ? FIRST_SAMPLE : SECOND_SAMPLE;
         vec3 p = mix(segmentStart, segmentEnd, along);
+        // T145. Rain contributes only strictly below the attachment height, and
+        // that height is either the raster cloud base for this column or, when
+        // the column is descriptor-owned, a convex combination of the BASE
+        // descriptors' own bases. The larger of the two is therefore an upper
+        // bound on it, and a probe at or above that bound cannot contribute -
+        // without entering the descriptor traversal to find out. The weather
+        // fetch this costs is one localRainSupportAt would have made anyway.
+        if (paT145RainLocality()) {
+            float paSlabSpan = max(SlabTopY - SlabBaseY, 1.0);
+            float paWeatherBaseY = SlabBaseY + sampleWeather(p.xz).g * paSlabSpan;
+            if (p.y >= max(paWeatherBaseY, paRainAttachTop)) {
+                continue;
+            }
+        }
         float attachY;
         float precipitation;
         float familyStrength;
@@ -4571,6 +4683,7 @@ void main() {
     // T143: one ray-invariant pass over the resident descriptors, before any
     // march step, rain probe or density sample can ask about reachability.
     paBuildStormReachability();
+    paBuildRainLocality();
     if (paRayTraceActive()) {
         paTraceIteration = int(gl_FragCoord.x);
         paTraceStage = int(gl_FragCoord.y);

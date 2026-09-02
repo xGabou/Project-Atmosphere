@@ -49,7 +49,18 @@ public enum StormOptimizationDiagnosticMode {
      * every reach the shader tests against elsewhere and the clearance it
      * publishes is a genuine lower bound, so no material can be skipped.
      */
-    T143_REACHABILITY(16, "t143_reachability");
+    T143_REACHABILITY(16, "t143_reachability"),
+    /**
+     * T145's precipitation-locality gate bypassed, restoring the unguarded rain
+     * probe. The gate is production behaviour: the per-step rain probe may not
+     * enter descriptor traversal until locality is decided. A probe at or above an upper bound on
+     * the attachment height cannot contribute, and a column outside the union
+     * of the descriptors' ownership ellipses cannot be descriptor-owned - so
+     * when the raster precipitation is also absent the probe's own early-out is
+     * already decided. Both conditions are conservative and neither changes a
+     * density, a rain equation or the march's progression.
+     */
+    T145_OFF(32, "t145_off");
 
     private final int shaderFlags;
     private final String serializedName;

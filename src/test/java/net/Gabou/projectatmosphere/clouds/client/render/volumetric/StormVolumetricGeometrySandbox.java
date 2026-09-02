@@ -52,6 +52,7 @@ public final class StormVolumetricGeometrySandbox {
         validateT123InstrumentationOnly();
         validateT143ReachabilityGuard();
         validateT143ShaderReachabilityShape();
+        validateT145RainLocalityGate();
         validateT121VerticalBoundIsConservative();
         validateT121Float32BoundaryMargin();
         validateT121GuardAdmitsNoUnionContribution();
@@ -5896,6 +5897,121 @@ public final class StormVolumetricGeometrySandbox {
                 "T143 gate published the miss sentinel instead of a real clearance");
         System.out.println(
                 "PHASE4T_RESULT|T143 reach bound and gate keep one derivation"
+                        + "|PASSED|invariant satisfied");
+    }
+
+
+    /**
+     * T145 fail-first. The per-step rain probe is gated on two conservative
+     * conditions before it may enter descriptor traversal, and both must be
+     * supersets of what the exact path would have accepted.
+     *
+     * <p><b>Vertical.</b> Rain contributes only where {@code p.y < attachY}.
+     * When a column is descriptor-owned, {@code attachY} is
+     * {@code directStormLocalBaseAt}'s support-weighted mean of the BASE
+     * descriptors' own base heights - a convex combination, so it can never
+     * exceed their maximum. The gate uses that maximum, so a probe it rejects
+     * could not have satisfied the height test.
+     *
+     * <p><b>Horizontal.</b> Ownership is the ellipse test
+     * {@code length((p.xz - centre) / radii) <= 1} with
+     * {@code radii = max(extent * 1.85, 1)}. The gate bounds that ellipse by
+     * its larger semi-axis, so every point the ellipse accepts the disc accepts
+     * too.
+     */
+    private static void validateT145RainLocalityGate() {
+        int verticalProbes = 0;
+        int verticalFalseNegatives = 0;
+        int ellipseProbes = 0;
+        int ellipseFalseNegatives = 0;
+        int ownedInside = 0;
+
+        for (int caseIndex = 0; caseIndex < 240; caseIndex++) {
+            // Deterministic pseudo-random BASE sets: the attachment height the
+            // shader bounds is a mean over however many are resident.
+            int members = 1 + (caseIndex % 5);
+            double[] bases = new double[members];
+            double maximumBase = Double.NEGATIVE_INFINITY;
+            double weightedSum = 0.0D;
+            double weightTotal = 0.0D;
+            for (int member = 0; member < members; member++) {
+                double base = 90.0D + ((caseIndex * 37 + member * 53) % 400);
+                double weight = 0.05D + ((caseIndex * 17 + member * 29) % 100) / 100.0D;
+                bases[member] = base;
+                maximumBase = Math.max(maximumBase, base);
+                weightedSum += base * weight;
+                weightTotal += weight;
+            }
+            double attachY = weightedSum / weightTotal;
+            verticalProbes++;
+            if (attachY > maximumBase + 1.0E-9D) {
+                verticalFalseNegatives++;
+            }
+
+            // Ownership ellipse against the bounding disc it is replaced by.
+            double major = 20.0D + (caseIndex % 12) * 45.0D;
+            double minor = major / (1.0D + (caseIndex % 5));
+            double angle = caseIndex * 0.2617993878D;
+            double cos = Math.cos(angle);
+            double sin = Math.sin(angle);
+            double extentX = Math.hypot(major * cos, minor * sin);
+            double extentZ = Math.hypot(major * sin, minor * cos);
+            double radiusX = Math.max(extentX * 1.85D, 1.0D);
+            double radiusZ = Math.max(extentZ * 1.85D, 1.0D);
+            double disc = Math.max(radiusX, radiusZ);
+            for (int probeAngle = 0; probeAngle < 36; probeAngle++) {
+                double theta = probeAngle * (Math.PI / 18.0D);
+                for (int step = 0; step < 8; step++) {
+                    double radius = disc * (0.2D + step * 0.18D);
+                    double dx = Math.cos(theta) * radius;
+                    double dz = Math.sin(theta) * radius;
+                    boolean owned = Math.hypot(dx / radiusX, dz / radiusZ) <= 1.0D;
+                    boolean insideDisc = Math.hypot(dx, dz) <= disc;
+                    ellipseProbes++;
+                    if (owned && !insideDisc) {
+                        ellipseFalseNegatives++;
+                    }
+                    if (owned) {
+                        ownedInside++;
+                    }
+                }
+            }
+        }
+
+        System.out.println("T145_RAIN_GATE|verticalProbes=" + verticalProbes
+                + "|verticalFalseNegatives=" + verticalFalseNegatives
+                + "|ellipseProbes=" + ellipseProbes
+                + "|ellipseFalseNegatives=" + ellipseFalseNegatives
+                + "|ownedProbes=" + ownedInside);
+
+        require(ellipseProbes >= 50000,
+                "T145 ownership sweep is too small to be evidence: " + ellipseProbes);
+        require(verticalFalseNegatives == 0,
+                "T145 attachment-height bound was exceeded by a weighted mean:"
+                        + " falseNegatives=" + verticalFalseNegatives);
+        require(ellipseFalseNegatives == 0,
+                "T145 ownership disc rejected a column the ellipse accepts:"
+                        + " falseNegatives=" + ellipseFalseNegatives);
+        require(ownedInside >= 1000,
+                "T145 ownership sweep is vacuous: no probe was ever owned");
+
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String build = functionBlock(shader, "void paBuildRainLocality()");
+        require(build.contains("role == 0"),
+                "T145 attachment bound is not restricted to BASE descriptors");
+        require(build.contains("* 1.85"),
+                "T145 ownership bound does not use the ownership ellipse's own factor");
+        String support = functionBlock(shader, "float localRainSupportAt(");
+        require(support.contains("precipitation <= 0.02")
+                        && support.indexOf("paT145RainLocality()")
+                            < support.indexOf("directStormRainSupportAt("),
+                "T145 ownership gate does not precede the descriptor traversal");
+        String segment = functionBlock(shader, "bool rainSegmentMayContribute(");
+        require(segment.contains("max(paWeatherBaseY, paRainAttachTop)"),
+                "T145 vertical gate does not take the larger of the two attachment bounds");
+        System.out.println(
+                "PHASE4T_RESULT|T145 rain locality gate is conservative"
                         + "|PASSED|invariant satisfied");
     }
 

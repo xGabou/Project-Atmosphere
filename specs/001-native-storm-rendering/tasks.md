@@ -925,7 +925,7 @@ not fabricate historical before/after percentages for T119--T123.
   2000-block cloud render distance. Edge softness of 165-200 blocks and the anvil's 2.18x1.56 role
   profile are what make it loose, and both are morphology decisions this task may not change. The
   bound, the arm and the `T143_REACH_GUARD` sweep are retained, defaulting off.
-- [ ] T145 [PERFORMANCE] Gate the rain probe on precipitation locality rather than storm geometry,
+- [X] T145 [PERFORMANCE] Gate the rain probe on precipitation locality rather than storm geometry,
   and record the result in `validation/performance-traversal-overhead.md`. T143 established that
   `rainSegmentMayContribute` is the dominant per-step traversal and that it early-outs only on the
   frame-wide `MaxPrecipitation` uniform, so a severe storm anywhere in the weather map keeps it
@@ -934,6 +934,21 @@ not fabricate historical before/after percentages for T119--T123.
   descriptor geometry and therefore without inheriting the softness and anvil-profile looseness that
   defeated T143. Measure against the same `PLAY_NEAR`/`CLEAR` bracket before implementing anything
   (depends on T143) [FR-012-FR-013, FR-027; SC-006, SC-017]
+  **Banked; now production behaviour.** Recorded in
+  `validation/performance-rain-locality.md`. Two conservative conditions gate the probe before it
+  may enter descriptor traversal: the probe height against `max(weatherBaseY, maxBaseDescriptorY)`,
+  which bounds `attachY` because `directStormLocalBaseAt` returns a convex combination of the BASE
+  descriptors' own bases; and, when the raster precipitation is <= 0.02, the column against the
+  union of the ownership ellipses, which are purely horizontal with no softness, blend or warp term
+  and therefore bound tightly where T143's SDF bound did not. Representative 1.154x PLAY_VIS_NEAR
+  and 1.285x PLAY_VIS_MID, severe 1.13x-1.32x, stress 1.202x, empty-sky-with-descriptors 2.362x,
+  clear sky correctly unchanged. Descriptor evaluations -25.0%, fetches -25.6%, `directStormShape`
+  calls -29.0%, while march steps, density calls, zero-density calls and light evaluations are
+  unchanged to within 0.01%. Zero false negatives over 69,360 sweep probes; at the whiteout pose the
+  arm-versus-production difference (0.224% of pixels) is smaller than production's own frame-to-
+  frame noise floor (0.315%); at the T098a poses the frames are bit-identical and centre-column
+  share stays 1.0000 with a 0 px inner sky run. The flag is inverted to `T145_OFF` per the
+  T121/T122 precedent so the equivalence stays re-provable.
 - [ ] T144 [PERFORMANCE] Collapse the redundant per-sample descriptor evaluations. T141 measured
   **4.35 `directStormShape` calls per `cloudDensity` call** at the corrected representative pose -
   the density path, the final-density path, the structure path and the safe-advance probe each
@@ -941,6 +956,14 @@ not fabricate historical before/after percentages for T119--T123.
   measured evaluation elasticity of 0.16 and is image-neutral when the cached value is the same
   value. Requires a deterministic equivalence test proving the cached and recomputed unions agree
   (depends on T141) [FR-012, FR-019, FR-027; SC-017]
+  **Benefit recomputed after T145.** T145 removed the rain probe's share, taking
+  `directStormShape` calls per `cloudDensity` call from 4.85 to **3.45** at the corrected
+  representative pose. Collapsing 3.45 to 1 removes ~71% of the remaining calls, worth
+  `0.65 x 0.16` (evaluations) `+ 0.65 x 0.37` (fetches) `= ~1.5x` on the elasticity model that
+  predicted T145 to within 0.002 - not the ~1.14x recorded when only evaluation elasticity was
+  considered. First step is a counter measuring how many of the 3.45 are genuinely at the same world
+  point, since the four call sites evaluate at different points and only same-point duplicates can
+  be collapsed; 1.5x is the ceiling if all are.
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This

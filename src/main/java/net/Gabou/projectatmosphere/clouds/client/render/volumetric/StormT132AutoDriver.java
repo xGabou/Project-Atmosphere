@@ -281,7 +281,7 @@ final class StormT132AutoDriver {
      */
     private static final StormOptimizationDiagnosticMode[] T141_ARMS = {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
-            StormOptimizationDiagnosticMode.T143_REACHABILITY
+            StormOptimizationDiagnosticMode.T145_OFF
     };
     /**
      * The resolution every T141 cell is measured at. Fixed so evaluation work
