@@ -172,6 +172,10 @@ const int PA_OPT_T122_OFF = 2;
 // full horizontal+vertical one.
 const int PA_OPT_T141_EVAL_AMPLIFY = 4;
 const int PA_OPT_T141_BOX_BOUND = 8;
+// T143 hoists storm reachability out of the per-step march loop: one
+// ray-invariant horizontal bound over every resident descriptor, tested per
+// sample instead of a candidate-map walk and a per-descriptor segment test.
+const int PA_OPT_T143_REACHABILITY = 16;
 uniform int PaDiagnosticOptimizationMode;
 /**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
@@ -199,6 +203,29 @@ bool paT141EvalAmplify() {
 bool paT141BoxBound() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T141_BOX_BOUND) != 0;
 }
+
+/** True when the hoisted ray-invariant storm reachability bound is active. */
+bool paT143Reachability() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T143_REACHABILITY) != 0;
+}
+
+/**
+ * Ray-invariant horizontal bound on every resident descriptor's reach, in
+ * world XZ. Computed once per fragment before the march; a negative radius
+ * means "not computed, gate disabled", which is the state every consumer sees
+ * unless the arm is on.
+ *
+ * <p>This exists because the reachability work the march repeats is not the
+ * exact SDF - T141 measured that at elasticity 0.16 - but the traversal around
+ * it. Every coarse step calls rainSegmentMayContribute, which evaluates
+ * localRainSupportAt twice, each of which walks every descriptor once in
+ * directStormLocalBaseAt and then performs a complete candidate/group union in
+ * directStormShape. That is two full storm traversals per step, paid at any
+ * distance, and it is what separates an empty sky with descriptors resident
+ * from the same sky without them.
+ */
+vec2 paStormReachCentre = vec2(0.0);
+float paStormReachRadius = -1.0;
 
 // T123: emitted only by the two on-demand workload views. FINAL frames retain
 // the normal colour/history path and never read these values back.
@@ -1011,6 +1038,19 @@ float stormLobeDistanceLowerBound(
     return max(verticalBound, horizontalBound);
 }
 
+/**
+ * Distance from a world column to the storm's reach boundary, positive outside.
+ *
+ * <p>Returns a negative value when the gate is disabled, so every caller reads
+ * "inside" and behaves exactly as it does today.
+ */
+float paStormColumnOutside(vec2 worldXZ) {
+    return paStormReachRadius < 0.0
+        ? -1.0
+        : distance(worldXZ, paStormReachCentre) - paStormReachRadius;
+}
+
+
 // Signed geometric distance from p to this lobe's surface, in world-space
 // blocks. Negative inside, zero on the surface, positive outside - and valid
 // everywhere outside, including directly above or below the lobe, where a
@@ -1191,6 +1231,74 @@ float stormEdgeWidthBlocks(int descriptorIndex, int role) {
         stormDescriptorTexel(descriptorIndex, 2),
         role
     );
+}
+
+/**
+ * Builds the ray-invariant reach bound over every resident descriptor.
+ *
+ * <p>The per-descriptor horizontal reach is deliberately larger than anything
+ * the shader tests against elsewhere. It takes the widest radius the role's
+ * whole height profile can produce, including the anvil's short-axis widening;
+ * multiplies by 1.08 for the most the domain warp can subtract from the
+ * normalized radius; adds the full shear magnitude, which covers every shear
+ * progress in [0,1]; adds the closing fillet; and adds the lobe's own edge
+ * softness plus the maximum blend, which together bound how far the envelope
+ * and the smooth union's webbing can extend past the lobe surface. A column
+ * further from the union of those discs than that cannot receive a non-zero
+ * contribution from any descriptor at any height.
+ */
+void paBuildStormReachability() {
+    paStormReachRadius = -1.0;
+    if (!paT143Reachability() || StormLobeCount <= 0) {
+        return;
+    }
+    vec2 minimum = vec2(1.0e18);
+    vec2 maximum = vec2(-1.0e18);
+    bool any = false;
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(lifecycleRole.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        float profileMin;
+        float profileMax;
+        stormRoleRadialProfileRange(role, profileMin, profileMax);
+        float anvilWiden = role == 3 ? 1.56 : 1.0;
+        vec2 widest = max(
+            vec2(radiusRotation.x, radiusRotation.y * anvilWiden) * profileMax,
+            vec2(1.0));
+        vec2 narrowest = max(radiusRotation.xy * profileMin, vec2(1.0));
+        float softness = stormEdgeWidthBlocksFromData(
+            positionHeight, radiusRotation, shearMedia, role);
+        // Mirrors StormLobeEvaluator.horizontalReachBlocks, whose derivation and
+        // its zero-false-negative sweep are the authority for this expression.
+        // The exact SDF's wall term grows at only narrowest/widest of the
+        // geometric rate, so the guard band divides rather than adds.
+        float guard = softness + STORM_MAX_BLEND_BLOCKS + STORM_MIN_EDGE_BLOCKS;
+        float reach = max(widest.x, widest.y)
+                * (1.08 + guard / (0.9 * min(narrowest.x, narrowest.y)))
+            + length(shearMedia.xy);
+        vec2 centre = positionHeight.xy;
+        minimum = min(minimum, centre - vec2(reach));
+        maximum = max(maximum, centre + vec2(reach));
+        any = true;
+    }
+    if (!any) {
+        // Descriptors are resident but none is usable. An empty union reaches
+        // nowhere; a zero-radius disc at the origin would still admit one
+        // column, so keep the gate disabled rather than invent a bound.
+        return;
+    }
+    paStormReachCentre = (minimum + maximum) * 0.5;
+    paStormReachRadius = length(maximum - paStormReachCentre);
 }
 
 // Maps the unioned world-space distance to a bounded coverage envelope. This
@@ -1567,6 +1675,17 @@ float directStormShape(
     dominantHeight01 = 0.0;
     envelopeStrength = 0.0;
     activeRoleMask = 0;
+    // T143: no descriptor can contribute to a column outside the reach bound,
+    // so the candidate walk and every group union under it are skipped. The
+    // published clearance is the distance to the bound itself, which is a
+    // genuine lower bound on the distance to any lobe surface - so the march's
+    // safe advance stays conservative and cannot step over material. Returning
+    // the 1.0e9 sentinel here instead would have been unsafe.
+    float paOutsideReach = paStormColumnOutside(p.xz);
+    if (paOutsideReach > 0.0) {
+        minDescriptorClearance = paOutsideReach;
+        return 0.0;
+    }
     if (paWorkloadCaptureActive()) {
         paDirectStormShapeCalls++;
     }
@@ -2867,6 +2986,14 @@ float funnelBaseLowering(vec2 worldXZ, vec4 A, vec4 B) {
 // This helper also supplies the interior height at which the same visible
 // union is sampled for rain support.
 bool directStormLocalBaseAt(vec2 worldXZ, out float attachY, out float supportY) {
+    // T143: outside the reach bound every lobe's support term is zero, so the
+    // loop below would run its exact SDF for each BASE descriptor and then
+    // discard all of them. Return the same fallback it does.
+    if (paStormColumnOutside(worldXZ) > 0.0) {
+        attachY = SlabBaseY;
+        supportY = SlabBaseY;
+        return false;
+    }
     float weightedBase = 0.0;
     float weightedSupportY = 0.0;
     float totalWeight = 0.0;
@@ -4441,6 +4568,9 @@ void main() {
     paViewFragCoord = paRayTraceActive()
         ? PaRayTraceFragCoord
         : gl_FragCoord.xy;
+    // T143: one ray-invariant pass over the resident descriptors, before any
+    // march step, rain probe or density sample can ask about reachability.
+    paBuildStormReachability();
     if (paRayTraceActive()) {
         paTraceIteration = int(gl_FragCoord.x);
         paTraceStage = int(gl_FragCoord.y);
@@ -4736,11 +4866,29 @@ void main() {
                 * (cameraInsideCloud ? distanceGrowth : 1.0);
             stepLength = min(stepLength, t1 - t);
         }
+        vec3 paSegmentEnd = CameraPos + rayDir * (t + stepLength);
+        // T143: the segment test itself costs three candidate-map lookups and a
+        // per-descriptor bounding-sphere pass. Reject the whole segment first
+        // against the ray-invariant bound, using the exact closest point of the
+        // segment in XZ so a segment that only passes through the disc is still
+        // admitted.
+        bool paSegmentReachable = true;
+        if (paStormReachRadius >= 0.0) {
+            vec2 paSegmentXZ = paSegmentEnd.xz - p.xz;
+            float paSegmentLengthSquared = max(dot(paSegmentXZ, paSegmentXZ), 0.000001);
+            float paAlong = clamp(
+                dot(paStormReachCentre - p.xz, paSegmentXZ) / paSegmentLengthSquared,
+                0.0, 1.0);
+            paSegmentReachable =
+                distance(p.xz + paSegmentXZ * paAlong, paStormReachCentre)
+                    <= paStormReachRadius;
+        }
         if (!fine
                 && StormLobeCount > 0
+                && paSegmentReachable
                 && directStormSegmentMayIntersect(
                     p,
-                    CameraPos + rayDir * (t + stepLength)
+                    paSegmentEnd
                 )) {
             // T098. The segment test is conservative and correct - it produced
             // zero false negatives at every traced distance - but its group

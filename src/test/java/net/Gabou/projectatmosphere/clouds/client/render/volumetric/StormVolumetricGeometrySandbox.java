@@ -50,6 +50,8 @@ public final class StormVolumetricGeometrySandbox {
         validateT132AuthoritativeControlSeparation();
         validateT133ProductionDefaultUnchanged();
         validateT123InstrumentationOnly();
+        validateT143ReachabilityGuard();
+        validateT143ShaderReachabilityShape();
         validateT121VerticalBoundIsConservative();
         validateT121Float32BoundaryMargin();
         validateT121GuardAdmitsNoUnionContribution();
@@ -5754,6 +5756,147 @@ public final class StormVolumetricGeometrySandbox {
                     role == StormLobeDescriptor.Role.ANVIL ? 150.0F : 82.0F,
                     role == StormLobeDescriptor.Role.ANVIL ? 48.0F : 68.0F));
         }
+    }
+
+
+    /**
+     * T143 fail-first. The march hoists storm reachability out of its per-step
+     * loop: a column further from a lobe's stored centre than
+     * {@code StormLobeEvaluator.horizontalReachBlocks} skips the candidate
+     * walk, the group unions, the per-descriptor segment test and the
+     * all-descriptor base loop the rain probe runs twice per step.
+     *
+     * <p>That is only sound if the bound never excludes a column the exact
+     * evaluation would have given a contribution to. This sweeps the claim
+     * directly: for every lobe and every probe outside the bound, the exact
+     * signed distance must exceed the lobe's own edge softness plus the maximum
+     * blend, which together are how far past the surface the coverage envelope
+     * and the smooth union's webbing can reach.
+     *
+     * <p>Required result: zero false negatives at every role, eccentricity,
+     * shear and probe direction.
+     */
+    private static void validateT143ReachabilityGuard() {
+        StormLobeDescriptor.Role[] roles = StormLobeDescriptor.Role.values();
+        int probes = 0;
+        int falseNegatives = 0;
+        double worstMargin = Double.POSITIVE_INFINITY;
+        String worstLabel = "";
+        int insideWithMaterial = 0;
+
+        for (int roleIndex = 0; roleIndex < roles.length; roleIndex++) {
+            StormLobeDescriptor.Role role = roles[roleIndex];
+            for (int majorStep = 0; majorStep < 6; majorStep++) {
+                double major = 24.0D + majorStep * 96.0D;
+                for (int ratioStep = 0; ratioStep < 5; ratioStep++) {
+                    // Eccentricity from circular to 5:1, which is where the
+                    // ellipse-to-blocks conversion is least exact.
+                    double minor = major / (1.0D + ratioStep);
+                    for (int heightStep = 0; heightStep < 3; heightStep++) {
+                        float base = 120.0F + heightStep * 90.0F;
+                        float top = base + 80.0F + heightStep * 260.0F;
+                        StormLobeDescriptor lobe = descriptor(
+                                group(0x7143L + roleIndex), 0, 1, role,
+                                17.0D * roleIndex, -31.0D * majorStep,
+                                base, top, (float) major, (float) minor);
+                        double reach = StormLobeEvaluator.horizontalReachBlocks(lobe);
+                        double guardBand = StormLobeEvaluator.edgeWidthBlocks(lobe) + 48.0D;
+
+                        for (int angleStep = 0; angleStep < 24; angleStep++) {
+                            double angle = angleStep * (Math.PI / 12.0D);
+                            for (int outStep = 0; outStep < 5; outStep++) {
+                                // Immediately outside the bound is the binding
+                                // case; further out can only be safer.
+                                double radius = reach + 0.05D + outStep * 37.0D;
+                                double x = lobe.centerX() + Math.cos(angle) * radius;
+                                double z = lobe.centerZ() + Math.sin(angle) * radius;
+                                for (int yStep = 0; yStep <= 8; yStep++) {
+                                    double y = base - 140.0D
+                                            + yStep * ((top - base) + 280.0D) / 8.0D;
+                                    double distance =
+                                            StormLobeEvaluator.signedDistanceAt(lobe, x, y, z);
+                                    double margin = distance - guardBand;
+                                    probes++;
+                                    if (!(margin > 0.0D)) {
+                                        falseNegatives++;
+                                    }
+                                    if (margin < worstMargin) {
+                                        worstMargin = margin;
+                                        worstLabel = role + " major=" + major
+                                                + " minor=" + minor + " radius=" + radius
+                                                + " y=" + y;
+                                    }
+                                }
+                            }
+                        }
+
+                        // The bound must not be vacuous: a column at the lobe's
+                        // own centre has to be inside it and carry material.
+                        if (StormLobeEvaluator.signedDistanceAt(
+                                lobe, lobe.centerX(), (base + top) * 0.5D, lobe.centerZ())
+                                    <= guardBand) {
+                            insideWithMaterial++;
+                        }
+                    }
+                }
+            }
+        }
+
+        System.out.println("T143_REACH_GUARD|probes=" + probes
+                + "|falseNegatives=" + falseNegatives
+                + "|worstMargin=" + String.format(java.util.Locale.ROOT, "%.3f", worstMargin)
+                + " blocks at " + worstLabel
+                + "|nonVacuousCentres=" + insideWithMaterial);
+
+        require(probes >= 100000,
+                "T143 reachability sweep is too small to be evidence: " + probes);
+        require(falseNegatives == 0,
+                "T143 reachability bound excluded a column the exact evaluation reaches:"
+                        + " falseNegatives=" + falseNegatives + " worst=" + worstLabel);
+        require(insideWithMaterial >= 60,
+                "T143 reachability sweep is vacuous: no lobe centre carried material");
+        System.out.println(
+                "PHASE4T_RESULT|T143 reachability bound has no false negatives"
+                        + "|PASSED|invariant satisfied");
+    }
+
+    /**
+     * T143 keeps one source for the reach bound. The shader cannot call the
+     * Java evaluator, so this asserts the GLSL builds the same expression from
+     * the same terms and that the gate publishes a real clearance rather than
+     * the miss sentinel - returning 1.0e9 there would let the march's safe
+     * advance step over material that lies just past the bound.
+     */
+    private static void validateT143ShaderReachabilityShape() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String build = functionBlock(shader, "void paBuildStormReachability()");
+        require(build.contains("stormRoleRadialProfileRange(role, profileMin, profileMax)"),
+                "T143 reach bound does not take the role's whole profile range");
+        require(build.contains("role == 3 ? 1.56 : 1.0"),
+                "T143 reach bound omits the anvil short-axis widening");
+        require(build.contains("1.08 + guard / (0.9 * min(narrowest.x, narrowest.y))"),
+                "T143 reach bound does not divide the guard band by the narrow radius;"
+                        + " an additive band is unsound for eccentric lobes");
+        require(build.contains("length(shearMedia.xy)"),
+                "T143 reach bound omits the shear magnitude");
+        require(build.contains("STORM_MIN_EDGE_BLOCKS"),
+                "T143 reach bound omits the cap-rounding fillet");
+        require(build.contains("profileMin"),
+                "T143 reach bound omits the narrow end of the role profile");
+        require(build.contains("softness"),
+                "T143 reach bound omits the lobe edge softness");
+        require(build.contains("STORM_MAX_BLEND_BLOCKS"),
+                "T143 reach bound omits the maximum blend");
+
+        String shape = functionBlock(shader, "float directStormShape(");
+        require(shape.contains("minDescriptorClearance = paOutsideReach;"),
+                "T143 gate does not publish the distance to the bound as its clearance");
+        require(!shape.contains("minDescriptorClearance = 1.0e9;\n        return 0.0;"),
+                "T143 gate published the miss sentinel instead of a real clearance");
+        System.out.println(
+                "PHASE4T_RESULT|T143 reach bound and gate keep one derivation"
+                        + "|PASSED|invariant satisfied");
     }
 
     private static StormLobeDescriptor descriptor(

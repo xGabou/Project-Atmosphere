@@ -898,7 +898,7 @@ not fabricate historical before/after percentages for T119--T123.
   what they actually rendered, and the representative claims drawn from them are withdrawn. The old
   PLAY_NEAR framing is retained under its correct label, empty-sky-with-descriptors, because paired
   with CLEAR it is the most diagnostically valuable control in the set.
-- [ ] T143 [PERFORMANCE] Hoist storm reachability out of the per-step march loop and measure it
+- [X] T143 [PERFORMANCE] Hoist storm reachability out of the per-step march loop and measure it
   against the `PLAY_NEAR`/`CLEAR` bracket, recording the result in
   `validation/performance-traversal-overhead.md`. T141 established that per-step descriptor
   *traversal* - the candidate-map lookup, descriptor validity and group-slot probes, and the
@@ -910,6 +910,30 @@ not fabricate historical before/after percentages for T119--T123.
   Measure against the control bracket before implementing anything else: if `PLAY_NEAR` does not
   collapse toward 1.8 ms the mechanism is misidentified and the task stops. Zero false negatives
   and T098a remain hard gates (depends on T141) [FR-001, FR-012-FR-013, FR-027; SC-006, SC-017]
+  **Rejected; no production change.** Recorded in `validation/performance-traversal-overhead.md`.
+  The traversal was located precisely - the dominant source is the rain probe, not the segment test:
+  `rainSegmentMayContribute` runs every march step and evaluates `localRainSupportAt` twice, each of
+  which walks every descriptor in `directStormLocalBaseAt` and performs a complete
+  `directStormShape` union, giving 2.01 storm traversals per step against 0.024 from the safe
+  advance. But a conservative spatial bound cannot remove it. A first, additive bound gave
+  PLAY_NEAR 109.2 -> 57.8 ms (1.89x) and the fail-first sweep then found 1296 false negatives in
+  388,800 probes, worst case 25.9 blocks: the exact SDF's wall term grows at only narrowest/widest
+  of the geometric rate, so the guard band must divide by the narrow radius rather than add to the
+  wide one. With the corrected, zero-false-negative bound the gate never fires - every pose moves by
+  at most 1.6% and the traversal counters are identical to within 0.02% - because a sound reach is
+  2.1x-4.9x the lobe's major radius, up to ~2722 blocks for the anvil, which exceeds the entire
+  2000-block cloud render distance. Edge softness of 165-200 blocks and the anvil's 2.18x1.56 role
+  profile are what make it loose, and both are morphology decisions this task may not change. The
+  bound, the arm and the `T143_REACH_GUARD` sweep are retained, defaulting off.
+- [ ] T145 [PERFORMANCE] Gate the rain probe on precipitation locality rather than storm geometry,
+  and record the result in `validation/performance-traversal-overhead.md`. T143 established that
+  `rainSegmentMayContribute` is the dominant per-step traversal and that it early-outs only on the
+  frame-wide `MaxPrecipitation` uniform, so a severe storm anywhere in the weather map keeps it
+  running at any distance. The morphology map already carries precipitation per texel; a per-column
+  or per-region bound would skip the whole probe wherever no rain can attach, without touching
+  descriptor geometry and therefore without inheriting the softness and anvil-profile looseness that
+  defeated T143. Measure against the same `PLAY_NEAR`/`CLEAR` bracket before implementing anything
+  (depends on T143) [FR-012-FR-013, FR-027; SC-006, SC-017]
 - [ ] T144 [PERFORMANCE] Collapse the redundant per-sample descriptor evaluations. T141 measured
   **4.35 `directStormShape` calls per `cloudDensity` call** at the corrected representative pose -
   the density path, the final-density path, the structure path and the safe-advance probe each

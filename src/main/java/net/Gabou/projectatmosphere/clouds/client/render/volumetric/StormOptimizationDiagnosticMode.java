@@ -39,7 +39,17 @@ public enum StormOptimizationDiagnosticMode {
      * the maximum of two valid lower bounds is a valid lower bound, so the arm
      * can only reject more lobes - never different ones.
      */
-    T141_BOX_BOUND(8, "t141_box_bound");
+    T141_BOX_BOUND(8, "t141_box_bound"),
+    /**
+     * T143: storm reachability is hoisted out of the per-step march loop. One
+     * ray-invariant horizontal bound over every resident descriptor is built
+     * once per fragment, and a column outside it skips the candidate walk, the
+     * group unions, the per-descriptor segment test and the all-descriptor base
+     * loop that the rain probe runs twice per step. The bound is a superset of
+     * every reach the shader tests against elsewhere and the clearance it
+     * publishes is a genuine lower bound, so no material can be skipped.
+     */
+    T143_REACHABILITY(16, "t143_reachability");
 
     private final int shaderFlags;
     private final String serializedName;
