@@ -83,7 +83,7 @@ final class StormT132AutoDriver {
         BOOTSTRAP_RESTORE, BOOTSTRAP_WAIT_RESTORED, WAIT_WORLD, SPAWN_STORM, WAIT_ADOPT, WAIT_MATURE, BEGIN_SUITE, POLL_SUITE,
         BEGIN_TRACE, POLL_TRACE,
         RAYTRACE_FIXTURE,
-        T135_PREPARE, T135_MOVE, T135_SETTLE, T135_SAMPLE, T135_REPORT,
+        T135_PREPARE, T135_MOVE, T135_SETTLE, T135_SAMPLE, T135_RESPAWN, T135_REPORT,
         BEGIN_T098, POLL_T098, DONE
     }
 
@@ -162,10 +162,22 @@ final class StormT132AutoDriver {
             AtmoCommonConfig.CloudRaymarchQuality.HIGH,
             AtmoCommonConfig.CloudRaymarchQuality.ULTRA
     };
-    private static final String[] T135_POSES = {"SIDE", "FAR", "BELOW", "ABOVE", "CLEAR"};
+    /**
+     * T136 scenarios. A is the severe worst case, B is storm gameplay the
+     * player is not deliberately parked in, D is the clear-weather control.
+     * Ordered cheapest-last so an expiring fixture costs the least important
+     * cells first.
+     */
+    private static final String[] T135_POSES = {
+            "SIDE", "BELOW", "ABOVE", "FAR", "NEAR_EDGE",
+            "PLAY_NEAR", "PLAY_MID", "PLAY_HIGH", "CLEAR"};
     private static int t135PoseIndex;
     private static int t135ModeIndex;
     private static int t135SettleFrames;
+    private static int t135CellRetries;
+    private static boolean t135LightingArm;
+    /** Retries allowed per cell before it is abandoned as unmeasurable. */
+    private static final int T135_MAX_CELL_RETRIES = 2;
 
     private static void tickInWorld(Minecraft minecraft) {
         LocalPlayer player = minecraft.player;
@@ -339,6 +351,15 @@ final class StormT132AutoDriver {
                 advance(Phase.T135_MOVE);
             }
             case T135_MOVE -> {
+                // Re-resolve before every pose. A respawn puts the new storm at
+                // the player, so poses derived from the previous fixture would
+                // aim at empty sky and the cell would silently measure nothing.
+                if (StormGeometryBuildCoordinator.lobeCount() < 10) {
+                    advance(Phase.T135_RESPAWN);
+                    return;
+                }
+                VolumetricCloudFrameDiagnostics.beginStormPerformanceBaseline(
+                        player.getX(), player.getY(), player.getZ());
                 StormPerformanceBaseline.SuiteFixture fixture =
                         StormPerformanceBaseline.suiteFixture();
                 if (fixture == null) {
@@ -352,8 +373,13 @@ final class StormT132AutoDriver {
                 double y = midY;
                 double z = fixture.centerZ();
                 switch (T135_POSES[t135PoseIndex]) {
+                    // A - severe worst case.
                     case "SIDE" -> x = fixture.centerX() + radius * 1.7D;
                     case "FAR" -> x = fixture.centerX() + radius * 2.6D;
+                    case "NEAR_EDGE" -> {
+                        x = fixture.centerX() + radius * 1.12D;
+                        y = fixture.baseY() + height * 0.55D;
+                    }
                     case "BELOW" -> {
                         y = Math.max(fixture.baseY() - Math.max(90.0D, height * 0.35D), 70.0D);
                     }
@@ -361,19 +387,36 @@ final class StormT132AutoDriver {
                         x = fixture.centerX() + radius * 0.6D;
                         y = fixture.topY() + Math.max(120.0D, height * 0.45D);
                     }
+                    // B - storm gameplay. A player is near the storm but at
+                    // ordinary altitude and not aimed through its thickest
+                    // chord, which is the case the budget actually has to hold.
+                    case "PLAY_NEAR" -> {
+                        x = fixture.centerX() + radius * 4.0D;
+                        y = 120.0D;
+                    }
+                    case "PLAY_MID" -> {
+                        x = fixture.centerX() + radius * 7.0D;
+                        z = fixture.centerZ() + radius * 3.0D;
+                        y = 100.0D;
+                    }
+                    case "PLAY_HIGH" -> {
+                        x = fixture.centerX() + radius * 5.0D;
+                        z = fixture.centerZ() - radius * 2.0D;
+                        y = 320.0D;
+                    }
                     default -> {
-                        // Clear-weather context: far enough that the storm is not
-                        // in frame, so the non-cloud remainder is measurable
-                        // against a scene the storm does not dominate.
-                        x = fixture.centerX() + radius * 12.0D;
-                        y = midY;
+                        // D - clear-weather control: the storm is out of frame,
+                        // so this is the non-cloud remainder with no storm cost.
+                        x = fixture.centerX() + radius * 14.0D;
+                        y = 120.0D;
                     }
                 }
                 float yaw = (float) (Math.toDegrees(Math.atan2(
                         fixture.centerZ() - z, fixture.centerX() - x)) - 90.0D);
                 float pitch = 0.0F;
                 if ("ABOVE".equals(T135_POSES[t135PoseIndex])
-                        || "BELOW".equals(T135_POSES[t135PoseIndex])) {
+                        || "BELOW".equals(T135_POSES[t135PoseIndex])
+                        || T135_POSES[t135PoseIndex].startsWith("PLAY")) {
                     double dy = midY - y;
                     double horizontal = Math.hypot(fixture.centerX() - x, fixture.centerZ() - z);
                     pitch = horizontal < 1.0D
@@ -394,7 +437,43 @@ final class StormT132AutoDriver {
                 if (StormT135PerformanceProfile.active()) {
                     return;
                 }
+                // A cell rejected for fixture decay is retried against a fresh
+                // storm rather than reported. This is what makes the matrix
+                // trustworthy: no cell reaches the record unless its descriptor
+                // count held for every sample in it.
+                if (StormT135PerformanceProfile.lastCellContaminated()
+                        || StormGeometryBuildCoordinator.lobeCount() <= 0) {
+                    if (++t135CellRetries > T135_MAX_CELL_RETRIES) {
+                        ProjectAtmosphere.LOGGER.warn(
+                                "T136_PROFILE abandoning {}/{} after {} contaminated attempts",
+                                T135_POSES[t135PoseIndex],
+                                T135_MODES[Math.max(0, t135ModeIndex - 1)], t135CellRetries);
+                        t135CellRetries = 0;
+                        // Fall through to the next mode rather than looping.
+                    } else {
+                        ProjectAtmosphere.LOGGER.info(
+                                "T136_PROFILE respawning fixture before retrying {}/{}",
+                                T135_POSES[t135PoseIndex],
+                                T135_MODES[Math.max(0, t135ModeIndex - 1)]);
+                        t135ModeIndex = Math.max(0, t135ModeIndex - 1);
+                        advance(Phase.T135_RESPAWN);
+                        return;
+                    }
+                }
+                t135CellRetries = 0;
                 if (t135ModeIndex >= T135_MODES.length) {
+                    if (!t135LightingArm && "SIDE".equals(T135_POSES[t135PoseIndex])) {
+                        // Lighting attribution: repeat SIDE with the light cone
+                        // replaced by a constant so the difference is its share.
+                        t135LightingArm = true;
+                        t135ModeIndex = 0;
+                        VolumetricCloudDebugConfig.setT136ConstantLighting(true);
+                        ProjectAtmosphere.LOGGER.info(
+                                "T136_PROFILE lighting attribution arm begins at SIDE");
+                        return;
+                    }
+                    VolumetricCloudDebugConfig.setT136ConstantLighting(false);
+                    t135LightingArm = false;
                     t135ModeIndex = 0;
                     t135PoseIndex++;
                     if (t135PoseIndex >= T135_POSES.length) {
@@ -406,8 +485,32 @@ final class StormT132AutoDriver {
                 }
                 AtmoCommonConfig.CloudRaymarchQuality quality = T135_MODES[t135ModeIndex];
                 AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(quality);
-                StormT135PerformanceProfile.begin(T135_POSES[t135PoseIndex], quality);
+                if (!StormT135PerformanceProfile.begin(T135_POSES[t135PoseIndex], quality,
+                        t135LightingArm ? "constantLighting" : "production")) {
+                    advance(Phase.T135_RESPAWN);
+                    return;
+                }
                 t135ModeIndex++;
+            }
+            case T135_RESPAWN -> {
+                // Deterministic re-adoption: spawn, wait for descriptors, then
+                // resume the sweep at the cell that was rejected.
+                if (StormGeometryBuildCoordinator.lobeCount() >= 10) {
+                    if (stageFrames > 200) {
+                        ProjectAtmosphere.LOGGER.info(
+                                "T136_PROFILE fixture re-adopted with {} descriptors;"
+                                        + " poses will be recomputed from it",
+                                StormGeometryBuildCoordinator.lobeCount());
+                        advance(Phase.T135_MOVE);
+                    }
+                    return;
+                }
+                if (stageFrames == 1 || stageFrames % 1200 == 0) {
+                    player.connection.sendCommand("pa cloud spawn cumulonimbus_capillatus");
+                }
+                if (stageFrames > INFRA_TIMEOUT_FRAMES) {
+                    finish("t136_respawn_timeout");
+                }
             }
             case T135_REPORT -> {
                 StringBuilder out = new StringBuilder("T135_PROFILE_COMPLETE cells="
@@ -415,9 +518,10 @@ final class StormT132AutoDriver {
                 for (StormT135PerformanceProfile.Cell cell
                         : StormT135PerformanceProfile.results()) {
                     out.append(String.format(Locale.ROOT,
-                            "%nT135_CELL|%s|%s|%d|%.3f|%dx%d|%dx%d|%d"
+                            "%nT135_CELL|%s|%s|%d|%s|%d|%.3f|%dx%d|%dx%d|%d"
                                     + "|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f",
-                            cell.pose(), cell.mode(), cell.raymarchSteps(),
+                            cell.pose(), cell.arm(), cell.descriptors(),
+                            cell.mode(), cell.raymarchSteps(),
                             cell.resolutionScale(), cell.frameWidth(), cell.frameHeight(),
                             cell.cloudWidth(), cell.cloudHeight(),
                             cell.samples(), cell.cloudP50(), cell.cloudP95(),

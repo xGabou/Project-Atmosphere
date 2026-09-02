@@ -370,6 +370,7 @@ public final class StormT098CaptureDriver {
         captureModeApplied = false;
         VolumetricCloudDebugConfig.setT098LegacyHitDepth(false);
         VolumetricCloudDebugConfig.setT098LegacyFinePromotion(false);
+        VolumetricCloudDebugConfig.setT136ConstantLighting(false);
         ProjectAtmosphere.LOGGER.info("T098_CAPTURE_MODE restored");
     }
 

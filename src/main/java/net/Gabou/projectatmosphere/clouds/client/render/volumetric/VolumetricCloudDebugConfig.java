@@ -22,6 +22,12 @@ public final class VolumetricCloudDebugConfig {
      * policies can be compared on one fixture in one run.
      */
     private static volatile boolean t098LegacyFinePromotion;
+    /**
+     * T136 cost-attribution arm. When true the cloud pass replaces lighting
+     * with a constant radiance, so the GPU-time difference against production
+     * is the lighting and self-shadow share. Never enabled by production.
+     */
+    private static volatile boolean t136ConstantLighting;
     private static volatile boolean depthCompositeEnabled = true;
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
@@ -65,6 +71,14 @@ public final class VolumetricCloudDebugConfig {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
 
     private VolumetricCloudDebugConfig() {
+    }
+
+    public static boolean t136ConstantLighting() {
+        return t136ConstantLighting;
+    }
+
+    public static void setT136ConstantLighting(boolean enabled) {
+        t136ConstantLighting = enabled;
     }
 
     public static boolean t098LegacyFinePromotion() {

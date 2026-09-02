@@ -502,6 +502,8 @@ public final class VolumetricCloudRenderer {
                 VolumetricCloudDebugConfig.t098LegacyHitDepth() ? 1 : 0);
         shader.safeGetUniform("PaLegacyFinePromotion").set(
                 VolumetricCloudDebugConfig.t098LegacyFinePromotion() ? 1 : 0);
+        shader.safeGetUniform("PaDiagnosticLightingMode").set(
+                VolumetricCloudDebugConfig.t136ConstantLighting() ? 1 : 0);
         shader.safeGetUniform("PaRayTraceMode").set(StormProductionRayTrace.shaderMode());
         shader.safeGetUniform("PaRayTraceNdc").set(
                 StormProductionRayTrace.ndcX(), StormProductionRayTrace.ndcY()

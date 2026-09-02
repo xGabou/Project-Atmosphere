@@ -174,6 +174,38 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 
 ### Revalidation Gate
 
+**T136/T137 2026-09-01: representative gameplay is 2-13x over budget; the parked severe worst case is
+70-125x. Cost is pixel-bound. No implementation.**
+
+*Harness.* T135's decay contamination is fixed three ways and every cell below held `descriptors=10`
+for its whole sample: per-sample descriptor validation that discards a cell whose count ever falls,
+deterministic respawn/re-adopt with bounded retries, and **per-pose fixture re-resolution** - `pa
+cloud spawn` places the storm at the player, so pre-respawn poses aimed at empty sky and the same
+FAR/Medium cell measured 113.6 ms on one attempt and 15.1 ms on another.
+
+*T136.* RTX 4070 Laptop, 1920x1080, each mode on its own resolution scale. Ultra cloud p50:
+**NEAR_EDGE 999.7 (125x)**, ABOVE 678.8 (84.8x), SIDE 561.5 (70.2x), FAR 270.6 (33.8x), but
+**PLAY_NEAR 102.3 (12.8x)**; PLAY_MID/High 29.5 (4.5x) and PLAY_MID/Low **5.2 (1.7x)**. The true
+worst case is NEAR_EDGE, not SIDE. Non-cloud remainder is **0.6-2.9 ms** everywhere and clear weather
+is inside budget at every mode, so the cost is entirely storm-driven. **Scaling: 4.00x pixels cost
+4.69x and 8.41x, while 1.60x step budget at fixed pixels cost only 1.23x and 1.39x** - cost is
+pixel-bound and the step cap is not the work unit, because rays exit on the transmittance floor at
+38-85 of 128. Lighting measured by a constant-radiance arm at **21-23%** of cloud cost (ceiling
+1.29x). Gap recorded: the descriptor-evaluation/fetch counters exist but were not wired into the
+sweep, so per-sample cost is not isolated.
+
+*T137.* Ranked by contribution, not ease: 1 internal resolution + temporal reconstruction (4x alone,
+8-16x with reconstruction; the only measured order-of-magnitude lever), 2 per-sample descriptor cost
+(1.5-3x, **image-neutral**, weakest estimate), 3 distance/LOD (1.5-2x, nothing at NEAR_EDGE),
+4 lighting (1.29x measured ceiling, conflicts with T098b's open self-shadow finding), 5 samples per
+ray (1.2-1.5x, highest risk per unit reward - it is the T098a machinery). Expected cumulative stack
+**27-40x**. **SC-006 is credible for representative gameplay and not for the parked worst case**:
+at 30x, PLAY_NEAR lands at 3.4 ms but NEAR_EDGE is still 33 ms against 8. Proposed mode ladder moves
+resolution/reconstruction rather than step counts. **Recommended first T138 increment: wire the
+counters, re-measure, then implement rank 2**, because it is the only large image-neutral lever and
+landing it first reduces how much image change the rest of the stack must buy. Evidence in
+`validation/performance-baseline.md` and `validation/performance-architecture.md`.
+
 **T098a 2026-09-01: PASSES on Forge-1.20.1. T135 established and FAILING by 9x-64x.**
 
 *T098a.* `Forge-1.20.1` had advanced to 4e356c3; it was merged into the correction branch (clean,
@@ -735,12 +767,12 @@ not fabricate historical before/after percentages for T119--T123.
   percentile. Start from the existing 3.0/4.0/5.0/6.5/8.0 ms cloud targets, validate or revise them
   by measurement, and retain Ultra SC-006 p95 total-frame <=16.7 ms at 1920x1080 unchanged
   (depends on T133) [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-017, SC-021]
-- [ ] T136 [PERFORMANCE] Create the controlled same-fixture profiling baseline for severe
+- [X] T136 [PERFORMANCE] Create the controlled same-fixture profiling baseline for severe
   SIDE/FAR/BELOW/ABOVE and useful clear-weather context. Capture GPU ms, ray iterations,
   `cloudDensity` evaluations, descriptor evaluations/fetches, lighting/shadow, reconstruction,
   history, resolution, and owned T119/T121/T122/T123 counters in
   `validation/performance-baseline.md` (depends on T135) [FR-012-FR-013, FR-027; SC-006, SC-017, SC-021]
-- [ ] T137 [PERFORMANCE] Produce a ranked performance architecture decision from T136 in
+- [X] T137 [PERFORMANCE] Produce a ranked performance architecture decision from T136 in
   `validation/performance-architecture.md`. Evaluate descriptor representation/cache/layout,
   fetch bandwidth, raymarch/adaptive stepping, shadow/light proxies, internal resolution/temporal
   reconstruction, quality-specific LOD, bounded simplification, and distance policy; select only

@@ -45,6 +45,15 @@ public final class StormT135PerformanceProfile {
     private static long previousFrameNanos;
     private static int cloudTargetWidth;
     private static int cloudTargetHeight;
+    /**
+     * Descriptor count required for this cell. A severe fixture that decays
+     * mid-cell produces a bimodal sample that is not a cost measurement, so a
+     * cell whose descriptor count ever drops below what it started with is
+     * rejected rather than reported.
+     */
+    private static int requiredDescriptors;
+    private static boolean contaminated;
+    private static String armLabel = "production";
     private static final float[] cloudMilliseconds = new float[SAMPLE_FRAMES];
     private static final float[] frameMilliseconds = new float[SAMPLE_FRAMES];
     private static final List<Cell> results = new ArrayList<>();
@@ -55,6 +64,8 @@ public final class StormT135PerformanceProfile {
     /** One completed (pose, mode) measurement. */
     public record Cell(
             String pose,
+            String arm,
+            int descriptors,
             String mode,
             int raymarchSteps,
             float resolutionScale,
@@ -75,10 +86,22 @@ public final class StormT135PerformanceProfile {
 
     /** Begins sampling one (pose, mode) cell. Returns false when already busy. */
     public static synchronized boolean begin(
-            String pose, AtmoCommonConfig.CloudRaymarchQuality quality) {
+            String pose, AtmoCommonConfig.CloudRaymarchQuality quality, String arm) {
         if (active) {
             return false;
         }
+        int descriptors = StormGeometryBuildCoordinator.lobeCount();
+        if (descriptors <= 0) {
+            // Refusing to start is the point: a cell measured against an absent
+            // fixture is worse than a missing cell.
+            ProjectAtmosphere.LOGGER.warn(
+                    "T136_PROFILE refusing to sample {}/{} with {} descriptors",
+                    pose, quality, descriptors);
+            return false;
+        }
+        requiredDescriptors = descriptors;
+        contaminated = false;
+        armLabel = arm;
         poseName = pose;
         mode = quality;
         settled = 0;
@@ -96,6 +119,15 @@ public final class StormT135PerformanceProfile {
     /** True once the current cell has collected its full sample. */
     public static synchronized boolean cellComplete() {
         return !active;
+    }
+
+    /** True when the cell just finished was rejected for fixture decay. */
+    public static synchronized boolean lastCellContaminated() {
+        return contaminated;
+    }
+
+    public static synchronized int requiredDescriptors() {
+        return requiredDescriptors;
     }
 
     public static synchronized List<Cell> results() {
@@ -133,6 +165,16 @@ public final class StormT135PerformanceProfile {
             finish(frameWidth, frameHeight);
             return;
         }
+        if (StormGeometryBuildCoordinator.lobeCount() < requiredDescriptors) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T136_PROFILE {}/{} contaminated: descriptors fell {} -> {} after {} samples",
+                    poseName, mode, requiredDescriptors,
+                    StormGeometryBuildCoordinator.lobeCount(), sampled);
+            contaminated = true;
+            sampled = 0;
+            active = false;
+            return;
+        }
         if (previous == 0L) {
             return;
         }
@@ -164,6 +206,8 @@ public final class StormT135PerformanceProfile {
             Arrays.sort(frame);
             results.add(new Cell(
                     poseName,
+                    armLabel,
+                    requiredDescriptors,
                     mode == null ? "unknown" : mode.name(),
                     mode == null ? 0 : mode.getRaymarchSteps(),
                     mode == null ? 0.0F : mode.getResolutionScale(),
@@ -182,11 +226,13 @@ public final class StormT135PerformanceProfile {
             ));
             Cell recorded = results.get(results.size() - 1);
             ProjectAtmosphere.LOGGER.info(
-                    "T135_PROFILE pose={} mode={} steps={} resolutionScale={} framebuffer={}x{}"
+                    "T135_PROFILE pose={} arm={} descriptors={} mode={} steps={}"
+                            + " resolutionScale={} framebuffer={}x{}"
                             + " cloudTarget={}x{} samples={}"
                             + " cloudP50={} cloudP95={} cloudMean={}"
                             + " frameP50={} frameP95={} frameMean={} remainderP50={}",
-                    recorded.pose(), recorded.mode(), recorded.raymarchSteps(),
+                    recorded.pose(), recorded.arm(), recorded.descriptors(),
+                    recorded.mode(), recorded.raymarchSteps(),
                     fmt(recorded.resolutionScale()), recorded.frameWidth(),
                     recorded.frameHeight(), recorded.cloudWidth(), recorded.cloudHeight(),
                     recorded.samples(),

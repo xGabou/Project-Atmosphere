@@ -228,6 +228,10 @@ uniform int PaLegacyHitDepth;
 // T098 evidence arm only: 1 restores the pre-fix promotion, which consumed a
 // march iteration per fine sample across empty envelope. Zero in production.
 uniform int PaLegacyFinePromotion;
+// T136 cost-attribution arm only. 1 replaces the whole lighting evaluation,
+// including its light-cone march, with a constant radiance, so the difference
+// in cloud GPU time is the lighting share. Zero in production.
+uniform int PaDiagnosticLightingMode;
 uniform int PaRayTraceMode;
 uniform vec2 PaRayTraceNdc;
 uniform vec2 PaRayTraceFragCoord;
@@ -3885,6 +3889,12 @@ vec3 sampleLighting(
         bool cameraStartsInsideSlab,
         bool cameraInsideCloud,
         out float diagnosticLightOpticalDepth) {
+    if (PaDiagnosticLightingMode == 1) {
+        // T136 attribution arm: no light cone, no scatter chain, no tone curve.
+        // A plausible mid-grey so the march still integrates a real colour.
+        diagnosticLightOpticalDepth = 0.0;
+        return vec3(0.62, 0.66, 0.74);
+    }
     // Fine rain streaks do not need a full cloud light cone. Avoid paying the
     // multi-sample self-shadow march for every precipitation step.
     float opticalDepth = rainFraction > 0.05
