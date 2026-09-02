@@ -44,11 +44,12 @@ public final class StormT098CaptureDriver {
      * The internal-resolution arms, matching the T138 performance sweep exactly
      * so a frame and a millisecond figure describe the same configuration.
      */
-    // Shipped Ultra scale first. It is the scale every performance A/B is
-    // measured at, so an interrupted set still yields the comparable pair, and
-    // the 1.00 arm - which renders over a second per frame and has tripped the
-    // display driver's timeout - is left until last.
-    private static final float[] RESOLUTION_LADDER = {0.75F, 0.50F, 0.375F, 0.25F, 1.00F};
+    // Shipped Ultra scale first, and no native arm at all. 0.75 is what a player
+    // sees today, so it is the baseline the frontier should be judged against,
+    // and the 1.00 arm renders over a second per frame - it has tripped this
+    // machine's display-driver timeout twice and taken the run down with it.
+    private static final float[] RESOLUTION_LADDER = {
+            0.75F, 0.50F, 0.375F, 0.25F, 0.1875F, 0.125F};
 
     /**
      * Frames held between a shot's two frames when it carries a temporal pair.

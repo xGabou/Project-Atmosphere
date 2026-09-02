@@ -205,10 +205,13 @@ final class StormT132AutoDriver {
      * T138 internal-resolution arms, as linear scales of the 1920x1080 display
      * resolution. 0.75 is the shipped ULTRA scale and is included so the sweep
      * carries its own baseline rather than borrowing T136's. The targets are
-     * ceil(1920*s) x ceil(1080*s): 1920x1080, 1440x810, 960x540, 720x405 and
-     * 480x270.
+     * ceil(1920*s) x ceil(1080*s): 1920x1080, 1440x810, 960x540, 720x405,
+     * 480x270, 360x203 and 240x135. The two most aggressive arms exist because
+     * the representative gap after T145 is 54.7x and a frontier that stops at
+     * a quarter scale cannot answer whether an order of magnitude is reachable.
      */
-    private static final float[] T138_SCALES = {1.00F, 0.75F, 0.50F, 0.375F, 0.25F};
+    private static final float[] T138_SCALES = {
+            1.00F, 0.75F, 0.50F, 0.375F, 0.25F, 0.1875F, 0.125F};
     /**
      * T138 poses. CLEAR is dropped: it has no storm and therefore no marched
      * cloud pixels to scale. PLAY_NEAR leads because it is the representative
@@ -264,7 +267,7 @@ final class StormT132AutoDriver {
      * to the representative pose and the severe reference pose: running it
      * everywhere would double a sweep that already outlasts its fixture.
      */
-    private static final String[] T138_HISTORY_ARM_POSES = {"PLAY_NEAR", "SIDE"};
+    private static final String[] T138_HISTORY_ARM_POSES = {};
     private static boolean t138ResolutionRun;
     private static int t138ScaleIndex;
     private static boolean t138HistoryArm;

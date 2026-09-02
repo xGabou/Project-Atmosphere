@@ -272,10 +272,13 @@ public final class VolumetricCloudRenderer {
             return false;
         }
         float cameraCloudDensity = CameraCloudDensityTracker.smoothedCameraDensity();
-        // ULTRA's 0.75 target exceeds one million fragments at 1080p. Dense
-        // whiteout cannot resolve that extra sampling, so use 0.50 only while
-        // the canonical camera density confirms an interior view. Hysteresis
-        // prevents repeated target rebuilds at the cloud boundary.
+        // Historically ULTRA's 0.75 target exceeded one million fragments at
+        // 1080p and dense whiteout could not resolve that extra sampling, so
+        // this clamped it to 0.50 on an interior view. After the Rank 1 ladder
+        // no mode exceeds 0.25, so min(profile, 0.50) is now always the profile
+        // and this override is inert. It is retained rather than deleted
+        // because it is the hook a later adaptive policy would reuse, and its
+        // hysteresis still prevents repeated target rebuilds at the boundary.
         if (denseCameraResolution) {
             if (cameraCloudDensity < 0.04F) {
                 denseCameraResolution = false;

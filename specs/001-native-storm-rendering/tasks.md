@@ -976,6 +976,35 @@ not fabricate historical before/after percentages for T119--T123.
   between `rainSegmentMayContribute`'s probe and `rainShaftDensityAt`'s first `localRainSupportAt`
   is real but occurs only on rain-carrying segments; `rainShaftDensityAt`'s own two calls are not
   duplicates, the second being at the wind-advected source column.
+- [X] T146 [PERFORMANCE] Implement the Rank 1 internal-resolution ladder from the measured
+  quality/performance frontier, in
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricQualityProfile.java`,
+  and record the frontier in `validation/performance-internal-resolution-frontier.md`
+  (depends on T145) [FR-001, FR-010-FR-012, FR-027, FR-030; SC-005-SC-007, SC-017, SC-021]
+  **Banked; image-changing, T098b regrade owed.** Seven scales x seven poses on one fixture with
+  everything else held: cost falls as pixels^0.49-0.75 and the exponent degrades as the target
+  shrinks, so the lever is nearing its own floor. **T098a passes at every scale down to 0.125** -
+  centre-column share 1.0000, longest inner sky run 0 px, FAR coverage growing rather than thinning -
+  so the structural gate is not the binding constraint. The binding constraint is silhouette
+  softening, which is smooth and has no knee: SSIM 0.998 -> 0.960 and mean displacement 1.0 -> 7.4 px
+  from 0.500 to 0.125. Reconstruction cost is flat at 0.085-0.121 ms and is never a floor. Shipped
+  ladder, all measured points: Low/Low 24/Medium 0.125 (240x135), High 0.1875 (360x203), Ultra
+  0.250 (480x270); the three modes sharing 240x135 still separate 1.8x on their existing step,
+  lighting and detail differences. **Representative Ultra 497.3 -> 113.2 ms, 4.39x; stress
+  NEAR_EDGE 902.1 -> 179.4 ms, 5.03x**; the frontier's best point is 8.98x at 0.125. The
+  representative gap against the 8 ms cloud budget falls from 63.2x to 14.2x. Also fixed: the
+  diagnostic `setFixedResolutionScale` floor was 0.25 against the renderer's own 0.10, which
+  silently pinned the first sweep's two most aggressive arms to a 480x270 target.
+- [ ] T147 [PERFORMANCE] Re-measure the renderer's cost distribution at the shipped Rank 1 ladder
+  before choosing the next lever, and record it in `validation/performance-post-rank1.md`. Every
+  earlier attribution - the lighting share, the step-budget elasticity, the descriptor evaluation and
+  fetch elasticities - was measured at 1440x810 and none can be assumed to hold at 480x270, where
+  the fallen scaling exponent of 0.61 says occupancy is now a materially different variable. Do not
+  extend the old multiplied ceilings; measure the new distribution and pick the next bottleneck from
+  it. The two plausible candidates to measure against are interleaved reconstruction - marching at
+  0.125 and resolving to 0.250, worth a measured 2.0x at equal spatial quality - and an explicit
+  distance/LOD policy, which has never been measured and where FAR already costs half of SIDE
+  without one (depends on T146) [FR-010-FR-012, FR-027; SC-006, SC-017]
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This

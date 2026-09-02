@@ -132,9 +132,19 @@ public final class VolumetricCloudDebugConfig {
         return fixedResolutionScale;
     }
 
+    /**
+     * Diagnostic override for the cloud target's linear scale.
+     *
+     * <p>The floor matches {@code VolumetricCloudRenderTargets.prepareCloudTargets},
+     * which is the only place the value is finally clamped. It was 0.25 here,
+     * which silently pinned every more aggressive arm to a 480x270 target: the
+     * Rank 1 sweep's 0.1875 and 0.125 cells reported their labels and rendered
+     * a quarter-scale image. A diagnostic floor tighter than the renderer's own
+     * makes the frontier it exists to explore unreachable.
+     */
     public static void setFixedResolutionScale(float scale) {
         fixedResolutionScale = Float.isFinite(scale)
-                ? Math.max(0.25F, Math.min(1.0F, scale))
+                ? Math.max(0.10F, Math.min(1.0F, scale))
                 : Float.NaN;
     }
 
