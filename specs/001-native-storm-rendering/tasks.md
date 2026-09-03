@@ -399,6 +399,24 @@ See `validation/t098-manual-checklist.md`.
   T159 when the visible-volume architecture reaches resolution recovery, or the recorded stop task
   if T153/T154/T155/T156/T157 rejects the architecture (also depends on T098a, T139, T052)
   [FR-006, FR-023-FR-024, FR-031-FR-032; SC-001-SC-002, SC-011, SC-022]
+  **T160 inputs (2026-09-03, commit `7169757`).** Both prerequisites are now settled: T152 and
+  T160 are complete and the Phase 4Q terminal outcome is the recorded T153 stop, not T159.
+  Two obligations follow.
+  (a) **Upper canopy is a profile-shape defect, not clipping.** The lever is the ANVIL
+  radius-growth knee at v ~= 0.62 - the endpoint 2.10 sets how wide, the knee sets where widening
+  stops. Raising maximum Y, extending the upper TOWER, changing erosion, changing the density
+  remap, and changing renderer bounds were each measured and falsified as the cause, and must not
+  be proposed as primary fixes without evidence overturning
+  `validation/t098b-upper-anvil-envelope.md`. The relaxed diagnostic values in that arm are not
+  shipping candidates and must not be promoted directly.
+  (b) **A rendered A/B is required before the upper canopy may be graded correct.** T160 measured
+  through final `cloudDensity` only; the ABOVE footprint is roughly a 1.5:1 ellipse (about
+  468 x 312 blocks) while the in-game view appears markedly more circular, so a renderer or
+  reconstruction contribution is not excluded. Compare the final `cloudDensity` footprint against
+  actual rendered occupancy at ABOVE and SIDE and classify: Outcome A, they agree and morphology
+  is the whole fix; or Outcome B, density stays elliptical while the rendering reads circular, in
+  which case reconstruction/sampling is a second independent defect that the morphology pass alone
+  will not remove. Until classified, treat the canopy as possibly two causes.
 - [ ] T099 [FUNCTIONAL] **[REOPENED 2026-08-19 - revised criteria]** Replace
   `specs/001-native-storm-rendering/validation/us2-rain-whiteout-stability.md` evidence with new
   dry/local-rain/remote-rain/boundary stationary and moving captures proving rain remains attached

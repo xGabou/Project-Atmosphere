@@ -120,6 +120,8 @@ Descriptor values that change smoothly are refreshed in reusable upload buffers.
 - CORE: rooted, vertically stretched mass bridging base and tower;
 - TOWER: narrower rising body with height-dependent wind lean and taper;
 - ANVIL: high, thin, horizontally extended wind-aligned outflow with curved underside and top.
+  T160 measured the shipped implementation of this role and found it stops extending horizontally
+  at about 62% of its own height; see Decision 18.
 
 Descriptor-local bounds, not generic global cloud bounds, constrain these shapes. Java `StormLobeEvaluator` is the authoritative source of storm equations and is consumed by `ClientCloudVisualDensity` and deterministic tests. GLSL independently mirrors that contract, and an independent equation fixture or real parity harness—not two Java callers of the same function and not hard-coded fake GPU values—proves parity. Per-frame density publication includes the exact adopted storm render snapshot.
 
@@ -381,6 +383,45 @@ is a production-readiness prerequisite, and T098b remains the authoritative fina
 
 These directions are not reopened without new evidence that invalidates their measured ceilings or
 premises.
+
+### Decision 18: The upper canopy is an ANVIL profile-shape defect, not a clipping defect
+
+**Decision**: Treat the rounded upper canopy as a defect in the ANVIL radius profile, and address
+it by moving the radius-growth knee later rather than by extending any bound. Recorded by T160
+(commit `7169757`), evidence `validation/t098b-upper-anvil-envelope.md`.
+
+**Measurement**: taken on the real production density path - `StormDensityModel` is the CPU
+authority the shader mirrors - against the measured ten-member severe fixture and the real baked
+noise volumes, so the cross-sections are final production density rather than descriptor geometry.
+
+**Rationale**: The canopy is not clipped. Final density realises about 104.6% of its intended
+horizontal width and its support extends about 28 blocks above the nominal role-envelope top. The
+shape is authored by `profileRadius(ANVIL, v)`: the radius-growth knee lands at v ~= 0.62, the
+radius peaks at v ~= 0.65, horizontal growth then collapses and the radius decreases while
+`verticalShape` fades to zero at v = 1.0. The upper third is constant-then-narrowing under fading
+density, which is a rounded cap by construction. Measured visible width peaks around v ~= 0.81 and
+decreases before support ends, so the cloud narrows too early rather than being cut off while
+still expanding.
+
+**Falsified alternatives** (measured, not argued):
+
+- vertical clipping or a maximum-height cutoff - support exceeds the role top, width exceeds intent;
+- the upper TOWER to ANVIL transition - the tower never widens (about 76-85 blocks), is fully
+  enclosed by the anvil from about y = 380, and ends about y = 476 hidden inside it;
+- density remap and erosion - envelope to body to final density preserves width to within about 3%
+  at every measured slice;
+- renderer safety bounds and extent clamps as the primary lever.
+
+**Capability**: the diagnostic relaxed arm reached about 1.86x half-width and 1.32x height, moved
+width/height from 2.93 to 4.14, kept density bounded, and was still widening at its own
+termination - CASE A. The existing profile family can produce the intended anvil; its constants
+stop it early. Those relaxed values are diagnostic only and are never promoted directly.
+
+**Open**: T160 did not measure rendered occupancy, so a renderer or reconstruction contribution is
+not excluded. The final-density footprint from ABOVE is about a 1.5:1 ellipse (468 x 312 blocks)
+while the in-game view appears markedly more circular; a rendered A/B must classify that
+discrepancy before the upper canopy can be accepted. See the plan section **Upper-Canopy
+Morphology Strategy**.
 
 ## Resolved Unknowns
 

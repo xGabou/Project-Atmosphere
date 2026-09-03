@@ -587,12 +587,13 @@ re-entry. Neither `insideCloud -> generic fog`, `first hit -> opaque shell`, nor
 thickness is admissible. Only after those cases pass may the design enter a ten-descriptor severe
 cumulonimbus and be banked or rejected.
 
-T152 supplies the deterministic motion gate: outside -> approach -> entry -> interior movement ->
-holes/openings -> exit. It may be built in parallel with the oracle and early prototype, but must
-pass before the architecture is considered production-ready. The separate upper-canopy diagnostic
-may also run in parallel by temporarily relaxing upper TOWER/ANVIL height and width in diagnostic
-arms only; it determines whether the existing field broadens into an anvil, becomes a larger dome,
-collapses during density/remap/erosion, or is hidden by rendering/reconstruction.
+T152 supplied the deterministic motion gate and is complete: outside -> approach -> entry ->
+interior movement -> holes/openings -> exit, baselined in
+`validation/performance-moving-camera.md`. **This track is now closed.** T153 measured a 1.633x
+combined oracle ceiling against its >=2x gate, so T154-T159 closed without implementation; the
+terminal reason is `validation/performance-visible-volume-oracle.md` section 7. The upper-canopy
+diagnostic ran independently of that track and is also complete - see **Upper-Canopy Morphology
+Strategy** below.
 
 After a banked full-storm design, remeasure the seven-pose cost distribution before reusing any
 T147/T149 percentages. Then compare Ultra 0.25 (480x270), 0.375 (720x405), and 0.50 (960x540).
@@ -601,17 +602,96 @@ not merely more FPS at the visibly soft/foggy 0.25 configuration. Final T098b gr
 shipping morphology, anvil, lighting/self-shadow, reconstruction, inside-cloud appearance, and
 temporal behavior before SC-006 release validation.
 
-| Task | Architecture stage | Gate/output |
+| Task | Architecture stage | Outcome |
 |---|---|---|
-| T152 | Deterministic moving-camera fixture | Outside through interior holes to exit; required before production readiness |
-| T153 | Production-density oracle ceiling | Stop below ~2x; >=2x unlocks the prototype |
-| T154 | Single real production blob | Select the smallest practical coherent representation |
-| T155 | Multi-lobe holes/re-entry | Preserve occupied -> empty -> occupied traversal |
-| T156 | Camera-inside validation | Preserve full interior density and aligned consumers using T152 |
-| T157 | Full severe cumulonimbus | Bank or reject the production architecture |
-| T158 | Production remeasurement | New seven-pose cost distribution and bottleneck |
-| T159 | Ultra resolution recovery | Compare 0.25, 0.375, and 0.50 |
-| T160 | Parallel upper-anvil diagnostic | Root-cause evidence for T098b; no relaxed values ship |
+| T152 | Deterministic moving-camera fixture | **Done.** Baseline recorded; history contributes almost nothing to flicker suppression |
+| T153 | Production-density oracle ceiling | **STOP at 1.633x** against a >=2x gate; track closed |
+| T154 | Single real production blob | **Closed without implementation** - T153 gate not met |
+| T155 | Multi-lobe holes/re-entry | **Closed and independently falsified** - holes are 0.05-1.2% of skippable distance |
+| T156 | Camera-inside validation | **Closed** - no surviving prototype to validate |
+| T157 | Full severe cumulonimbus | **Closed** - nothing reached the bank/reject gate |
+| T158 | Production remeasurement | **Closed** - T157 did not bank; T147/T149 shares stand |
+| T159 | Ultra resolution recovery | **Closed** - no multi-X headroom; Ultra stays at 0.250 |
+| T160 | Parallel upper-anvil diagnostic | **Done.** Clipping hypothesis falsified; the ANVIL profile shape is the cause |
+
+## Upper-Canopy Morphology Strategy (T160 outcome, authoritative)
+
+T160 (commit `7169757`, evidence `validation/t098b-upper-anvil-envelope.md`) measured the upper
+morphology on the real production density path - `StormDensityModel` is the CPU authority the
+shader mirrors - against the measured ten-member severe fixture and the real baked noise. It
+settles what the remaining morphology work should and should not touch.
+
+### Root cause: the ANVIL radius profile narrows too early, by construction
+
+The upper canopy is **not clipped**. Final density reaches about **104.6% of its intended
+horizontal width**, and its support extends about **28 blocks above** the nominal role-envelope
+top. There is no maximum-height cutoff producing the shape.
+
+The rounded cap is authored by `profileRadius(ANVIL, v)` itself:
+
+1. horizontal radius expands through the lower profile;
+2. the radius-growth knee lands at **v ~= 0.62**;
+3. the radius peaks at **v ~= 0.65** and horizontal growth collapses;
+4. the radius then **decreases** while `verticalShape` continues fading toward zero at v = 1.0.
+
+The upper third is therefore constant-then-narrowing while density fades - a rounded, circular
+canopy. Measured visible width peaks earlier still, around **v ~= 0.81**, and decreases before
+final support ends. The cloud is **not** being cut off while still expanding: it narrows too early
+and then fades. The distinction matters, because the two framings point at different fixes.
+
+### Formally rejected as the cause of this shape
+
+Each was measured, not argued:
+
+- **Vertical clipping or a maximum-height cutoff.** Support exceeds the role-envelope top by about
+  28 blocks and width realises 104.6% of intent.
+- **The upper TOWER to ANVIL transition.** The tower stays about 76-85 blocks wide, never widens,
+  is fully enclosed by the anvil from about y = 380, and ends about y = 476 hidden inside it.
+- **Density remap and erosion.** Descriptor envelope to body to final `cloudDensity` preserves
+  horizontal width to within about 3% at every measured slice.
+- **Renderer safety bounds and extent clamps** as the primary lever.
+
+Consequently, raising maximum Y, extending the upper TOWER, changing erosion, changing the density
+remap, or changing renderer bounds are **not** primary fixes for this defect, and must not be
+proposed as such without new evidence that overturns the measurements above.
+
+### Direction for the morphology pass (T098b)
+
+The existing profile family is capable: the diagnostic relaxed arm produced about **1.86x**
+half-width and **1.32x** height, moved width/height from **2.93 to 4.14**, kept density bounded,
+and was **still widening at its own termination** - classification **CASE A**. The intended shape
+is reachable without inventing a new profile.
+
+Work should therefore concentrate on:
+
+- moving the ANVIL radius-growth knee **later than the current ~0.62**;
+- sustaining horizontal expansion farther up the profile;
+- tuning the final radius endpoint **independently from the knee** - the endpoint sets how wide,
+  the knee sets where widening stops;
+- preventing the upper third from narrowing into a dome too early.
+
+**The relaxed diagnostic values are not shipping candidates and must not be promoted directly.**
+They were chosen large enough to make the natural behaviour unambiguous, which is the opposite of
+a tuning candidate. Final morphology values are T098b to derive.
+
+### Unresolved: density footprint versus rendered silhouette
+
+T160 measured through final `cloudDensity` and **did not measure rendered occupancy**, so a
+downstream renderer or reconstruction contribution remains possible and is **not** excluded.
+
+The specific discrepancy: the final-density footprint from ABOVE is roughly a **1.5:1 ellipse,
+about 468 x 312 blocks**, while the in-game ABOVE rendering appears significantly more circular. A
+later visual investigation must explicitly compare the final `cloudDensity` footprint against
+actual rendered occupancy and silhouette at ABOVE and SIDE, and classify:
+
+- **Outcome A** - density and rendered silhouette agree. Morphology is the dominant problem and
+  the knee work above is the whole fix.
+- **Outcome B** - density stays elliptical and broad but the rendering reads circular.
+  Reconstruction, sampling or rendering is then introducing a **second, independent** visual
+  defect that the morphology pass alone will not remove.
+
+Until that A/B is run, the upper-canopy defect must be treated as **possibly two causes**, and a
+morphology-only change must not be assumed sufficient.
 
 ## Diagnostics
 
@@ -695,6 +775,13 @@ Every new geometry regression assertion must be run against the audited implemen
   variation at multiple spatial frequencies; irregular but coherent silhouette curvature; and
   continuous transitions between base, tower, core, and anvil.
 
+  **Required by T160:** final visual acceptance must include a **rendered A/B comparing the final
+  `cloudDensity` footprint against actual rendered occupancy** at ABOVE and SIDE. T160 measured the
+  density footprint from ABOVE as roughly a 1.5:1 ellipse (about 468 x 312 blocks) while the
+  in-game view appears markedly more circular, and it could not see rendered occupancy. Acceptance
+  may not record the upper canopy as correct until that comparison classifies the discrepancy as
+  Outcome A or Outcome B per **Upper-Canopy Morphology Strategy**.
+
   Negative (FR-024): no large smooth balloon surfaces; no large regions of visually uniform
   density; no visible ellipsoid or sphere primitives; no isolated ears or bulb protrusions; no
   descriptor seams; no rectangular or vertical walls; no flat slabs; no uniformly smooth
@@ -736,8 +823,12 @@ Every new geometry regression assertion must be run against the audited implemen
 7. Run T098b only after the shipping traversal, resolution/reconstruction, lighting, and quality
    policy stabilize, then converge on T070/SC-006 without silently weakening the release target.
 
-In parallel, run the bounded upper-TOWER/ANVIL extent diagnostic for T098b root-cause attribution;
-its relaxed values are never shipped from that experiment.
+The bounded upper-TOWER/ANVIL extent diagnostic is complete (T160, commit `7169757`). It falsified
+the clipping hypothesis and identified the ANVIL radius-growth knee at v ~= 0.62 as the lever; its
+relaxed values are diagnostic only and are never shipped from that experiment. Steps 1-6 above are
+resolved by the T153 stop, so the remaining sequence is step 7 - T098b - now additionally carrying
+the rendered-density versus rendered-silhouette A/B required by **Upper-Canopy Morphology
+Strategy**.
 
 ## Complexity Tracking
 
