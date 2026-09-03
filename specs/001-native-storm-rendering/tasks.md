@@ -1231,13 +1231,35 @@ do not fabricate historical before/after percentages for T119--T123.
   **Closed without implementation: no multi-X headroom was found to fund it.** Ultra stays at
   the Rank 1 ladder's 0.250 internal scale; T139 receives no resolution-recovery input and
   T098b regrades the shipped ladder as it stands.
-- [ ] T160 [P] [VISUAL POLISH] Run the bounded upper-cloud root-cause experiment independently of
+- [X] T160 [P] [VISUAL POLISH] Run the bounded upper-cloud root-cause experiment independently of
   T153: in diagnostic-only arms temporarily relax upper TOWER/ANVIL height and horizontal-width
   extents, never ship those values, and classify whether (A) the existing shape broadens naturally
   into an anvil, (B) it becomes a larger dome, (C) density/remap/erosion collapses the intended
   width, or (D) final density is broad but rendering/reconstruction hides it. Record ABOVE plus
   SIDE/FAR evidence in `validation/t098b-upper-anvil-envelope.md` for later T098b use
   (depends on T098a) [FR-003, FR-006, FR-023-FR-024; SC-001-SC-002, SC-011-SC-016]
+  **Root cause is (C)-adjacent but resolves to PROFILE SHAPE.** Recorded in
+  `validation/t098b-upper-anvil-envelope.md`, measured headlessly on the real production
+  density path via `stormT160UpperEnvelopeSandbox`. The upper morphology is **not truncated**:
+  it reaches **104.6%** of its own intended width and its support extends **28 blocks above**
+  the role envelope top rather than being clipped. The cap is the anvil's own
+  `profileRadius`, which **peaks at height fraction 0.65 and declines** above it while
+  `verticalShape` fades from 0.76 to zero - so the top third is a constant-then-narrowing
+  column with fading density. Width is **not** still increasing at termination: it peaks at
+  v~0.81 (480-block half-width at y=468) and falls. The stage trace excludes everything
+  downstream - envelope -> body -> final preserves width to within 3% at every height, so the
+  descriptor envelope is already the limiting shape and neither remap nor erosion contracts
+  it. The TOWER->ANVIL handoff is **not** the cause: the tower never widens (flat 76-85
+  blocks) and is fully enclosed by the anvil from y=380, so its abrupt end at y~476 is
+  invisible; the silhouette stops expanding where the anvil's radius derivative collapses
+  from +3.8 to +0.63 at y~476. The relaxed arm is **case A** - moving only the knee, endpoint
+  and fade starts gives 1.86x half-width, 1.32x height, 4.14 width/height, still widening at
+  its own termination with bounded density - so the existing profile **can** form a proper
+  anvil; its constants stop it at 62% height. **T098b lever: the anvil radius knee at 0.62**,
+  not any extent clamp. Nothing banked; the arm is default-off and never referenced by
+  production. Caveat: rendered occupancy was not measured, so root cause 4 is not positively
+  excluded - and the density field from above is a 1.5:1 ellipse, so a rendered view that
+  reads *circular* would itself be evidence for it.
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T139 and the terminal Phase 4Q outcome using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This

@@ -312,6 +312,15 @@ tasks.register('stormVolumetricGeometrySandbox', JavaExec) {
     workingDir = project.rootDir
 }
 
+tasks.register('stormT160UpperEnvelopeSandbox', JavaExec) {
+    group = 'project atmosphere'
+    description = 'T160: measures upper TOWER/ANVIL extent on the real production density path. Diagnostic only.'
+    dependsOn 'testClasses'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormT160UpperEnvelopeSandbox'
+    workingDir = project.rootDir
+}
+
 tasks.register('stormDensityThresholdSandbox', JavaExec) {
     group = 'project atmosphere'
     description = 'Measures the baked cloud noise and re-derives the storm morphology thresholds (T100).'

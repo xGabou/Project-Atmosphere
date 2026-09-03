@@ -768,7 +768,7 @@ final class StormLobeEvaluator {
             case BASE -> 1.06D;
             case CORE -> 1.02D;
             case TOWER -> 1.43D;
-            case ANVIL -> 2.18D;
+            case ANVIL -> StormT160UpperExtentArm.anvilMaxProfileRadius();
         };
     }
 
@@ -919,7 +919,12 @@ final class StormLobeEvaluator {
                     + 0.18D * Math.pow(Math.sin(Math.PI * vertical01), 0.65D);
             // A mature anvil begins while the tower is still present and its
             // wide profile retains the actual descriptor-strength differences.
-            case ANVIL -> lerp(smoothstep(0.0D, 0.62D, vertical01), 0.70D, 2.10D)
+            // T160 reads the knee and endpoint through the diagnostic arm.
+            // With the arm off - which is every production frame - these are
+            // the shipped 0.62 and 2.10 and the expression is unchanged.
+            case ANVIL -> lerp(
+                        smoothstep(0.0D, StormT160UpperExtentArm.anvilRadiusKnee(), vertical01),
+                        0.70D, StormT160UpperExtentArm.anvilRadiusMax())
                     + 0.08D * Math.pow(Math.sin(Math.PI * vertical01), 0.55D)
                     - 0.10D * smoothstep(0.88D, 1.0D, vertical01);
         };
@@ -944,7 +949,7 @@ final class StormLobeEvaluator {
             case CORE -> lobe.topY() + 32.0D;
             // Keep the lateral canopy substantial through the measured upper
             // role transition instead of collapsing at a thin cap.
-            case ANVIL -> lobe.topY() + 16.0D;
+            case ANVIL -> lobe.topY() + StormT160UpperExtentArm.anvilTopExtension();
             default -> lobe.topY();
         };
     }
@@ -956,9 +961,11 @@ final class StormLobeEvaluator {
             case CORE -> smoothstep(0.0D, 0.24D, vertical01)
                     * (1.0D - smoothstep(0.62D, 1.0D, vertical01));
             case TOWER -> smoothstep(0.0D, 0.28D, vertical01)
-                    * (1.0D - smoothstep(0.72D, 1.0D, vertical01));
+                    * (1.0D - smoothstep(
+                            StormT160UpperExtentArm.towerFadeStart(), 1.0D, vertical01));
             case ANVIL -> smoothstep(0.0D, 0.35D, vertical01)
-                    * (1.0D - smoothstep(0.76D, 1.0D, vertical01));
+                    * (1.0D - smoothstep(
+                            StormT160UpperExtentArm.anvilFadeStart(), 1.0D, vertical01));
         };
     }
 
