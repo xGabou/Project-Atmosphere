@@ -1104,7 +1104,7 @@ do not fabricate historical before/after percentages for T119--T123.
   1.74x/1.61x at the representative poses. The 4-phase pattern that comes closest also carries the
   worst temporal exposure available, on a renderer whose sample lattice was deliberately frozen
   because moving it made thin silhouette pixels alternate between hit and miss. CASE C.
-- [ ] T152 [P] [PERFORMANCE] Build the moving-camera fixture and silhouette-stability metric. Not built
+- [X] T152 [P] [PERFORMANCE] Build the moving-camera fixture and silhouette-stability metric. Not built
   under T151 because that candidate was rejected on its performance ceiling before its quality
   precondition could matter, but now required before visible-volume traversal can be considered
   production-ready. Drive one deterministic route from outside -> approach -> cloud entry ->
@@ -1113,6 +1113,26 @@ do not fabricate historical before/after percentages for T119--T123.
   occupied/empty/re-entry continuity in `validation/performance-moving-camera.md`. This may run in
   parallel with T153/T154 but must pass before T156/T157 can bank (depends on T150)
   [FR-001, FR-009-FR-012, FR-032; SC-004-SC-007, SC-021-SC-022]
+  **Built and baselined.** Recorded in `validation/performance-moving-camera.md`. One
+  continuous Bezier, 2200 frames per arm, both arms proven to fly one storm (0 frames where
+  one arm has storm and the other does not). Uniform curve parameterisation was measured and
+  rejected: it runs entry/interior/exit at 90-164 px/frame, saturating every temporal term in
+  the segments the metric exists to read; each frame now advances a constant 0.00922 rad
+  (~14 px/frame) against the nearest cloud surface. **Headline: temporal accumulation is not
+  what keeps this renderer stable.** Route flicker is identical with history on and off
+  (0.00232 both; per-segment ratios 0.932-1.015), so the frozen sample lattice is doing that
+  work alone - which measures the quality half of T151's argument that a lattice-moving change
+  cannot be rescued by the history blend. **Flicker is an interior phenomenon**, not a
+  silhouette one: 0.00581 mean inside against 0.00086 at ENTRY, p95 2.05%, worst frame 20.7%
+  of pixels, with `colRunsMax` 75 inside against 7-9 wherever the storm has an edge against
+  sky. Ghosting is negligible in the mean (<=0.00055) and real in the tail (max 0.675), with
+  bias within +/-0.0002 of zero - no trailing smear. Disocclusion error rises 29x across the
+  route and runs ~10x the unrestricted ghost, so the isolation works. Baseline for T098b:
+  0.48-0.81 empty gaps per occupied column, inner-sky runs to 224 px, on the shipped renderer.
+  The first run was invalid and reported success - the storm dissipated mid-arm-2 while a
+  vacuous cached-fixture check passed - and both causes are fixed with a per-frame
+  `lobeCount() >= 10` guard and a bounded whole-route retry. T152's gating purpose is void
+  since T153 stopped, but the fixture and baseline stand on their own.
 - [X] T153 [PERFORMANCE] **Oracle empty-space / visible-volume ceiling.** Add diagnostic-only oracle
   arms that use real production `cloudDensity` as free ground truth; exclude interval-discovery and
   ground-truth construction cost from the timed oracle traversal, and do not treat the arms as

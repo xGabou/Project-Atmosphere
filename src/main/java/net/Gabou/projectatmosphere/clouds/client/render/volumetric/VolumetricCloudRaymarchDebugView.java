@@ -36,7 +36,23 @@ public enum VolumetricCloudRaymarchDebugView {
     /** T141 channels: zero-density calls, segment tests, positive segment tests, box rejects. */
     STORM_WORKLOAD_QUATERNARY(25, "storm_workload_quaternary"),
     /** T149 channels: executed packed detail-noise octave evaluations. */
-    STORM_WORKLOAD_QUINARY(26, "storm_workload_quinary");
+    STORM_WORKLOAD_QUINARY(26, "storm_workload_quinary"),
+    /** T153 untimed ground-truth interval publication pass. */
+    T153_ORACLE_GROUND_TRUTH(27, "t153_oracle_ground_truth"),
+    /** T153 skipped-distance attribution: total, pre-cloud, holes, post-cloud. */
+    STORM_WORKLOAD_ORACLE_DISTANCE(28, "storm_workload_oracle_distance"),
+    /** T153 oracle events, interval count, overflow pixels and optical exits. */
+    STORM_WORKLOAD_ORACLE_STATUS(29, "storm_workload_oracle_status"),
+    /** T153 primary steps after alpha 50/90/95/98 percent. */
+    STORM_WORKLOAD_ORACLE_ALPHA_STEPS(30, "storm_workload_oracle_alpha_steps"),
+    /** T153 cloud-density calls after alpha 50/90/95/98 percent. */
+    STORM_WORKLOAD_ORACLE_ALPHA_DENSITY(31, "storm_workload_oracle_alpha_density"),
+    /** T153 descriptor evaluations after alpha 50/90/95/98 percent. */
+    STORM_WORKLOAD_ORACLE_ALPHA_DESCRIPTOR(32, "storm_workload_oracle_alpha_descriptor"),
+    /** T153 lighting evaluations after alpha 50/90/95/98 percent. */
+    STORM_WORKLOAD_ORACLE_ALPHA_LIGHT(33, "storm_workload_oracle_alpha_light"),
+    /** T153 detail-octave evaluations after alpha 50/90/95/98 percent. */
+    STORM_WORKLOAD_ORACLE_ALPHA_DETAIL(34, "storm_workload_oracle_alpha_detail");
 
     private final int shaderId;
     private final String serializedName;

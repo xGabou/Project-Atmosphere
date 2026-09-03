@@ -173,6 +173,14 @@ public final class VolumetricCloudFrameDiagnostics {
         StormReferenceImageCapture.capture(cloudTarget);
     }
 
+    /**
+     * T152: advances the moving-camera route and measures the frame it just
+     * drew. Inert unless the route is running, which only its marker starts.
+     */
+    public static void tryCaptureStormMovingCamera(RenderTarget cloudTarget) {
+        StormT152MovingCameraFixture.capture(cloudTarget);
+    }
+
     public static void tickT132AutoDriver() {
         StormT132AutoDriver.tick();
     }

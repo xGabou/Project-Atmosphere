@@ -334,6 +334,16 @@ public final class VolumetricCloudRenderer {
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         RenderTarget historyTarget = VolumetricCloudRenderTargets.historyCloudTarget();
+        StormOptimizationDiagnosticMode optimizationMode =
+                VolumetricCloudDebugConfig.optimizationDiagnosticMode();
+        boolean t153Oracle = optimizationMode.t153Oracle();
+        RenderTarget oracleTarget = t153Oracle
+                ? VolumetricCloudRenderTargets.prepareVisibleVolumeOracleTarget(
+                        cloudTarget.width, cloudTarget.height)
+                : null;
+        if (!t153Oracle) {
+            VolumetricCloudRenderTargets.releaseVisibleVolumeOracleTarget();
+        }
         // History is only consumed when the ping-pong target actually holds
         // last frame's clouds and no camera cut/resize/no-cloud frame
         // invalidated it since. Everything else ghosts.
@@ -398,6 +408,7 @@ public final class VolumetricCloudRenderer {
         shader.setSampler("SceneDepthSampler", safeSceneDepth.valid() ? safeSceneDepth.textureId() : 0);
         shader.setSampler("HistorySampler", historyValid ? historyTarget.getColorTextureId() : 0);
         shader.setSampler("HistoryDepthSampler", historyValid ? historyTarget.getDepthTextureId() : 0);
+        shader.setSampler("OracleIntervalSampler", 0);
 
         lastCloudProjection.set(projection);
         lastViewRotation.set(viewRotation);
@@ -457,8 +468,7 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("ScatterOctaves").set(profile.scatterOctaves());
         // T147 detail-LOD ceiling: diagnostic-only, zero outside a capture.
         shader.safeGetUniform("DetailQuality").set(
-                VolumetricCloudDebugConfig.optimizationDiagnosticMode()
-                        == StormOptimizationDiagnosticMode.T147_DETAIL_OFF
+                optimizationMode == StormOptimizationDiagnosticMode.T147_DETAIL_OFF
                         ? 0
                         : profile.detailQuality());
         shader.safeGetUniform("StepScale").set(stepScale);
@@ -473,8 +483,7 @@ public final class VolumetricCloudRenderer {
         int uploadedCoveragePretestDilation = VolumetricCloudDebugConfig.coveragePretestDilation();
         // T147 distance-LOD ceiling: diagnostic-only, unchanged outside a capture.
         shader.safeGetUniform("MaxRenderDistance").set(
-                VolumetricCloudDebugConfig.optimizationDiagnosticMode()
-                        == StormOptimizationDiagnosticMode.T147_HALF_DISTANCE
+                optimizationMode == StormOptimizationDiagnosticMode.T147_HALF_DISTANCE
                         ? Math.max(300.0F, uploadedMaxRenderDistance * 0.5F)
                         : uploadedMaxRenderDistance);
         shader.safeGetUniform("UseSceneDepth").set(uploadedUseSceneDepth ? 1 : 0);
@@ -503,8 +512,10 @@ public final class VolumetricCloudRenderer {
         // the call away; a zero perturbation keeps the result bit-identical.
         shader.safeGetUniform("PaDiagnosticEvalEpsilon").set(0.0F);
         shader.safeGetUniform("PaDiagnosticOptimizationMode").set(
-                VolumetricCloudDebugConfig.optimizationDiagnosticMode().shaderFlags()
-        );
+                VolumetricCloudDebugConfig.optimizationDiagnosticMode().shaderFlags());
+        shader.safeGetUniform("PaOraclePass").set(0);
+        shader.safeGetUniform("PaOracleBaseSize").set(
+                (float) cloudTarget.width, (float) cloudTarget.height);
         shader.safeGetUniform("StormTraceOrigin").set(
                 StormMaterialRuntimeTrace.x(), StormMaterialRuntimeTrace.z()
         );
@@ -537,6 +548,32 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("Funnel0B").set(safeFunnels.f0b());
         shader.safeGetUniform("Funnel1A").set(safeFunnels.f1a());
         shader.safeGetUniform("Funnel1B").set(safeFunnels.f1b());
+
+        if (t153Oracle) {
+            // T153's ground-truth pass deliberately sits outside the timestamp
+            // query. It runs the real production density/march and publishes
+            // occupied intervals; only the replay below is the measured
+            // ceiling. This is diagnostic infrastructure, not an occupancy
+            // implementation and never executes for NORMAL_PRODUCTION.
+            VolumetricCloudRenderTargets.clearAndBind(oracleTarget);
+            shader.safeGetUniform("DebugView").set(
+                    VolumetricCloudRaymarchDebugView.T153_ORACLE_GROUND_TRUTH.shaderId());
+            shader.safeGetUniform("PaOraclePass").set(1);
+            shader.apply();
+            PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+            bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+            try {
+                FullscreenQuad.draw(shader);
+            } finally {
+                unbindManualTextures();
+                shader.clear();
+            }
+
+            VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+            shader.setSampler("OracleIntervalSampler", oracleTarget.getColorTextureId());
+            shader.safeGetUniform("DebugView").set(debugView.shaderId());
+            shader.safeGetUniform("PaOraclePass").set(0);
+        }
 
         shader.apply();
         PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
@@ -592,7 +629,8 @@ public final class VolumetricCloudRenderer {
         // A ray-trace pass writes a diagnostic record, not an image. It must
         // never become the next frame's history.
         renderedProductionFrame = debugView == VolumetricCloudRaymarchDebugView.FINAL
-                && !StormProductionRayTrace.active();
+                && !StormProductionRayTrace.active()
+                && !t153Oracle;
         if (renderedProductionFrame) {
             prevProj.set(projection);
             prevViewRot.set(viewRotation);

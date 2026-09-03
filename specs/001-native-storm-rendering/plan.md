@@ -32,8 +32,19 @@ pre-T134 T130 fixture `ce4ffed5-14f1-4b78-bec7-059c1985cedb` and the T121--T123 
 `66b2c85a-aa93-4d18-b428-ac546e280c02` can no longer be reproduced, so their frozen visual
 references are historical record only and are not a T132 comparison basis. T132 now requires a
 fresh post-T134 controlled reference plus a fresh post-T134 material trace on the same fixture;
-its full criteria are in `tasks.md` under "T132 revised acceptance criteria". T133 and T098 remain
-unstarted.
+its full criteria are in `tasks.md` under "T132 revised acceptance criteria". At that 2026-08-21
+checkpoint, T133 and T098 remained unstarted; the 2026-09-03 status below supersedes that state.
+
+**2026-09-03 post-T149 performance update**: T133 and T098a are now accepted. T149's graded
+lighting/detail LOD is complete and rejected, with no production render-path change. The current
+shipped Ultra ladder renders at 0.25 internal scale (480x270 at 1920x1080), yet PLAY_VIS_NEAR is
+103.9 ms against the 8 ms cloud budget and NEAR_EDGE is 198.4 ms. T149 found that approximately
+83--100% of representative primary steps resolve empty and that selective lane/sample reductions
+frequently fail to convert into time. Phase 4Q therefore pivots to an oracle-gated adaptive
+visible-volume/occupancy traversal architecture: coherently remove large empty or optically
+irrelevant spans, retain the full volumetric interior and re-entry through openings, then use any
+multi-X gain to test recovery to 0.375 and 0.50 internal scale. T098b remains deferred until the
+shipping traversal and resolution policy stabilize.
 
 Correct the implemented native severe-storm path so the descriptor set itself is the evaluated storm field. Each `StormLobeDescriptor` is evaluated independently through the authoritative Java equations and the independently mirrored GLSL equations; lobe distance-like fields are smoothly unioned lobe-to-lobe and then group-to-group. The candidate grid is restored only as a conservative acceleration structure. Keep the existing synchronized `CloudFieldSnapshot` and `CloudMorphologyMembership` inputs, corrected source morphology, four-texel descriptors, stable identity/order, geometry build/snapshot lifecycle, render-thread boundaries, broad-map distant fallback, server authority, packets, saved data, forecast behavior, Simple Clouds ownership, native rollback path, precipitation ownership, and camera-density interfaces.
 
@@ -45,7 +56,7 @@ Correct the implemented native severe-storm path so the descriptor set itself is
 **Testing**: Gradle `check`, architecture boundary check, existing standalone Java sandboxes, new deterministic storm rendering sandbox, Forge `runClient`, optional Simple Clouds `runClient -PenableSimpleCloudsRuntime=true`, manual diagnostic captures  
 **Target Platform**: Minecraft Forge 1.20.1 client and dedicated server; native volumetric rendering on the repository's GL 3.2 baseline  
 **Project Type**: Existing brownfield Java Minecraft mod with server weather domain, Forge platform adapters, client renderer, resources, and optional compatibility modules  
-**Performance Goals**: Ultra sustains 60 FPS at 1920x1080 on the specified plugged-in RTX 4070 laptop, no external shader pack, approximately 2000-block render distance; p95 total frame time no more than 16.7 ms over ten minutes after convergence. Current live raymarch observations of roughly 80, 100, 140, and 200+ ms depending on viewpoint are architectural alarms, not final gate evidence; T130 MUST baseline and T132/T133 MUST re-measure them before T098 resumes
+**Performance Goals**: Ultra sustains 60 FPS at 1920x1080 on the specified plugged-in RTX 4070 laptop, no external shader pack, approximately 2000-block render distance; p95 total frame time no more than 16.7 ms over ten minutes after convergence. The cloud-pass target remains 8 ms. Post-T149 production measures 103.9 ms at PLAY_VIS_NEAR and 198.4 ms at NEAR_EDGE at the already-reduced 0.25 Ultra scale, leaving 13.0x and 24.8x gaps respectively. SC-006 is not rescoped, and lowering Ultra below 0.25 is not the primary solution
 **Constraints**: Server-authoritative weather; render-thread-only Minecraft/GL access; no per-frame geometry rebuild; bounded 64 storm descriptors and eight candidates per tile; every counted descriptor slot is real or explicitly skipped by sentinel; the candidate grid may reject work but never define density; no new runtime dependency; no texture-unit use beyond current units 0-14; smooth role transitions, rain, whiteout, LOD, and history  
 **Scale/Scope**: Native `STORM_ANVIL` presentation and related rain/whiteout/quality/diagnostics only; a derived severe-system footprint and aspect ratio rather than a compact-cloud assumption; ten-member mature severe source groups from the accepted T127/T134 scale contract, up to 64 direct descriptors, 256-square spatial index, five quality modes
 
@@ -56,7 +67,7 @@ Correct the implemented native severe-storm path so the descriptor set itself is
 | Gate | Pre-research | Post-design | Evidence |
 |---|---|---|---|
 | Forge 1.20.1 and Java baseline | PASS | PASS | Java 17 and existing Forge/GL shader pipeline only; no new dependency or platform API. |
-| Preserve architecture and modular ownership | PASS | PASS | Phase 4R and Phase 4S change only storm density composition and directly related correctness/lifecycle defects; Phase 4P changes only evaluation cost without altering the rendered result; it retains descriptor packing/identity, build/snapshot/async boundaries, source morphology, server/network/save/forecast ownership, Simple Clouds, custom precipitation, and camera-density interfaces. |
+| Preserve architecture and modular ownership | PASS | PASS | Phase 4R and Phase 4S change only storm density composition and directly related correctness/lifecycle defects; Phase 4P changes only evaluation cost without altering the rendered result. Phase 4Q may change sampling/traversal only behind staged oracle/prototype gates, while retaining descriptor identity, production density authority, build/snapshot/async boundaries, server/network/save/forecast ownership, Simple Clouds, custom precipitation, and camera-density interfaces. |
 | Server authority and explicit synchronization | PASS | PASS | `CloudRegionState`/`CloudClusterState` remain truth; the client consumes existing immutable field snapshots. No packet, save, or forecast schema change. |
 | Tick, allocation, async, and thread discipline | PASS | PASS | Dirty cluster-only signatures, valid re-request after rejection, reusable primitive buffers, coalesced CPU builds, bounded per-group intersections, and render-thread-only adoption/upload are defined. No new tick loop. |
 | Compatibility and dependency restraint | PASS | PASS | Existing Simple Clouds/Serene Seasons/GeckoLib boundaries stay intact; native resources are used only under native ownership; no dependency added. |
@@ -483,6 +494,11 @@ Signatures use quantized geometry values sufficient to preserve conservative cov
 | High | 64, 50% | 32, 37.5% | Increased lighting/refinement |
 | Ultra | 96, 75% | 48, 50% | Full supported detail; 60 FPS reference target |
 
+This table records the original target policy, not the current shipped Rank 1 ladder. Post-T146
+Ultra currently runs at 25% (480x270 at 1920x1080), which is an interim performance compromise and
+is visibly too soft/foggy for final T098b. Phase 4Q must not lower Ultra further as its primary
+solution; after traversal remeasurement it explicitly tests recovery to 37.5% and 50%.
+
 The direct descriptor capacity remains 64 in every mode so quality changes cannot disconnect a selected storm. Modes scale per-ray refinement, shadow cadence, lighting work, map size, and the number of fine analytic samples—not group integrity. Adaptive mode changes one discrete step/resolution band at a time using sustained-load/recovery hysteresis and a 30-second transition cooldown.
 
 ## Render Distance Behavior
@@ -526,9 +542,76 @@ The direct descriptor capacity remains 64 in every mode so quality changes canno
 - Retain broad weather pretests and make precipitation rejection local.
 - Query GPU timings through the existing frame diagnostics/governor path without synchronous readback stalls.
 - Record CPU build time, wait time, upload time, cache hit rate, rebuild frequency, descriptor/candidate complexity, raymarch GPU time, composite time, and adaptive transitions.
-- Treat the post-correction Ultra reference measurement as a release gate; tune only after morphology acceptance and only within mode floors and visual criteria rather than lowering source topology or disconnecting groups.
+- Treat the post-correction Ultra reference measurement as a release gate. Performance architecture may proceed after T098a, but it must preserve structural correctness and return every image change to T098b; never lower source topology or disconnect groups to meet the budget.
 - The per-sample descriptor scan in `stormGroupFirstIndex()` / `stormGroupEndIndex()` is a confirmed structural contributor to GPU cost, so measurements taken before Phase 4P are not final.
 - No Phase 4P change may alter the rendered result. A performance change that moves the image is a correctness change.
+
+### Post-T149 adaptive visible-volume / occupancy traversal
+
+The final Phase 4P rule above remains true for T119--T123. Phase 4Q is a later, explicitly graded
+track: image changes are allowed only while T098a stays green and the final result returns to T098b.
+T149 establishes two design constraints for this track:
+
+1. At representative poses, approximately 83--100% of primary steps resolve empty, but still pay
+   storm/safe-advance/descriptor-related work.
+2. Per-lane or per-sample conditional reductions often create divergence or dynamic-loop costs and
+   do not convert proportionally into GPU time. Prefer neighboring pixel groups skipping large
+   spans together.
+
+T153 is an oracle ceiling, not a production algorithm. It evaluates real production density as
+ground truth and compares production with four diagnostic arms:
+
+- perfect empty-space skip across spans with no contributing density;
+- perfect occupied intervals that enter expensive traversal only where ground truth is occupied;
+- perfect optical relevance that stops expensive work only when deeper samples cannot materially
+  affect the output beyond the current transmittance-floor behavior;
+- the combined oracle.
+
+The oracle records p50/p95 GPU time, steps, expensive density/descriptor/light/detail work, empty
+steps and distance removed, and work after alpha 50%, 90%, 95%, and 98% at PLAY_VIS_NEAR,
+PLAY_VIS_MID, SIDE, FAR, ABOVE, BELOW, and NEAR_EDGE. Below approximately 2x combined speedup, the
+architecture stops. At least 2x permits the prototype; 3x is strong; 4x is very strong and may fund
+higher Ultra resolution.
+
+If the gate passes, the smallest real prototype uses one production descriptor and the real
+`StormLobeEvaluator`, `cloudDensity`, noise/remap/erosion, extinction, lighting, and raymarch. It
+tests outside, near, and inside cases; toy sphere density is prohibited. Representation candidates
+include a low-resolution 3D occupancy or coarse-density volume, distance field, macrocell grid, or
+hierarchy, selected by measured skip distance, false-negative safety, update cost, memory, and
+warp coherence rather than by theoretical tightness alone.
+
+The next prototype expands to multiple lobes and requires occupied -> empty -> occupied traversal.
+It must preserve deeper cloud through holes whenever transmittance remains meaningful. Camera-inside
+validation keeps nearby dense and thin regions, internal structure, holes, openings, and deeper
+re-entry. Neither `insideCloud -> generic fog`, `first hit -> opaque shell`, nor a fixed shell
+thickness is admissible. Only after those cases pass may the design enter a ten-descriptor severe
+cumulonimbus and be banked or rejected.
+
+T152 supplies the deterministic motion gate: outside -> approach -> entry -> interior movement ->
+holes/openings -> exit. It may be built in parallel with the oracle and early prototype, but must
+pass before the architecture is considered production-ready. The separate upper-canopy diagnostic
+may also run in parallel by temporarily relaxing upper TOWER/ANVIL height and width in diagnostic
+arms only; it determines whether the existing field broadens into an anvil, becomes a larger dome,
+collapses during density/remap/erosion, or is hidden by rendering/reconstruction.
+
+After a banked full-storm design, remeasure the seven-pose cost distribution before reusing any
+T147/T149 percentages. Then compare Ultra 0.25 (480x270), 0.375 (720x405), and 0.50 (960x540).
+The objective is cheaper traversal plus higher internal resolution and full volumetric interiors,
+not merely more FPS at the visibly soft/foggy 0.25 configuration. Final T098b grades the resulting
+shipping morphology, anvil, lighting/self-shadow, reconstruction, inside-cloud appearance, and
+temporal behavior before SC-006 release validation.
+
+| Task | Architecture stage | Gate/output |
+|---|---|---|
+| T152 | Deterministic moving-camera fixture | Outside through interior holes to exit; required before production readiness |
+| T153 | Production-density oracle ceiling | Stop below ~2x; >=2x unlocks the prototype |
+| T154 | Single real production blob | Select the smallest practical coherent representation |
+| T155 | Multi-lobe holes/re-entry | Preserve occupied -> empty -> occupied traversal |
+| T156 | Camera-inside validation | Preserve full interior density and aligned consumers using T152 |
+| T157 | Full severe cumulonimbus | Bank or reject the production architecture |
+| T158 | Production remeasurement | New seven-pose cost distribution and bottleneck |
+| T159 | Ultra resolution recovery | Compare 0.25, 0.375, and 0.50 |
+| T160 | Parallel upper-anvil diagnostic | Root-cause evidence for T098b; no relaxed values ship |
 
 ## Diagnostics
 
@@ -633,8 +716,28 @@ Every new geometry regression assertion must be run against the audited implemen
 11. Freeze a reference performance/image/trace baseline, then run Phase 4P structural work in separate tasks and commits: precomputed group topology, bounded metadata/fetches, conservative culling and empty-space rejection, reuse, and a bounded evaluation-cost budget. A lighting-support proxy is conditional on demonstrated equivalence. No step 11 change may alter the rendered result.
 12. Correct only the stage measured in step 10, then revalidate physical scale, one-medium continuity, Phase 4S morphology, final-density consumers, and performance together.
 13. Re-run US1 and US2 against the revised positive and negative morphology criteria and replace their validation evidence.
-14. Extend quality profiles/governor/configuration and existing diagnostics/commands only after T099.
+14. Extend quality profiles/governor/configuration and existing diagnostics/commands after T098a
+    and T135; run that plumbing alongside Phase 4Q, then bank the final mode policy only after the
+    terminal traversal/resolution decision.
 15. Run automated, ownership, launch, visual, failure, and post-correction Ultra performance gates; tune only within the documented contracts.
+
+### Post-T149 continuation (authoritative for remaining performance work)
+
+1. Run T153's production-density oracle and stop the track if the combined ceiling is below
+   approximately 2x.
+2. If it passes, approximate that ceiling on one real production lobe in outside, near, and inside
+   fixtures; select an occupancy representation only from measured results.
+3. Extend the prototype to multi-lobe holes and deeper re-entry, then validate complete
+   camera-inside structure with T152's deterministic movement route.
+4. Integrate one full severe cumulonimbus, preserve T098a plus rain/whiteout/depth correctness, and
+   bank or reject the architecture.
+5. Rebuild the production cost distribution on all seven poses; do not reuse T147/T149 shares.
+6. If headroom is multi-X, compare Ultra 0.25, 0.375, and 0.50 and select a sharper shipping point.
+7. Run T098b only after the shipping traversal, resolution/reconstruction, lighting, and quality
+   policy stabilize, then converge on T070/SC-006 without silently weakening the release target.
+
+In parallel, run the bounded upper-TOWER/ANVIL extent diagnostic for T098b root-cause attribution;
+its relaxed values are never shipped from that experiment.
 
 ## Complexity Tracking
 

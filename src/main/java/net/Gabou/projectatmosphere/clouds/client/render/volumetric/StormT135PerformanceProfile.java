@@ -174,6 +174,29 @@ public final class StormT135PerformanceProfile {
         return List.copyOf(results);
     }
 
+    /** Removes a just-finished diagnostic cell that failed its post-capture validity gate. */
+    public static synchronized void discardLastCell(String reason) {
+        if (!results.isEmpty()) {
+            Cell removed = results.remove(results.size() - 1);
+            ProjectAtmosphere.LOGGER.warn(
+                    "T135_PROFILE discarded {}/{} arm={} reason={}",
+                    removed.pose(), removed.mode(), removed.arm(), reason);
+        }
+        contaminated = true;
+    }
+
+    /** Removes every completed arm for one pose after its shared fixture changes. */
+    public static synchronized void discardPose(String pose, String reason) {
+        int before = results.size();
+        results.removeIf(cell -> java.util.Objects.equals(pose, cell.pose()));
+        int removed = before - results.size();
+        if (removed > 0) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T135_PROFILE discarded pose={} cells={} reason={}",
+                    pose, removed, reason);
+        }
+    }
+
     public static synchronized void reset() {
         active = false;
         results.clear();

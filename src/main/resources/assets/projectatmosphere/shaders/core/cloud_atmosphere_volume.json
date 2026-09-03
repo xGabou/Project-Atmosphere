@@ -23,7 +23,8 @@
     { "name": "BlueNoiseSampler" },
     { "name": "SceneDepthSampler" },
     { "name": "HistorySampler" },
-    { "name": "HistoryDepthSampler" }
+    { "name": "HistoryDepthSampler" },
+    { "name": "OracleIntervalSampler" }
   ],
   "uniforms": [
     { "name": "CloudProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
@@ -73,6 +74,8 @@
     { "name": "StormTopologyMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaDiagnosticOptimizationMode", "type": "int", "count": 1, "values": [ 0 ] },
     { "name": "PaDiagnosticEvalEpsilon", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "PaOraclePass", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "PaOracleBaseSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
     { "name": "StormTraceOrigin", "type": "float", "count": 2, "values": [ 0.0, 0.0 ] },
     { "name": "StormTraceYStart", "type": "float", "count": 1, "values": [ 0.0 ] },
     { "name": "StormTraceYInterval", "type": "float", "count": 1, "values": [ 1.0 ] },

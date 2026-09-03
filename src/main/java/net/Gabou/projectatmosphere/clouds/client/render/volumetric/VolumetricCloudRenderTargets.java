@@ -25,6 +25,8 @@ public final class VolumetricCloudRenderTargets {
     private static RenderTarget stormDescriptorTarget;
     private static RenderTarget puffCandidateTarget;
     private static RenderTarget shadowTarget;
+    /** T153-only ground-truth interval map; never sampled by production. */
+    private static RenderTarget visibleVolumeOracleTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
     private static int currentIndex;
     private static boolean historyValid;
@@ -220,6 +222,41 @@ public final class VolumetricCloudRenderTargets {
         return cloudTargets[1 - currentIndex];
     }
 
+    /**
+     * Allocates the T153 diagnostic oracle publication target. Four horizontal
+     * banks provide sixteen packed occupied intervals per production pixel.
+     * Each packed interval also carries the alpha-98 optical cutoff. The target exists
+     * only while an oracle arm is selected and is excluded from production
+     * history and timing.
+     */
+    public static RenderTarget prepareVisibleVolumeOracleTarget(int width, int height) {
+        int oracleWidth = Math.max(1, width) * 4;
+        int oracleHeight = Math.max(1, height);
+        if (visibleVolumeOracleTarget == null
+                || visibleVolumeOracleTarget.width != oracleWidth
+                || visibleVolumeOracleTarget.height != oracleHeight) {
+            if (visibleVolumeOracleTarget != null) {
+                visibleVolumeOracleTarget.destroyBuffers();
+            }
+            visibleVolumeOracleTarget = new TextureTarget(
+                    oracleWidth, oracleHeight, true, Minecraft.ON_OSX);
+            visibleVolumeOracleTarget.setFilterMode(GL11.GL_NEAREST);
+            configureClamp(visibleVolumeOracleTarget.getColorTextureId());
+            upgradeColorToRgba32f(
+                    visibleVolumeOracleTarget.getColorTextureId(), oracleWidth, oracleHeight);
+            configureDepth(visibleVolumeOracleTarget.getDepthTextureId());
+            visibleVolumeOracleTarget.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+        }
+        return visibleVolumeOracleTarget;
+    }
+
+    public static void releaseVisibleVolumeOracleTarget() {
+        if (visibleVolumeOracleTarget != null) {
+            visibleVolumeOracleTarget.destroyBuffers();
+            visibleVolumeOracleTarget = null;
+        }
+    }
+
     public static boolean isHistoryValid() {
         return historyValid && historyCloudTarget() != null;
     }
@@ -293,6 +330,10 @@ public final class VolumetricCloudRenderTargets {
         if (shadowTarget != null) {
             shadowTarget.destroyBuffers();
             shadowTarget = null;
+        }
+        if (visibleVolumeOracleTarget != null) {
+            visibleVolumeOracleTarget.destroyBuffers();
+            visibleVolumeOracleTarget = null;
         }
         destroyCloudTargets();
         StormGeometryBuildCoordinator.reset();

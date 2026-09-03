@@ -291,7 +291,7 @@ of them. Positive criteria with derived thresholds make the intended result fals
 - Fixed hand-tuned numeric thresholds: unanchored thresholds drift toward whatever the current
   implementation produces, which is how the previous gate stayed green.
 
-### Decision 15: Storm performance architecture (planned, deferred)
+### Decision 15: Storm performance architecture (historical Phase 4P; implemented and measured)
 
 **Decision**: Record the following performance architecture as required plan items. Implement them
 in a separate Phase 4P, not inside the correctness refactor, except where an item is inseparable
@@ -339,6 +339,49 @@ question. With the model itself being replaced, an absolute ordering gate blocks
 new model depends on while providing no protection - the gate's own acceptance criteria were the
 ones found insufficient.
 
+### Decision 17: Gate adaptive visible-volume traversal with a production-density oracle
+
+**Decision (2026-09-03)**: T149 closes the descriptor/light/detail micro-optimization sequence and
+changes the active performance architecture. At PLAY_VIS_NEAR, 103.9 ms of Ultra cloud work remains
+against an 8 ms budget, while NEAR_EDGE remains 198.4 ms. Approximately 83--100% of primary march
+steps at representative poses resolve empty, yet those steps still pay storm, safe-advance, and
+descriptor-related work. T141, T151, and T149 also show that reducing work on selected lanes or
+samples often fails to produce proportional time because execution becomes divergent or loses
+fixed-loop compilation.
+
+The next architecture therefore targets **warp-coherent elimination of large empty or optically
+irrelevant ray spans**. T153 is diagnostic only: production `cloudDensity` is sampled as ground
+truth to construct perfect empty-space, perfect occupied-interval, perfect optical-relevance, and
+combined oracle arms. These arms are deliberately not production algorithms. If the combined
+oracle is below approximately 2x, the architecture stops before an occupancy system is built;
+2x permits a bounded prototype, 3x is a strong candidate, and 4x is a very strong candidate with
+potential to fund higher internal resolution.
+
+If the gate passes, implementation proceeds in measured stages: one real production descriptor
+and lobe; then multi-lobe occupied -> empty -> occupied re-entry; then camera-inside-cloud behavior;
+then a complete severe cumulonimbus. Candidate representations include a low-resolution 3D
+occupancy or coarse density volume, a distance field, a macrocell grid, and a hierarchy, but no
+representation is selected before the oracle and single-blob measurements. The selected design
+must enable neighboring rays to skip large spans coherently. The complete density field remains
+authoritative, and neither a generic inside-cloud fog nor a first-hit shell is permitted.
+
+The current Ultra 0.25 scale (480x270 at 1920x1080) is an interim compromise that is visibly too
+soft/foggy for final acceptance. A banked traversal architecture must be remeasured before explicit
+0.375 (720x405) and 0.50 (960x540) recovery experiments. T152's deterministic moving-camera route
+is a production-readiness prerequisite, and T098b remains the authoritative final regrade.
+
+**Alternatives rejected by measurement and retained as evidence**:
+
+- Rank 2 descriptor micro-optimization: measured ceilings too small.
+- T143 geometric reach gate: a sound bound covered almost the entire render distance.
+- T144 same-point `directStormShape` collapse: the presumed duplicate calls used different points.
+- Interleaved reconstruction: 1.42x/1.67x ceilings before resolve/history overhead.
+- T149 graded lighting/detail LOD: approximately 1.02x representative and a PLAY_VIS_NEAR
+  regression.
+
+These directions are not reopened without new evidence that invalidates their measured ceilings or
+premises.
+
 ## Resolved Unknowns
 
 - **Network or save migration**: none required.
@@ -354,7 +397,8 @@ ones found insufficient.
   pseudo-distance; no zero-density lobe skipping.
 - **Morphology thresholds**: derived in `validation/morphology-thresholds.md` from the erosion
   strength, noise amplitude, and octave weights actually configured in the shader.
-- **Performance architecture**: planned in Phase 4P; only precomputed group topology may enter the
-  correctness phase, and only if the corrected model is otherwise impractical.
+- **Performance architecture**: Phase 4P's bounded descriptor work is implemented and retained;
+  post-T149 Phase 4Q is the oracle-gated adaptive visible-volume/occupancy traversal track in
+  Decision 17.
 - **Forecast behavior**: unchanged.
 - **Simple Clouds behavior**: unchanged and remains externally owned when selected.

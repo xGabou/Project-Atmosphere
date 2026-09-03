@@ -69,6 +69,16 @@ final class StormT132AutoDriver {
      * descriptor evaluation work alone. Non-comment lines select the poses.
      */
     private static final Path T141_MARKER = Path.of("t141-descriptor-eval.txt");
+    /** T153 marker: production plus four visible-volume oracle ceiling arms. */
+    private static final Path T153_MARKER = Path.of("t153-visible-volume-oracle.txt");
+    /**
+     * T152 marker. The run drives the deterministic moving-camera route twice -
+     * once without temporal accumulation and once with it - and measures
+     * silhouette stability per frame. It shares the T135 fixture resolution but
+     * none of the pose sweep, because a pose sweep is exactly what it exists to
+     * complement.
+     */
+    private static final Path T152_MARKER = Path.of("t152-moving-camera.txt");
     /** SC-006 states its total-frame budget at this resolution. */
     private static final int T135_WIDTH = 1920;
     private static final int T135_HEIGHT = 1080;
@@ -106,6 +116,7 @@ final class StormT132AutoDriver {
         RAYTRACE_FIXTURE,
         T135_PREPARE, T135_MOVE, T135_SETTLE, T135_VERIFY, T135_SAMPLE, T135_COUNTERS,
         T135_RESPAWN, T135_REPORT,
+        T152_BEGIN, T152_POLL,
         BEGIN_T098, POLL_T098, DONE
     }
 
@@ -173,7 +184,9 @@ final class StormT132AutoDriver {
     }
 
     private static boolean performanceRunRequested() {
-        return Files.exists(T135_MARKER) || resolutionRunRequested() || evaluationRunRequested();
+        return Files.exists(T135_MARKER) || resolutionRunRequested()
+                || evaluationRunRequested() || oracleRunRequested()
+                || movingCameraRunRequested();
     }
 
     private static boolean resolutionRunRequested() {
@@ -182,6 +195,14 @@ final class StormT132AutoDriver {
 
     private static boolean evaluationRunRequested() {
         return Files.exists(T141_MARKER);
+    }
+
+    private static boolean oracleRunRequested() {
+        return Files.exists(T153_MARKER);
+    }
+
+    private static boolean movingCameraRunRequested() {
+        return Files.exists(T152_MARKER);
     }
 
     /** The five shipped quality modes, in ascending cost order. */
@@ -297,6 +318,17 @@ final class StormT132AutoDriver {
             StormOptimizationDiagnosticMode.T149_LIGHT_GRADED,
             StormOptimizationDiagnosticMode.T149_GRADED
     };
+    private static final StormOptimizationDiagnosticMode[] T153_ARMS = {
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
+            StormOptimizationDiagnosticMode.T153_PERFECT_EMPTY_SKIP,
+            StormOptimizationDiagnosticMode.T153_PERFECT_OCCUPIED_INTERVALS,
+            StormOptimizationDiagnosticMode.T153_PERFECT_OPTICAL_RELEVANCE,
+            StormOptimizationDiagnosticMode.T153_COMBINED
+    };
+    private static final String[] T153_POSES = {
+            "PLAY_VIS_NEAR", "PLAY_VIS_MID", "SIDE", "FAR",
+            "ABOVE", "BELOW", "NEAR_EDGE"
+    };
     /** Index of the arm that is production plus constant lighting. */
     private static final int T141_CONSTANT_LIGHTING_ARM = 2;
     /** Index of the arm that is detail-off plus constant lighting. */
@@ -315,6 +347,9 @@ final class StormT132AutoDriver {
             "NEAR_EDGE", "CLEAR"};
     private static String[] T141_POSES = T141_DEFAULT_POSES;
     private static boolean t141EvaluationRun;
+    private static boolean t153OracleRun;
+    private static boolean t153OriginalHistoryEnabled = true;
+    private static int t153PoseAttempts;
     private static int t141ArmIndex;
     private static int t141ArmAttempts;
     private static boolean t141CellPending;
@@ -338,24 +373,42 @@ final class StormT132AutoDriver {
 
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
+        if (t153OracleRun) {
+            // Every T153 arm must use the same temporal state. Oracle replay
+            // frames deliberately do not enter production history, so leaving
+            // history enabled would make later oracle arms lose valid history
+            // while the production baseline retained it. Disable it for the
+            // complete diagnostic matrix and restore the prior value on exit.
+            VolumetricCloudDebugConfig.setHistoryEnabled(false);
+        }
+        StormOptimizationDiagnosticMode[] arms = activeEvaluationArms();
         VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
-                T141_ARMS[Math.max(0, Math.min(T141_ARMS.length - 1, t141ArmIndex))]);
+                arms[Math.max(0, Math.min(arms.length - 1, t141ArmIndex))]);
         // The lighting share needs its own arm at the new ladder: every earlier
         // measurement of it was taken at 1440x810.
         VolumetricCloudDebugConfig.setT136ConstantLighting(
-                t141ArmIndex == T141_CONSTANT_LIGHTING_ARM
-                        || t141ArmIndex == T141_LIGHT_AND_DETAIL_ARM);
+                !t153OracleRun && (t141ArmIndex == T141_CONSTANT_LIGHTING_ARM
+                        || t141ArmIndex == T141_LIGHT_AND_DETAIL_ARM));
     }
 
     private static String t141ArmName() {
+        StormOptimizationDiagnosticMode[] arms = activeEvaluationArms();
+        if (t153OracleRun) {
+            return arms[Math.max(0, Math.min(arms.length - 1, t141ArmIndex))]
+                    .serializedName();
+        }
         if (t141ArmIndex == T141_CONSTANT_LIGHTING_ARM) {
             return "constant_lighting";
         }
         if (t141ArmIndex == T141_LIGHT_AND_DETAIL_ARM) {
             return "light_and_detail_off";
         }
-        return T141_ARMS[Math.max(0, Math.min(T141_ARMS.length - 1, t141ArmIndex))]
+        return arms[Math.max(0, Math.min(arms.length - 1, t141ArmIndex))]
                 .serializedName();
+    }
+
+    private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        return t153OracleRun ? T153_ARMS : T141_ARMS;
     }
 
     private static boolean t138HistoryArmPose(String pose) {
@@ -474,7 +527,7 @@ final class StormT132AutoDriver {
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
         if (t141EvaluationRun) {
-            return T141_POSES;
+            return t153OracleRun ? T153_POSES : T141_POSES;
         }
         return t138ResolutionRun ? T138_POSES : T135_POSES;
     }
@@ -510,6 +563,21 @@ final class StormT132AutoDriver {
     private static boolean t135LightingArm;
     private static String t135CounterLabel = "";
     private static boolean t135CountersRequested;
+    /** True while the T152 route owns the run, so a respawn returns to it. */
+    private static boolean t152Run;
+    private static int t152Attempts;
+    private static boolean t153LastCounterInvalid;
+    private static final java.util.List<T153CounterCell> T153_COUNTERS =
+            new java.util.ArrayList<>();
+    private static final java.util.Map<String, T153PoseFixture> T153_FIXTURES =
+            new java.util.LinkedHashMap<>();
+
+    private record T153CounterCell(
+            String pose, String arm, StormWorkloadRuntimeCapture.WorkloadResult workload) {
+    }
+
+    private record T153PoseFixture(String groupId, String structuralFingerprint) {
+    }
 
     private static String t135ArmName() {
         return switch (t135Arm) {
@@ -588,12 +656,14 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "T132_AUTORUN storm mature: topologyGeneration={} stable for {} frames",
                             generation, stableGenerationFrames);
-                    advance(rayTraceRunRequested() ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
+                    advance(rayTraceRunRequested() || performanceRunRequested()
+                            ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
                 if (stageFrames > MATURE_TIMEOUT_FRAMES) {
                     ProjectAtmosphere.LOGGER.info(
                             "T132_AUTORUN storm never matured; proceeding at generation {}", generation);
-                    advance(rayTraceRunRequested() ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
+                    advance(rayTraceRunRequested() || performanceRunRequested()
+                            ? Phase.RAYTRACE_FIXTURE : Phase.BEGIN_SUITE);
                 }
             }
             case BEGIN_SUITE -> {
@@ -675,9 +745,68 @@ final class StormT132AutoDriver {
                         player.getX(), player.getY(), player.getZ());
                 if (StormPerformanceBaseline.suiteFixture() != null) {
                     ProjectAtmosphere.LOGGER.info("T098_RAYTRACE fixture resolved: {}", begun);
-                    advance(performanceRunRequested() ? Phase.T135_PREPARE : Phase.BEGIN_T098);
+                    advance(movingCameraRunRequested()
+                            ? Phase.T152_BEGIN
+                            : (performanceRunRequested()
+                                    ? Phase.T135_PREPARE : Phase.BEGIN_T098));
                 } else if (stageFrames > ADOPT_TIMEOUT_FRAMES) {
                     finish("raytrace_fixture_failed:" + begun);
+                }
+            }
+            case T152_BEGIN -> {
+                // Measured at the SC-006 reference resolution, like every other
+                // record, and at the shipped Ultra ladder scale rather than the
+                // capture pin: the question is how the renderer that ships
+                // behaves under motion, so its own internal resolution is part
+                // of the answer.
+                try {
+                    com.mojang.blaze3d.systems.RenderSystem.recordRenderCall(() ->
+                            org.lwjgl.glfw.GLFW.glfwSetWindowSize(
+                                    minecraft.getWindow().getWindow(),
+                                    T135_WIDTH, T135_HEIGHT));
+                } catch (Throwable throwable) {
+                    ProjectAtmosphere.LOGGER.warn(
+                            "T152_ROUTE window resize failed: {}", throwable.toString());
+                }
+                restoreFixtureResolutionControl();
+                AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(
+                        AtmoCommonConfig.CloudRaymarchQuality.ULTRA);
+                // The fixture's cloud-movement freeze stays applied. The route
+                // is a camera-motion measurement, so material advection must
+                // not also be moving: otherwise a silhouette change cannot be
+                // attributed to the camera rather than to the storm.
+                t152Run = true;
+                String begun = StormT152MovingCameraFixture.begin();
+                if ("t152_started".equals(begun)) {
+                    advance(Phase.T152_POLL);
+                } else if (stageFrames > ADOPT_TIMEOUT_FRAMES) {
+                    finish("t152_begin_failed:" + begun);
+                }
+            }
+            case T152_POLL -> {
+                if (StormT152MovingCameraFixture.finished()) {
+                    String latest = StormT152MovingCameraFixture.latest();
+                    ProjectAtmosphere.LOGGER.info("T152_ROUTE result={}", latest);
+                    // A dissipated fixture is a retryable condition, not a
+                    // result. Both arms must fly the same storm, so the whole
+                    // route restarts against a fresh one rather than salvaging
+                    // a half-empty arm.
+                    if (latest.contains("fixture_dissipated")
+                            || latest.contains("fixture_identity_changed")) {
+                        if (++t152Attempts < T138_MAX_ARM_ATTEMPTS) {
+                            ProjectAtmosphere.LOGGER.info(
+                                    "T152_ROUTE retrying on a fresh fixture,"
+                                            + " attempt {}/{} after: {}",
+                                    t152Attempts + 1, T138_MAX_ARM_ATTEMPTS, latest);
+                            advance(Phase.T135_RESPAWN);
+                            return;
+                        }
+                        finish("t152_fixture_unstable:" + latest);
+                        return;
+                    }
+                    finish(latest.startsWith("t152_aborted") ? latest : "t152_complete");
+                } else if (stageFrames > STAGE_TIMEOUT_FRAMES * 4) {
+                    finish("t152_timeout:" + StormT152MovingCameraFixture.latest());
                 }
             }
             case T135_PREPARE -> {
@@ -703,21 +832,36 @@ final class StormT132AutoDriver {
                 t138ResolutionRun = resolutionRunRequested();
                 t138ScaleIndex = 0;
                 t138HistoryArm = false;
-                t141EvaluationRun = evaluationRunRequested();
+                t153OracleRun = oracleRunRequested();
+                t153OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t141EvaluationRun = evaluationRunRequested() || t153OracleRun;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
+                t153LastCounterInvalid = false;
+                T153_COUNTERS.clear();
+                T153_FIXTURES.clear();
+                t153PoseAttempts = 0;
                 if (t141EvaluationRun) {
-                    resolveT141Poses();
+                    if (!t153OracleRun) {
+                        resolveT141Poses();
+                    }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
                     AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(
                             AtmoCommonConfig.CloudRaymarchQuality.ULTRA);
                     applyT141Arm();
                     ProjectAtmosphere.LOGGER.info(
-                            "T141_EVAL_BEGIN poses={} arms={} mode=ULTRA steps=96"
+                            "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            T141_POSES.length, T141_ARMS.length,
+                            t153OracleRun ? "T153_ORACLE" : "T141_EVAL",
+                            sweepPoses().length, activeEvaluationArms().length,
                             fmt(T141_RESOLUTION_SCALE), T135_WIDTH, T135_HEIGHT);
+                    if (t153OracleRun) {
+                        ProjectAtmosphere.LOGGER.info(
+                                "T153_ORACLE_CONTROL history=false priorHistory={}"
+                                        + " restoredOnExit=true groundTruthGpuQuery=false",
+                                t153OriginalHistoryEnabled);
+                    }
                 }
                 if (t138ResolutionRun) {
                     resolveT138Poses();
@@ -733,7 +877,7 @@ final class StormT132AutoDriver {
                                     + " target={}x{} historyArmPoses={}",
                             T138_POSES.length, T138_SCALES.length,
                             T135_WIDTH, T135_HEIGHT, T138_HISTORY_ARM_POSES.length);
-                } else {
+                } else if (!t141EvaluationRun) {
                     ProjectAtmosphere.LOGGER.info(
                             "T135_PROFILE_BEGIN poses={} modes={} target={}x{}",
                             T135_POSES.length, T135_MODES.length, T135_WIDTH, T135_HEIGHT);
@@ -755,6 +899,30 @@ final class StormT132AutoDriver {
                 if (fixture == null) {
                     finish("t135_fixture_lost");
                     return;
+                }
+                if (t153OracleRun) {
+                    String pose = sweepPose();
+                    T153PoseFixture current = new T153PoseFixture(
+                            fixture.groupId(), fixture.structuralFingerprint());
+                    T153PoseFixture expected = T153_FIXTURES.get(pose);
+                    if (expected == null) {
+                        T153_FIXTURES.put(pose, current);
+                        ProjectAtmosphere.LOGGER.info(
+                                "T153_POSE_FIXTURE pose={} group={} fingerprint={}",
+                                pose, current.groupId(), current.structuralFingerprint());
+                    } else if (!expected.equals(current)) {
+                        resetT153Pose(pose, "fixture_identity_changed expected="
+                                + expected.groupId() + "/" + expected.structuralFingerprint()
+                                + " actual=" + current.groupId() + "/"
+                                + current.structuralFingerprint());
+                        if (++t153PoseAttempts >= T138_MAX_ARM_ATTEMPTS) {
+                            finish("t153_pose_fixture_unstable:" + pose);
+                            return;
+                        }
+                        advance(StormGeometryBuildCoordinator.lobeCount() >= 10
+                                ? Phase.T135_MOVE : Phase.T135_RESPAWN);
+                        return;
+                    }
                 }
                 double radius = fixture.horizontalRadius();
                 double midY = (fixture.baseY() + fixture.topY()) * 0.5D;
@@ -963,6 +1131,36 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info("T136_COUNTERS cell={} {}",
                             t135CounterLabel, line);
                 }
+                if (t153OracleRun) {
+                    StormWorkloadRuntimeCapture.WorkloadResult workload =
+                            StormWorkloadRuntimeCapture.latestResult();
+                    com.mojang.blaze3d.pipeline.RenderTarget target =
+                            VolumetricCloudRenderTargets.currentCloudTarget();
+                    int pixels = target == null ? 0 : target.width * target.height;
+                    boolean visible = workload != null
+                            && StormFixtureVisibility.renderedStormConfirmed(
+                                    workload.cloudDensityCalls(), pixels);
+                    boolean exact = workload != null && workload.oracleOverflowPixels() == 0.0D;
+                    t153LastCounterInvalid = !visible || !exact;
+                    if (t153LastCounterInvalid) {
+                        String reason = !visible ? "t150_rendered_no_storm" : "oracle_interval_overflow";
+                        StormT135PerformanceProfile.discardLastCell(reason);
+                        ProjectAtmosphere.LOGGER.warn(
+                                "T153_ORACLE_REJECT cell={} reason={} densityCalls={} pixels={}"
+                                        + " overflowPixels={}",
+                                t135CounterLabel, reason,
+                                workload == null ? "n/a" : fmt(workload.cloudDensityCalls()),
+                                pixels,
+                                workload == null ? "n/a" : fmt(workload.oracleOverflowPixels()));
+                    } else {
+                        T153_COUNTERS.add(new T153CounterCell(
+                                sweepPose(), t141ArmName(), workload));
+                        ProjectAtmosphere.LOGGER.info(
+                                "T150_VISIBILITY_CONFIRMED cell={} cloudDensityCalls={} perPixel={}",
+                                t135CounterLabel, fmt(workload.cloudDensityCalls()),
+                                fmt(workload.cloudDensityCalls() / Math.max(1, pixels)));
+                    }
+                }
                 advance(Phase.T135_SAMPLE);
             }
             case T135_RESPAWN -> {
@@ -974,7 +1172,7 @@ final class StormT132AutoDriver {
                                 "T136_PROFILE fixture re-adopted with {} descriptors;"
                                         + " poses will be recomputed from it",
                                 StormGeometryBuildCoordinator.lobeCount());
-                        advance(Phase.T135_MOVE);
+                        advance(t152Run ? Phase.T152_BEGIN : Phase.T135_MOVE);
                     }
                     return;
                 }
@@ -987,7 +1185,9 @@ final class StormT132AutoDriver {
             }
             case T135_REPORT -> {
                 String completionLabel = t141EvaluationRun
-                        ? "T141_EVAL_COMPLETE cells="
+                        ? (t153OracleRun
+                            ? "T153_ORACLE_COMPLETE cells="
+                            : "T141_EVAL_COMPLETE cells=")
                         : (t138ResolutionRun
                             ? "T138_RES_COMPLETE cells="
                             : "T135_PROFILE_COMPLETE cells=");
@@ -998,7 +1198,8 @@ final class StormT132AutoDriver {
                     out.append(String.format(Locale.ROOT,
                             "%n%s|%s|%s|%d|%s|%d|%.3f|%dx%d|%dx%d|%d|%d"
                                     + "|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f",
-                            t138ResolutionRun ? "T138_CELL" : "T135_CELL",
+                            t153OracleRun ? "T153_CELL"
+                                    : (t138ResolutionRun ? "T138_CELL" : "T135_CELL"),
                             cell.pose(), cell.arm(), cell.descriptors(),
                             cell.mode(), cell.raymarchSteps(),
                             cell.effectiveResolutionScale(),
@@ -1023,8 +1224,14 @@ final class StormT132AutoDriver {
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
                 }
-                applyFixtureResolutionControl();
-                advance(Phase.BEGIN_T098);
+                if (t153OracleRun) {
+                    ProjectAtmosphere.LOGGER.info(buildT153DecisionReport());
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t153OriginalHistoryEnabled);
+                    finish("t153_complete");
+                } else {
+                    applyFixtureResolutionControl();
+                    advance(Phase.BEGIN_T098);
+                }
             }
             case BEGIN_T098 -> {
                 String begun = StormT098CaptureDriver.begin();
@@ -1130,26 +1337,40 @@ final class StormT132AutoDriver {
         if (t141CellPending) {
             t141CellPending = false;
             boolean failed = StormT135PerformanceProfile.lastCellContaminated()
+                    || (t153OracleRun && t153LastCounterInvalid)
                     || (!pose.startsWith("CLEAR")
                         && StormGeometryBuildCoordinator.lobeCount() <= 0);
+            t153LastCounterInvalid = false;
             if (failed) {
+                if (t153OracleRun) {
+                    resetT153Pose(pose, "cell_invalid_or_fixture_decayed");
+                    if (++t153PoseAttempts >= T138_MAX_ARM_ATTEMPTS) {
+                        finish("t153_pose_unmeasurable:" + pose);
+                        return;
+                    }
+                    advance(StormGeometryBuildCoordinator.lobeCount() >= 10
+                            ? Phase.T135_MOVE : Phase.T135_RESPAWN);
+                    return;
+                }
                 if (++t141ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
                     advance(Phase.T135_RESPAWN);
                     return;
                 }
                 ProjectAtmosphere.LOGGER.warn(
-                        "T141_EVAL {}/{} unmeasurable after {} attempts; arm skipped",
+                        "{} {}/{} unmeasurable after {} attempts; arm skipped",
+                        t153OracleRun ? "T153_ORACLE" : "T141_EVAL",
                         pose, t141ArmName(), t141ArmAttempts);
             }
             t141ArmAttempts = 0;
             t141ArmIndex++;
         }
-        if (t141ArmIndex >= T141_ARMS.length) {
+        if (t141ArmIndex >= activeEvaluationArms().length) {
             t141ArmIndex = 0;
             t141ArmAttempts = 0;
+            t153PoseAttempts = 0;
             applyT141Arm();
             t135PoseIndex++;
-            if (t135PoseIndex >= T141_POSES.length) {
+            if (t135PoseIndex >= sweepPoses().length) {
                 advance(Phase.T135_REPORT);
             } else {
                 advance(Phase.T135_MOVE);
@@ -1165,7 +1386,8 @@ final class StormT132AutoDriver {
                 return;
             }
             ProjectAtmosphere.LOGGER.warn(
-                    "T141_EVAL {}/{} never became measurable after {} attempts; arm skipped",
+                    "{} {}/{} never became measurable after {} attempts; arm skipped",
+                    t153OracleRun ? "T153_ORACLE" : "T141_EVAL",
                     pose, arm, t141ArmAttempts);
             t141ArmAttempts = 0;
             t141ArmIndex++;
@@ -1175,6 +1397,168 @@ final class StormT132AutoDriver {
         t135CounterLabel = pose + "|" + arm + "|ULTRA";
         t135CountersRequested = false;
         advance(Phase.T135_COUNTERS);
+    }
+
+    /**
+     * Invalidates an entire five-arm T153 pose comparison. Retaining the
+     * earlier arms after a severe group expires would compare two different
+     * density fixtures and manufacture an oracle speedup or regression.
+     */
+    private static void resetT153Pose(String pose, String reason) {
+        StormT135PerformanceProfile.discardPose(pose, reason);
+        T153_COUNTERS.removeIf(cell -> pose.equals(cell.pose()));
+        T153_FIXTURES.remove(pose);
+        t141ArmIndex = 0;
+        t141ArmAttempts = 0;
+        t141CellPending = false;
+        t153LastCounterInvalid = false;
+        applyT141Arm();
+        ProjectAtmosphere.LOGGER.warn(
+                "T153_ORACLE restarting complete pose={} reason={}", pose, reason);
+    }
+
+    /** Builds the compact, self-contained T153 ceiling and attribution report. */
+    private static String buildT153DecisionReport() {
+        StringBuilder out = new StringBuilder("T153_ORACLE_DECISION");
+        boolean complete = true;
+        for (String pose : T153_POSES) {
+            StormT135PerformanceProfile.Cell baseline = t153Cell(
+                    pose, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION.serializedName());
+            StormT135PerformanceProfile.Cell combined = t153Cell(
+                    pose, StormOptimizationDiagnosticMode.T153_COMBINED.serializedName());
+            if (baseline == null || combined == null) {
+                complete = false;
+            }
+            StormWorkloadRuntimeCapture.WorkloadResult baselineWork = t153Workload(
+                    pose, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION.serializedName());
+            T153PoseFixture poseFixture = T153_FIXTURES.get(pose);
+            out.append(System.lineSeparator()).append("T153_POSE pose=").append(pose)
+                    .append(" fixtureGroup=")
+                    .append(poseFixture == null ? "missing" : poseFixture.groupId())
+                    .append(" fixtureFingerprint=")
+                    .append(poseFixture == null ? "missing" : poseFixture.structuralFingerprint());
+            for (StormOptimizationDiagnosticMode arm : T153_ARMS) {
+                StormT135PerformanceProfile.Cell cell = t153Cell(pose, arm.serializedName());
+                StormWorkloadRuntimeCapture.WorkloadResult work =
+                        t153Workload(pose, arm.serializedName());
+                if (cell == null || work == null) {
+                    complete = false;
+                    out.append(" arm[").append(arm.serializedName()).append("=missing]");
+                    continue;
+                }
+                long pixels = Math.max(1L, (long) work.width() * work.height());
+                double speedup = baseline == null
+                        ? Double.NaN : baseline.cloudP50() / cell.cloudP50();
+                double removedSteps = baselineWork == null
+                        ? Double.NaN
+                        : Math.max(0.0D,
+                                baselineWork.primaryRaySteps() - work.primaryRaySteps());
+                out.append(String.format(Locale.ROOT,
+                        " arm[%s p50=%.4f p95=%.4f speedup=%.3fx"
+                                + " stepsPerPixel=%.4f density=%1.0f descriptor=%1.0f"
+                                + " textureFetches=%1.0f light=%1.0f detail=%1.0f"
+                                + " emptyStepsRemoved=%1.0f skippedDistancePerPixel=%.4f"
+                                + " preCloudPerPixel=%.4f holesPerPixel=%.4f"
+                                + " postCloudPerPixel=%.4f postOpacityPerPixel=%.4f"
+                                + " intervals=%1.0f overflowPixels=%1.0f]",
+                        arm.serializedName(), cell.cloudP50(), cell.cloudP95(), speedup,
+                        work.primaryRaySteps() / pixels,
+                        work.cloudDensityCalls(), work.descriptorEvaluations(),
+                        work.descriptorTextureFetches(), work.lightMarchDensityEvaluations(),
+                        work.detailOctaveEvaluations(), removedSteps,
+                        work.oracleSkippedDistance() / pixels,
+                        work.oraclePreCloudDistance() / pixels,
+                        work.oracleHoleDistance() / pixels,
+                        work.oraclePostCloudDistance() / pixels,
+                        work.oraclePostOpacityDistance() / pixels,
+                        work.oracleIntervalsSeen(), work.oracleOverflowPixels()));
+            }
+            StormWorkloadRuntimeCapture.WorkloadResult productionWork = t153Workload(
+                    pose, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION.serializedName());
+            if (productionWork != null) {
+                out.append(" productionWorkAfterOpacity[steps=")
+                        .append(productionWork.stepsAfterAlpha().format())
+                        .append(" density=").append(productionWork.densityAfterAlpha().format())
+                        .append(" descriptor=").append(productionWork.descriptorAfterAlpha().format())
+                        .append(" light=").append(productionWork.lightAfterAlpha().format())
+                        .append(" detail=").append(productionWork.detailAfterAlpha().format())
+                        .append(']');
+            }
+        }
+
+        StormT135PerformanceProfile.Cell representativeBaseline = t153Cell(
+                "PLAY_VIS_NEAR",
+                StormOptimizationDiagnosticMode.NORMAL_PRODUCTION.serializedName());
+        StormT135PerformanceProfile.Cell representativeCombined = t153Cell(
+                "PLAY_VIS_NEAR", StormOptimizationDiagnosticMode.T153_COMBINED.serializedName());
+        double representativeSpeedup = representativeBaseline == null
+                || representativeCombined == null
+                ? Double.NaN
+                : representativeBaseline.cloudP50() / representativeCombined.cloudP50();
+
+        double preCloud = 0.0D;
+        double holes = 0.0D;
+        double postCloud = 0.0D;
+        double postOpacity = 0.0D;
+        for (String pose : T153_POSES) {
+            StormWorkloadRuntimeCapture.WorkloadResult work = t153Workload(
+                    pose, StormOptimizationDiagnosticMode.T153_COMBINED.serializedName());
+            if (work != null) {
+                preCloud += work.oraclePreCloudDistance();
+                holes += work.oracleHoleDistance();
+                postCloud += work.oraclePostCloudDistance();
+                postOpacity += work.oraclePostOpacityDistance();
+            }
+        }
+        String dominant = "none";
+        double largest = 0.0D;
+        if (preCloud > largest) { largest = preCloud; dominant = "pre_cloud_empty_distance"; }
+        if (holes > largest) { largest = holes; dominant = "holes_between_occupied_intervals"; }
+        if (postOpacity > largest) { largest = postOpacity; dominant = "post_opacity_work"; }
+        if (postCloud > largest) { dominant = "post_cloud_empty_distance"; }
+
+        String gate;
+        if (!complete || !Double.isFinite(representativeSpeedup)) {
+            gate = "INCONCLUSIVE_MISSING_OR_INVALID_CELLS";
+        } else if (representativeSpeedup < 2.0D) {
+            gate = "REJECT_PRIMARY_ARCHITECTURE_STOP_BEFORE_T154";
+        } else if (representativeSpeedup < 3.0D) {
+            gate = "PROCEED_T154";
+        } else if (representativeSpeedup < 4.0D) {
+            gate = "STRONG_ARCHITECTURE_CANDIDATE_PROCEED_T154";
+        } else {
+            gate = "VERY_STRONG_ARCHITECTURE_CANDIDATE_PROCEED_T154";
+        }
+        out.append(String.format(Locale.ROOT,
+                "%nT153_GATE complete=%s representativePose=PLAY_VIS_NEAR"
+                        + " productionP50=%.4f combinedP50=%.4f speedup=%.3fx"
+                        + " threshold=2.000x decision=%s dominantSavings=%s"
+                        + " sourceDistance[preCloud=%.0f,holes=%.0f,postCloud=%.0f,postOpacity=%.0f]"
+                        + " note=oracle_map_construction_excluded_from_gpu_query",
+                complete, representativeBaseline == null ? Double.NaN : representativeBaseline.cloudP50(),
+                representativeCombined == null ? Double.NaN : representativeCombined.cloudP50(),
+                representativeSpeedup, gate, dominant,
+                preCloud, holes, postCloud, postOpacity));
+        return out.toString();
+    }
+
+    private static StormT135PerformanceProfile.Cell t153Cell(String pose, String arm) {
+        for (StormT135PerformanceProfile.Cell cell : StormT135PerformanceProfile.results()) {
+            if (pose.equals(cell.pose()) && arm.equals(cell.arm())) {
+                return cell;
+            }
+        }
+        return null;
+    }
+
+    private static StormWorkloadRuntimeCapture.WorkloadResult t153Workload(
+            String pose, String arm) {
+        for (T153CounterCell cell : T153_COUNTERS) {
+            if (pose.equals(cell.pose()) && arm.equals(cell.arm())) {
+                return cell.workload();
+            }
+        }
+        return null;
     }
 
     /** Moves to the next history arm, or to the next resolution. */
@@ -1389,6 +1773,9 @@ final class StormT132AutoDriver {
     }
 
     private static void finish(String outcome) {
+        if (t153OracleRun) {
+            VolumetricCloudDebugConfig.setHistoryEnabled(t153OriginalHistoryEnabled);
+        }
         restoreFixtureMotionFreeze();
         restoreFixtureDaylightFreeze();
         restoreFixtureResolutionControl();

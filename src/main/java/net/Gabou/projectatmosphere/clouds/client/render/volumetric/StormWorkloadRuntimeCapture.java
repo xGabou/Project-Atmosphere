@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 5;
+    private static final int STAGES = 12;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -95,6 +95,13 @@ final class StormWorkloadRuntimeCapture {
             case 2 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_TERTIARY;
             case 3 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_QUATERNARY;
             case 4 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_QUINARY;
+            case 5 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_DISTANCE;
+            case 6 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_STATUS;
+            case 7 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_STEPS;
+            case 8 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DENSITY;
+            case 9 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DESCRIPTOR;
+            case 10 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_LIGHT;
+            case 11 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DETAIL;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -184,7 +191,14 @@ final class StormWorkloadRuntimeCapture {
                     values[1][0], values[1][1], values[1][2],
                     values[2][0], values[2][1], values[2][2], values[2][3],
                     values[3][0], values[3][1], values[3][2], values[3][3],
-                    values[4][0]);
+                    values[4][0],
+                    values[5][0], values[5][1], values[5][2], values[5][3],
+                    values[6][0], values[6][1], values[6][2], values[6][3],
+                    ThresholdWork.of(values[7]),
+                    ThresholdWork.of(values[8]),
+                    ThresholdWork.of(values[9]),
+                    ThresholdWork.of(values[10]),
+                    ThresholdWork.of(values[11]));
         }
     }
 
@@ -203,8 +217,38 @@ final class StormWorkloadRuntimeCapture {
             double directStormShapeCalls, double groupFieldCalls, double lobesVisited,
             double cloudDensityCalls,
             double densityZeroCalls, double segmentTestCalls, double segmentTestPositive,
-            double boxBoundRejects, double detailOctaveEvaluations
+            double boxBoundRejects, double detailOctaveEvaluations,
+            double oracleSkippedDistance, double oraclePreCloudDistance,
+            double oracleHoleDistance, double oraclePostCloudDistance,
+            double oracleSkipEvents, double oracleIntervalsSeen,
+            double oracleOverflowPixels, double oracleOpticalExits,
+            ThresholdWork stepsAfterAlpha, ThresholdWork densityAfterAlpha,
+            ThresholdWork descriptorAfterAlpha, ThresholdWork lightAfterAlpha,
+            ThresholdWork detailAfterAlpha
     ) {
+        /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
+        WorkloadResult(
+                long captureToken, String view, int width, int height,
+                double conservativeDescriptorRejects, double avoidedDescriptorTextureFetches,
+                double primaryRaySteps, double descriptorEvaluations,
+                double descriptorTextureFetches, double lightMarchDensityEvaluations,
+                double emptySpaceRejects, double earlyTerminations,
+                double directStormShapeCalls, double groupFieldCalls, double lobesVisited,
+                double cloudDensityCalls, double densityZeroCalls, double segmentTestCalls,
+                double segmentTestPositive, double boxBoundRejects,
+                double detailOctaveEvaluations) {
+            this(captureToken, view, width, height,
+                    conservativeDescriptorRejects, avoidedDescriptorTextureFetches,
+                    primaryRaySteps, descriptorEvaluations, descriptorTextureFetches,
+                    lightMarchDensityEvaluations, emptySpaceRejects, earlyTerminations,
+                    directStormShapeCalls, groupFieldCalls, lobesVisited, cloudDensityCalls,
+                    densityZeroCalls, segmentTestCalls, segmentTestPositive,
+                    boxBoundRejects, detailOctaveEvaluations,
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    0.0D, 0.0D, 0.0D, 0.0D,
+                    ThresholdWork.ZERO, ThresholdWork.ZERO, ThresholdWork.ZERO,
+                    ThresholdWork.ZERO, ThresholdWork.ZERO);
+        }
         String format() {
             return "T123 workload view=" + view
                     + " captureToken=" + captureToken
@@ -227,7 +271,26 @@ final class StormWorkloadRuntimeCapture {
                     + " boxBoundRejects=" + fmt(boxBoundRejects)
                     + " detailOctaveEvaluations=" + fmt(detailOctaveEvaluations)
                     + " lightEvaluationsPerPixel=" + perPixel(lightMarchDensityEvaluations)
-                    + " detailOctaveEvaluationsPerPixel=" + perPixel(detailOctaveEvaluations);
+                    + " detailOctaveEvaluationsPerPixel=" + perPixel(detailOctaveEvaluations)
+                    + " oracleSkippedDistance=" + fmt(oracleSkippedDistance)
+                    + " oraclePreCloudDistance=" + fmt(oraclePreCloudDistance)
+                    + " oracleHoleDistance=" + fmt(oracleHoleDistance)
+                    + " oraclePostCloudDistance=" + fmt(oraclePostCloudDistance)
+                    + " oraclePostOpacityDistance=" + fmt(oraclePostOpacityDistance())
+                    + " oracleSkipEvents=" + fmt(oracleSkipEvents)
+                    + " oracleIntervalsSeen=" + fmt(oracleIntervalsSeen)
+                    + " oracleOverflowPixels=" + fmt(oracleOverflowPixels)
+                    + " oracleOpticalExits=" + fmt(oracleOpticalExits)
+                    + " stepsAfterAlpha=" + stepsAfterAlpha.format()
+                    + " densityAfterAlpha=" + densityAfterAlpha.format()
+                    + " descriptorAfterAlpha=" + descriptorAfterAlpha.format()
+                    + " lightAfterAlpha=" + lightAfterAlpha.format()
+                    + " detailAfterAlpha=" + detailAfterAlpha.format();
+        }
+
+        double oraclePostOpacityDistance() {
+            return Math.max(0.0D, oracleSkippedDistance
+                    - oraclePreCloudDistance - oracleHoleDistance - oraclePostCloudDistance);
         }
 
         private String perPixel(double value) {
@@ -235,6 +298,20 @@ final class StormWorkloadRuntimeCapture {
             return pixels <= 0L
                     ? "n/a"
                     : String.format(Locale.ROOT, "%.6f", value / (double) pixels);
+        }
+    }
+
+    record ThresholdWork(double alpha50, double alpha90, double alpha95, double alpha98) {
+        private static final ThresholdWork ZERO = new ThresholdWork(0.0D, 0.0D, 0.0D, 0.0D);
+        static ThresholdWork of(double[] values) {
+            return new ThresholdWork(values[0], values[1], values[2], values[3]);
+        }
+
+        String format() {
+            return "[50=" + fmt(alpha50)
+                    + ",90=" + fmt(alpha90)
+                    + ",95=" + fmt(alpha95)
+                    + ",98=" + fmt(alpha98) + "]";
         }
     }
 

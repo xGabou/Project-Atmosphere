@@ -22,6 +22,7 @@ uniform sampler2D BlueNoiseSampler;
 uniform sampler2D SceneDepthSampler;
 uniform sampler2D HistorySampler;
 uniform sampler2D HistoryDepthSampler;
+uniform sampler2D OracleIntervalSampler;
 uniform sampler3D BaseNoiseSampler;   // bound manually (3D)
 uniform sampler3D DetailNoiseSampler; // bound manually (3D)
 
@@ -198,7 +199,15 @@ const int PA_OPT_T149_LIGHT_CONTRIBUTION = 256;
 const int PA_OPT_T149_LIGHT_DISTANCE = 512;
 const int PA_OPT_T149_DETAIL_GRADED = 1024;
 const int PA_OPT_T149_LIGHT_VERTICAL = 2048;
+// T153 oracle replay bits. The ground-truth publication pass runs the exact
+// production density path with PaOraclePass=1; these bits are acted on only by
+// the separately timed replay.
+const int PA_OPT_T153_EMPTY_SKIP = 4096;
+const int PA_OPT_T153_OCCUPIED_INTERVALS = 8192;
+const int PA_OPT_T153_OPTICAL_RELEVANCE = 16384;
 uniform int PaDiagnosticOptimizationMode;
+uniform int PaOraclePass;
+uniform vec2 PaOracleBaseSize;
 /**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
  * evaluation by this, so the compiler cannot prove the second call redundant
@@ -249,6 +258,30 @@ bool paT149DetailGraded() {
 /** True when near-vertical rays use a shorter continuous light cone. */
 bool paT149LightVertical() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T149_LIGHT_VERTICAL) != 0;
+}
+
+bool paT153GroundTruthPass() {
+    return PaOraclePass == 1;
+}
+
+bool paT153EmptySkip() {
+    return !paT153GroundTruthPass()
+        && (PaDiagnosticOptimizationMode & PA_OPT_T153_EMPTY_SKIP) != 0;
+}
+
+bool paT153OccupiedIntervals() {
+    return !paT153GroundTruthPass()
+        && (PaDiagnosticOptimizationMode & PA_OPT_T153_OCCUPIED_INTERVALS) != 0;
+}
+
+bool paT153OpticalRelevance() {
+    return !paT153GroundTruthPass()
+        && (PaDiagnosticOptimizationMode & PA_OPT_T153_OPTICAL_RELEVANCE) != 0;
+}
+
+bool paT153Replay() {
+    return paT153EmptySkip() || paT153OccupiedIntervals()
+        || paT153OpticalRelevance();
 }
 
 /**
@@ -343,10 +376,178 @@ int paBoxBoundRejects = 0;
 // texture lookup. Rain noise is intentionally excluded: it is functional
 // precipitation work, not the cloud-surface/detail lever T149 is measuring.
 int paDetailOctaveEvaluations = 0;
+// T153-only attribution. Distances are world blocks; the remaining values are
+// exact executed-work counts from the timed replay.
+float paOracleSkippedDistance = 0.0;
+float paOraclePreCloudDistance = 0.0;
+float paOracleHoleDistance = 0.0;
+float paOraclePostCloudDistance = 0.0;
+int paOracleSkipEvents = 0;
+int paOracleIntervalsSeen = 0;
+int paOracleOverflow = 0;
+int paOracleOpticalExits = 0;
+ivec4 paOracleStepsAfterAlpha = ivec4(0);
+ivec4 paOracleDensityAfterAlpha = ivec4(0);
+ivec4 paOracleDescriptorAfterAlpha = ivec4(0);
+ivec4 paOracleLightAfterAlpha = ivec4(0);
+ivec4 paOracleDetailAfterAlpha = ivec4(0);
 
 bool paWorkloadCaptureActive() {
     return DebugView == 22 || DebugView == 23 || DebugView == 24
-        || DebugView == 25 || DebugView == 26;
+        || DebugView == 25 || DebugView == 26
+        || (DebugView >= 28 && DebugView <= 34);
+}
+
+/** Temporary capture encoding: two 12-bit normalized interval endpoints. */
+float paOraclePackRawInterval(float startT, float endT, float t0, float t1) {
+    float span = max(t1 - t0, 0.0001);
+    float startQ = floor(clamp((startT - t0) / span, 0.0, 1.0) * 4094.0 + 0.5);
+    float endQ = floor(clamp((endT - t0) / span, 0.0, 1.0) * 4094.0 + 0.5);
+    return startQ * 4096.0 + endQ + 2.0;
+}
+
+vec2 paOracleDecodeRawInterval(float encodedInterval, float t0, float t1) {
+    float value = abs(encodedInterval) - 2.0;
+    if (value < 0.0) {
+        return vec2(t1, t1);
+    }
+    float startQ = floor(value / 4096.0);
+    float endQ = value - startQ * 4096.0;
+    float span = max(t1 - t0, 0.0001);
+    // Expand by one quantization cell. This prevents the replay from losing a
+    // production-positive boundary sample to endpoint quantization.
+    float quantum = span / 4094.0;
+    return vec2(
+        max(t0, t0 + startQ / 4094.0 * span - quantum),
+        min(t1, t0 + endQ / 4094.0 * span + quantum)
+    );
+}
+
+/**
+ * Replay encoding: 8-bit start/end/cutoff packed into one exact 24-bit integer.
+ * Repeating the cutoff in every occupied interval keeps T153 within Minecraft's
+ * twelve-sampler ShaderInstance limit without borrowing a production sampler.
+ */
+float paOraclePackReplayInterval(
+    float startT,
+    float endT,
+    float cutoffT,
+    float t0,
+    float t1
+) {
+    float span = max(t1 - t0, 0.0001);
+    float startQ = floor(clamp((startT - t0) / span, 0.0, 1.0) * 255.0 + 0.5);
+    float endQ = floor(clamp((endT - t0) / span, 0.0, 1.0) * 255.0 + 0.5);
+    float cutoffQ = floor(clamp((cutoffT - t0) / span, 0.0, 1.0) * 255.0 + 0.5);
+    return startQ * 65536.0 + endQ * 256.0 + cutoffQ + 1.0;
+}
+
+vec3 paOracleDecodeReplayInterval(float encodedInterval, float t0, float t1) {
+    float value = abs(encodedInterval) - 1.0;
+    if (value < 0.0) {
+        return vec3(t1, t1, t1);
+    }
+    float startQ = floor(value / 65536.0);
+    float remainder = value - startQ * 65536.0;
+    float endQ = floor(remainder / 256.0);
+    float cutoffQ = remainder - endQ * 256.0;
+    float span = max(t1 - t0, 0.0001);
+    float quantum = span / 255.0;
+    return vec3(
+        max(t0, t0 + startQ / 255.0 * span - quantum),
+        min(t1, t0 + endQ / 255.0 * span + quantum),
+        clamp(t0 + cutoffQ / 255.0 * span, t0, t1)
+    );
+}
+
+float paOracleComponent(
+    vec4 bank0,
+    vec4 bank1,
+    vec4 bank2,
+    vec4 bank3,
+    int index
+) {
+    if (index == 0) return bank0.x;
+    if (index == 1) return bank0.y;
+    if (index == 2) return bank0.z;
+    if (index == 3) return bank0.w;
+    if (index == 4) return bank1.x;
+    if (index == 5) return bank1.y;
+    if (index == 6) return bank1.z;
+    if (index == 7) return bank1.w;
+    if (index == 8) return bank2.x;
+    if (index == 9) return bank2.y;
+    if (index == 10) return bank2.z;
+    if (index == 11) return bank2.w;
+    if (index == 12) return bank3.x;
+    if (index == 13) return bank3.y;
+    if (index == 14) return bank3.z;
+    if (index == 15) return bank3.w;
+    return 0.0;
+}
+
+void paOracleStoreComponent(inout vec4 value, int index, float encodedInterval) {
+    if (index == 0) value.x = encodedInterval;
+    else if (index == 1) value.y = encodedInterval;
+    else if (index == 2) value.z = encodedInterval;
+    else if (index == 3) value.w = encodedInterval;
+}
+
+void paOracleCloseCapturedInterval(
+    inout vec4 published,
+    inout int intervalCount,
+    inout bool intervalOpen,
+    float intervalStart,
+    float intervalEnd,
+    int captureBank,
+    float t0,
+    float t1
+) {
+    if (!intervalOpen) {
+        return;
+    }
+    int localIndex = intervalCount - captureBank * 4;
+    if (localIndex >= 0 && localIndex < 4) {
+        paOracleStoreComponent(
+            published,
+            localIndex,
+            paOraclePackRawInterval(intervalStart, intervalEnd, t0, t1)
+        );
+    }
+    intervalCount++;
+    intervalOpen = false;
+}
+
+void paOracleRecordAfterAlpha(
+    float alphaBefore,
+    int descriptorBefore,
+    int densityBefore,
+    int lightBefore,
+    int detailBefore
+) {
+    if (!paWorkloadCaptureActive()) {
+        return;
+    }
+    ivec4 active = ivec4(
+        alphaBefore >= 0.50 ? 1 : 0,
+        alphaBefore >= 0.90 ? 1 : 0,
+        alphaBefore >= 0.95 ? 1 : 0,
+        alphaBefore >= 0.98 ? 1 : 0
+    );
+    if (paWorkloadCaptureActive())
+        paOracleStepsAfterAlpha += active;
+    if (paWorkloadCaptureActive())
+        paOracleDescriptorAfterAlpha += active
+            * (paDescriptorEvaluations - descriptorBefore);
+    if (paWorkloadCaptureActive())
+        paOracleDensityAfterAlpha += active
+            * (paCloudDensityCalls - densityBefore);
+    if (paWorkloadCaptureActive())
+        paOracleLightAfterAlpha += active
+            * (paLightMarchDensityEvaluations - lightBefore);
+    if (paWorkloadCaptureActive())
+        paOracleDetailAfterAlpha += active
+            * (paDetailOctaveEvaluations - detailBefore);
 }
 // T128 on-demand centre-line trace uniforms. They are inert unless DebugView
 // is STORM_MATERIAL_TRACE (21), so they never affect production rendering.
@@ -4841,12 +5042,23 @@ void main() {
     // Every fragment of a trace pass marches the traced ray, not its own. The
     // view sample is therefore the traced pixel's, and only the published
     // record varies across the fragment grid.
+    bool paOracleCapture = paT153GroundTruthPass();
+    int paOracleCaptureBank = 0;
+    vec2 paOracleSourceFrag = gl_FragCoord.xy;
+    if (paOracleCapture) {
+        float paBaseWidth = max(PaOracleBaseSize.x, 1.0);
+        paOracleCaptureBank = clamp(
+            int(floor((gl_FragCoord.x - 0.5) / paBaseWidth)), 0, 3);
+        paOracleSourceFrag.x = mod(gl_FragCoord.x - 0.5, paBaseWidth) + 0.5;
+    }
     paViewTexCoord = paRayTraceActive()
         ? PaRayTraceNdc * 0.5 + 0.5
-        : texCoord;
+        : paOracleCapture
+            ? paOracleSourceFrag / max(PaOracleBaseSize, vec2(1.0))
+            : texCoord;
     paViewFragCoord = paRayTraceActive()
         ? PaRayTraceFragCoord
-        : gl_FragCoord.xy;
+        : paOracleCapture ? paOracleSourceFrag : gl_FragCoord.xy;
     // T143: one ray-invariant pass over the resident descriptors, before any
     // march step, rain probe or density sample can ask about reachability.
     paBuildStormReachability();
@@ -4874,7 +5086,7 @@ void main() {
         gl_FragDepth = 1.0;
         return;
     }
-    vec2 ndc = paRayTraceActive() ? PaRayTraceNdc : (texCoord * 2.0 - 1.0);
+    vec2 ndc = paRayTraceActive() ? PaRayTraceNdc : (paViewTexCoord * 2.0 - 1.0);
     vec4 clipDir = vec4(ndc, -1.0, 1.0);
     vec4 viewDir4 = InvProjMat * clipDir;
     vec3 viewDir = normalize(viewDir4.xyz / max(abs(viewDir4.w), 0.00001));
@@ -5085,6 +5297,51 @@ void main() {
     float stratusMaterialRelief = 0.0;
     float stratusSurfaceSide = 0.0;
 
+    // T153 oracle state. The capture pass executes the unmodified production
+    // march and publishes up to eight exact threshold-positive intervals. The
+    // timed replay samples those intervals once per ray; creating this map is
+    // deliberately outside the GPU query and is not a proposed occupancy
+    // representation.
+    vec4 paOraclePublished = vec4(0.0);
+    int paOracleCapturedIntervalCount = 0;
+    bool paOracleIntervalOpen = false;
+    float paOracleOpenStart = t1;
+    float paOracleOpenEnd = t1;
+    float paOracleOpticalCutoff = t1;
+    bool paOracleOpticalCutoffFound = false;
+
+    vec4 paOracleBank0 = vec4(0.0);
+    vec4 paOracleBank1 = vec4(0.0);
+    vec4 paOracleBank2 = vec4(0.0);
+    vec4 paOracleBank3 = vec4(0.0);
+    int paOracleIntervalIndex = 0;
+    if (paT153Replay()) {
+        vec2 paOracleUv0 = vec2(paViewTexCoord.x * 0.25, paViewTexCoord.y);
+        vec2 paOracleUv1 = vec2(0.25 + paViewTexCoord.x * 0.25, paViewTexCoord.y);
+        vec2 paOracleUv2 = vec2(0.50 + paViewTexCoord.x * 0.25, paViewTexCoord.y);
+        vec2 paOracleUv3 = vec2(0.75 + paViewTexCoord.x * 0.25, paViewTexCoord.y);
+        paOracleBank0 = texture(OracleIntervalSampler, paOracleUv0);
+        paOracleBank1 = texture(OracleIntervalSampler, paOracleUv1);
+        paOracleBank2 = texture(OracleIntervalSampler, paOracleUv2);
+        paOracleBank3 = texture(OracleIntervalSampler, paOracleUv3);
+        paOracleOverflow = paOracleBank3.w < 0.0 ? 1 : 0;
+        for (int paIndex = 0; paIndex < 16; paIndex++) {
+            if (abs(paOracleComponent(
+                    paOracleBank0, paOracleBank1, paOracleBank2, paOracleBank3,
+                    paIndex)) >= 1.0) {
+                if (paWorkloadCaptureActive()) {
+                    paOracleIntervalsSeen++;
+                }
+            }
+        }
+        float paFirstInterval = paOracleComponent(
+            paOracleBank0, paOracleBank1, paOracleBank2, paOracleBank3, 0);
+        if (abs(paFirstInterval) >= 1.0) {
+            paOracleOpticalCutoff = paOracleDecodeReplayInterval(
+                paFirstInterval, t0, t1).z;
+        }
+    }
+
     for (int i = 0; i < paStepCap; i++) {
         if (t >= t1 || transmittance < 0.015) {
             if (transmittance < 0.015 && paWorkloadCaptureActive()) {
@@ -5095,8 +5352,17 @@ void main() {
             }
             break;
         }
-        if (paWorkloadCaptureActive()) {
-            paPrimaryRaySteps++;
+        if (paT153OpticalRelevance()
+                && paOracleOpticalCutoff < t1
+                && t >= paOracleOpticalCutoff) {
+            float paOpticalDistance = max(t1 - t, 0.0);
+            if (paWorkloadCaptureActive()) {
+                paOracleSkippedDistance += paOpticalDistance;
+                paOracleOpticalExits++;
+            }
+            // This category is intentionally disjoint from pre-cloud, holes
+            // and post-cloud: it is work after substantial opacity.
+            break;
         }
         // Recording arm for this iteration. False for every fragment whose
         // column is not this iteration, and unreachable at all in production.
@@ -5116,6 +5382,82 @@ void main() {
             : min(coarseStep * distanceGrowth, coarseStepCap);
         // Never integrate optical depth past the scene/slab ray endpoint.
         stepLength = min(stepLength, t1 - t);
+
+        // Consume expired oracle intervals. A zero channel is the terminator;
+        // an overflow flag invalidates the cell in the Java report rather
+        // than silently claiming a perfect oracle from truncated data.
+        if (paT153EmptySkip() || paT153OccupiedIntervals()) {
+            while (paOracleIntervalIndex < 16) {
+                float paPacked = paOracleComponent(
+                    paOracleBank0, paOracleBank1, paOracleBank2, paOracleBank3,
+                    paOracleIntervalIndex);
+                if (abs(paPacked) < 1.0) {
+                    break;
+                }
+                vec2 paInterval = paOracleDecodeReplayInterval(paPacked, t0, t1).xy;
+                if (t <= paInterval.y) {
+                    break;
+                }
+                paOracleIntervalIndex = paOracleIntervalIndex + 1;
+            }
+            float paPacked = paOracleIntervalIndex < 16
+                ? paOracleComponent(
+                    paOracleBank0, paOracleBank1, paOracleBank2, paOracleBank3,
+                    paOracleIntervalIndex)
+                : 0.0;
+            bool paHasInterval = abs(paPacked) >= 1.0;
+            vec2 paInterval = paHasInterval
+                ? paOracleDecodeReplayInterval(paPacked, t0, t1).xy
+                : vec2(t1, t1);
+            bool paInsideInterval = paHasInterval
+                && t >= paInterval.x && t <= paInterval.y;
+            if (!paInsideInterval) {
+                float paSkipEnd = paHasInterval ? paInterval.x : t1;
+                float paAvailableSkip = max(paSkipEnd - t, 0.0);
+                float paSkipDistance = paT153OccupiedIntervals()
+                    ? paAvailableSkip
+                    : min(stepLength, paAvailableSkip);
+                if (paSkipDistance > 0.0001) {
+                    if (paWorkloadCaptureActive()) {
+                        paOracleSkippedDistance += paSkipDistance;
+                        paOracleSkipEvents++;
+                        if (paHasInterval && paOracleIntervalIndex == 0) {
+                            if (paWorkloadCaptureActive())
+                                paOraclePreCloudDistance += paSkipDistance;
+                        } else if (paHasInterval) {
+                            if (paWorkloadCaptureActive())
+                                paOracleHoleDistance += paSkipDistance;
+                        } else {
+                            if (paWorkloadCaptureActive())
+                                paOraclePostCloudDistance += paSkipDistance;
+                        }
+                    }
+                    if (paT153EmptySkip() && paWorkloadCaptureActive()) {
+                        paPrimaryRaySteps++;
+                        paOracleRecordAfterAlpha(
+                            1.0 - transmittance,
+                            paDescriptorEvaluations,
+                            paCloudDensityCalls,
+                            paLightMarchDensityEvaluations,
+                            paDetailOctaveEvaluations
+                        );
+                    }
+                    sinceHit = 100;
+                    lastClearT = t;
+                    hasClearBracket = true;
+                    t += paSkipDistance;
+                    continue;
+                }
+            }
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryRaySteps++;
+        }
+        float paOracleAlphaBefore = 1.0 - transmittance;
+        int paOracleDescriptorBefore = paDescriptorEvaluations;
+        int paOracleDensityBefore = paCloudDensityCalls;
+        int paOracleLightBefore = paLightMarchDensityEvaluations;
+        int paOracleDetailBefore = paDetailOctaveEvaluations;
 
         vec3 p = CameraPos + rayDir * t;
         if (paCap) {
@@ -5336,6 +5678,25 @@ void main() {
                     paMrFlags |= PA_MR_WEATHER_SKIP_TAKEN;
                     paMrTAfter = t + stepLength;
                 }
+                if (paOracleCapture) {
+                    paOracleCloseCapturedInterval(
+                        paOraclePublished,
+                        paOracleCapturedIntervalCount,
+                        paOracleIntervalOpen,
+                        paOracleOpenStart,
+                        paOracleOpenEnd,
+                        paOracleCaptureBank,
+                        t0,
+                        t1
+                    );
+                }
+                paOracleRecordAfterAlpha(
+                    paOracleAlphaBefore,
+                    paOracleDescriptorBefore,
+                    paOracleDensityBefore,
+                    paOracleLightBefore,
+                    paOracleDetailBefore
+                );
                 lastClearT = t;
                 hasClearBracket = true;
                 sinceHit++;
@@ -5358,6 +5719,18 @@ void main() {
             ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
             : 0.0;
         float density = bodyDensity + rainDensity;
+        if (paOracleCapture && density <= 0.0008) {
+            paOracleCloseCapturedInterval(
+                paOraclePublished,
+                paOracleCapturedIntervalCount,
+                paOracleIntervalOpen,
+                paOracleOpenStart,
+                paOracleOpenEnd,
+                paOracleCaptureBank,
+                t0,
+                t1
+            );
+        }
         if (paCap) {
             paMrFlags |= PA_MR_CLOUD_DENSITY_CALLED
                 | (density > 0.0008 ? PA_MR_DENSITY_ABOVE_THRESHOLD : 0);
@@ -5522,7 +5895,21 @@ void main() {
                     paMrFlags |= PA_MR_BRACKET_REFINED;
                     paMrTAfter = t;
                 }
+                paOracleRecordAfterAlpha(
+                    paOracleAlphaBefore,
+                    paOracleDescriptorBefore,
+                    paOracleDensityBefore,
+                    paOracleLightBefore,
+                    paOracleDetailBefore
+                );
                 continue;
+            }
+            if (paOracleCapture) {
+                if (!paOracleIntervalOpen) {
+                    paOracleIntervalOpen = true;
+                    paOracleOpenStart = t;
+                }
+                paOracleOpenEnd = min(t1, t + stepLength);
             }
             // Shafts stay on coarse strides. Their broad envelope and streak
             // noise do not need cloud-surface resolution, and keeping the fine
@@ -6035,6 +6422,12 @@ void main() {
             }
 
             transmittance *= stepTrans;
+            if (paOracleCapture
+                    && !paOracleOpticalCutoffFound
+                    && transmittance <= 0.02) {
+                paOracleOpticalCutoff = min(t1, t + stepLength);
+                paOracleOpticalCutoffFound = true;
+            }
             if (paCap) {
                 paMrFlags |= PA_MR_INTEGRATED;
                 paMrTransmittanceAfter = transmittance;
@@ -6050,10 +6443,63 @@ void main() {
                 paMrTransmittanceAfter = transmittance;
             }
         }
+        paOracleRecordAfterAlpha(
+            paOracleAlphaBefore,
+            paOracleDescriptorBefore,
+            paOracleDensityBefore,
+            paOracleLightBefore,
+            paOracleDetailBefore
+        );
         t += stepLength;
         if (paCap) {
             paMrTAfter = t;
         }
+    }
+
+    if (paOracleCapture) {
+        paOracleCloseCapturedInterval(
+            paOraclePublished,
+            paOracleCapturedIntervalCount,
+            paOracleIntervalOpen,
+            paOracleOpenStart,
+            paOracleOpenEnd,
+            paOracleCaptureBank,
+            t0,
+            t1
+        );
+        // The alpha-98 cutoff is known only after the production march. Convert
+        // this bank's temporary 12-bit endpoint records to the single-texture
+        // 8/8/8 replay encoding now.
+        for (int paLocalIndex = 0; paLocalIndex < 4; paLocalIndex++) {
+            float paRawInterval = paOracleComponent(
+                paOraclePublished, vec4(0.0), vec4(0.0), vec4(0.0),
+                paLocalIndex);
+            if (abs(paRawInterval) >= 2.0) {
+                vec2 paRawEndpoints = paOracleDecodeRawInterval(
+                    paRawInterval, t0, t1);
+                paOracleStoreComponent(
+                    paOraclePublished,
+                    paLocalIndex,
+                    paOraclePackReplayInterval(
+                        paRawEndpoints.x,
+                        paRawEndpoints.y,
+                        paOracleOpticalCutoff,
+                        t0,
+                        t1
+                    )
+                );
+            }
+        }
+        if (paOracleCaptureBank == 3 && paOracleCapturedIntervalCount > 16) {
+            paOraclePublished.w = -max(abs(paOraclePublished.w), 1.0);
+        }
+        fragColor = paOraclePublished;
+        gl_FragDepth = clamp(
+            (paOracleOpticalCutoff - t0) / max(t1 - t0, 0.0001),
+            0.0,
+            1.0
+        );
+        return;
     }
 
     float alpha = saturate(1.0 - transmittance);
@@ -6171,6 +6617,51 @@ void main() {
     if (DebugView == 26) {
         gl_FragDepth = 1.0;
         fragColor = vec4(float(paDetailOctaveEvaluations), 0.0, 0.0, 0.0);
+        return;
+    }
+    if (DebugView == 28) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            paOracleSkippedDistance,
+            paOraclePreCloudDistance,
+            paOracleHoleDistance,
+            paOraclePostCloudDistance
+        );
+        return;
+    }
+    if (DebugView == 29) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paOracleSkipEvents),
+            float(paOracleIntervalsSeen),
+            float(paOracleOverflow),
+            float(paOracleOpticalExits)
+        );
+        return;
+    }
+    if (DebugView == 30) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(paOracleStepsAfterAlpha);
+        return;
+    }
+    if (DebugView == 31) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(paOracleDensityAfterAlpha);
+        return;
+    }
+    if (DebugView == 32) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(paOracleDescriptorAfterAlpha);
+        return;
+    }
+    if (DebugView == 33) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(paOracleLightAfterAlpha);
+        return;
+    }
+    if (DebugView == 34) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(paOracleDetailAfterAlpha);
         return;
     }
 

@@ -84,7 +84,15 @@ public enum StormOptimizationDiagnosticMode {
     /** T149: all continuous lighting signals, whichever is most restrictive. */
     T149_LIGHT_GRADED(2816, "t149_light_graded"),
     /** T149 candidate: the complete graded lighting and detail policy. */
-    T149_GRADED(3840, "t149_graded");
+    T149_GRADED(3840, "t149_graded"),
+    /** T153 oracle: omit expensive density work at ground-truth-empty samples. */
+    T153_PERFECT_EMPTY_SKIP(4096, "t153_perfect_empty_skip"),
+    /** T153 oracle: jump directly between ground-truth occupied intervals. */
+    T153_PERFECT_OCCUPIED_INTERVALS(8192, "t153_perfect_occupied_intervals"),
+    /** T153 oracle: stop once the diagnostic optical-relevance limit is reached. */
+    T153_PERFECT_OPTICAL_RELEVANCE(16384, "t153_perfect_optical_relevance"),
+    /** T153 oracle: occupied-interval traversal plus optical relevance. */
+    T153_COMBINED(28672, "t153_combined");
 
     private final int shaderFlags;
     private final String serializedName;
@@ -105,6 +113,11 @@ public enum StormOptimizationDiagnosticMode {
     /** True for any mode that disables a production optimization. */
     public boolean diagnostic() {
         return shaderFlags != 0;
+    }
+
+    /** True only for the T153 ceiling experiment's diagnostic replay arms. */
+    public boolean t153Oracle() {
+        return (shaderFlags & 28672) != 0;
     }
 
     public static StormOptimizationDiagnosticMode parse(String value) {

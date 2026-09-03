@@ -437,6 +437,7 @@ public final class VolumetricCloudRenderHook {
         VolumetricCloudFrameDiagnostics.tryCaptureStormMaterialTrace(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormWorkload(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryCaptureStormReferenceImage(cloudTarget);
+        VolumetricCloudFrameDiagnostics.tryCaptureStormMovingCamera(cloudTarget);
         VolumetricCloudFrameDiagnostics.tryDispatchStabilityCapture(
                 cloudTarget,
                 sceneDepth,
