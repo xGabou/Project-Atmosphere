@@ -1028,11 +1028,40 @@ not fabricate historical before/after percentages for T119--T123.
   static poses cannot see the hit/miss flicker that made the current shader freeze its sample
   lattice - `searchBlue` is a static screen-space phase for exactly that reason, and interleaving
   requires moving it (depends on T147) [FR-001, FR-010-FR-012, FR-027; SC-006, SC-017, SC-021]
-- [ ] T149 [PERFORMANCE] Graded distance/LOD over the measured 16-25% lighting and 9-41% detail
+- [X] T149 [PERFORMANCE] Graded distance/LOD over the measured 16-25% lighting and 9-41% detail
   shares. Cheapen at distance rather than delete: T147's ceiling comes from removing both outright,
   which is not shippable, and halving the render distance is a visibility change T098a forbids
   because FAR must not disappear. Report popping and transition quality alongside GPU savings
   (depends on T148) [FR-010-FR-012, FR-027; SC-006, SC-017]
+  **Rejected; no production change.** Recorded in `validation/performance-lighting-detail-lod.md`.
+  The graded light cone removes **27-40% of light evaluations at every pose** and converts almost
+  none of it into time: representative PLAY_VIS_NEAR is **+5.7% slower**, the mean of the two
+  representative poses is ~1.02x against a 1.3x bar, and the two most expensive poses - BELOW at
+  187.5 ms and NEAR_EDGE at 198.4 ms - are the two it helps least, so CASE B fails its own
+  condition too. The distance-only arm isolates the cause: it removed **0.1%** of light evaluations
+  and still cost **+8.9%**, because a data-dependent tap count stops the compiler unrolling the
+  fixed six-iteration light cone. ABOVE is the one pose that wins (-24.2%) because there the
+  reduction is both large and spatially coherent, so whole warps drop from six taps to two together.
+  The detail arm was **not built**: the coarsest detail octave has a 22.7-block wavelength and stays
+  above Nyquist at every distance inside the 2000-block render distance at the shipped Ultra, so a
+  footprint-based detail LOD has nothing to remove and the three FBM octaves arrive in one texture
+  fetch anyway. This is the **third independent confirmation** that reducing work for some lanes or
+  samples does not become time on this shader - after T141's tighter descriptor bound (+4.3 to
+  +7.6%) and T151's interleaving ceiling - while the two changes that did work, Rank 1 and T145,
+  both remove work uniformly. Also re-measured: lighting is 8.4% at PLAY_VIS_NEAR here against
+  T147's 23.2% on a different storm, so that figure was not a stable representative number, and
+  BELOW has **no** lighting cost at all because the in-cloud path replaces the cone with one
+  forward probe.
+- [ ] T153 [PERFORMANCE] Measure, then build if the ceiling supports it, a coarse empty-space
+  acceleration structure, recording it in `validation/performance-empty-space.md`. At the
+  representative poses **83-100% of march steps resolve as empty space**, and each still pays the
+  conservative safe-advance descriptor query before the weather skip can reject it. A low-resolution
+  occupancy volume or distance field published alongside the descriptors would let an empty span be
+  crossed in one step instead of marched. It is the right shape of change under the rule T149
+  established - rays in a warp are spatially coherent, so neighbouring pixels traverse the same
+  empty regions and skip them together, which is a **uniform** reduction rather than the per-sample
+  masking that has now failed three times. Measure the ceiling first with an oracle arm that skips
+  all empty-space steps outright (depends on T149) [FR-012-FR-013, FR-027; SC-006, SC-017]
 - [X] T150 [PERFORMANCE] Add a storm-visibility guard to `StormT135PerformanceProfile`: after a
   storm pose settles, take a one-frame counter capture and refuse the cell unless
   `cloudDensityCalls > 0`. A pose that silently renders no storm has now corrupted three separate

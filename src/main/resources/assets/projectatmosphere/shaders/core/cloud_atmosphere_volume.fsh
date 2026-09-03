@@ -189,6 +189,15 @@ const int PA_OPT_T145_OFF = 32;
 // drops the detail-noise octaves everywhere.
 const int PA_OPT_T147_HALF_DISTANCE = 64;
 const int PA_OPT_T147_DETAIL_OFF = 128;
+// T149 graded lighting LOD. The light cone is the largest remaining measured
+// cost after Rank 1 - 16-25% of cloud time at the representative and severe
+// poses and 73% at ABOVE - and it is paid per lit sample, so the natural
+// gradings are how much a sample can still contribute and how far away it is.
+// CONTRIBUTION and DISTANCE are the isolated halves; GRADED is the policy.
+const int PA_OPT_T149_LIGHT_CONTRIBUTION = 256;
+const int PA_OPT_T149_LIGHT_DISTANCE = 512;
+const int PA_OPT_T149_DETAIL_GRADED = 1024;
+const int PA_OPT_T149_LIGHT_VERTICAL = 2048;
 uniform int PaDiagnosticOptimizationMode;
 /**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
@@ -221,6 +230,38 @@ bool paT141BoxBound() {
 bool paT143Reachability() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T143_REACHABILITY) != 0;
 }
+
+/** True when the light cone is graded by how much the sample can contribute. */
+bool paT149LightContribution() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T149_LIGHT_CONTRIBUTION) != 0;
+}
+
+/** True when the light cone is graded by distance. */
+bool paT149LightDistance() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T149_LIGHT_DISTANCE) != 0;
+}
+
+/** True when packed detail work may be replaced by its neutral mean. */
+bool paT149DetailGraded() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T149_DETAIL_GRADED) != 0;
+}
+
+/** True when near-vertical rays use a shorter continuous light cone. */
+bool paT149LightVertical() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T149_LIGHT_VERTICAL) != 0;
+}
+
+/**
+ * T149 grading inputs, published by the primary march immediately before each
+ * lighting sample. Globals rather than parameters because `sampleLighting` is
+ * reached from seven call sites and only the primary march knows either value;
+ * the defaults leave every other caller at full quality.
+ */
+float paLodDistance01 = 0.0;
+float paLodTransmittance = 1.0;
+float paLodRayVerticality = 0.0;
+bool paLightingDensityTap = false;
+float paLightingDetailWeight = 1.0;
 
 /** True when the march's far endpoint is halved, bounding distance culling. */
 bool paT147HalfDistance() {
@@ -298,9 +339,14 @@ int paDensityZeroCalls = 0;
 int paSegmentTestCalls = 0;
 int paSegmentTestPositive = 0;
 int paBoxBoundRejects = 0;
+// T149: three packed R/G/B detail octaves are evaluated by each actual detail
+// texture lookup. Rain noise is intentionally excluded: it is functional
+// precipitation work, not the cloud-surface/detail lever T149 is measuring.
+int paDetailOctaveEvaluations = 0;
 
 bool paWorkloadCaptureActive() {
-    return DebugView == 22 || DebugView == 23 || DebugView == 24 || DebugView == 25;
+    return DebugView == 22 || DebugView == 23 || DebugView == 24
+        || DebugView == 25 || DebugView == 26;
 }
 // T128 on-demand centre-line trace uniforms. They are inert unless DebugView
 // is STORM_MATERIAL_TRACE (21), so they never affect production rendering.
@@ -3341,6 +3387,18 @@ float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipB
     return (first + second) * 0.5;
 }
 
+/**
+ * Approximate projected size of a world-space feature on the cloud target.
+ * This uses only continuous render inputs and remains stable while descriptor
+ * or role boundaries cross the ray.
+ */
+float paProjectedFeaturePixels(vec3 p, float worldSize) {
+    float distanceToSample = max(length(p - CameraPos), 1.0);
+    float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
+    float targetHeight = max(float(textureSize(HistorySampler, 0).y), 1.0);
+    return worldSize * projectionScale * targetHeight / (2.0 * distanceToSample);
+}
+
 float cloudDensity(
         vec3 p,
         float mipBias,
@@ -3735,15 +3793,45 @@ float cloudDensity(
             vec3 detailPos = detailNoiseDomain(samplePos);
             // Cheap curl-ish churn: offset detail lookup by low-freq noise.
             detailPos += (baseNoise.gbr - 0.5) * 0.18;
-            vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
-            float detailFbm = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
+            // T149 never alters the analytic envelope or base-noise body. For
+            // lighting probes only, detail may fade continuously toward its
+            // neutral mean as that probe's contribution becomes negligible.
+            // The lookup is skipped only at an exact zero weight.
+            float detailWeight = paT149DetailGraded() && paLightingDensityTap
+                ? paLightingDetailWeight
+                : 1.0;
+            float detailFbm = 0.5;
+            if (detailWeight > 0.0001) {
+                vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
+                if (paWorkloadCaptureActive()) {
+                    paDetailOctaveEvaluations += 3;
+                }
+                float sampledDetail = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
+                detailFbm = mix(0.5, sampledDetail, detailWeight);
+            }
             if (nearCamera && DetailQuality >= 2) {
-                vec4 fine = texture(
-                    DetailNoiseSampler,
-                    detailPos * 2.71 + vec3(0.173, -0.291, 0.417),
-                    mipBias
-                );
-                detailFbm = detailFbm * 0.72 + (fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125) * 0.28;
+                // The second lookup's coarsest packed wavelength is about 8.4
+                // blocks. Fade it only near one target pixel, then omit it
+                // once genuinely sub-pixel.
+                float fineWeight = paT149DetailGraded()
+                    ? smoothstep(0.65, 1.65, paProjectedFeaturePixels(p, 8.4))
+                    : 1.0;
+                if (fineWeight > 0.0001) {
+                    vec4 fine = texture(
+                        DetailNoiseSampler,
+                        detailPos * 2.71 + vec3(0.173, -0.291, 0.417),
+                        mipBias
+                    );
+                    if (paWorkloadCaptureActive()) {
+                        paDetailOctaveEvaluations += 3;
+                    }
+                    float fineDetail = fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125;
+                    detailFbm = mix(
+                        detailFbm,
+                        detailFbm * 0.72 + fineDetail * 0.28,
+                        fineWeight
+                    );
+                }
             }
             float erosion = profileId == 3 ? 0.14 : 0.26;
             if (profileId == 1 || profileId == 5) {
@@ -3920,6 +4008,40 @@ float lightMarchOpticalDepth(
     if (cameraStartsInsideSlab) {
         steps = min(steps, 4);
     }
+    // T149. A sample's radiance reaches the frame multiplied by the
+    // transmittance accumulated before it, while distance and ray verticality
+    // describe projected importance and the measured high-coverage view
+    // geometry. All three are continuous and independent of descriptor/role
+    // boundaries. Two taps remain the floor so lighting keeps a direction.
+    float desiredSteps = float(steps);
+    bool gradedLight = paT149LightContribution()
+        || paT149LightDistance()
+        || paT149LightVertical();
+    if (gradedLight) {
+        float quality = 1.0;
+        if (paT149LightContribution()) {
+            // 1 while the sample can still carry most of its radiance to the
+            // frame, falling to 0 once the ray is nearly opaque ahead of it.
+            quality = min(quality, smoothstep(0.08, 0.45, paLodTransmittance));
+        }
+        if (paT149LightDistance()) {
+            quality = min(quality, 1.0 - smoothstep(0.35, 0.85, paLodDistance01));
+        }
+        if (paT149LightVertical()) {
+            // The expensive ABOVE result is caused by near-vertical rays
+            // covering most of the target and repeatedly integrating the
+            // self-shadow cone. This is the general geometric signal for that
+            // condition, not a pose-specific branch.
+            float verticalQuality = 1.0
+                - 0.72 * smoothstep(0.48, 0.92, paLodRayVerticality);
+            quality = min(quality, verticalQuality);
+        }
+        desiredSteps = mix(2.0, float(steps), quality);
+        // The final admitted tap is weighted fractionally below. ceil() makes
+        // a newly entered tap begin at zero contribution instead of popping in
+        // at full strength as the earlier rounded prototype did.
+        steps = clamp(int(ceil(desiredSteps - 0.0001)), 2, steps);
+    }
     float opticalDepth = 0.0;
     float stepLength = 14.0;
     vec3 pos = p;
@@ -3946,8 +4068,37 @@ float lightMarchOpticalDepth(
         if (paWorkloadCaptureActive()) {
             paLightMarchDensityEvaluations++;
         }
-        float density = cloudDensity(pos + offset, float(i) * 0.6, i < 2, false, false);
-        opticalDepth += density * stepLength;
+        float tapWeight = 1.0;
+        if (gradedLight && float(i + 1) > desiredSteps) {
+            tapWeight = clamp(desiredSteps - float(i), 0.0, 1.0);
+        }
+        bool detailTap = i < 2;
+        if (detailTap && paT149DetailGraded()) {
+            float projectedQuality = smoothstep(
+                0.65,
+                2.25,
+                paProjectedFeaturePixels(pos + offset, 22.7)
+            );
+            float contributionQuality = smoothstep(0.04, 0.38, paLodTransmittance);
+            float distanceQuality = 1.0 - smoothstep(0.42, 0.90, paLodDistance01);
+            float verticalQuality = 1.0
+                - 0.65 * smoothstep(0.52, 0.94, paLodRayVerticality);
+            float proxyQuality = min(
+                min(projectedQuality, contributionQuality),
+                min(distanceQuality, verticalQuality)
+            );
+            // The second detailed cone tap fades sooner. Full-quality near
+            // samples still retain both taps; low-importance probes retain the
+            // base body but avoid one or both packed detail lookups.
+            paLightingDetailWeight = i == 0
+                ? proxyQuality
+                : proxyQuality * smoothstep(0.35, 0.85, proxyQuality);
+            paLightingDensityTap = true;
+        }
+        float density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+        paLightingDensityTap = false;
+        paLightingDetailWeight = 1.0;
+        opticalDepth += density * stepLength * tapWeight;
         if (cameraStartsInsideSlab && opticalDepth * ExtinctionScale >= 28.0) {
             break;
         }
@@ -5547,6 +5698,12 @@ void main() {
                 paMrStepTrans = stepTrans;
             }
             float diagnosticLightOpticalDepth = 0.0;
+            // T149 grading inputs for this sample. `transmittance` is what the
+            // ray has left before this step is integrated, which is exactly the
+            // weight this sample's radiance will carry into the frame.
+            paLodDistance01 = saturate(t / MaxRenderDistance);
+            paLodTransmittance = transmittance;
+            paLodRayVerticality = abs(rayDir.y);
             vec3 radiance = sampleLighting(
                 p,
                 density,
@@ -6009,6 +6166,11 @@ void main() {
             float(paSegmentTestPositive),
             float(paBoxBoundRejects)
         );
+        return;
+    }
+    if (DebugView == 26) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(float(paDetailOctaveEvaluations), 0.0, 0.0, 0.0);
         return;
     }
 

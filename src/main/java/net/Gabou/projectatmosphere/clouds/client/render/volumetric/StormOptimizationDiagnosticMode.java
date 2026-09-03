@@ -72,7 +72,19 @@ public enum StormOptimizationDiagnosticMode {
      * T147: the detail-noise octaves are dropped everywhere. Ceiling of a
      * detail LOD, in the same sense.
      */
-    T147_DETAIL_OFF(128, "t147_detail_off");
+    T147_DETAIL_OFF(128, "t147_detail_off"),
+    /** T149: light cone graded by how much the sample can still contribute. */
+    T149_LIGHT_CONTRIBUTION(256, "t149_light_contribution"),
+    /** T149: light cone graded by distance. */
+    T149_LIGHT_DISTANCE(512, "t149_light_distance"),
+    /** T149: detail is simplified only when its projected/contribution weight is small. */
+    T149_DETAIL_GRADED(1024, "t149_detail_graded"),
+    /** T149: light cone graded by continuous ray verticality. */
+    T149_LIGHT_VERTICAL(2048, "t149_light_vertical"),
+    /** T149: all continuous lighting signals, whichever is most restrictive. */
+    T149_LIGHT_GRADED(2816, "t149_light_graded"),
+    /** T149 candidate: the complete graded lighting and detail policy. */
+    T149_GRADED(3840, "t149_graded");
 
     private final int shaderFlags;
     private final String serializedName;

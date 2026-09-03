@@ -1115,7 +1115,9 @@ public final class StormVolumetricGeometrySandbox {
                         2027767531.0D, 21318588.0D, 1488992.0D, 149382.0D,
                         // T141 decomposition channels; freshness is the capture
                         // token, so their values are immaterial here.
-                        0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                        0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                        // T149 packed detail-octave evaluations.
+                        0.0D);
 
         require(StormPerformanceSuite.workloadFreshnessFailure(passA, 41L, "above") == null,
                 "T132 freshness rejected the capture it actually requested");

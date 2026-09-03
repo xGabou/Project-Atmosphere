@@ -277,36 +277,30 @@ final class StormT132AutoDriver {
     private static boolean t138HistoryArm;
 
     /**
-     * T141 descriptor-evaluation arms, all at one resolution and one quality
-     * mode, and at the mode's own shipped resolution rather than a pinned one.
-     * `production` is the shipped path. `evalAmplify` doubles the exact
-     * SDF evaluations at unchanged fetch volume and unchanged output, so its
-     * GPU-time delta is the marginal cost of descriptor evaluation. `boxBound`
-     * strengthens T121's conservative rejection from a vertical-only bound to a
-     * horizontal-and-vertical one, so its delta is what a tighter conservative
-     * bound is worth. `t122Refetch` is carried forward from the rank-2 arm so
-     * fetch and evaluation elasticity are read off the same fixture.
+     * T149 lighting/detail arms, all at one resolution and one quality mode,
+     * and at the mode's own shipped resolution rather than a pinned one. The
+     * first four arms establish production and independent/combined ceilings;
+     * the remaining arms isolate the continuous inputs before the complete
+     * graded candidate is measured.
      */
     private static final StormOptimizationDiagnosticMode[] T141_ARMS = {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
-            StormOptimizationDiagnosticMode.T145_OFF,
-            StormOptimizationDiagnosticMode.T141_EVAL_AMPLIFY,
-            StormOptimizationDiagnosticMode.T121_OFF,
-            StormOptimizationDiagnosticMode.T122_OFF,
-            StormOptimizationDiagnosticMode.T147_HALF_DISTANCE,
             StormOptimizationDiagnosticMode.T147_DETAIL_OFF,
-            // Not an optimization mode: the constant-radiance arm is its own
-            // switch, applied alongside NORMAL_PRODUCTION by applyT141Arm.
+            // Not an optimization mode: constant lighting is toggled separately.
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
-            // Combined ceiling: detail octaves dropped AND lighting replaced by
-            // a constant, so the interaction between the two is measured rather
-            // than inferred by multiplying their separate shares.
-            StormOptimizationDiagnosticMode.T147_DETAIL_OFF
+            // Combined ceiling: detail dropped plus constant lighting.
+            StormOptimizationDiagnosticMode.T147_DETAIL_OFF,
+            StormOptimizationDiagnosticMode.T149_DETAIL_GRADED,
+            StormOptimizationDiagnosticMode.T149_LIGHT_CONTRIBUTION,
+            StormOptimizationDiagnosticMode.T149_LIGHT_DISTANCE,
+            StormOptimizationDiagnosticMode.T149_LIGHT_VERTICAL,
+            StormOptimizationDiagnosticMode.T149_LIGHT_GRADED,
+            StormOptimizationDiagnosticMode.T149_GRADED
     };
     /** Index of the arm that is production plus constant lighting. */
-    private static final int T141_CONSTANT_LIGHTING_ARM = 7;
+    private static final int T141_CONSTANT_LIGHTING_ARM = 2;
     /** Index of the arm that is detail-off plus constant lighting. */
-    private static final int T141_LIGHT_AND_DETAIL_ARM = 8;
+    private static final int T141_LIGHT_AND_DETAIL_ARM = 3;
     /**
      * The resolution every T141 cell is measured at. Fixed so evaluation work
      * is the only variable, and chosen at the shipped Ultra scale so the arms

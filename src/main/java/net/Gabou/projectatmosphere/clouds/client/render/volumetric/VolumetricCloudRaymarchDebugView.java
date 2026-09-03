@@ -34,7 +34,9 @@ public enum VolumetricCloudRaymarchDebugView {
     /** T141 channels: storm-shape calls, group-field calls, lobes visited, density calls. */
     STORM_WORKLOAD_TERTIARY(24, "storm_workload_tertiary"),
     /** T141 channels: zero-density calls, segment tests, positive segment tests, box rejects. */
-    STORM_WORKLOAD_QUATERNARY(25, "storm_workload_quaternary");
+    STORM_WORKLOAD_QUATERNARY(25, "storm_workload_quaternary"),
+    /** T149 channels: executed packed detail-noise octave evaluations. */
+    STORM_WORKLOAD_QUINARY(26, "storm_workload_quinary");
 
     private final int shaderId;
     private final String serializedName;

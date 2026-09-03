@@ -10,13 +10,13 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * T123's short, on-demand workload readback. Two diagnostic frames encode
+ * T123's short, on-demand workload readback. Diagnostic frames encode
  * integer per-pixel counter channels; their target-wide sum is the actual
  * executed work for that rendered frame. FINAL rendering never enters this
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 4;
+    private static final int STAGES = 5;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -56,7 +56,8 @@ final class StormWorkloadRuntimeCapture {
         latestResult = null;
         long token = CAPTURE_SEQUENCE.incrementAndGet();
         active = new Request(view.trim().toLowerCase(Locale.ROOT), token);
-        latest = "acquiring view=" + active.view + " captureToken=" + token + " stage=0/2";
+        latest = "acquiring view=" + active.view + " captureToken=" + token
+                + " stage=0/" + STAGES;
         VolumetricCloudRenderer.invalidateHistory();
         return new CaptureRequest(latest, token);
     }
@@ -93,6 +94,7 @@ final class StormWorkloadRuntimeCapture {
             case 1 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SECONDARY;
             case 2 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_TERTIARY;
             case 3 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_QUATERNARY;
+            case 4 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_QUINARY;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -181,7 +183,8 @@ final class StormWorkloadRuntimeCapture {
                     values[0][0], values[0][1], values[0][2],
                     values[1][0], values[1][1], values[1][2],
                     values[2][0], values[2][1], values[2][2], values[2][3],
-                    values[3][0], values[3][1], values[3][2], values[3][3]);
+                    values[3][0], values[3][1], values[3][2], values[3][3],
+                    values[4][0]);
         }
     }
 
@@ -200,7 +203,7 @@ final class StormWorkloadRuntimeCapture {
             double directStormShapeCalls, double groupFieldCalls, double lobesVisited,
             double cloudDensityCalls,
             double densityZeroCalls, double segmentTestCalls, double segmentTestPositive,
-            double boxBoundRejects
+            double boxBoundRejects, double detailOctaveEvaluations
     ) {
         String format() {
             return "T123 workload view=" + view
@@ -221,7 +224,17 @@ final class StormWorkloadRuntimeCapture {
                     + " densityZeroCalls=" + fmt(densityZeroCalls)
                     + " segmentTestCalls=" + fmt(segmentTestCalls)
                     + " segmentTestPositive=" + fmt(segmentTestPositive)
-                    + " boxBoundRejects=" + fmt(boxBoundRejects);
+                    + " boxBoundRejects=" + fmt(boxBoundRejects)
+                    + " detailOctaveEvaluations=" + fmt(detailOctaveEvaluations)
+                    + " lightEvaluationsPerPixel=" + perPixel(lightMarchDensityEvaluations)
+                    + " detailOctaveEvaluationsPerPixel=" + perPixel(detailOctaveEvaluations);
+        }
+
+        private String perPixel(double value) {
+            long pixels = (long) width * (long) height;
+            return pixels <= 0L
+                    ? "n/a"
+                    : String.format(Locale.ROOT, "%.6f", value / (double) pixels);
         }
     }
 
