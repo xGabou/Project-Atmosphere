@@ -888,11 +888,37 @@ do not fabricate historical before/after percentages for T119--T123.
   fundamentally unable to add resolution back (no screen-space jitter, no
   accumulation). One candidate reconstruction change was implemented, measured
   inert (<=0.0033% of pixels) and rejected.
-- [ ] T139 [PERFORMANCE] Integrate the T135 budget plus the terminal Phase 4Q evidence into five-mode quality policy: map
+- [X] T139 [PERFORMANCE] Integrate the T135 budget plus the terminal Phase 4Q evidence into five-mode quality policy: map
   budgets, LOD, raymarch, lighting, resolution, governor floors/ceilings, and history transitions
   to Low/Low 24/Medium/High/Ultra without disconnecting complete groups. Record the policy and
   transition rationale in `validation/us3-quality-lod.md` (depends on T045, T137) [FR-001,
-  FR-009-FR-012; SC-005-SC-007, SC-021]. The final policy cannot bank until T158/T159 when the
+  FR-009-FR-012; SC-005-SC-007, SC-021]
+  **CURRENT ACCEPTED POLICY recorded** in `validation/us3-quality-lod.md`, deliberately separated
+  from desired final quality. Shipped ladder verified from source and runtime, not documentation:
+  Low/Low 24/Medium **0.125** (240x135), High **0.1875** (**360x203** - `Mth.ceil` of 202.5, not
+  202), Ultra **0.250** (480x270, confirmed by 260 runtime cells). Render distance is **not**
+  mode-dependent (single `CLOUD_RENDER_DISTANCE`, default 2000, 300-block floor). The governor is
+  a scalar **step-budget** governor (4.2 ms, 40/400 frames, +/-0.125, clamped [0.5, 1.0]) that
+  never changes resolution; T046's adaptive state machine is still unimplemented, as are T044's
+  `adaptiveCloudQuality` and `nativeStormDetailDistance`. **Monotonicity audit passes** - no
+  inversion on any dimension; intentional plateaus are light steps High=Ultra=6, scatter octaves
+  Medium/High/Ultra=3, detail Low24/Medium/High=1, weather map 512, and Low alone disabling
+  temporal. **Measured evidence is Ultra-only**: 260 cells at 0.250, and **zero** cells for
+  Low/Low 24/Medium/High at their shipped scales - every non-Ultra cell on record is at the
+  superseded pre-Rank-1 ladder and is not evidence for this one. **SC-006 is not met and is not
+  claimed**: representative Ultra is 100.28 ms cloud p50 against an 8.0 ms budget (12.5x) and
+  113.32 ms frame p95 against 16.7 ms (6.8x). Current Ultra is explicitly **not** the desired
+  final visual target - it is 4.39x faster than the old path but visibly soft with 2.40 px
+  silhouette displacement; a higher rung is to be tested only if the core-renderer experiment
+  creates headroom, with 0.375/0.50 named as candidates and not promised. T152's temporal finding
+  is recorded as policy: accumulation is **not** a safety net for aggressive sampling changes.
+  T160's morphology findings are recorded as T098b requirements only; no profile value changed.
+  **Policy defect found and corrected**: `AtmoCommonConfig.CloudRaymarchQuality` still carried the
+  pre-Rank-1 ladder, and `ProjectAtmosphereQuickOptionsScreen` renders it, so the in-game quality
+  label advertised resolutions **2x to 4x too high on every mode**; the config comment did the
+  same. Enum and comment corrected to the shipped values. No rendering behaviour reads those
+  fields, and recorded measurements were never contaminated - they use
+  `effectiveResolutionScale`.. The final policy cannot bank until T158/T159 when the
   architecture reaches those stages, or the recorded T153--T157 stop decision if it does not
 - [X] T141 [PERFORMANCE] Measure the per-pixel descriptor **evaluation** cost with a controlled
   arm before implementing anything against it, and record it in
