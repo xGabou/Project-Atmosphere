@@ -455,7 +455,12 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("RaymarchSteps").set(profile.raymarchSteps());
         shader.safeGetUniform("LightSteps").set(profile.lightSteps());
         shader.safeGetUniform("ScatterOctaves").set(profile.scatterOctaves());
-        shader.safeGetUniform("DetailQuality").set(profile.detailQuality());
+        // T147 detail-LOD ceiling: diagnostic-only, zero outside a capture.
+        shader.safeGetUniform("DetailQuality").set(
+                VolumetricCloudDebugConfig.optimizationDiagnosticMode()
+                        == StormOptimizationDiagnosticMode.T147_DETAIL_OFF
+                        ? 0
+                        : profile.detailQuality());
         shader.safeGetUniform("StepScale").set(stepScale);
         shader.safeGetUniform("ExteriorFineStep").set(
                 PuffLobeSpatialIndex.exteriorFineStepWorld(profile.raymarchSteps(), stepScale)
@@ -466,7 +471,12 @@ public final class VolumetricCloudRenderer {
         int uploadedCoveragePretestSamples = VolumetricCloudDebugConfig.coveragePretestSamples();
         float uploadedCoveragePretestThreshold = VolumetricCloudDebugConfig.coveragePretestThreshold();
         int uploadedCoveragePretestDilation = VolumetricCloudDebugConfig.coveragePretestDilation();
-        shader.safeGetUniform("MaxRenderDistance").set(uploadedMaxRenderDistance);
+        // T147 distance-LOD ceiling: diagnostic-only, unchanged outside a capture.
+        shader.safeGetUniform("MaxRenderDistance").set(
+                VolumetricCloudDebugConfig.optimizationDiagnosticMode()
+                        == StormOptimizationDiagnosticMode.T147_HALF_DISTANCE
+                        ? Math.max(300.0F, uploadedMaxRenderDistance * 0.5F)
+                        : uploadedMaxRenderDistance);
         shader.safeGetUniform("UseSceneDepth").set(uploadedUseSceneDepth ? 1 : 0);
         shader.safeGetUniform("CoveragePretestEnabled").set(uploadedCoveragePretestEnabled ? 1 : 0);
         shader.safeGetUniform("CoveragePretestSamples").set(uploadedCoveragePretestSamples);

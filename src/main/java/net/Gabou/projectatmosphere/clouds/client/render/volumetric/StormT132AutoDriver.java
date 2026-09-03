@@ -274,7 +274,8 @@ final class StormT132AutoDriver {
 
     /**
      * T141 descriptor-evaluation arms, all at one resolution and one quality
-     * mode. `production` is the shipped path. `evalAmplify` doubles the exact
+     * mode, and at the mode's own shipped resolution rather than a pinned one.
+     * `production` is the shipped path. `evalAmplify` doubles the exact
      * SDF evaluations at unchanged fetch volume and unchanged output, so its
      * GPU-time delta is the marginal cost of descriptor evaluation. `boxBound`
      * strengthens T121's conservative rejection from a vertical-only bound to a
@@ -284,17 +285,36 @@ final class StormT132AutoDriver {
      */
     private static final StormOptimizationDiagnosticMode[] T141_ARMS = {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
-            StormOptimizationDiagnosticMode.T145_OFF
+            StormOptimizationDiagnosticMode.T145_OFF,
+            StormOptimizationDiagnosticMode.T141_EVAL_AMPLIFY,
+            StormOptimizationDiagnosticMode.T121_OFF,
+            StormOptimizationDiagnosticMode.T122_OFF,
+            StormOptimizationDiagnosticMode.T147_HALF_DISTANCE,
+            StormOptimizationDiagnosticMode.T147_DETAIL_OFF,
+            // Not an optimization mode: the constant-radiance arm is its own
+            // switch, applied alongside NORMAL_PRODUCTION by applyT141Arm.
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
+            // Combined ceiling: detail octaves dropped AND lighting replaced by
+            // a constant, so the interaction between the two is measured rather
+            // than inferred by multiplying their separate shares.
+            StormOptimizationDiagnosticMode.T147_DETAIL_OFF
     };
+    /** Index of the arm that is production plus constant lighting. */
+    private static final int T141_CONSTANT_LIGHTING_ARM = 7;
+    /** Index of the arm that is detail-off plus constant lighting. */
+    private static final int T141_LIGHT_AND_DETAIL_ARM = 8;
     /**
      * The resolution every T141 cell is measured at. Fixed so evaluation work
      * is the only variable, and chosen at the shipped Ultra scale so the arms
      * are comparable with the T136 and T138 records.
      */
-    private static final float T141_RESOLUTION_SCALE = 0.75F;
+    // T147 measures the renderer as shipped, so the sweep must NOT pin a scale:
+    // NaN releases the diagnostic override and every cell renders at the quality
+    // mode's own Rank 1 ladder value.
+    private static final float T141_RESOLUTION_SCALE = Float.NaN;
     private static final String[] T141_DEFAULT_POSES = {
             "PLAY_VIS_NEAR", "PLAY_VIS_MID", "SIDE", "FAR", "ABOVE", "BELOW",
-            "NEAR_EDGE", "PLAY_NEAR", "CLEAR"};
+            "NEAR_EDGE", "CLEAR"};
     private static String[] T141_POSES = T141_DEFAULT_POSES;
     private static boolean t141EvaluationRun;
     private static int t141ArmIndex;
@@ -322,9 +342,20 @@ final class StormT132AutoDriver {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                 T141_ARMS[Math.max(0, Math.min(T141_ARMS.length - 1, t141ArmIndex))]);
+        // The lighting share needs its own arm at the new ladder: every earlier
+        // measurement of it was taken at 1440x810.
+        VolumetricCloudDebugConfig.setT136ConstantLighting(
+                t141ArmIndex == T141_CONSTANT_LIGHTING_ARM
+                        || t141ArmIndex == T141_LIGHT_AND_DETAIL_ARM);
     }
 
     private static String t141ArmName() {
+        if (t141ArmIndex == T141_CONSTANT_LIGHTING_ARM) {
+            return "constant_lighting";
+        }
+        if (t141ArmIndex == T141_LIGHT_AND_DETAIL_ARM) {
+            return "light_and_detail_off";
+        }
         return T141_ARMS[Math.max(0, Math.min(T141_ARMS.length - 1, t141ArmIndex))]
                 .serializedName();
     }

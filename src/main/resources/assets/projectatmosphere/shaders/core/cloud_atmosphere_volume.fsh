@@ -183,6 +183,12 @@ const int PA_OPT_T143_REACHABILITY = 16;
 // production behaviour; the flag is the OFF arm that restores the unguarded
 // path so the equivalence stays re-provable.
 const int PA_OPT_T145_OFF = 32;
+// T147 distance/LOD ceilings. Neither is a policy: each removes a whole class
+// of work outright so the measurement bounds what any policy over that class
+// could ever return. HALF_DISTANCE halves the march's far endpoint; DETAIL_OFF
+// drops the detail-noise octaves everywhere.
+const int PA_OPT_T147_HALF_DISTANCE = 64;
+const int PA_OPT_T147_DETAIL_OFF = 128;
 uniform int PaDiagnosticOptimizationMode;
 /**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
@@ -214,6 +220,16 @@ bool paT141BoxBound() {
 /** True when the hoisted ray-invariant storm reachability bound is active. */
 bool paT143Reachability() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T143_REACHABILITY) != 0;
+}
+
+/** True when the march's far endpoint is halved, bounding distance culling. */
+bool paT147HalfDistance() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T147_HALF_DISTANCE) != 0;
+}
+
+/** True when the detail-noise octaves are dropped, bounding a detail LOD. */
+bool paT147DetailOff() {
+    return (PaDiagnosticOptimizationMode & PA_OPT_T147_DETAIL_OFF) != 0;
 }
 
 /** True when T145's precipitation-locality gate must be bypassed. */

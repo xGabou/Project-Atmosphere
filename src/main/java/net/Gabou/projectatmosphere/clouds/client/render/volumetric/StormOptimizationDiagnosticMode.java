@@ -60,7 +60,19 @@ public enum StormOptimizationDiagnosticMode {
      * already decided. Both conditions are conservative and neither changes a
      * density, a rain equation or the march's progression.
      */
-    T145_OFF(32, "t145_off");
+    T145_OFF(32, "t145_off"),
+    /**
+     * T147: the march's far endpoint is halved. This is not a distance policy,
+     * it is the ceiling of one - it deletes every sample beyond half the render
+     * distance outright, so whatever it saves bounds what any cheapening of
+     * distant work could return.
+     */
+    T147_HALF_DISTANCE(64, "t147_half_distance"),
+    /**
+     * T147: the detail-noise octaves are dropped everywhere. Ceiling of a
+     * detail LOD, in the same sense.
+     */
+    T147_DETAIL_OFF(128, "t147_detail_off");
 
     private final int shaderFlags;
     private final String serializedName;

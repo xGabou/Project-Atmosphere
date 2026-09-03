@@ -995,7 +995,7 @@ not fabricate historical before/after percentages for T119--T123.
   representative gap against the 8 ms cloud budget falls from 63.2x to 14.2x. Also fixed: the
   diagnostic `setFixedResolutionScale` floor was 0.25 against the renderer's own 0.10, which
   silently pinned the first sweep's two most aggressive arms to a 480x270 target.
-- [ ] T147 [PERFORMANCE] Re-measure the renderer's cost distribution at the shipped Rank 1 ladder
+- [X] T147 [PERFORMANCE] Re-measure the renderer's cost distribution at the shipped Rank 1 ladder
   before choosing the next lever, and record it in `validation/performance-post-rank1.md`. Every
   earlier attribution - the lighting share, the step-budget elasticity, the descriptor evaluation and
   fetch elasticities - was measured at 1440x810 and none can be assumed to hold at 480x270, where
@@ -1005,6 +1005,40 @@ not fabricate historical before/after percentages for T119--T123.
   0.125 and resolving to 0.250, worth a measured 2.0x at equal spatial quality - and an explicit
   distance/LOD policy, which has never been measured and where FAR already costs half of SIDE
   without one (depends on T146) [FR-010-FR-012, FR-027; SC-006, SC-017]
+  **Done; no production change.** Recorded in `validation/performance-post-rank1.md`. Three results
+  do not carry over from before Rank 1: **lighting is 16-25% at the representative and severe poses
+  and 73% at ABOVE**, against the ~6.5-11.4% T137 carried; the **detail-noise octaves are 9-41%**,
+  never separately measured before; and **T145's rain gate is worth more at the new ladder than the
+  old** (+14% to +27% to remove, against +12% to +21% at 0.75). Reconstruction and composite remain
+  negligible at 0.085-0.121 ms, so the worry that fixed costs would now dominate is measured and
+  false - the pass is still overwhelmingly the march. Descriptor elasticities survive Rank 1
+  unchanged (evaluation 0.15-0.20, fetch 0.20-0.42), so T141's rejections still stand. **Candidate A
+  has no implementation**: the 2.0x is a ceiling inferred from two frontier points, and T146's
+  wording is corrected. **Candidate B measured**: removing lighting and detail entirely is
+  1.43-1.60x representative and 9.13x at ABOVE, independent at four of five poses and super-additive
+  at ABOVE. Stacked at their ceilings A and B take the representative gap from 13.0x to ~4.5x - real
+  progress, still not budget. **Decision: CASE A, interleaved reconstruction next**, because it has
+  the larger ceiling, moves quality the right way, attacks the artefact the T098b reconnaissance
+  found now leads the list (silhouette quantisation has displaced ANVIL flatness), and leaves B
+  fully available behind it.
+- [ ] T148 [PERFORMANCE] Implement interleaved reconstruction: march 240x135 through a 2x2 phase
+  pattern and resolve into a 480x270 target with reprojection and disocclusion fallback, then A/B it
+  against the shipped ladder on one fixture with T098a as a hard gate. **The first milestone must be
+  a moving-camera fixture and a silhouette-stability metric, before any interleaving code**, because
+  static poses cannot see the hit/miss flicker that made the current shader freeze its sample
+  lattice - `searchBlue` is a static screen-space phase for exactly that reason, and interleaving
+  requires moving it (depends on T147) [FR-001, FR-010-FR-012, FR-027; SC-006, SC-017, SC-021]
+- [ ] T149 [PERFORMANCE] Graded distance/LOD over the measured 16-25% lighting and 9-41% detail
+  shares. Cheapen at distance rather than delete: T147's ceiling comes from removing both outright,
+  which is not shippable, and halving the render distance is a visibility change T098a forbids
+  because FAR must not disappear. Report popping and transition quality alongside GPU savings
+  (depends on T148) [FR-010-FR-012, FR-027; SC-006, SC-017]
+- [ ] T150 [PERFORMANCE] Add a storm-visibility guard to `StormT135PerformanceProfile`: after a
+  storm pose settles, take a one-frame counter capture and refuse the cell unless
+  `cloudDensityCalls > 0`. A pose that silently renders no storm has now corrupted three separate
+  measurement runs - T142's `PLAY_NEAR`, the T138 ladder, and two of three T147 runs at
+  `PLAY_VIS_NEAR` - and the existing descriptor-count check does not catch it (depends on T147)
+  [FR-012-FR-013, FR-027; SC-017]
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This

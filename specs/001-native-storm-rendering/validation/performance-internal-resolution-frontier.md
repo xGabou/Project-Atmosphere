@@ -198,7 +198,7 @@ nothing to accumulate.
 | B/C. jittered low-res sampling + temporal accumulation | **Would antialias each low-resolution texel, not add resolution.** Accumulating jittered samples into a low-resolution history makes each texel a better average of its own footprint; the output is still 240x135 before upscaling. |
 | D. hybrid | Reduces to B plus the existing filter. |
 | E. per-mode reconstruction quality | Available and cheap, but it varies a filter that is not the limit above 0.250. |
-| **F. interleaved / checkerboard** | **The only class that adds resolution.** March 240x135 per frame, cycle the sample grid through a 2x2 phase pattern, accumulate into a 480x270 resolve target with reprojection. That yields 0.250-class spatial information at 0.125-class march cost — worth a further **2.0x** at equal quality, from the measured frontier (113.2 ms at 0.250 versus 55.4 ms at 0.125). |
+| **F. interleaved / checkerboard** | **The only class that adds resolution.** March 240x135 per frame, cycle the sample grid through a 2x2 phase pattern, accumulate into a 480x270 resolve target with reprojection. That yields 0.250-class spatial information at 0.125-class march cost — worth a further **2.0x** at equal quality — a *ceiling inferred from* two measured frontier points (113.2 ms at 0.250 versus 55.4 ms at 0.125), not a measured result of an implementation. No interleaving code exists. |
 
 **F is the right next piece of work and was deliberately not started here.** It
 needs a new resolve target pair, per-phase ray offsets, reprojection and
@@ -305,10 +305,11 @@ where occupancy is the new variable.
 **T147 — re-measure the cost distribution at the shipped ladder**, then choose
 between two levers that are now the plausible candidates:
 
-1. **Interleaved reconstruction (candidate F)** — worth a measured **2.0x** at
-   equal spatial quality, by marching at 0.125 and resolving to 0.250. This is
-   the largest remaining lever and the only one that improves quality *and*
-   cost together.
+1. **Interleaved reconstruction (candidate F)** — ceiling **2.0x** at equal
+   spatial quality, by marching at 0.125 and resolving to 0.250. The figure is
+   inferred from two measured frontier points, **not** from an implementation:
+   none exists. It is the largest remaining lever and the only one that could
+   improve quality *and* cost together.
 2. **Distance and LOD policy (Rank 3)** — never measured. FAR already costs 59.5
    ms against SIDE's 113.5 at the shipped Ultra, so distance is doing work
    without a policy; an explicit one may halve the distant cases.
