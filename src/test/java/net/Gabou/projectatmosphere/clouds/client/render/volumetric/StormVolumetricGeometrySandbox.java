@@ -53,6 +53,7 @@ public final class StormVolumetricGeometrySandbox {
         validateT143ReachabilityGuard();
         validateT143ShaderReachabilityShape();
         validateT145RainLocalityGate();
+        validateT150StormVisibilityGuard();
         validateT121VerticalBoundIsConservative();
         validateT121Float32BoundaryMargin();
         validateT121GuardAdmitsNoUnionContribution();
@@ -6012,6 +6013,128 @@ public final class StormVolumetricGeometrySandbox {
                 "T145 vertical gate does not take the larger of the two attachment bounds");
         System.out.println(
                 "PHASE4T_RESULT|T145 rain locality gate is conservative"
+                        + "|PASSED|invariant satisfied");
+    }
+
+
+    /**
+     * T150 fail-first. Three measurement runs have been corrupted by a pose
+     * that held its descriptors and still rendered an empty sky, and each was
+     * only caught by reading counters afterwards. This pins the guard that
+     * rejects such a pose before it can produce a cell.
+     *
+     * <p>The regression case is the real one: at T134 severe scale the fixture
+     * radius is about 670 blocks, so the shipped {@code PLAY_NEAR} pose at four
+     * radii puts the storm's near edge past the 2000-block cloud render
+     * distance while {@code PLAY_VIS_NEAR} at 1.6 radii sits well inside it.
+     */
+    private static void validateT150StormVisibilityGuard() {
+        final double centreX = 0.0D;
+        final double centreZ = 0.0D;
+        final double baseY = 136.0D;
+        final double topY = 1000.0D;
+        final double radius = 670.0D;
+        final double renderDistance = 2000.0D;
+        final double fov = 70.0D;
+        final double centreY = (baseY + topY) * 0.5D;
+
+        // Camera on +X looking back along -X, the framing every severe pose uses.
+        final double yaw = 90.0D;
+
+        // 1. The corrupted case. PLAY_NEAR at 4.0 radii is beyond the cloud
+        //    render distance even though the descriptors are resident.
+        double playNearX = centreX + radius * 4.0D;
+        double playNearPitch = -Math.toDegrees(
+                Math.atan2(centreY - 120.0D, Math.abs(playNearX - centreX)));
+        StormFixtureVisibility.Verdict playNear = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                playNearX, 120.0D, centreZ, yaw, playNearPitch, fov, renderDistance);
+        require(!playNear.valid(),
+                "T150 accepted PLAY_NEAR, whose storm is past the cloud render distance: "
+                        + playNear.format());
+        require("beyond_render_distance".equals(playNear.reason()),
+                "T150 rejected PLAY_NEAR for the wrong reason: " + playNear.reason());
+        require(playNear.descriptorsPresent(),
+                "T150's regression case must have descriptors, or it does not"
+                        + " reproduce the defect: " + playNear.format());
+
+        // 2. The corrected pose must pass.
+        double visNearX = centreX + radius * 1.6D;
+        double visNearPitch = -Math.toDegrees(
+                Math.atan2(centreY - 120.0D, Math.abs(visNearX - centreX)));
+        StormFixtureVisibility.Verdict visNear = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                visNearX, 120.0D, centreZ, yaw, visNearPitch, fov, renderDistance);
+        require(visNear.valid(), "T150 rejected PLAY_VIS_NEAR, which is in range and in frame: "
+                + visNear.format());
+
+        // 3. Every shipped severe pose must pass, at its own framing.
+        record Pose(String name, double factor, double y) {
+        }
+        Pose[] poses = {
+                new Pose("PLAY_VIS_NEAR", 1.6D, 120.0D),
+                new Pose("PLAY_VIS_MID", 2.4D, 120.0D),
+                new Pose("SIDE", 1.7D, centreY),
+                new Pose("FAR", 2.6D, centreY),
+                new Pose("NEAR_EDGE", 1.12D, baseY + (topY - baseY) * 0.55D)
+        };
+        for (Pose pose : poses) {
+            double x = centreX + radius * pose.factor();
+            double pitch = -Math.toDegrees(Math.atan2(centreY - pose.y(), Math.abs(x - centreX)));
+            StormFixtureVisibility.Verdict verdict = StormFixtureVisibility.evaluate(
+                    10, centreX, centreZ, baseY, topY, radius,
+                    x, pose.y(), centreZ, yaw, pitch, fov, renderDistance);
+            require(verdict.valid(),
+                    "T150 rejected the shipped pose " + pose.name() + ": " + verdict.format());
+        }
+        // ABOVE and BELOW look down and up the column from outside it.
+        StormFixtureVisibility.Verdict above = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                centreX + radius * 0.6D, topY + 200.0D, centreZ, yaw, 60.0D, fov, renderDistance);
+        require(above.valid(), "T150 rejected ABOVE: " + above.format());
+        StormFixtureVisibility.Verdict below = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                centreX, 70.0D, centreZ, yaw, -80.0D, fov, renderDistance);
+        require(below.valid(), "T150 rejected BELOW: " + below.format());
+
+        // 4. Each individual condition must be able to fail on its own.
+        require(!StormFixtureVisibility.evaluate(
+                        0, centreX, centreZ, baseY, topY, radius,
+                        visNearX, 120.0D, centreZ, yaw, visNearPitch, fov, renderDistance).valid(),
+                "T150 accepted a pose with no descriptors");
+        StormFixtureVisibility.Verdict lookingAway = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, baseY, topY, radius,
+                visNearX, 120.0D, centreZ, yaw + 180.0D, 0.0D, fov, renderDistance);
+        require(!lookingAway.valid() && "outside_frustum".equals(lookingAway.reason()),
+                "T150 accepted a camera facing away from the storm: " + lookingAway.format());
+        // Genuinely small in both axes: a 4-block radius over a 10-block span.
+        // A thin but tall column is not a token footprint - its height alone
+        // subtends most of the frame - so the case has to shrink both.
+        StormFixtureVisibility.Verdict tiny = StormFixtureVisibility.evaluate(
+                10, centreX, centreZ, 500.0D, 510.0D, 4.0D,
+                centreX + 1900.0D, 505.0D, centreZ, yaw, 0.0D, fov, renderDistance);
+        require(!tiny.valid() && "projected_footprint_too_small".equals(tiny.reason()),
+                "T150 accepted a storm that occupies a token footprint: " + tiny.format());
+
+        // 5. The authoritative half separates the measured cases by a wide
+        //    margin: the corrupted cells reported exactly zero density calls
+        //    and the thinnest passing pose reported 4.88 per pixel.
+        int pixels = 480 * 270;
+        require(!StormFixtureVisibility.renderedStormConfirmed(0.0D, pixels),
+                "T150 confirmed a render that produced no density samples at all");
+        require(StormFixtureVisibility.renderedStormConfirmed(4.88D * pixels, pixels),
+                "T150 refused FAR, the thinnest pose that actually renders the storm");
+        require(!StormFixtureVisibility.renderedStormConfirmed(1000.0D, 0),
+                "T150 confirmed a render with no marched pixels");
+
+        System.out.println("T150_VISIBILITY_GUARD|playNear=" + playNear.reason()
+                + "|playVisNear=" + visNear.reason()
+                + "|playNearNearestDistance="
+                + String.format(java.util.Locale.ROOT, "%.1f", playNear.nearestDistanceBlocks())
+                + "|playVisNearNearestDistance="
+                + String.format(java.util.Locale.ROOT, "%.1f", visNear.nearestDistanceBlocks()));
+        System.out.println(
+                "PHASE4T_RESULT|T150 storm visibility guard rejects stormless benchmark poses"
                         + "|PASSED|invariant satisfied");
     }
 

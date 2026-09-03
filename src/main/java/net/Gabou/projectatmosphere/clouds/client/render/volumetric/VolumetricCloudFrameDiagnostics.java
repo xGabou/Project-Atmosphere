@@ -134,6 +134,17 @@ public final class VolumetricCloudFrameDiagnostics {
         return result == null ? null : result.format();
     }
 
+    /**
+     * T150: cloud density evaluations from the most recent completed workload
+     * readback, or a negative value when there is none. The visibility guard
+     * uses this as its authoritative "the march really produced cloud" signal.
+     */
+    public static double stormWorkloadCloudDensityCalls() {
+        StormWorkloadRuntimeCapture.WorkloadResult result =
+                StormWorkloadRuntimeCapture.latestResult();
+        return result == null ? -1.0D : result.cloudDensityCalls();
+    }
+
     public static void abortStormWorkloadCapture() {
         StormWorkloadRuntimeCapture.abort("driver_timeout");
     }

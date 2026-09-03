@@ -104,7 +104,7 @@ final class StormT132AutoDriver {
         BOOTSTRAP_RESTORE, BOOTSTRAP_WAIT_RESTORED, WAIT_WORLD, SPAWN_STORM, WAIT_ADOPT, WAIT_MATURE, BEGIN_SUITE, POLL_SUITE,
         BEGIN_TRACE, POLL_TRACE,
         RAYTRACE_FIXTURE,
-        T135_PREPARE, T135_MOVE, T135_SETTLE, T135_SAMPLE, T135_COUNTERS,
+        T135_PREPARE, T135_MOVE, T135_SETTLE, T135_VERIFY, T135_SAMPLE, T135_COUNTERS,
         T135_RESPAWN, T135_REPORT,
         BEGIN_T098, POLL_T098, DONE
     }
@@ -211,7 +211,11 @@ final class StormT132AutoDriver {
      * a quarter scale cannot answer whether an order of magnitude is reachable.
      */
     private static final float[] T138_SCALES = {
-            1.00F, 0.75F, 0.50F, 0.375F, 0.25F, 0.1875F, 0.125F};
+            1.00F, 0.75F, 0.50F, 0.375F, 0.25F, 0.1875F, 0.125F,
+            // 0.1768 is the half-marched-pixel point: it is what a 2-phase
+            // interleave would actually march. T151 used it, with 0.125 as the
+            // 4-phase equivalent, to bound interleaving before building it.
+            0.1768F};
     /**
      * T138 poses. CLEAR is dropped: it has no storm and therefore no marched
      * cloud pixels to scale. PLAY_NEAR leads because it is the representative
@@ -367,6 +371,110 @@ final class StormT132AutoDriver {
             }
         }
         return false;
+    }
+
+    /**
+     * T150 storm-visibility guard. A pose may not produce a single cell until
+     * the storm it claims to measure is proven present: first geometrically,
+     * which is free, then by the march's own counters, which is authoritative.
+     *
+     * <p>The geometric test alone is not enough - the corrupted PLAY_VIS_NEAR
+     * cells were inside the render distance and inside the frustum and still
+     * marched nothing - and the counter test alone is wasteful, because a pose
+     * that is obviously out of range should not cost a readback to reject.
+     */
+    private static int t150Attempts;
+    private static boolean t150CaptureRequested;
+
+    private static void verifyStormVisible(Minecraft minecraft, LocalPlayer player) {
+        String pose = sweepPose();
+        if (pose.startsWith("CLEAR")) {
+            // The control pose expects no storm; verifying one would reject it.
+            t150Attempts = 0;
+            t150CaptureRequested = false;
+            advance(Phase.T135_SAMPLE);
+            return;
+        }
+        StormPerformanceBaseline.SuiteFixture fixture = StormPerformanceBaseline.suiteFixture();
+        if (fixture == null) {
+            failStormVisibility(pose, "fixture_missing");
+            return;
+        }
+        if (!t150CaptureRequested) {
+            StormFixtureVisibility.Verdict verdict = StormFixtureVisibility.evaluate(
+                    StormGeometryBuildCoordinator.lobeCount(),
+                    fixture.centerX(), fixture.centerZ(), fixture.baseY(), fixture.topY(),
+                    fixture.horizontalRadius(),
+                    player.getX(), player.getEyeY(), player.getZ(),
+                    player.getYRot(), player.getXRot(),
+                    minecraft.options.fov().get(),
+                    AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get());
+            if (!verdict.valid()) {
+                ProjectAtmosphere.LOGGER.warn("T150_VISIBILITY_REJECT pose={} {}",
+                        pose, verdict.format());
+                failStormVisibility(pose, verdict.reason());
+                return;
+            }
+            ProjectAtmosphere.LOGGER.info("T150_VISIBILITY_GEOMETRY pose={} {}",
+                    pose, verdict.format());
+            t150CaptureRequested = true;
+            VolumetricCloudFrameDiagnostics.requestStormWorkloadCapture("side");
+            advance(Phase.T135_VERIFY);
+            return;
+        }
+        if (VolumetricCloudFrameDiagnostics.stormWorkloadActive()) {
+            if (stageFrames > COUNTER_TIMEOUT_FRAMES) {
+                VolumetricCloudFrameDiagnostics.abortStormWorkloadCapture();
+                failStormVisibility(pose, "visibility_capture_timeout");
+            }
+            return;
+        }
+        com.mojang.blaze3d.pipeline.RenderTarget cloudTarget =
+                VolumetricCloudRenderTargets.currentCloudTarget();
+        int marchedPixels = cloudTarget == null ? 0 : cloudTarget.width * cloudTarget.height;
+        double densityCalls = VolumetricCloudFrameDiagnostics.stormWorkloadCloudDensityCalls();
+        if (!StormFixtureVisibility.renderedStormConfirmed(densityCalls, marchedPixels)) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T150_VISIBILITY_REJECT pose={} rendered no storm:"
+                            + " cloudDensityCalls={} marchedPixels={}",
+                    pose, fmt(densityCalls), marchedPixels);
+            failStormVisibility(pose, "rendered_no_storm");
+            return;
+        }
+        ProjectAtmosphere.LOGGER.info(
+                "T150_VISIBILITY_CONFIRMED pose={} cloudDensityCalls={} perPixel={}",
+                pose, fmt(densityCalls), fmt(densityCalls / Math.max(1, marchedPixels)));
+        t150Attempts = 0;
+        t150CaptureRequested = false;
+        advance(Phase.T135_SAMPLE);
+    }
+
+    /** Bounded retry: respawn and re-resolve, then abandon the pose. */
+    private static void failStormVisibility(String pose, String reason) {
+        t150CaptureRequested = false;
+        if (++t150Attempts < T138_MAX_ARM_ATTEMPTS) {
+            ProjectAtmosphere.LOGGER.info(
+                    "T150_VISIBILITY retrying {} after {} (attempt {})",
+                    pose, reason, t150Attempts + 1);
+            advance(Phase.T135_RESPAWN);
+            return;
+        }
+        ProjectAtmosphere.LOGGER.warn(
+                "T150_VISIBILITY abandoning pose {}: {} after {} attempts."
+                        + " No cell is recorded for it rather than an empty-sky one.",
+                pose, reason, t150Attempts);
+        t150Attempts = 0;
+        // Skip the whole pose. Its arms are not measurable on this fixture.
+        t141ArmIndex = 0;
+        t141CellPending = false;
+        t138ScaleIndex = 0;
+        t138HistoryArm = false;
+        t135PoseIndex++;
+        if (t135PoseIndex >= sweepPoses().length) {
+            advance(Phase.T135_REPORT);
+        } else {
+            advance(Phase.T135_MOVE);
+        }
     }
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
@@ -732,9 +840,10 @@ final class StormT132AutoDriver {
             }
             case T135_SETTLE -> {
                 if (++t135SettleFrames >= T135_POSE_SETTLE_FRAMES) {
-                    advance(Phase.T135_SAMPLE);
+                    advance(Phase.T135_VERIFY);
                 }
             }
+            case T135_VERIFY -> verifyStormVisible(minecraft, player);
             case T135_SAMPLE -> {
                 if (StormT135PerformanceProfile.active()) {
                     return;

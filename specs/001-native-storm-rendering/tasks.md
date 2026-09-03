@@ -1033,12 +1033,44 @@ not fabricate historical before/after percentages for T119--T123.
   which is not shippable, and halving the render distance is a visibility change T098a forbids
   because FAR must not disappear. Report popping and transition quality alongside GPU savings
   (depends on T148) [FR-010-FR-012, FR-027; SC-006, SC-017]
-- [ ] T150 [PERFORMANCE] Add a storm-visibility guard to `StormT135PerformanceProfile`: after a
+- [X] T150 [PERFORMANCE] Add a storm-visibility guard to `StormT135PerformanceProfile`: after a
   storm pose settles, take a one-frame counter capture and refuse the cell unless
   `cloudDensityCalls > 0`. A pose that silently renders no storm has now corrupted three separate
   measurement runs - T142's `PLAY_NEAR`, the T138 ladder, and two of three T147 runs at
   `PLAY_VIS_NEAR` - and the existing descriptor-count check does not catch it (depends on T147)
   [FR-012-FR-013, FR-027; SC-017]
+  **Banked.** Recorded in `validation/performance-interleaving.md` part 1. Two halves, both
+  required: `StormFixtureVisibility.evaluate` checks descriptors, range against the storm's
+  **cylinder**, frustum cone and projected footprint for free before a cell begins, and
+  `renderedStormConfirmed` requires the march itself to have produced at least 1% of pixels' worth
+  of density evaluations. The fail-first sweep caught a real modelling error: measuring range
+  against the bounding sphere accepted `PLAY_NEAR` at 1920 blocks because the sphere bulges below
+  the cloud base, while the cylinder - the shape the march can hit - is 2010.1 blocks out, exactly
+  reproducing T142's hand-derived figure. Bounded retry respawns and re-resolves up to three
+  attempts, then abandons the whole pose rather than recording an empty-sky cell; CLEAR is exempt.
+  Live: **7 confirmations, 0 false rejections** across every storm pose, with `PLAY_VIS_NEAR` now
+  proven present at 15.89 density calls per pixel.
+- [X] T151 [PERFORMANCE] Interleaved reconstruction - **rejected before implementation**. Recorded
+  in `validation/performance-interleaving.md` part 2. Interleaving's performance ceiling is exactly
+  the cost of marching its reduced pixel count, which is measurable on the shipped ladder without
+  writing any of it. Measured on one fixture with T150 confirming the storm in all seven poses:
+  marching **half** the pixels (340x191) is **1.42x** representative, and marching a **quarter**
+  (240x135) is **1.67x** - both below the >= 1.7x CASE A bar, and both are ceilings that assume the
+  resolve pass, reprojection, disocclusion and history traffic are free and that reconstruction
+  recovers the missing samples perfectly. The cause is the scaling exponent T146 measured and T147
+  confirmed - cost falls as pixels^0.49-0.75, so halving marched pixels returns ~1.4x, not 2x - and
+  interleaving inherits it exactly because marching half the pixels is what it does. This also
+  corrects T147's inferred 2.04x, which came from a single fixture instance; re-measured it is
+  1.74x/1.61x at the representative poses. The 4-phase pattern that comes closest also carries the
+  worst temporal exposure available, on a renderer whose sample lattice was deliberately frozen
+  because moving it made thin silhouette pixels alternate between hit and miss. CASE C.
+- [ ] T152 [PERFORMANCE] Build the moving-camera fixture and silhouette-stability metric. Not built
+  under T151 because that candidate was rejected on its performance ceiling before its quality
+  precondition could matter, but still owed: T098b has to grade temporal artefacts on the shipped
+  Rank 1 ladder, and any future temporal candidate needs this to be rejectable. Deterministic camera
+  path across a severe storm; per-frame silhouette position and width, alpha edge stability, flicker,
+  ghosting, disocclusion, column connectivity and inner sky run over time (depends on T150)
+  [FR-001, FR-010-FR-012; SC-005, SC-007, SC-021]
 - [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This
