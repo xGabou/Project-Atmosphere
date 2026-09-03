@@ -28,7 +28,7 @@ For candidate semantics, rain attachment, and history lifecycle, the T041 correc
 - **[P]**: Can run in parallel after its stated prerequisites because it affects different files and does not depend on another incomplete task in the same group.
 - **[Story]**: Maps the task to a user story from `spec.md`.
 - Requirement IDs in descriptions provide direct specification traceability.
-- Existing task IDs remain stable for audit history. Phase 4R uses T074-T099, Phase 4S uses T100-T118, Phase 4P uses T119-T123, and the renderer-wide correction gate uses T127-T134. Phases are placed by dependency order, not by numeric sorting.
+- Existing task IDs remain stable for audit history. Phase 4R uses T074-T099, Phase 4S uses T100-T118, Phase 4P uses T119-T123, the renderer-wide correction gate uses T127-T134, and the active performance redesign uses T135-T160. Phases are placed by dependency order, not by numeric sorting.
 - Completed Phase 4R implementation tasks are **not** retroactively unchecked. Where the Phase 4S architecture invalidates what a completed task built, that task is listed as superseded and a new Phase 4S task ID owns the replacement. Only validation gates whose acceptance criteria are invalidated are reopened.
 
 ## Phase 1: Setup and Baseline
@@ -389,12 +389,16 @@ See `validation/t098-manual-checklist.md`.
   [FR-001-FR-005, FR-021-FR-022, FR-028-FR-031; SC-001, SC-011, SC-018-SC-020]
 - [ ] T098b [VISUAL POLISH] **Final Visual Polish.** At the final shipping marcher,
   reconstruction, lighting, resolution, and quality-mode configurations, replace the remaining
-  US1 capture evidence and grade all FR-023/FR-024 appearance criteria. Own ANVIL
-  billowing/readability and its self-shadow response, the approximately four-pixel
-  reconstruction/upscale beat, and the authoritative SIDE/FAR/ABOVE/BELOW regrade for Ultra plus
-  representative lower shipped modes in
-  `specs/001-native-storm-rendering/validation/t098b-final-visual-polish.md`. This gate does not block performance design or T099
-  (depends on T098a, T139, T052) [FR-023-FR-024; SC-001-SC-002, SC-011]
+  US1 capture evidence and grade all FR-023/FR-024 appearance criteria. Own the current excessive
+  Ultra softness/fogginess and silhouette quantisation, cumulonimbus macro morphology and ANVIL
+  shape, ANVIL billowing/readability and self-shadow response, reconstruction/upscale artifacts,
+  inside-cloud appearance, temporal behavior, and the authoritative SIDE/FAR/ABOVE/BELOW regrade
+  for Ultra plus representative lower shipped modes in
+  `specs/001-native-storm-rendering/validation/t098b-final-visual-polish.md`. This gate does not
+  block performance design or T099. It runs after T152 and T160 plus the terminal Phase 4Q outcome:
+  T159 when the visible-volume architecture reaches resolution recovery, or the recorded stop task
+  if T153/T154/T155/T156/T157 rejects the architecture (also depends on T098a, T139, T052)
+  [FR-006, FR-023-FR-024, FR-031-FR-032; SC-001-SC-002, SC-011, SC-022]
 - [ ] T099 [FUNCTIONAL] **[REOPENED 2026-08-19 - revised criteria]** Replace
   `specs/001-native-storm-rendering/validation/us2-rain-whiteout-stability.md` evidence with new
   dry/local-rain/remote-rain/boundary stationary and moving captures proving rain remains attached
@@ -728,12 +732,12 @@ production shader change. Severe-scale storm raymarch measures 136-261 ms at `64
 `governorScale=0.50000` / `resolutionScale=0.75000`; SC-006's 16.7 ms Ultra contract is owned by
 T070, not T133. See `validation/renderer-wide-architecture-audit.md`.
 
-- [X] T133 [US1] **[ACCEPTED 2026-08-27]** Revalidate physical scale, one-medium continuity, T124-T126 macro morphology, CPU/GPU noise parity, final-density rain/whiteout, retained Phase 4R invariants, production shader compilation, and T130-T132 performance evidence together. Record the result in `specs/001-native-storm-rendering/validation/renderer-wide-architecture-audit.md`; only a passing result allows T098 to resume (depends on T127-T132, T134) [FR-028-FR-031; SC-018-SC-020]
+- [X] T133 [US1] **[ACCEPTED 2026-08-27]** Revalidate physical scale, one-medium continuity, T124-T126 macro morphology, CPU/GPU noise parity, final-density rain/whiteout, retained Phase 4R invariants, production shader compilation, and T130-T132 performance evidence together. Record the result in `specs/001-native-storm-rendering/validation/renderer-wide-architecture-audit.md`; only a passing result allows the then-monolithic visual acceptance gate to resume (depends on T127-T132, T134) [FR-028-FR-031; SC-018-SC-020]
 
-**Checkpoint**: A severe storm has an explicit physical-system target **and an accepted
+**Historical checkpoint, superseded by the accepted T132/T133/T098a state**: A severe storm has an explicit physical-system target **and an accepted
 implementation of it (T134)**, the lower/upper material split has an attributed cause, and
-performance work has evidence of visual neutrality before T098 resumes. T132 is the only remaining
-prerequisite for T133; T133 is the only remaining prerequisite for T098.
+performance work has evidence of visual neutrality before visual acceptance resumes. At that
+checkpoint T132 was the remaining prerequisite for T133; both have since been accepted.
 
 ---
 
@@ -796,18 +800,27 @@ unchanged from the Phase 4S baseline.
 
 ---
 
-## Phase 4Q: Active Performance Redesign
+## Phase 4Q: Adaptive Visible-Volume / Occupancy Traversal
 
 **Classification**: PERFORMANCE
-**Purpose**: Close the measured severe-storm performance risk in parallel with T098b. The current
-136--261 ms cloud-pass measurements at a reduced `641x360`, `governorScale=0.50000`, and
-`resolutionScale=0.75000` are a profiling alarm, not an SC-006 result. They show that the existing
-bounded optimizations do not approach the release target.
+**Purpose**: Close the measured severe-storm performance risk in parallel with T098b by eliminating
+large empty or optically irrelevant ray spans coherently. After T149, PLAY_VIS_NEAR is 103.9 ms at
+the shipped 0.25 Ultra scale against an 8 ms cloud budget (13.0x), while NEAR_EDGE is 198.4 ms
+(24.8x). SC-006 remains unrescoped.
 
-**Independent Test**: A same-fixture, per-mode profile reports cloud GPU cost separately from
-total-frame cost and attributes the major contributors before any major implementation increment.
-Image-changing performance work is permitted only with an explicit T098b regrade obligation; do
-not fabricate historical before/after percentages for T119--T123.
+**Architectural finding**: Approximately 83--100% of primary march steps at representative poses
+resolve empty while still paying storm/safe-advance/descriptor work. T141, T151, and T149 show that
+selectively reducing individual samples or lanes often fails to return proportional GPU time.
+Prefer warp-coherent elimination of large neighboring spans. Do not reopen descriptor
+micro-optimization, T143/T144, interleaving, or graded lighting/detail LOD without new evidence.
+Do not lower Ultra below 0.25 as the primary solution; the objective is cheaper traversal, higher
+internal resolution, and full volumetric interiors.
+
+**Independent Test**: First establish a production-density oracle ceiling over all seven canonical
+poses. Only a >=2x combined oracle unlocks production prototypes. Every prototype must preserve
+T098a, allow occupied -> empty -> occupied re-entry, retain real camera-inside structure, and pass
+T152 before production adoption. Image-changing work carries an explicit T098b regrade obligation;
+do not fabricate historical before/after percentages for T119--T123.
 
 - [X] T135 [PERFORMANCE] Establish and record the five-mode performance budget contract in
   `validation/performance-budget.md`: Low, Low 24, Medium, High, and Ultra must each have a cloud
@@ -857,11 +870,12 @@ not fabricate historical before/after percentages for T119--T123.
   fundamentally unable to add resolution back (no screen-space jitter, no
   accumulation). One candidate reconstruction change was implemented, measured
   inert (<=0.0033% of pixels) and rejected.
-- [ ] T139 [PERFORMANCE] Integrate the T135/T137 evidence into five-mode quality policy: map
+- [ ] T139 [PERFORMANCE] Integrate the T135 budget plus the terminal Phase 4Q evidence into five-mode quality policy: map
   budgets, LOD, raymarch, lighting, resolution, governor floors/ceilings, and history transitions
   to Low/Low 24/Medium/High/Ultra without disconnecting complete groups. Record the policy and
   transition rationale in `validation/us3-quality-lod.md` (depends on T045, T137) [FR-001,
-  FR-009-FR-012; SC-005-SC-007, SC-021]
+  FR-009-FR-012; SC-005-SC-007, SC-021]. The final policy cannot bank until T158/T159 when the
+  architecture reaches those stages, or the recorded T153--T157 stop decision if it does not
 - [X] T141 [PERFORMANCE] Measure the per-pixel descriptor **evaluation** cost with a controlled
   arm before implementing anything against it, and record it in
   `validation/performance-descriptor-evaluation.md`. T138 measured 397 descriptor SDF evaluations
@@ -1021,13 +1035,17 @@ not fabricate historical before/after percentages for T119--T123.
   the larger ceiling, moves quality the right way, attacks the artefact the T098b reconnaissance
   found now leads the list (silhouette quantisation has displaced ANVIL flatness), and leaves B
   fully available behind it.
-- [ ] T148 [PERFORMANCE] Implement interleaved reconstruction: march 240x135 through a 2x2 phase
+- [X] T148 [PERFORMANCE] Implement interleaved reconstruction: march 240x135 through a 2x2 phase
   pattern and resolve into a 480x270 target with reprojection and disocclusion fallback, then A/B it
   against the shipped ladder on one fixture with T098a as a hard gate. **The first milestone must be
   a moving-camera fixture and a silhouette-stability metric, before any interleaving code**, because
   static poses cannot see the hit/miss flicker that made the current shader freeze its sample
   lattice - `searchBlue` is a static screen-space phase for exactly that reason, and interleaving
   requires moving it (depends on T147) [FR-001, FR-010-FR-012, FR-027; SC-006, SC-017, SC-021]
+  **Closed without implementation by T151's measured ceiling.** The 2-phase and 4-phase
+  representative ceilings are approximately 1.42x and 1.67x before resolve, reprojection,
+  disocclusion, or history overhead, both below the >=1.7x acceptance bar. Production remains
+  unchanged; do not reopen interleaving without new evidence that invalidates that ceiling.
 - [X] T149 [PERFORMANCE] Graded distance/LOD over the measured 16-25% lighting and 9-41% detail
   shares. Cheapen at distance rather than delete: T147's ceiling comes from removing both outright,
   which is not shippable, and halving the render distance is a visibility change T098a forbids
@@ -1055,16 +1073,6 @@ not fabricate historical before/after percentages for T119--T123.
   T147's 23.2% on a different storm, so that figure was not a stable representative number, and
   BELOW has **no** lighting cost at all because the in-cloud path replaces the cone with one
   forward probe.
-- [ ] T153 [PERFORMANCE] Measure, then build if the ceiling supports it, a coarse empty-space
-  acceleration structure, recording it in `validation/performance-empty-space.md`. At the
-  representative poses **83-100% of march steps resolve as empty space**, and each still pays the
-  conservative safe-advance descriptor query before the weather skip can reject it. A low-resolution
-  occupancy volume or distance field published alongside the descriptors would let an empty span be
-  crossed in one step instead of marched. It is the right shape of change under the rule T149
-  established - rays in a warp are spatially coherent, so neighbouring pixels traverse the same
-  empty regions and skip them together, which is a **uniform** reduction rather than the per-sample
-  masking that has now failed three times. Measure the ceiling first with an oracle arm that skips
-  all empty-space steps outright (depends on T149) [FR-012-FR-013, FR-027; SC-006, SC-017]
 - [X] T150 [PERFORMANCE] Add a storm-visibility guard to `StormT135PerformanceProfile`: after a
   storm pose settles, take a one-frame counter capture and refuse the cell unless
   `cloudDensityCalls > 0`. A pose that silently renders no storm has now corrupted three separate
@@ -1096,18 +1104,126 @@ not fabricate historical before/after percentages for T119--T123.
   1.74x/1.61x at the representative poses. The 4-phase pattern that comes closest also carries the
   worst temporal exposure available, on a renderer whose sample lattice was deliberately frozen
   because moving it made thin silhouette pixels alternate between hit and miss. CASE C.
-- [ ] T152 [PERFORMANCE] Build the moving-camera fixture and silhouette-stability metric. Not built
+- [ ] T152 [P] [PERFORMANCE] Build the moving-camera fixture and silhouette-stability metric. Not built
   under T151 because that candidate was rejected on its performance ceiling before its quality
-  precondition could matter, but still owed: T098b has to grade temporal artefacts on the shipped
-  Rank 1 ladder, and any future temporal candidate needs this to be rejectable. Deterministic camera
-  path across a severe storm; per-frame silhouette position and width, alpha edge stability, flicker,
-  ghosting, disocclusion, column connectivity and inner sky run over time (depends on T150)
-  [FR-001, FR-010-FR-012; SC-005, SC-007, SC-021]
-- [ ] T140 [PERFORMANCE] Reprofile all five modes after T138/T139 using T135's written targets in
+  precondition could matter, but now required before visible-volume traversal can be considered
+  production-ready. Drive one deterministic route from outside -> approach -> cloud entry ->
+  interior movement -> holes/openings -> exit and record per-frame silhouette position/width,
+  alpha-edge stability, flicker, ghosting, disocclusion, column connectivity, inner-sky run, and
+  occupied/empty/re-entry continuity in `validation/performance-moving-camera.md`. This may run in
+  parallel with T153/T154 but must pass before T156/T157 can bank (depends on T150)
+  [FR-001, FR-009-FR-012, FR-032; SC-004-SC-007, SC-021-SC-022]
+- [X] T153 [PERFORMANCE] **Oracle empty-space / visible-volume ceiling.** Add diagnostic-only oracle
+  arms that use real production `cloudDensity` as free ground truth; exclude interval-discovery and
+  ground-truth construction cost from the timed oracle traversal, and do not treat the arms as
+  production algorithms. For representative rays classify exact intervals containing nonzero
+  density, visibly contributing density, transparent openings, later cloud re-entry, and dense
+  optically irrelevant interior. Compare production against (A) perfect empty-space skip, (B)
+  perfect occupied intervals, (C) perfect optical relevance beyond the current transmittance-floor
+  exit, and (D) the combined
+  oracle at PLAY_VIS_NEAR, PLAY_VIS_MID, SIDE, FAR, ABOVE, BELOW, and NEAR_EDGE. Record GPU p50/p95,
+  steps/pixel, expensive density/descriptor/light/detail evaluations, empty steps and distance
+  removed, and work after alpha 50/90/95/98% in
+  `validation/performance-visible-volume-oracle.md`. Stop below approximately 2x combined; >=2x
+  unlocks T154, >=3x is strong, and >=4x is very strong and may fund Ultra resolution recovery
+  (depends on T149, T150) [FR-012-FR-013, FR-027, FR-030, FR-032; SC-006, SC-017, SC-021-SC-022]
+  **STOP at 1.63x; T154 does not unlock.** Recorded in
+  `validation/performance-visible-volume-oracle.md`. The combined oracle returns **1.633x**
+  over the six valid poses and **1.570x** at the two representative gameplay poses, against
+  a >=2x gate. Only FAR clears it, at 2.266x, and FAR is the cheapest pose containing a
+  storm; the expensive poses return least - NEAR_EDGE 1.781x at 190.3 ms, SIDE 1.523x,
+  ABOVE 1.088x. Every figure is a ceiling: the ground-truth pass runs the real production
+  `cloudDensity` and is excluded from the GPU query, so a shippable design must pay what
+  this harness is given free. Two further findings stand on their own. **The empty space is
+  behind the storm, not inside it**: holes are 0.6-13.1 blocks per pixel, 0.05-1.2% of
+  skippable distance, while 66-96% is post-cloud ray tail - which independently falsifies
+  the premise of T155. **Step count is not the cost**: arm B removes up to 97% of march
+  iterations and returns no more than arm A, which removes none, because both cut texture
+  fetches ~4.6x and that is what buys the time. This is the fourth confirmation after T141,
+  T151 and T149. Arm C is closed outright at 0.958-1.057x: a perfect optical-relevance
+  oracle removes only 2.5-5.2% of density evaluations because production's
+  `transmittance < 0.015` exit already takes them. BELOW's three traversal arms are excluded
+  as a harness defect - they execute 8x more density calls than production while removing
+  zero empty steps, defeating rather than subsetting the camera-inside-cloud early-out.
+- [X] T154 [PERFORMANCE] **Single production blob feasibility.** Only if T153 reaches >=2x, build
+  the smallest practical oracle approximation for one real production lobe using its real
+  descriptor, `StormLobeEvaluator`, production `cloudDensity`, noise/remap/erosion, extinction,
+  lighting, and raymarch; toy sphere density is prohibited. Measure outside-blob, near-blob, and
+  inside-blob fixtures while comparing a low-resolution 3D occupancy/coarse-density volume,
+  distance field, macrocell grid, hierarchy, or another measured representation for conservative
+  safety, update/upload cost, memory, skipped distance, and warp coherence. Select no representation
+  that merely repeats T143's nearly full-ray bound. Record the decision and prototype evidence in
+  `validation/performance-visible-volume-single-blob.md` (depends on T153 gate)
+  [FR-006, FR-012-FR-013, FR-021-FR-022, FR-027, FR-030, FR-032; SC-006, SC-017, SC-021-SC-022]
+  **Closed without implementation: the T153 gate was not met.** The combined oracle ceiling
+  is 1.633x against the >=2x this task is explicitly conditioned on. No representation was
+  prototyped and production is unchanged.
+- [X] T155 [PERFORMANCE] **Multi-lobe holes and re-entry.** Extend the selected T154 prototype to
+  multiple real production lobes and prove conservative occupied -> empty -> occupied traversal for
+  camera -> cloud -> opening -> deeper cloud rays. When remaining transmittance is meaningful, the
+  deeper interval must render; no hollow shell, first-hit opacity, fixed shell thickness, or skipped
+  role handoff is allowed. Measure coherent skip span, false negatives, GPU gain, T098a connectivity,
+  and image difference in `validation/performance-visible-volume-reentry.md` (depends on T154)
+  [FR-001-FR-006, FR-021-FR-027, FR-030, FR-032; SC-001-SC-002, SC-011-SC-017, SC-022]
+  **Closed without implementation, and independently falsified.** T154 never unlocked, and
+  T153 measured this task's own subject directly: transparent openings between lobes are
+  0.6-13.1 blocks per pixel, 0.05-1.2% of the skippable distance, against 66-96% lying in
+  the post-cloud ray tail. The conservative occupied -> empty -> occupied machinery specified
+  here would guard about one part in two hundred of the available saving.
+- [X] T156 [PERFORMANCE] **Inside-cloud validation.** Exercise outside, near, entry, fully inside,
+  thin-region, hole/opening, deeper re-entry, and exit cases using the T152 route. Verify the full
+  production density field still presents nearby dense cloud, thin regions, actual internal
+  structure, openings, and deeper cloud, with camera density/whiteout, rain, depth, and history
+  aligned. Reject any `insideCloud -> generic fog` or first-surface substitution. Record static and
+  moving evidence in `validation/performance-visible-volume-inside-cloud.md` (depends on T152, T155)
+  [FR-006-FR-009, FR-021-FR-022, FR-030, FR-032; SC-001-SC-004, SC-022]
+  **Closed without implementation: no surviving T155 prototype to validate.** Note that
+  T153's own BELOW arms failed precisely by defeating the camera-inside-cloud early-out
+  rather than subsetting it, which is the failure mode this task existed to catch.
+- [X] T157 [PERFORMANCE] **Severe cumulonimbus integration and bank/reject gate.** Integrate the
+  surviving representation on one descriptor-owned ten-member post-T134 severe storm and validate
+  PLAY_VIS_NEAR, PLAY_VIS_MID, SIDE, FAR, ABOVE, BELOW, and NEAR_EDGE. Require coherent large-span
+  skipping, bounded build/update/upload work, stable topology/ownership, T098a green, rain/whiteout
+  and depth correctness, and T152 temporal stability. Bank only if the practical production design
+  retains a material multi-X gain without shells, lost re-entry, or catastrophic visual regression;
+  otherwise reject it and record the terminal reason in
+  `validation/performance-visible-volume-severe.md` (depends on T156)
+  [FR-001-FR-009, FR-012-FR-019, FR-021-FR-032; SC-001-SC-010, SC-017, SC-021-SC-022]
+  **Closed without implementation: nothing reached this gate to bank or reject.** The
+  terminal reason is recorded in `validation/performance-visible-volume-oracle.md` section 7
+  rather than in this task's own file, which was never created.
+- [X] T158 [PERFORMANCE] **Post-architecture production remeasurement.** If T157 banks, rebuild the
+  same-fixture production cost distribution at all seven canonical poses: cloud GPU p50/p95,
+  steps/pixel, density/descriptor/fetch/light/detail work, empty distance skipped, optical-depth
+  work distribution, reconstruction/history, build/upload/cache cost, representative and stress
+  speedups, remaining 8 ms gaps, and the new dominant bottleneck. Do not reuse T147/T149 shares.
+  Record the result in `validation/performance-post-visible-volume.md` (depends on banked T157)
+  [FR-012-FR-013, FR-027, FR-030; SC-006, SC-017, SC-021-SC-022]
+  **Closed without implementation: T157 did not bank.** The production cost distribution
+  therefore stands unchanged at the T147/T149 shares, and T140 reprofiles against those.
+- [X] T159 [PERFORMANCE] **Ultra resolution recovery.** If T158 shows multi-X headroom, compare the
+  banked renderer at 0.25/480x270, 0.375/720x405, and 0.50/960x540 at 1920x1080 across the seven
+  poses and T152 route. Report GPU p50/p95, silhouette quantisation, softness/fogginess, interior
+  detail, reconstruction artifacts, temporal behavior, and T098a. Select a sharper candidate only
+  within measured performance headroom; do not lower Ultra below 0.25 as the primary solution.
+  Record the shipping input for T139/T098b in `validation/performance-ultra-resolution-recovery.md`
+  (depends on T158) [FR-001, FR-006, FR-010-FR-012, FR-030-FR-032; SC-001, SC-005-SC-007, SC-021-SC-022]
+  **Closed without implementation: no multi-X headroom was found to fund it.** Ultra stays at
+  the Rank 1 ladder's 0.250 internal scale; T139 receives no resolution-recovery input and
+  T098b regrades the shipped ladder as it stands.
+- [ ] T160 [P] [VISUAL POLISH] Run the bounded upper-cloud root-cause experiment independently of
+  T153: in diagnostic-only arms temporarily relax upper TOWER/ANVIL height and horizontal-width
+  extents, never ship those values, and classify whether (A) the existing shape broadens naturally
+  into an anvil, (B) it becomes a larger dome, (C) density/remap/erosion collapses the intended
+  width, or (D) final density is broad but rendering/reconstruction hides it. Record ABOVE plus
+  SIDE/FAR evidence in `validation/t098b-upper-anvil-envelope.md` for later T098b use
+  (depends on T098a) [FR-003, FR-006, FR-023-FR-024; SC-001-SC-002, SC-011-SC-016]
+- [ ] T140 [PERFORMANCE] Reprofile all five modes after T139 and the terminal Phase 4Q outcome using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This
   task does not waive final shipped visual regrading in T098b
-  (depends on T052, T138, T139) [FR-010-FR-012, FR-027, FR-030; SC-005-SC-007, SC-017, SC-021]
+  (depends on T052, T139, and T159 if resolution recovery proceeds, otherwise the recorded
+  T153--T157 stop task) [FR-010-FR-012, FR-027, FR-030; SC-005-SC-007, SC-017, SC-021]
 
 **Checkpoint**: Performance work has a measured budget and ranked architecture before further
 implementation, while visual polish remains independently active.
@@ -1274,10 +1390,16 @@ Phase 1 Setup
                         -> Phase 4A Renderer-wide Correction Gate (T127-T131)
                                                    \
                                                     -> T133 -> T098a Structural Gate -> T099
-                                                                 \-> T098b Final Visual Gate (after T052/T139)
-                            -> US3 Scalable Quality Modes
-                                -> US4 Diagnostics
-                                    -> Phase 7 Compatibility and Release Validation
+                                                               |       \
+                                                               |        -> US3/US4/compatible release work
+                                                               -> Phase 4Q T135-T153 oracle
+                                                                    -> T154 single production blob
+                                                                    -> T155 holes/re-entry
+                                                                    -> T152 + T156 inside-cloud
+                                                                    -> T157 full severe storm
+                                                                    -> T158 remeasure -> T159 Ultra recovery
+                                                                                         \
+                                                                                          -> T098b -> release gates
 ```
 
 - Phase 1 has no implementation dependency and establishes the baseline/harness.
@@ -1288,6 +1410,10 @@ Phase 1 Setup
 - Phase 4S depends on Phase 4R and owns the corrected density architecture. T100 must precede every Phase 4S regression so no threshold is set without a derivation, and T107 must record meaningful fail-first results before any Phase 4S production change. T124-T126 are complete history; their morphology thresholds remain retained inputs to T133.
 - Phase 4A depends on the completed Phase 4S gate. T127-T129 derive scale and attribute the first material discontinuity. T131 may change only the measured responsible stage. T130 and neutral Phase 4P work can proceed in parallel with that diagnosis, but T132 must prove equivalence before convergence at T133.
 - Phase 4P is **not** blocked by T098a/T098b/T099. T119, T121, T122, and T123 are accepted after T130's baseline under their controlled equivalence/runtime-counter evidence. Phase 4P tasks are separate commits from visual-correctness work and may not alter the rendered result.
+- Phase 4Q is the post-T149 adaptive visible-volume/occupancy track. T153 is a diagnostic oracle and
+  gates every production prototype. T152 and T160 may run in parallel; T152 converges before T156
+  and T157, while T160 feeds T098b only. A failed oracle or prototype records a terminal stop rather
+  than forcing the remaining architecture tasks.
 - T098a, T098b, and T099 use the revised criteria: T098a depends on T133, T099 remains blocked by T098a, and T098b is the later final-shipping visual gate.
 - US3 quality-mode plumbing depends on T098a and the written T135 budget contract, not on T099 or
   T098b. T052 validates the policy and transitions; T098b later performs authoritative shipped
@@ -1305,6 +1431,7 @@ Phase 1 Setup
 | Phase 4S | Phase 4R | T118 records corrected density-architecture evidence; T124-T126 retain macro/role evidence |
 | Phase 4A | Completed Phase 4S | T133 records scale, material continuity, morphology, final-density, and performance convergence |
 | Phase 4P | T130 reference baseline | T132 proves bounded cost work preserves the frozen rendered result and trace |
+| Phase 4Q | T098a + T149/T150 evidence | T153 proves >=2x oracle value before prototypes; T157 banks/rejects the full-storm design; T152/SC-022 prove motion, holes, re-entry, and inside-cloud safety |
 | US3 (P3) | T098a + T135 for plumbing; T050 also needs US2 history work | T052 proves all modes, LOD, and adaptive stability; T098b grades the shipped visual result |
 | US4 (P4) | US1 plus completed US2/US3 state providers | T060 answers the diagnostic contract from one session |
 
@@ -1318,7 +1445,12 @@ Phase 1 Setup
 - **Density architecture (Phase 4S)**: T100 -> T101-T106 -> T107 -> T108-T111 -> T112-T114 -> T115-T117 -> T118 -> T124-T126.
 - **Renderer-wide correction (Phase 4A)**: T127 -> T128 -> T129 -> T131; T130 -> T119/T121/T122/T123 -> T132; T131 + T132 -> T133 -> T098a -> T099. T098b is a later shipping visual gate.
 - **Performance architecture (Phase 4P)**: T130 -> T119 -> T121/T122 -> T123 -> T132; T121 is skipped rather than approximated if equivalent evidence is unavailable.
-- **Quality/LOD**: T098a + T135 -> T042-T043 -> T044-T051; T045 + T137 -> T139 -> T052 -> T070-T071.
+- **Adaptive visible-volume traversal (Phase 4Q)**: T149 + T150 -> T153 -> T154 -> T155;
+  T150 -> T152 in parallel; T152 + T155 -> T156 -> T157 -> T158 -> T159. T160 runs in parallel
+  after T098a and feeds T098b. T153/T154/T155/T156/T157 may terminate the architecture with a
+  recorded rejection instead of opening their successors.
+- **Quality/LOD**: T098a + T135 -> T042-T043 -> T044-T051 in parallel with Phase 4Q; T139 banks
+  only after the terminal Phase 4Q result, then T052 -> T140 -> T070-T071.
 - **Diagnostics**: T053 -> T054-T059 -> T060.
 - **Compatibility/fallback**: T061-T065 -> T066 -> T067-T069.
 - **Release**: T067-T070 -> T071 -> T072-T073.
@@ -1370,6 +1502,22 @@ T122 may follow T119; T121 may run only if its equivalent lighting-support proof
 T123 and T132 converge their measured work with T131 at T133. T098a cannot run before that
 convergence.
 
+### Phase 4Q
+
+After T149/T150 and accepted T098a:
+
+```text
+T153 oracle ceiling -> T154 single-blob feasibility -> T155 multi-lobe re-entry
+T152 moving-camera route -----------------------------------------------------> T156 inside-cloud
+T160 upper-anvil diagnostic -------------------------------------------------> T098b
+```
+
+T153 is the first critical-path task. T152 and T160 own separate diagnostic/test files and may run
+alongside it. T156 requires both the selected T155 prototype and T152. The full-storm T157 gate,
+remeasurement T158, and Ultra recovery T159 are sequential because each consumes the preceding
+measured decision. T042-T051 quality-mode plumbing, T099, US4 consolidation, and compatible release
+work remain parallel; only final T139/T052/T098b/T140 evidence waits for the shipping architecture.
+
 ### User Story 3
 
 After T098a and T135 for quality-mode plumbing, and then after T042-T043:
@@ -1392,11 +1540,11 @@ Converge at frame diagnostics, shader views, and command registration.
 
 ### Cross-Story
 
-Phase 4R may use only the parallelism explicitly marked in T079; its tests complete and fail meaningfully before production fixes. Phase 4S follows the same fail-first discipline through T107. Phase 4A requires fail-first material attribution before correction. Phase 4P runs after T130's frozen baseline, in separate commits, and may not alter the rendered result. The active T135-T140 performance redesign can run in parallel with T098b, with visual regrade explicitly returned to T098b when an increment changes images. US3 quality-mode plumbing is gated by T098a and T135, not T099. Begin US4's standalone diagnostic data model only after the corrected workload/counter meanings and the test contract in T053 are stable.
+Phase 4R may use only the parallelism explicitly marked in T079; its tests complete and fail meaningfully before production fixes. Phase 4S follows the same fail-first discipline through T107. Phase 4A requires fail-first material attribution before correction. Phase 4P runs after T130's frozen baseline, in separate commits, and may not alter the rendered result. Phase 4Q runs from T149/T150 evidence in parallel with T099, US3 plumbing, US4 consolidation, compatible release work, and T160 visual diagnosis; every image change is returned to T098b. US3 quality-mode plumbing is gated by T098a and T135, not T099. Begin US4's standalone diagnostic data model only after the corrected workload/counter meanings and the test contract in T053 are stable.
 
 ---
 
-## 2026-09-01 authoritative dependency and classification update
+## 2026-09-03 authoritative post-T149 dependency and classification update
 
 This section supersedes conflicting dependency prose anywhere else in this document. It preserves checked historical work
 and its evidence; it does not erase old acceptance/retraction records.
@@ -1405,9 +1553,9 @@ and its evidence; it does not erase old acceptance/retraction records.
 
 | Classification | Work currently in that class |
 |---|---|
-| **BLOCKING CORRECTNESS** | T098a, T099, retained production correctness regressions |
-| **PERFORMANCE** | T135-T140, T042-T051, T071, final T070 acceptance |
-| **VISUAL POLISH** | T098b, final shipped visual matrix T069 |
+| **BLOCKING CORRECTNESS** | T099 and retained production correctness regressions; T098a is accepted |
+| **PERFORMANCE** | T139-T159, T042-T051, T071, final T070 acceptance; T135-T151 are retained measured/banked/rejected history |
+| **VISUAL POLISH** | T098b, T160 upper-anvil side experiment, final shipped visual matrix T069 |
 | **FUNCTIONAL** | T061, T063, T064 and compatibility/fallback behavior |
 | **VALIDATION / RELEASE** | T052, T053, T059-T060, T062, T065-T070, T072-T073 |
 
@@ -1415,28 +1563,33 @@ and its evidence; it does not erase old acceptance/retraction records.
 
 ```text
 Structural/rain path:       T133 -> T098a -> T099
-Performance path:           T133 -> T135 -> T136 -> T137; T098a + T137 -> T138 -> T140 -> T070 -> T071 -> T072
-Quality-policy path:        T098a + T135 -> T042 -> T045..T051 -> T139 -> T052
-Visual-polish path:         T098a + T139 + T052 -> T098b -> T069
+Performance path:           T149 + T150 -> T153 oracle -> T154 single blob -> T155 holes/re-entry
+                              T152 (parallel) + T155 -> T156 inside-cloud -> T157 full storm
+                                             -> T158 remeasure -> T159 Ultra recovery
+                                             -> T139/T052 -> T098b || T140
+                                             -> T069 + T140 -> T070 -> T071 -> T072
+Quality-policy path:        T098a + T135 -> T042 -> T045..T051 || Phase 4Q; terminal Phase 4Q -> T139 -> T052
+Visual-polish path:         T160 || Phase 4Q; T152 + T159/terminal stop + T139 + T052 + T160 -> T098b -> T069
 Compatibility/server path:  T061 -> T062 -> T063/T064 -> T065 -> T066
                               T062 -> T068
 Release convergence:        T052 + T060 + T066 + T068 + T098b -> T069 -> T070..T073
 ```
 
-T098a is intentionally still open on this checkout: the evidence branch proves the criteria, but
-the commits are not ancestors of `Forge-1.20.1` and must be integrated/revalidated first. T098b is
-not a predecessor of T099, T135-T140, T042-T051, T061-T068, or any other unrelated release work.
+T098a is accepted and remains a hard regression gate for Phase 4Q. T098b is not a predecessor of
+T099, T042-T051, T053-T068, T152-T158, T160, or other unrelated release work. It becomes
+authoritative only after the shipping traversal/resolution/quality configuration stabilizes.
 
 ### Immediate parallel execution
 
 ```text
-T098a integration verification       || T135 budgets          || T061 ownership assertions
-                                     || T064 direct fallback  || T059 diagnostics consolidation
+T153 oracle ceiling                  || T152 moving-camera route || T160 upper-anvil diagnostic
+T099 rain/whiteout                   || T042-T051 quality plumbing
+T053-T060 diagnostic consolidation  || T061-T068 compatible release work
 ```
 
-After the T135/T136 decision, T042/T045 quality plumbing and T137 performance architecture may
-continue alongside T098b's ANVIL self-shadow investigation. Do not begin speculative T138 work
-until T137 identifies the dominant measured contribution.
+T154 begins only if T153 reports a combined oracle ceiling of at least approximately 2x. T155-T159
+then follow their measured gates; a rejection records the terminal architecture result and returns
+the stabilized renderer to T139/T098b rather than spawning speculative microtasks.
 
 ## Implementation Strategy
 
@@ -1460,7 +1613,11 @@ until T137 identifies the dominant measured contribution.
 7. **T133/T098a** revalidate physical size, single-medium continuity, morphology, final-density consumers, and performance before rain validation; **T098b** performs the final shipping visual regrade.
 8. **US3** adds predictable mode scaling, LOD, and adaptive performance policy after T098a and the T135 budget contract; final visual grading returns to T098b.
 9. **US4** exposes bounded evidence for ownership, workload, artifacts, and timing.
-10. **Phase 7** proves Simple Clouds boundaries, legacy fallback, server safety, full regressions, and the post-correction RTX 4070 release gate.
+10. **Phase 4Q** uses T153 to measure the perfect visible-volume ceiling before implementation,
+    approximates it on one production blob, proves holes/re-entry and inside-cloud behavior with
+    T152, integrates a full severe storm, remeasures production, and attempts Ultra resolution
+    recovery only if the measured headroom supports it.
+11. **Phase 7** proves Simple Clouds boundaries, legacy fallback, server safety, full regressions, and the post-correction RTX 4070 release gate.
 
 ## Traceability Summary
 
@@ -1470,9 +1627,10 @@ until T137 identifies the dominant measured contribution.
 | Coverage envelope vs. noise-formed body | T100-T102, T107, T110-T114, T118 |
 | Geometric distance field and world-space unions | T104, T107-T109, T111, T118 |
 | Physical severe-system scale and one-medium continuity | T127-T131, T133, T098a |
-| Positive morphology criteria and derived thresholds | T100, T102-T106, T118, T124-T126, T133, T098a-T098b |
+| Positive morphology criteria and derived thresholds | T100, T102-T106, T118, T124-T126, T133, T098a-T098b, T160 |
 | Interior detail erosion | T101, T103, T113, T118 |
-| Bounded descriptor evaluation cost | T130, T119-T123, T132-T133 |
+| Bounded descriptor evaluation cost | T130, T119-T123, T132-T133; exhausted micro-optimization evidence T141/T143/T144/T149/T151 |
+| Coherent visible-volume traversal and optical relevance | T153-T159, with T152 as the moving/inside-cloud readiness gate |
 | Rain, whiteout, temporal stability | T031-T041, T078-T079, T089, T093-T095, T097, T098a, T099 |
 | Descriptor validity, fallback, async, signatures | T079, T087-T088, T091-T092, T096-T097 |
 | Five modes, adaptive quality, LOD | T098a + T135 -> T042-T052 + T139 |
@@ -1481,7 +1639,7 @@ until T137 identifies the dominant measured contribution.
 | Simple Clouds ownership | T061-T066 |
 | Legacy fallback | T064-T066 |
 | Automated/visual regression | T067-T069, T072, T098b |
-| RTX 4070 performance | T119-T123 -> T135-T140 -> T070-T072 |
+| RTX 4070 performance | T119-T123 -> T135-T151 -> T153-T159 -> T139-T140 -> T070-T072 |
 | Scope and no unrelated redesign | Every implementation task is limited to paths named in `plan.md`; T067-T073 enforce the boundary |
 
 ## Notes
@@ -1492,7 +1650,15 @@ until T137 identifies the dominant measured contribution.
 - Phase 4S thresholds come from `validation/morphology-thresholds.md` and are derived from the shader's configured erosion strength, noise amplitude, octave weights, and octave frequencies. Adjusting a threshold to accommodate an observed result, without a recorded model change, violates FR-026.
 - **Renderer-wide gate**: the prior assumption that another local role-geometry iteration should follow a failed T098 is obsolete. T127-T129 must derive physical size and locate the first material discontinuity before T131 changes the responsible stage.
 - **Ordering rule removed**: the previous rule that no performance work of any kind could begin before T099 no longer applies. Phase 4P runs after T130's frozen visual/trace baseline. Performance changes stay in separate tasks and commits from visual-correctness changes, and no Phase 4P change may alter the rendered result.
-- T042 remains blocked by T099 because quality-mode scaling is judged against the accepted visual result. The roughly 80, 100, 140, and 200+ ms raymarch observations must be baselined at T130 and re-measured at T132/T133.
+- T042 quality-mode plumbing is unblocked by accepted T098a and T135 and may proceed alongside
+  Phase 4Q; only the final T139/T052 policy and T098b grading wait for the terminal shipping
+  traversal/resolution decision.
+- Phase 4Q keeps production `cloudDensity` authoritative, favors warp-coherent span elimination,
+  and requires occupied -> empty -> occupied plus camera-inside validation. It does not permit toy
+  density, generic inside fog, a first-hit shell, or a fixed shell thickness.
+- Rank 2 descriptor micro-optimization, T143 geometric reach, T144 same-point collapse,
+  T148/T151 interleaving, and T149 graded lighting/detail LOD are formally exhausted by measurement.
+  Preserve their evidence and do not reopen them without new evidence.
 - Phase 4S and Phase 4P preserve every already validated behavior: server-authoritative weather, forecast behavior, network packets, saved weather state, Simple Clouds ownership, legacy renderer fallback, rain placement, whiteout behavior, history invalidation semantics, and the candidate texture as a scheduling/index hint rather than authoritative geometry.
 - Do not change packet registration, packet encoding, saved-data schemas, forecast orchestration, Simple Clouds managed systems, or unrelated cloud families.
 - Do not perform Minecraft, RenderSystem, render-target, shader, buffer-upload, or OpenGL access from the async worker.
