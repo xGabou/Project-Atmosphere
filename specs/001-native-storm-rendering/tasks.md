@@ -1042,11 +1042,14 @@ not fabricate historical before/after percentages for T119--T123.
   and still cost **+8.9%**, because a data-dependent tap count stops the compiler unrolling the
   fixed six-iteration light cone. ABOVE is the one pose that wins (-24.2%) because there the
   reduction is both large and spatially coherent, so whole warps drop from six taps to two together.
-  The detail arm was **not built**: the coarsest detail octave has a 22.7-block wavelength and stays
-  above Nyquist at every distance inside the 2000-block render distance at the shipped Ultra, so a
-  footprint-based detail LOD has nothing to remove and the three FBM octaves arrive in one texture
-  fetch anyway. This is the **third independent confirmation** that reducing work for some lanes or
-  samples does not become time on this shader - after T141's tighter descriptor bound (+4.3 to
+  The bounded detail arm was also rejected: it faded low-importance lighting-probe detail toward
+  the neutral mean and omitted the second near-camera lookup only near sub-pixel scale. It removed
+  **45-62%** of counted detail-octave evaluations in the uncontaminated prefix, but PLAY_VIS_NEAR
+  regressed **6.1%**, FAR regressed **4.0%**, ABOVE was unchanged, and its best observed result was
+  only 1.06x. The expanded run then lost its descriptors during BELOW; that cell was rejected and
+  every post-respawn cell is excluded rather than mixed across fixtures. This is the **third
+  independent confirmation** that reducing work for some lanes or samples does not become time on
+  this shader - after T141's tighter descriptor bound (+4.3 to
   +7.6%) and T151's interleaving ceiling - while the two changes that did work, Rank 1 and T145,
   both remove work uniformly. Also re-measured: lighting is 8.4% at PLAY_VIS_NEAR here against
   T147's 23.2% on a different storm, so that figure was not a stable representative number, and

@@ -32,7 +32,7 @@ the two it helps least. **CASE C, and CASE B fails its own condition**: the
 policy does not materially improve the severe worst views, it improves ABOVE,
 which is mid-pack.
 
-All eight poses in this run were confirmed storm-visible by T150's guard, with
+All seven poses in this run were confirmed storm-visible by T150's guard, with
 zero rejections, so none of these cells is an empty-sky artefact.
 
 ---
@@ -81,7 +81,7 @@ not pay.
 
 ## 3. Phases 2, 3, 4 and 6 — what was built
 
-### 3.1 Detail: the principled cutoff cannot fire
+### 3.1 Detail: a bounded proxy was measured and rejected
 
 The intended criterion was "reduce high-frequency detail when projected below
 pixel scale". It was computed before implementing and it rules the arm out.
@@ -104,10 +104,35 @@ beyond ~1250 blocks at the 240x135 modes. The three FBM octaves also arrive in
 a single texture fetch — they are the r, g and b channels of one sample — so
 the finer ones cannot be dropped individually.
 
-**A footprint-based detail LOD therefore has almost nothing to remove**, and
-removing detail earlier would be arbitrary quality loss rather than level of
-detail. The correct treatment of the sub-Nyquist octaves is a mip bias, which
-the fetch already accepts and which costs the same fetch. The arm was not built.
+**A pure footprint-based detail LOD therefore has almost nothing to remove**,
+and the three packed octaves cannot be dropped independently. The diagnostic
+arm nevertheless tested the two bounded opportunities that remain:
+
+- lighting probes continuously fade their detail sample toward the neutral
+  mean when projected footprint, contribution, distance, and ray verticality
+  make that probe low importance;
+- the second near-camera detail lookup fades only when its 8.4-block feature is
+  near or below one target pixel.
+
+The supplemental controlled prefix measured the result before the fixture
+expired. It removed **45-62% of counted detail-octave evaluations**, but again
+failed to convert that work into useful GPU time:
+
+| pose | detail evals removed | cloud p50 change |
+|---|---:|---:|
+| PLAY_VIS_NEAR | 53.7% | **+6.1%** |
+| PLAY_VIS_MID | 52.2% | -3.2% |
+| SIDE | 58.8% | **+0.8%** |
+| FAR | 51.5% | **+4.0%** |
+| ABOVE | 61.5% | **+0.0%** |
+| BELOW | 45.3% | -5.5% |
+
+The fixture then lost its descriptors during the following BELOW lighting
+cell (`descriptors fell 10 -> 0`). The driver rejected that cell and respawned,
+so the remainder of that expanded 70-cell attempt is explicitly excluded; no
+cross-fixture result is used here. The uncontaminated prefix is already enough
+to reject the detail arm: it regresses the representative near view and FAR,
+is neutral at ABOVE, and its best observed result is only 1.06x.
 
 ### 3.2 Lighting: graded by contribution and by distance
 
@@ -183,10 +208,12 @@ must be uniform across the warp to become time.**
 
 ## 5. Phases 8 and 9 — decision
 
-No visual validation was run and no transition behaviour was captured, because
-the candidate is rejected on performance before quality could matter — it makes
-the representative pose slower. The policy's transitions are continuous by
-construction, so nothing about popping is left unresolved by not measuring it.
+No visual acceptance campaign was run and no transition capture was promoted,
+because both candidates are rejected on performance before quality could
+matter — each makes the representative near pose slower. Both policies use
+continuous `smoothstep` weights rather than descriptor/role boundaries, but
+their visual transition quality remains **unbanked**, not assumed. Production
+uses neither arm, so this leaves no shipping transition regression.
 
 | case | verdict |
 |---|---|
@@ -250,6 +277,7 @@ bounds what any occupancy structure could return.
 
 | artefact | path |
 |---|---|
-| T149 sweep, 7 poses x 7 arms, all guard-confirmed | `run/logs/t149-lighting-lod.log` |
-| arms | `T149_LIGHT_CONTRIBUTION`, `T149_LIGHT_DISTANCE`, `T149_LIGHT_GRADED` — diagnostic, default off |
+| T149 lighting sweep, 7 poses x 7 arms, all guard-confirmed | `run/logs/t149-lighting-lod.log` |
+| detail/vertical supplemental prefix; cells after descriptor expiry excluded | `run/logs/t149-detail-lod-supplemental.log` |
+| arms | `T149_DETAIL_GRADED`, `T149_LIGHT_CONTRIBUTION`, `T149_LIGHT_DISTANCE`, `T149_LIGHT_VERTICAL`, `T149_LIGHT_GRADED`, `T149_GRADED` — diagnostic, default off |
 | grading | `lightMarchOpticalDepth` in `cloud_atmosphere_volume.fsh`, driven by `paLodTransmittance` / `paLodDistance01` |
