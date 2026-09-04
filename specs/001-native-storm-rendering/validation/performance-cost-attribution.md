@@ -10,6 +10,7 @@ Status: **COMPLETE** 2026-09-04
 / Feature: 001-native-storm-rendering
 / Starting commit: `bd47124` (T161 banked at `4844cc8`, T140 at `122a566`)
 / Branch: `worktree-t098-production-ray-trace`
+/ Banking commit: `f2b21fc`
 
 T140 established that the remaining cost is inside cloud-relevant rays and
 closed whole-pixel culling. T162 asks the next question: **within a density

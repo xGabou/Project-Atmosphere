@@ -1419,7 +1419,8 @@ implementation, while visual polish remains independently active.
   recommendation in `specs/001-native-storm-rendering/validation/performance-cost-attribution.md`
   (depends on T161, T140; T153's 1.63x is pre-T161 and may not be quoted as current)
   [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-017, SC-021]
-  **ACCEPTED.** Diagnostic only; no ladder value, morphology or FINAL semantic changed.
+  **[ACCEPTED 2026-09-04, commit f2b21fc]** Diagnostic only; no ladder value,
+  morphology or FINAL semantic changed.
   Fresh Ultra/PLAY_VIS_NEAR/480x270 baseline 33.62-37.32 ms cloud p50 across three runs.
   **CASE C: descriptor traversal is NOT dominant.** The fixed-work ladder (64 fixed samples per
   fragment, identical control flow, deltas reproducible within 3% over three runs) attributes a
