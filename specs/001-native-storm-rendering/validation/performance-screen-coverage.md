@@ -11,6 +11,7 @@ Status: **COMPLETE** 2026-09-04
 / Feature: 001-native-storm-rendering
 / Starting commit: `a59ce46` (T161 banked at `4844cc8`)
 / Branch: `worktree-t098-production-ray-trace`
+/ Banking commit: `122a566`
 
 T140 is a measurement and bottleneck-localization task. It implements no
 optimization. It answers two questions that T153 did not:

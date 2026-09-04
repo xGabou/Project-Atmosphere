@@ -1366,7 +1366,7 @@ implementation, while visual polish remains independently active.
 
 ### Tests for User Story 3
 
-  **ACCEPTED.** Diagnostic only; no ladder value, morphology or rendering semantic changed.
+  **[ACCEPTED 2026-09-04, commit 122a566]** Diagnostic only; no ladder value, morphology or rendering semantic changed.
   Five-mode post-T161 baseline at PLAY_VIS_NEAR on the banked lean FINAL program, each mode at
   its own shipped scale, 120 frames per cell: Low 8.798/9.158, Low 24 11.371/12.194,
   Medium 12.101/21.470 (240x135); High 24.620/26.639 (360x203); Ultra 38.394/41.525 (480x270)
