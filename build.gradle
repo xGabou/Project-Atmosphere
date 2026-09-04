@@ -295,22 +295,32 @@ def leanFinalRemovedUniforms = leanFinalConstants.keySet().collect {
 // already carries it every frame; PaOraclePass stays baked to 0, so the oracle
 // capture path it normally serves remains dead.
 def leanProgramVariants = [
-        [name: leanFinalShaderName, defines: [], keepUniforms: []],
+        // T163: FINAL no longer carries the unreachable precipitation branch.
+        [name: leanFinalShaderName,
+         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
+        // The T140 oracle family must stay bit-for-bit equivalent to FINAL, so
+        // it takes the same specialization.
         [name: 'cloud_atmosphere_volume_t140_pixel',
-         defines: ['PA_T140_ORACLE 1'], keepUniforms: []],
+         defines: ['PA_T140_ORACLE 1', 'PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
         [name: 'cloud_atmosphere_volume_t140_mask',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_MASK 1'], keepUniforms: []],
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_MASK 1', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: []],
         [name: 'cloud_atmosphere_volume_t140_tile8',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8'], keepUniforms: ['PaOracleBaseSize']],
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaOracleBaseSize']],
         [name: 'cloud_atmosphere_volume_t140_tile16',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16'], keepUniforms: ['PaOracleBaseSize']],
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16', 'PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // The pre-T163 FINAL, kept so the optimization can be measured and
+        // compared against back to back rather than against a remembered number.
+        [name: 'cloud_atmosphere_volume_t163_withrain', defines: [], keepUniforms: []],
         // T162 production-context attribution arms. These render the real
         // raymarch; only one cost class is compiled out of each.
         [name: 'cloud_atmosphere_volume_t162_nolight', defines: [], keepUniforms: [],
          overrides: ['uniform int PaDiagnosticLightingMode;':
                      'const int PaDiagnosticLightingMode = 1;']],
         [name: 'cloud_atmosphere_volume_t162_norain',
-         defines: ['PA_T162_NO_RAIN 1'], keepUniforms: []],
+         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
         // T162 fixed-work ladder. Every arm evaluates the same 64 points per
         // fragment, so the deltas between them are attributable.
         [name: 'cloud_atmosphere_volume_t162_fw1_address',

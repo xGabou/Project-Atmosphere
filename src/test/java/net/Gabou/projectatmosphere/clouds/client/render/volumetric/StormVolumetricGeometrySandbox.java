@@ -593,6 +593,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT140OracleVariants);
         runCorrected("T162 attribution arms compile and stay out of FINAL",
                 StormVolumetricGeometrySandbox::validateT162AttributionArms);
+        runCorrected("T163 FINAL is specialized against the dead precipitation path",
+                StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
 
     private static void validateFixedStormSilhouette() {
@@ -5641,9 +5643,6 @@ public final class StormVolumetricGeometrySandbox {
         if (finalSource.contains("#define PA_T162_FIXED_WORK")) {
             violations.add("FINAL defines PA_T162_FIXED_WORK");
         }
-        if (finalSource.contains("#define PA_T162_NO_RAIN")) {
-            violations.add("FINAL defines PA_T162_NO_RAIN");
-        }
         // FINAL must still bake production lighting, not the attribution arm.
         if (!finalSource.contains("const int PaDiagnosticLightingMode = 0;")) {
             violations.add("FINAL no longer bakes PaDiagnosticLightingMode = 0");
@@ -5653,7 +5652,7 @@ public final class StormVolumetricGeometrySandbox {
 
         String[][] arms = {
                 {"cloud_atmosphere_volume_t162_nolight", "const int PaDiagnosticLightingMode = 1;"},
-                {"cloud_atmosphere_volume_t162_norain", "#define PA_T162_NO_RAIN"},
+                {"cloud_atmosphere_volume_t162_norain", "#define PA_PRECIPITATION_ABSENT"},
                 {"cloud_atmosphere_volume_t162_fw1_address", "#define PA_T162_ARM 1"},
                 {"cloud_atmosphere_volume_t162_fw2_candidate", "#define PA_T162_ARM 2"},
                 {"cloud_atmosphere_volume_t162_fw3_descriptor", "#define PA_T162_ARM 3"},
@@ -5672,6 +5671,71 @@ public final class StormVolumetricGeometrySandbox {
             require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
             compileFragmentShader(resolveMojImports(source), arm[0]);
         }
+    }
+
+    /**
+     * FINAL must be built without the unreachable precipitation branch, and the
+     * programs that have to match FINAL bit for bit must be built the same way.
+     *
+     * <p>This is the regression this gate exists for. The branch is dead at
+     * runtime either way, so restoring it to FINAL would change no pixel and
+     * pass every image check while silently giving back the ~1.5x T163
+     * measured. Nothing else in the suite would notice, so the specialization
+     * is asserted directly.
+     *
+     * <p>The complementary assertion matters just as much: the programs that
+     * genuinely need precipitation-capable cloudDensity must NOT be specialized,
+     * or the T162 ladder would stop measuring what it claims to.
+     */
+    private static void validateT163PrecipitationSpecialization() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String marker = "#define PA_PRECIPITATION_ABSENT";
+        List<String> violations = new ArrayList<>();
+
+        // FINAL, and everything required to be bit-identical to it.
+        String[] specialized = {
+                "cloud_atmosphere_volume_final",
+                "cloud_atmosphere_volume_t140_pixel",
+                "cloud_atmosphere_volume_t140_mask",
+                "cloud_atmosphere_volume_t140_tile8",
+                "cloud_atmosphere_volume_t140_tile16"
+        };
+        for (String program : specialized) {
+            String path = base + program + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated program missing; run generateLeanFinalShader: " + path);
+            }
+            if (!readWorkspaceSource(path).contains(marker)) {
+                violations.add(program + " lost the precipitation specialization");
+            }
+        }
+
+        // Programs that must retain the capability.
+        String[] capable = {
+                "cloud_atmosphere_volume_t163_withrain",
+                "cloud_atmosphere_volume_t162_fw7_density"
+        };
+        for (String program : capable) {
+            String path = base + program + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated program missing; run generateLeanFinalShader: " + path);
+            }
+            if (readWorkspaceSource(path).contains(marker)) {
+                violations.add(program + " must keep precipitation-capable cloudDensity");
+            }
+        }
+
+        require(violations.isEmpty(), "T163 precipitation specialization broken: "
+                + String.join("; ", violations));
+
+        // The measurement baseline has to build too, or the optimization cannot
+        // be compared against the program it replaced.
+        compileFragmentShader(
+                resolveMojImports(readWorkspaceSource(
+                        base + "cloud_atmosphere_volume_t163_withrain.fsh")),
+                "cloud_atmosphere_volume_t163_withrain");
     }
 
     private static void validateProductionShaderCompiles() {

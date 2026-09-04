@@ -3949,9 +3949,16 @@ float cloudDensity(
         paCdUnionDistance = paUnionDistanceUnusedB;
     }
 
+#ifdef PA_PRECIPITATION_ABSENT
+    // Also false for every production call site; naming it a constant lets the
+    // early-coverage reject below fold instead of carrying MaxPrecipitation and
+    // the slab comparison live.
+    bool precipitationCandidate = false;
+#else
     bool precipitationCandidate = includePrecipitation
         && MaxPrecipitation > 0.02
         && p.y < SlabBaseY + 48.0;
+#endif
     if (coverage <= 0.008 && funnel <= 0.001 && !precipitationCandidate
             && directStormCoverage <= 0.001) {
         if (paTraceCapture) {
@@ -4318,10 +4325,14 @@ float cloudDensity(
         return 0.0;
     }
 
-#ifdef PA_T162_NO_RAIN
-    // T162 production-context rain arm: the shaft evaluation is compiled out
-    // rather than branched around, so its cost cannot survive as a dormant
-    // path the way T161 showed dormant paths can.
+#ifdef PA_PRECIPITATION_ABSENT
+    // T163: every production call site passes includePrecipitation = false, so
+    // this evaluation is unreachable in FINAL - but a branch the compiler
+    // cannot fold still costs register pressure across the whole of
+    // cloudDensity, which T162 measured at roughly a third of the frame.
+    // Compiling it out is what makes it actually absent rather than merely
+    // unvisited. Rain itself is unaffected: it renders through
+    // rainShaftDensityOverSegment, which the march calls directly.
     float rainShaft = 0.0;
 #else
     float rainShaft = includePrecipitation

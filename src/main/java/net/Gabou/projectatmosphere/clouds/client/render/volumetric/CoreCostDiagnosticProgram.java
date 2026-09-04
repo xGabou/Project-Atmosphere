@@ -68,7 +68,14 @@ public enum CoreCostDiagnosticProgram {
     T162_FW4_SHAPE("t162_fw4_shape"),
     T162_FW5_NODETAIL("t162_fw5_nodetail"),
     T162_FW6_NORAIN("t162_fw6_norain"),
-    T162_FW7_DENSITY("t162_fw7_density");
+    T162_FW7_DENSITY("t162_fw7_density"),
+    /**
+     * T163 measurement baseline: the FINAL program as it was before the
+     * precipitation specialization, kept so the optimization can be compared
+     * back to back against the program it replaced rather than against a
+     * remembered number from an earlier session.
+     */
+    T163_WITH_RAIN("t163_withrain");
 
     private final String serializedName;
 

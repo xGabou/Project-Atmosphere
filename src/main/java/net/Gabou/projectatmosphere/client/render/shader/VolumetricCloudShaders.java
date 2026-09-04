@@ -78,6 +78,9 @@ public final class VolumetricCloudShaders {
     private static final ResourceLocation T162_FW7_DENSITY_ID =
             ResourceLocation.fromNamespaceAndPath(
                     ProjectAtmosphere.MODID, "cloud_atmosphere_volume_t162_fw7_density");
+    private static final ResourceLocation T163_WITH_RAIN_ID =
+            ResourceLocation.fromNamespaceAndPath(
+                    ProjectAtmosphere.MODID, "cloud_atmosphere_volume_t163_withrain");
     private static final ResourceLocation SHADOW_MAP_ID =
             ResourceLocation.fromNamespaceAndPath(ProjectAtmosphere.MODID, "cloud_shadow_map");
     private static final ResourceLocation SHADOW_APPLY_ID =
@@ -101,6 +104,7 @@ public final class VolumetricCloudShaders {
     private static ShaderInstance t162Fw5Shader;
     private static ShaderInstance t162Fw6Shader;
     private static ShaderInstance t162Fw7Shader;
+    private static ShaderInstance t163WithRainShader;
     private static ShaderInstance shadowMapShader;
     private static ShaderInstance shadowApplyShader;
 
@@ -156,6 +160,8 @@ public final class VolumetricCloudShaders {
                     loaded -> t162Fw6Shader = loaded);
             registerDiagnosticVolumeProgram(event, T162_FW7_DENSITY_ID,
                     loaded -> t162Fw7Shader = loaded);
+            registerDiagnosticVolumeProgram(event, T163_WITH_RAIN_ID,
+                    loaded -> t163WithRainShader = loaded);
         } catch (IOException | RuntimeException failure) {
             leanFinalVolumeShader = null;
             ProjectAtmosphere.LOGGER.error(
@@ -212,6 +218,7 @@ public final class VolumetricCloudShaders {
             case T162_FW5_NODETAIL -> t162Fw5Shader;
             case T162_FW6_NORAIN -> t162Fw6Shader;
             case T162_FW7_DENSITY -> t162Fw7Shader;
+            case T163_WITH_RAIN -> t163WithRainShader;
         };
     }
 
