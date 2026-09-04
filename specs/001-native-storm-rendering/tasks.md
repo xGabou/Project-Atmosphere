@@ -1323,7 +1323,7 @@ do not fabricate historical before/after percentages for T119--T123.
   in `specs/001-native-storm-rendering/validation/production-shader-specialization.md`
   (depends on T139; uses `e301494` as evidence, not an implementation to merge) [FR-001,
   FR-006-FR-013, FR-027, FR-030; SC-004-SC-007, SC-017, SC-020-SC-021]
-  **BANKED.** FINAL frames link a separately generated `cloud_atmosphere_volume_final` program in
+  **[BANKED 2026-09-03, commit 4844cc8]** FINAL frames link a separately generated `cloud_atmosphere_volume_final` program in
   which 19 diagnostic selectors are compile-time constants; the unmodified `cloud_atmosphere_volume`
   remains the diagnostic program and nothing was deleted from it. Same-fixture A/B on
   PLAY_VIS_NEAR / Ultra / 1920x1080 / 480x270 / 10 descriptors, 60 samples per arm:

@@ -2,6 +2,8 @@
 
 Status: **BANKED** 2026-09-03
 
+/ Implementation commit: `4844cc8`
+
 / Feature: 001-native-storm-rendering
 / Depends on: T139 (`3790752`)
 / Reference experiment: `e301494` on `experiment/core-cost` - evidence, not an
