@@ -1455,6 +1455,52 @@ implementation, while visual polish remains independently active.
   ran after the per-arm program re-pin so every frame silently rendered the anchor; the lighting
   arm showing a real difference is now the harness self-check. Evidence in
   `validation/performance-cost-attribution.md`.
+- [X] T163 [PERFORMANCE] [US3] Productionize the T162 dead-precipitation finding: make the
+  unreachable precipitation path compile-time absent from the lean FINAL cloud program while
+  every diagnostic program that genuinely needs precipitation-capable `cloudDensity` keeps it.
+  Guard the two precipitation-only expressions in
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` behind
+  `PA_PRECIPITATION_ABSENT`, define it for FINAL and for the T140 oracle family that must stay
+  bit-identical to FINAL in `build.gradle`, and keep a `cloud_atmosphere_volume_t163_withrain`
+  baseline so old and new FINAL can be measured back to back rather than against a remembered
+  number. Extend the existing T161 generation architecture rather than adding a second mechanism;
+  one source of truth for the cloud equations must remain. Add a build invariant in
+  `StormVolumetricGeometrySandbox.java` asserting both directions - FINAL specialized, capability
+  retained where required - because restoring the dead path to FINAL would change no pixel and
+  pass every image check while silently losing ~1.5x. Drive the old/new comparison from
+  `StormT132AutoDriver.java` with adjacent captures, the lighting arm as the known-non-identical
+  harness self-check, and every cell qualified immediately before and after. Require exact
+  equivalence, not epsilon. Re-measure the 0.25/0.375/0.50 resolution frontier afterwards without
+  changing the shipping scale, and record everything in
+  `specs/001-native-storm-rendering/validation/performance-precipitation-specialization.md`
+  (depends on T162, T161) [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-017, SC-021]
+  **[BANKED 2026-09-04, commit ad12a63]** FINAL no longer compiles the precipitation branch that
+  no production call site can reach. Both precipitation-only expressions in `cloudDensity` are
+  guarded by `PA_PRECIPITATION_ABSENT`, defined for FINAL and the T140 oracle family and withheld
+  from the monolith, the rain-capable T162 arm and a new `t163_withrain` baseline kept so old and
+  new FINAL are measured back to back. Nothing was deleted from the source; this extends the T161
+  generator, so one shader file is still the single source of truth. **Nine within-run pairs over
+  three poses and three internal resolutions: mean p50 speedup 1.517x, range 1.458x-1.589x**
+  (PLAY_VIS_NEAR 0.25 37.208 -> 24.517; 0.375 63.689 -> 42.660; 0.50 99.867 -> 64.799;
+  PLAY_VIS_MID 0.25 25.468 -> 16.697; SIDE 0.25 34.590 -> 23.127 ms), retaining essentially all of
+  the 1.486x-1.581x T162 predicted. **Image is exactly unchanged: 0 changed pixels of 129,600 and
+  maximum error exactly 0.0 at all three poses**, with the lighting arm differing at all three as
+  the harness self-check - the check that would have caught the T162 capture defects. Rain is
+  untouched: it renders through `rainShaftDensityOverSegment`, called directly by the march, and
+  the fixture is rain-bearing, so any lost shaft, intensity or T145 locality would have shown as
+  changed pixels. Production counters confirm **0 rain density calls**. A new build invariant,
+  `T163 FINAL is specialized against the dead precipitation path`, asserts both directions and is
+  the only thing that would catch a regression, because restoring the dead path changes no pixel
+  and passes every image check while silently losing ~1.5x. Resolution frontier re-measured on
+  fresh qualified cells without changing the shipping scale: **0.25 = 24.517, 0.375 = 42.660,
+  0.50 = 64.799 ms cloud p50**. **0.375 is materially closer but not yet shippable** - it now sits
+  roughly where 0.25 sat before (1.15x the old 0.25, down from 1.71x), though still 1.74x the
+  current 0.25 and 5.3x SC-006. **0.50 remains impractical** at 2.64x the current 0.25. SC-006
+  stays 8 ms, unmet and unrescoped; Ultra 0.25 moves from **4.65x to 3.06x** the budget, closing
+  the absolute gap from 29.2 to 16.5 ms - the largest single step since T161, at no image cost.
+  Evidence hygiene: 42 fixture qualifications over 18 timing cells and 3 image sequences,
+  **0 rejected**; no other Minecraft or Java benchmark instance running at launch. Evidence in
+  `validation/performance-precipitation-specialization.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
