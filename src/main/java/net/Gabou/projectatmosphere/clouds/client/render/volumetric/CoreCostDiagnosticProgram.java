@@ -48,7 +48,27 @@ public enum CoreCostDiagnosticProgram {
     /** T140 diagnostic: the oracle applied per 8x8 tile instead of per pixel. */
     T140_TILE8("t140_tile8"),
     /** T140 diagnostic: the oracle applied per 16x16 tile instead of per pixel. */
-    T140_TILE16("t140_tile16");
+    T140_TILE16("t140_tile16"),
+    /**
+     * T162 production-context arm: the real raymarch with the light cone and
+     * scatter chain compiled out (the T136 constant-lighting arm, specialized
+     * rather than branched).
+     */
+    T162_NO_LIGHT("t162_nolight"),
+    /** T162 production-context arm: the real raymarch with rain shafts compiled out. */
+    T162_NO_RAIN("t162_norain"),
+    /**
+     * T162 fixed-work attribution ladder. Every arm evaluates the same 64
+     * points per fragment, so control flow is identical and the deltas between
+     * consecutive arms are attributable to the one cost class each adds.
+     */
+    T162_FW1_ADDRESS("t162_fw1_address"),
+    T162_FW2_CANDIDATE("t162_fw2_candidate"),
+    T162_FW3_DESCRIPTOR("t162_fw3_descriptor"),
+    T162_FW4_SHAPE("t162_fw4_shape"),
+    T162_FW5_NODETAIL("t162_fw5_nodetail"),
+    T162_FW6_NORAIN("t162_fw6_norain"),
+    T162_FW7_DENSITY("t162_fw7_density");
 
     private final String serializedName;
 
@@ -75,6 +95,11 @@ public enum CoreCostDiagnosticProgram {
     public boolean normalProductionOutput() {
         return this == LEAN_FINAL || this == T140_PIXEL_ORACLE
                 || this == T140_TILE8 || this == T140_TILE16;
+    }
+
+    /** True for the T162 fixed-work ladder, which renders a checksum, not a scene. */
+    public boolean fixedWork() {
+        return name().startsWith("T162_FW");
     }
 
     public static CoreCostDiagnosticProgram parse(String value) {

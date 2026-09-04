@@ -91,6 +91,12 @@ final class StormT132AutoDriver {
      */
     private static final Path T140_MODES_MARKER = Path.of("t140-modes.txt");
     /**
+     * T162: the post-T161 cost attribution ladder. Every arm is a separately
+     * linked, lean-specialized program so no runtime diagnostic branch can
+     * distort the timing, which is the trap T161 documented.
+     */
+    private static final Path T162_MARKER = Path.of("t162-attribution.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -208,6 +214,7 @@ final class StormT132AutoDriver {
                 || specializationRunRequested()
                 || coverageRunRequested()
                 || fiveModeRunRequested()
+                || attributionRunRequested()
                 || movingCameraRunRequested();
     }
 
@@ -233,6 +240,10 @@ final class StormT132AutoDriver {
 
     private static boolean fiveModeRunRequested() {
         return Files.exists(T140_MODES_MARKER);
+    }
+
+    private static boolean attributionRunRequested() {
+        return Files.exists(T162_MARKER);
     }
 
     private static boolean movingCameraRunRequested() {
@@ -407,6 +418,66 @@ final class StormT132AutoDriver {
     };
     private static boolean t140Run;
     private static boolean t140ModeRun;
+    private static boolean t162Run;
+    private static boolean t162OriginalHistoryEnabled;
+    private static int t162ExpectedDescriptors;
+    private static int t162ImageStep;
+    private static StormReferenceImageComparison.Reference t162AnchorImage;
+
+    /** One T162 cell: which linked program, and how many descriptors it may see. */
+    private record T162Arm(CoreCostDiagnosticProgram program, int descriptorLimit) {
+        String label() {
+            return descriptorLimit < 0
+                    ? program.serializedName()
+                    : program.serializedName() + "@d" + descriptorLimit;
+        }
+    }
+
+    /**
+     * The attribution matrix. The first three arms run the real raymarch; the
+     * rest are the fixed-work ladder, whose consecutive differences are the
+     * attribution. The trailing entries repeat two ladder rungs at capped
+     * descriptor counts to answer whether cost scales with descriptor count -
+     * the evidence that decides for or against descriptor binning.
+     */
+    private static final T162Arm[] T162_ARMS = buildT162Arms();
+
+    private static T162Arm[] buildT162Arms() {
+        java.util.List<T162Arm> arms = new java.util.ArrayList<>();
+        arms.add(new T162Arm(CoreCostDiagnosticProgram.LEAN_FINAL, -1));
+        arms.add(new T162Arm(CoreCostDiagnosticProgram.T162_NO_LIGHT, -1));
+        arms.add(new T162Arm(CoreCostDiagnosticProgram.T162_NO_RAIN, -1));
+        for (CoreCostDiagnosticProgram rung : new CoreCostDiagnosticProgram[] {
+                CoreCostDiagnosticProgram.T162_FW1_ADDRESS,
+                CoreCostDiagnosticProgram.T162_FW2_CANDIDATE,
+                CoreCostDiagnosticProgram.T162_FW3_DESCRIPTOR,
+                CoreCostDiagnosticProgram.T162_FW4_SHAPE,
+                CoreCostDiagnosticProgram.T162_FW5_NODETAIL,
+                CoreCostDiagnosticProgram.T162_FW6_NORAIN,
+                CoreCostDiagnosticProgram.T162_FW7_DENSITY}) {
+            arms.add(new T162Arm(rung, -1));
+        }
+        for (int limit : new int[] {1, 2, 4, 6, 8, 10}) {
+            arms.add(new T162Arm(CoreCostDiagnosticProgram.T162_FW3_DESCRIPTOR, limit));
+            arms.add(new T162Arm(CoreCostDiagnosticProgram.T162_FW4_SHAPE, limit));
+        }
+        return arms.toArray(new T162Arm[0]);
+    }
+
+    private static final String[] T162_POSES = {"PLAY_VIS_NEAR"};
+    private static final StormOptimizationDiagnosticMode[] T162_OPTIMIZATION_ARMS =
+            buildT162OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT162OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T162_ARMS.length];
+        java.util.Arrays.fill(modes, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
+        return modes;
+    }
+
+    private static T162Arm t162Arm() {
+        return T162_ARMS[Math.max(0, Math.min(T162_ARMS.length - 1, t141ArmIndex))];
+    }
     private static final String[] T140_MODE_POSES = {"PLAY_VIS_NEAR"};
     /** 0 request mask, 1 collect mask, 2 request final, 3 collect final, 4 done. */
     private static int t140ImageStep;
@@ -479,6 +550,18 @@ final class StormT132AutoDriver {
 
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
+        if (t162Run) {
+            T162Arm arm = t162Arm();
+            VolumetricCloudDebugConfig.setFinalProgramOverride(arm.program());
+            VolumetricCloudDebugConfig.setDescriptorCountLimit(arm.descriptorLimit());
+            VolumetricCloudDebugConfig.setT136ConstantLighting(false);
+            VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                    StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
+            // Every arm must share one temporal state or the comparison is
+            // between different history situations rather than between programs.
+            VolumetricCloudDebugConfig.setHistoryEnabled(false);
+            return;
+        }
         if (t140Run) {
             // Pin the program under test. Every arm is pinned, including the
             // lean baseline, so a selection bug surfaces as a failed arm rather
@@ -518,6 +601,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t162Run) {
+            return t162Arm().label();
+        }
         if (t140Run) {
             return t140Arm().serializedName();
         }
@@ -540,6 +626,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t162Run) {
+            return T162_OPTIMIZATION_ARMS;
+        }
         if (t140Run) {
             return T140_OPTIMIZATION_ARMS;
         }
@@ -693,6 +782,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t162Run) {
+            return T162_POSES;
+        }
         if (t140Run) {
             return T140_POSES;
         }
@@ -1010,6 +1102,12 @@ final class StormT132AutoDriver {
                 t138HistoryArm = false;
                 t140Run = coverageRunRequested();
                 t140ModeRun = fiveModeRunRequested();
+                t162Run = attributionRunRequested();
+                t162OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t162ExpectedDescriptors = 0;
+                t162ImageStep = 0;
+                t162AnchorImage = null;
+                T162_REJECTED.clear();
                 t140ImageStep = 0;
                 T140_COVERAGE.clear();
                 t161Run = specializationRunRequested();
@@ -1020,7 +1118,8 @@ final class StormT132AutoDriver {
                 t153OracleRun = oracleRunRequested();
                 t153OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t141EvaluationRun =
-                        evaluationRunRequested() || t153OracleRun || t161Run || t140Run;
+                        evaluationRunRequested() || t153OracleRun || t161Run
+                                || t140Run || t162Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -1029,7 +1128,7 @@ final class StormT132AutoDriver {
                 T153_FIXTURES.clear();
                 t153PoseAttempts = 0;
                 if (t141EvaluationRun) {
-                    if (!t153OracleRun && !t161Run && !t140Run) {
+                    if (!t153OracleRun && !t161Run && !t140Run && !t162Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -1039,7 +1138,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t140Run ? "T140_COVERAGE"
+                            t162Run ? "T162_ATTRIBUTION"
+                                    : t140Run ? "T140_COVERAGE"
                                     : (t161Run ? "T161_SPECIALIZATION"
                                         : (t153OracleRun ? "T153_ORACLE" : "T141_EVAL")),
                             sweepPoses().length, activeEvaluationArms().length,
@@ -1313,6 +1413,14 @@ final class StormT132AutoDriver {
                 if (StormT135PerformanceProfile.active()) {
                     return;
                 }
+                if (t162Run && t162Arm().program().fixedWork()) {
+                    // A fixed-work arm renders a checksum, not the production
+                    // scene, so production workload counters captured beside it
+                    // would describe a different program. The production-context
+                    // arms carry the counters for this campaign.
+                    advance(Phase.T135_SAMPLE);
+                    return;
+                }
                 if (!t135CountersRequested) {
                     t135CountersRequested = true;
                     // The workload counters live behind debug views 22/23, which
@@ -1320,7 +1428,7 @@ final class StormT132AutoDriver {
                     // lets the capture link the diagnostic monolith, so the
                     // counters describe the production work for this pose rather
                     // than returning zeroes from a program that cannot count.
-                    if (t140Run) {
+                    if (t140Run || t162Run) {
                         VolumetricCloudDebugConfig.setFinalProgramOverride(null);
                     }
                     VolumetricCloudFrameDiagnostics.requestStormWorkloadCapture("side");
@@ -1342,7 +1450,7 @@ final class StormT132AutoDriver {
                         // cell and complete from frames of several different
                         // arms. Abandon it here instead.
                         VolumetricCloudFrameDiagnostics.abortStormWorkloadCapture();
-                        if (t140Run) {
+                        if (t140Run || t162Run) {
                             applyT141Arm();
                         }
                         advance(Phase.T135_SAMPLE);
@@ -1384,7 +1492,7 @@ final class StormT132AutoDriver {
                                 fmt(workload.cloudDensityCalls() / Math.max(1, pixels)));
                     }
                 }
-                if (t140Run) {
+                if (t140Run || t162Run) {
                     applyT141Arm();
                 }
                 advance(Phase.T135_SAMPLE);
@@ -1450,6 +1558,12 @@ final class StormT132AutoDriver {
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
                 }
+                if (t162Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT162AttributionReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t162OriginalHistoryEnabled);
+                }
                 if (t140Run) {
                     ProjectAtmosphere.LOGGER.info(buildT140CoverageReport());
                     VolumetricCloudDebugConfig.setFinalProgramOverride(null);
@@ -1462,6 +1576,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(buildT153DecisionReport());
                     VolumetricCloudDebugConfig.setHistoryEnabled(t153OriginalHistoryEnabled);
                     finish("t153_complete");
+                } else if (t162Run) {
+                    finish("t162_complete");
                 } else if (t140Run) {
                     finish("t140_complete");
                 } else if (t161Run) {
@@ -1576,8 +1692,21 @@ final class StormT132AutoDriver {
             t141CellPending = false;
             boolean failed = StormT135PerformanceProfile.lastCellContaminated()
                     || (t153OracleRun && t153LastCounterInvalid)
+                    || (t162Run && !t162QualifyFixture(pose, t141ArmName(), "after"))
                     || (!pose.startsWith("CLEAR")
                         && StormGeometryBuildCoordinator.lobeCount() <= 0);
+            if (t162Run && failed) {
+                // A cell whose fixture moved is discarded outright rather than
+                // averaged in. This is the hazard the Ultra recovery sweep hit:
+                // it qualified the pose once and kept measuring after the storm
+                // stopped contributing.
+                StormT135PerformanceProfile.discardLastCell("t162_fixture_changed");
+                T162_REJECTED.add(t141ArmName() + ":fixture_changed");
+                ProjectAtmosphere.LOGGER.warn(
+                        "T162_REJECT arm={} reason=fixture_changed descriptors={} expected={}",
+                        t141ArmName(), StormGeometryBuildCoordinator.lobeCount(),
+                        t162ExpectedDescriptors);
+            }
             t153LastCounterInvalid = false;
             if (failed) {
                 if (t153OracleRun) {
@@ -1623,6 +1752,17 @@ final class StormT132AutoDriver {
             tickT140Coverage(pose);
             return;
         }
+        if (t162Run && t141ArmIndex == 0 && t162ImageStep < 6) {
+            // Captured before applyT141Arm(), which re-pins the override to the
+            // current arm on every tick: running after it meant every capture
+            // silently rendered the anchor program, and all three frames then
+            // compared identical - including the lighting arm, which cannot be.
+            // The three frames are also taken back to back, because an earlier
+            // attempt captured them minutes apart and the fixture drifted
+            // between them.
+            tickT162Images();
+            return;
+        }
         applyT141Arm();
         String arm = t141ArmName();
         if (t161Run && !t161ArmImageDone) {
@@ -1659,6 +1799,19 @@ final class StormT132AutoDriver {
                 }
                 return;
             }
+        }
+        if (t162Run && !t162QualifyFixture(pose, arm, "before")) {
+            if (++t141ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
+                advance(Phase.T135_RESPAWN);
+                return;
+            }
+            T162_REJECTED.add(arm + ":unqualified_before");
+            ProjectAtmosphere.LOGGER.warn(
+                    "T162_REJECT arm={} reason=unqualified_before attempts={}",
+                    arm, t141ArmAttempts);
+            t141ArmAttempts = 0;
+            t141ArmIndex++;
+            return;
         }
         if (!StormT135PerformanceProfile.begin(
                 pose, AtmoCommonConfig.CloudRaymarchQuality.ULTRA, arm)) {
@@ -1834,6 +1987,220 @@ final class StormT132AutoDriver {
             }
         }
         return count;
+    }
+
+    /**
+     * Captures the three production-context frames back to back and compares
+     * the two arms against the anchor.
+     *
+     * <p>Adjacency is the whole point. The rain arm removes a code path that
+     * every production call site reaches with {@code includePrecipitation}
+     * false, so it should be numerically identical; a difference therefore
+     * either falsifies that reading or means the fixture moved between the two
+     * captures. Only adjacent captures can tell those apart.
+     */
+    private static void tickT162Images() {
+        if (StormReferenceImageCapture.active()) {
+            return;
+        }
+        switch (t162ImageStep) {
+            case 0 -> {
+                VolumetricCloudDebugConfig.setFinalProgramOverride(
+                        CoreCostDiagnosticProgram.LEAN_FINAL);
+                if (StormReferenceImageCapture.request("t162_anchor")
+                        .startsWith("acquiring")) {
+                    t162ImageStep = 1;
+                }
+            }
+            case 1 -> {
+                StormReferenceImageComparison.Reference captured =
+                        StormReferenceImageCapture.latestResult();
+                if (captured == null) {
+                    t162ImageStep = 0;
+                    return;
+                }
+                t162AnchorImage = captured;
+                ProjectAtmosphere.LOGGER.info("T162_IMAGE anchor {}", captured.format());
+                t162ImageStep = 2;
+            }
+            case 2 -> {
+                VolumetricCloudDebugConfig.setFinalProgramOverride(
+                        CoreCostDiagnosticProgram.T162_NO_RAIN);
+                if (StormReferenceImageCapture.request("t162_norain")
+                        .startsWith("acquiring")) {
+                    t162ImageStep = 3;
+                }
+            }
+            case 3 -> {
+                t162CompareAgainstAnchor("t162_norain");
+                t162ImageStep = 4;
+            }
+            case 4 -> {
+                VolumetricCloudDebugConfig.setFinalProgramOverride(
+                        CoreCostDiagnosticProgram.T162_NO_LIGHT);
+                if (StormReferenceImageCapture.request("t162_nolight")
+                        .startsWith("acquiring")) {
+                    t162ImageStep = 5;
+                }
+            }
+            default -> {
+                t162CompareAgainstAnchor("t162_nolight");
+                t162ImageStep = 6;
+                applyT141Arm();
+            }
+        }
+    }
+
+    private static void t162CompareAgainstAnchor(String arm) {
+        StormReferenceImageComparison.Reference captured =
+                StormReferenceImageCapture.latestResult();
+        if (captured == null || t162AnchorImage == null) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T162_IMAGE_AB arm={} evaluated=false reason=missing_capture", arm);
+            return;
+        }
+        ProjectAtmosphere.LOGGER.info(
+                "T162_IMAGE_AB arm={} a=lean_final {} digestsEqual={}",
+                arm,
+                StormReferenceImageComparison.compare(t162AnchorImage, captured).format(),
+                t162AnchorImage.digest().equals(captured.digest()));
+    }
+
+    /** Arms whose cells were discarded, so the report can name them. */
+    private static final java.util.List<String> T162_REJECTED = new java.util.ArrayList<>();
+
+    /**
+     * Qualifies the fixture immediately before and immediately after every
+     * single timing cell.
+     *
+     * <p>This exists because of a specific failure: the Ultra resolution
+     * recovery sweep confirmed pose visibility once and then ran eight arms
+     * without rechecking, and the last five became roughly nine times too cheap
+     * after the storm stopped contributing. Descriptor count alone did not
+     * catch it - the count stayed at ten. So this checks the count against the
+     * one the pose started with AND re-evaluates the geometric visibility
+     * verdict, at both ends of the cell.
+     */
+    private static boolean t162QualifyFixture(String pose, String arm, String phase) {
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        if (player == null) {
+            return false;
+        }
+        int descriptors = StormGeometryBuildCoordinator.lobeCount();
+        if (t162ExpectedDescriptors == 0) {
+            t162ExpectedDescriptors = descriptors;
+        }
+        if (descriptors <= 0 || descriptors != t162ExpectedDescriptors) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T162_QUALIFY {} arm={} descriptors={} expected={} verdict=fail",
+                    phase, arm, descriptors, t162ExpectedDescriptors);
+            return false;
+        }
+        StormPerformanceBaseline.SuiteFixture fixture = StormPerformanceBaseline.suiteFixture();
+        if (fixture == null) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T162_QUALIFY {} arm={} verdict=fail reason=fixture_missing", phase, arm);
+            return false;
+        }
+        StormFixtureVisibility.Verdict verdict = StormFixtureVisibility.evaluate(
+                descriptors,
+                fixture.centerX(), fixture.centerZ(), fixture.baseY(), fixture.topY(),
+                fixture.horizontalRadius(),
+                player.getX(), player.getEyeY(), player.getZ(),
+                player.getYRot(), player.getXRot(),
+                minecraft.options.fov().get(),
+                AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get());
+        if (!verdict.valid()) {
+            ProjectAtmosphere.LOGGER.warn(
+                    "T162_QUALIFY {} arm={} verdict=fail {}", phase, arm, verdict.format());
+            return false;
+        }
+        ProjectAtmosphere.LOGGER.info(
+                "T162_QUALIFY {} arm={} descriptors={} {}", phase, arm, descriptors,
+                verdict.format());
+        return true;
+    }
+
+    /**
+     * Builds the attribution record.
+     *
+     * <p>The fixed-work rungs are cumulative, so the report prints each rung
+     * and the delta over the rung below it. That delta is the cost of the one
+     * class the rung adds, measured with control flow held identical.
+     */
+    private static String buildT162AttributionReport() {
+        StringBuilder out = new StringBuilder("T162_ATTRIBUTION_DECISION");
+        String pose = T162_POSES[0];
+        for (T162Arm arm : T162_ARMS) {
+            StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+            if (cell == null) {
+                out.append(String.format(Locale.ROOT,
+                        "%nT162_ARM arm=%s evaluated=false", arm.label()));
+                continue;
+            }
+            out.append(String.format(Locale.ROOT,
+                    "%nT162_ARM arm=%s descriptorLimit=%d target=%dx%d cloudP50=%.4f"
+                            + " cloudP95=%.4f frameP50=%.4f frameP95=%.4f",
+                    arm.label(), arm.descriptorLimit(),
+                    cell.cloudWidth(), cell.cloudHeight(),
+                    cell.cloudP50(), cell.cloudP95(), cell.frameP50(), cell.frameP95()));
+        }
+
+        CoreCostDiagnosticProgram[] ladder = {
+                CoreCostDiagnosticProgram.T162_FW1_ADDRESS,
+                CoreCostDiagnosticProgram.T162_FW2_CANDIDATE,
+                CoreCostDiagnosticProgram.T162_FW3_DESCRIPTOR,
+                CoreCostDiagnosticProgram.T162_FW4_SHAPE,
+                CoreCostDiagnosticProgram.T162_FW5_NODETAIL,
+                CoreCostDiagnosticProgram.T162_FW6_NORAIN,
+                CoreCostDiagnosticProgram.T162_FW7_DENSITY};
+        String[] classNames = {
+                "control_floor", "candidate_traversal", "descriptor_fetch",
+                "shape_profile_sdf", "weather_basenoise_erosion", "detail_octaves",
+                "precipitation"};
+        double previous = Double.NaN;
+        for (int rung = 0; rung < ladder.length; rung++) {
+            StormT135PerformanceProfile.Cell cell =
+                    t162Cell(pose, ladder[rung].serializedName());
+            if (cell == null) {
+                continue;
+            }
+            double delta = Double.isNaN(previous) ? cell.cloudP50() : cell.cloudP50() - previous;
+            out.append(String.format(Locale.ROOT,
+                    "%nT162_LADDER rung=%d arm=%s class=%s cloudP50=%.4f deltaP50=%.4f",
+                    rung + 1, ladder[rung].serializedName(), classNames[rung],
+                    cell.cloudP50(), delta));
+            previous = cell.cloudP50();
+        }
+
+        for (int limit : new int[] {1, 2, 4, 6, 8, 10}) {
+            StormT135PerformanceProfile.Cell descriptorCell = t162Cell(pose,
+                    CoreCostDiagnosticProgram.T162_FW3_DESCRIPTOR.serializedName() + "@d" + limit);
+            StormT135PerformanceProfile.Cell shapeCell = t162Cell(pose,
+                    CoreCostDiagnosticProgram.T162_FW4_SHAPE.serializedName() + "@d" + limit);
+            out.append(String.format(Locale.ROOT,
+                    "%nT162_SCALING descriptors=%d descriptorArmP50=%s shapeArmP50=%s",
+                    limit,
+                    descriptorCell == null ? "n/a"
+                            : String.format(Locale.ROOT, "%.4f", descriptorCell.cloudP50()),
+                    shapeCell == null ? "n/a"
+                            : String.format(Locale.ROOT, "%.4f", shapeCell.cloudP50())));
+        }
+
+        out.append(String.format(Locale.ROOT, "%nT162_REJECTED count=%d %s",
+                T162_REJECTED.size(),
+                T162_REJECTED.isEmpty() ? "none" : String.join(",", T162_REJECTED)));
+        return out.toString();
+    }
+
+    private static StormT135PerformanceProfile.Cell t162Cell(String pose, String arm) {
+        for (StormT135PerformanceProfile.Cell cell : StormT135PerformanceProfile.results()) {
+            if (pose.equals(cell.pose()) && arm.equals(cell.arm())) {
+                return cell;
+            }
+        }
+        return null;
     }
 
     /**

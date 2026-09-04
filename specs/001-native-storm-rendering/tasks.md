@@ -1399,6 +1399,61 @@ implementation, while visual polish remains independently active.
   `ultra-recovery-primary-run.out.log` are contaminated (the sweep verifies pose visibility once
   and the fixture stopped contributing after the 0.500 arm); the shipped ladder is unaffected
   because it draws only from valid cells.
+- [X] T162 [PERFORMANCE] [US3] Attribute the remaining post-T161 cloud GPU time to a cost class
+  before any further architecture is chosen. Diagnostic only: change no ladder value, no
+  morphology, and no FINAL rendering semantic. Build a compile-time attribution ladder of
+  separately linked, lean-specialized programs in `build.gradle` and
+  `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh` -
+  a fixed-work rung per cost class (control floor, candidate traversal, descriptor payload fetch,
+  shape/profile/SDF, weather plus base noise and erosion, detail octaves, precipitation) plus
+  production-context arms with lighting and with rain compiled out - so no runtime diagnostic
+  branch can distort the timing, which is the distortion T161 measured. Register and select them
+  through `CoreCostDiagnosticProgram.java` and `VolumetricCloudShaders.java`; drive the campaign
+  from `StormT132AutoDriver.java` with a descriptor-count scaling sweep gated by a diagnostic
+  `descriptorCountLimit` in `VolumetricCloudDebugConfig.java`. Every timing cell must be
+  qualified independently - descriptor count and T150 geometric visibility re-verified
+  immediately before and immediately after the cell, and the cell discarded outright if the
+  fixture moved - because the Ultra recovery sweep qualified its pose once and silently kept
+  measuring after the storm stopped contributing. Record the ladder, the deltas, the
+  descriptor-count scaling, the lighting and rain shares, and a ranked next-architecture
+  recommendation in `specs/001-native-storm-rendering/validation/performance-cost-attribution.md`
+  (depends on T161, T140; T153's 1.63x is pre-T161 and may not be quoted as current)
+  [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-017, SC-021]
+  **ACCEPTED.** Diagnostic only; no ladder value, morphology or FINAL semantic changed.
+  Fresh Ultra/PLAY_VIS_NEAR/480x270 baseline 33.62-37.32 ms cloud p50 across three runs.
+  **CASE C: descriptor traversal is NOT dominant.** The fixed-work ladder (64 fixed samples per
+  fragment, identical control flow, deltas reproducible within 3% over three runs) attributes a
+  density evaluation as control floor 0.3%, candidate traversal 11.6%, descriptor payload fetch
+  4.1%, shape/profile/SDF 20.7%, weather+base noise+erosion 8.1%, detail octaves 0.6%,
+  **precipitation 54.5%**. Descriptor work end to end is **15.7%** of a density call - the T140
+  fetch-count clue pointed at the wrong thing, because 186 fetches per density call is 3.58
+  shape calls x 5.71 lobes x 9.12 texels of re-entry, not one sample touching many descriptors,
+  and T122 already avoids 185.2M of 551M fetches. **The largest single cost is code that never
+  runs**: `cloudDensity` takes an `includePrecipitation` parameter that **all 19 production call
+  sites pass false** (rain renders through a separate `rainShaftDensityOverSegment` integrator),
+  yet compiling that branch out is measured at **1.486x-1.581x (mean ~1.53x, ~35% of the frame)**
+  and is **bit-identical - 0 changed pixels of 129,600, maxAbsRGBA exactly 0.0** - while the
+  lighting arm captured the same way changes 18,062 pixels, which is what makes the zero
+  credible. This is T161 one level down: a dormant path inside a single function rather than
+  across programs. Lighting is second at **1.391x-1.476x (~30%)** and is real executed work
+  (38.8% of all density calls are light-march probes), so it can be reduced but not deleted;
+  **the historical T136 ~1.10x representative lighting share no longer holds** post-T161.
+  Descriptor-count scaling is flat from 1 to 6 descriptors then steps: 10x the descriptors costs
+  1.48x on the fetch arm and 3.15x on the shape arm - strongly sublinear, so perfect binning is
+  worth only ~25% of a density call and ranks **third**. **Recommended next: compile the
+  unreachable precipitation path out of `cloudDensity`** (preserving the capability behind a
+  compile-time variant rather than deleting it, per the T161 pattern) - trivial complexity, zero
+  visual risk, ~1.53x. **0.375 should be retested immediately after it** (60.91/1.53 = ~39.8 ms,
+  about what 0.25 costs today); 0.50 should not (~64.7 ms) unless rank 1 and lighting stack.
+  Composition of the two was **not** measured - a combined arm was dropped to save shader compile
+  time, and building it is a cheap follow-up. T153 re-derivation was **not attempted** and is left
+  as an explicit follow-up; its 1.63x remains stale. SC-006 stays 8 ms and unmet; rank 1 alone
+  would move Ultra from ~4.4x to ~2.9x the budget. Evidence hygiene: every cell qualified at both
+  ends (44 checks over 22 cells), **0 rejected**. Two harness defects were found and fixed before
+  any number was trusted - non-adjacent captures that let the fixture drift, and a capture that
+  ran after the per-arm program re-pin so every frame silently rendered the anchor; the lighting
+  arm showing a real difference is now the harness self-check. Evidence in
+  `validation/performance-cost-attribution.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

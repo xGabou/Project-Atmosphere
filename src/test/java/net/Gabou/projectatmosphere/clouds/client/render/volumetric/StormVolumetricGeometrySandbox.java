@@ -591,6 +591,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateLeanFinalShaderCompiles);
         runCorrected("T140 oracle variants compile and stay out of FINAL",
                 StormVolumetricGeometrySandbox::validateT140OracleVariants);
+        runCorrected("T162 attribution arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT162AttributionArms);
     }
 
     private static void validateFixedStormSilhouette() {
@@ -5622,6 +5624,53 @@ public final class StormVolumetricGeometrySandbox {
             require(source.contains("#define " + variant[1]),
                     variant[0] + " is missing #define " + variant[1]);
             compileFragmentShader(resolveMojImports(source), variant[0]);
+        }
+    }
+
+    /**
+     * The T162 attribution arms must compile, and none of them may leak into
+     * the shipped program. The fixed-work ladder replaces main() outright and
+     * the production-context arms bake a different constant than FINAL does, so
+     * either escaping into FINAL would silently change what ships. FINAL is
+     * asserted clean rather than trusted to be.
+     */
+    private static void validateT162AttributionArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        if (finalSource.contains("#define PA_T162_FIXED_WORK")) {
+            violations.add("FINAL defines PA_T162_FIXED_WORK");
+        }
+        if (finalSource.contains("#define PA_T162_NO_RAIN")) {
+            violations.add("FINAL defines PA_T162_NO_RAIN");
+        }
+        // FINAL must still bake production lighting, not the attribution arm.
+        if (!finalSource.contains("const int PaDiagnosticLightingMode = 0;")) {
+            violations.add("FINAL no longer bakes PaDiagnosticLightingMode = 0");
+        }
+        require(violations.isEmpty(), "T162 arm leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t162_nolight", "const int PaDiagnosticLightingMode = 1;"},
+                {"cloud_atmosphere_volume_t162_norain", "#define PA_T162_NO_RAIN"},
+                {"cloud_atmosphere_volume_t162_fw1_address", "#define PA_T162_ARM 1"},
+                {"cloud_atmosphere_volume_t162_fw2_candidate", "#define PA_T162_ARM 2"},
+                {"cloud_atmosphere_volume_t162_fw3_descriptor", "#define PA_T162_ARM 3"},
+                {"cloud_atmosphere_volume_t162_fw4_shape", "#define PA_T162_ARM 4"},
+                {"cloud_atmosphere_volume_t162_fw5_nodetail", "#define PA_T162_ARM 5"},
+                {"cloud_atmosphere_volume_t162_fw6_norain", "#define PA_T162_ARM 6"},
+                {"cloud_atmosphere_volume_t162_fw7_density", "#define PA_T162_ARM 7"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T162 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            compileFragmentShader(resolveMojImports(source), arm[0]);
         }
     }
 

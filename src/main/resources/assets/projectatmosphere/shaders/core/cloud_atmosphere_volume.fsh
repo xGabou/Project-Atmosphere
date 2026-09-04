@@ -4318,11 +4318,18 @@ float cloudDensity(
         return 0.0;
     }
 
+#ifdef PA_T162_NO_RAIN
+    // T162 production-context rain arm: the shaft evaluation is compiled out
+    // rather than branched around, so its cost cannot survive as a dormant
+    // path the way T161 showed dormant paths can.
+    float rainShaft = 0.0;
+#else
     float rainShaft = includePrecipitation
         && PuffDensityStage != 5
         && PuffDensityStage != 6
         ? rainShaftDensityAt(p, mipBias)
         : 0.0;
+#endif
     float familyDensityScale = directStormAvailable ? 0.73 : 0.88;
     if (!directStormAvailable && profileId == 1) {
         familyDensityScale = 0.62;
@@ -5225,7 +5232,180 @@ float precipitationRayPadding() {
 // Main
 // ---------------------------------------------------------------------------
 
+
+#ifdef PA_T162_FIXED_WORK
+// ---------------------------------------------------------------------------
+// T162 fixed-work attribution ladder. DIAGNOSTIC ONLY.
+//
+// Compiled only into the generated T162 programs; FINAL never defines
+// PA_T162_FIXED_WORK, so none of this exists in the shipped renderer.
+//
+// Every arm marches the same 64 fixed world-space points per fragment. No
+// point, loop bound or exit depends on density, transmittance, lighting or
+// rain, so all arms execute identical control flow and an identical number of
+// evaluations. Only the work performed at each point differs, which is what
+// makes the differences between arms attributable.
+//
+// The ladder is cumulative, so each step is a delta:
+//   1 ADDRESS          ray/loop/address arithmetic only          - control floor
+//   2 CANDIDATE        + candidate tile fetch, decode, group walk
+//   3 DESCRIPTOR       + the four-texel descriptor payload reads
+//   4 SHAPE            + ownership, profile, warp/SDF, role union
+//   5 DENSITY_NODETAIL + weather/morphology, base noise, erosion
+//   6 DENSITY_NORAIN   + detail octaves
+//   7 DENSITY_FULL     + precipitation shafts               - production density
+//
+// This is a SYNTHETIC context by construction: it is not the production
+// raymarch, and T161 already showed that isolated shader cost can mislead.
+// The production-context arms (constant lighting, no rain) exist to check it.
+// ---------------------------------------------------------------------------
+const int PA_T162_SAMPLES = 64;
+
+float paT162Consume(float checksum, float payload, int sampleIndex) {
+    return fract(checksum * 1.61803398875
+        + payload * 0.754877666
+        + float(sampleIndex + 1) * 0.013579);
+}
+
+/**
+ * Walks the production candidate topology for one sample point.
+ *
+ * With readPayload false it performs exactly the tile fetch, candidate decode,
+ * validity test and per-group iteration and nothing else. With it true it also
+ * issues the same four descriptor texel reads per admitted descriptor that the
+ * production evaluator issues. The difference between the two arms is the
+ * descriptor payload fetch and unpack cost, isolated from the traversal that
+ * finds them.
+ */
+float paT162CandidateWalk(vec3 samplePoint, bool readPayload) {
+    int groupVisited = 0;
+    float checksum = 0.0;
+    vec4 candidates = stormCandidatesAt(samplePoint.xz);
+    for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
+        int witnessIndex = decodeStormCandidate(candidates, rank);
+        if (!stormDescriptorIsValid(witnessIndex)) {
+            continue;
+        }
+        int groupSlot = stormDescriptorGroupSlot(witnessIndex);
+        int groupBit = 1 << groupSlot;
+        if ((groupVisited & groupBit) != 0) {
+            continue;
+        }
+        groupVisited |= groupBit;
+        int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
+        int endIndex = min(stormGroupEndIndex(witnessIndex, groupSlot), StormLobeCount);
+        checksum = paT162Consume(
+            checksum, float(witnessIndex + groupSlot + firstIndex + endIndex), rank);
+        for (int descriptorIndex = firstIndex;
+                descriptorIndex < MAX_STORM_LOBES;
+                descriptorIndex++) {
+            if (descriptorIndex >= endIndex) {
+                break;
+            }
+            if (!readPayload) {
+                checksum = paT162Consume(
+                    checksum, float(descriptorIndex), descriptorIndex);
+                continue;
+            }
+            vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+            vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
+            vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+            vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+            vec4 reduced = positionHeight * vec4(0.00031, 0.00023, 0.00019, 0.00017)
+                + radiusRotation * vec4(0.0031, 0.0023, 0.0019, 0.0017)
+                + shearMedia * vec4(0.0041, 0.0037, 0.0031, 0.0029)
+                + lifecycleRole * vec4(0.0053, 0.0047, 0.0043, 0.0000007);
+            checksum = paT162Consume(
+                checksum, dot(reduced, vec4(1.0)), descriptorIndex);
+        }
+    }
+    return checksum;
+}
+
+float paT162ShapePayload(vec3 samplePoint) {
+    bool ownsDescriptorGroup;
+    float dominantHeight01;
+    float envelopeStrength;
+    int activeRoleMask;
+    float unionDistanceBlocks;
+    float minDescriptorClearance;
+    float shape = directStormShape(
+        samplePoint, ownsDescriptorGroup, dominantHeight01, envelopeStrength,
+        activeRoleMask, unionDistanceBlocks, minDescriptorClearance);
+    // Consume every output so none of the evaluation can be folded away.
+    return shape
+        + dominantHeight01 * 0.071
+        + envelopeStrength * 0.113
+        + float(activeRoleMask) * 0.017
+        + (ownsDescriptorGroup ? 0.193 : 0.0)
+        + min(unionDistanceBlocks, 100000.0) * 0.0000031
+        + min(minDescriptorClearance, 100000.0) * 0.0000017;
+}
+
+void paT162FixedWorkMain() {
+    vec2 ndc = texCoord * 2.0 - 1.0;
+    vec4 viewDirection4 = InvProjMat * vec4(ndc, -1.0, 1.0);
+    vec3 viewDirection = normalize(
+        viewDirection4.xyz / max(abs(viewDirection4.w), 0.00001));
+    vec3 rayDirection = normalize((InvViewRotMat * vec4(viewDirection, 0.0)).xyz);
+
+    float startDistance;
+    float endDistance;
+    if (abs(rayDirection.y) < 0.0001) {
+        startDistance = 0.0;
+        endDistance = MaxRenderDistance;
+    } else {
+        float first = (SlabBaseY - CameraPos.y) / rayDirection.y;
+        float second = (SlabTopY - CameraPos.y) / rayDirection.y;
+        startDistance = max(min(first, second), 0.0);
+        endDistance = min(max(first, second), MaxRenderDistance);
+        if (endDistance <= startDistance) {
+            startDistance = 0.0;
+            endDistance = MaxRenderDistance;
+        }
+    }
+
+    float checksum = dot(rayDirection, vec3(0.173, 0.271, 0.389))
+        + dot(CameraPos, vec3(0.000013, 0.000017, 0.000019));
+    for (int sampleIndex = 0; sampleIndex < PA_T162_SAMPLES; sampleIndex++) {
+        float sampleFraction = (float(sampleIndex) + 0.5) / float(PA_T162_SAMPLES);
+        float sampleDistance = mix(startDistance, endDistance, sampleFraction);
+        vec3 samplePoint = CameraPos + rayDirection * sampleDistance;
+        float payload;
+#if PA_T162_ARM == 1
+        payload = dot(samplePoint, vec3(0.00031, 0.00017, 0.00023))
+            + sampleDistance * 0.00011;
+#elif PA_T162_ARM == 2
+        payload = paT162CandidateWalk(samplePoint, false);
+#elif PA_T162_ARM == 3
+        payload = paT162CandidateWalk(samplePoint, true);
+#elif PA_T162_ARM == 4
+        payload = paT162ShapePayload(samplePoint);
+#elif PA_T162_ARM == 5
+        payload = cloudDensity(samplePoint, 0.0, false, sampleDistance < 220.0, false);
+#elif PA_T162_ARM == 6
+        payload = cloudDensity(samplePoint, 0.0, true, sampleDistance < 220.0, false);
+#else
+        payload = cloudDensity(samplePoint, 0.0, true, sampleDistance < 220.0, true);
+#endif
+        checksum = paT162Consume(checksum, payload, sampleIndex);
+    }
+    fragColor = vec4(
+        fract(checksum),
+        fract(checksum * 1.324717957),
+        fract(checksum * 1.220744085),
+        1.0);
+    gl_FragDepth = 1.0;
+}
+#endif
+
 void main() {
+#ifdef PA_T162_FIXED_WORK
+    // Fixed-work attribution ladder. Everything below is unreachable in
+    // these programs and the driver eliminates it.
+    paT162FixedWorkMain();
+    return;
+#endif
     // Every fragment of a trace pass marches the traced ray, not its own. The
     // view sample is therefore the traced pixel's, and only the published
     // record varies across the fragment grid.

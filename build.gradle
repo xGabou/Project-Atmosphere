@@ -303,7 +303,30 @@ def leanProgramVariants = [
         [name: 'cloud_atmosphere_volume_t140_tile8',
          defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8'], keepUniforms: ['PaOracleBaseSize']],
         [name: 'cloud_atmosphere_volume_t140_tile16',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16'], keepUniforms: ['PaOracleBaseSize']]
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16'], keepUniforms: ['PaOracleBaseSize']],
+        // T162 production-context attribution arms. These render the real
+        // raymarch; only one cost class is compiled out of each.
+        [name: 'cloud_atmosphere_volume_t162_nolight', defines: [], keepUniforms: [],
+         overrides: ['uniform int PaDiagnosticLightingMode;':
+                     'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_t162_norain',
+         defines: ['PA_T162_NO_RAIN 1'], keepUniforms: []],
+        // T162 fixed-work ladder. Every arm evaluates the same 64 points per
+        // fragment, so the deltas between them are attributable.
+        [name: 'cloud_atmosphere_volume_t162_fw1_address',
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t162_fw2_candidate',
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t162_fw3_descriptor',
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t162_fw4_shape',
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t162_fw5_nodetail',
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t162_fw6_norain',
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t162_fw7_density',
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 7'], keepUniforms: []]
 ]
 
 tasks.register('generateLeanFinalShader') {
@@ -328,7 +351,14 @@ tasks.register('generateLeanFinalShader') {
             List<String> keep = variant.keepUniforms
             String variantSource = productionSource
             List<String> baked = []
-            leanFinalConstants.each { String uniformDeclaration, String constantDeclaration ->
+            // A variant may bake a uniform to a different constant than FINAL
+            // does; that is how a production-context arm switches one cost
+            // class off without introducing a runtime branch.
+            Map<String, String> variantConstants = new LinkedHashMap<>(leanFinalConstants)
+            if (variant.overrides != null) {
+                variantConstants.putAll(variant.overrides)
+            }
+            variantConstants.each { String uniformDeclaration, String constantDeclaration ->
                 String uniformName = uniformDeclaration
                         .replaceAll(/^uniform\s+\w+\s+/, '').replaceAll(/;$/, '')
                 if (keep.contains(uniformName)) {

@@ -36,6 +36,15 @@ public final class VolumetricCloudDebugConfig {
      * monolithic FINAL and the new lean FINAL from one run. Never set outside a
      * deliberate capture; {@link #resetDefaults()} clears it.
      */
+    /**
+     * T162 descriptor-count scaling arm. Negative means no limit. A positive
+     * value caps the StormLobeCount the shader is told about, so a fixed-work
+     * arm evaluates fewer descriptors per sample while everything else - pose,
+     * target, sample count, fixture - is held identical. It changes what is
+     * drawn, so it is only meaningful for the fixed-work ladder, where the
+     * number of evaluations does not depend on what the storm looks like.
+     */
+    private static volatile int descriptorCountLimit = -1;
     private static volatile CoreCostDiagnosticProgram finalProgramOverride;
     private static volatile boolean depthCompositeEnabled = true;
     private static volatile boolean sceneRayLimitEnabled = true;
@@ -306,6 +315,15 @@ public final class VolumetricCloudDebugConfig {
                 mode == null ? StormOptimizationDiagnosticMode.NORMAL_PRODUCTION : mode;
     }
 
+    /** Negative when the shader sees the true resident descriptor count. */
+    public static int descriptorCountLimit() {
+        return descriptorCountLimit;
+    }
+
+    public static void setDescriptorCountLimit(int limit) {
+        descriptorCountLimit = limit;
+    }
+
     /** Null when the renderer selects the FINAL program automatically. */
     public static CoreCostDiagnosticProgram finalProgramOverride() {
         return finalProgramOverride;
@@ -341,6 +359,7 @@ public final class VolumetricCloudDebugConfig {
         stormTopologyMode = StormTopologyMode.COMPACT;
         optimizationDiagnosticMode = StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
         finalProgramOverride = null;
+        descriptorCountLimit = -1;
     }
 
     /** Pure reset-contract check for the standalone renderer sandbox. */
@@ -364,6 +383,7 @@ public final class VolumetricCloudDebugConfig {
         coveragePretestDilation = 2;
         stormTopologyMode = StormTopologyMode.LEGACY_SCAN;
         finalProgramOverride = CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH;
+        descriptorCountLimit = 4;
         resetDefaults();
         if (!depthCompositeEnabled
                 || !sceneRayLimitEnabled
@@ -383,7 +403,8 @@ public final class VolumetricCloudDebugConfig {
                 || coveragePretestThreshold != 0.004F
                 || coveragePretestDilation != 0
                 || stormTopologyMode != StormTopologyMode.COMPACT
-                || finalProgramOverride != null) {
+                || finalProgramOverride != null
+                || descriptorCountLimit != -1) {
             throw new IllegalStateException("volumetric debug defaults did not reset exactly");
         }
     }

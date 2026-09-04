@@ -443,7 +443,13 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("SlabTopY").set(weather.slabTopY());
         shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
-        shader.safeGetUniform("StormLobeCount").set(StormGeometryBuildCoordinator.lobeCount());
+        // T162 scaling arm: a positive cap tells the shader about fewer
+        // descriptors than are resident. Diagnostic only; the default is no cap.
+        int residentLobeCount = StormGeometryBuildCoordinator.lobeCount();
+        int descriptorLimit = VolumetricCloudDebugConfig.descriptorCountLimit();
+        shader.safeGetUniform("StormLobeCount").set(
+                descriptorLimit < 0 ? residentLobeCount
+                        : Math.min(residentLobeCount, descriptorLimit));
         shader.safeGetUniform("PaDiagnosticStepBudget").set(diagnosticStepBudget);
         shader.safeGetUniform("PuffShapeMode").set(PuffLobeSpatialIndex.effectiveShapeMode().shaderId());
         shader.safeGetUniform("PuffDensityStage").set(
