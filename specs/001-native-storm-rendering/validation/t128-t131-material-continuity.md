@@ -1,5 +1,13 @@
 # T128–T131 Vertical Material Trace and Measured Correction
 
+> **Supersession / attribution correction (2026-09-01).** Preserve the accepted historical T128
+> capture as evidence for `directStormShape` descriptor/envelope material and the stage helper it
+> actually executes. It is **not evidence for the complete production `cloudDensity` path** or a
+> production raymarch conclusion: `cloudDensity` applies additional gates and terms that the old
+> trace did not execute. The 2026-08-31 retraction in
+> `validation/t098-manual-checklist.md` is authoritative for this limitation. Do not rewrite the
+> accepted record; use full production-density or production-ray diagnostics for those claims.
+
 ## T128 deterministic trace
 
 Fixture: live 3c039aa7 ten-member strengths.  
