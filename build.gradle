@@ -214,7 +214,131 @@ dependencies {
     // runtimeOnly fg.deobf("curse.maven:tough-as-nails-246391:5815863")
 }
 
+
+// ---------------------------------------------------------------------------
+// T161: compile-time FINAL shader specialization.
+//
+// The volumetric cloud raymarch is one source file that carries both the normal
+// renderer and every dormant diagnostic, oracle, trace, legacy and alternate
+// output path. Those paths are selected by uniforms, so a driver cannot prove
+// them unreachable: it must keep their code, allocate registers for their live
+// ranges, and preserve their control flow inside the hot march loop even though
+// an ordinary frame never enters one.
+//
+// This task emits a second, separately linked program from the SAME source, with
+// each diagnostic selector replaced by the exact constant an ordinary FINAL
+// frame uploads. Every dormant path then becomes statically unreachable and is
+// eliminated before register allocation. Nothing is deleted: the unmodified
+// program is still compiled and is what every diagnostic campaign selects.
+//
+// The renderer must only bind the lean program on frames where these uniforms
+// really would have carried these values; VolumetricCloudRenderer's
+// leanFinalEligible() is the matching runtime predicate, and the two lists must
+// be changed together.
+// ---------------------------------------------------------------------------
+def leanFinalShaderSource =
+        file('src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh')
+def leanFinalShaderJson =
+        file('src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.json')
+def leanFinalGeneratedResources = layout.buildDirectory.dir('generated/leanFinalResources')
+def leanFinalShaderName = 'cloud_atmosphere_volume_final'
+
+// uniform declaration -> replacement declaration. The value on the right is the
+// production value the renderer uploads for an ordinary FINAL frame; where a
+// uniform is only read behind a diagnostic gate that is itself literalized off,
+// the value is the shader's own inert default.
+def leanFinalConstants = [
+        'uniform int PaDiagnosticStepBudget;'      : 'const int PaDiagnosticStepBudget = 0;',
+        'uniform int PuffDensityStage;'            : 'const int PuffDensityStage = 0;',
+        'uniform int PuffTierFilter;'              : 'const int PuffTierFilter = -1;',
+        'uniform int DebugView;'                   : 'const int DebugView = 0;',
+        'uniform int PaDiagnosticOptimizationMode;': 'const int PaDiagnosticOptimizationMode = 0;',
+        'uniform float PaDiagnosticEvalEpsilon;'   : 'const float PaDiagnosticEvalEpsilon = 0.0;',
+        'uniform int PaOraclePass;'                : 'const int PaOraclePass = 0;',
+        'uniform vec2 PaOracleBaseSize;'           : 'const vec2 PaOracleBaseSize = vec2(1.0);',
+        'uniform vec2 StormTraceOrigin;'           : 'const vec2 StormTraceOrigin = vec2(0.0);',
+        'uniform float StormTraceYStart;'          : 'const float StormTraceYStart = 0.0;',
+        'uniform float StormTraceYInterval;'       : 'const float StormTraceYInterval = 1.0;',
+        'uniform int StormTraceSamples;'           : 'const int StormTraceSamples = 2;',
+        'uniform int StormTraceStage;'             : 'const int StormTraceStage = 0;',
+        'uniform int PaLegacyHitDepth;'            : 'const int PaLegacyHitDepth = 0;',
+        'uniform int PaLegacyFinePromotion;'       : 'const int PaLegacyFinePromotion = 0;',
+        'uniform int PaDiagnosticLightingMode;'    : 'const int PaDiagnosticLightingMode = 0;',
+        'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
+        'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
+        'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);'
+]
+
+// The oracle interval texture is read only by the T153 ground-truth replay,
+// which PaOraclePass = 0 makes unreachable. The driver therefore drops the
+// sampler entirely, so naming it in the lean JSON only produces a "could not
+// find sampler" warning on every load. Its absence from the linked program is
+// also the clearest single proof that the specialization really did eliminate
+// the diagnostic paths rather than merely hide them.
+def leanFinalRemovedSamplers = ['OracleIntervalSampler']
+
+// The uniform names the lean program no longer declares. Minecraft binds every
+// uniform named in the JSON, so the generated JSON must drop them; the renderer
+// reaches them through safeGetUniform, which returns a dummy for an absent name.
+def leanFinalRemovedUniforms = leanFinalConstants.keySet().collect {
+    it.replaceAll(/^uniform\s+\w+\s+/, '').replaceAll(/;$/, '')
+}
+
+tasks.register('generateLeanFinalShader') {
+    description = 'Generates the compile-time-specialized lean FINAL cloud program.'
+    inputs.files(leanFinalShaderSource, leanFinalShaderJson)
+    inputs.property('leanConstants', leanFinalConstants.toString())
+    inputs.property('leanProgramName', leanFinalShaderName)
+    inputs.property('leanRemovedSamplers', leanFinalRemovedSamplers.toString())
+    outputs.dir(leanFinalGeneratedResources)
+    doLast {
+        File shaderDirectory = new File(
+                leanFinalGeneratedResources.get().asFile,
+                'assets/projectatmosphere/shaders/core')
+        shaderDirectory.mkdirs()
+
+        String leanSource = leanFinalShaderSource.getText('UTF-8')
+        leanFinalConstants.each { String uniformDeclaration, String constantDeclaration ->
+            // A silently missed replacement would ship a lean program that is
+            // identical to the monolith and quietly lose the entire gain, so a
+            // renamed or reformatted declaration must fail the build.
+            if (!leanSource.contains(uniformDeclaration)) {
+                throw new GradleException(
+                        'Lean FINAL specialization could not find uniform declaration: '
+                                + uniformDeclaration
+                                + ' in cloud_atmosphere_volume.fsh. Update leanFinalConstants in'
+                                + ' build.gradle and leanFinalEligible() in'
+                                + ' VolumetricCloudRenderer together.')
+            }
+            leanSource = leanSource.replace(uniformDeclaration, constantDeclaration)
+        }
+
+        new File(shaderDirectory, leanFinalShaderName + '.fsh').setText(
+                '// GENERATED - do not edit. Compile-time-specialized FINAL program\n'
+                        + '// emitted from cloud_atmosphere_volume.fsh by generateLeanFinalShader.\n'
+                        + '// Every dormant diagnostic selector is a constant here, so the driver\n'
+                        + '// eliminates those paths before allocating registers.\n'
+                        + leanSource,
+                'UTF-8')
+
+        def shaderJson = new groovy.json.JsonSlurper().parse(leanFinalShaderJson, 'UTF-8')
+        shaderJson.fragment = 'projectatmosphere:' + leanFinalShaderName
+        shaderJson.uniforms = shaderJson.uniforms.findAll {
+            !leanFinalRemovedUniforms.contains(it.name)
+        }
+        shaderJson.samplers = shaderJson.samplers.findAll {
+            !leanFinalRemovedSamplers.contains(it.name)
+        }
+        new File(shaderDirectory, leanFinalShaderName + '.json').setText(
+                groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(shaderJson)),
+                'UTF-8')
+    }
+}
+
+sourceSets.main.resources.srcDir leanFinalGeneratedResources
+
 tasks.named('processResources', ProcessResources).configure {
+    dependsOn tasks.named('generateLeanFinalShader')
     def replaceProps = [
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
@@ -307,6 +431,9 @@ tasks.register('stormVolumetricGeometrySandbox', JavaExec) {
     group = 'project atmosphere'
     description = 'Runs deterministic direct severe-storm geometry and cache checks without launching Minecraft.'
     dependsOn 'testClasses'
+    // The T161 check compiles the generated lean FINAL program, so it has to
+    // exist before the sandbox runs.
+    dependsOn 'generateLeanFinalShader'
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormVolumetricGeometrySandbox'
     workingDir = project.rootDir

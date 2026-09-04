@@ -587,6 +587,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateBoundedPerGroupIntersection);
         runCorrected("T111 production storm shader compiles",
                 StormVolumetricGeometrySandbox::validateProductionShaderCompiles);
+        runCorrected("T161 lean FINAL shader specializes and compiles",
+                StormVolumetricGeometrySandbox::validateLeanFinalShaderCompiles);
     }
 
     private static void validateFixedStormSilhouette() {
@@ -5522,10 +5524,75 @@ public final class StormVolumetricGeometrySandbox {
      * only discovered by launching the game, where the failure surfaces as
      * "clouds disappeared" rather than as a compile error.
      */
+    /**
+     * The uniforms T161 turns into constants for the lean FINAL program, paired
+     * with the constant declaration the generator must emit. This mirrors
+     * leanFinalConstants in build.gradle; if the two drift, the generated
+     * program stops being a faithful specialization of the shipped shader.
+     */
+    private static final String[][] LEAN_FINAL_SPECIALIZATIONS = {
+            {"PaDiagnosticStepBudget", "const int PaDiagnosticStepBudget = 0;"},
+            {"PuffDensityStage", "const int PuffDensityStage = 0;"},
+            {"PuffTierFilter", "const int PuffTierFilter = -1;"},
+            {"DebugView", "const int DebugView = 0;"},
+            {"PaDiagnosticOptimizationMode", "const int PaDiagnosticOptimizationMode = 0;"},
+            {"PaDiagnosticEvalEpsilon", "const float PaDiagnosticEvalEpsilon = 0.0;"},
+            {"PaOraclePass", "const int PaOraclePass = 0;"},
+            {"PaOracleBaseSize", "const vec2 PaOracleBaseSize = vec2(1.0);"},
+            {"StormTraceOrigin", "const vec2 StormTraceOrigin = vec2(0.0);"},
+            {"StormTraceYStart", "const float StormTraceYStart = 0.0;"},
+            {"StormTraceYInterval", "const float StormTraceYInterval = 1.0;"},
+            {"StormTraceSamples", "const int StormTraceSamples = 2;"},
+            {"StormTraceStage", "const int StormTraceStage = 0;"},
+            {"PaLegacyHitDepth", "const int PaLegacyHitDepth = 0;"},
+            {"PaLegacyFinePromotion", "const int PaLegacyFinePromotion = 0;"},
+            {"PaDiagnosticLightingMode", "const int PaDiagnosticLightingMode = 0;"},
+            {"PaRayTraceMode", "const int PaRayTraceMode = 0;"},
+            {"PaRayTraceNdc", "const vec2 PaRayTraceNdc = vec2(0.0);"},
+            {"PaRayTraceFragCoord", "const vec2 PaRayTraceFragCoord = vec2(0.0);"}
+    };
+
+    /**
+     * The generated lean FINAL program must both specialize and still compile.
+     * A generator that silently stopped substituting would emit a program
+     * identical to the monolith, keep every image check green, and quietly give
+     * back the whole cost T161 removed - so the substitution is asserted here
+     * rather than inferred from the frame time.
+     */
+    private static void validateLeanFinalShaderCompiles() {
+        String generated =
+                "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/"
+                        + "cloud_atmosphere_volume_final.fsh";
+        if (!Files.exists(workspacePath(generated))) {
+            throw new IllegalStateException(
+                    "generated lean FINAL shader is missing; run generateLeanFinalShader: "
+                            + generated);
+        }
+        String leanSource = readWorkspaceSource(generated);
+        List<String> violations = new ArrayList<>();
+        for (String[] specialization : LEAN_FINAL_SPECIALIZATIONS) {
+            String name = specialization[0];
+            if (leanSource.contains("uniform int " + name + ";")
+                    || leanSource.contains("uniform float " + name + ";")
+                    || leanSource.contains("uniform vec2 " + name + ";")) {
+                violations.add(name + " is still a uniform in the lean FINAL program");
+            }
+            if (!leanSource.contains(specialization[1])) {
+                violations.add(name + " was not specialized to " + specialization[1]);
+            }
+        }
+        require(violations.isEmpty(), "lean FINAL specialization incomplete: "
+                + String.join("; ", violations));
+        compileFragmentShader(resolveMojImports(leanSource), "lean FINAL storm shader");
+    }
+
     private static void validateProductionShaderCompiles() {
-        String fragmentSource = resolveMojImports(readWorkspaceSource(
+        compileFragmentShader(resolveMojImports(readWorkspaceSource(
                 "src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh"
-        ));
+        )), "production storm shader");
+    }
+
+    private static void compileFragmentShader(String fragmentSource, String label) {
         if (!GLFW.glfwInit()) {
             throw new IllegalStateException("GLFW could not initialize for the shader compile check");
         }
@@ -5546,7 +5613,7 @@ public final class StormVolumetricGeometrySandbox {
             GL20.glShaderSource(shader, fragmentSource);
             GL20.glCompileShader(shader);
             if (GL20.glGetShaderi(shader, GL20.GL_COMPILE_STATUS) != GL11.GL_TRUE) {
-                throw new IllegalStateException("production storm shader failed to compile: "
+                throw new IllegalStateException(label + " failed to compile: "
                         + oneLine(GL20.glGetShaderInfoLog(shader)));
             }
         } finally {

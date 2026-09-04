@@ -28,6 +28,15 @@ public final class VolumetricCloudDebugConfig {
      * is the lighting and self-shadow share. Never enabled by production.
      */
     private static volatile boolean t136ConstantLighting;
+    /**
+     * T161 A/B arm. Null lets the renderer pick the program automatically: the
+     * lean FINAL build whenever the frame's uploads match its baked-in
+     * constants, and the diagnostic monolith otherwise. A non-null value pins
+     * one program so a controlled same-fixture comparison can render the old
+     * monolithic FINAL and the new lean FINAL from one run. Never set outside a
+     * deliberate capture; {@link #resetDefaults()} clears it.
+     */
+    private static volatile CoreCostDiagnosticProgram finalProgramOverride;
     private static volatile boolean depthCompositeEnabled = true;
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
@@ -297,6 +306,15 @@ public final class VolumetricCloudDebugConfig {
                 mode == null ? StormOptimizationDiagnosticMode.NORMAL_PRODUCTION : mode;
     }
 
+    /** Null when the renderer selects the FINAL program automatically. */
+    public static CoreCostDiagnosticProgram finalProgramOverride() {
+        return finalProgramOverride;
+    }
+
+    public static void setFinalProgramOverride(CoreCostDiagnosticProgram program) {
+        finalProgramOverride = program;
+    }
+
     /**
      * Returns every comparison switch to the production baseline. Debug state
      * is process-static, so session/world/backend transitions must call this
@@ -322,6 +340,7 @@ public final class VolumetricCloudDebugConfig {
         coveragePretestDilation = 0;
         stormTopologyMode = StormTopologyMode.COMPACT;
         optimizationDiagnosticMode = StormOptimizationDiagnosticMode.NORMAL_PRODUCTION;
+        finalProgramOverride = null;
     }
 
     /** Pure reset-contract check for the standalone renderer sandbox. */
@@ -344,6 +363,7 @@ public final class VolumetricCloudDebugConfig {
         coveragePretestThreshold = 0.02F;
         coveragePretestDilation = 2;
         stormTopologyMode = StormTopologyMode.LEGACY_SCAN;
+        finalProgramOverride = CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH;
         resetDefaults();
         if (!depthCompositeEnabled
                 || !sceneRayLimitEnabled
@@ -362,7 +382,8 @@ public final class VolumetricCloudDebugConfig {
                 || coveragePretestSamples != 6
                 || coveragePretestThreshold != 0.004F
                 || coveragePretestDilation != 0
-                || stormTopologyMode != StormTopologyMode.COMPACT) {
+                || stormTopologyMode != StormTopologyMode.COMPACT
+                || finalProgramOverride != null) {
             throw new IllegalStateException("volumetric debug defaults did not reset exactly");
         }
     }
@@ -384,6 +405,9 @@ public final class VolumetricCloudDebugConfig {
                 + "\nsentinelHeights=" + (sentinelHeightsEnabled ? "on" : "off")
                 + "\nfullres=" + (fullResolutionEnabled ? "on" : "off")
                 + "\nweatherCoverageScale=" + weatherCoverageScale
-                + "\nstormTopology=" + stormTopologyMode.serializedName();
+                + "\nstormTopology=" + stormTopologyMode.serializedName()
+                + "\nfinalProgram=" + (finalProgramOverride == null
+                        ? "auto"
+                        : finalProgramOverride.serializedName());
     }
 }

@@ -47,6 +47,8 @@ public final class VolumetricCloudRenderer {
     private static boolean denseCameraResolution;
     private static int fragmentTextureUnits = -1;
     private static boolean renderedProductionFrame;
+    private static volatile CoreCostDiagnosticProgram lastProgram =
+            CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH;
     /**
      * The exact transform the last draw uploaded. Diagnostics that must
      * address a specific rendered pixel project through this rather than
@@ -264,7 +266,23 @@ public final class VolumetricCloudRenderer {
         if (!hasTextureUnitCapacity()) {
             return false;
         }
-        ShaderInstance shader = VolumetricCloudShaders.volumeShader();
+        StormOptimizationDiagnosticMode optimizationMode =
+                VolumetricCloudDebugConfig.optimizationDiagnosticMode();
+        VolumetricCloudRaymarchDebugView debugView = StormMaterialRuntimeTrace.active()
+                ? VolumetricCloudRaymarchDebugView.STORM_MATERIAL_TRACE
+                : StormWorkloadRuntimeCapture.active()
+                    ? StormWorkloadRuntimeCapture.view()
+                    : VolumetricCloudDebugConfig.raymarchDebugView();
+        CoreCostDiagnosticProgram program = selectProgram(debugView, optimizationMode);
+        ShaderInstance shader = VolumetricCloudShaders.volumeShader(program);
+        if (shader == null && program == CoreCostDiagnosticProgram.LEAN_FINAL) {
+            // Never quietly substitute the monolith here. It would render the
+            // correct image at the pre-T161 cost, so the regression would be
+            // invisible in every image check and only show up as lost frames.
+            throw new LeanFinalProgramUnavailableException(
+                    "lean FINAL cloud program (cloud_atmosphere_volume_final) failed to link;"
+                            + " refusing to fall back to the diagnostic monolith");
+        }
         if (shader == null || mainTarget == null || !weather.rendered()) {
             return false;
         }
@@ -334,8 +352,6 @@ public final class VolumetricCloudRenderer {
 
         RenderTarget cloudTarget = VolumetricCloudRenderTargets.currentCloudTarget();
         RenderTarget historyTarget = VolumetricCloudRenderTargets.historyCloudTarget();
-        StormOptimizationDiagnosticMode optimizationMode =
-                VolumetricCloudDebugConfig.optimizationDiagnosticMode();
         boolean t153Oracle = optimizationMode.t153Oracle();
         RenderTarget oracleTarget = t153Oracle
                 ? VolumetricCloudRenderTargets.prepareVisibleVolumeOracleTarget(
@@ -496,11 +512,6 @@ public final class VolumetricCloudRenderer {
                 ? safeTuning.historyBlend() * historyConfidence
                 : 0.0F;
         shader.safeGetUniform("HistoryBlend").set(uploadedHistoryBlend);
-        VolumetricCloudRaymarchDebugView debugView = StormMaterialRuntimeTrace.active()
-                ? VolumetricCloudRaymarchDebugView.STORM_MATERIAL_TRACE
-                : StormWorkloadRuntimeCapture.active()
-                    ? StormWorkloadRuntimeCapture.view()
-                    : VolumetricCloudDebugConfig.raymarchDebugView();
         shader.safeGetUniform("DebugView").set(debugView.shaderId());
         shader.safeGetUniform("StormTopologyMode").set(
                 VolumetricCloudDebugConfig.stormTopologyMode().shaderId()
@@ -575,6 +586,7 @@ public final class VolumetricCloudRenderer {
             shader.safeGetUniform("PaOraclePass").set(0);
         }
 
+        lastProgram = program;
         shader.apply();
         PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
         bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
@@ -628,7 +640,8 @@ public final class VolumetricCloudRenderer {
 
         // A ray-trace pass writes a diagnostic record, not an image. It must
         // never become the next frame's history.
-        renderedProductionFrame = debugView == VolumetricCloudRaymarchDebugView.FINAL
+        renderedProductionFrame = program.normalProductionOutput()
+                && debugView == VolumetricCloudRaymarchDebugView.FINAL
                 && !StormProductionRayTrace.active()
                 && !t153Oracle;
         if (renderedProductionFrame) {
@@ -641,6 +654,73 @@ public final class VolumetricCloudRenderer {
         }
         frameIndex++;
         return true;
+    }
+
+    /**
+     * Chooses the linked program for this frame.
+     *
+     * <p>The lean FINAL build has every diagnostic selector baked in as a
+     * constant, so it is only correct for a frame that would have uploaded
+     * exactly those values. This predicate is the runtime half of that
+     * contract: each clause corresponds to one entry of {@code
+     * leanFinalConstants} in {@code build.gradle}, and the two must be edited
+     * together. Anything diagnostic - a debug view, a trace, an oracle replay,
+     * an optimization arm, a legacy evidence arm, a stage or tier cut, a
+     * ray-trace record, a step budget - falls through to the unmodified
+     * monolith, which still contains all of it.
+     */
+    private static CoreCostDiagnosticProgram selectProgram(
+            VolumetricCloudRaymarchDebugView debugView,
+            StormOptimizationDiagnosticMode optimizationMode
+    ) {
+        CoreCostDiagnosticProgram override = VolumetricCloudDebugConfig.finalProgramOverride();
+        if (override != null) {
+            return override;
+        }
+        return leanFinalEligible(debugView, optimizationMode)
+                ? CoreCostDiagnosticProgram.LEAN_FINAL
+                : CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH;
+    }
+
+    /** True when every uniform the lean program literalizes is at its baked value. */
+    private static boolean leanFinalEligible(
+            VolumetricCloudRaymarchDebugView debugView,
+            StormOptimizationDiagnosticMode optimizationMode
+    ) {
+        return debugView == VolumetricCloudRaymarchDebugView.FINAL
+                && diagnosticStepBudget == 0
+                && VolumetricCloudDebugConfig.puffDensityStage()
+                        == VolumetricPuffDensityStage.FINAL
+                && VolumetricCloudDebugConfig.puffTierFilter() == VolumetricPuffTierFilter.ALL
+                && optimizationMode == StormOptimizationDiagnosticMode.NORMAL_PRODUCTION
+                && !StormProductionRayTrace.active()
+                && !StormMaterialRuntimeTrace.active()
+                && !VolumetricCloudDebugConfig.t098LegacyHitDepth()
+                && !VolumetricCloudDebugConfig.t098LegacyFinePromotion()
+                && !VolumetricCloudDebugConfig.t136ConstantLighting();
+    }
+
+    /**
+     * Raised when a FINAL frame cannot bind the lean program.
+     *
+     * <p>It propagates to the render hook's handler, which disables the
+     * volumetric pass for the session and logs the cause - the established
+     * native fallback. That is deliberately louder than substituting the
+     * monolith: the monolith would draw the same image while silently costing
+     * what T161 removed, so a link failure has to be visible rather than merely
+     * slow. Its simple name reaches the user through the render status string.
+     */
+    public static final class LeanFinalProgramUnavailableException extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+
+        LeanFinalProgramUnavailableException(String message) {
+            super(message);
+        }
+    }
+
+    /** Which program the last frame actually bound; for diagnostics and status. */
+    public static CoreCostDiagnosticProgram lastProgram() {
+        return lastProgram;
     }
 
     private static float rotationDelta(Matrix4f previous, Matrix4f current) {

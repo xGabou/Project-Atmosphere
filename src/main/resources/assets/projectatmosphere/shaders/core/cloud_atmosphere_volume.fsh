@@ -45,6 +45,27 @@ uniform float SlabTopY;
 uniform float MaxPrecipitation;
 uniform int PuffLobeCount;
 uniform int StormLobeCount;
+// ---------------------------------------------------------------------------
+// T161: this file is compiled twice.
+//
+// As written it is the DIAGNOSTIC program, and every campaign that needs a
+// debug view, a trace, an oracle replay, an optimization arm, a legacy evidence
+// arm or a ray-trace record binds this build and drives the uniforms below.
+//
+// The generateLeanFinalShader Gradle task also emits a lean FINAL program from
+// this same source, with each of those diagnostic selectors replaced by the
+// constant an ordinary frame uploads, so the driver deletes the dormant paths
+// before allocating registers. Ordinary rendering binds that build.
+//
+// Consequences for editing:
+//  - Renaming or reformatting one of the specialized uniform declarations
+//    fails the build rather than silently producing an unspecialized program.
+//  - Adding a new diagnostic selector means adding it in three places:
+//    leanFinalConstants in build.gradle, LEAN_FINAL_SPECIALIZATIONS in
+//    StormVolumetricGeometrySandbox, and leanFinalEligible() in
+//    VolumetricCloudRenderer. Otherwise FINAL frames can bind a program whose
+//    baked constant disagrees with what the renderer meant to upload.
+// ---------------------------------------------------------------------------
 // T098 phase 1 control arm. Zero means production: the loop caps at MAX_STEPS
 // exactly as before. A positive value raises the cap so budget exhaustion can
 // be removed as a variable while every other rule stays fixed. Set only by the

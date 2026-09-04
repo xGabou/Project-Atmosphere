@@ -84,6 +84,7 @@ public final class VolumetricCloudRenderHook {
         return "volumetricActive=" + isActive()
                 + " status=" + lastStatus
                 + " cells=" + ClientCloudCellCache.trackedCellCount()
+                + " cloudProgram=" + VolumetricCloudRenderer.lastProgram().serializedName()
                 + " raymarchGpuMs=" + VolumetricCloudRenderer.lastGpuMilliseconds()
                 + " governorScale=" + VolumetricCloudRenderer.governorStepScale()
                 + " cloudlets[" + lastCloudletBudgetStats.summary() + "]"
@@ -499,6 +500,7 @@ public final class VolumetricCloudRenderHook {
                 + " regionalSource=" + (renderingFields
                         ? "disabled_for_fields"
                         : (regionalCoverage > 0.01F ? "enabled" : "none"))
+                + " cloudProgram=" + VolumetricCloudRenderer.lastProgram().serializedName()
                 + " debug[depthComposite=" + VolumetricCloudDebugConfig.depthCompositeEnabled()
                 + " sceneRayLimit=" + VolumetricCloudDebugConfig.sceneRayLimitEnabled()
                 + " coveragePretest=" + VolumetricCloudDebugConfig.coveragePretestEnabled()

@@ -1304,11 +1304,53 @@ do not fabricate historical before/after percentages for T119--T123.
   production. Caveat: rendered occupancy was not measured, so root cause 4 is not positively
   excluded - and the density field from above is a 1.5:1 ellipse, so a rendered view that
   reads *circular* would itself be evidence for it.
-- [ ] T140 [PERFORMANCE] Reprofile all five modes after T139 and the terminal Phase 4Q outcome using T135's written targets in
+- [X] T161 [PERFORMANCE] [US3] Productionize compile-time FINAL shader specialization without
+  cherry-picking the experimental branch blindly: make FINAL frames select a separately compiled
+  lean production program in `build.gradle`,
+  `src/main/java/net/Gabou/projectatmosphere/client/render/shader/VolumetricCloudShaders.java`,
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/CoreCostDiagnosticProgram.java`,
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudRenderer.java`,
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/VolumetricCloudDebugConfig.java`,
+  and `src/main/resources/assets/projectatmosphere/shaders/core/cloud_atmosphere_volume.fsh`.
+  Preserve density, morphology, rain, lighting, extinction, depth, temporal history, reconstruction,
+  and FINAL output semantics; compile diagnostic/oracle/trace/legacy/alternate-output and
+  experimental-control paths into explicitly selected specialized diagnostic programs instead of
+  retaining dormant runtime-uniform branches in FINAL. FINAL must session-disable through the
+  established native fallback policy on lean-program failure and must never silently select the
+  bloated diagnostic program. Extend the controlled A/B and diagnostic-campaign harness in
+  `src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormT132AutoDriver.java`
+  and record source linkage, image, history, T098a, diagnostic-campaign, and performance evidence
+  in `specs/001-native-storm-rendering/validation/production-shader-specialization.md`
+  (depends on T139; uses `e301494` as evidence, not an implementation to merge) [FR-001,
+  FR-006-FR-013, FR-027, FR-030; SC-004-SC-007, SC-017, SC-020-SC-021]
+  **BANKED.** FINAL frames link a separately generated `cloud_atmosphere_volume_final` program in
+  which 19 diagnostic selectors are compile-time constants; the unmodified `cloud_atmosphere_volume`
+  remains the diagnostic program and nothing was deleted from it. Same-fixture A/B on
+  PLAY_VIS_NEAR / Ultra / 1920x1080 / 480x270 / 10 descriptors, 60 samples per arm:
+  **0 changed pixels of 129,600, maximum error exactly 0.0, identical digest `d90e60c8881dec9b`**;
+  cloud p50 **110.99 ms -> 36.07 ms (3.0775x)**, p95 119.88 -> 38.47 (3.1163x), frame p50 3.038x.
+  That **retains the whole of `e301494`'s 2.984x** (103% of it). Selection is automatic and
+  per frame: ordinary frames report `cloudProgram=lean_final`, and any active debug view, trace,
+  oracle, optimization arm, legacy arm, stage/tier cut, ray trace or step budget falls through to
+  the monolith, so **no campaign source changed**. Verified end to end: T121-T123 suite, T128
+  trace, T098 production ray trace and the 29-shot T098 capture set (including the
+  `LEGACY_HIT_DEPTH` and `LEGACY_PROMOTION` arms) all completed. Fallback proven by fault
+  injection: a corrupted lean program session-disables with
+  `LeanFinalProgramUnavailableException` and the monolith is bound **zero** times. A build-time
+  gate (`T161 lean FINAL shader specializes and compiles`) asserts the substitution and compiles
+  the generated program on a real GL context, so a generator that silently stopped specializing is
+  a build failure rather than a silent 3x regression. `./gradlew check build` passes. Evidence in
+  `validation/production-shader-specialization.md`. Implemented on
+  `worktree-t098-production-ray-trace`, where T139/T160 and the whole harness live; `Forge-1.20.1`
+  carries only 6 of the 19 uniform groups and none of the fixture/profiler, so the criteria could
+  not have been produced there. Establishes execution-context specialization as a dominant cost
+  class; the hardware mechanism (register pressure, occupancy, latency hiding) remains unproven
+  without counters.
+- [ ] T140 [PERFORMANCE] Reprofile all five modes only after T161's productionized FINAL program, using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This
   task does not waive final shipped visual regrading in T098b
-  (depends on T052, T139, and T159 if resolution recovery proceeds, otherwise the recorded
+  (depends on T052, T139, T161, and T159 if resolution recovery proceeds, otherwise the recorded
   T153--T157 stop task) [FR-010-FR-012, FR-027, FR-030; SC-005-SC-007, SC-017, SC-021]
 
 **Checkpoint**: Performance work has a measured budget and ranked architecture before further

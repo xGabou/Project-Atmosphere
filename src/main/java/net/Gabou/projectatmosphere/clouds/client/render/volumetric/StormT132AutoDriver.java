@@ -72,6 +72,13 @@ final class StormT132AutoDriver {
     /** T153 marker: production plus four visible-volume oracle ceiling arms. */
     private static final Path T153_MARKER = Path.of("t153-visible-volume-oracle.txt");
     /**
+     * T161: the same-fixture A/B between the old monolithic FINAL program and
+     * the new compile-time-specialized lean FINAL program. Both arms render the
+     * identical pose, fixture, quality mode and resolution; the only difference
+     * is which linked program the renderer binds.
+     */
+    private static final Path T161_MARKER = Path.of("t161-final-specialization.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -186,6 +193,7 @@ final class StormT132AutoDriver {
     private static boolean performanceRunRequested() {
         return Files.exists(T135_MARKER) || resolutionRunRequested()
                 || evaluationRunRequested() || oracleRunRequested()
+                || specializationRunRequested()
                 || movingCameraRunRequested();
     }
 
@@ -199,6 +207,10 @@ final class StormT132AutoDriver {
 
     private static boolean oracleRunRequested() {
         return Files.exists(T153_MARKER);
+    }
+
+    private static boolean specializationRunRequested() {
+        return Files.exists(T161_MARKER);
     }
 
     private static boolean movingCameraRunRequested() {
@@ -329,6 +341,32 @@ final class StormT132AutoDriver {
             "PLAY_VIS_NEAR", "PLAY_VIS_MID", "SIDE", "FAR",
             "ABOVE", "BELOW", "NEAR_EDGE"
     };
+    /**
+     * T161 arms. The lean program is measured first so a fixture that decays
+     * mid-run costs the monolith's cell rather than the one being productionized.
+     * Both arms are NORMAL_PRODUCTION: nothing about the rendered work changes,
+     * only which linked build of the same shader executes it.
+     */
+    private static final CoreCostDiagnosticProgram[] T161_ARMS = {
+            CoreCostDiagnosticProgram.LEAN_FINAL,
+            CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+    };
+    /**
+     * One pose. T161 is a program-identity comparison, not a coverage sweep:
+     * PLAY_VIS_NEAR is the representative visible-storm gameplay case the
+     * budget has to hold, and is the fixture the core-cost experiment used.
+     */
+    private static final String[] T161_POSES = {"PLAY_VIS_NEAR"};
+    private static final StormOptimizationDiagnosticMode[] T161_OPTIMIZATION_ARMS = {
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION
+    };
+    private static boolean t161Run;
+    private static boolean t161ImageRequested;
+    private static boolean t161ArmImageDone;
+    private static final java.util.Map<String, StormReferenceImageComparison.Reference>
+            T161_IMAGES = new java.util.LinkedHashMap<>();
+
     /** Index of the arm that is production plus constant lighting. */
     private static final int T141_CONSTANT_LIGHTING_ARM = 2;
     /** Index of the arm that is detail-off plus constant lighting. */
@@ -373,6 +411,16 @@ final class StormT132AutoDriver {
 
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
+        if (t161Run) {
+            // Pin the program under test. The lean arm is pinned too rather
+            // than left on automatic, so a selection bug shows up as a failed
+            // arm instead of silently measuring the monolith twice.
+            VolumetricCloudDebugConfig.setFinalProgramOverride(t161Arm());
+            VolumetricCloudDebugConfig.setT136ConstantLighting(false);
+            VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                    StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
+            return;
+        }
         if (t153OracleRun) {
             // Every T153 arm must use the same temporal state. Oracle replay
             // frames deliberately do not enter production history, so leaving
@@ -392,6 +440,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t161Run) {
+            return t161Arm().serializedName();
+        }
         StormOptimizationDiagnosticMode[] arms = activeEvaluationArms();
         if (t153OracleRun) {
             return arms[Math.max(0, Math.min(arms.length - 1, t141ArmIndex))]
@@ -408,7 +459,14 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t161Run) {
+            return T161_OPTIMIZATION_ARMS;
+        }
         return t153OracleRun ? T153_ARMS : T141_ARMS;
+    }
+
+    private static CoreCostDiagnosticProgram t161Arm() {
+        return T161_ARMS[Math.max(0, Math.min(T161_ARMS.length - 1, t141ArmIndex))];
     }
 
     private static boolean t138HistoryArmPose(String pose) {
@@ -526,6 +584,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t161Run) {
+            return T161_POSES;
+        }
         if (t141EvaluationRun) {
             return t153OracleRun ? T153_POSES : T141_POSES;
         }
@@ -832,9 +893,14 @@ final class StormT132AutoDriver {
                 t138ResolutionRun = resolutionRunRequested();
                 t138ScaleIndex = 0;
                 t138HistoryArm = false;
+                t161Run = specializationRunRequested();
+                t161ImageRequested = false;
+                t161ArmImageDone = false;
+                T161_IMAGES.clear();
+                StormReferenceImageCapture.cancel();
                 t153OracleRun = oracleRunRequested();
                 t153OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
-                t141EvaluationRun = evaluationRunRequested() || t153OracleRun;
+                t141EvaluationRun = evaluationRunRequested() || t153OracleRun || t161Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -843,7 +909,7 @@ final class StormT132AutoDriver {
                 T153_FIXTURES.clear();
                 t153PoseAttempts = 0;
                 if (t141EvaluationRun) {
-                    if (!t153OracleRun) {
+                    if (!t153OracleRun && !t161Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -853,7 +919,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t153OracleRun ? "T153_ORACLE" : "T141_EVAL",
+                            t161Run ? "T161_SPECIALIZATION"
+                                    : (t153OracleRun ? "T153_ORACLE" : "T141_EVAL"),
                             sweepPoses().length, activeEvaluationArms().length,
                             fmt(T141_RESOLUTION_SCALE), T135_WIDTH, T135_HEIGHT);
                     if (t153OracleRun) {
@@ -1224,10 +1291,16 @@ final class StormT132AutoDriver {
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
                 }
+                if (t161Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT161SpecializationReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                }
                 if (t153OracleRun) {
                     ProjectAtmosphere.LOGGER.info(buildT153DecisionReport());
                     VolumetricCloudDebugConfig.setHistoryEnabled(t153OriginalHistoryEnabled);
                     finish("t153_complete");
+                } else if (t161Run) {
+                    finish("t161_complete");
                 } else {
                     applyFixtureResolutionControl();
                     advance(Phase.BEGIN_T098);
@@ -1363,6 +1436,8 @@ final class StormT132AutoDriver {
             }
             t141ArmAttempts = 0;
             t141ArmIndex++;
+            t161ArmImageDone = false;
+            t161ImageRequested = false;
         }
         if (t141ArmIndex >= activeEvaluationArms().length) {
             t141ArmIndex = 0;
@@ -1379,6 +1454,41 @@ final class StormT132AutoDriver {
         }
         applyT141Arm();
         String arm = t141ArmName();
+        if (t161Run && !t161ArmImageDone) {
+            // The image A/B must precede the timing cell: the capture bypasses
+            // history and pins the world clock, so both arms are compared on
+            // the same deterministic frame rather than on whatever temporal
+            // state each arm happened to accumulate.
+            if (StormReferenceImageCapture.active()) {
+                return;
+            }
+            if (t161ImageRequested) {
+                StormReferenceImageComparison.Reference captured =
+                        StormReferenceImageCapture.latestResult();
+                if (captured == null) {
+                    if (++t141ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
+                        t161ImageRequested = false;
+                        return;
+                    }
+                    finish("t161_image_capture_failed:" + arm);
+                    return;
+                }
+                T161_IMAGES.put(arm, captured);
+                ProjectAtmosphere.LOGGER.info(
+                        "T161_IMAGE arm={} boundProgram={} {}",
+                        arm, VolumetricCloudRenderer.lastProgram().serializedName(),
+                        captured.format());
+                t161ImageRequested = false;
+                t161ArmImageDone = true;
+                t141ArmAttempts = 0;
+            } else {
+                String requested = StormReferenceImageCapture.request("t161_" + arm);
+                if (requested.startsWith("acquiring")) {
+                    t161ImageRequested = true;
+                }
+                return;
+            }
+        }
         if (!StormT135PerformanceProfile.begin(
                 pose, AtmoCommonConfig.CloudRaymarchQuality.ULTRA, arm)) {
             if (++t141ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
@@ -1415,6 +1525,65 @@ final class StormT132AutoDriver {
         applyT141Arm();
         ProjectAtmosphere.LOGGER.warn(
                 "T153_ORACLE restarting complete pose={} reason={}", pose, reason);
+    }
+
+    /**
+     * Builds the T161 decision record: the same-fixture image comparison
+     * between the two linked programs, and the GPU time each one took.
+     *
+     * <p>Both halves have to hold. A speedup with a changed image is a broken
+     * translation of the experiment, and an identical image with no speedup
+     * means the specialization never reached the linked program.
+     */
+    private static String buildT161SpecializationReport() {
+        String leanArm = CoreCostDiagnosticProgram.LEAN_FINAL.serializedName();
+        String monolithArm = CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH.serializedName();
+        StormReferenceImageComparison.Reference leanImage = T161_IMAGES.get(leanArm);
+        StormReferenceImageComparison.Reference monolithImage = T161_IMAGES.get(monolithArm);
+        StringBuilder out = new StringBuilder("T161_SPECIALIZATION_DECISION");
+        if (leanImage == null || monolithImage == null) {
+            out.append(String.format(Locale.ROOT,
+                    "%nT161_IMAGE_AB evaluated=false reason=missing_capture lean=%s monolith=%s",
+                    leanImage != null, monolithImage != null));
+        } else {
+            StormReferenceImageComparison.Comparison comparison =
+                    StormReferenceImageComparison.compare(monolithImage, leanImage);
+            out.append(String.format(Locale.ROOT,
+                    "%nT161_IMAGE_AB a=%s b=%s %s digestsEqual=%s",
+                    monolithArm, leanArm, comparison.format(),
+                    monolithImage.digest().equals(leanImage.digest())));
+        }
+        StormT135PerformanceProfile.Cell lean = t161Cell(leanArm);
+        StormT135PerformanceProfile.Cell monolith = t161Cell(monolithArm);
+        if (lean == null || monolith == null) {
+            out.append(String.format(Locale.ROOT,
+                    "%nT161_PERF evaluated=false reason=missing_cell lean=%s monolith=%s",
+                    lean != null, monolith != null));
+            return out.toString();
+        }
+        out.append(String.format(Locale.ROOT,
+                "%nT161_PERF pose=%s mode=%s descriptors=%d target=%dx%d cloud=%dx%d"
+                        + " resolutionScale=%.4f"
+                        + "%nT161_PERF old=%s cloudP50=%.4f cloudP95=%.4f"
+                        + "%nT161_PERF new=%s cloudP50=%.4f cloudP95=%.4f"
+                        + "%nT161_PERF speedupP50=%.4fx speedupP95=%.4fx",
+                lean.pose(), lean.mode(), lean.descriptors(),
+                lean.frameWidth(), lean.frameHeight(),
+                lean.cloudWidth(), lean.cloudHeight(), lean.effectiveResolutionScale(),
+                monolithArm, monolith.cloudP50(), monolith.cloudP95(),
+                leanArm, lean.cloudP50(), lean.cloudP95(),
+                lean.cloudP50() <= 0.0D ? Double.NaN : monolith.cloudP50() / lean.cloudP50(),
+                lean.cloudP95() <= 0.0D ? Double.NaN : monolith.cloudP95() / lean.cloudP95()));
+        return out.toString();
+    }
+
+    private static StormT135PerformanceProfile.Cell t161Cell(String arm) {
+        for (StormT135PerformanceProfile.Cell cell : StormT135PerformanceProfile.results()) {
+            if (arm.equals(cell.arm())) {
+                return cell;
+            }
+        }
+        return null;
     }
 
     /** Builds the compact, self-contained T153 ceiling and attribution report. */
