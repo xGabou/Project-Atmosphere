@@ -8,9 +8,9 @@ Status: **COMPLETE** 2026-09-04
   ranks third and is NOT recommended next.
 
 / Feature: 001-native-storm-rendering
-/ Starting commit: `bd47124` (T161 banked at `4844cc8`, T140 at `122a566`)
+/ Starting commit: `09a61fa` (T161 banked at `6106c99`, T140 at `9dabab8`)
 / Branch: `worktree-t098-production-ray-trace`
-/ Banking commit: `f2b21fc`
+/ Banking commit: `330e786`
 
 T140 established that the remaining cost is inside cloud-relevant rays and
 closed whole-pixel culling. T162 asks the next question: **within a density

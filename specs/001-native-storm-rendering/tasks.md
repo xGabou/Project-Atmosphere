@@ -1323,7 +1323,7 @@ do not fabricate historical before/after percentages for T119--T123.
   in `specs/001-native-storm-rendering/validation/production-shader-specialization.md`
   (depends on T139; uses `e301494` as evidence, not an implementation to merge) [FR-001,
   FR-006-FR-013, FR-027, FR-030; SC-004-SC-007, SC-017, SC-020-SC-021]
-  **[BANKED 2026-09-03, commit 4844cc8]** FINAL frames link a separately generated `cloud_atmosphere_volume_final` program in
+  **[BANKED 2026-09-03, commit 6106c99]** FINAL frames link a separately generated `cloud_atmosphere_volume_final` program in
   which 19 diagnostic selectors are compile-time constants; the unmodified `cloud_atmosphere_volume`
   remains the diagnostic program and nothing was deleted from it. Same-fixture A/B on
   PLAY_VIS_NEAR / Ultra / 1920x1080 / 480x270 / 10 descriptors, 60 samples per arm:
@@ -1366,7 +1366,7 @@ implementation, while visual polish remains independently active.
 
 ### Tests for User Story 3
 
-  **[ACCEPTED 2026-09-04, commit 122a566]** Diagnostic only; no ladder value, morphology or rendering semantic changed.
+  **[ACCEPTED 2026-09-04, commit 9dabab8]** Diagnostic only; no ladder value, morphology or rendering semantic changed.
   Five-mode post-T161 baseline at PLAY_VIS_NEAR on the banked lean FINAL program, each mode at
   its own shipped scale, 120 frames per cell: Low 8.798/9.158, Low 24 11.371/12.194,
   Medium 12.101/21.470 (240x135); High 24.620/26.639 (360x203); Ultra 38.394/41.525 (480x270)
@@ -1419,7 +1419,7 @@ implementation, while visual polish remains independently active.
   recommendation in `specs/001-native-storm-rendering/validation/performance-cost-attribution.md`
   (depends on T161, T140; T153's 1.63x is pre-T161 and may not be quoted as current)
   [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-017, SC-021]
-  **[ACCEPTED 2026-09-04, commit f2b21fc]** Diagnostic only; no ladder value,
+  **[ACCEPTED 2026-09-04, commit 330e786]** Diagnostic only; no ladder value,
   morphology or FINAL semantic changed.
   Fresh Ultra/PLAY_VIS_NEAR/480x270 baseline 33.62-37.32 ms cloud p50 across three runs.
   **CASE C: descriptor traversal is NOT dominant.** The fixed-work ladder (64 fixed samples per

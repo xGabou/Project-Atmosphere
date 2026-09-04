@@ -2,7 +2,7 @@
 
 Status: **BANKED** 2026-09-03
 
-/ Implementation commit: `4844cc8`
+/ Implementation commit: `6106c99`
 
 / Feature: 001-native-storm-rendering
 / Depends on: T139 (`3790752`)
