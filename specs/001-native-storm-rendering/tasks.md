@@ -1501,6 +1501,60 @@ implementation, while visual polish remains independently active.
   Evidence hygiene: 42 fixture qualifications over 18 timing cells and 3 image sequences,
   **0 rejected**; no other Minecraft or Java benchmark instance running at launch. Evidence in
   `validation/performance-precipitation-specialization.md`.
+- [X] T166 [PERFORMANCE] [US3] Re-measure the production cloud pipeline at FAR and SIDE on the
+  post-T163 program, re-derive the cost attribution against the current shader rather than
+  quoting T162's table, and evaluate the seven PMWeather-inspired ideas against those fresh
+  measurements. Build every arm as a separately generated compile-time program carrying
+  `PA_PRECIPITATION_ABSENT`, because the T162 arms predate T163 and still compile the dead
+  precipitation branch - measuring one of them against today's FINAL would charge the rain-carry
+  cost T163 already banked to whatever else the arm changed. Re-derive the T153 empty-space
+  oracle on lean programs so its ratio is comparable to today's renderer. Measure composition
+  with a combined arm rather than multiplying speedups. Report image quality, not just timing,
+  for every arm that deliberately changes the picture. Productionize nothing; keep every arm
+  default-off and compile-time absent from FINAL, and assert that in a build gate. Record in
+  `specs/001-native-storm-rendering/validation/performance-pmweather-evaluation.md`
+  (depends on T163, T162, T161, T153) [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-021]
+  **[BANKED 2026-09-04]** **Fresh baseline, Ultra 0.25, 480x270 of 1920x1080: SIDE raymarch
+  22.0826/24.4685 ms p50/p95, FAR 14.5388/15.5116, PLAY_VIS_NEAR 19.5092/21.0094**; the
+  reconstruction and composite are one draw at 0.085-0.087 ms p50, 0.4% of the pipeline, and are
+  not separately timeable. The ~24.5 ms anchor in circulation was T163's **PLAY_VIS_NEAR** cell;
+  SIDE reproduces T163's SIDE figure within 4.5% across three campaigns and **FAR had never been
+  measured post-T163 at all**. SIDE is 2.77x over the 8 ms budget, FAR 1.83x. **The attribution
+  inverts T162's headline**: with precipitation gone, the fixed-work ladder puts candidate
+  traversal plus descriptor payload plus shape/profile/SDF at **69.6% (FAR), 79.6% (SIDE), 79.8%
+  (PLAY_VIS_NEAR) of a density call**, and T162's non-precipitation rows renormalise onto the
+  fresh ladder within about one point - two independent campaigns agreeing, and confirmation that
+  T163 removed exactly the precipitation class. Lighting is 20.1% of the SIDE frame (4.438 ms,
+  1.252x), detail+erosion 11.1% (2.451 ms). **PMWeather verdicts: A distance-dependent step
+  HIGH VALUE (1.643x-2.144x, silhouette IoU 0.993-0.999, but thin-material retention 0.80-0.87);
+  B aggressive empty-space REJECT (1.002x-1.064x - 87-97% of ray steps already resolve empty, and
+  PA's existing coarse tier, SDF safe-advance and 16-probe empty-span scan are strictly more
+  aggressive than PMWeather's); C cheaper lighting MARGINAL (1.012x-1.047x - PA already omits
+  detail on light taps 2+ and its noise is one packed fetch with no octave loop to shorten; only
+  cutting 6 taps to 2 pays, at 1.121x); D distance density LOD PROMISING (1.084x-1.203x at thin
+  retention 1.0000); E early termination PROMISING (1.145x-1.216x at IoU 1.0000 and SSIM
+  0.983-0.991); F scene-depth march ALREADY SOLVED and worth 3.11 ms at PLAY_VIS_NEAR - `t1` is
+  clipped before the loop, so the work is never scheduled; G spatial blur REJECT - the composite
+  is 0.087 ms.** **Refreshed T153 ceiling: 1.998x mean combined, slightly above the historical
+  1.836x on the same three poses, so the opportunity still exists - but the distance-step arm
+  already reaches or beats it (1.733x against the oracle's 1.375x at SIDE) without any occupancy
+  structure**, which closes the category on grounds the old campaign could not see. **Composition
+  is measured, not multiplied: the combined arm returns 87-97% of the product of its parts**, and
+  at SIDE it adds essentially nothing over distance stepping alone. Cost scales as
+  pixels^0.57-0.60. **Path to 8 ms: FAR already reaches 5.97 ms with the measured stack and
+  PLAY_VIS_NEAR 10.32 ms, but SIDE reaches only 12.87 ms and 8 ms is NOT attainable from this
+  list** - because 79.6% of a SIDE density call is descriptor geometry and no PMWeather idea
+  touches it (PMWeather's storms are analytic; it has no descriptor system). **Recommended next
+  task: a diagnostic descriptor-binning arm, not a PMWeather port**, plus a graded
+  distance-step curve to recover the thin material the tested curve loses. Four campaign runs
+  were needed: **three existing guards - descriptor count, the T150 visibility verdict, and the
+  autorun's topology-generation maturity check - all passed a pose whose camera had not finished
+  teleporting**, so its first cells timed the previous camera, which for the first pose stands
+  inside the storm and takes the in-cloud fast path. `T166_ARRIVAL pose=FAR reached after 69
+  extra frames` isolated it; the drift control added for this campaign is what caught it
+  (`ratio=3.0885 verdict=DRIFTED`). Primary run: 84 cells, **0 rejected**, all three drift
+  controls stable, 18 image comparisons. FINAL is textually untouched - the shader diff is 129
+  insertions and 0 deletions. Evidence in `validation/performance-pmweather-evaluation.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

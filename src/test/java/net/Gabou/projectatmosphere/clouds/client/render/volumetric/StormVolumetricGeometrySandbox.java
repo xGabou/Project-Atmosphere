@@ -593,6 +593,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT140OracleVariants);
         runCorrected("T162 attribution arms compile and stay out of FINAL",
                 StormVolumetricGeometrySandbox::validateT162AttributionArms);
+        runCorrected("T166 attribution arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT166AttributionArms);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -5670,6 +5672,104 @@ public final class StormVolumetricGeometrySandbox {
             String source = readWorkspaceSource(path);
             require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
             compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+    }
+
+    /**
+     * The T166 arms must compile, must each carry the marker that makes them
+     * the arm they claim to be, and none of their guards may reach FINAL.
+     *
+     * <p>Every PA_ARM_* guard is a deliberate quality or traversal change. If
+     * one leaked into the shipped program it would alter the image and the
+     * frame time together, and no image check in this suite compares against
+     * anything but FINAL itself - so FINAL would simply become the new
+     * reference and the regression would never surface. The separation is
+     * asserted here rather than trusted to the #ifdef.
+     *
+     * <p>The arms are also required to carry PA_PRECIPITATION_ABSENT. Without
+     * it an arm is pre-T163 shaped, and its delta against today's FINAL would
+     * silently include the rain-carry cost T163 removed rather than the class
+     * the arm exists to isolate. That is the exact error this set was built to
+     * avoid, so it is a build failure rather than a review note.
+     */
+    private static void validateT166AttributionArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        String[] guards = {
+                "PA_ARM_NO_DETAIL", "PA_ARM_DISTANCE_LOD", "PA_ARM_LIGHT_CHEAP",
+                "PA_ARM_LIGHT_NO_DETAIL", "PA_ARM_LIGHT_STEPS", "PA_ARM_LIGHT_STEP_WIDE",
+                "PA_ARM_LIGHT_EARLY_OUT", "PA_ARM_NO_SCENE_LIMIT", "PA_ARM_EMPTY_JUMP",
+                "PA_ARM_EARLY_TERM", "PA_ARM_DISTANCE_STEP"};
+        for (String guard : guards) {
+            if (finalSource.contains("#define " + guard)) {
+                violations.add("FINAL defines " + guard);
+            }
+        }
+        // FINAL must still bake production lighting and the production
+        // optimization mode, not an arm's constant.
+        if (!finalSource.contains("const int PaDiagnosticLightingMode = 0;")) {
+            violations.add("FINAL no longer bakes PaDiagnosticLightingMode = 0");
+        }
+        if (!finalSource.contains("const int PaDiagnosticOptimizationMode = 0;")) {
+            violations.add("FINAL no longer bakes PaDiagnosticOptimizationMode = 0");
+        }
+        require(violations.isEmpty(), "T166 arm leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t166_nolight", "const int PaDiagnosticLightingMode = 1;"},
+                {"cloud_atmosphere_volume_t166_nodetail", "#define PA_ARM_NO_DETAIL 1"},
+                {"cloud_atmosphere_volume_t166_lightnodetail", "#define PA_ARM_LIGHT_NO_DETAIL 1"},
+                {"cloud_atmosphere_volume_t166_lightsteps2", "#define PA_ARM_LIGHT_STEPS 2"},
+                {"cloud_atmosphere_volume_t166_lightwide", "#define PA_ARM_LIGHT_STEP_WIDE 1.6"},
+                {"cloud_atmosphere_volume_t166_lightearlyout", "#define PA_ARM_LIGHT_EARLY_OUT 3.0"},
+                {"cloud_atmosphere_volume_t166_lightcheap", "#define PA_ARM_LIGHT_CHEAP 1"},
+                {"cloud_atmosphere_volume_t166_diststep", "#define PA_ARM_DISTANCE_STEP 1.0"},
+                {"cloud_atmosphere_volume_t166_emptyjump", "#define PA_ARM_EMPTY_JUMP 4.0"},
+                {"cloud_atmosphere_volume_t166_distlod", "#define PA_ARM_DISTANCE_LOD 0.35"},
+                {"cloud_atmosphere_volume_t166_earlyterm", "#define PA_ARM_EARLY_TERM 0.06"},
+                {"cloud_atmosphere_volume_t166_noscenelimit", "#define PA_ARM_NO_SCENE_LIMIT 1"},
+                {"cloud_atmosphere_volume_t166_stack", "#define PA_ARM_DISTANCE_LOD 0.35"},
+                {"cloud_atmosphere_volume_t166_fw1_address", "#define PA_T162_ARM 1"},
+                {"cloud_atmosphere_volume_t166_fw2_candidate", "#define PA_T162_ARM 2"},
+                {"cloud_atmosphere_volume_t166_fw3_descriptor", "#define PA_T162_ARM 3"},
+                {"cloud_atmosphere_volume_t166_fw4_shape", "#define PA_T162_ARM 4"},
+                {"cloud_atmosphere_volume_t166_fw5_nodetail", "#define PA_T162_ARM 5"},
+                {"cloud_atmosphere_volume_t166_fw6_density", "#define PA_T162_ARM 6"},
+                {"cloud_atmosphere_volume_t166_oracle_empty",
+                 "const int PaDiagnosticOptimizationMode = 4096;"},
+                {"cloud_atmosphere_volume_t166_oracle_intervals",
+                 "const int PaDiagnosticOptimizationMode = 8192;"},
+                {"cloud_atmosphere_volume_t166_oracle_combined",
+                 "const int PaDiagnosticOptimizationMode = 28672;"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T166 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized, so its delta against"
+                            + " FINAL would include the rain-carry cost T163 removed");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The oracle arms replay a texture FINAL provably never reads. If the
+        // generator stripped that sampler from them as it strips it from FINAL,
+        // the replay would silently read black and report a perfect oracle.
+        String[] oracleArms = {
+                "cloud_atmosphere_volume_t166_oracle_empty",
+                "cloud_atmosphere_volume_t166_oracle_intervals",
+                "cloud_atmosphere_volume_t166_oracle_combined"};
+        for (String program : oracleArms) {
+            String json = readWorkspaceSource(base + program + ".json");
+            require(json.contains("OracleIntervalSampler"),
+                    program + " lost OracleIntervalSampler; its replay would read black"
+                            + " and report a perfect oracle");
         }
     }
 

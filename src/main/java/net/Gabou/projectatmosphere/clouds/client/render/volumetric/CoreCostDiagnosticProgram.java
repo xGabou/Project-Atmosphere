@@ -75,7 +75,56 @@ public enum CoreCostDiagnosticProgram {
      * back to back against the program it replaced rather than against a
      * remembered number from an earlier session.
      */
-    T163_WITH_RAIN("t163_withrain");
+    T163_WITH_RAIN("t163_withrain"),
+
+    /**
+     * T166 production-context attribution arms. Each is the shipped FINAL
+     * program - precipitation specialization included - with exactly one cost
+     * class compiled out, so a delta against FINAL is attributable to that
+     * class alone.
+     *
+     * <p>They exist separately from the T162 arms above because those predate
+     * T163 and still carry the unreachable precipitation branch. Measuring one
+     * of them against today's FINAL would charge the removed rain-carry cost to
+     * whatever else the arm changed.
+     */
+    T166_NO_LIGHT("t166_nolight"),
+    T166_NO_DETAIL("t166_nodetail"),
+    /** PM idea C, one lighting lever per arm. */
+    T166_LIGHT_NO_DETAIL("t166_lightnodetail"),
+    T166_LIGHT_STEPS2("t166_lightsteps2"),
+    T166_LIGHT_WIDE("t166_lightwide"),
+    T166_LIGHT_EARLY_OUT("t166_lightearlyout"),
+    T166_LIGHT_CHEAP("t166_lightcheap"),
+    /** PM ideas A, B, D, E and F. */
+    T166_DISTANCE_STEP("t166_diststep"),
+    T166_EMPTY_JUMP("t166_emptyjump"),
+    T166_DISTANCE_LOD("t166_distlod"),
+    T166_EARLY_TERM("t166_earlyterm"),
+    T166_NO_SCENE_LIMIT("t166_noscenelimit"),
+    /** The three top-ranked levers together, so overlap is measured. */
+    T166_STACK("t166_stack"),
+    /**
+     * T166 fixed-work ladder: the T162 ladder rebuilt on the post-T163 density
+     * call. Every arm evaluates the same 64 points per fragment, so the deltas
+     * between consecutive rungs are attributable to the one class each adds.
+     */
+    T166_FW1_ADDRESS("t166_fw1_address"),
+    T166_FW2_CANDIDATE("t166_fw2_candidate"),
+    T166_FW3_DESCRIPTOR("t166_fw3_descriptor"),
+    T166_FW4_SHAPE("t166_fw4_shape"),
+    T166_FW5_NODETAIL("t166_fw5_nodetail"),
+    T166_FW6_DENSITY("t166_fw6_density"),
+    /**
+     * T166 re-derivation of the T153 empty-space oracle on a lean program. The
+     * historical 1.63x was measured on the pre-T161 monolith and is not a
+     * current number; these arms make it one. Each keeps {@code PaOraclePass},
+     * {@code PaOracleBaseSize} and the interval sampler, because one program
+     * runs both the untimed capture pass and the timed replay.
+     */
+    T166_ORACLE_EMPTY("t166_oracle_empty"),
+    T166_ORACLE_INTERVALS("t166_oracle_intervals"),
+    T166_ORACLE_COMBINED("t166_oracle_combined");
 
     private final String serializedName;
 
@@ -104,9 +153,37 @@ public enum CoreCostDiagnosticProgram {
                 || this == T140_TILE8 || this == T140_TILE16;
     }
 
-    /** True for the T162 fixed-work ladder, which renders a checksum, not a scene. */
+    /** True for a fixed-work ladder arm, which renders a checksum, not a scene. */
     public boolean fixedWork() {
-        return name().startsWith("T162_FW");
+        return name().startsWith("T162_FW") || name().startsWith("T166_FW");
+    }
+
+    /**
+     * True for the T166 arms that replay the T153 ground-truth oracle. These
+     * need the renderer's untimed capture pass to run before the timed draw,
+     * which the optimization-mode upload still drives.
+     */
+    public boolean t153OracleReplay() {
+        return this == T166_ORACLE_EMPTY || this == T166_ORACLE_INTERVALS
+                || this == T166_ORACLE_COMBINED;
+    }
+
+    /**
+     * The generated program this arm binds. Every diagnostic build is emitted
+     * from the one production source as {@code cloud_atmosphere_volume_<name>},
+     * except the monolith itself and the lean FINAL program, whose resource
+     * name predates the serialized labels.
+     */
+    public String resourceName() {
+        return switch (this) {
+            case DIAGNOSTIC_MONOLITH -> "cloud_atmosphere_volume";
+            case LEAN_FINAL -> "cloud_atmosphere_volume_final";
+            case T140_PIXEL_ORACLE -> "cloud_atmosphere_volume_t140_pixel";
+            case T140_MASK -> "cloud_atmosphere_volume_t140_mask";
+            case T140_TILE8 -> "cloud_atmosphere_volume_t140_tile8";
+            case T140_TILE16 -> "cloud_atmosphere_volume_t140_tile16";
+            default -> "cloud_atmosphere_volume_" + serializedName;
+        };
     }
 
     public static CoreCostDiagnosticProgram parse(String value) {

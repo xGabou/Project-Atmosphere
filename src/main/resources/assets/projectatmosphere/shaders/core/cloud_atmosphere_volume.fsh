@@ -316,6 +316,17 @@ float paLodTransmittance = 1.0;
 float paLodRayVerticality = 0.0;
 bool paLightingDensityTap = false;
 float paLightingDetailWeight = 1.0;
+#ifdef PA_ARM_LIGHT_CHEAP
+/**
+ * PM idea C. True for exactly the density calls the light cone makes.
+ *
+ * <p>`paLightingDensityTap` above cannot be reused for this: it is raised only
+ * under the T149 graded-detail arm, which production never selects, so a guard
+ * on it would compile into a branch that never runs and the arm would silently
+ * measure the anchor.
+ */
+bool paArmLightingSample = false;
+#endif
 
 /** True when the march's far endpoint is halved, bounding distance culling. */
 bool paT147HalfDistance() {
@@ -3796,6 +3807,28 @@ float cloudDensity(
     if (paWorkloadCaptureActive()) {
         paCloudDensityCalls++;
     }
+#ifdef PA_ARM_NO_DETAIL
+    // T166 attribution arm. The detail-octave lookups and the erosion they
+    // drive are one fused stage here, so suppressing useDetail removes exactly
+    // that stage and nothing else.
+    useDetail = false;
+#endif
+#ifdef PA_ARM_DISTANCE_LOD
+    // PM idea D. Distant samples keep their large-scale morphology and lose
+    // only the sub-pixel detail erosion.
+    if (distance(p, CameraPos) > MaxRenderDistance * PA_ARM_DISTANCE_LOD) {
+        useDetail = false;
+    }
+#endif
+#ifdef PA_ARM_LIGHT_CHEAP
+    // PM idea C. Only the light cone raises this flag, so a primary camera
+    // sample keeps full quality. The mip bias is not redundant with the detail
+    // cut: the base 3-D noise fetch reads it too.
+    if (paArmLightingSample) {
+        useDetail = false;
+        mipBias += 2.0;
+    }
+#endif
     if (PuffDensityStage == 1) {
         // Pure descriptor geometry: no WeatherMap and no candidate texture.
         // Empty descriptors render empty instead of silently falling through.
@@ -4401,6 +4434,9 @@ float lightMarchOpticalDepth(
         if (paWorkloadCaptureActive()) {
             paLightMarchDensityEvaluations++;
         }
+#ifdef PA_ARM_LIGHT_CHEAP
+        paArmLightingSample = true;
+#endif
         float forwardDensity = cloudDensity(
             p + LightDir * 28.0,
             1.2,
@@ -4408,12 +4444,20 @@ float lightMarchOpticalDepth(
             false,
             false
         );
+#ifdef PA_ARM_LIGHT_CHEAP
+        paArmLightingSample = false;
+#endif
         return localDensity * 18.0 + forwardDensity * 82.0;
     }
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
     if (cameraStartsInsideSlab) {
         steps = min(steps, 4);
     }
+#ifdef PA_ARM_LIGHT_STEPS
+    // PM idea C: fewer light-march taps. Two is the floor the graded T149 path
+    // already treats as the minimum that keeps a light direction.
+    steps = min(steps, PA_ARM_LIGHT_STEPS);
+#endif
     // T149. A sample's radiance reaches the frame multiplied by the
     // transmittance accumulated before it, while distance and ray verticality
     // describe projected importance and the measured high-coverage view
@@ -4449,7 +4493,13 @@ float lightMarchOpticalDepth(
         steps = clamp(int(ceil(desiredSteps - 0.0001)), 2, steps);
     }
     float opticalDepth = 0.0;
+#ifdef PA_ARM_LIGHT_STEP_WIDE
+    // PM idea C: same tap count, wider spacing, so the cone covers a longer
+    // optical path at coarser resolution.
+    float stepLength = 14.0 * PA_ARM_LIGHT_STEP_WIDE;
+#else
     float stepLength = 14.0;
+#endif
     vec3 pos = p;
     for (int i = 0; i < MAX_LIGHT_STEPS; i++) {
         if (i >= steps) {
@@ -4479,6 +4529,11 @@ float lightMarchOpticalDepth(
             tapWeight = clamp(desiredSteps - float(i), 0.0, 1.0);
         }
         bool detailTap = i < 2;
+#ifdef PA_ARM_LIGHT_NO_DETAIL
+        // PM idea C: no detail octave on any light tap. Production already
+        // restricts detail to the first two taps, so this removes those two.
+        detailTap = false;
+#endif
         if (detailTap && paT149DetailGraded()) {
             float projectedQuality = smoothstep(
                 0.65,
@@ -4501,10 +4556,26 @@ float lightMarchOpticalDepth(
                 : proxyQuality * smoothstep(0.35, 0.85, proxyQuality);
             paLightingDensityTap = true;
         }
+#ifdef PA_ARM_LIGHT_CHEAP
+        paArmLightingSample = true;
+#endif
         float density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+#ifdef PA_ARM_LIGHT_CHEAP
+        paArmLightingSample = false;
+#endif
         paLightingDensityTap = false;
         paLightingDetailWeight = 1.0;
         opticalDepth += density * stepLength * tapWeight;
+#ifdef PA_ARM_LIGHT_EARLY_OUT
+        // PM idea C, from PMWeather's light march: it stops a light ray once
+        // Beer transmission through the cone falls below 0.05. PA only applies
+        // an optical-depth break for a camera that starts inside the slab, and
+        // at 28.0 - a threshold no exterior cone reaches. This arm applies the
+        // equivalent cut to every camera.
+        if (opticalDepth * ExtinctionScale >= PA_ARM_LIGHT_EARLY_OUT) {
+            break;
+        }
+#endif
         if (cameraStartsInsideSlab && opticalDepth * ExtinctionScale >= 28.0) {
             break;
         }
@@ -5205,6 +5276,12 @@ bool integratePrimaryDensityQuadratureSegment(
 // ---------------------------------------------------------------------------
 
 float sceneRayLimit(vec3 rayDir, float fallback) {
+#ifdef PA_ARM_NO_SCENE_LIMIT
+    // PM idea F control arm: what the march costs when opaque scene depth does
+    // not shorten the ray, so the saving the shipped clip already takes is
+    // measured rather than asserted.
+    return fallback;
+#else
     if (UseSceneDepth == 0) {
         return fallback;
     }
@@ -5218,6 +5295,7 @@ float sceneRayLimit(vec3 rayDir, float fallback) {
     vec4 worldRel = InvViewRotMat * vec4(view.xyz, 0.0);
     float sceneT = dot(worldRel.xyz, rayDir);
     return min(fallback, max(0.0, sceneT - 0.3));
+#endif
 }
 
 /** depthAt without its clamp, so the trace can see the point leave the frustum. */
@@ -5642,7 +5720,15 @@ void main() {
     float exteriorFineStep = clamp(ExteriorFineStep, 2.5, 8.0);
     float fineStep = cameraInsideCloud ? legacyFineStep : exteriorFineStep;
     float coarseStep = max(baseStep * 1.5, fineStep * 3.0);
+#ifdef PA_ARM_EMPTY_JUMP
+    // PM idea B. Only the coarse (confidently-outside-material) tier is
+    // lengthened; the conservative SDF clearance, the fine-lattice empty-span
+    // scan and every promotion test are untouched, so nothing the fine march
+    // would have sampled is skipped by a shorter route.
+    float coarseStepCap = min(112.0 * PA_ARM_EMPTY_JUMP, fineStep * 16.0 * PA_ARM_EMPTY_JUMP);
+#else
     float coarseStepCap = min(112.0, fineStep * 16.0);
+#endif
 
     float cosTheta = dot(rayDir, LightDir);
 
@@ -5750,6 +5836,22 @@ void main() {
     }
 
     for (int i = 0; i < paStepCap; i++) {
+#ifdef PA_ARM_EARLY_TERM
+        // PM idea E. Production's floor is 0.015; this arm raises it so the ray
+        // stops while a larger residual transmittance is still unabsorbed. The
+        // production form below is left textually verbatim rather than
+        // refactored to share a constant, because this shader's whole cost
+        // story is that compile-time context changes time in ways source-level
+        // equivalence does not predict.
+        if (t >= t1 || transmittance < PA_ARM_EARLY_TERM) {
+            if (transmittance < PA_ARM_EARLY_TERM && paWorkloadCaptureActive()) {
+                paEarlyTerminations++;
+            }
+            if (paRayTraceActive()) {
+                paMrTerminationReason = transmittance < PA_ARM_EARLY_TERM ? 2.0 : 1.0;
+            }
+            break;
+#else
         if (t >= t1 || transmittance < 0.015) {
             if (transmittance < 0.015 && paWorkloadCaptureActive()) {
                 paEarlyTerminations++;
@@ -5758,6 +5860,7 @@ void main() {
                 paMrTerminationReason = transmittance < 0.015 ? 2.0 : 1.0;
             }
             break;
+#endif
         }
         if (paT153OpticalRelevance()
                 && paOracleOpticalCutoff < t1
@@ -5784,9 +5887,21 @@ void main() {
             paMrFlags |= PA_MR_EXECUTED | (fine ? PA_MR_FINE_AT_ENTRY : 0);
         }
         float distanceGrowth = 1.0 + (t / max(MaxRenderDistance, 1.0)) * 2.2;
+#ifdef PA_ARM_DISTANCE_STEP
+        // PM idea A. Production already grows the coarse tier with distance and
+        // the fine tier only when the camera is inside cloud; this arm gives the
+        // exterior fine tier the same growth, so sample spacing tracks the
+        // shrinking screen-space footprint of distant material.
+        float paFineGrowth = 1.0
+            + (distanceGrowth - 1.0) * PA_ARM_DISTANCE_STEP;
+        float stepLength = fine
+            ? fineStep * (cameraInsideCloud ? distanceGrowth : paFineGrowth)
+            : min(coarseStep * distanceGrowth, coarseStepCap);
+#else
         float stepLength = fine
             ? fineStep * (cameraInsideCloud ? distanceGrowth : 1.0)
             : min(coarseStep * distanceGrowth, coarseStepCap);
+#endif
         // Never integrate optical depth past the scene/slab ray endpoint.
         stepLength = min(stepLength, t1 - t);
 
@@ -5891,8 +6006,15 @@ void main() {
             // AABB entries could exhaust the march before the ray endpoint.
             sinceHit = 0;
             fine = true;
+#ifdef PA_ARM_DISTANCE_STEP
+            stepLength = fineStep
+                * (cameraInsideCloud
+                    ? distanceGrowth
+                    : 1.0 + (distanceGrowth - 1.0) * PA_ARM_DISTANCE_STEP);
+#else
             stepLength = fineStep
                 * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
             stepLength = min(stepLength, t1 - t);
         }
         vec3 paSegmentEnd = CameraPos + rayDir * (t + stepLength);
@@ -5993,8 +6115,15 @@ void main() {
                 // found is still found. Dropping the scan and trusting the
                 // bracket refinement alone is what is unsafe - measured offline
                 // it skipped material on every ray, 1.4 to 39.2 blocks of it.
+#ifdef PA_ARM_DISTANCE_STEP
+                float paScanStep = fineStep
+                    * (cameraInsideCloud
+                        ? distanceGrowth
+                        : 1.0 + (distanceGrowth - 1.0) * PA_ARM_DISTANCE_STEP);
+#else
                 float paScanStep = fineStep
                     * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
                 // The evidence arm takes no probes, so the scan cannot advance
                 // and the branch below falls through to a single fine step -
                 // exactly the pre-fix behaviour.

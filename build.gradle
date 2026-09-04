@@ -336,7 +336,105 @@ def leanProgramVariants = [
         [name: 'cloud_atmosphere_volume_t162_fw6_norain',
          defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'], keepUniforms: []],
         [name: 'cloud_atmosphere_volume_t162_fw7_density',
-         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 7'], keepUniforms: []]
+         defines: ['PA_T162_FIXED_WORK 1', 'PA_T162_ARM 7'], keepUniforms: []],
+
+        // ------------------------------------------------------------------
+        // T166 post-T163 attribution and PMWeather-idea arms.
+        //
+        // Every one of these carries PA_PRECIPITATION_ABSENT, so each is FINAL
+        // minus exactly one thing. The T162 arms above do NOT carry it and are
+        // therefore pre-T163 shaped; comparing one of them against today's
+        // FINAL would attribute the removed rain-carry cost to whatever else
+        // the arm changed. That is the specific trap this set exists to avoid.
+        // ------------------------------------------------------------------
+
+        // Production-context cost attribution.
+        [name: 'cloud_atmosphere_volume_t166_nolight',
+         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: [],
+         overrides: ['uniform int PaDiagnosticLightingMode;':
+                     'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_t166_nodetail',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_DETAIL 1'], keepUniforms: []],
+
+        // PM idea C - cheaper lighting density, one lever per arm.
+        [name: 'cloud_atmosphere_volume_t166_lightnodetail',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_NO_DETAIL 1'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_lightsteps2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 2'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_lightwide',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEP_WIDE 1.6'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_lightearlyout',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_EARLY_OUT 3.0'], keepUniforms: []],
+        // The combined PMWeather-shaped lighting evaluator.
+        [name: 'cloud_atmosphere_volume_t166_lightcheap',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_CHEAP 1',
+                   'PA_ARM_LIGHT_NO_DETAIL 1', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_LIGHT_EARLY_OUT 3.0'], keepUniforms: []],
+
+        // PM ideas A, B, D, E, F.
+        [name: 'cloud_atmosphere_volume_t166_diststep',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DISTANCE_STEP 1.0'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_emptyjump',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EMPTY_JUMP 4.0'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_distlod',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DISTANCE_LOD 0.35'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_earlyterm',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.06'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_noscenelimit',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_SCENE_LIMIT 1'], keepUniforms: []],
+
+        // Stacking arm. The only way to measure overlap rather than assume it.
+        [name: 'cloud_atmosphere_volume_t166_stack',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_CHEAP 1',
+                   'PA_ARM_LIGHT_NO_DETAIL 1', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_LIGHT_EARLY_OUT 3.0', 'PA_ARM_DISTANCE_STEP 1.0',
+                   'PA_ARM_DISTANCE_LOD 0.35'], keepUniforms: []],
+
+        // Post-T163 fixed-work ladder. Identical control flow to the T162
+        // ladder, but with the rain branch compiled out so the rungs describe
+        // the density call production actually makes today.
+        [name: 'cloud_atmosphere_volume_t166_fw1_address',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_fw2_candidate',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 2'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_fw3_descriptor',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 3'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_fw4_shape',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 4'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_fw5_nodetail',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 5'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t166_fw6_density',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_T162_FIXED_WORK 1', 'PA_T162_ARM 6'],
+         keepUniforms: []],
+
+        // T153 empty-space oracle, re-derived on a lean program. The historical
+        // 1.63x was measured on the pre-T161 monolith and cannot be quoted as
+        // current. These keep the oracle selector, its base size and its
+        // interval sampler, because the capture pass and the timed replay both
+        // run on this one program exactly as the monolith runs them.
+        [name: 'cloud_atmosphere_volume_t166_oracle_empty',
+         defines: ['PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
+         keepSamplers: ['OracleIntervalSampler'],
+         overrides: ['uniform int PaDiagnosticOptimizationMode;':
+                     'const int PaDiagnosticOptimizationMode = 4096;']],
+        [name: 'cloud_atmosphere_volume_t166_oracle_intervals',
+         defines: ['PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
+         keepSamplers: ['OracleIntervalSampler'],
+         overrides: ['uniform int PaDiagnosticOptimizationMode;':
+                     'const int PaDiagnosticOptimizationMode = 8192;']],
+        [name: 'cloud_atmosphere_volume_t166_oracle_combined',
+         defines: ['PA_PRECIPITATION_ABSENT 1'],
+         keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
+         keepSamplers: ['OracleIntervalSampler'],
+         overrides: ['uniform int PaDiagnosticOptimizationMode;':
+                     'const int PaDiagnosticOptimizationMode = 28672;']]
 ]
 
 tasks.register('generateLeanFinalShader') {
@@ -420,8 +518,13 @@ tasks.register('generateLeanFinalShader') {
                     groovy.json.JsonOutput.toJson(productionJson))
             variantJson.fragment = 'projectatmosphere:' + programName
             variantJson.uniforms = variantJson.uniforms.findAll { !baked.contains(it.name) }
+            // A variant that keeps PaOraclePass as a uniform still reads the
+            // oracle texture, so its sampler must survive the strip that exists
+            // only because FINAL provably never reads it.
+            List<String> keptSamplers = variant.keepSamplers == null
+                    ? [] : variant.keepSamplers
             variantJson.samplers = variantJson.samplers.findAll {
-                !leanFinalRemovedSamplers.contains(it.name)
+                keptSamplers.contains(it.name) || !leanFinalRemovedSamplers.contains(it.name)
             }
             new File(shaderDirectory, programName + '.json').setText(
                     groovy.json.JsonOutput.prettyPrint(
@@ -700,7 +803,7 @@ if (modrinthToken) {
         changelog = rootProject.file("PAchangelog.md").text
         gameVersions = ["1.20.1"]
         loaders = ["forge"]
-        versionType = "alpha" // options: alpha, beta, release
+        versionType = "release" // options: alpha, beta, release
         dependencies {
             optional.project "e0bNACJD"
             optional.project "4Al4H3t9"
@@ -721,7 +824,7 @@ if (curseForgeToken) {
         project {
             id = "1258344"
             changelog = rootProject.file("PAchangelog.md")
-            releaseType = "alpha" // options: alpha, beta, release
+            releaseType = "release" // options: alpha, beta, release
             addGameVersion "1.20.1"
             addGameVersion "Forge"
             mainArtifact(releaseJarFile.get().asFile) {
