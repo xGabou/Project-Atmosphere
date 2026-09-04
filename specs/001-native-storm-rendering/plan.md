@@ -616,7 +616,7 @@ temporal behavior before SC-006 release validation.
 
 ## Upper-Canopy Morphology Strategy (T160 outcome, authoritative)
 
-T160 (commit `7169757`, evidence `validation/t098b-upper-anvil-envelope.md`) measured the upper
+T160 (commit `9b8ccc5`, evidence `validation/t098b-upper-anvil-envelope.md`) measured the upper
 morphology on the real production density path - `StormDensityModel` is the CPU authority the
 shader mirrors - against the measured ten-member severe fixture and the real baked noise. It
 settles what the remaining morphology work should and should not touch.
@@ -823,7 +823,7 @@ Every new geometry regression assertion must be run against the audited implemen
 7. Run T098b only after the shipping traversal, resolution/reconstruction, lighting, and quality
    policy stabilize, then converge on T070/SC-006 without silently weakening the release target.
 
-The bounded upper-TOWER/ANVIL extent diagnostic is complete (T160, commit `7169757`). It falsified
+The bounded upper-TOWER/ANVIL extent diagnostic is complete (T160, commit `9b8ccc5`). It falsified
 the clipping hypothesis and identified the ANVIL radius-growth knee at v ~= 0.62 as the lever; its
 relaxed values are diagnostic only and are never shipped from that experiment. Steps 1-6 above are
 resolved by the T153 stop, so the remaining sequence is step 7 - T098b - now additionally carrying

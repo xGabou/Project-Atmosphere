@@ -399,7 +399,7 @@ See `validation/t098-manual-checklist.md`.
   T159 when the visible-volume architecture reaches resolution recovery, or the recorded stop task
   if T153/T154/T155/T156/T157 rejects the architecture (also depends on T098a, T139, T052)
   [FR-006, FR-023-FR-024, FR-031-FR-032; SC-001-SC-002, SC-011, SC-022]
-  **T160 inputs (2026-09-03, commit `7169757`).** Both prerequisites are now settled: T152 and
+  **T160 inputs (2026-09-03, commit `9b8ccc5`).** Both prerequisites are now settled: T152 and
   T160 are complete and the Phase 4Q terminal outcome is the recorded T153 stop, not T159.
   Two obligations follow.
   (a) **Upper canopy is a profile-shape defect, not clipping.** The lever is the ANVIL

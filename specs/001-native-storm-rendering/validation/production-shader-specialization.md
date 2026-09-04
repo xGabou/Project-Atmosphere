@@ -5,7 +5,7 @@ Status: **BANKED** 2026-09-03
 / Implementation commit: `6106c99`
 
 / Feature: 001-native-storm-rendering
-/ Depends on: T139 (`3790752`)
+/ Depends on: T139 (`6010161`)
 / Reference experiment: `e301494` on `experiment/core-cost` - evidence, not an
   implementation to merge.
 

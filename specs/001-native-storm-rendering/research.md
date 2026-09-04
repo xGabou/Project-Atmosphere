@@ -388,7 +388,7 @@ premises.
 
 **Decision**: Treat the rounded upper canopy as a defect in the ANVIL radius profile, and address
 it by moving the radius-growth knee later rather than by extending any bound. Recorded by T160
-(commit `7169757`), evidence `validation/t098b-upper-anvil-envelope.md`.
+(commit `9b8ccc5`), evidence `validation/t098b-upper-anvil-envelope.md`.
 
 **Measurement**: taken on the real production density path - `StormDensityModel` is the CPU
 authority the shader mirrors - against the measured ten-member severe fixture and the real baked
