@@ -1672,6 +1672,172 @@ void paBuildStormReachability() {
     paStormReachRadius = length(maximum - paStormReachCentre);
 }
 
+#ifdef PA_T140_ORACLE
+// ---------------------------------------------------------------------------
+// T140 diagnostic-only whole-pixel rejection oracle.
+//
+// DIAGNOSTIC ONLY. This block is compiled only into the generated T140 oracle
+// programs; FINAL never defines PA_T140_ORACLE, so none of it exists in the
+// shipped lean program and the T161 specialization is untouched.
+//
+// The question it answers: how much of the cloud pass is spent on pixels whose
+// camera ray cannot reach any cloud material at all? It builds a conservative
+// vertical cylinder around the resident storm descriptors and rejects rays that
+// miss it. Because a rejected ray provably finds no density, it can emit the
+// renderer's own no-cloud result and stay bit-identical - which the campaign
+// verifies by image A/B rather than assuming.
+//
+// The XZ radius reuses StormLobeEvaluator.horizontalReachBlocks, the same
+// expression paBuildStormReachability uses and whose zero-false-negative sweep
+// is its authority. It is duplicated here rather than reused because the
+// production builder is gated behind the T143 optimization bit, which is off in
+// FINAL; the oracle must not depend on a diagnostic arm being enabled.
+//
+// Cost note: the bound is rebuilt per fragment and the test is included in
+// every measurement, so the measured gain is a LOWER bound on the true ceiling.
+// ---------------------------------------------------------------------------
+// Defined later in the file; the oracle sits beside the reachability
+// builder it inherits its bound from, which is earlier than this.
+float precipitationRayPadding();
+
+/** True when content the descriptor bounds do not cover may be present. */
+bool paT140UnboundedContent() {
+    // Funnels and resident puff lobes are outside the storm-descriptor bounds,
+    // so their presence disables rejection rather than risking a false one.
+    return FunnelCount > 0 || PuffLobeCount > 0;
+}
+
+/** Overlap test between the ray segment [t0,t1] and one vertical cylinder. */
+bool paT140CylinderHit(vec3 rayDirection, float t0, float t1,
+        vec2 centre, float radius, float yLow, float yHigh) {
+    float enter = t0;
+    float leave = t1;
+    if (abs(rayDirection.y) < 1.0e-6) {
+        if (CameraPos.y < yLow || CameraPos.y > yHigh) {
+            return false;
+        }
+    } else {
+        float ta = (yLow - CameraPos.y) / rayDirection.y;
+        float tb = (yHigh - CameraPos.y) / rayDirection.y;
+        enter = max(enter, min(ta, tb));
+        leave = min(leave, max(ta, tb));
+        if (leave < enter) {
+            return false;
+        }
+    }
+    vec2 origin = CameraPos.xz - centre;
+    vec2 direction = rayDirection.xz;
+    float a = dot(direction, direction);
+    float r2 = radius * radius;
+    if (a < 1.0e-12) {
+        return dot(origin, origin) <= r2;
+    }
+    float b = 2.0 * dot(origin, direction);
+    float c = dot(origin, origin) - r2;
+    float discriminant = b * b - 4.0 * a * c;
+    if (discriminant < 0.0) {
+        return false;
+    }
+    float rootTerm = sqrt(discriminant);
+    enter = max(enter, (-b - rootTerm) / (2.0 * a));
+    leave = min(leave, (-b + rootTerm) / (2.0 * a));
+    return leave >= enter;
+}
+
+/**
+ * True when the ray segment can reach any descriptor bound.
+ *
+ * Deliberately per descriptor rather than one union disc. A single disc around
+ * every descriptor, inflated by the guard band, swallows the camera itself at
+ * ordinary gameplay range - the player stands inside the storm footprint - so
+ * it can never reject anything and measures nothing. Ten separate cylinders,
+ * each with its own height range, is the tightest bound that still inherits the
+ * zero-false-negative reach expression.
+ */
+bool paT140SegmentReachesBound(vec3 rayDirection, float t0, float t1) {
+    if (paT140UnboundedContent()) {
+        return true;
+    }
+    if (StormLobeCount <= 0) {
+        return false;
+    }
+    float rainPadding = precipitationRayPadding();
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        int packedTopology = int(floor(lifecycleRole.w + 0.5));
+        int role = packedTopology - (packedTopology / 8) * 8;
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        float profileMin;
+        float profileMax;
+        stormRoleRadialProfileRange(role, profileMin, profileMax);
+        float anvilWiden = role == 3 ? 1.56 : 1.0;
+        vec2 widest = max(
+            vec2(radiusRotation.x, radiusRotation.y * anvilWiden) * profileMax,
+            vec2(1.0));
+        vec2 narrowest = max(radiusRotation.xy * profileMin, vec2(1.0));
+        float softness = stormEdgeWidthBlocksFromData(
+            positionHeight, radiusRotation, shearMedia, role);
+        float guard = softness + STORM_MAX_BLEND_BLOCKS + STORM_MIN_EDGE_BLOCKS;
+        float reach = max(widest.x, widest.y)
+                * (1.08 + guard / (0.9 * min(narrowest.x, narrowest.y)))
+            + length(shearMedia.xy);
+        // Rain shafts hang below the descriptor, so the floor drops by the same
+        // padding the slab intersection already allows for them.
+        float yLow = positionHeight.z - guard - rainPadding;
+        float yHigh = positionHeight.w + guard;
+        if (paT140CylinderHit(rayDirection, t0, t1,
+                positionHeight.xy, reach, yLow, yHigh)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+#ifdef PA_T140_TILE
+/**
+ * Conservative-ish tile classification: a tile is active when any of its four
+ * corner rays or its centre ray reaches the bound. Corner sampling can in
+ * principle miss a bound that passes between the samples, so this is an
+ * approximation used only to ask how much of the per-pixel benefit survives
+ * coarse granularity - not a production culling design.
+ */
+bool paT140TileReachesBound(float t0, float t1) {
+    float tile = float(PA_T140_TILE);
+    vec2 tileOrigin = floor(gl_FragCoord.xy / tile) * tile;
+    for (int corner = 0; corner < 5; corner++) {
+        vec2 offset = corner == 0 ? vec2(0.5, 0.5)
+            : corner == 1 ? vec2(tile - 0.5, 0.5)
+            : corner == 2 ? vec2(0.5, tile - 0.5)
+            : corner == 3 ? vec2(tile - 0.5, tile - 0.5)
+            : vec2(tile * 0.5, tile * 0.5);
+        vec2 sampleFrag = tileOrigin + offset;
+        // PaOracleBaseSize is the cloud target size the renderer uploads every
+        // frame. The T140 variants deliberately leave it a uniform (PaOraclePass
+        // stays baked to 0, so the oracle-capture path it normally serves is
+        // still dead) rather than adding a new one.
+        vec2 sampleNdc = (sampleFrag / max(PaOracleBaseSize, vec2(1.0))) * 2.0 - 1.0;
+        vec4 sampleClip = vec4(sampleNdc, -1.0, 1.0);
+        vec4 sampleView = InvProjMat * sampleClip;
+        vec3 sampleDirection = normalize(
+            sampleView.xyz / max(abs(sampleView.w), 0.00001));
+        vec3 sampleRay = normalize((InvViewRotMat * vec4(sampleDirection, 0.0)).xyz);
+        if (paT140SegmentReachesBound(sampleRay, t0, t1)) {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
+#endif
+
 // Maps the unioned world-space distance to a bounded coverage envelope. This
 // is stage 4 of the composition: it is never a visible density, and nothing
 // downstream may treat it as one.
@@ -5170,6 +5336,35 @@ void main() {
         fragColor = vec4(0.0);
         return;
     }
+
+#ifdef PA_T140_ORACLE
+    // Placed after slab and scene-depth clipping so it measures only what the
+    // production renderer would still have marched.
+#ifdef PA_T140_TILE
+    bool paT140Relevant = paT140TileReachesBound(t0, t1);
+#else
+    bool paT140Relevant = paT140SegmentReachesBound(rayDir, t0, t1);
+#endif
+#ifdef PA_T140_MASK
+    // Classification image: opaque white where the oracle admits the pixel,
+    // fully transparent where it rejects. Pixels that already returned above
+    // (slab miss, scene depth) are transparent too, so alpha is exactly the
+    // "could this pixel reach cloud" mask.
+    fragColor = paT140Relevant ? vec4(1.0) : vec4(0.0);
+    gl_FragDepth = 1.0;
+    return;
+#else
+    if (!paT140Relevant) {
+        // Exactly the renderer's own no-cloud result: main()'s tail emits this
+        // whenever result.a < 0.002, and history is only consumed when the ray
+        // actually hit cloud, so a provably empty ray produces this and nothing
+        // else. Bit-identity is verified per fixture by image A/B.
+        gl_FragDepth = 1.0;
+        fragColor = vec4(0.0);
+        return;
+    }
+#endif
+#endif
 
     bool analyticPuffDiagnostic = PuffDensityStage == 1
         || PuffDensityStage == 2

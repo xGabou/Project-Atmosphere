@@ -79,6 +79,18 @@ final class StormT132AutoDriver {
      */
     private static final Path T161_MARKER = Path.of("t161-final-specialization.txt");
     /**
+     * T140: the screen-coverage cost campaign. It measures cloud GPU cost as a
+     * function of how much of the viewport can contain cloud at all, and
+     * compares the shipped lean renderer against a diagnostic oracle that
+     * rejects provably empty pixels before they march.
+     */
+    private static final Path T140_MARKER = Path.of("t140-coverage.txt");
+    /**
+     * T140 part 1: the five shipped quality modes at one pose, each at its
+     * own ladder resolution, measured against the banked lean FINAL program.
+     */
+    private static final Path T140_MODES_MARKER = Path.of("t140-modes.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -194,6 +206,8 @@ final class StormT132AutoDriver {
         return Files.exists(T135_MARKER) || resolutionRunRequested()
                 || evaluationRunRequested() || oracleRunRequested()
                 || specializationRunRequested()
+                || coverageRunRequested()
+                || fiveModeRunRequested()
                 || movingCameraRunRequested();
     }
 
@@ -211,6 +225,14 @@ final class StormT132AutoDriver {
 
     private static boolean specializationRunRequested() {
         return Files.exists(T161_MARKER);
+    }
+
+    private static boolean coverageRunRequested() {
+        return Files.exists(T140_MARKER);
+    }
+
+    private static boolean fiveModeRunRequested() {
+        return Files.exists(T140_MODES_MARKER);
     }
 
     private static boolean movingCameraRunRequested() {
@@ -357,6 +379,52 @@ final class StormT132AutoDriver {
      * budget has to hold, and is the fixture the core-cost experiment used.
      */
     private static final String[] T161_POSES = {"PLAY_VIS_NEAR"};
+    /**
+     * T140 arms. LEAN_FINAL is the shipped renderer and the baseline every
+     * speedup is quoted against; the rest are the same lean program plus a
+     * whole-pixel rejection oracle at three granularities. Measuring the tile
+     * arms alongside the per-pixel one shows how much of the theoretical
+     * benefit survives coarse classification.
+     */
+    private static final CoreCostDiagnosticProgram[] T140_ARMS = {
+            CoreCostDiagnosticProgram.LEAN_FINAL,
+            CoreCostDiagnosticProgram.T140_PIXEL_ORACLE,
+            CoreCostDiagnosticProgram.T140_TILE8,
+            CoreCostDiagnosticProgram.T140_TILE16
+    };
+    /**
+     * The coverage series, ordered heaviest first so a decaying fixture costs
+     * the cheapest and least informative poses rather than the storm-heavy
+     * reference. All five stand at the same point and differ only in aim.
+     */
+    private static final String[] T140_POSES = {
+            "PLAY_VIS_NEAR", "T140_PARTIAL", "T140_EDGE", "T140_AWAY_180", "T140_AWAY_DOWN"};
+    private static final StormOptimizationDiagnosticMode[] T140_OPTIMIZATION_ARMS = {
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
+            StormOptimizationDiagnosticMode.NORMAL_PRODUCTION
+    };
+    private static boolean t140Run;
+    private static boolean t140ModeRun;
+    private static final String[] T140_MODE_POSES = {"PLAY_VIS_NEAR"};
+    /** 0 request mask, 1 collect mask, 2 request final, 3 collect final, 4 done. */
+    private static int t140ImageStep;
+    private static final java.util.Map<String, T140Coverage> T140_COVERAGE =
+            new java.util.LinkedHashMap<>();
+
+    /** Per-pose screen-coverage census, counted from two captured images. */
+    private record T140Coverage(
+            int totalPixels, int potentialPixels, int contributingPixels,
+            int width, int height) {
+        double potentialPercent() {
+            return totalPixels <= 0 ? 0.0D : 100.0D * potentialPixels / totalPixels;
+        }
+
+        double contributingPercent() {
+            return totalPixels <= 0 ? 0.0D : 100.0D * contributingPixels / totalPixels;
+        }
+    }
     private static final StormOptimizationDiagnosticMode[] T161_OPTIMIZATION_ARMS = {
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION,
             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION
@@ -411,6 +479,16 @@ final class StormT132AutoDriver {
 
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
+        if (t140Run) {
+            // Pin the program under test. Every arm is pinned, including the
+            // lean baseline, so a selection bug surfaces as a failed arm rather
+            // than as two arms quietly measuring the same program.
+            VolumetricCloudDebugConfig.setFinalProgramOverride(t140Arm());
+            VolumetricCloudDebugConfig.setT136ConstantLighting(false);
+            VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
+                    StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
+            return;
+        }
         if (t161Run) {
             // Pin the program under test. The lean arm is pinned too rather
             // than left on automatic, so a selection bug shows up as a failed
@@ -440,6 +518,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t140Run) {
+            return t140Arm().serializedName();
+        }
         if (t161Run) {
             return t161Arm().serializedName();
         }
@@ -459,10 +540,17 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t140Run) {
+            return T140_OPTIMIZATION_ARMS;
+        }
         if (t161Run) {
             return T161_OPTIMIZATION_ARMS;
         }
         return t153OracleRun ? T153_ARMS : T141_ARMS;
+    }
+
+    private static CoreCostDiagnosticProgram t140Arm() {
+        return T140_ARMS[Math.max(0, Math.min(T140_ARMS.length - 1, t141ArmIndex))];
     }
 
     private static CoreCostDiagnosticProgram t161Arm() {
@@ -503,6 +591,27 @@ final class StormT132AutoDriver {
         StormPerformanceBaseline.SuiteFixture fixture = StormPerformanceBaseline.suiteFixture();
         if (fixture == null) {
             failStormVisibility(pose, "fixture_missing");
+            return;
+        }
+        if (pose.startsWith("T140_")) {
+            // The coverage series deliberately contains views this guard exists
+            // to reject - looking away from the storm is the measurement, not a
+            // fault. Record the geometric verdict as evidence and continue.
+            // What was actually on screen is established far more directly by
+            // the per-pose mask and FINAL pixel counts than by this heuristic.
+            ProjectAtmosphere.LOGGER.info("T140_VISIBILITY_GEOMETRY pose={} {}",
+                    pose,
+                    StormFixtureVisibility.evaluate(
+                            StormGeometryBuildCoordinator.lobeCount(),
+                            fixture.centerX(), fixture.centerZ(),
+                            fixture.baseY(), fixture.topY(), fixture.horizontalRadius(),
+                            player.getX(), player.getEyeY(), player.getZ(),
+                            player.getYRot(), player.getXRot(),
+                            minecraft.options.fov().get(),
+                            AtmoCommonConfig.CLOUD_RENDER_DISTANCE.get()).format());
+            t150Attempts = 0;
+            t150CaptureRequested = false;
+            advance(Phase.T135_SAMPLE);
             return;
         }
         if (!t150CaptureRequested) {
@@ -584,6 +693,12 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t140Run) {
+            return T140_POSES;
+        }
+        if (t140ModeRun) {
+            return T140_MODE_POSES;
+        }
         if (t161Run) {
             return T161_POSES;
         }
@@ -893,6 +1008,10 @@ final class StormT132AutoDriver {
                 t138ResolutionRun = resolutionRunRequested();
                 t138ScaleIndex = 0;
                 t138HistoryArm = false;
+                t140Run = coverageRunRequested();
+                t140ModeRun = fiveModeRunRequested();
+                t140ImageStep = 0;
+                T140_COVERAGE.clear();
                 t161Run = specializationRunRequested();
                 t161ImageRequested = false;
                 t161ArmImageDone = false;
@@ -900,7 +1019,8 @@ final class StormT132AutoDriver {
                 StormReferenceImageCapture.cancel();
                 t153OracleRun = oracleRunRequested();
                 t153OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
-                t141EvaluationRun = evaluationRunRequested() || t153OracleRun || t161Run;
+                t141EvaluationRun =
+                        evaluationRunRequested() || t153OracleRun || t161Run || t140Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -909,7 +1029,7 @@ final class StormT132AutoDriver {
                 T153_FIXTURES.clear();
                 t153PoseAttempts = 0;
                 if (t141EvaluationRun) {
-                    if (!t153OracleRun && !t161Run) {
+                    if (!t153OracleRun && !t161Run && !t140Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -919,8 +1039,9 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t161Run ? "T161_SPECIALIZATION"
-                                    : (t153OracleRun ? "T153_ORACLE" : "T141_EVAL"),
+                            t140Run ? "T140_COVERAGE"
+                                    : (t161Run ? "T161_SPECIALIZATION"
+                                        : (t153OracleRun ? "T153_ORACLE" : "T141_EVAL")),
                             sweepPoses().length, activeEvaluationArms().length,
                             fmt(T141_RESOLUTION_SCALE), T135_WIDTH, T135_HEIGHT);
                     if (t153OracleRun) {
@@ -947,7 +1068,7 @@ final class StormT132AutoDriver {
                 } else if (!t141EvaluationRun) {
                     ProjectAtmosphere.LOGGER.info(
                             "T135_PROFILE_BEGIN poses={} modes={} target={}x{}",
-                            T135_POSES.length, T135_MODES.length, T135_WIDTH, T135_HEIGHT);
+                            sweepPoses().length, T135_MODES.length, T135_WIDTH, T135_HEIGHT);
                 }
                 advance(Phase.T135_MOVE);
             }
@@ -1038,6 +1159,15 @@ final class StormT132AutoDriver {
                         x = fixture.centerX() + radius * 2.4D;
                         y = 120.0D;
                     }
+                    // T140 screen-coverage series. Every one of these stands
+                    // exactly where PLAY_VIS_NEAR stands and differs only in
+                    // where it looks, so cost differences between them are
+                    // attributable to how much cloud is on screen and to
+                    // nothing else - not distance, altitude, or fixture.
+                    case "T140_PARTIAL", "T140_EDGE", "T140_AWAY_180", "T140_AWAY_DOWN" -> {
+                        x = fixture.centerX() + radius * 1.6D;
+                        y = 120.0D;
+                    }
                     case "PLAY_HIGH" -> {
                         x = fixture.centerX() + radius * 5.0D;
                         z = fixture.centerZ() - radius * 2.0D;
@@ -1055,12 +1185,27 @@ final class StormT132AutoDriver {
                 float pitch = 0.0F;
                 if ("ABOVE".equals(sweepPose())
                         || "BELOW".equals(sweepPose())
-                        || sweepPose().startsWith("PLAY")) {
+                        || sweepPose().startsWith("PLAY")
+                        || sweepPose().startsWith("T140_")) {
                     double dy = midY - y;
                     double horizontal = Math.hypot(fixture.centerX() - x, fixture.centerZ() - z);
                     pitch = horizontal < 1.0D
                             ? (dy >= 0.0D ? -89.0F : 89.0F)
                             : (float) -Math.toDegrees(Math.atan2(dy, horizontal));
+                }
+                // The coverage series turns the camera away from the storm by a
+                // fixed amount rather than moving it. AWAY_DOWN additionally
+                // pitches at the ground, whose rays leave the cloud slab almost
+                // immediately: it is the strongest available zero-coverage case.
+                switch (sweepPose()) {
+                    case "T140_PARTIAL" -> yaw += 30.0F;
+                    case "T140_EDGE" -> yaw += 75.0F;
+                    case "T140_AWAY_180" -> yaw += 180.0F;
+                    case "T140_AWAY_DOWN" -> {
+                        yaw += 180.0F;
+                        pitch = 88.0F;
+                    }
+                    default -> { }
                 }
                 player.connection.sendCommand(String.format(Locale.ROOT,
                         "tp @s %.5f %.5f %.5f %.3f %.3f", x, y, z, yaw, pitch));
@@ -1097,14 +1242,14 @@ final class StormT132AutoDriver {
                     if (++t135CellRetries > T135_MAX_CELL_RETRIES) {
                         ProjectAtmosphere.LOGGER.warn(
                                 "T136_PROFILE abandoning {}/{} after {} contaminated attempts",
-                                T135_POSES[t135PoseIndex],
+                                sweepPose(),
                                 T135_MODES[Math.max(0, t135ModeIndex - 1)], t135CellRetries);
                         t135CellRetries = 0;
                         // Fall through to the next mode rather than looping.
                     } else {
                         ProjectAtmosphere.LOGGER.info(
                                 "T136_PROFILE respawning fixture before retrying {}/{}",
-                                T135_POSES[t135PoseIndex],
+                                sweepPose(),
                                 T135_MODES[Math.max(0, t135ModeIndex - 1)]);
                         t135ModeIndex = Math.max(0, t135ModeIndex - 1);
                         advance(Phase.T135_RESPAWN);
@@ -1113,15 +1258,15 @@ final class StormT132AutoDriver {
                 }
                 t135CellRetries = 0;
                 if (t135ModeIndex >= T135_MODES.length) {
-                    boolean attributionPose = "SIDE".equals(T135_POSES[t135PoseIndex])
-                            || "PLAY_NEAR".equals(T135_POSES[t135PoseIndex]);
+                    boolean attributionPose = "SIDE".equals(sweepPose())
+                            || "PLAY_NEAR".equals(sweepPose());
                     if (attributionPose && t135Arm < 2) {
                         t135Arm++;
                         t135ModeIndex = 0;
                         applyT135Arm();
                         ProjectAtmosphere.LOGGER.info(
                                 "T136_PROFILE attribution arm {} begins at {}",
-                                t135ArmName(), T135_POSES[t135PoseIndex]);
+                                t135ArmName(), sweepPose());
                         return;
                     }
                     t135Arm = 0;
@@ -1129,7 +1274,7 @@ final class StormT132AutoDriver {
                     t135LightingArm = false;
                     t135ModeIndex = 0;
                     t135PoseIndex++;
-                    if (t135PoseIndex >= T135_POSES.length) {
+                    if (t135PoseIndex >= sweepPoses().length) {
                         advance(Phase.T135_REPORT);
                     } else {
                         advance(Phase.T135_MOVE);
@@ -1138,7 +1283,7 @@ final class StormT132AutoDriver {
                 }
                 AtmoCommonConfig.CloudRaymarchQuality quality = T135_MODES[t135ModeIndex];
                 AtmoCommonConfig.CLOUD_RAYMARCH_QUALITY.set(quality);
-                if (!StormT135PerformanceProfile.begin(T135_POSES[t135PoseIndex], quality,
+                if (!StormT135PerformanceProfile.begin(sweepPose(), quality,
                         t135ArmName())) {
                     // A refusal consumes a retry. Without this the sweep loops
                     // between refusing and respawning forever, which is exactly
@@ -1147,7 +1292,7 @@ final class StormT132AutoDriver {
                         ProjectAtmosphere.LOGGER.warn(
                                 "T136_PROFILE abandoning {}/{}: fixture never became"
                                         + " measurable after {} attempts",
-                                T135_POSES[t135PoseIndex], quality, t135CellRetries);
+                                sweepPose(), quality, t135CellRetries);
                         t135CellRetries = 0;
                         t135ModeIndex++;
                         return;
@@ -1170,6 +1315,14 @@ final class StormT132AutoDriver {
                 }
                 if (!t135CountersRequested) {
                     t135CountersRequested = true;
+                    // The workload counters live behind debug views 22/23, which
+                    // every lean and oracle program bakes off. Releasing the pin
+                    // lets the capture link the diagnostic monolith, so the
+                    // counters describe the production work for this pose rather
+                    // than returning zeroes from a program that cannot count.
+                    if (t140Run) {
+                        VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    }
                     VolumetricCloudFrameDiagnostics.requestStormWorkloadCapture("side");
                     // The timing sample runs inside this phase, so stageFrames
                     // has already counted every tick of it. At the T141 arms'
@@ -1189,6 +1342,9 @@ final class StormT132AutoDriver {
                         // cell and complete from frames of several different
                         // arms. Abandon it here instead.
                         VolumetricCloudFrameDiagnostics.abortStormWorkloadCapture();
+                        if (t140Run) {
+                            applyT141Arm();
+                        }
                         advance(Phase.T135_SAMPLE);
                     }
                     return;
@@ -1227,6 +1383,9 @@ final class StormT132AutoDriver {
                                 t135CounterLabel, fmt(workload.cloudDensityCalls()),
                                 fmt(workload.cloudDensityCalls() / Math.max(1, pixels)));
                     }
+                }
+                if (t140Run) {
+                    applyT141Arm();
                 }
                 advance(Phase.T135_SAMPLE);
             }
@@ -1291,6 +1450,10 @@ final class StormT132AutoDriver {
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
                 }
+                if (t140Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT140CoverageReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                }
                 if (t161Run) {
                     ProjectAtmosphere.LOGGER.info(buildT161SpecializationReport());
                     VolumetricCloudDebugConfig.setFinalProgramOverride(null);
@@ -1299,6 +1462,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(buildT153DecisionReport());
                     VolumetricCloudDebugConfig.setHistoryEnabled(t153OriginalHistoryEnabled);
                     finish("t153_complete");
+                } else if (t140Run) {
+                    finish("t140_complete");
                 } else if (t161Run) {
                     finish("t161_complete");
                 } else {
@@ -1443,6 +1608,8 @@ final class StormT132AutoDriver {
             t141ArmIndex = 0;
             t141ArmAttempts = 0;
             t153PoseAttempts = 0;
+            t140ImageStep = 0;
+            t140FinalImage = null;
             applyT141Arm();
             t135PoseIndex++;
             if (t135PoseIndex >= sweepPoses().length) {
@@ -1450,6 +1617,10 @@ final class StormT132AutoDriver {
             } else {
                 advance(Phase.T135_MOVE);
             }
+            return;
+        }
+        if (t140Run && t140ImageStep < 6) {
+            tickT140Coverage(pose);
             return;
         }
         applyT141Arm();
@@ -1525,6 +1696,202 @@ final class StormT132AutoDriver {
         applyT141Arm();
         ProjectAtmosphere.LOGGER.warn(
                 "T153_ORACLE restarting complete pose={} reason={}", pose, reason);
+    }
+
+    /**
+     * Counts, once per pose, how much of the cloud target could contain cloud
+     * at all and how much actually does.
+     *
+     * <p>Three images are captured at the same pinned clock with history
+     * bypassed. The mask program renders the oracle verdict, so its opaque
+     * pixels are exactly those whose ray can reach the conservative cloud
+     * bound. The lean FINAL image supplies the pixels that actually carried
+     * cloud, because the renderer emits a fully transparent pixel for every ray
+     * that ends below the composite threshold. The gap between the two is work
+     * spent inside the bound that produced nothing; everything outside the mask
+     * is work spent on pixels that could never have produced anything at all.
+     *
+     * <p>The third capture is the oracle rendering the scene. Comparing it
+     * against the lean FINAL image is what makes the whole campaign
+     * trustworthy: a rejection that changed even one pixel would mean the bound
+     * was not conservative and every speedup measured against it would be
+     * meaningless. It is checked per pose rather than assumed.
+     */
+    private static void tickT140Coverage(String pose) {
+        if (StormReferenceImageCapture.active()) {
+            return;
+        }
+        switch (t140ImageStep) {
+            case 0 -> {
+                VolumetricCloudDebugConfig.setFinalProgramOverride(
+                        CoreCostDiagnosticProgram.T140_MASK);
+                if (StormReferenceImageCapture.request("t140_mask_" + pose)
+                        .startsWith("acquiring")) {
+                    t140ImageStep = 1;
+                }
+            }
+            case 1 -> {
+                StormReferenceImageComparison.Reference mask =
+                        StormReferenceImageCapture.latestResult();
+                if (mask == null) {
+                    t140ImageStep = 0;
+                    return;
+                }
+                t140PotentialPixels = countOpaquePixels(mask, 0.5D);
+                t140MaskWidth = mask.width();
+                t140MaskHeight = mask.height();
+                t140ImageStep = 2;
+            }
+            case 2 -> {
+                VolumetricCloudDebugConfig.setFinalProgramOverride(
+                        CoreCostDiagnosticProgram.LEAN_FINAL);
+                if (StormReferenceImageCapture.request("t140_final_" + pose)
+                        .startsWith("acquiring")) {
+                    t140ImageStep = 3;
+                }
+            }
+            case 3 -> {
+                StormReferenceImageComparison.Reference rendered =
+                        StormReferenceImageCapture.latestResult();
+                if (rendered == null) {
+                    t140ImageStep = 2;
+                    return;
+                }
+                // 0.002 is the composite threshold main() itself uses: below it
+                // the pixel is emitted fully transparent and no cloud reaches
+                // the frame.
+                t140FinalImage = rendered;
+                int contributing = countOpaquePixels(rendered, 0.002D);
+                T140Coverage coverage = new T140Coverage(
+                        t140MaskWidth * t140MaskHeight, t140PotentialPixels, contributing,
+                        t140MaskWidth, t140MaskHeight);
+                T140_COVERAGE.put(pose, coverage);
+                ProjectAtmosphere.LOGGER.info(String.format(Locale.ROOT,
+                        "T140_COVERAGE pose=%s target=%dx%d totalPixels=%d"
+                                + " potentialPixels=%d (%.3f%%)"
+                                + " contributingPixels=%d (%.3f%%)"
+                                + " provablyIrrelevantPixels=%d (%.3f%%)"
+                                + " insideBoundButEmptyPixels=%d",
+                        pose, coverage.width(), coverage.height(), coverage.totalPixels(),
+                        coverage.potentialPixels(), coverage.potentialPercent(),
+                        coverage.contributingPixels(), coverage.contributingPercent(),
+                        coverage.totalPixels() - coverage.potentialPixels(),
+                        100.0D - coverage.potentialPercent(),
+                        Math.max(0, coverage.potentialPixels()
+                                - coverage.contributingPixels())));
+                t140ImageStep = 4;
+            }
+            case 4 -> {
+                VolumetricCloudDebugConfig.setFinalProgramOverride(
+                        CoreCostDiagnosticProgram.T140_PIXEL_ORACLE);
+                if (StormReferenceImageCapture.request("t140_oracle_" + pose)
+                        .startsWith("acquiring")) {
+                    t140ImageStep = 5;
+                }
+            }
+            default -> {
+                StormReferenceImageComparison.Reference oracle =
+                        StormReferenceImageCapture.latestResult();
+                if (oracle == null) {
+                    t140ImageStep = 4;
+                    return;
+                }
+                if (t140FinalImage == null) {
+                    ProjectAtmosphere.LOGGER.warn(
+                            "T140_EXACTNESS pose={} evaluated=false reason=missing_final", pose);
+                } else {
+                    StormReferenceImageComparison.Comparison comparison =
+                            StormReferenceImageComparison.compare(t140FinalImage, oracle);
+                    ProjectAtmosphere.LOGGER.info(
+                            "T140_EXACTNESS pose={} a=lean_final b=t140_pixel_oracle {}"
+                                    + " digestsEqual={}",
+                            pose, comparison.format(),
+                            t140FinalImage.digest().equals(oracle.digest()));
+                }
+                t140FinalImage = null;
+                t140ImageStep = 6;
+                applyT141Arm();
+            }
+        }
+    }
+
+    private static StormReferenceImageComparison.Reference t140FinalImage;
+    private static int t140PotentialPixels;
+    private static int t140MaskWidth;
+    private static int t140MaskHeight;
+
+    /** Counts pixels whose alpha reaches the threshold in a captured frame. */
+    private static int countOpaquePixels(
+            StormReferenceImageComparison.Reference reference, double threshold) {
+        float[] pixels = reference.pixels();
+        if (pixels == null) {
+            return 0;
+        }
+        int count = 0;
+        for (int index = 3; index < pixels.length; index += 4) {
+            if (pixels[index] >= threshold) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Builds the T140 cost-versus-coverage record.
+     *
+     * <p>One row per pose per arm, plus the coverage census, so the question
+     * the campaign exists to answer can be read directly: does cloud cost track
+     * the size of the render target, or the part of it that can contain cloud?
+     */
+    private static String buildT140CoverageReport() {
+        StringBuilder out = new StringBuilder("T140_COVERAGE_DECISION");
+        for (String pose : T140_POSES) {
+            T140Coverage coverage = T140_COVERAGE.get(pose);
+            StormT135PerformanceProfile.Cell baseline = t140Cell(
+                    pose, CoreCostDiagnosticProgram.LEAN_FINAL.serializedName());
+            if (coverage == null || baseline == null) {
+                out.append(String.format(Locale.ROOT,
+                        "%nT140_ROW pose=%s evaluated=false coverage=%s baseline=%s",
+                        pose, coverage != null, baseline != null));
+                continue;
+            }
+            out.append(String.format(Locale.ROOT,
+                    "%nT140_ROW pose=%s target=%dx%d potentialPercent=%.3f"
+                            + " contributingPercent=%.3f baselineCloudP50=%.4f"
+                            + " baselineCloudP95=%.4f",
+                    pose, coverage.width(), coverage.height(),
+                    coverage.potentialPercent(), coverage.contributingPercent(),
+                    baseline.cloudP50(), baseline.cloudP95()));
+            for (CoreCostDiagnosticProgram arm : T140_ARMS) {
+                if (arm == CoreCostDiagnosticProgram.LEAN_FINAL) {
+                    continue;
+                }
+                StormT135PerformanceProfile.Cell cell = t140Cell(pose, arm.serializedName());
+                if (cell == null) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT140_ARM pose=%s arm=%s evaluated=false", pose, arm.serializedName()));
+                    continue;
+                }
+                out.append(String.format(Locale.ROOT,
+                        "%nT140_ARM pose=%s arm=%s cloudP50=%.4f cloudP95=%.4f"
+                                + " speedupP50=%.4fx speedupP95=%.4fx",
+                        pose, arm.serializedName(), cell.cloudP50(), cell.cloudP95(),
+                        cell.cloudP50() <= 0.0D
+                                ? Double.NaN : baseline.cloudP50() / cell.cloudP50(),
+                        cell.cloudP95() <= 0.0D
+                                ? Double.NaN : baseline.cloudP95() / cell.cloudP95()));
+            }
+        }
+        return out.toString();
+    }
+
+    private static StormT135PerformanceProfile.Cell t140Cell(String pose, String arm) {
+        for (StormT135PerformanceProfile.Cell cell : StormT135PerformanceProfile.results()) {
+            if (pose.equals(cell.pose()) && arm.equals(cell.arm())) {
+                return cell;
+            }
+        }
+        return null;
     }
 
     /**

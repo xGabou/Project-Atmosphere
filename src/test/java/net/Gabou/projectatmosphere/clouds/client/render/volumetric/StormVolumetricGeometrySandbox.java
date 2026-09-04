@@ -589,6 +589,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateProductionShaderCompiles);
         runCorrected("T161 lean FINAL shader specializes and compiles",
                 StormVolumetricGeometrySandbox::validateLeanFinalShaderCompiles);
+        runCorrected("T140 oracle variants compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT140OracleVariants);
     }
 
     private static void validateFixedStormSilhouette() {
@@ -5584,6 +5586,43 @@ public final class StormVolumetricGeometrySandbox {
         require(violations.isEmpty(), "lean FINAL specialization incomplete: "
                 + String.join("; ", violations));
         compileFragmentShader(resolveMojImports(leanSource), "lean FINAL storm shader");
+    }
+
+    /**
+     * The T140 diagnostic programs must compile, and - more importantly - the
+     * shipped FINAL program must contain none of them. The oracle is guarded by
+     * PA_T140_ORACLE, which only the diagnostic variants define; if that guard
+     * were ever removed the oracle would start executing inside FINAL, which is
+     * both a semantic and a performance change. This asserts the separation
+     * rather than trusting the #ifdef.
+     */
+    private static void validateT140OracleVariants() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        if (finalSource.contains("#define PA_T140_ORACLE")) {
+            violations.add("FINAL defines PA_T140_ORACLE");
+        }
+        require(violations.isEmpty(), "T140 oracle leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] variants = {
+                {"cloud_atmosphere_volume_t140_pixel", "PA_T140_ORACLE"},
+                {"cloud_atmosphere_volume_t140_mask", "PA_T140_MASK"},
+                {"cloud_atmosphere_volume_t140_tile8", "PA_T140_TILE 8"},
+                {"cloud_atmosphere_volume_t140_tile16", "PA_T140_TILE 16"}
+        };
+        for (String[] variant : variants) {
+            String path = base + variant[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T140 variant missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains("#define " + variant[1]),
+                    variant[0] + " is missing #define " + variant[1]);
+            compileFragmentShader(resolveMojImports(source), variant[0]);
+        }
     }
 
     private static void validateProductionShaderCompiles() {

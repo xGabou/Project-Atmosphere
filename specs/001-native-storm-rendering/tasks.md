@@ -1346,7 +1346,7 @@ do not fabricate historical before/after percentages for T119--T123.
   not have been produced there. Establishes execution-context specialization as a dominant cost
   class; the hardware mechanism (register pressure, occupancy, latency hiding) remains unproven
   without counters.
-- [ ] T140 [PERFORMANCE] Reprofile all five modes only after T161's productionized FINAL program, using T135's written targets in
+- [X] T140 [PERFORMANCE] Reprofile all five modes only after T161's productionized FINAL program, using T135's written targets in
   `specs/001-native-storm-rendering/validation/performance-baseline.md`, record per-mode pass/fail
   and representative visual checks, and prepare the evidence consumed by final T070/SC-006. This
   task does not waive final shipped visual regrading in T098b
@@ -1366,6 +1366,39 @@ implementation, while visual polish remains independently active.
 
 ### Tests for User Story 3
 
+  **ACCEPTED.** Diagnostic only; no ladder value, morphology or rendering semantic changed.
+  Five-mode post-T161 baseline at PLAY_VIS_NEAR on the banked lean FINAL program, each mode at
+  its own shipped scale, 120 frames per cell: Low 8.798/9.158, Low 24 11.371/12.194,
+  Medium 12.101/21.470 (240x135); High 24.620/26.639 (360x203); Ultra 38.394/41.525 (480x270)
+  cloud p50/p95 ms. **No mode meets SC-006; Ultra is 4.8x the 8 ms budget. SC-006 is recorded
+  unmet, not rescoped.** A new screen-coverage campaign held the target at 480x270 and varied
+  only camera aim: contributing coverage 13.9% / 23.2% / 30.6% / 0% / 0% cost
+  37.12 / 46.39 / 39.94 / **3.59** / **2.77** ms. **The zero-cloud floor is 3.59 ms - 9.7% of a
+  storm-heavy frame - and looking away still marches 92% as many primary steps while performing
+  ZERO density evaluations.** A diagnostic whole-pixel rejection oracle (separate generated
+  programs; FINAL never defines `PA_T140_ORACLE`) rendered bit-identically to lean FINAL at all
+  five poses in both runs and produced **no gain: 0.97x-1.04x** at pixel, 8x8 and 16x16
+  granularity. A conservative descriptor bound proved unable to reject anything (0.10% at one
+  pose, 0% elsewhere) because at gameplay range the camera stands inside the storm footprint, so
+  **projected conservative descriptor bounds would cull nothing where it matters**. Independent
+  of the oracle, the floor caps perfect free whole-pixel rejection at **1.09x** (PLAY_VIS_NEAR),
+  1.06x (PARTIAL/EDGE). **OPPORTUNITY 1 (whole-pixel/screen-space culling) is measured CLOSED
+  and must not be built.** Cost follows neither target area (sublinear, exponent ~0.76 across the
+  resolution ladder) nor covered pixels (EDGE has 2.2x the coverage of PLAY_VIS_NEAR and costs
+  less); it follows density evaluations weighted by the light march they drive. **Dominant
+  remaining class: density evaluation inside cloud-relevant rays (~92% of the frame).** Standout
+  counter: 390.6M descriptor texture fetches for 2.50M density calls with ten resident
+  descriptors (~156 texels per density evaluation). T153's 1.63x within-ray ceiling is kept
+  separate and flagged as a **pre-T161 measurement that must be re-derived** on the lean program.
+  The two opportunities act on disjoint pixels, so they add rather than multiply. **Recommended
+  next: an attribution experiment isolating per-sample descriptor traversal cost inside a density
+  call (T136-shaped), before committing to a spatial descriptor-binning architecture.** Ceiling
+  for that class is bounded by the empty-march floor at ~10x. Do NOT retest 0.375 after culling
+  (1.09x leaves it at 55.9 ms); retest 0.375 only after a measured >=1.6x, and 0.50 after ~2.7x.
+  Evidence in `validation/performance-screen-coverage.md`. Also recorded there: five cells of
+  `ultra-recovery-primary-run.out.log` are contaminated (the sweep verifies pose visibility once
+  and the fixture stopped contributing after the 0.500 arm); the shipped ladder is unaffected
+  because it draws only from valid cells.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

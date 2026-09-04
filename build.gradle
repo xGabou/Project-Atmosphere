@@ -284,12 +284,35 @@ def leanFinalRemovedUniforms = leanFinalConstants.keySet().collect {
     it.replaceAll(/^uniform\s+\w+\s+/, '').replaceAll(/;$/, '')
 }
 
+// T140 diagnostic variants. Each is the SAME lean specialization plus a
+// preprocessor define that switches on the diagnostic-only whole-pixel
+// rejection oracle. They are separate programs so FINAL never contains the
+// oracle: the shipped program does not define PA_T140_ORACLE, so none of that
+// code exists in it and the T161 specialization is unchanged.
+//
+// keepUniforms names constants the variant must NOT bake. The tile arms need
+// the live cloud-target size to rebuild neighbouring rays, and PaOracleBaseSize
+// already carries it every frame; PaOraclePass stays baked to 0, so the oracle
+// capture path it normally serves remains dead.
+def leanProgramVariants = [
+        [name: leanFinalShaderName, defines: [], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t140_pixel',
+         defines: ['PA_T140_ORACLE 1'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t140_mask',
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_MASK 1'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t140_tile8',
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8'], keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t140_tile16',
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16'], keepUniforms: ['PaOracleBaseSize']]
+]
+
 tasks.register('generateLeanFinalShader') {
-    description = 'Generates the compile-time-specialized lean FINAL cloud program.'
+    description = 'Generates the lean FINAL cloud program and the T140 oracle variants.'
     inputs.files(leanFinalShaderSource, leanFinalShaderJson)
     inputs.property('leanConstants', leanFinalConstants.toString())
     inputs.property('leanProgramName', leanFinalShaderName)
     inputs.property('leanRemovedSamplers', leanFinalRemovedSamplers.toString())
+    inputs.property('leanVariants', leanProgramVariants.toString())
     outputs.dir(leanFinalGeneratedResources)
     doLast {
         File shaderDirectory = new File(
@@ -297,41 +320,74 @@ tasks.register('generateLeanFinalShader') {
                 'assets/projectatmosphere/shaders/core')
         shaderDirectory.mkdirs()
 
-        String leanSource = leanFinalShaderSource.getText('UTF-8')
-        leanFinalConstants.each { String uniformDeclaration, String constantDeclaration ->
-            // A silently missed replacement would ship a lean program that is
-            // identical to the monolith and quietly lose the entire gain, so a
-            // renamed or reformatted declaration must fail the build.
-            if (!leanSource.contains(uniformDeclaration)) {
-                throw new GradleException(
-                        'Lean FINAL specialization could not find uniform declaration: '
-                                + uniformDeclaration
-                                + ' in cloud_atmosphere_volume.fsh. Update leanFinalConstants in'
-                                + ' build.gradle and leanFinalEligible() in'
-                                + ' VolumetricCloudRenderer together.')
+        String productionSource = leanFinalShaderSource.getText('UTF-8')
+        def productionJson = new groovy.json.JsonSlurper().parse(leanFinalShaderJson, 'UTF-8')
+
+        leanProgramVariants.each { variant ->
+            String programName = variant.name
+            List<String> keep = variant.keepUniforms
+            String variantSource = productionSource
+            List<String> baked = []
+            leanFinalConstants.each { String uniformDeclaration, String constantDeclaration ->
+                String uniformName = uniformDeclaration
+                        .replaceAll(/^uniform\s+\w+\s+/, '').replaceAll(/;$/, '')
+                if (keep.contains(uniformName)) {
+                    return
+                }
+                // A silently missed replacement would emit a program identical
+                // to the monolith and quietly lose the entire gain, so a
+                // renamed or reformatted declaration must fail the build.
+                if (!variantSource.contains(uniformDeclaration)) {
+                    throw new GradleException(
+                            'Lean specialization could not find uniform declaration: '
+                                    + uniformDeclaration
+                                    + ' in cloud_atmosphere_volume.fsh. Update'
+                                    + ' leanFinalConstants in build.gradle and'
+                                    + ' leanFinalEligible() in VolumetricCloudRenderer'
+                                    + ' together.')
+                }
+                variantSource = variantSource.replace(
+                        uniformDeclaration, constantDeclaration)
+                baked.add(uniformName)
             }
-            leanSource = leanSource.replace(uniformDeclaration, constantDeclaration)
-        }
 
-        new File(shaderDirectory, leanFinalShaderName + '.fsh').setText(
-                '// GENERATED - do not edit. Compile-time-specialized FINAL program\n'
-                        + '// emitted from cloud_atmosphere_volume.fsh by generateLeanFinalShader.\n'
-                        + '// Every dormant diagnostic selector is a constant here, so the driver\n'
-                        + '// eliminates those paths before allocating registers.\n'
-                        + leanSource,
-                'UTF-8')
+            if (!variant.defines.isEmpty()) {
+                // The defines must precede every use, and #version must stay
+                // the first line of the program.
+                String versionLine = '#version 150'
+                if (!variantSource.startsWith(versionLine)) {
+                    throw new GradleException(
+                            'cloud_atmosphere_volume.fsh must start with ' + versionLine)
+                }
+                String defineBlock = variant.defines
+                        .collect { '#define ' + it }.join('\n')
+                variantSource = versionLine + '\n' + defineBlock +
+                        variantSource.substring(versionLine.length())
+            }
 
-        def shaderJson = new groovy.json.JsonSlurper().parse(leanFinalShaderJson, 'UTF-8')
-        shaderJson.fragment = 'projectatmosphere:' + leanFinalShaderName
-        shaderJson.uniforms = shaderJson.uniforms.findAll {
-            !leanFinalRemovedUniforms.contains(it.name)
+            new File(shaderDirectory, programName + '.fsh').setText(
+                    '// GENERATED - do not edit. Emitted from'
+                            + ' cloud_atmosphere_volume.fsh by generateLeanFinalShader.\n'
+                            + '// Dormant diagnostic selectors are constants here, so the driver\n'
+                            + '// eliminates those paths before allocating registers.\n'
+                            + (variant.defines.isEmpty()
+                                ? ''
+                                : '// Variant defines: ' + variant.defines.join(', ') + '\n')
+                            + variantSource,
+                    'UTF-8')
+
+            def variantJson = new groovy.json.JsonSlurper().parseText(
+                    groovy.json.JsonOutput.toJson(productionJson))
+            variantJson.fragment = 'projectatmosphere:' + programName
+            variantJson.uniforms = variantJson.uniforms.findAll { !baked.contains(it.name) }
+            variantJson.samplers = variantJson.samplers.findAll {
+                !leanFinalRemovedSamplers.contains(it.name)
+            }
+            new File(shaderDirectory, programName + '.json').setText(
+                    groovy.json.JsonOutput.prettyPrint(
+                            groovy.json.JsonOutput.toJson(variantJson)),
+                    'UTF-8')
         }
-        shaderJson.samplers = shaderJson.samplers.findAll {
-            !leanFinalRemovedSamplers.contains(it.name)
-        }
-        new File(shaderDirectory, leanFinalShaderName + '.json').setText(
-                groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(shaderJson)),
-                'UTF-8')
     }
 }
 
