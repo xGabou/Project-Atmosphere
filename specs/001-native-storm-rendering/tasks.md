@@ -1668,6 +1668,35 @@ implementation, while visual polish remains independently active.
   and trades arithmetic for a fetch that this campaign showed is free. 64 cells across two runs,
   **0 rejected**, all four drift controls stable. Evidence in
   `validation/performance-primary-march.md`.
+- [X] T171 [PERFORMANCE] [US3] Explain T170's 13% spread across identical-output arms and
+  establish a measurement floor before any architecture change. **The audit found two real
+  sampler defects before a single frame was measured**: `observeFrame()` recorded the async GPU
+  timer once per frame with no freshness test, so a cell could re-record one GPU interval many
+  times, and `VolumetricCloudRenderer.lastGpuTimingSample()` - written for exactly that and
+  documented as such - **was called from nowhere**, a fourth instance of the omission class the
+  T170 registry invariant catches, in a file it does not cover. Both fixed; **neither was the
+  cause** (`duplicatesRejected=0` in all 140 cell records). **The measurement floor**: same GL
+  program back-to-back CV **0.50%**; separately linked byte-identical programs differ by at most
+  **1.07%**, inside the same-program spread, so there is **no program-identity effect**; pooled
+  across 19 identical-output cells CV **0.97% SIDE / 1.23% FAR**. Ordering, warm-up and sample
+  count are all excluded - 60/120/240 frames do not converge, so more frames cannot help.
+  GPU telemetry rules out the leading hardware hypothesis: an RTX 4070 **Laptop** GPU with a
+  210-3105 MHz range held **2340 MHz pinned**, 44-63 C, no throttle, including through the
+  anomalous cell. **What remains is occasional bimodality, not wide distributions**: 2 cells of
+  70 (2.9%) measured an internally tight state disjoint from their own twin - SIDE `fpmax5`
+  12.5880 vs 11.0971 (13.4%, T170's spread reproduced exactly, and it is a *cell* property not an
+  arm property) and FAR `desc_nosdf` 12.7887 vs 8.1859 (56.2%, no frame of one overlapping the
+  other). Cause not identified; eleven hypotheses excluded. **Threshold adopted: minimum
+  measurable speedup 3%, every banked arm measured at least twice, repeats disagreeing by more
+  than 3% rejected rather than averaged, anything else BELOW MEASUREMENT FLOOR.** **Task 7
+  re-measurement**: all six T170 points re-measured with both repeats agreeing within 1.31%.
+  `t169_stack_fast` 1.774x, `desc_nosdf` 1.778x, `desc_constedge` 1.395x, `desc_hoist` **1.421x**
+  - the descriptor findings survive, with the hoist smaller than T170 claimed. **But
+  `t170_stack_hoist` re-measures at 8.7532 ms SIDE against T170's 7.3052 - 19.8% higher and far
+  outside the floor - so SIDE <=10 ms is met and SIDE <=8 ms is NOT, and T170's claim to be the
+  first configuration in the line to clear 8 ms at the binding pose is withdrawn.** 70 cells,
+  **0 rejected**. Descriptor-invariant precompute authorized as the next architecture with its
+  target revised to the 10 ms goal. Evidence in `validation/performance-harness-stability.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

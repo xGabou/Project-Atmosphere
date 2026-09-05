@@ -130,6 +130,12 @@ final class StormT132AutoDriver {
      */
     private static final Path T170_MARKER = Path.of("t170-primary-march.txt");
     /**
+     * T171: the harness itself. T170 measured a 13% spread across arms proven to
+     * render byte-identical images, which is larger than most remaining effects,
+     * so nothing further is banked until that spread has a cause.
+     */
+    private static final Path T171_MARKER = Path.of("t171-harness-stability.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -310,6 +316,10 @@ final class StormT132AutoDriver {
 
     private static boolean primaryMarchRunRequested() {
         return Files.exists(T170_MARKER);
+    }
+
+    private static boolean harnessStabilityRunRequested() {
+        return Files.exists(T171_MARKER);
     }
 
     private static boolean movingCameraRunRequested() {
@@ -635,14 +645,32 @@ final class StormT132AutoDriver {
             CoreCostDiagnosticProgram program,
             float resolutionScale,
             StormOptimizationDiagnosticMode mode,
-            int descriptorLimit) {
+            int descriptorLimit,
+            String tag,
+            int sampleFrames) {
         T166Arm(CoreCostDiagnosticProgram program) {
-            this(program, Float.NaN, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1);
+            this(program, Float.NaN, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1,
+                    "", 0);
         }
 
         T166Arm(CoreCostDiagnosticProgram program, float resolutionScale,
                 StormOptimizationDiagnosticMode mode) {
-            this(program, resolutionScale, mode, -1);
+            this(program, resolutionScale, mode, -1, "", 0);
+        }
+
+        T166Arm(CoreCostDiagnosticProgram program, float resolutionScale,
+                StormOptimizationDiagnosticMode mode, int descriptorLimit) {
+            this(program, resolutionScale, mode, descriptorLimit, "", 0);
+        }
+
+        /**
+         * T171. A repeat of the same program is a distinct cell and must have a
+         * distinct label, or the results map collapses the repeats onto one
+         * entry - the failure that silently erased T169's five T149 arms.
+         */
+        T166Arm(CoreCostDiagnosticProgram program, String tag, int sampleFrames) {
+            this(program, Float.NaN, StormOptimizationDiagnosticMode.NORMAL_PRODUCTION, -1,
+                    tag, sampleFrames);
         }
 
         /**
@@ -663,7 +691,10 @@ final class StormT132AutoDriver {
             if (mode != StormOptimizationDiagnosticMode.NORMAL_PRODUCTION) {
                 base = base + "@m" + mode.serializedName();
             }
-            return descriptorLimit < 0 ? base : base + "@d" + descriptorLimit;
+            if (descriptorLimit >= 0) {
+                base = base + "@d" + descriptorLimit;
+            }
+            return tag == null || tag.isEmpty() ? base : base + "#" + tag;
         }
     }
 
@@ -925,6 +956,102 @@ final class StormT132AutoDriver {
     /** SIDE is the binding pose; FAR guards against a regression. */
     private static final String[] T170_POSES = {"FAR", "SIDE"};
 
+    /** T171 measures the harness, so SIDE - the pose the budget binds on - leads. */
+    private static final String[] T171_POSES = {"SIDE", "FAR"};
+
+    private static boolean t171Run;
+    private static boolean t171OriginalHistoryEnabled;
+
+    /**
+     * The T171 matrix. Every arm renders the same image; the campaign exists to
+     * measure how much the harness disagrees with itself about that.
+     *
+     * <p>Blocks, in execution order, so ordering effects are visible as position
+     * in the arm list rather than having to be inferred:
+     *
+     * <ul>
+     *   <li>A - the same GL program measured four times in a row. This is the
+     *       floor: whatever spread appears here is not attributable to shader
+     *       logic, program identity or ordering.</li>
+     *   <li>B - anchor and the two duplicate programs interleaved, so a
+     *       program switch happens between every pair of cells.</li>
+     *   <li>C - block B's programs in reverse order.</li>
+     *   <li>D - the same program at 60, 120 and 240 sampled frames.</li>
+     *   <li>E - the T170 fpmax arms already proven byte-identical to each
+     *       other, which is where the 13% was first seen.</li>
+     *   <li>F - the T170 points worth re-measuring, twice each.</li>
+     * </ul>
+     */
+    private static final T166Arm[] T171_ARMS = buildT171Arms();
+
+    private static T166Arm[] buildT171Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        CoreCostDiagnosticProgram lean = CoreCostDiagnosticProgram.LEAN_FINAL;
+
+        // A. Same program, no switch between cells.
+        for (int i = 1; i <= 4; i++) {
+            arms.add(new T166Arm(lean, "a" + i, 60));
+        }
+        // B. Interleaved anchor / duplicate-program, fixed order.
+        for (int i = 1; i <= 2; i++) {
+            arms.add(new T166Arm(lean, "b" + i, 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T171_DUP_A, "b" + i, 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T171_DUP_B, "b" + i, 60));
+        }
+        // C. The same three programs, reversed.
+        for (int i = 1; i <= 2; i++) {
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T171_DUP_B, "c" + i, 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T171_DUP_A, "c" + i, 60));
+            arms.add(new T166Arm(lean, "c" + i, 60));
+        }
+        // D. Sample-count sweep, same program.
+        arms.add(new T166Arm(lean, "d060", 60));
+        arms.add(new T166Arm(lean, "d120", 120));
+        arms.add(new T166Arm(lean, "d240", 240));
+        // E. The byte-identical T170 clamp arms that produced the 13%.
+        for (int i = 1; i <= 2; i++) {
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T170_FPMAX5, "e" + i, 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T170_FPMAX6, "e" + i, 60));
+            arms.add(new T166Arm(CoreCostDiagnosticProgram.T170_FPMAX8, "e" + i, 60));
+        }
+        // F. The T170 points to re-measure once the floor is known.
+        for (int i = 1; i <= 2; i++) {
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T169_STACK_FAST,
+                    CoreCostDiagnosticProgram.T170_DESC_NO_EXACT_SDF,
+                    CoreCostDiagnosticProgram.T170_DESC_CONST_EDGE,
+                    CoreCostDiagnosticProgram.T170_DESC_HOIST,
+                    CoreCostDiagnosticProgram.T170_STACK_HOIST}) {
+                arms.add(new T166Arm(arm, "f" + i, 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t171Arm() {
+        return T171_ARMS[Math.max(0, Math.min(T171_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T171_OPTIMIZATION_ARMS =
+            buildT171OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT171OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T171_ARMS.length];
+        for (int i = 0; i < T171_ARMS.length; i++) {
+            modes[i] = T171_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * T171 captures no reference images. Every arm in blocks A-E is already
+     * proven identical to the anchor, and block F's arms were captured in T170;
+     * re-capturing would add program switches inside the very measurement the
+     * campaign exists to characterise.
+     */
+    private static final CoreCostDiagnosticProgram[] T171_IMAGE_ARMS = {};
+
     private static boolean t170Run;
     private static boolean t170OriginalHistoryEnabled;
 
@@ -935,7 +1062,7 @@ final class StormT132AutoDriver {
      * them.
      */
     private static boolean programArmCampaign() {
-        return t166Run || t167Run || t168Run || t169Run || t170Run;
+        return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -1193,7 +1320,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t170Run ? t170Arm()
+            T166Arm arm = t171Run ? t171Arm()
+                    : t170Run ? t170Arm()
                     : t169Run ? t169Arm()
                     : t168Run ? t168Arm()
                     : t167Run ? t167Arm() : t166Arm();
@@ -1204,6 +1332,12 @@ final class StormT132AutoDriver {
             // The oracle arms need their capture pass; everything else must
             // upload exactly the production mode its program bakes.
             VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(arm.mode());
+            // T171 varies the sampled-frame count per arm to find the minimum
+            // count that yields a stable percentile. Every other campaign keeps
+            // the budget its own begin() installed.
+            if (arm.sampleFrames() > 0) {
+                StormT135PerformanceProfile.setCellBudget(30, arm.sampleFrames());
+            }
             // One temporal state for the whole matrix, or the comparison is
             // between history situations rather than between programs.
             VolumetricCloudDebugConfig.setHistoryEnabled(false);
@@ -1271,6 +1405,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t171Run) {
+            return t171Arm().label();
+        }
         if (t170Run) {
             return t170Arm().label();
         }
@@ -1314,6 +1451,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t171Run) {
+            return T171_OPTIMIZATION_ARMS;
+        }
         if (t170Run) {
             return T170_OPTIMIZATION_ARMS;
         }
@@ -1488,6 +1628,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t171Run) {
+            return T171_POSES;
+        }
         if (t170Run) {
             return T170_POSES;
         }
@@ -1830,6 +1973,8 @@ final class StormT132AutoDriver {
                 t169Run = lightingDetailRunRequested();
                 t170Run = primaryMarchRunRequested();
                 t170OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t171Run = harnessStabilityRunRequested();
+                t171OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t168OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t167Run = refinementRunRequested();
                 t167OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
@@ -1867,7 +2012,8 @@ final class StormT132AutoDriver {
                                 || t140Run || t162Run || t163Run || t166Run || t167Run
                                 || t168Run
                                 || t169Run
-                                || t170Run;
+                                || t170Run
+                                || t171Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -1877,7 +2023,8 @@ final class StormT132AutoDriver {
                 t153PoseAttempts = 0;
                 if (t141EvaluationRun) {
                     if (!t153OracleRun && !t161Run && !t140Run && !t162Run && !t163Run
-                            && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run) {
+                            && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
+                            && !t171Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -1887,7 +2034,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t170Run ? "T170_PRIMARY_MARCH"
+                            t171Run ? "T171_HARNESS_STABILITY"
+                                    : t170Run ? "T170_PRIMARY_MARCH"
                                     : t169Run ? "T169_LIGHTING_DETAIL"
                                     : t168Run ? "T168_FOOTPRINT"
                                     : t167Run ? "T167_REFINE"
@@ -2208,7 +2356,8 @@ final class StormT132AutoDriver {
                         || (t167Run && t167Arm().program().fixedWork())
                         || (t168Run && t168Arm().program().fixedWork())
                         || (t169Run && t169Arm().program().fixedWork())
-                        || (t170Run && t170Arm().program().fixedWork())) {
+                        || (t170Run && t170Arm().program().fixedWork())
+                        || (t171Run && t171Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -2352,6 +2501,13 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t171Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT171HarnessStabilityReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t171OriginalHistoryEnabled);
                 }
                 if (t170Run) {
                     ProjectAtmosphere.LOGGER.info(buildT170PrimaryMarchReport());
@@ -3107,6 +3263,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t171Run) {
+            return T171_IMAGE_ARMS;
+        }
         if (t170Run) {
             return T170_IMAGE_ARMS;
         }
@@ -3436,6 +3595,40 @@ final class StormT132AutoDriver {
      * cannot distinguish "more lighting per sample" from "more samples", which
      * are different problems with different fixes.
      */
+    /**
+     * T171's report. Unlike every other campaign this one reports dispersion
+     * rather than a speedup: the question is not which arm is faster but how
+     * much the harness disagrees with itself about arms that are the same.
+     */
+    private static String buildT171HarnessStabilityReport() {
+        StringBuilder out = new StringBuilder("T171_HARNESS_STABILITY_DECISION");
+        for (String pose : T171_POSES) {
+            for (T166Arm arm : T171_ARMS) {
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (cell == null) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT171_CELL pose=%s arm=%s evaluated=false", pose, arm.label()));
+                    continue;
+                }
+                out.append(String.format(Locale.ROOT,
+                        "%nT171_CELL pose=%s arm=%s block=%s program=%s samples=%d"
+                                + " duplicatesRejected=%d cloudP50=%.4f cloudP95=%.4f"
+                                + " cloudMean=%.4f cloudSd=%.4f cloudCv=%.5f"
+                                + " cloudMin=%.4f cloudMax=%.4f",
+                        pose, arm.label(),
+                        arm.tag().isEmpty() ? "-" : arm.tag().substring(0, 1),
+                        arm.program().serializedName(), cell.samples(),
+                        cell.duplicateSamplesRejected(), cell.cloudP50(), cell.cloudP95(),
+                        cell.cloudMean(), cell.cloudSd(), cell.cloudCv(),
+                        cell.cloudMin(), cell.cloudMax()));
+            }
+        }
+        out.append(String.format(Locale.ROOT, "%nT171_REJECTED count=%d %s",
+                T162_REJECTED.size(),
+                T162_REJECTED.isEmpty() ? "none" : String.join(",", T162_REJECTED)));
+        return out.toString();
+    }
+
     private static String buildT170PrimaryMarchReport() {
         StringBuilder out = new StringBuilder("T170_PRIMARY_MARCH_DECISION");
         for (String pose : T170_POSES) {

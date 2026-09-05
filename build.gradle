@@ -697,6 +697,18 @@ def leanProgramVariants = [
                    'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045',
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
          keepUniforms: ['PaOracleBaseSize']],
+        // ------------------------------------------------------------------
+        // T171 program-identity controls. Exactly FINAL's defines and
+        // keepUniforms, so the generated GLSL differs from
+        // cloud_atmosphere_volume_final.fsh only in its file name. Two of them,
+        // separately linked, so "same logic, different GL program" can be
+        // separated from "same GL program, measured twice".
+        // ------------------------------------------------------------------
+        [name: 'cloud_atmosphere_volume_t171_dup_a',
+         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t171_dup_b',
+         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
+
         [name: 'cloud_atmosphere_volume_t170_stack8',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
                    'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045',

@@ -607,6 +607,10 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateCampaignWiring);
         runCorrected("T170 the campaign wiring invariant detects an omitted wire",
                 StormVolumetricGeometrySandbox::validateCampaignWiringCatchesOmissions);
+        runCorrected("T171 program identity controls are byte-identical to FINAL",
+                StormVolumetricGeometrySandbox::validateT171ProgramIdentityControls);
+        runCorrected("T171 the GPU sampler records only fresh timer results",
+                StormVolumetricGeometrySandbox::validateGpuSampleFreshnessGating);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -5965,10 +5969,10 @@ public final class StormVolumetricGeometrySandbox {
         // A campaign latched but left out of the shared evaluation flag runs
         // its whole sweep with the pose guards disarmed - T167 exactly.
         String unguardedSweep = driver.replace(
-                "                                || t169Run\n                                || t170Run;",
-                "                                || t169Run;");
+                "                                || t170Run\n                                || t171Run;",
+                "                                || t170Run;");
         require(!unguardedSweep.equals(driver), "evaluation-latch mutation did not apply");
-        requireDetected(unguardedSweep, "t170Run",
+        requireDetected(unguardedSweep, "t171Run",
                 "a campaign missing from the t141EvaluationRun latch");
 
         System.out.println("T170_WIRING_NEGATIVE mutations=5|allDetected=true");
@@ -6110,6 +6114,77 @@ public final class StormVolumetricGeometrySandbox {
      * The T170 primary-march arms must compile, must stay out of FINAL, and the
      * attribution arms must remove exactly the stage they claim to remove.
      */
+    /**
+     * T171. The program-identity controls must be byte-identical to FINAL.
+     *
+     * <p>The whole campaign rests on this: if `t171_dup_a` and `t171_dup_b`
+     * differ from FINAL by so much as a comment, a timing difference between
+     * them stops being evidence about linking and program identity and becomes
+     * evidence about shader source. The check is exact string equality of the
+     * generated GLSL, not a heuristic.
+     */
+    private static void validateT171ProgramIdentityControls() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        for (String duplicate : new String[] {
+                "cloud_atmosphere_volume_t171_dup_a",
+                "cloud_atmosphere_volume_t171_dup_b"}) {
+            String path = base + duplicate + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T171 control missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.equals(finalSource),
+                    duplicate + " is not byte-identical to FINAL; a timing difference"
+                            + " between them would no longer isolate program identity");
+            compileFragmentShader(resolveMojImports(source), duplicate);
+        }
+        require(!finalSource.contains("t171_dup"),
+                "FINAL references a T171 control program");
+        System.out.println("T171_CONTROLS duplicates=2|byteIdenticalToFinal=true");
+    }
+
+    /**
+     * T171. The sampler must not record a GPU timing twice.
+     *
+     * <p>The timer resolves asynchronously, so {@code lastGpuMilliseconds()}
+     * holds the most recently completed timestamp pair - frequently the same
+     * value it held last frame. Recording it once per sampled frame without
+     * checking freshness mixes distinct measurements with duplicates, and the
+     * duplicate rate depends on the phase between the frame loop and query
+     * resolution. That is a per-arm, per-run quantity, which is exactly the
+     * shape of T170's unexplained 13%.
+     *
+     * <p>{@code VolumetricCloudRenderer.lastGpuTimingSample()} was written for
+     * this, documented as identifying a fresh result without a frame-time proxy,
+     * and never called - the same omission class the T170 registry invariant
+     * exists to catch, in a file that invariant does not cover.
+     */
+    private static void validateGpuSampleFreshnessGating() {
+        String profile = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "StormT135PerformanceProfile.java");
+        require(profile.contains("VolumetricCloudRenderer.lastGpuTimingSample()"),
+                "the performance profile no longer consults the GPU timing serial;"
+                        + " it would record the same GPU interval on consecutive frames");
+        require(profile.contains("duplicateSamplesRejected++"),
+                "the duplicate-sample counter is gone, so a cell can no longer report"
+                        + " how much of its sample array was re-recorded");
+        require(profile.contains("standardDeviation(cloud)")
+                        && profile.contains("coefficientOfVariation(cloud)"),
+                "the cell no longer reports dispersion, which is the only thing that"
+                        + " distinguishes a real speedup from harness noise");
+
+        String renderer = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "VolumetricCloudRenderer.java");
+        require(renderer.contains("static long lastGpuTimingSample()"),
+                "lastGpuTimingSample() is gone; the profile's freshness gate has no source");
+        System.out.println("T171_SAMPLING freshnessGate=wired|duplicateCounter=wired"
+                + "|dispersion=wired");
+    }
+
     private static void validateT170PrimaryMarchArms() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");

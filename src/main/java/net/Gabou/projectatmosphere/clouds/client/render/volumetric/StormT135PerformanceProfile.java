@@ -33,9 +33,9 @@ public final class StormT135PerformanceProfile {
     /** Frames discarded after a mode or pose change before sampling begins. */
     private static final int SETTLE_FRAMES = 45;
     /** Frames kept per (pose, mode) cell. */
-    private static final int SAMPLE_FRAMES = 120;
+    private static final int SAMPLE_FRAMES = 240;
     /** Hard ceiling so a stalled cell cannot hang a run. */
-    private static final int CELL_TIMEOUT_FRAMES = 600;
+    private static final int CELL_TIMEOUT_FRAMES = 1500;
 
     /**
      * Active per-cell budgets. The T136 five-mode sweep keeps the full 45/120
@@ -55,6 +55,18 @@ public final class StormT135PerformanceProfile {
      * and never falls below the 16-sample floor {@code finish} already requires
      * before a cell may be recorded.
      */
+    /**
+     * T171 control. Disabling the gate restores the pre-T171 behaviour so the
+     * defect's contribution can be measured rather than asserted.
+     */
+    public static synchronized void setFreshSampleGating(boolean enabled) {
+        freshSampleGating = enabled;
+    }
+
+    public static synchronized boolean freshSampleGating() {
+        return freshSampleGating;
+    }
+
     public static synchronized void setCellBudget(int settleFrames, int sampleFrames) {
         settleTarget = Math.max(0, Math.min(SETTLE_FRAMES, settleFrames));
         sampleTarget = Math.max(16, Math.min(SAMPLE_FRAMES, sampleFrames));
@@ -78,6 +90,25 @@ public final class StormT135PerformanceProfile {
     private static int requiredDescriptors;
     private static boolean contaminated;
     private static String armLabel = "production";
+    /**
+     * T171. The GPU timer resolves asynchronously, so {@code lastGpuMilliseconds()}
+     * holds whatever timestamp pair most recently completed - which is frequently
+     * the same value it held on the previous frame.
+     *
+     * <p>Until T171 this class recorded that value once per sampled frame without
+     * checking whether it was new, so a cell's sample array mixed distinct GPU
+     * measurements with re-recorded duplicates. The duplicate rate depends on the
+     * phase between the frame loop and query resolution, which is exactly the kind
+     * of thing that shifts between arms and between runs, and it is the leading
+     * suspect for T170's 13% spread across arms that render identical images.
+     *
+     * <p>{@code VolumetricCloudRenderer.lastGpuTimingSample()} was written for this
+     * and documented as "identifies a fresh completed GPU timestamp result without
+     * using a frame-time proxy" - and was never called. It is called now.
+     */
+    private static boolean freshSampleGating = true;
+    private static long lastRecordedTimingSerial = -1L;
+    private static int duplicateSamplesRejected;
     private static final float[] cloudMilliseconds = new float[SAMPLE_FRAMES];
     private static final float[] frameMilliseconds = new float[SAMPLE_FRAMES];
     /**
@@ -106,9 +137,14 @@ public final class StormT135PerformanceProfile {
             int cloudWidth,
             int cloudHeight,
             int samples,
+            int duplicateSamplesRejected,
             double cloudP50,
             double cloudP95,
             double cloudMean,
+            double cloudSd,
+            double cloudCv,
+            double cloudMin,
+            double cloudMax,
             double frameP50,
             double frameP95,
             double frameMean,
@@ -122,6 +158,8 @@ public final class StormT135PerformanceProfile {
     /** Begins sampling one (pose, mode) cell. Returns false when already busy. */
     public static synchronized boolean begin(
             String pose, AtmoCommonConfig.CloudRaymarchQuality quality, String arm) {
+        lastRecordedTimingSerial = -1L;
+        duplicateSamplesRejected = 0;
         if (active) {
             return false;
         }
@@ -251,6 +289,18 @@ public final class StormT135PerformanceProfile {
             // The asynchronous timer has no result yet; do not fabricate one.
             return;
         }
+        // A frame that produced no new timestamp pair carries the previous
+        // frame's measurement. Recording it again would count one GPU interval
+        // twice and shrink the apparent spread of whatever the cell is really
+        // doing, so the frame is skipped rather than resampled.
+        long timingSerial = VolumetricCloudRenderer.lastGpuTimingSample();
+        if (freshSampleGating) {
+            if (timingSerial == lastRecordedTimingSerial) {
+                duplicateSamplesRejected++;
+                return;
+            }
+            lastRecordedTimingSerial = timingSerial;
+        }
         // The scale actually in force this frame, read from the renderer rather
         // than from the mode table: a diagnostic override turns the mode's
         // configured scale into a label instead of a measurement.
@@ -291,9 +341,14 @@ public final class StormT135PerformanceProfile {
                     cloudTargetWidth,
                     cloudTargetHeight,
                     sampled,
+                    duplicateSamplesRejected,
                     percentile(cloud, 0.50D),
                     percentile(cloud, 0.95D),
                     mean(cloud),
+                    standardDeviation(cloud),
+                    coefficientOfVariation(cloud),
+                    cloud.length == 0 ? Double.NaN : cloud[0],
+                    cloud.length == 0 ? Double.NaN : cloud[cloud.length - 1],
                     percentile(frame, 0.50D),
                     percentile(frame, 0.95D),
                     mean(frame),
@@ -306,8 +361,10 @@ public final class StormT135PerformanceProfile {
             ProjectAtmosphere.LOGGER.info(
                     "T135_PROFILE pose={} arm={} descriptors={} mode={} steps={}"
                             + " resolutionScale={} framebuffer={}x{}"
-                            + " cloudTarget={}x{} samples={}"
-                            + " cloudP50={} cloudP95={} cloudMean={}"
+                            + " cloudTarget={}x{} samples={} duplicatesRejected={}"
+                            + " gating={}"
+                            + " cloudP50={} cloudP95={} cloudMean={} cloudSd={}"
+                            + " cloudCv={} cloudMin={} cloudMax={}"
                             + " frameP50={} frameP95={} frameMean={} remainderP50={}"
                             + " effectiveResolutionScale={}"
                             + " compositeP50={} compositeP95={}",
@@ -315,8 +372,11 @@ public final class StormT135PerformanceProfile {
                     recorded.mode(), recorded.raymarchSteps(),
                     fmt(recorded.resolutionScale()), recorded.frameWidth(),
                     recorded.frameHeight(), recorded.cloudWidth(), recorded.cloudHeight(),
-                    recorded.samples(),
+                    recorded.samples(), recorded.duplicateSamplesRejected(),
+                    freshSampleGating,
                     fmt(recorded.cloudP50()), fmt(recorded.cloudP95()), fmt(recorded.cloudMean()),
+                    fmt(recorded.cloudSd()), fmt(recorded.cloudCv()),
+                    fmt(recorded.cloudMin()), fmt(recorded.cloudMax()),
                     fmt(recorded.frameP50()), fmt(recorded.frameP95()), fmt(recorded.frameMean()),
                     fmt(recorded.remainderP50()),
                     fmt(recorded.effectiveResolutionScale()),
@@ -335,6 +395,30 @@ public final class StormT135PerformanceProfile {
         }
         int index = (int) Math.round(q * (sorted.length - 1));
         return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
+    }
+
+    private static double standardDeviation(float[] values) {
+        if (values.length < 2) {
+            return Double.NaN;
+        }
+        double average = mean(values);
+        double sum = 0.0D;
+        for (float v : values) {
+            double d = v - average;
+            sum += d * d;
+        }
+        // Sample standard deviation: these are a sample of the cell's frames,
+        // not the whole population of frames the arm could ever render.
+        return Math.sqrt(sum / (values.length - 1));
+    }
+
+    /** Dispersion as a fraction of the mean, which is what compares across arms. */
+    private static double coefficientOfVariation(float[] values) {
+        double average = mean(values);
+        if (!(average > 0.0D)) {
+            return Double.NaN;
+        }
+        return standardDeviation(values) / average;
     }
 
     private static double mean(float[] values) {

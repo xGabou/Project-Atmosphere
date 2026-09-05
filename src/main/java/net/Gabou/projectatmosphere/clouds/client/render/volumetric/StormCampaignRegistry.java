@@ -125,7 +125,9 @@ public final class StormCampaignRegistry {
             new Campaign("T169", "t169-lighting-detail.txt", "lightingDetailRunRequested",
                     "t169Run", "T169_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T170", "t170-primary-march.txt", "primaryMarchRunRequested",
-                    "t170Run", "T170_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "t170Run", "T170_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T171", "t171-harness-stability.txt", "harnessStabilityRunRequested",
+                    "t171Run", "T171_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

@@ -282,7 +282,21 @@ public enum CoreCostDiagnosticProgram {
     /** T170 Task 6: the T169 stack_fast carried forward with the clamp at 6. */
     T170_STACK("t170_stack"),
     /** T170 Task 6: the same stack with the clamp at 8. */
-    T170_STACK8("t170_stack8");
+    T170_STACK8("t170_stack8"),
+
+    // -----------------------------------------------------------------------
+    // T171. Harness stability. T170 measured a 13% spread across arms that
+    // render byte-identical images, which is larger than most of the effects
+    // the line is now trying to resolve. These two are generated from the same
+    // source with the same defines as FINAL - byte-identical GLSL, separately
+    // linked GL programs - so any difference between them and LEAN_FINAL is
+    // attributable to linking and program identity, not to shader logic.
+    // -----------------------------------------------------------------------
+
+    /** T171 program-identity control A: byte-identical to FINAL, separately linked. */
+    T171_DUP_A("t171_dup_a"),
+    /** T171 program-identity control B: byte-identical to FINAL, separately linked. */
+    T171_DUP_B("t171_dup_b");
 
     private final String serializedName;
 
