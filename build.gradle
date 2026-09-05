@@ -125,7 +125,7 @@ dependencies {
 
     // Core dependencies
     implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
-    implementation fg.deobf("curse.maven:gabous-libs-1367332:8280104")
+    implementation fg.deobf("curse.maven:gabous-libs-1367332:8774253")
     implementation fg.deobf("curse.maven:spark-361579:4738952")
     implementation fg.deobf("curse.maven:cloth-config-348521:5729105")
 
@@ -434,7 +434,78 @@ def leanProgramVariants = [
          keepUniforms: ['PaOraclePass', 'PaOracleBaseSize'],
          keepSamplers: ['OracleIntervalSampler'],
          overrides: ['uniform int PaDiagnosticOptimizationMode;':
-                     'const int PaDiagnosticOptimizationMode = 28672;']]
+                     'const int PaDiagnosticOptimizationMode = 28672;']],
+
+        // ------------------------------------------------------------------
+        // T167. Three independent questions, measured separately before any
+        // combination: a graded replacement for T166's over-aggressive
+        // distance step, a nearest-K cap on descriptor owners, and a safer
+        // early-termination threshold.
+        //
+        // Every arm carries PA_PRECIPITATION_ABSENT, so each is FINAL minus
+        // exactly one thing, on the same terms as the T166 set.
+        // ------------------------------------------------------------------
+
+        // Task 1. Graded exterior fine-step curves. Each keeps PaOracleBaseSize
+        // as a uniform because the footprint curve needs the live cloud-target
+        // height, and the renderer uploads it on every frame.
+        [name: 'cloud_atmosphere_volume_t167_curve_a_late',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t167_curve_b_smooth',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 2'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t167_curve_c_capped',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 3'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t167_curve_d_footprint',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // The same footprint curve with the empty-span scan held at production
+        // spacing, to separate scan-lattice misses from coarser integration as
+        // the source of the thin-material loss.
+        [name: 'cloud_atmosphere_volume_t167_curve_d_scanfixed',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
+                   'PA_ARM_SCAN_LATTICE_FIXED 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // Task 2. Nearest-K descriptor owner cap.
+        [name: 'cloud_atmosphere_volume_t167_k1',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 1'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t167_k2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 2'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t167_k3',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 3'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t167_k4',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 4'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t167_k6',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESCRIPTOR_K 6'], keepUniforms: []],
+
+        // Task 3. Safer early-termination thresholds. Production is 0.015 and
+        // T166 measured 0.06; these fill the interval.
+        [name: 'cloud_atmosphere_volume_t167_term030',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.030'], keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t167_term045',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_EARLY_TERM 0.045'], keepUniforms: []],
+
+        // Task 4. The combined stacks. Descriptor nearest-K is deliberately
+        // absent: it was slower than FULL at every K measured, so there is
+        // nothing to combine.
+        //
+        // BALANCED keeps the footprint curve's integration growth but holds the
+        // empty-span scan at production spacing, which is where most of the
+        // thin-material loss was traced to, and adds the safer termination
+        // floor.
+        [name: 'cloud_atmosphere_volume_t167_stack_balanced',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 4',
+                   'PA_ARM_SCAN_LATTICE_FIXED 1', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // SAFE takes the late-ramp curve, which recovered essentially all thin
+        // material, and the same termination floor.
+        [name: 'cloud_atmosphere_volume_t167_stack_safe',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1',
+                   'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']]
 ]
 
 tasks.register('generateLeanFinalShader') {

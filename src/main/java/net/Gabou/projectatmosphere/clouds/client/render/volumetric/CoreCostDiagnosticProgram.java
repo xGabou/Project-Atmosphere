@@ -124,7 +124,44 @@ public enum CoreCostDiagnosticProgram {
      */
     T166_ORACLE_EMPTY("t166_oracle_empty"),
     T166_ORACLE_INTERVALS("t166_oracle_intervals"),
-    T166_ORACLE_COMBINED("t166_oracle_combined");
+    T166_ORACLE_COMBINED("t166_oracle_combined"),
+
+    /**
+     * T167 graded exterior fine-step curves. T166's distance-step arm was the
+     * fastest thing measured and also the only one that lost thin material;
+     * these trade parts of its growth back for that material.
+     */
+    T167_CURVE_A_LATE("t167_curve_a_late"),
+    T167_CURVE_B_SMOOTH("t167_curve_b_smooth"),
+    T167_CURVE_C_CAPPED("t167_curve_c_capped"),
+    T167_CURVE_D_FOOTPRINT("t167_curve_d_footprint"),
+    /**
+     * The footprint curve with the empty-span scan held at production spacing.
+     * The scan's safety argument is that it probes the lattice the fine march
+     * would have sampled; widening the fine step widens that lattice too, so
+     * this separates scan-lattice misses from coarser integration.
+     */
+    T167_CURVE_D_SCANFIXED("t167_curve_d_scanfixed"),
+    /**
+     * T167 nearest-K descriptor owner cap. Skipped descriptors still feed the
+     * conservative clearance, so the march stays safe; only the exact SDF and
+     * the ordered union are avoided.
+     */
+    T167_K1("t167_k1"),
+    T167_K2("t167_k2"),
+    T167_K3("t167_k3"),
+    T167_K4("t167_k4"),
+    T167_K6("t167_k6"),
+    /** T167 early-termination thresholds between production's 0.015 and T166's 0.06. */
+    T167_TERM030("t167_term030"),
+    T167_TERM045("t167_term045"),
+    /**
+     * The combined stacks, composed only of arms that actually passed their own
+     * measurement. Nearest-K is absent from both: it was slower than FULL at
+     * every K and its seam index rose monotonically as owners were dropped.
+     */
+    T167_STACK_BALANCED("t167_stack_balanced"),
+    T167_STACK_SAFE("t167_stack_safe");
 
     private final String serializedName;
 

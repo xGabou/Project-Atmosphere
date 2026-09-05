@@ -1555,6 +1555,51 @@ implementation, while visual polish remains independently active.
   (`ratio=3.0885 verdict=DRIFTED`). Primary run: 84 cells, **0 rejected**, all three drift
   controls stable, 18 image comparisons. FINAL is textually untouched - the shader diff is 129
   insertions and 0 deletions. Evidence in `validation/performance-pmweather-evaluation.md`.
+- [X] T167 [PERFORMANCE] [US3] Refine the two arms T166 left open and take the cheap win it
+  identified: graded replacements for the over-aggressive distance step, a nearest-K cap on
+  per-sample descriptor owners, and a safer early-termination threshold. Measure all three
+  independently before combining anything, and combine only what passes. Build every arm as a
+  compile-time program carrying `PA_PRECIPITATION_ABSENT`, keep the march conservative under the
+  K cap by having skipped descriptors still feed `groupMinClearance`, and report image quality -
+  not only timing - for every arm, because the descriptor question cannot be decided on speed.
+  Productionize nothing; assert the arms stay out of FINAL in a build gate. Record in
+  `specs/001-native-storm-rendering/validation/performance-descriptor-and-step-refinement.md`
+  (depends on T166, T163, T162, T121) [FR-010-FR-012, FR-027, FR-030; SC-006-SC-007, SC-021]
+  **[BANKED 2026-09-04, branch `experiment/cloud-descriptor-k`, not merged]**
+  **Descriptor nearest-K is REJECTED - CASE D.** No K is faster than evaluating every owner at
+  any pose: K1 1.005x/0.892x/0.940x, K2 0.936/0.870/0.916, K3 0.916/0.844/0.877, K4
+  0.851/0.809/0.818, K6 0.716/0.719/0.762 (FAR/SIDE/PVN). The ordering runs the wrong way -
+  **K6 is the slowest arm in the campaign and also the closest to FULL on every quality metric**,
+  which is the signature of pure overhead. Quality fails independently: the new seam index,
+  added specifically to catch collapse of the ordered smooth union, rises monotonically as owners
+  are dropped and reaches **0.0379 at K1/FAR against 0.0023 for the aggressive step arm**, with
+  cloud SSIM 0.653 and thin retention 0.403 - exactly the failure `directStormGroupField` already
+  documents. **The mechanism corrects a reading of T166**: production already applies the exact
+  lobe SDF to 88.1% of visited lobes at SIDE (T121 rejects only 21.8%), so K1 skipped ~86% of all
+  exact SDF evaluations and was still 8-11% slower. **The ladder's 48.6% "shape/profile/SDF/union"
+  class is per-descriptor traversal - four texel fetches, role decode, ownership ellipse, edge
+  softness, conservative bound - not the SDF equation.** A cap inside the loop cannot reach it.
+  **Do not build nearest-K binning**; the only version still open is one that reduces which
+  descriptors a sample *iterates*, upstream in the candidate map. **Graded curves: PARTIAL
+  SUCCESS.** Curve A (late ramp) recovers thin retention from the aggressive arm's 0.712-0.867 to
+  **0.931-0.969** at silhouette IoU 0.998-0.999 and the lowest seam index measured, for
+  1.055x-1.477x. **Curve D (footprint) is rejected as degenerate**: its unity-pixel constant makes
+  it saturate before the storm begins, so it renders the same picture as the aggressive arm -
+  metrics agree to the third decimal, exactly at PLAY_VIS_NEAR - while costing **+26.9% at FAR**,
+  which measures one extra division in the march loop at up to a quarter of the frame. **The
+  curves are pose-dependent because `t / MaxRenderDistance` couples them to the render distance
+  rather than the material**; a pose-invariant curve needs a footprint variable, which makes
+  fixing curve D's constant the most promising follow-up. **Early termination 0.045 ACCEPTED**:
+  1.081x/1.118x/1.099x at silhouette IoU and thin retention of exactly 1.0000. **Combined SAFE
+  stack (curve A + 0.045): FAR 10.371 ms 1.360x, SIDE 19.692 ms 1.166x, PVN 16.942 ms 1.156x** at
+  thin retention 0.931-0.969; composition returns 85-100% of the product, so speedups still must
+  not be multiplied. **Targets: FAR <=8 ms NOT met (best 8.447 ms, curve B), SIDE <=10 ms NOT met
+  (best 13.466 ms), SIDE <=8 ms NOT met.** Two runs; run 1's FAR was invalidated because the T166
+  arrival guard is armed by `t166PoseTargetValid = t166Run` and wiring T167 through the rest of
+  the machinery did not extend that one assignment - **a guard that exists, works, and is simply
+  not switched on**. The drift control caught it again (`ratio=3.1127 DRIFTED`). Final run: 51
+  cells, **0 rejected**, all three drift controls stable, 42 image comparisons. Evidence in
+  `validation/performance-descriptor-and-step-refinement.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

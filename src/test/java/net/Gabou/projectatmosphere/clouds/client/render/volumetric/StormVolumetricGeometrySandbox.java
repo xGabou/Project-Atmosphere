@@ -595,6 +595,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT162AttributionArms);
         runCorrected("T166 attribution arms compile and stay out of FINAL",
                 StormVolumetricGeometrySandbox::validateT166AttributionArms);
+        runCorrected("T167 refinement arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT167RefinementArms);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -5700,7 +5702,8 @@ public final class StormVolumetricGeometrySandbox {
                 "PA_ARM_NO_DETAIL", "PA_ARM_DISTANCE_LOD", "PA_ARM_LIGHT_CHEAP",
                 "PA_ARM_LIGHT_NO_DETAIL", "PA_ARM_LIGHT_STEPS", "PA_ARM_LIGHT_STEP_WIDE",
                 "PA_ARM_LIGHT_EARLY_OUT", "PA_ARM_NO_SCENE_LIMIT", "PA_ARM_EMPTY_JUMP",
-                "PA_ARM_EARLY_TERM", "PA_ARM_DISTANCE_STEP"};
+                "PA_ARM_EARLY_TERM", "PA_ARM_DISTANCE_STEP",
+                "PA_ARM_STEP_CURVE", "PA_ARM_DESCRIPTOR_K", "PA_ARM_SCAN_LATTICE_FIXED"};
         for (String guard : guards) {
             if (finalSource.contains("#define " + guard)) {
                 violations.add("FINAL defines " + guard);
@@ -5770,6 +5773,82 @@ public final class StormVolumetricGeometrySandbox {
             require(json.contains("OracleIntervalSampler"),
                     program + " lost OracleIntervalSampler; its replay would read black"
                             + " and report a perfect oracle");
+        }
+    }
+
+    /**
+     * The T167 arms must compile and must stay out of FINAL.
+     *
+     * <p>Two of these change the shape of the storm rather than only its cost:
+     * the graded step curves resample it, and the nearest-K cap evaluates fewer
+     * descriptor owners per sample. Either leaking into the shipped program
+     * would change the image and the frame time together, and the campaign's
+     * own image comparison would then be measuring FINAL against itself.
+     *
+     * <p>The footprint curve additionally needs {@code PaOracleBaseSize} to
+     * survive as a uniform - it reads the live cloud-target height from it,
+     * because textureSize(HistorySampler) is undefined whenever history is
+     * disabled, which is every campaign matrix. A variant that lost the uniform
+     * would silently divide by a baked 1.0 and grade every sample as if the
+     * target were one pixel tall.
+     */
+    private static void validateT167RefinementArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        List<String> violations = new ArrayList<>();
+        for (String guard : new String[] {
+                "PA_ARM_STEP_CURVE", "PA_ARM_DESCRIPTOR_K", "PA_ARM_SCAN_LATTICE_FIXED"}) {
+            if (finalSource.contains("#define " + guard)) {
+                violations.add("FINAL defines " + guard);
+            }
+        }
+        require(violations.isEmpty(), "T167 arm leaked into FINAL: "
+                + String.join("; ", violations));
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t167_curve_a_late", "#define PA_ARM_STEP_CURVE 1"},
+                {"cloud_atmosphere_volume_t167_curve_b_smooth", "#define PA_ARM_STEP_CURVE 2"},
+                {"cloud_atmosphere_volume_t167_curve_c_capped", "#define PA_ARM_STEP_CURVE 3"},
+                {"cloud_atmosphere_volume_t167_curve_d_footprint", "#define PA_ARM_STEP_CURVE 4"},
+                {"cloud_atmosphere_volume_t167_curve_d_scanfixed",
+                 "#define PA_ARM_SCAN_LATTICE_FIXED 1"},
+                {"cloud_atmosphere_volume_t167_k1", "#define PA_ARM_DESCRIPTOR_K 1"},
+                {"cloud_atmosphere_volume_t167_k2", "#define PA_ARM_DESCRIPTOR_K 2"},
+                {"cloud_atmosphere_volume_t167_k3", "#define PA_ARM_DESCRIPTOR_K 3"},
+                {"cloud_atmosphere_volume_t167_k4", "#define PA_ARM_DESCRIPTOR_K 4"},
+                {"cloud_atmosphere_volume_t167_k6", "#define PA_ARM_DESCRIPTOR_K 6"},
+                {"cloud_atmosphere_volume_t167_term030", "#define PA_ARM_EARLY_TERM 0.030"},
+                {"cloud_atmosphere_volume_t167_term045", "#define PA_ARM_EARLY_TERM 0.045"},
+                {"cloud_atmosphere_volume_t167_stack_balanced",
+                 "#define PA_ARM_SCAN_LATTICE_FIXED 1"},
+                {"cloud_atmosphere_volume_t167_stack_safe", "#define PA_ARM_STEP_CURVE 1"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T167 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized, so its delta against"
+                            + " FINAL would include the rain-carry cost T163 removed");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        for (String program : new String[] {
+                "cloud_atmosphere_volume_t167_curve_a_late",
+                "cloud_atmosphere_volume_t167_curve_b_smooth",
+                "cloud_atmosphere_volume_t167_curve_c_capped",
+                "cloud_atmosphere_volume_t167_curve_d_footprint",
+                "cloud_atmosphere_volume_t167_curve_d_scanfixed",
+                "cloud_atmosphere_volume_t167_stack_balanced",
+                "cloud_atmosphere_volume_t167_stack_safe"}) {
+            String source = readWorkspaceSource(base + program + ".fsh");
+            require(source.contains("uniform vec2 PaOracleBaseSize;"),
+                    program + " baked PaOracleBaseSize; its footprint grading would"
+                            + " read a constant target height instead of the live one");
         }
     }
 

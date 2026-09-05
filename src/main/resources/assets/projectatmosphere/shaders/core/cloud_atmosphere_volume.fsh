@@ -2023,6 +2023,45 @@ void directStormGroupField(
     }
     int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
     int endIndex = stormGroupEndIndex(witnessIndex, groupSlot);
+#ifdef PA_ARM_DESCRIPTOR_K
+    // Rank the group's descriptors by the cheapest bound already trusted
+    // elsewhere in this file - the role-aware vertical lower bound, which needs
+    // only texel 0 and the role from texel 3 - and keep the K smallest.
+    //
+    // A lower bound is the right ordering here precisely because it is
+    // conservative: a descriptor whose bound is large provably cannot be close,
+    // so ranking by it can only mis-order descriptors that are all plausibly
+    // near, never promote a distant one over a near one.
+    float paKBest[PA_ARM_DESCRIPTOR_K];
+    for (int paSlot = 0; paSlot < PA_ARM_DESCRIPTOR_K; paSlot++) {
+        paKBest[paSlot] = 1.0e9;
+    }
+    for (int paRankIndex = firstIndex; paRankIndex < MAX_STORM_LOBES; paRankIndex++) {
+        if (paRankIndex >= endIndex) {
+            break;
+        }
+        vec4 paRankPosition = stormDescriptorTexel(paRankIndex, 0);
+        vec4 paRankLifecycle = stormDescriptorTexel(paRankIndex, 3);
+        if (paRankLifecycle.w < -0.5) {
+            continue;
+        }
+        int paRankPacked = int(floor(paRankLifecycle.w + 0.5));
+        int paRankRole = paRankPacked - (paRankPacked / 8) * 8;
+        float paRankBound = stormVerticalDistanceLowerBound(
+            p, paRankPosition, paRankRole);
+        for (int paSlot = 0; paSlot < PA_ARM_DESCRIPTOR_K; paSlot++) {
+            if (paRankBound < paKBest[paSlot]) {
+                float paSwap = paKBest[paSlot];
+                paKBest[paSlot] = paRankBound;
+                paRankBound = paSwap;
+            }
+        }
+    }
+    // Ties admit together, so the arm can evaluate more than K when several
+    // descriptors share a bound. The reported descriptors-per-density-call
+    // counter is what the campaign uses, never the nominal K.
+    float paKThreshold = paKBest[PA_ARM_DESCRIPTOR_K - 1];
+#endif
     for (int descriptorIndex = firstIndex; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
         if (descriptorIndex >= endIndex) {
             break;
@@ -2088,6 +2127,25 @@ void directStormGroupField(
         // rejected, through the identical exact SDF and the identical ordered
         // smooth union.  Nothing else about the loop changes, so any image
         // difference between the arms is attributable to the rejection alone.
+#ifdef PA_ARM_DESCRIPTOR_K
+        // Not among the K most relevant owners of this sample. Skipped exactly
+        // the way T121 skips a provably irrelevant lobe: the exact SDF and the
+        // union are avoided, but the clearance still receives this lobe's lower
+        // bound, so paSafeAdvance in the march cannot grow and the ray cannot
+        // step over material this descriptor owns.
+        //
+        // This is a deliberately conservative form of the experiment. A real
+        // ownership structure would also avoid the four texel fetches above and
+        // the ranking pass; this arm pays both, so whatever it measures is a
+        // LOWER bound on what such a structure could return.
+        if (verticalLowerBound > paKThreshold) {
+            groupMinClearance = min(
+                groupMinClearance, verticalLowerBound - lobeSoftness);
+            previousRadius = lobeRadius;
+            previousRole = lobeRole;
+            continue;
+        }
+#endif
         if (started && !paT121Off() && verticalLowerBound > max(
                 lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
                 groupDistance + STORM_MAX_BLEND_BLOCKS)) {
@@ -3791,6 +3849,61 @@ float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipB
  * This uses only continuous render inputs and remains stable while descriptor
  * or role boundaries cross the ray.
  */
+#ifdef PA_ARM_STEP_CURVE
+/**
+ * T167 graded exterior fine-step growth.
+ *
+ * <p>Production holds the exterior fine step at a constant world size; the T166
+ * arm gave it the coarse tier's full growth and lost 13-20% of thin material.
+ * Each curve here trades a share of that growth for the material back.
+ *
+ * @param normalizedDistance t / MaxRenderDistance, in [0,1]
+ * @param fullGrowth         the aggressive arm's multiplier at this distance
+ * @param footprintPixels    the fine step's projected height in target pixels
+ */
+float paGradedStepGrowth(
+        float normalizedDistance, float fullGrowth, float footprintPixels) {
+#if PA_ARM_STEP_CURVE == 1
+    // A - LATE RAMP. Untouched near and mid, where thin material is resolvable
+    // and cheap to keep; the full curve only arrives in the far field.
+    return 1.0 + (fullGrowth - 1.0) * smoothstep(0.45, 1.0, normalizedDistance);
+#elif PA_ARM_STEP_CURVE == 2
+    // B - SMOOTH RAMP. The same endpoint, reached quadratically, so the near
+    // half of the ray keeps most of its sampling density.
+    return 1.0 + (fullGrowth - 1.0) * normalizedDistance * normalizedDistance;
+#elif PA_ARM_STEP_CURVE == 3
+    // C - CAPPED RAMP. Production's growth shape, clamped well below the
+    // aggressive arm so no sample is ever more than 1.9x coarser.
+    return min(fullGrowth, 1.9);
+#else
+    // D - FOOTPRINT-AWARE. Lengthen the step only by the factor that brings its
+    // projected size back to about one target pixel, and never past the
+    // aggressive arm. Where a fine step already covers a pixel or more this is
+    // exactly 1.0, so near and mid-field material is sampled as production
+    // samples it; the growth appears only where the lattice is provably
+    // finer than the display can resolve.
+    return clamp(1.0 / max(footprintPixels, 0.0001), 1.0, fullGrowth);
+#endif
+}
+#endif
+
+#ifdef PA_ARM_STEP_CURVE
+/**
+ * Projected height, in cloud-target pixels, of a world-space span at distance t.
+ *
+ * <p>Deliberately not routed through paProjectedFeaturePixels: that reads
+ * textureSize(HistorySampler), and history is disabled for every campaign
+ * matrix, so the sampler is unbound and the size is undefined. PaOracleBaseSize
+ * carries the live cloud-target size on every frame and is kept as a uniform in
+ * the curve variants for exactly this reason.
+ */
+float paStepFootprintPixels(float t, float worldSize) {
+    float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
+    float targetHeight = max(PaOracleBaseSize.y, 1.0);
+    return worldSize * projectionScale * targetHeight / (2.0 * max(t, 1.0));
+}
+#endif
+
 float paProjectedFeaturePixels(vec3 p, float worldSize) {
     float distanceToSample = max(length(p - CameraPos), 1.0);
     float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
@@ -5887,6 +6000,15 @@ void main() {
             paMrFlags |= PA_MR_EXECUTED | (fine ? PA_MR_FINE_AT_ENTRY : 0);
         }
         float distanceGrowth = 1.0 + (t / max(MaxRenderDistance, 1.0)) * 2.2;
+#ifdef PA_ARM_STEP_CURVE
+        float paCurveGrowth = paGradedStepGrowth(
+            t / max(MaxRenderDistance, 1.0),
+            distanceGrowth,
+            paStepFootprintPixels(t, fineStep));
+        float stepLength = fine
+            ? fineStep * (cameraInsideCloud ? distanceGrowth : paCurveGrowth)
+            : min(coarseStep * distanceGrowth, coarseStepCap);
+#else
 #ifdef PA_ARM_DISTANCE_STEP
         // PM idea A. Production already grows the coarse tier with distance and
         // the fine tier only when the camera is inside cloud; this arm gives the
@@ -5901,6 +6023,7 @@ void main() {
         float stepLength = fine
             ? fineStep * (cameraInsideCloud ? distanceGrowth : 1.0)
             : min(coarseStep * distanceGrowth, coarseStepCap);
+#endif
 #endif
         // Never integrate optical depth past the scene/slab ray endpoint.
         stepLength = min(stepLength, t1 - t);
@@ -6006,6 +6129,15 @@ void main() {
             // AABB entries could exhaust the march before the ray endpoint.
             sinceHit = 0;
             fine = true;
+#ifdef PA_ARM_STEP_CURVE
+            stepLength = fineStep
+                * (cameraInsideCloud
+                    ? distanceGrowth
+                    : paGradedStepGrowth(
+                        t / max(MaxRenderDistance, 1.0),
+                        distanceGrowth,
+                        paStepFootprintPixels(t, fineStep)));
+#else
 #ifdef PA_ARM_DISTANCE_STEP
             stepLength = fineStep
                 * (cameraInsideCloud
@@ -6014,6 +6146,7 @@ void main() {
 #else
             stepLength = fineStep
                 * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
 #endif
             stepLength = min(stepLength, t1 - t);
         }
@@ -6115,6 +6248,30 @@ void main() {
                 // found is still found. Dropping the scan and trusting the
                 // bracket refinement alone is what is unsafe - measured offline
                 // it skipped material on every ray, 1.4 to 39.2 blocks of it.
+#ifdef PA_ARM_STEP_CURVE
+#ifdef PA_ARM_SCAN_LATTICE_FIXED
+                // The empty-span scan's safety argument is that it probes
+                // exactly the lattice the fine march would have sampled, so
+                // anything the fine march would have found is still found.
+                // Widening the fine step widens that lattice too, which
+                // silently weakens the guarantee - the scan can then declare a
+                // span empty that a production-width march would have hit.
+                // This arm holds the scan at production spacing while the
+                // integration step still grows, to separate how much of the
+                // measured thin-material loss comes from the scan rather than
+                // from coarser integration.
+                float paScanStep = fineStep
+                    * (cameraInsideCloud ? distanceGrowth : 1.0);
+#else
+                float paScanStep = fineStep
+                    * (cameraInsideCloud
+                        ? distanceGrowth
+                        : paGradedStepGrowth(
+                            t / max(MaxRenderDistance, 1.0),
+                            distanceGrowth,
+                            paStepFootprintPixels(t, fineStep)));
+#endif
+#else
 #ifdef PA_ARM_DISTANCE_STEP
                 float paScanStep = fineStep
                     * (cameraInsideCloud
@@ -6123,6 +6280,7 @@ void main() {
 #else
                 float paScanStep = fineStep
                     * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
 #endif
                 // The evidence arm takes no probes, so the scan cannot advance
                 // and the branch below falls through to a single fine step -
