@@ -1623,6 +1623,51 @@ implementation, while visual polish remains independently active.
   `descriptorCandidateRanks` reads 0 everywhere because the counter was emitted but never
   incremented, leaving the "8 candidate ranks" figure a static reading. Evidence in
   `validation/performance-footprint-lod-and-traversal-audit.md`.
+- [X] T169 [PERFORMANCE] [US3] Reduce lighting and detail cost, and bound what either can
+  return. **The task's premise was wrong.** Conservative tap reduction buys nothing: 6 -> 5 and
+  6 -> 4 return 0.5-0.8% at both poses, and at SIDE they are **bit-identical to the anchor**
+  (`maxAbsRGBA=0.0`, 0 changed pixels) - direct proof that the cone early-out already terminates
+  before tap 5, so capping there is a no-op. Only the early-out floor returns anything (3.3-3.5%).
+  Ceilings: lighting **16.8% FAR / 19.5% SIDE**, detail **17.5% FAR / 15.2% SIDE**. The
+  footprint-gated detail cut captures 84.7% of its ceiling at FAR but 21.2% at SIDE, which is the
+  mechanism working - close range genuinely resolves the detail. Stacks: FAR 5.3371 ms
+  (**<=8 ms met, P50 and P95**), SIDE 10.7305 ms. **SIDE misses both budgets, and the ceilings
+  prove lighting and detail cannot close it**: with both at zero SIDE would still cost ~14.7 ms.
+  36 cells, **0 rejected**, both drift controls stable. Three defects recorded: two driver wiring
+  gaps left the campaign unreachable for three launches (`lightingDetailRunRequested()` missing
+  from `performanceRunRequested()`; `t169Run` missing from `activeEvaluationArms()`), and
+  `T166Arm.label()` omitted the optimization mode, so the five T149 arms collided with the anchor
+  and **were never measured**. Evidence in `validation/performance-lighting-and-detail.md`.
+- [X] T170 [PERFORMANCE] [US3] Build a harness wiring invariant, then attribute the primary march
+  and its per-sample descriptor cost. **Task 0 done and proven**: `StormCampaignRegistry` is the
+  single declaration of all 15 campaigns, `performanceRunRequested()` is now derived from it, and
+  `programArmCampaign()` replaces a four-way chain that had been duplicated at six sites. The
+  sandbox invariant checks marker/predicate/flag/arm-table/pose-guard linkage and **rejects five
+  deliberately mutated copies of the real driver source**, one per historical defect
+  (`T170_WIRING campaigns=15|armMatrices=11|violations=0`,
+  `T170_WIRING_NEGATIVE mutations=5|allDetected=true`). **Task 1 is not answerable and its premise
+  is false**: `fpmax5/6/8` render byte-identical images in both runs, so the clamp stops binding
+  above ~5 and there is no headroom to release; and five SIDE arms rendering the *same image* span
+  **13% in measured time**, while run 1 and run 2 invert the FAR ordering entirely (`fpmax4`
+  2.591x then 1.533x; `fpmax6` 1.537x then 2.884x). No clamp conclusion is banked. **Tasks 2/3/4
+  succeed.** Descriptor texture fetches are **not** the bottleneck - 2148 fetches per pixel at
+  SIDE, and removing essentially all of them returns 1.003x/0.986x. The smooth union returns
+  nothing (1.011x). What dominates is per-sample arithmetic, and a third of it is **provably
+  invariant**: `stormEdgeWidthBlocksFromData` takes no sample position yet is evaluated 259 times
+  per pixel at SIDE (1.655x), as are the ownership ellipse's rotated extents (1.035x); combined
+  hoist ceiling **1.731x SIDE**. **Task 5: C, at two scopes** - SIDE takes only 1.08x the primary
+  steps of FAR but evaluates density on 81% of them against 15%, while the per-call profile is
+  nearly identical (11.85 vs 13.10 descriptor evaluations per density call). Lobes per group
+  entered is 10.000, reconfirming T168. **Task 6: no shippable improvement on T169.** Every
+  shippable stack sits at 12.06-12.64 ms SIDE, inside the noise floor. The ceiling arm
+  `t170_stack_hoist` reaches **SIDE 7.3052 / 7.7558 and FAR 4.0724 / 4.2885 - the first
+  configuration in this line to clear 8 ms at the binding pose** - but it is a ceiling, not a
+  candidate (constant edge width, meanAbs 1.606e-02 vs the stack's 2.210e-03). **CASE C.**
+  Recommended production candidate remains `t169_stack_fast`; recommended next architecture is a
+  per-frame descriptor precompute of edge width and ownership extents, which is image-identical
+  and trades arithmetic for a fetch that this campaign showed is free. 64 cells across two runs,
+  **0 rejected**, all four drift controls stable. Evidence in
+  `validation/performance-primary-march.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -52,7 +52,11 @@ public enum VolumetricCloudRaymarchDebugView {
     /** T153 lighting evaluations after alpha 50/90/95/98 percent. */
     STORM_WORKLOAD_ORACLE_ALPHA_LIGHT(33, "storm_workload_oracle_alpha_light"),
     /** T153 detail-octave evaluations after alpha 50/90/95/98 percent. */
-    STORM_WORKLOAD_ORACLE_ALPHA_DETAIL(34, "storm_workload_oracle_alpha_detail");
+    STORM_WORKLOAD_ORACLE_ALPHA_DETAIL(34, "storm_workload_oracle_alpha_detail"),
+    /** T169 lighting attribution: cone marches, cone taps, cone early-outs, cheap probes. */
+    STORM_WORKLOAD_LIGHT_ATTRIBUTION(35, "storm_workload_light_attribution"),
+    /** T169 detail attribution: primary fetches, light fetches, second octave, opaque marches. */
+    STORM_WORKLOAD_DETAIL_ATTRIBUTION(36, "storm_workload_detail_attribution");
 
     private final int shaderId;
     private final String serializedName;

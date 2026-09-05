@@ -328,6 +328,21 @@ float paLightingDetailWeight = 1.0;
 bool paArmLightingSample = false;
 #endif
 
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+/**
+ * T169 Task 4A. Squared distances past which a detail octave projects to less
+ * than PA_ARM_DETAIL_FOOTPRINT target pixels.
+ *
+ * <p>Squared deliberately. The existing T149 path calls
+ * `paProjectedFeaturePixels`, which costs a `length()`, a `textureSize()` and a
+ * division at every detail evaluation - the per-step division T167 already
+ * showed is unaffordable. Comparing squared distances against a per-fragment
+ * constant is a dot product and a compare, and answers the same question.
+ */
+float paDetailCutoffDistSq = 3.0e38;
+float paDetailFineCutoffDistSq = 3.0e38;
+#endif
+
 /** True when the march's far endpoint is halved, bounding distance culling. */
 bool paT147HalfDistance() {
     return (PaDiagnosticOptimizationMode & PA_OPT_T147_HALF_DISTANCE) != 0;
@@ -408,6 +423,35 @@ int paBoxBoundRejects = 0;
 // texture lookup. Rain noise is intentionally excluded: it is functional
 // precipitation work, not the cloud-surface/detail lever T149 is measuring.
 int paDetailOctaveEvaluations = 0;
+/**
+ * T169 lighting and detail attribution counters.
+ *
+ * <p>T168 left the pose gap unexplained: SIDE spends 14.83 light evaluations
+ * and 35.99 detail-octave evaluations per pixel against FAR's 1.74 and 4.57.
+ * `paLightMarchDensityEvaluations` counts taps, which cannot separate "more
+ * material sampled" from "more lighting per sample" - the two readings imply
+ * completely different optimizations, so they are counted apart here.
+ *
+ * <p>`paLightConeMarches` counts entries into the cone loop, so
+ * taps/march is the average admitted tap count after T149 grading and the
+ * in-slab cap. `paLightCheapProbes` counts the in-cloud single-probe path,
+ * which is one evaluation and would otherwise be indistinguishable from a
+ * one-tap cone.
+ */
+int paLightConeMarches = 0;
+int paLightConeTaps = 0;
+int paLightConeEarlyOuts = 0;
+int paLightCheapProbes = 0;
+/**
+ * Detail fetches split by the path that asked for them. Each fetch is three
+ * packed octaves, matching `paDetailOctaveEvaluations`' step of 3, so
+ * (primary + light) * 3 reconciles against it exactly.
+ */
+int paDetailFetchPrimary = 0;
+int paDetailFetchLight = 0;
+int paDetailFetchSecondOctave = 0;
+/** Cone marches begun while the ray was already effectively opaque. */
+int paLightMarchBelowFloor = 0;
 /**
  * T168 descriptor-traversal counters. They ride the three unused channels of
  * the existing workload view 26, so no new readback stage is introduced.
@@ -2035,6 +2079,20 @@ void directStormGroupField(
     }
     int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
     int endIndex = stormGroupEndIndex(witnessIndex, groupSlot);
+#ifdef PA_ARM_DESC_CONST_FETCH
+    // T170 Task 3, oracle A. One descriptor payload read, hoisted out of the
+    // walk and reused by every iteration. The loop still runs the same number
+    // of times and every downstream term is still computed, so the only thing
+    // removed is per-descriptor texture traffic.
+    //
+    // Deliberately not a valid image. This arm exists to bound fetch cost and
+    // is never a production candidate.
+    int paDescCacheIndex = clamp(firstIndex, 0, MAX_STORM_LOBES - 1);
+    vec4 paDescCached0 = stormDescriptorTexel(paDescCacheIndex, 0);
+    vec4 paDescCached1 = stormDescriptorTexel(paDescCacheIndex, 1);
+    vec4 paDescCached2 = stormDescriptorTexel(paDescCacheIndex, 2);
+    vec4 paDescCached3 = stormDescriptorTexel(paDescCacheIndex, 3);
+#endif
 #ifdef PA_ARM_DESCRIPTOR_K
     // Rank the group's descriptors by the cheapest bound already trusted
     // elsewhere in this file - the role-aware vertical lower bound, which needs
@@ -2081,16 +2139,31 @@ void directStormGroupField(
         if (paWorkloadCaptureActive()) {
             paLobesVisited++;
         }
+#ifdef PA_ARM_DESC_CONST_FETCH
+        vec4 positionHeight = paDescCached0;
+        vec4 radiusRotation = paDescCached1;
+        vec4 shearMedia = paDescCached2;
+        vec4 lifecycleRole = paDescCached3;
+#else
         vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
         vec4 radiusRotation = stormDescriptorTexel(descriptorIndex, 1);
         vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
         vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+#endif
         if (lifecycleRole.w < -0.5) {
             continue;
         }
         int packedTopology = int(floor(lifecycleRole.w + 0.5));
         int lobeRole = packedTopology - (packedTopology / 8) * 8;
         vec2 ownershipCenter = positionHeight.xy + shearMedia.xy * 0.5;
+#if defined(PA_ARM_DESC_CHEAP_OWNERSHIP) || defined(PA_ARM_DESC_HOIST)
+        // T170 Task 2/4. The rotated extents are a pure function of the
+        // descriptor's radii and rotation - no sample position enters them -
+        // yet both length() terms are evaluated at every density sample. This
+        // substitutes the unrotated radii to bound what hoisting them to once
+        // per descriptor per frame could return.
+        vec2 ownershipRadii = max(radiusRotation.xy * 1.85, vec2(1.0));
+#else
         float extentX = length(vec2(
             radiusRotation.x * radiusRotation.w,
             radiusRotation.y * radiusRotation.z
@@ -2100,6 +2173,7 @@ void directStormGroupField(
             radiusRotation.y * radiusRotation.w
         ));
         vec2 ownershipRadii = max(vec2(extentX, extentZ) * 1.85, vec2(1.0));
+#endif
         ownsGroup = ownsGroup || length((p.xz - ownershipCenter) / ownershipRadii) <= 1.0;
 
         float lobeRadius = min(radiusRotation.x, radiusRotation.y);
@@ -2108,10 +2182,20 @@ void directStormGroupField(
         // values.  Same texture, same descriptor index, same texel indices, so
         // the refetched values are bit-identical to the ones in registers -
         // this is the real pre-reuse work, not a copy of the ON result.
+#if defined(PA_ARM_DESC_CONST_EDGE) || defined(PA_ARM_DESC_HOIST)
+        // T170 Task 2/4. stormEdgeWidthBlocksFromData takes no sample position:
+        // it is a pure function of the descriptor payload and the role, so its
+        // value is fixed for the life of a frame's descriptor set. It is
+        // nevertheless evaluated once per descriptor per density sample, which
+        // at SIDE is the single most-repeated invariant in the walk. Replacing
+        // it with a constant bounds the hoist.
+        float lobeSoftness = STORM_MIN_EDGE_BLOCKS;
+#else
         float lobeSoftness = paT122Off()
             ? stormEdgeWidthBlocks(descriptorIndex, lobeRole)
             : stormEdgeWidthBlocksFromData(
                 positionHeight, radiusRotation, shearMedia, lobeRole);
+#endif
         // T122: the FromData softness form consumes the two descriptor texels
         // already fetched above.  Count those two precise wrapper fetches that
         // are avoided; this is a diagnostic-only counter, not an estimate
@@ -2196,6 +2280,13 @@ void directStormGroupField(
         // T122 OFF refetches the three texels the exact SDF consumes and
         // passes the refetched values into the same equation, in the same
         // order, with the same groupSlot and role already decoded above.
+#ifdef PA_ARM_DESC_NO_EXACT_SDF
+        // T170 Task 2. The exact descriptor SDF replaced by the conservative
+        // lower bound the T121 test already computed, so the walk still visits
+        // every descriptor and still runs the union, but pays no exact
+        // evaluation. Bounds the exact-SDF share of a primary density sample.
+        float lobeDistance = verticalLowerBound;
+#else
         float lobeDistance = paT122Off()
             ? directStormLobeDistanceFromData(
                 p,
@@ -2207,6 +2298,7 @@ void directStormGroupField(
             : directStormLobeDistanceFromData(
                 p, positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole
             );
+#endif
         if (paT141EvalAmplify()) {
             // A second exact evaluation of the same lobe, on the texels already
             // in registers. PaDiagnosticEvalEpsilon is uploaded as exactly
@@ -2244,11 +2336,20 @@ void directStormGroupField(
                 paDescriptorUnionContributors++;
             }
         } else {
+#ifdef PA_ARM_DESC_HARD_UNION
+            // T170 Task 2. Every distance is still evaluated; only the blend
+            // radius, blend factor and smooth-minimum chain are removed.
+            float mixFactor = lobeDistance < groupDistance ? 0.0 : 1.0;
+            groupDistance = min(groupDistance, lobeDistance);
+            groupStrength = mix(lobeStrength, groupStrength, mixFactor);
+            groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
+#else
             float blend = stormLobeBlendRadius(previousRadius, lobeRadius, previousRole, lobeRole);
             float mixFactor = stormBlendFactor(groupDistance, lobeDistance, blend);
             groupDistance = stormSmoothMinimum(groupDistance, lobeDistance, blend);
             groupStrength = mix(lobeStrength, groupStrength, mixFactor);
             groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
+#endif
             // "Contributes" has to mean changed the answer, not merely was
             // evaluated. A lobe counts if it moved the union distance by more
             // than a hundredth of a block, or if it turned on a role bit that
@@ -3880,6 +3981,27 @@ float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipB
  * This uses only continuous render inputs and remains stable while descriptor
  * or role boundaries cross the ray.
  */
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+/**
+ * T169 footprint-gated detail (Task 4A).
+ *
+ * <p>Same relation T168 validated for the march step, applied to the detail
+ * lookup instead: the packed detail wavelength projects to
+ * `wavelength * P11 * H / (2t)` pixels, so it falls below one target pixel
+ * beyond a fixed distance. Past that the fetch is resolving structure finer
+ * than the target can show, and its only visible effect is aliasing.
+ *
+ * <p>The coefficient is the T168 form with the detail wavelength substituted
+ * for the step, so it is hoisted per fragment exactly the same way and the
+ * inner test stays a multiply and a compare - no per-sample division.
+ */
+float paDetailFootprintCoefficient(float wavelengthBlocks) {
+    float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
+    float targetHeight = max(PaOracleBaseSize.y, 1.0);
+    return (projectionScale * targetHeight * wavelengthBlocks) * 0.5;
+}
+#endif
+
 #ifdef PA_ARM_FOOTPRINT
 /**
  * T168 footprint step LOD - the per-fragment half of it.
@@ -4006,6 +4128,22 @@ float cloudDensity(
     if (paArmLightingSample) {
         useDetail = false;
         mipBias += 2.0;
+    }
+#endif
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+    // T169 Task 4A. Once the packed detail wavelength projects below the
+    // configured pixel count the fetch resolves structure the target cannot
+    // show, and its only remaining effect is aliasing.
+    {
+        vec3 toSample = p - CameraPos;
+        float distSq = dot(toSample, toSample);
+        if (distSq > paDetailCutoffDistSq) {
+            useDetail = false;
+        } else if (distSq > paDetailFineCutoffDistSq) {
+            // The second lookup goes first: it is the finer wavelength, so it
+            // becomes subpixel nearer the camera than the base octave does.
+            nearCamera = false;
+        }
     }
 #endif
     if (PuffDensityStage == 1) {
@@ -4410,8 +4548,11 @@ float cloudDensity(
             float detailFbm = 0.5;
             if (detailWeight > 0.0001) {
                 vec4 detail = texture(DetailNoiseSampler, detailPos, mipBias);
+                // Which path paid for it decides which LOD could remove it.
                 if (paWorkloadCaptureActive()) {
                     paDetailOctaveEvaluations += 3;
+                    paDetailFetchLight += paLightingDensityTap ? 1 : 0;
+                    paDetailFetchPrimary += paLightingDensityTap ? 0 : 1;
                 }
                 float sampledDetail = detail.r * 0.625 + detail.g * 0.25 + detail.b * 0.125;
                 detailFbm = mix(0.5, sampledDetail, detailWeight);
@@ -4431,6 +4572,11 @@ float cloudDensity(
                     );
                     if (paWorkloadCaptureActive()) {
                         paDetailOctaveEvaluations += 3;
+                        paDetailFetchSecondOctave++;
+                    }
+                    if (paWorkloadCaptureActive()) {
+                        paDetailFetchLight += paLightingDensityTap ? 1 : 0;
+                        paDetailFetchPrimary += paLightingDensityTap ? 0 : 1;
                     }
                     float fineDetail = fine.r * 0.625 + fine.g * 0.25 + fine.b * 0.125;
                     detailFbm = mix(
@@ -4612,6 +4758,7 @@ float lightMarchOpticalDepth(
         // optical path instead of flattening the interior to a constant colour.
         if (paWorkloadCaptureActive()) {
             paLightMarchDensityEvaluations++;
+            paLightCheapProbes++;
         }
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = true;
@@ -4671,6 +4818,12 @@ float lightMarchOpticalDepth(
         // at full strength as the earlier rounded prototype did.
         steps = clamp(int(ceil(desiredSteps - 0.0001)), 2, steps);
     }
+    // "Already opaque" uses the same 0.045 floor the validated early
+    // termination arm uses, so the two readings are commensurable.
+    if (paWorkloadCaptureActive()) {
+        paLightConeMarches++;
+        paLightMarchBelowFloor += paLodTransmittance < 0.045 ? 1 : 0;
+    }
     float opticalDepth = 0.0;
 #ifdef PA_ARM_LIGHT_STEP_WIDE
     // PM idea C: same tap count, wider spacing, so the cone covers a longer
@@ -4702,6 +4855,7 @@ float lightMarchOpticalDepth(
         pos += LightDir * stepLength;
         if (paWorkloadCaptureActive()) {
             paLightMarchDensityEvaluations++;
+            paLightConeTaps++;
         }
         float tapWeight = 1.0;
         if (gradedLight && float(i + 1) > desiredSteps) {
@@ -4752,10 +4906,16 @@ float lightMarchOpticalDepth(
         // at 28.0 - a threshold no exterior cone reaches. This arm applies the
         // equivalent cut to every camera.
         if (opticalDepth * ExtinctionScale >= PA_ARM_LIGHT_EARLY_OUT) {
+            if (paWorkloadCaptureActive()) {
+                paLightConeEarlyOuts++;
+            }
             break;
         }
 #endif
         if (cameraStartsInsideSlab && opticalDepth * ExtinctionScale >= 28.0) {
+            if (paWorkloadCaptureActive()) {
+                paLightConeEarlyOuts++;
+            }
             break;
         }
         stepLength *= 1.42;
@@ -5916,6 +6076,18 @@ void main() {
     // Per fragment, not per step. This is the only division the footprint LOD
     // performs on the whole ray.
     float paFootprintCoefficient = paFootprintGrowthCoefficient(fineStep);
+#endif
+#ifdef PA_ARM_DETAIL_FOOTPRINT
+    // 22.7 and 8.4 blocks are the packed wavelengths the existing T149 graded
+    // path already names for the base and fine detail lookups.
+    {
+        float baseCutoff =
+            paDetailFootprintCoefficient(22.7) / PA_ARM_DETAIL_FOOTPRINT;
+        float fineCutoff =
+            paDetailFootprintCoefficient(8.4) / PA_ARM_DETAIL_FOOTPRINT;
+        paDetailCutoffDistSq = baseCutoff * baseCutoff;
+        paDetailFineCutoffDistSq = fineCutoff * fineCutoff;
+    }
 #endif
 
     float cosTheta = dot(rayDir, LightDir);
@@ -7416,6 +7588,26 @@ void main() {
             float(paDescriptorCandidateRanks),
             float(paDescriptorGroupsEntered),
             float(paDescriptorUnionContributors)
+        );
+        return;
+    }
+    if (DebugView == 35) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paLightConeMarches),
+            float(paLightConeTaps),
+            float(paLightConeEarlyOuts),
+            float(paLightCheapProbes)
+        );
+        return;
+    }
+    if (DebugView == 36) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDetailFetchPrimary),
+            float(paDetailFetchLight),
+            float(paDetailFetchSecondOctave),
+            float(paLightMarchBelowFloor)
         );
         return;
     }

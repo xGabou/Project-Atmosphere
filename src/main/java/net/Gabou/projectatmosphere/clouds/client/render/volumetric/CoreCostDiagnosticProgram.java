@@ -178,7 +178,111 @@ public enum CoreCostDiagnosticProgram {
      * built so the winning curve does not have to be guessed before the run.
      */
     T168_STACK("t168_stack"),
-    T168_STACK_BALANCED("t168_stack_balanced");
+    T168_STACK_BALANCED("t168_stack_balanced"),
+
+    /** T169 lighting arms: conservative tap reduction and a real cone early-out. */
+    T169_LIGHT_STEPS5("t169_lightsteps5"),
+    T169_LIGHT_STEPS4("t169_lightsteps4"),
+    T169_LIGHT_EARLY_OUT2("t169_lightearlyout2"),
+    /** T169 detail arms: footprint-gated detail, and the all-detail-off ceiling. */
+    T169_DETAIL_FP_CONSERVATIVE("t169_detailfp_conservative"),
+    T169_DETAIL_FP_BALANCED("t169_detailfp_balanced"),
+    T169_DETAIL_FP_AGGRESSIVE("t169_detailfp_aggressive"),
+    T169_NO_DETAIL("t169_nodetail"),
+    /** T169 Task 5 stacks: T168 winners plus the lighting and detail candidates. */
+    T169_STACK_SAFE("t169_stack_safe"),
+    T169_STACK_FAST("t169_stack_fast"),
+
+    // -----------------------------------------------------------------------
+    // T170. The primary march. T169 bounded lighting at 19.5% and detail at
+    // 15.2% of SIDE cloud cost; with both at zero SIDE would still cost
+    // ~14.7 ms against a 10 ms budget, so the march and the descriptor work
+    // each primary density sample pays are the only remaining class large
+    // enough to close it.
+    // -----------------------------------------------------------------------
+
+    /**
+     * T170 Task 1, run 2: the clamp tightened below the shipped 4.
+     *
+     * <p>Run 1 measured the sweep upward and found the opposite of what the
+     * task expected. fpmax5, fpmax6 and fpmax8 render byte-identical images, so
+     * the clamp stops binding above ~5 and there is nothing left to release;
+     * and fpmax4, where it does bind, was 41% faster than all three at FAR.
+     * Larger steps cost time here rather than saving it, so run 2 sweeps down.
+     */
+    T170_FPMAX3("t170_fpmax3"),
+    /**
+     * T170 Task 6, run 2: the candidate stack plus the descriptor hoist.
+     *
+     * <p>A ceiling, not a candidate. The hoist arm substitutes a constant edge
+     * width, so this renders an invalid image; a real hoist would compute the
+     * same edge width once per descriptor per frame instead of once per
+     * descriptor per sample and would be image-identical. This arm answers the
+     * only question that matters before building that: whether the stack plus a
+     * perfect hoist would reach the SIDE budget at all.
+     */
+    T170_STACK_HOIST("t170_stack_hoist"),
+
+    /** T170 Task 6, run 2: the candidate stack with the clamp at 3. */
+    T170_STACK3("t170_stack3"),
+
+    /** T170 Task 1: the T169 stack_fast footprint with the step clamp at 4. */
+    T170_FPMAX4("t170_fpmax4"),
+    /** T170 Task 1: the same, clamp raised to 5. */
+    T170_FPMAX5("t170_fpmax5"),
+    /** T170 Task 1: the same, clamp raised to 6. */
+    T170_FPMAX6("t170_fpmax6"),
+    /** T170 Task 1: the same, clamp raised to 8. */
+    T170_FPMAX8("t170_fpmax8"),
+
+    /**
+     * T170 Task 3 oracle A. Descriptor payload fetches replaced by one cached
+     * read hoisted out of the group walk. Iteration count, control shape and
+     * every downstream arithmetic operation are preserved, so the delta is
+     * descriptor texture traffic and nothing else.
+     *
+     * <p>Visually invalid by construction. This is a ceiling, never a
+     * production candidate.
+     */
+    T170_DESC_CONST_FETCH("t170_desc_constfetch"),
+    /**
+     * T170 Task 2/4. Edge width replaced by a constant. The shipped form,
+     * {@code stormEdgeWidthBlocksFromData}, takes no sample position - it is a
+     * pure function of the descriptor and its role - yet it is recomputed for
+     * every descriptor at every density sample. This arm bounds what hoisting
+     * it to once per descriptor per frame could return.
+     */
+    T170_DESC_CONST_EDGE("t170_desc_constedge"),
+    /**
+     * T170 Task 2. The ownership ellipse's two {@code length()} extent terms
+     * replaced by the raw radii. Also descriptor-invariant, also recomputed per
+     * sample.
+     */
+    T170_DESC_CHEAP_OWNERSHIP("t170_desc_cheapowner"),
+    /**
+     * T170 Task 2. The exact descriptor SDF replaced by the conservative lower
+     * bound already computed for the T121 rejection test. Bounds the exact-SDF
+     * share of a primary density sample.
+     */
+    T170_DESC_NO_EXACT_SDF("t170_desc_nosdf"),
+    /**
+     * T170 Task 2. The ordered smooth union replaced by a hard minimum, so the
+     * blend-radius and blend-factor chain is removed but every distance is
+     * still evaluated.
+     */
+    T170_DESC_HARD_UNION("t170_desc_hardunion"),
+    /**
+     * T170 Task 4. Both descriptor-invariant terms removed at once - edge width
+     * and the ownership extents. The realistic hoist target, and the sum whose
+     * parts {@link #T170_DESC_CONST_EDGE} and {@link #T170_DESC_CHEAP_OWNERSHIP}
+     * measure separately.
+     */
+    T170_DESC_HOIST("t170_desc_hoist"),
+
+    /** T170 Task 6: the T169 stack_fast carried forward with the clamp at 6. */
+    T170_STACK("t170_stack"),
+    /** T170 Task 6: the same stack with the clamp at 8. */
+    T170_STACK8("t170_stack8");
 
     private final String serializedName;
 

@@ -47,6 +47,22 @@ minecraft {
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
 
+            // Benchmark-owned heap cap. Opt-in only: without -PpaBenchHeap the
+            // dev client keeps stock JVM ergonomics, so ordinary `runClient` is
+            // untouched. The stock ergonomic Xmx on this 32 GB host is 7.93 GB
+            // (MaxHeapSize=8510242816) with Xms 508 MB, which lets G1 drift the
+            // committed heap far above the live set during a long campaign.
+            // -PpaBenchHeap bounds it; -PpaBenchGcLog turns on GC logging so a
+            // timing cell that overlapped a pause can be rejected after the fact.
+            // Neither flag touches renderer, fixture or shader behaviour.
+            if (project.hasProperty('paBenchHeap')) {
+                jvmArgs '-Xms1G', "-Xmx${project.property('paBenchHeap')}".toString()
+            }
+            if (project.hasProperty('paBenchGcLog')) {
+                jvmArg('-Xlog:gc*:file='
+                        + rootProject.file(project.property('paBenchGcLog')).absolutePath
+                        + ':time,uptime,level,tags')
+            }
         }
 
         server {
@@ -535,6 +551,156 @@ def leanProgramVariants = [
         [name: 'cloud_atmosphere_volume_t168_stack_balanced',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
                    'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // ------------------------------------------------------------------
+        // T169. Lighting and detail, the workload T168 pointed at: SIDE spends
+        // 14.83 light and 35.99 detail evaluations per pixel against FAR's
+        // 1.74 and 4.57.
+        //
+        // Tap reduction is deliberately conservative. The earlier global
+        // 6 -> 2 cut was fast and visibly flattened self-shadowing, so 5 and 4
+        // are measured separately instead of repeating it.
+        // ------------------------------------------------------------------
+        [name: 'cloud_atmosphere_volume_t169_lightsteps5',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 5'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t169_lightsteps4',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: []],
+        // Cone early-out at the validated transmittance floor rather than the
+        // 28.0 optical depth no exterior cone ever reaches.
+        [name: 'cloud_atmosphere_volume_t169_lightearlyout2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_LIGHT_EARLY_OUT 2.0'],
+         keepUniforms: []],
+
+        // Detail gated by projected footprint - the T168 relation applied to
+        // the detail wavelength. PaOracleBaseSize carries the live target
+        // height the derivation needs and must survive specialization.
+        [name: 'cloud_atmosphere_volume_t169_detailfp_conservative',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 0.5'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t169_detailfp_balanced',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t169_detailfp_aggressive',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DETAIL_FOOTPRINT 1.5'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // Ceiling: all detail removed. Not shippable, it bounds what any
+        // detail LOD can return.
+        [name: 'cloud_atmosphere_volume_t169_nodetail',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_NO_DETAIL 1'],
+         keepUniforms: []],
+
+        // Task 5 stacks. Both carry the T168 winners plus the lighting and
+        // detail candidates, so the combination is measured rather than
+        // multiplied out of the independent arms.
+        [name: 'cloud_atmosphere_volume_t169_stack_safe',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 5'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t169_stack_fast',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // ------------------------------------------------------------------
+        // T170. The primary march. T169 bounded lighting at 19.5% and detail
+        // at 15.2% of SIDE cloud cost; with both removed SIDE would still cost
+        // ~14.7 ms against a 10 ms budget, so what remains is the march and
+        // the descriptor work each primary density sample pays.
+        //
+        // Task 1 - is PA_ARM_FOOTPRINT_MAX limiting SIDE? The clamp caps the
+        // step multiplier at clamp(coefficient * t, 1.0, MAX). At the SIDE
+        // pose the storm sits ~914 m out and the march runs to ~1600 m, so
+        // with P=0.75 the unclamped multiplier passes 4 at roughly t=1030 and
+        // the clamp binds over most of the traversal. The sweep measures
+        // whether releasing it keeps paying, and what it costs structurally.
+        // The projected-footprint formulation itself is unchanged; only the
+        // ceiling moves, so no arithmetic enters the inner loop.
+        // ------------------------------------------------------------------
+        // Run 2 sweeps the clamp DOWN. Run 1 showed max5/max6/max8 rendering
+        // identical images - the clamp no longer binds above ~5 - while max4,
+        // where it does bind, was 41% faster at FAR than any of them. The
+        // ceiling was never the limit; the step growth itself is.
+        [name: 'cloud_atmosphere_volume_t170_fpmax3',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // Ceiling, not a candidate: PA_ARM_DESC_HOIST substitutes a constant
+        // edge width and so renders an invalid image. A real hoist computes
+        // the same value once per descriptor per frame and is image-identical.
+        // This measures whether the stack plus a perfect hoist reaches budget.
+        [name: 'cloud_atmosphere_volume_t170_stack_hoist',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_HOIST 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t170_stack3',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 3.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t170_fpmax4',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t170_fpmax5',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 5.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t170_fpmax6',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t170_fpmax8',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // Tasks 2/3/4 - attribution of what a primary density sample pays per
+        // descriptor. Each arm removes exactly one stage of the group walk and
+        // keeps the iteration count and control shape intact, so the deltas
+        // are attributable and, where they overlap, comparably measured.
+        //
+        // Every one of these is visually invalid by construction. They bound
+        // cost; none is a production candidate, and the sandbox invariant
+        // keeps all of them out of FINAL.
+        [name: 'cloud_atmosphere_volume_t170_desc_constfetch',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_FETCH 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t170_desc_constedge',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CONST_EDGE 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t170_desc_cheapowner',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_CHEAP_OWNERSHIP 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t170_desc_nosdf',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_NO_EXACT_SDF 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t170_desc_hardunion',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HARD_UNION 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t170_desc_hoist',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_HOIST 1'],
+         keepUniforms: []],
+
+        // Task 6 stacks. T169's stack_fast carried forward unchanged except
+        // for the clamp, so the campaign's own lever is the only difference
+        // from the banked configuration. Two, so the clamp is not guessed
+        // before the sweep reports.
+        [name: 'cloud_atmosphere_volume_t170_stack',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 6.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t170_stack8',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 8.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4'],
          keepUniforms: ['PaOracleBaseSize']]
 ]
 

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 12;
+    private static final int STAGES = 14;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -102,6 +102,8 @@ final class StormWorkloadRuntimeCapture {
             case 9 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DESCRIPTOR;
             case 10 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_LIGHT;
             case 11 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DETAIL;
+            case 12 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LIGHT_ATTRIBUTION;
+            case 13 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DETAIL_ATTRIBUTION;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -198,7 +200,9 @@ final class StormWorkloadRuntimeCapture {
                     ThresholdWork.of(values[8]),
                     ThresholdWork.of(values[9]),
                     ThresholdWork.of(values[10]),
-                    ThresholdWork.of(values[11]));
+                    ThresholdWork.of(values[11]),
+                    values[12][0], values[12][1], values[12][2], values[12][3],
+                    values[13][0], values[13][1], values[13][2], values[13][3]);
         }
     }
 
@@ -226,7 +230,11 @@ final class StormWorkloadRuntimeCapture {
             double oracleOverflowPixels, double oracleOpticalExits,
             ThresholdWork stepsAfterAlpha, ThresholdWork densityAfterAlpha,
             ThresholdWork descriptorAfterAlpha, ThresholdWork lightAfterAlpha,
-            ThresholdWork detailAfterAlpha
+            ThresholdWork detailAfterAlpha,
+            double lightConeMarches, double lightConeTaps,
+            double lightConeEarlyOuts, double lightCheapProbes,
+            double detailFetchPrimary, double detailFetchLight,
+            double detailFetchSecondOctave, double lightMarchBelowFloor
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -250,8 +258,14 @@ final class StormWorkloadRuntimeCapture {
                     0.0D, 0.0D, 0.0D, 0.0D,
                     0.0D, 0.0D, 0.0D, 0.0D,
                     ThresholdWork.ZERO, ThresholdWork.ZERO, ThresholdWork.ZERO,
-                    ThresholdWork.ZERO, ThresholdWork.ZERO);
+                    ThresholdWork.ZERO, ThresholdWork.ZERO,
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
+
+        private static String ratio(double numerator, double denominator) {
+            return denominator <= 0.0D ? "n/a" : String.format("%.4f", numerator / denominator);
+        }
+
         String format() {
             return "T123 workload view=" + view
                     + " captureToken=" + captureToken
@@ -294,7 +308,23 @@ final class StormWorkloadRuntimeCapture {
                     + " densityAfterAlpha=" + densityAfterAlpha.format()
                     + " descriptorAfterAlpha=" + descriptorAfterAlpha.format()
                     + " lightAfterAlpha=" + lightAfterAlpha.format()
-                    + " detailAfterAlpha=" + detailAfterAlpha.format();
+                    + " detailAfterAlpha=" + detailAfterAlpha.format()
+                    // T169. Taps alone cannot separate "more material sampled"
+                    // from "more lighting per sample", so marches and taps are
+                    // reported apart, and detail is split by the path that
+                    // asked for it.
+                    + " lightConeMarches=" + fmt(lightConeMarches)
+                    + " lightConeTaps=" + fmt(lightConeTaps)
+                    + " lightConeEarlyOuts=" + fmt(lightConeEarlyOuts)
+                    + " lightCheapProbes=" + fmt(lightCheapProbes)
+                    + " lightMarchBelowFloor=" + fmt(lightMarchBelowFloor)
+                    + " tapsPerConeMarch=" + ratio(lightConeTaps, lightConeMarches)
+                    + " coneMarchesPerDensityCall=" + ratio(lightConeMarches, cloudDensityCalls)
+                    + " detailFetchPrimary=" + fmt(detailFetchPrimary)
+                    + " detailFetchLight=" + fmt(detailFetchLight)
+                    + " detailFetchSecondOctave=" + fmt(detailFetchSecondOctave)
+                    + " detailFetchLightShare=" + ratio(detailFetchLight,
+                            detailFetchPrimary + detailFetchLight);
         }
 
         double oraclePostOpacityDistance() {

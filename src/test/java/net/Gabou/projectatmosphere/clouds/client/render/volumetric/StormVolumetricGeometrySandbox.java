@@ -599,6 +599,14 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT167RefinementArms);
         runCorrected("T168 footprint arms compile and stay out of FINAL",
                 StormVolumetricGeometrySandbox::validateT168FootprintArms);
+        runCorrected("T169 lighting and detail arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT169LightingDetailArms);
+        runCorrected("T170 primary march arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT170PrimaryMarchArms);
+        runCorrected("T170 every registered campaign is wired into every dispatch site",
+                StormVolumetricGeometrySandbox::validateCampaignWiring);
+        runCorrected("T170 the campaign wiring invariant detects an omitted wire",
+                StormVolumetricGeometrySandbox::validateCampaignWiringCatchesOmissions);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -5867,6 +5875,388 @@ public final class StormVolumetricGeometrySandbox {
      * T167 shipped, where an assumed constant made the curve degenerate into an
      * ungraded step while still looking like it was grading.
      */
+    private static final String DRIVER_SOURCE_PATH =
+            "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                    + "StormT132AutoDriver.java";
+
+    /**
+     * T170 Task 0. Every registered campaign must be wired into every dispatch
+     * site it needs, or the build fails here.
+     *
+     * <p>Three campaigns in a row shipped with a missing wire. T167's pose
+     * arrival guard existed but was armed from {@code t166Run}. T169's
+     * predicate was missing from {@code performanceRunRequested()}, so the
+     * matrix was unreachable and three GPU runs measured nothing. T169's flag
+     * was missing from {@code activeEvaluationArms()}, so its arm table was
+     * dead code. Each was a hand-maintained chain drifting from a
+     * hand-maintained declaration, and each was found by a human reading logs
+     * after the fact.
+     *
+     * <p>The check is structural rather than behavioural because the driver
+     * cannot be loaded without a client: it reads the driver's own source and
+     * compares it against {@link StormCampaignRegistry}. That is enough to
+     * catch all three historical defects, which is the bar it has to clear.
+     */
+    private static void validateCampaignWiring() {
+        String driver = readWorkspaceSource(DRIVER_SOURCE_PATH);
+        List<String> violations = campaignWiringViolations(
+                driver, StormCampaignRegistry.CAMPAIGNS);
+        require(violations.isEmpty(),
+                "campaign wiring incomplete: " + String.join("; ", violations));
+        System.out.println("T170_WIRING campaigns=" + StormCampaignRegistry.CAMPAIGNS.size()
+                + "|armMatrices=" + StormCampaignRegistry.evaluationCampaigns().size()
+                + "|violations=0");
+    }
+
+    /**
+     * T170 Task 0. Proof that the invariant above actually catches an omitted
+     * wire, run against deliberately mutated copies of the real driver source
+     * rather than against a hand-written fixture.
+     *
+     * <p>Each mutation reproduces one of the defects that shipped. A check that
+     * cannot fail is not a check, so this asserts that every mutation is
+     * rejected and that the unmutated source is accepted.
+     */
+    private static void validateCampaignWiringCatchesOmissions() {
+        String driver = readWorkspaceSource(DRIVER_SOURCE_PATH);
+        require(campaignWiringViolations(driver, StormCampaignRegistry.CAMPAIGNS).isEmpty(),
+                "the unmutated driver must pass, or the negative proof means nothing");
+
+        // Defect 1, T169's second gap: the arm table exists but nothing selects
+        // it, so the campaign silently drives the default T141 arms.
+        String noArmTable = driver.replace(
+                "        if (t170Run) {\n            return T170_OPTIMIZATION_ARMS;\n        }\n",
+                "");
+        require(!noArmTable.equals(driver), "arm-table mutation did not apply");
+        requireDetected(noArmTable, "T170_OPTIMIZATION_ARMS",
+                "an arm table unreachable from activeEvaluationArms()");
+
+        // Defect 2, T169's first gap: a marker declared in the driver that no
+        // registry row claims. Under the old hand-written disjunction this is
+        // the failure that made three GPU runs measure nothing.
+        String strayMarker = driver.replace(
+                "    private static final Path T170_MARKER = Path.of(\"t170-primary-march.txt\");",
+                "    private static final Path T170_MARKER = Path.of(\"t170-primary-march.txt\");\n"
+                        + "    private static final Path T171_MARKER ="
+                        + " Path.of(\"t171-unregistered.txt\");");
+        require(!strayMarker.equals(driver), "stray-marker mutation did not apply");
+        requireDetected(strayMarker, "t171-unregistered.txt",
+                "a campaign marker declared but never registered");
+
+        // Defect 3, T167: pose guards armed from one campaign's own flag, so a
+        // new campaign inherits no guards.
+        String perCampaignGuard = driver.replace(
+                "    private static boolean poseGuardsArmed() {\n"
+                        + "        return t141EvaluationRun;\n    }",
+                "    private static boolean poseGuardsArmed() {\n"
+                        + "        return t166Run;\n    }");
+        require(!perCampaignGuard.equals(driver), "pose-guard mutation did not apply");
+        requireDetected(perCampaignGuard, "poseGuardsArmed",
+                "pose guards keyed to a single campaign's flag");
+
+        // Defect 4: the derived routing replaced by a hand-written chain again.
+        String handWrittenRouting = driver.replace(
+                "return StormCampaignRegistry.performanceMarkerPresent();",
+                "return Files.exists(T135_MARKER) || baselineRunRequested();");
+        require(!handWrittenRouting.equals(driver), "routing mutation did not apply");
+        requireDetected(handWrittenRouting, "performanceRunRequested",
+                "performance routing written out by hand instead of derived");
+
+        // A campaign latched but left out of the shared evaluation flag runs
+        // its whole sweep with the pose guards disarmed - T167 exactly.
+        String unguardedSweep = driver.replace(
+                "                                || t169Run\n                                || t170Run;",
+                "                                || t169Run;");
+        require(!unguardedSweep.equals(driver), "evaluation-latch mutation did not apply");
+        requireDetected(unguardedSweep, "t170Run",
+                "a campaign missing from the t141EvaluationRun latch");
+
+        System.out.println("T170_WIRING_NEGATIVE mutations=5|allDetected=true");
+    }
+
+    private static void requireDetected(String mutatedSource, String expectedMention,
+            String what) {
+        List<String> violations =
+                campaignWiringViolations(mutatedSource, StormCampaignRegistry.CAMPAIGNS);
+        require(!violations.isEmpty(), "the wiring invariant did not detect " + what);
+        boolean mentioned = false;
+        for (String violation : violations) {
+            if (violation.contains(expectedMention)) {
+                mentioned = true;
+                break;
+            }
+        }
+        require(mentioned, "the wiring invariant detected something other than " + what
+                + ": " + String.join("; ", violations));
+    }
+
+    /**
+     * The wiring check itself, as a pure function of the driver source and the
+     * registry so the negative proof can run it against mutated copies.
+     */
+    private static List<String> campaignWiringViolations(
+            String driver, List<StormCampaignRegistry.Campaign> campaigns) {
+        List<String> problems = new ArrayList<>();
+
+        // Every marker the driver declares must be a registered campaign or an
+        // explicitly listed harness marker.
+        Set<String> known = new HashSet<>(StormCampaignRegistry.HARNESS_MARKERS);
+        for (StormCampaignRegistry.Campaign campaign : campaigns) {
+            known.add(campaign.markerFileName());
+        }
+        java.util.regex.Matcher markers = java.util.regex.Pattern
+                .compile("Path\\.of\\(\"([A-Za-z0-9._-]+\\.txt)\"\\)")
+                .matcher(driver);
+        while (markers.find()) {
+            String marker = markers.group(1);
+            if (!known.contains(marker)) {
+                problems.add("marker " + marker + " is declared in the driver but is not"
+                        + " registered in StormCampaignRegistry");
+            }
+        }
+
+        // Performance routing must stay derived. This is the exact site that
+        // lost T169.
+        String routing = methodBody(driver, "performanceRunRequested");
+        if (routing == null) {
+            problems.add("performanceRunRequested() not found");
+        } else if (!routing.contains("StormCampaignRegistry.performanceMarkerPresent")) {
+            problems.add("performanceRunRequested() no longer derives from the registry;"
+                    + " a hand-written chain here is what lost T169");
+        }
+
+        // Pose guards must not be keyed to any one campaign.
+        String guard = methodBody(driver, "poseGuardsArmed");
+        if (guard == null) {
+            problems.add("poseGuardsArmed() not found");
+        } else if (!guard.replaceAll("\\s+", "").equals("returnt141EvaluationRun;")) {
+            problems.add("poseGuardsArmed() is not keyed to the shared evaluation flag;"
+                    + " arming it from one campaign's flag is what lost T167's"
+                    + " arrival guard");
+        }
+
+        String armSelector = methodBody(driver, "activeEvaluationArms");
+        if (armSelector == null) {
+            problems.add("activeEvaluationArms() not found");
+        }
+        String evaluationLatch = evaluationRunAssignment(driver);
+
+        for (StormCampaignRegistry.Campaign campaign : campaigns) {
+            if (!driver.contains("boolean " + campaign.predicateName() + "()")) {
+                problems.add("campaign " + campaign.id() + " declares predicate "
+                        + campaign.predicateName() + "() which the driver does not define");
+            }
+            if (campaign.flagFieldName() != null
+                    && !driver.contains("boolean " + campaign.flagFieldName() + ";")) {
+                problems.add("campaign " + campaign.id() + " declares flag "
+                        + campaign.flagFieldName() + " which the driver does not define");
+            }
+            if (!campaign.drivesArmMatrix()) {
+                continue;
+            }
+            if (armSelector != null && !armSelector.contains(campaign.armTableName())) {
+                problems.add("campaign " + campaign.id() + " declares arm table "
+                        + campaign.armTableName()
+                        + " which activeEvaluationArms() never returns");
+            }
+            // The shared evaluation flag arms the pose guards, so a campaign
+            // missing from it runs its sweep unguarded.
+            if (evaluationLatch != null
+                    && campaign.flagFieldName() != null
+                    && !"t141EvaluationRun".equals(campaign.flagFieldName())
+                    && !evaluationLatch.contains(campaign.flagFieldName())) {
+                problems.add("campaign " + campaign.id() + " flag "
+                        + campaign.flagFieldName() + " is missing from the"
+                        + " t141EvaluationRun latch, so its sweep would run with"
+                        + " the pose guards disarmed");
+            }
+        }
+        return problems;
+    }
+
+    /** The right-hand side of the {@code t141EvaluationRun = ...;} assignment. */
+    private static String evaluationRunAssignment(String driver) {
+        int start = driver.indexOf("t141EvaluationRun =");
+        if (start < 0) {
+            return null;
+        }
+        int end = driver.indexOf(';', start);
+        return end < 0 ? null : driver.substring(start, end);
+    }
+
+    /** The brace-matched body of a no-argument static method. */
+    private static String methodBody(String source, String methodName) {
+        int signature = source.indexOf(" " + methodName + "() {");
+        if (signature < 0) {
+            return null;
+        }
+        int open = source.indexOf('{', signature);
+        int depth = 0;
+        for (int i = open; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open + 1, i);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The T170 primary-march arms must compile, must stay out of FINAL, and the
+     * attribution arms must remove exactly the stage they claim to remove.
+     */
+    private static void validateT170PrimaryMarchArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        for (String define : new String[] {
+                "PA_ARM_DESC_CONST_FETCH", "PA_ARM_DESC_CONST_EDGE",
+                "PA_ARM_DESC_CHEAP_OWNERSHIP", "PA_ARM_DESC_NO_EXACT_SDF",
+                "PA_ARM_DESC_HARD_UNION", "PA_ARM_DESC_HOIST"}) {
+            require(!finalSource.contains("#define " + define),
+                    "FINAL defines " + define + "; every T170 attribution arm is"
+                            + " visually invalid and must never reach a shipped frame");
+        }
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t170_fpmax3", "#define PA_ARM_FOOTPRINT_MAX 3.0"},
+                {"cloud_atmosphere_volume_t170_stack3", "#define PA_ARM_FOOTPRINT_MAX 3.0"},
+                {"cloud_atmosphere_volume_t170_stack_hoist", "#define PA_ARM_DESC_HOIST 1"},
+                {"cloud_atmosphere_volume_t170_fpmax4", "#define PA_ARM_FOOTPRINT_MAX 4.0"},
+                {"cloud_atmosphere_volume_t170_fpmax5", "#define PA_ARM_FOOTPRINT_MAX 5.0"},
+                {"cloud_atmosphere_volume_t170_fpmax6", "#define PA_ARM_FOOTPRINT_MAX 6.0"},
+                {"cloud_atmosphere_volume_t170_fpmax8", "#define PA_ARM_FOOTPRINT_MAX 8.0"},
+                {"cloud_atmosphere_volume_t170_desc_constfetch",
+                        "#define PA_ARM_DESC_CONST_FETCH 1"},
+                {"cloud_atmosphere_volume_t170_desc_constedge",
+                        "#define PA_ARM_DESC_CONST_EDGE 1"},
+                {"cloud_atmosphere_volume_t170_desc_cheapowner",
+                        "#define PA_ARM_DESC_CHEAP_OWNERSHIP 1"},
+                {"cloud_atmosphere_volume_t170_desc_nosdf",
+                        "#define PA_ARM_DESC_NO_EXACT_SDF 1"},
+                {"cloud_atmosphere_volume_t170_desc_hardunion",
+                        "#define PA_ARM_DESC_HARD_UNION 1"},
+                {"cloud_atmosphere_volume_t170_desc_hoist", "#define PA_ARM_DESC_HOIST 1"},
+                {"cloud_atmosphere_volume_t170_stack", "#define PA_ARM_FOOTPRINT_MAX 6.0"},
+                {"cloud_atmosphere_volume_t170_stack8", "#define PA_ARM_FOOTPRINT_MAX 8.0"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T170 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // Each arm's implementation must still exist behind its guard. The
+        // generated sources keep both branches of every #ifdef - the GLSL
+        // preprocessor resolves them at compile time, not the generator - so a
+        // text search cannot prove an arm removed work. What it can prove is
+        // that the guarded implementation was not deleted while the define
+        // stayed, which would silently turn an arm into a second anchor and
+        // report a ceiling of zero.
+        String armSource = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t170_desc_constfetch.fsh");
+        require(armSource.contains("#ifdef PA_ARM_DESC_CONST_FETCH")
+                        && armSource.contains("vec4 positionHeight = paDescCached0;"),
+                "the fetch oracle's cached-payload path is gone; the arm would"
+                        + " measure the anchor and report a fetch ceiling of zero");
+        require(armSource.contains("#if defined(PA_ARM_DESC_CONST_EDGE)"
+                        + " || defined(PA_ARM_DESC_HOIST)"),
+                "the edge-width hoist path is gone");
+        require(armSource.contains("#ifdef PA_ARM_DESC_NO_EXACT_SDF")
+                        && armSource.contains("float lobeDistance = verticalLowerBound;"),
+                "the exact-SDF arm's substitute path is gone");
+        require(armSource.contains("#ifdef PA_ARM_DESC_HARD_UNION"),
+                "the hard-union arm's path is gone");
+
+        // The attribution arms must not carry a footprint or termination
+        // change as well, or their deltas would not be attributable to the
+        // descriptor stage they name.
+        for (String arm : new String[] {"constfetch", "constedge", "cheapowner",
+                "nosdf", "hardunion", "hoist"}) {
+            String source = readWorkspaceSource(
+                    base + "cloud_atmosphere_volume_t170_desc_" + arm + ".fsh");
+            require(!source.contains("#define PA_ARM_FOOTPRINT ")
+                            && !source.contains("#define PA_ARM_EARLY_TERM "),
+                    "T170 attribution arm " + arm + " also changes the march;"
+                            + " its delta would not be attributable to the descriptor"
+                            + " stage it names");
+        }
+
+        // The clamp sweep must move only the ceiling. If a sweep arm also
+        // changed the footprint target the comparison would confound two levers.
+        for (String arm : new String[] {"fpmax3", "fpmax4", "fpmax5", "fpmax6", "fpmax8"}) {
+            String source = readWorkspaceSource(
+                    base + "cloud_atmosphere_volume_t170_" + arm + ".fsh");
+            require(source.contains("#define PA_ARM_FOOTPRINT 0.75"),
+                    "T170 clamp sweep arm " + arm + " moved the footprint target as well"
+                            + " as the ceiling; the sweep would confound two levers");
+        }
+    }
+
+    private static void validateT169LightingDetailArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(!finalSource.contains("#define PA_ARM_DETAIL_FOOTPRINT"),
+                "FINAL defines PA_ARM_DETAIL_FOOTPRINT");
+        require(!finalSource.contains("#define PA_ARM_LIGHT_STEPS"),
+                "FINAL defines PA_ARM_LIGHT_STEPS");
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t169_lightsteps5", "#define PA_ARM_LIGHT_STEPS 5"},
+                {"cloud_atmosphere_volume_t169_lightsteps4", "#define PA_ARM_LIGHT_STEPS 4"},
+                {"cloud_atmosphere_volume_t169_lightearlyout2",
+                        "#define PA_ARM_LIGHT_EARLY_OUT 2.0"},
+                {"cloud_atmosphere_volume_t169_detailfp_conservative",
+                        "#define PA_ARM_DETAIL_FOOTPRINT 0.5"},
+                {"cloud_atmosphere_volume_t169_detailfp_balanced",
+                        "#define PA_ARM_DETAIL_FOOTPRINT 1.0"},
+                {"cloud_atmosphere_volume_t169_detailfp_aggressive",
+                        "#define PA_ARM_DETAIL_FOOTPRINT 1.5"},
+                {"cloud_atmosphere_volume_t169_nodetail", "#define PA_ARM_NO_DETAIL 1"},
+                {"cloud_atmosphere_volume_t169_stack_safe", "#define PA_ARM_FOOTPRINT 0.35"},
+                {"cloud_atmosphere_volume_t169_stack_fast", "#define PA_ARM_FOOTPRINT 0.75"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T169 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The detail cut exists to be cheaper than the T149 graded path it
+        // competes with. That path calls paProjectedFeaturePixels, which costs
+        // a length(), a textureSize() and a division at every detail
+        // evaluation; this one must stay a squared compare against a hoisted
+        // constant or it has no reason to exist.
+        String balanced = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t169_detailfp_balanced.fsh");
+        require(balanced.contains("uniform vec2 PaOracleBaseSize;"),
+                "the detail footprint arm baked PaOracleBaseSize; it would read a"
+                        + " constant target height instead of the live one");
+        require(balanced.contains("paDetailCutoffDistSq"),
+                "the detail footprint arm no longer compares a hoisted squared cutoff");
+        require(!balanced.contains("paProjectedFeaturePixels(p, 22.7)"),
+                "the detail footprint arm calls paProjectedFeaturePixels, reintroducing"
+                        + " the per-evaluation division it exists to avoid");
+    }
+
     private static void validateT168FootprintArms() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
