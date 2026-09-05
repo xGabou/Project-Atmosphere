@@ -597,6 +597,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT166AttributionArms);
         runCorrected("T167 refinement arms compile and stay out of FINAL",
                 StormVolumetricGeometrySandbox::validateT167RefinementArms);
+        runCorrected("T168 footprint arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT168FootprintArms);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -5797,7 +5799,8 @@ public final class StormVolumetricGeometrySandbox {
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
         List<String> violations = new ArrayList<>();
         for (String guard : new String[] {
-                "PA_ARM_STEP_CURVE", "PA_ARM_DESCRIPTOR_K", "PA_ARM_SCAN_LATTICE_FIXED"}) {
+                "PA_ARM_STEP_CURVE", "PA_ARM_DESCRIPTOR_K", "PA_ARM_SCAN_LATTICE_FIXED",
+                "PA_ARM_FOOTPRINT"}) {
             if (finalSource.contains("#define " + guard)) {
                 violations.add("FINAL defines " + guard);
             }
@@ -5850,6 +5853,58 @@ public final class StormVolumetricGeometrySandbox {
                     program + " baked PaOracleBaseSize; its footprint grading would"
                             + " read a constant target height instead of the live one");
         }
+    }
+
+    /**
+     * The T168 footprint arms must compile, must stay out of FINAL, and must
+     * keep the one uniform their derivation depends on.
+     *
+     * <p>The footprint growth is derived from the live projection and the live
+     * cloud-target height, and the target height arrives only through
+     * {@code PaOracleBaseSize}. A variant that let the generator bake that to
+     * its FINAL constant would silently grade every sample as if the target
+     * were one pixel tall - which is a subtler version of exactly the failure
+     * T167 shipped, where an assumed constant made the curve degenerate into an
+     * ungraded step while still looking like it was grading.
+     */
+    private static void validateT168FootprintArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        require(!finalSource.contains("#define PA_ARM_FOOTPRINT"),
+                "FINAL defines PA_ARM_FOOTPRINT");
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t168_fp_conservative", "#define PA_ARM_FOOTPRINT 0.35"},
+                {"cloud_atmosphere_volume_t168_fp_balanced", "#define PA_ARM_FOOTPRINT 0.50"},
+                {"cloud_atmosphere_volume_t168_fp_aggressive", "#define PA_ARM_FOOTPRINT 0.75"},
+                {"cloud_atmosphere_volume_t168_stack", "#define PA_ARM_EARLY_TERM 0.045"},
+                {"cloud_atmosphere_volume_t168_stack_balanced", "#define PA_ARM_EARLY_TERM 0.045"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T168 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            require(source.contains("uniform vec2 PaOracleBaseSize;"),
+                    arm[0] + " baked PaOracleBaseSize; its footprint derivation would"
+                            + " read a constant target height instead of the live one");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The whole point of the T168 form is that the reciprocal is hoisted.
+        // A division reintroduced into the march loop is the T167 regression.
+        String balanced = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t168_fp_balanced.fsh");
+        require(balanced.contains("paFootprintCoefficient * t"),
+                "the footprint arm no longer multiplies a hoisted coefficient by t;"
+                        + " the per-step division T167 measured at 27% may be back");
+        require(balanced.contains("float paFootprintCoefficient = paFootprintGrowthCoefficient("),
+                "the footprint coefficient is no longer hoisted out of the march loop");
     }
 
     /**

@@ -161,7 +161,24 @@ public enum CoreCostDiagnosticProgram {
      * every K and its seam index rose monotonically as owners were dropped.
      */
     T167_STACK_BALANCED("t167_stack_balanced"),
-    T167_STACK_SAFE("t167_stack_safe");
+    T167_STACK_SAFE("t167_stack_safe"),
+
+    /**
+     * T168 footprint step LOD. Grades the exterior fine step by the projected
+     * size of a sample rather than by distance / MaxRenderDistance, which is
+     * what made the T167 curves swing by pose. The growth is linear in ray
+     * distance once the projection algebra is done, so the march loop pays one
+     * multiply and one clamp - not the division that cost T167 27% of a frame.
+     */
+    T168_FOOTPRINT_CONSERVATIVE("t168_fp_conservative"),
+    T168_FOOTPRINT_BALANCED("t168_fp_balanced"),
+    T168_FOOTPRINT_AGGRESSIVE("t168_fp_aggressive"),
+    /**
+     * T168 combined stacks: a footprint curve plus termination 0.045. Two are
+     * built so the winning curve does not have to be guessed before the run.
+     */
+    T168_STACK("t168_stack"),
+    T168_STACK_BALANCED("t168_stack_balanced");
 
     private final String serializedName;
 

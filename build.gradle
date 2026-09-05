@@ -505,6 +505,36 @@ def leanProgramVariants = [
         [name: 'cloud_atmosphere_volume_t167_stack_safe',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_STEP_CURVE 1',
                    'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // ------------------------------------------------------------------
+        // T168 footprint step LOD. PA_ARM_FOOTPRINT is the target sample
+        // spacing in cloud-target pixels; the growth it implies is linear in
+        // ray distance, so the march loop pays one multiply and one clamp.
+        // PaOracleBaseSize carries the live cloud-target height the derivation
+        // needs and must survive specialization.
+        // ------------------------------------------------------------------
+        [name: 'cloud_atmosphere_volume_t168_fp_conservative',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                   'PA_ARM_FOOTPRINT_MAX 4.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t168_fp_balanced',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
+                   'PA_ARM_FOOTPRINT_MAX 4.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t168_fp_aggressive',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0'],
+         keepUniforms: ['PaOracleBaseSize']],
+        // Combined stacks: a footprint curve plus the reconfirmed termination
+        // floor. Two, so the winning curve is not guessed before the run.
+        [name: 'cloud_atmosphere_volume_t168_stack',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.35',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t168_stack_balanced',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.50',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045'],
          keepUniforms: ['PaOracleBaseSize']]
 ]
 

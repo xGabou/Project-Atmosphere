@@ -191,7 +191,7 @@ final class StormWorkloadRuntimeCapture {
                     values[1][0], values[1][1], values[1][2],
                     values[2][0], values[2][1], values[2][2], values[2][3],
                     values[3][0], values[3][1], values[3][2], values[3][3],
-                    values[4][0],
+                    values[4][0], values[4][1], values[4][2], values[4][3],
                     values[5][0], values[5][1], values[5][2], values[5][3],
                     values[6][0], values[6][1], values[6][2], values[6][3],
                     ThresholdWork.of(values[7]),
@@ -218,6 +218,8 @@ final class StormWorkloadRuntimeCapture {
             double cloudDensityCalls,
             double densityZeroCalls, double segmentTestCalls, double segmentTestPositive,
             double boxBoundRejects, double detailOctaveEvaluations,
+            double descriptorCandidateRanks, double descriptorGroupsEntered,
+            double descriptorUnionContributors,
             double oracleSkippedDistance, double oraclePreCloudDistance,
             double oracleHoleDistance, double oraclePostCloudDistance,
             double oracleSkipEvents, double oracleIntervalsSeen,
@@ -244,6 +246,7 @@ final class StormWorkloadRuntimeCapture {
                     directStormShapeCalls, groupFieldCalls, lobesVisited, cloudDensityCalls,
                     densityZeroCalls, segmentTestCalls, segmentTestPositive,
                     boxBoundRejects, detailOctaveEvaluations,
+                    0.0D, 0.0D, 0.0D,
                     0.0D, 0.0D, 0.0D, 0.0D,
                     0.0D, 0.0D, 0.0D, 0.0D,
                     ThresholdWork.ZERO, ThresholdWork.ZERO, ThresholdWork.ZERO,
@@ -272,6 +275,12 @@ final class StormWorkloadRuntimeCapture {
                     + " detailOctaveEvaluations=" + fmt(detailOctaveEvaluations)
                     + " lightEvaluationsPerPixel=" + perPixel(lightMarchDensityEvaluations)
                     + " detailOctaveEvaluationsPerPixel=" + perPixel(detailOctaveEvaluations)
+                    // T168. The traversal question is how many descriptors enter
+                    // the loop versus how many change the answer, so both are
+                    // reported per density call rather than per pixel.
+                    + " descriptorCandidateRanks=" + fmt(descriptorCandidateRanks)
+                    + " descriptorGroupsEntered=" + fmt(descriptorGroupsEntered)
+                    + " descriptorUnionContributors=" + fmt(descriptorUnionContributors)
                     + " oracleSkippedDistance=" + fmt(oracleSkippedDistance)
                     + " oraclePreCloudDistance=" + fmt(oraclePreCloudDistance)
                     + " oracleHoleDistance=" + fmt(oracleHoleDistance)

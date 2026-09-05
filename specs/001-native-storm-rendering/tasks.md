@@ -1600,6 +1600,29 @@ implementation, while visual polish remains independently active.
   not switched on**. The drift control caught it again (`ratio=3.1127 DRIFTED`). Final run: 51
   cells, **0 rejected**, all three drift controls stable, 42 image comparisons. Evidence in
   `validation/performance-descriptor-and-step-refinement.md`.
+- [X] T168 [PERFORMANCE] [US3] Build a pose-invariant footprint step LOD from the live
+  projection and audit the descriptor candidate/group walk upstream of the loop prologue.
+  **Task A succeeds.** Deriving the criterion algebraically first shows the growth is
+  **linear in `t`** - `growth(t) = (2P / (P11 * H * fineStep)) * t` - so the whole reciprocal
+  hoists to one per-fragment constant and the inner loop is one multiply plus one clamp,
+  against the per-step division that cost T167 up to 27% of a frame. Best banked arm P=0.75:
+  **1.468x FAR, 1.838x SIDE**, degradation monotone in P at every pose (thin retention
+  0.84-0.96 vs nearest-K's 0.38-0.49). **Task B closes the upstream-binning line (CASE C).**
+  The walk visits **exactly 10.000 lobes per group entered** (8.000 at cap 8) - groups are
+  entered whole, so a candidate structure cannot filter below group granularity - and only
+  38-48% of visited lobes change the union answer, but that majority is *sample-dependent*
+  and no static structure can remove it. Measured ceiling for removing 2 of 10 descriptors
+  upstream: 1.13x FAR / 1.29x SIDE, already rendering a different image; caps 1-6 are
+  degenerate (`cloudDensityCalls=0`, empty sky). Termination 0.045 reconfirmed at ~1.11x with
+  IoU 1.0000 and thin retention 1.0000. **No target met**: best trustworthy FAR 9.4566 ms
+  (goal 8), best SIDE 12.0996 ms (goals 10 and 8). 45 cells, **0 rejected**; FAR and SIDE
+  drift controls stable, **PLAY_VIS_NEAR drifted 1.0923 and is reported but not banked**.
+  Two defects recorded rather than hidden: a static-initializer ordering bug
+  (`T168_ARMS` read `T168_DESCRIPTOR_CAPS` before it was declared) killed two launches at
+  class init - invisible to the build gate, which sees only compile-time invariants - and
+  `descriptorCandidateRanks` reads 0 everywhere because the counter was emitted but never
+  incremented, leaving the "8 candidate ranks" figure a static reading. Evidence in
+  `validation/performance-footprint-lod-and-traversal-audit.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

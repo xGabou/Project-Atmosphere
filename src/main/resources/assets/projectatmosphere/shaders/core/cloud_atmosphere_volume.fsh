@@ -408,6 +408,18 @@ int paBoxBoundRejects = 0;
 // texture lookup. Rain noise is intentionally excluded: it is functional
 // precipitation work, not the cloud-surface/detail lever T149 is measuring.
 int paDetailOctaveEvaluations = 0;
+/**
+ * T168 descriptor-traversal counters. They ride the three unused channels of
+ * the existing workload view 26, so no new readback stage is introduced.
+ *
+ * <p>They exist to answer one question T167 left open: a descriptor's cost is
+ * paid in the loop prologue, before the exact SDF is even considered, so the
+ * useful number is not how many descriptors are evaluated but how many enter
+ * the loop at all, and of those how many change the answer.
+ */
+int paDescriptorCandidateRanks = 0;
+int paDescriptorGroupsEntered = 0;
+int paDescriptorUnionContributors = 0;
 // T153-only attribution. Distances are world blocks; the remaining values are
 // exact executed-work counts from the timed replay.
 float paOracleSkippedDistance = 0.0;
@@ -2220,17 +2232,33 @@ void directStormGroupField(
             0.0,
             1.0
         );
+        int paRoleMaskBefore = groupActiveRoleMask;
+        float paGroupDistanceBefore = groupDistance;
         if (!started) {
             groupDistance = lobeDistance;
             groupStrength = lobeStrength;
             groupSoftness = lobeSoftness;
             started = true;
+            // The first admitted lobe defines the union, so it always counts.
+            if (paWorkloadCaptureActive()) {
+                paDescriptorUnionContributors++;
+            }
         } else {
             float blend = stormLobeBlendRadius(previousRadius, lobeRadius, previousRole, lobeRole);
             float mixFactor = stormBlendFactor(groupDistance, lobeDistance, blend);
             groupDistance = stormSmoothMinimum(groupDistance, lobeDistance, blend);
             groupStrength = mix(lobeStrength, groupStrength, mixFactor);
             groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
+            // "Contributes" has to mean changed the answer, not merely was
+            // evaluated. A lobe counts if it moved the union distance by more
+            // than a hundredth of a block, or if it turned on a role bit that
+            // downstream density behaviour reads. Anything else was evaluated
+            // for nothing, and is exactly what an upstream filter could remove.
+            if (paWorkloadCaptureActive()
+                    && (abs(groupDistance - paGroupDistanceBefore) > 0.01
+                        || groupActiveRoleMask != paRoleMaskBefore)) {
+                paDescriptorUnionContributors++;
+            }
         }
         previousRadius = lobeRadius;
         previousRole = lobeRole;
@@ -2307,6 +2335,9 @@ float directStormShape(
             continue;
         }
         groupVisited |= groupBit;
+        if (paWorkloadCaptureActive()) {
+            paDescriptorGroupsEntered++;
+        }
         float groupDistance;
         float groupMinimumRadius;
         float groupStrength;
@@ -3849,6 +3880,41 @@ float rainShaftDensityOverSegment(vec3 segmentStart, vec3 segmentEnd, float mipB
  * This uses only continuous render inputs and remains stable while descriptor
  * or role boundaries cross the ray.
  */
+#ifdef PA_ARM_FOOTPRINT
+/**
+ * T168 footprint step LOD - the per-fragment half of it.
+ *
+ * <p>A world-space span s at ray distance t projects to a height, in cloud
+ * target pixels, of
+ *
+ *     pixels(s, t) = s * P11 * H / (2 t)
+ *
+ * where P11 is the vertical projection scale CloudProjMat[1][1] = 1/tan(fovY/2)
+ * and H is the cloud target height in pixels - the 270 of a 480x270 target, so
+ * the resolution scale is already inside it and must not be applied again.
+ *
+ * <p>Solving pixels(s, t) = P for the span that covers exactly P pixels gives
+ * s = 2 P t / (P11 H), and the growth over the shipped constant exterior fine
+ * step is therefore
+ *
+ *     growth(t) = s / fineStep = ( 2 P / (P11 H fineStep) ) * t
+ *
+ * <p>**That is linear in t.** The whole reciprocal collapses into one constant
+ * that depends only on the projection, the target and the quality ladder - none
+ * of which vary along a ray. T167 computed `1.0 / max(footprintPixels, eps)`
+ * per march step and paid up to 27% of the frame for the division; the same
+ * criterion costs one multiply and one clamp once the algebra is done first.
+ *
+ * @return the coefficient C such that growth = clamp(C * t, 1, cap)
+ */
+float paFootprintGrowthCoefficient(float fineStep) {
+    float projectionScale = max(abs(CloudProjMat[1][1]), 0.001);
+    float targetHeight = max(PaOracleBaseSize.y, 1.0);
+    return (2.0 * PA_ARM_FOOTPRINT)
+        / max(projectionScale * targetHeight * fineStep, 0.0001);
+}
+#endif
+
 #ifdef PA_ARM_STEP_CURVE
 /**
  * T167 graded exterior fine-step growth.
@@ -5494,6 +5560,9 @@ float paT162CandidateWalk(vec3 samplePoint, bool readPayload) {
             continue;
         }
         groupVisited |= groupBit;
+        if (paWorkloadCaptureActive()) {
+            paDescriptorGroupsEntered++;
+        }
         int firstIndex = stormGroupFirstIndex(witnessIndex, groupSlot);
         int endIndex = min(stormGroupEndIndex(witnessIndex, groupSlot), StormLobeCount);
         checksum = paT162Consume(
@@ -5843,6 +5912,12 @@ void main() {
     float coarseStepCap = min(112.0, fineStep * 16.0);
 #endif
 
+#ifdef PA_ARM_FOOTPRINT
+    // Per fragment, not per step. This is the only division the footprint LOD
+    // performs on the whole ray.
+    float paFootprintCoefficient = paFootprintGrowthCoefficient(fineStep);
+#endif
+
     float cosTheta = dot(rayDir, LightDir);
 
     float originJitterDistance = min(
@@ -6000,6 +6075,14 @@ void main() {
             paMrFlags |= PA_MR_EXECUTED | (fine ? PA_MR_FINE_AT_ENTRY : 0);
         }
         float distanceGrowth = 1.0 + (t / max(MaxRenderDistance, 1.0)) * 2.2;
+#ifdef PA_ARM_FOOTPRINT
+        // One multiply and one clamp. Everything else was hoisted.
+        float paFootprintGrowth = clamp(
+            paFootprintCoefficient * t, 1.0, PA_ARM_FOOTPRINT_MAX);
+        float stepLength = fine
+            ? fineStep * (cameraInsideCloud ? distanceGrowth : paFootprintGrowth)
+            : min(coarseStep * distanceGrowth, coarseStepCap);
+#else
 #ifdef PA_ARM_STEP_CURVE
         float paCurveGrowth = paGradedStepGrowth(
             t / max(MaxRenderDistance, 1.0),
@@ -6023,6 +6106,7 @@ void main() {
         float stepLength = fine
             ? fineStep * (cameraInsideCloud ? distanceGrowth : 1.0)
             : min(coarseStep * distanceGrowth, coarseStepCap);
+#endif
 #endif
 #endif
         // Never integrate optical depth past the scene/slab ray endpoint.
@@ -6129,6 +6213,12 @@ void main() {
             // AABB entries could exhaust the march before the ray endpoint.
             sinceHit = 0;
             fine = true;
+#ifdef PA_ARM_FOOTPRINT
+            stepLength = fineStep
+                * (cameraInsideCloud
+                    ? distanceGrowth
+                    : clamp(paFootprintCoefficient * t, 1.0, PA_ARM_FOOTPRINT_MAX));
+#else
 #ifdef PA_ARM_STEP_CURVE
             stepLength = fineStep
                 * (cameraInsideCloud
@@ -6146,6 +6236,7 @@ void main() {
 #else
             stepLength = fineStep
                 * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
 #endif
 #endif
             stepLength = min(stepLength, t1 - t);
@@ -6248,6 +6339,15 @@ void main() {
                 // found is still found. Dropping the scan and trusting the
                 // bracket refinement alone is what is unsafe - measured offline
                 // it skipped material on every ray, 1.4 to 39.2 blocks of it.
+#ifdef PA_ARM_FOOTPRINT
+                // The empty-span scan probes the lattice the fine march would
+                // have sampled, so it has to move with it or its safety
+                // argument stops holding.
+                float paScanStep = fineStep
+                    * (cameraInsideCloud
+                        ? distanceGrowth
+                        : clamp(paFootprintCoefficient * t, 1.0, PA_ARM_FOOTPRINT_MAX));
+#else
 #ifdef PA_ARM_STEP_CURVE
 #ifdef PA_ARM_SCAN_LATTICE_FIXED
                 // The empty-span scan's safety argument is that it probes
@@ -6280,6 +6380,7 @@ void main() {
 #else
                 float paScanStep = fineStep
                     * (cameraInsideCloud ? distanceGrowth : 1.0);
+#endif
 #endif
 #endif
                 // The evidence arm takes no probes, so the scan cannot advance
@@ -7310,7 +7411,12 @@ void main() {
     }
     if (DebugView == 26) {
         gl_FragDepth = 1.0;
-        fragColor = vec4(float(paDetailOctaveEvaluations), 0.0, 0.0, 0.0);
+        fragColor = vec4(
+            float(paDetailOctaveEvaluations),
+            float(paDescriptorCandidateRanks),
+            float(paDescriptorGroupsEntered),
+            float(paDescriptorUnionContributors)
+        );
         return;
     }
     if (DebugView == 28) {
