@@ -428,6 +428,37 @@ int paGroupFieldCalls = 0;
 int paLobesVisited = 0;
 int paCloudDensityCalls = 0;
 int paDensityZeroCalls = 0;
+/**
+ * T175. The PRIMARY body density histogram.
+ *
+ * <p>T174 reported 25.37 density calls per pixel at SIDE, but cloudDensityCalls
+ * counts light-march taps too - 1,826,472 of 3,287,861 at SIDE. The primary
+ * march actually makes 11.28 per pixel, on 36.6% of its steps rather than 82%.
+ * These count only the one body call in the march loop, so they cannot be
+ * conflated with lighting again.
+ *
+ * <p>Bins are anchored on the shader's own material threshold, 0.0008 - the
+ * value PA_MR_DENSITY_ABOVE_THRESHOLD and the oracle interval close already use
+ * - rather than on invented cut points.
+ */
+int paPrimaryDensityCalls = 0;
+int paPrimaryDensityZero = 0;
+int paPrimaryDensityNegligible = 0;
+int paPrimaryDensityLow = 0;
+int paPrimaryDensityMedium = 0;
+int paPrimaryDensityHigh = 0;
+/** Transitions along a ray, so run lengths can be derived rather than assumed. */
+int paPrimaryMaterialRuns = 0;
+int paPrimaryZeroRuns = 0;
+/** Per-fragment march state for the histogram's run-length transitions. */
+bool paPrimaryPrevMaterial = false;
+#ifdef PA_ARM_DENSITY_EVERY_2
+// Arm-local control state, not T123 counters: deliberately outside the pa*
+// namespace and behind the arm's own define, so production carries neither the
+// variables nor a per-step increment for them.
+int primaryStepParity = 0;
+float primaryHeldDensity = 0.0;
+#endif
 int paSegmentTestCalls = 0;
 int paSegmentTestPositive = 0;
 int paBoxBoundRejects = 0;
@@ -506,9 +537,19 @@ ivec4 paOracleLightAfterAlpha = ivec4(0);
 ivec4 paOracleDetailAfterAlpha = ivec4(0);
 
 bool paWorkloadCaptureActive() {
+    // T175: this list had fallen behind the views that depend on it. Views 35
+    // and 36 - T169's light and detail attribution - have been emitted since
+    // T169 while this predicate returned false for them, so every counter they
+    // carry read zero and the campaign recorded "lightConeMarches=0
+    // tapsPerConeMarch=n/a" without anyone noticing. The same would have
+    // happened to T175's histogram.
+    //
+    // Now a contiguous range with an explicit upper bound, and the sandbox
+    // asserts every STORM_WORKLOAD_* view id falls inside it, so adding a view
+    // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 34);
+        || (DebugView >= 28 && DebugView <= 38);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -2481,6 +2522,9 @@ float directStormShape(
 #ifdef PA_ARM_GROUP2_NO_SDF
     groupEntryOrdinal = 0;
 #endif
+#ifdef PA_ARM_CLEARANCE_FIRST_GROUP
+    int groupEntryOrdinalClearance = 0;
+#endif
     float paOutsideReach = paStormColumnOutside(p.xz);
     if (paOutsideReach > 0.0) {
         minDescriptorClearance = paOutsideReach;
@@ -2520,7 +2564,23 @@ float directStormShape(
             groupDistance, groupMinimumRadius, groupStrength, groupSoftness,
             groupHeight01, groupActiveRoleMask, ownsGroup, groupMinClearance
         );
+#ifdef PA_ARM_CLEARANCE_FIRST_GROUP
+        // T175 Task 4 oracle. Only the first entered group is allowed to
+        // constrain the safe advance; every group's density contribution is
+        // still evaluated and unioned exactly as production does.
+        //
+        // T174 showed groups 2+ never change the density result on this
+        // fixture. They may still shorten the march's safe advance, which would
+        // cost steps rather than correctness - this measures whether they do.
+        // Unsafe by construction: a real ray could step over material a
+        // suppressed group owns. Oracle only.
+        if (groupEntryOrdinalClearance == 0) {
+            minDescriptorClearance = min(minDescriptorClearance, groupMinClearance);
+        }
+        groupEntryOrdinalClearance++;
+#else
         minDescriptorClearance = min(minDescriptorClearance, groupMinClearance);
+#endif
         activeRoleMask |= groupActiveRoleMask;
         ownsDescriptorGroup = ownsDescriptorGroup || ownsGroup;
         if (groupDistance > 1.0e8) {
@@ -6758,8 +6818,60 @@ void main() {
         // separate deterministic segment integral and can never force the
         // body marcher into a fine-step curtain below the cloud.
         paTraceCapture = paCap;
+#ifdef PA_ARM_DENSITY_EVERY_2
+        // T175 ceiling. Every second primary step reuses the previous body
+        // density instead of evaluating it. Halves primary density calls while
+        // leaving the march structure, the step sizes and the lighting alone,
+        // so it prices "sample occupied material less often" on its own.
+        //
+        // Visually invalid by construction and never a candidate: it is a
+        // nearest-neighbour hold, not the interpolation a real design would use.
+        float bodyDensity;
+        if ((primaryStepParity & 1) == 0) {
+            bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+            primaryHeldDensity = bodyDensity;
+        } else {
+            bodyDensity = primaryHeldDensity;
+        }
+        primaryStepParity++;
+#else
         float bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
+#endif
         paTraceCapture = false;
+        // Each bin is incremented under its own guard rather than inside an
+        // else-if chain, so every increment is provably unreachable in a
+        // production frame - the T123 instrumentation invariant checks exactly
+        // that, and a chain would put the later branches out of its sight.
+        bool paMaterialNow = bodyDensity > 0.0008;
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityCalls++;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityZero += bodyDensity <= 0.0 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityNegligible += (bodyDensity > 0.0 && !paMaterialNow) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityLow += (paMaterialNow && bodyDensity <= 0.05) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityMedium += (bodyDensity > 0.05 && bodyDensity <= 0.25) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryDensityHigh += bodyDensity > 0.25 ? 1 : 0;
+        }
+        // Runs are counted by transition so the average length is derived from
+        // real data rather than assumed to be geometric.
+        if (paWorkloadCaptureActive()) {
+            paPrimaryMaterialRuns += (paMaterialNow && !paPrimaryPrevMaterial) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryZeroRuns += (!paMaterialNow && paPrimaryPrevMaterial) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paPrimaryPrevMaterial = paMaterialNow;
+        }
         float rainDensity = localRainSegment
             ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
             : 0.0;
@@ -7666,6 +7778,26 @@ void main() {
             float(paDescriptorCandidateRanks),
             float(paDescriptorGroupsEntered),
             float(paDescriptorUnionContributors)
+        );
+        return;
+    }
+    if (DebugView == 37) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paPrimaryDensityCalls),
+            float(paPrimaryDensityZero),
+            float(paPrimaryDensityNegligible),
+            float(paPrimaryDensityLow)
+        );
+        return;
+    }
+    if (DebugView == 38) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paPrimaryDensityMedium),
+            float(paPrimaryDensityHigh),
+            float(paPrimaryMaterialRuns),
+            float(paPrimaryZeroRuns)
         );
         return;
     }

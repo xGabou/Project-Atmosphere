@@ -56,7 +56,15 @@ public enum VolumetricCloudRaymarchDebugView {
     /** T169 lighting attribution: cone marches, cone taps, cone early-outs, cheap probes. */
     STORM_WORKLOAD_LIGHT_ATTRIBUTION(35, "storm_workload_light_attribution"),
     /** T169 detail attribution: primary fetches, light fetches, second octave, opaque marches. */
-    STORM_WORKLOAD_DETAIL_ATTRIBUTION(36, "storm_workload_detail_attribution");
+    STORM_WORKLOAD_DETAIL_ATTRIBUTION(36, "storm_workload_detail_attribution"),
+    /**
+     * T175 primary density histogram, part 1: calls, exactly zero, negligible,
+     * low. Primary body samples only - the light march is excluded by
+     * construction, since these are counted at the single body call site.
+     */
+    STORM_WORKLOAD_PRIMARY_DENSITY_A(37, "storm_workload_primary_density_a"),
+    /** T175 primary density histogram, part 2: medium, high, material runs, zero runs. */
+    STORM_WORKLOAD_PRIMARY_DENSITY_B(38, "storm_workload_primary_density_b");
 
     private final int shaderId;
     private final String serializedName;

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 14;
+    private static final int STAGES = 16;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -104,6 +104,8 @@ final class StormWorkloadRuntimeCapture {
             case 11 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_ORACLE_ALPHA_DETAIL;
             case 12 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LIGHT_ATTRIBUTION;
             case 13 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DETAIL_ATTRIBUTION;
+            case 14 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_A;
+            case 15 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_B;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -202,7 +204,9 @@ final class StormWorkloadRuntimeCapture {
                     ThresholdWork.of(values[10]),
                     ThresholdWork.of(values[11]),
                     values[12][0], values[12][1], values[12][2], values[12][3],
-                    values[13][0], values[13][1], values[13][2], values[13][3]);
+                    values[13][0], values[13][1], values[13][2], values[13][3],
+                    values[14][0], values[14][1], values[14][2], values[14][3],
+                    values[15][0], values[15][1], values[15][2], values[15][3]);
         }
     }
 
@@ -234,7 +238,11 @@ final class StormWorkloadRuntimeCapture {
             double lightConeMarches, double lightConeTaps,
             double lightConeEarlyOuts, double lightCheapProbes,
             double detailFetchPrimary, double detailFetchLight,
-            double detailFetchSecondOctave, double lightMarchBelowFloor
+            double detailFetchSecondOctave, double lightMarchBelowFloor,
+            double primaryDensityCalls, double primaryDensityZero,
+            double primaryDensityNegligible, double primaryDensityLow,
+            double primaryDensityMedium, double primaryDensityHigh,
+            double primaryMaterialRuns, double primaryZeroRuns
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -259,6 +267,8 @@ final class StormWorkloadRuntimeCapture {
                     0.0D, 0.0D, 0.0D, 0.0D,
                     ThresholdWork.ZERO, ThresholdWork.ZERO, ThresholdWork.ZERO,
                     ThresholdWork.ZERO, ThresholdWork.ZERO,
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T175 primary density histogram, absent from the legacy shape.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
@@ -322,6 +332,30 @@ final class StormWorkloadRuntimeCapture {
                     + " coneMarchesPerDensityCall=" + ratio(lightConeMarches, cloudDensityCalls)
                     + " detailFetchPrimary=" + fmt(detailFetchPrimary)
                     + " detailFetchLight=" + fmt(detailFetchLight)
+                    + " primaryDensityCalls=" + fmt(primaryDensityCalls)
+                    + " primaryDensityZero=" + fmt(primaryDensityZero)
+                    + " primaryDensityNegligible=" + fmt(primaryDensityNegligible)
+                    + " primaryDensityLow=" + fmt(primaryDensityLow)
+                    + " primaryDensityMedium=" + fmt(primaryDensityMedium)
+                    + " primaryDensityHigh=" + fmt(primaryDensityHigh)
+                    + " primaryMaterialRuns=" + fmt(primaryMaterialRuns)
+                    + " primaryZeroRuns=" + fmt(primaryZeroRuns)
+                    // Derived here so the report cannot restate them wrongly:
+                    // T174 conflated primary and lighting density calls and
+                    // reported 25.37 per pixel when the primary march makes
+                    // 11.28. These ratios are primary-only by construction.
+                    + " primaryDensityPerPixel="
+                    + ratio(primaryDensityCalls, (double) width * (double) height)
+                    + " materialFraction="
+                    + ratio(primaryDensityLow + primaryDensityMedium + primaryDensityHigh,
+                            primaryDensityCalls)
+                    + " emptyFraction="
+                    + ratio(primaryDensityZero + primaryDensityNegligible, primaryDensityCalls)
+                    + " meanMaterialRun="
+                    + ratio(primaryDensityLow + primaryDensityMedium + primaryDensityHigh,
+                            primaryMaterialRuns)
+                    + " meanEmptyRun="
+                    + ratio(primaryDensityZero + primaryDensityNegligible, primaryZeroRuns)
                     + " detailFetchSecondOctave=" + fmt(detailFetchSecondOctave)
                     + " detailFetchLightShare=" + ratio(detailFetchLight,
                             detailFetchPrimary + detailFetchLight);

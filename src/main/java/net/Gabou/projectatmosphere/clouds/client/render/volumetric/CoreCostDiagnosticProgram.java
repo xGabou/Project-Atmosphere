@@ -356,7 +356,36 @@ public enum CoreCostDiagnosticProgram {
      * replaced by the bound. The gap to ceiling A separates what entering a
      * group costs from what the exact SDFs inside it cost.
      */
-    T174_GROUP2_NO_SDF("t174_group2_no_sdf");
+    T174_GROUP2_NO_SDF("t174_group2_no_sdf"),
+
+    // -----------------------------------------------------------------------
+    // T175. Whether the primary march's density calls are necessary.
+    //
+    // T174's 25.37 calls per pixel at SIDE counted light-march taps as well;
+    // the primary march makes 11.28, on 36.6% of its steps. These two arms
+    // price the only two ways that number can fall: sample occupied material
+    // less often, or stop letting irrelevant groups shorten the safe advance.
+    // -----------------------------------------------------------------------
+
+    /**
+     * T175 ceiling: every second primary step reuses the previous body density.
+     *
+     * <p>Halves primary density calls while leaving step sizes, the march
+     * structure and the light march untouched, so it prices occupied-material
+     * sampling reduction on its own. A nearest-neighbour hold, not the
+     * interpolation a real design would use - visually invalid, oracle only.
+     */
+    T175_DENSITY_EVERY_2("t175_density_every2"),
+    /**
+     * T175 oracle: only the first entered group may constrain the safe advance,
+     * while every group's density contribution is still evaluated.
+     *
+     * <p>T174 proved groups 2+ never change the density result on this fixture.
+     * They may still shorten the march. Unsafe by construction - a real ray
+     * could step over material a suppressed group owns - so this measures the
+     * prize without being a candidate.
+     */
+    T175_CLEARANCE_FIRST_GROUP("t175_clearance_first_group");
 
     private final String serializedName;
 

@@ -756,6 +756,22 @@ def leanProgramVariants = [
         // They exist to price the group-entry line before any group metadata is
         // designed, because there is currently none to reject on.
         // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T175. Both carry FINAL's specialization, precompute included, so they
+        // differ from the shipped program only in the one thing each names.
+        // Both are visually invalid or unsafe by construction and neither is a
+        // candidate; they exist to decide between empty-space skipping and
+        // occupied-space sampling reduction before either is designed.
+        // ------------------------------------------------------------------
+        [name: 'cloud_atmosphere_volume_t175_density_every2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_DENSITY_EVERY_2 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t175_clearance_first_group',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_CLEARANCE_FIRST_GROUP 1'],
+         keepUniforms: []],
+
         [name: 'cloud_atmosphere_volume_t174_first_group_only',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
                    'PA_ARM_FIRST_GROUP_ONLY 1'],

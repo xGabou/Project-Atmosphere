@@ -615,6 +615,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT172PrecomputeArms);
         runCorrected("T172 the CPU precompute still matches the shader formula",
                 StormVolumetricGeometrySandbox::validateT172PrecomputeEquivalence);
+        runCorrected("T175 every workload debug view is actually enabled",
+                StormVolumetricGeometrySandbox::validateWorkloadViewsAreEnabled);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -6159,6 +6161,68 @@ public final class StormVolumetricGeometrySandbox {
         int end = shader.indexOf(';', start + token.length());
         require(end >= 0, "shader constant unterminated: " + name);
         return shader.substring(start + token.length(), end).trim();
+    }
+
+    /**
+     * T175. Every workload debug view must actually be enabled by
+     * {@code paWorkloadCaptureActive()}.
+     *
+     * <p>This existed as a silent failure for two campaigns. Views 35 and 36 -
+     * T169's light and detail attribution - were emitted by the shader, plumbed
+     * through the capture, printed in the campaign log, and read zero the whole
+     * time, because the predicate that gates every counter increment listed
+     * views 22-26 and 28-34 and nobody extended it. T169's report recorded
+     * "lightConeMarches=0 tapsPerConeMarch=n/a" and drew no conclusion from it.
+     *
+     * <p>It is the omission class the registry invariant exists for, in a file
+     * that invariant does not cover: a thing declared, wired most of the way,
+     * and dead at one gate. Adding a view without enabling it now fails the
+     * build.
+     */
+    private static void validateWorkloadViewsAreEnabled() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String views = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "VolumetricCloudRaymarchDebugView.java");
+
+        String predicate = functionBlock(shader, "bool paWorkloadCaptureActive()");
+        Set<Integer> enabled = new HashSet<>();
+        java.util.regex.Matcher single = java.util.regex.Pattern
+                .compile("DebugView == (\\d+)").matcher(predicate);
+        while (single.find()) {
+            enabled.add(Integer.parseInt(single.group(1)));
+        }
+        java.util.regex.Matcher range = java.util.regex.Pattern
+                .compile("DebugView >= (\\d+) && DebugView <= (\\d+)").matcher(predicate);
+        while (range.find()) {
+            int lo = Integer.parseInt(range.group(1));
+            int hi = Integer.parseInt(range.group(2));
+            for (int v = lo; v <= hi; v++) {
+                enabled.add(v);
+            }
+        }
+        require(!enabled.isEmpty(), "could not parse paWorkloadCaptureActive()");
+
+        // Every STORM_WORKLOAD_* view the enum declares must be in that set.
+        java.util.regex.Matcher declared = java.util.regex.Pattern
+                .compile("STORM_WORKLOAD_[A-Z_]+\\((\\d+),").matcher(views);
+        List<String> dead = new ArrayList<>();
+        int checked = 0;
+        while (declared.find()) {
+            int id = Integer.parseInt(declared.group(1));
+            checked++;
+            if (!enabled.contains(id)) {
+                dead.add("view " + id);
+            }
+        }
+        require(checked > 0, "no STORM_WORKLOAD_* views found to check");
+        require(dead.isEmpty(),
+                "workload views emitted but never enabled by paWorkloadCaptureActive(),"
+                        + " so every counter they carry reads zero: "
+                        + String.join(", ", dead));
+        System.out.println("T175_WORKLOAD_VIEWS declared=" + checked
+                + "|allEnabled=true");
     }
 
     private static void validateT172PrecomputeEquivalence() {

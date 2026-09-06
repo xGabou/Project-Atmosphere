@@ -1794,6 +1794,36 @@ implementation, while visual polish remains independently active.
   recommended line is empty-space skipping / clearance quality, possibly at group granularity where
   the missing group metadata would actually pay. Evidence in
   `validation/performance-group-entry.md`.
+- [X] T175 [PERFORMANCE] [US3] Establish whether the primary march's density calls are necessary.
+  **Both oracles are at the measurement floor, and the framing three campaigns have used was
+  wrong.** `density_every2` halves primary body density calls and returns **1.0146 / 0.9977 SIDE**;
+  `clearance_first_group` frees the safe advance from irrelevant groups and returns **1.0080 /
+  0.9903** - all four results BELOW MEASUREMENT FLOOR across both runs and both poses. The reason
+  is that **the primary march makes 4.99 body density calls per pixel at SIDE, not the 25.37 T174
+  reported**, while the descriptor walk runs **38.25 times per pixel**: the primary body call is
+  **13%** of it, the light march is **39%** (14.98 taps/pixel), and segment tests, clearance probes
+  and quadrature are the remaining 48%. **Histogram** (primary-only by construction, bins anchored
+  on the shader's own 0.0008 threshold): **85.8% of primary calls return material**, 65.7% return
+  high density, only 14.2% exactly zero; mean material run 14.90 samples, mean empty run 9.34. That
+  formally selects CASE B, but CASE B's direction is empty too - the occupied-sampling ceiling is
+  1.006x - so **neither case applies: the primary march's density calls simply are not a
+  significant share of the work.** Perfect empty-skip is DERIVED at <1.02x and did not warrant an
+  arm. **A dead instrumentation gate was found by building on it**: `paWorkloadCaptureActive()`
+  accepted views 22-26 and 28-34, so **T169's light and detail attribution views 35/36 have been
+  emitting zeros since T169** (`lightConeMarches=0 tapsPerConeMarch=n/a` is in T169's own log) -
+  the registry invariant's omission class in a file it does not cover. Fixed, and closed by
+  `validateWorkloadViewsAreEnabled`, which parses the predicate and every `STORM_WORKLOAD_*` id and
+  fails the build on any unenabled view (`declared=16|allEnabled=true`). No banked T169 conclusion
+  depended on those counters. **Every primary-march lever is now measured and at the floor** - group
+  entry 1.136x (T174), tighter per-lobe bound 0.95x (T173), occupied sampling 1.006x, clearance
+  0.999x, empty skip <1.02x - so the 1.25x needed for SIDE <=10 ms cannot come from there. FAR stack
+  ~5.32 ms accepted (2.406x); SIDE stack pair REJECTED on 5.08% repeat disagreement, working figure
+  stays ~12.5 ms. **Recommended T176: attribute and attack the light march**, which is 39% of the
+  descriptor walk, three times the primary march's, and has never been profiled at that level
+  because its counters were dead - specifically whether a light tap can reuse the primary sample's
+  group resolution, and whether the 3.75 cone marches per pixel can be reduced given T169 showed the
+  taps within a march already terminate early. Evidence in
+  `validation/performance-density-necessity.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
