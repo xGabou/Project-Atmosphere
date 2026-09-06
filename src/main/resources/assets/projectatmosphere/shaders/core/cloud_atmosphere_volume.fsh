@@ -2156,7 +2156,18 @@ void directStormGroupField(
         int packedTopology = int(floor(lifecycleRole.w + 0.5));
         int lobeRole = packedTopology - (packedTopology / 8) * 8;
         vec2 ownershipCenter = positionHeight.xy + shearMedia.xy * 0.5;
-#if defined(PA_ARM_DESC_CHEAP_OWNERSHIP) || defined(PA_ARM_DESC_HOIST)
+#if defined(PA_ARM_DESC_PRECOMPUTE_OWNER) || defined(PA_ARM_DESC_PRECOMPUTE)
+        // T172. The real hoist, not the T170 ceiling that approximated it.
+        // StormLobeDescriptor.writePrecomputedInvariants applied the rotated
+        // extents, the 1.85 widening and the unit floor on the CPU when the
+        // descriptor was built, so this is the same number the walk used to
+        // derive - not a cheaper substitute for it.
+        //
+        // texel 3 is already in registers; it was fetched for the role. The
+        // hoist therefore costs no additional fetch and removes two length()
+        // calls per descriptor per density sample.
+        vec2 ownershipRadii = lifecycleRole.yz;
+#elif defined(PA_ARM_DESC_CHEAP_OWNERSHIP) || defined(PA_ARM_DESC_HOIST)
         // T170 Task 2/4. The rotated extents are a pure function of the
         // descriptor's radii and rotation - no sample position enters them -
         // yet both length() terms are evaluated at every density sample. This
@@ -2182,7 +2193,14 @@ void directStormGroupField(
         // values.  Same texture, same descriptor index, same texel indices, so
         // the refetched values are bit-identical to the ones in registers -
         // this is the real pre-reuse work, not a copy of the ON result.
-#if defined(PA_ARM_DESC_CONST_EDGE) || defined(PA_ARM_DESC_HOIST)
+#if defined(PA_ARM_DESC_PRECOMPUTE_EDGE) || defined(PA_ARM_DESC_PRECOMPUTE)
+        // T172. The real hoist. stormEdgeWidthBlocksFromData is a pure function
+        // of the descriptor payload and the role, so its result was computed
+        // once when the descriptor was built and stored in texel 3. This is the
+        // identical value, not the constant the T170 ceiling substituted, so
+        // unlike that arm this one is image-equivalent.
+        float lobeSoftness = lifecycleRole.x;
+#elif defined(PA_ARM_DESC_CONST_EDGE) || defined(PA_ARM_DESC_HOIST)
         // T170 Task 2/4. stormEdgeWidthBlocksFromData takes no sample position:
         // it is a pure function of the descriptor payload and the role, so its
         // value is fixed for the life of a frame's descriptor set. It is

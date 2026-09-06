@@ -136,6 +136,11 @@ final class StormT132AutoDriver {
      */
     private static final Path T171_MARKER = Path.of("t171-harness-stability.txt");
     /**
+     * T172: the real descriptor-invariant precompute, measured against T170's
+     * compile-time ceilings under T171's two-repeat rule.
+     */
+    private static final Path T172_MARKER = Path.of("t172-descriptor-precompute.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -320,6 +325,10 @@ final class StormT132AutoDriver {
 
     private static boolean harnessStabilityRunRequested() {
         return Files.exists(T171_MARKER);
+    }
+
+    private static boolean precomputeRunRequested() {
+        return Files.exists(T172_MARKER);
     }
 
     private static boolean movingCameraRunRequested() {
@@ -959,6 +968,74 @@ final class StormT132AutoDriver {
     /** T171 measures the harness, so SIDE - the pose the budget binds on - leads. */
     private static final String[] T171_POSES = {"SIDE", "FAR"};
 
+    /** T172 keeps T171's ordering: SIDE binds the budget. */
+    private static final String[] T172_POSES = {"SIDE", "FAR"};
+
+    private static boolean t172Run;
+    private static boolean t172OriginalHistoryEnabled;
+
+    /**
+     * The T172 matrix, built under T171's rule: every arm measured twice, and a
+     * pair disagreeing by more than 3% is rejected rather than averaged.
+     *
+     * <p>Each real precompute arm sits next to the T170 ceiling that estimated
+     * it, so "how much of the ceiling does the real architecture retain" is a
+     * within-run comparison rather than a cross-campaign one.
+     */
+    private static final T166Arm[] T172_ARMS = buildT172Arms();
+
+    private static T166Arm[] buildT172Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        for (int repeat = 1; repeat <= 2; repeat++) {
+            String tag = "r" + repeat;
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    // A: the production anchor.
+                    CoreCostDiagnosticProgram.LEAN_FINAL,
+                    // B, C, D: the real precompute, isolated then combined.
+                    CoreCostDiagnosticProgram.T172_PRE_EDGE,
+                    CoreCostDiagnosticProgram.T172_PRE_OWNER,
+                    CoreCostDiagnosticProgram.T172_PRE_BOTH,
+                    // The T170 ceilings the real arms are measured against.
+                    CoreCostDiagnosticProgram.T170_DESC_CONST_EDGE,
+                    CoreCostDiagnosticProgram.T170_DESC_HOIST,
+                    // E: the shippable stack, its baseline, and the ceiling.
+                    CoreCostDiagnosticProgram.T169_STACK_FAST,
+                    CoreCostDiagnosticProgram.T172_STACK_PRE,
+                    CoreCostDiagnosticProgram.T170_STACK_HOIST}) {
+                arms.add(new T166Arm(arm, tag, 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t172Arm() {
+        return T172_ARMS[Math.max(0, Math.min(T172_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T172_OPTIMIZATION_ARMS =
+            buildT172OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT172OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T172_ARMS.length];
+        for (int i = 0; i < T172_ARMS.length; i++) {
+            modes[i] = T172_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * The precompute arms claim to be image-equivalent, not merely fast, so
+     * every one of them is captured. The T170 ceilings are not: they are known
+     * to be visually wrong and T170 already recorded by how much.
+     */
+    private static final CoreCostDiagnosticProgram[] T172_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T172_PRE_EDGE,
+            CoreCostDiagnosticProgram.T172_PRE_OWNER,
+            CoreCostDiagnosticProgram.T172_PRE_BOTH,
+            CoreCostDiagnosticProgram.T172_STACK_PRE
+    };
+
     private static boolean t171Run;
     private static boolean t171OriginalHistoryEnabled;
 
@@ -1062,7 +1139,7 @@ final class StormT132AutoDriver {
      * them.
      */
     private static boolean programArmCampaign() {
-        return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run;
+        return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run || t172Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -1320,7 +1397,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t171Run ? t171Arm()
+            T166Arm arm = t172Run ? t172Arm()
+                    : t171Run ? t171Arm()
                     : t170Run ? t170Arm()
                     : t169Run ? t169Arm()
                     : t168Run ? t168Arm()
@@ -1405,6 +1483,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t172Run) {
+            return t172Arm().label();
+        }
         if (t171Run) {
             return t171Arm().label();
         }
@@ -1451,6 +1532,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t172Run) {
+            return T172_OPTIMIZATION_ARMS;
+        }
         if (t171Run) {
             return T171_OPTIMIZATION_ARMS;
         }
@@ -1628,6 +1712,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t172Run) {
+            return T172_POSES;
+        }
         if (t171Run) {
             return T171_POSES;
         }
@@ -1975,6 +2062,8 @@ final class StormT132AutoDriver {
                 t170OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t171Run = harnessStabilityRunRequested();
                 t171OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t172Run = precomputeRunRequested();
+                t172OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t168OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t167Run = refinementRunRequested();
                 t167OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
@@ -2013,7 +2102,8 @@ final class StormT132AutoDriver {
                                 || t168Run
                                 || t169Run
                                 || t170Run
-                                || t171Run;
+                                || t171Run
+                                || t172Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -2024,7 +2114,7 @@ final class StormT132AutoDriver {
                 if (t141EvaluationRun) {
                     if (!t153OracleRun && !t161Run && !t140Run && !t162Run && !t163Run
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
-                            && !t171Run) {
+                            && !t171Run && !t172Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -2034,7 +2124,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t171Run ? "T171_HARNESS_STABILITY"
+                            t172Run ? "T172_DESCRIPTOR_PRECOMPUTE"
+                                    : t171Run ? "T171_HARNESS_STABILITY"
                                     : t170Run ? "T170_PRIMARY_MARCH"
                                     : t169Run ? "T169_LIGHTING_DETAIL"
                                     : t168Run ? "T168_FOOTPRINT"
@@ -2357,7 +2448,8 @@ final class StormT132AutoDriver {
                         || (t168Run && t168Arm().program().fixedWork())
                         || (t169Run && t169Arm().program().fixedWork())
                         || (t170Run && t170Arm().program().fixedWork())
-                        || (t171Run && t171Arm().program().fixedWork())) {
+                        || (t171Run && t171Arm().program().fixedWork())
+                        || (t172Run && t172Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -2501,6 +2593,13 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t172Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT172PrecomputeReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t172OriginalHistoryEnabled);
                 }
                 if (t171Run) {
                     ProjectAtmosphere.LOGGER.info(buildT171HarnessStabilityReport());
@@ -3263,6 +3362,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t172Run) {
+            return T172_IMAGE_ARMS;
+        }
         if (t171Run) {
             return T171_IMAGE_ARMS;
         }
@@ -3600,6 +3702,67 @@ final class StormT132AutoDriver {
      * rather than a speedup: the question is not which arm is faster but how
      * much the harness disagrees with itself about arms that are the same.
      */
+    /**
+     * T172's report applies T171's rule directly: each program appears twice, and
+     * the report states whether the pair agrees inside the 3% floor. A pair that
+     * does not agree is marked REJECTED and carries no speedup, because
+     * averaging a contradictory pair is exactly what made T170's clamp sweep
+     * unusable.
+     */
+    private static String buildT172PrecomputeReport() {
+        StringBuilder out = new StringBuilder("T172_PRECOMPUTE_DECISION");
+        for (String pose : T172_POSES) {
+            StormT135PerformanceProfile.Cell anchor1 = t162Cell(
+                    pose, CoreCostDiagnosticProgram.LEAN_FINAL.serializedName() + "#r1");
+            StormT135PerformanceProfile.Cell anchor2 = t162Cell(
+                    pose, CoreCostDiagnosticProgram.LEAN_FINAL.serializedName() + "#r2");
+            double anchorMean = anchor1 == null || anchor2 == null
+                    ? Double.NaN
+                    : (anchor1.cloudP50() + anchor2.cloudP50()) * 0.5D;
+            java.util.LinkedHashSet<String> programs = new java.util.LinkedHashSet<>();
+            for (T166Arm arm : T172_ARMS) {
+                programs.add(arm.program().serializedName());
+            }
+            for (String program : programs) {
+                StormT135PerformanceProfile.Cell first = t162Cell(pose, program + "#r1");
+                StormT135PerformanceProfile.Cell second = t162Cell(pose, program + "#r2");
+                if (first == null || second == null
+                        || first.cloudP50() <= 0.0D || second.cloudP50() <= 0.0D) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT172_ARM pose=%s arm=%s evaluated=false", pose, program));
+                    continue;
+                }
+                double mean = (first.cloudP50() + second.cloudP50()) * 0.5D;
+                double disagreement = Math.abs(first.cloudP50() - second.cloudP50())
+                        / Math.max(1.0e-6D, mean);
+                boolean accepted = disagreement <= T171_REPEAT_TOLERANCE;
+                out.append(String.format(Locale.ROOT,
+                        "%nT172_ARM pose=%s arm=%s run1=%.4f run2=%.4f mean=%.4f"
+                                + " disagreement=%.4f verdict=%s p95run1=%.4f p95run2=%.4f"
+                                + " cv1=%.5f cv2=%.5f speedup=%s",
+                        pose, program, first.cloudP50(), second.cloudP50(), mean,
+                        disagreement, accepted ? "accepted" : "REJECTED",
+                        first.cloudP95(), second.cloudP95(),
+                        first.cloudCv(), second.cloudCv(),
+                        accepted && anchorMean > 0.0D && !Double.isNaN(anchorMean)
+                                ? String.format(Locale.ROOT, "%.4f", anchorMean / mean)
+                                : "n/a"));
+            }
+        }
+        out.append(String.format(Locale.ROOT, "%nT172_FLOOR repeatTolerance=%.3f",
+                T171_REPEAT_TOLERANCE));
+        out.append(String.format(Locale.ROOT, "%nT172_REJECTED count=%d %s",
+                T162_REJECTED.size(),
+                T162_REJECTED.isEmpty() ? "none" : String.join(",", T162_REJECTED)));
+        return out.toString();
+    }
+
+    /**
+     * T171's measured floor. Repeats disagreeing by more than this are rejected
+     * rather than averaged; effects smaller than this are below the floor.
+     */
+    private static final double T171_REPEAT_TOLERANCE = 0.03D;
+
     private static String buildT171HarnessStabilityReport() {
         StringBuilder out = new StringBuilder("T171_HARNESS_STABILITY_DECISION");
         for (String pose : T171_POSES) {

@@ -296,7 +296,24 @@ public enum CoreCostDiagnosticProgram {
     /** T171 program-identity control A: byte-identical to FINAL, separately linked. */
     T171_DUP_A("t171_dup_a"),
     /** T171 program-identity control B: byte-identical to FINAL, separately linked. */
-    T171_DUP_B("t171_dup_b");
+    T171_DUP_B("t171_dup_b"),
+
+    // -----------------------------------------------------------------------
+    // T172. The real descriptor-invariant precompute, as opposed to T170's
+    // compile-time ceilings which approximated the values away. These consume
+    // the same numbers the walk used to derive, computed once when the
+    // descriptor was built and carried in texel 3's previously unused channels,
+    // so unlike the ceilings they are image-equivalent.
+    // -----------------------------------------------------------------------
+
+    /** T172 B: edge width read from the descriptor instead of recomputed. */
+    T172_PRE_EDGE("t172_pre_edge"),
+    /** T172 C: ownership radii read from the descriptor instead of recomputed. */
+    T172_PRE_OWNER("t172_pre_owner"),
+    /** T172 D: both invariants read from the descriptor. */
+    T172_PRE_BOTH("t172_pre_both"),
+    /** T172 E: the validated T169 stack plus the real precompute. */
+    T172_STACK_PRE("t172_stack_pre");
 
     private final String serializedName;
 

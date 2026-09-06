@@ -1697,6 +1697,37 @@ implementation, while visual polish remains independently active.
   first configuration in the line to clear 8 ms at the binding pose is withdrawn.** 70 cells,
   **0 rejected**. Descriptor-invariant precompute authorized as the next architecture with its
   target revised to the 10 ms goal. Evidence in `validation/performance-harness-stability.md`.
+- [X] T172 [PERFORMANCE] [US3] Implement the real descriptor-invariant precompute authorized by
+  T170/T171 and measure what the architecture actually retains. **The implementation succeeds
+  completely and is bit-exact.** Edge width and the ownership radii are computed once when the
+  descriptor is built and carried in texel 3's channels, which the shader already fetched for the
+  role: **16 bytes added per descriptor, zero additional fetches per density call.** All three
+  isolated precompute arms render images **bit-identical** to the anchor at both poses
+  (`maxAbsRGBA=0.0`, 0 changed pixels) - no SSIM or IoU is reported because there is no
+  difference to characterise. Density-call counts are unchanged (primary steps 3,907,150 against
+  T170's 3,907,935), confirming the gain is cost per call. **But it retains only 19.3% of the
+  T170 ceiling (36.8% on the stack), far under the 80% Task 10 threshold, and the cause is a
+  correction to T170 rather than a shortfall here.** T170's `desc_constedge`/`desc_hoist`
+  substituted `STORM_MIN_EDGE_BLOCKS`, the *floor* of the edge-width distribution; a smaller
+  `lobeSoftness` makes the T121 conservative rejection easier to satisfy, so those arms culled far
+  more descriptors before the exact SDF. They measured cheaper arithmetic **plus a much more
+  aggressive cull**, and the cull was ~4x the larger term. The proof is that the real precompute
+  is bit-identical - it provably cannot change the cull - and captures 19%, while the ceiling
+  changes the image an order of magnitude more than the shipped stack's own error and captured
+  the rest. **T170's "1.421x image-identical hoist" is withdrawn**, the second T170 headline to
+  fall to a proper control after T171 withdrew the 7.31 ms figure. **Banked at FAR** (8 of 9
+  pairs accepted, all within 1.45%): anchor 13.0883, edge precompute **1.0496x**, ownership alone
+  1.0291x = **BELOW MEASUREMENT FLOOR**, combined **1.0952x**, and on the shipped stack
+  `t169_stack_fast` 5.0785 -> `t172_stack_pre` 4.7698 = **1.0647x**. **SIDE produced no usable
+  measurement**: 8 of 9 pairs REJECTED with disagreements to 56%, T171's unexplained bimodal mode
+  taking most of a block, with the GPU pinned at 2340 MHz throughout - and the one accepted SIDE
+  pair is still unbankable because its anchor was rejected. **Decision: productionize the combined
+  precompute** (free, bit-exact, 6% on the shipping stack), but not in this commit - the invariant
+  asserts FINAL does not define it, and flipping that belongs with a campaign that covers SIDE.
+  **New lever identified**: the ceilings accidentally showed that loosening the T121 rejection is
+  worth ~4x what removing the arithmetic is, so the recommended next work is a **tighter,
+  still-conservative lower bound** - image-preserving by construction, as T141's box bound already
+  is. Evidence in `validation/performance-descriptor-precompute.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

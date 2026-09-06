@@ -611,6 +611,10 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT171ProgramIdentityControls);
         runCorrected("T171 the GPU sampler records only fresh timer results",
                 StormVolumetricGeometrySandbox::validateGpuSampleFreshnessGating);
+        runCorrected("T172 precompute arms compile and stay out of FINAL",
+                StormVolumetricGeometrySandbox::validateT172PrecomputeArms);
+        runCorrected("T172 the CPU precompute still matches the shader formula",
+                StormVolumetricGeometrySandbox::validateT172PrecomputeEquivalence);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -5968,11 +5972,20 @@ public final class StormVolumetricGeometrySandbox {
 
         // A campaign latched but left out of the shared evaluation flag runs
         // its whole sweep with the pose guards disarmed - T167 exactly.
+        // Derived, not written out. This mutation was hardcoded against the
+        // latch's exact text and went stale in T171 and again in T172, failing
+        // the build each time a campaign was added. Deriving the newest
+        // campaign from the registry means the proof keeps testing the wire
+        // most likely to be forgotten - the one just added.
+        StormCampaignRegistry.Campaign newest = StormCampaignRegistry.CAMPAIGNS
+                .get(StormCampaignRegistry.CAMPAIGNS.size() - 1);
+        String latch = evaluationRunAssignment(driver);
+        require(latch != null && latch.contains(newest.flagFieldName()),
+                "the newest campaign " + newest.id() + " is not in the evaluation latch");
         String unguardedSweep = driver.replace(
-                "                                || t170Run\n                                || t171Run;",
-                "                                || t170Run;");
+                latch, latch.replace("|| " + newest.flagFieldName(), ""));
         require(!unguardedSweep.equals(driver), "evaluation-latch mutation did not apply");
-        requireDetected(unguardedSweep, "t171Run",
+        requireDetected(unguardedSweep, newest.flagFieldName(),
                 "a campaign missing from the t141EvaluationRun latch");
 
         System.out.println("T170_WIRING_NEGATIVE mutations=5|allDetected=true");
@@ -6123,6 +6136,177 @@ public final class StormVolumetricGeometrySandbox {
      * evidence about shader source. The check is exact string equality of the
      * generated GLSL, not a heuristic.
      */
+    /**
+     * T172. The precomputed descriptor invariants must stay equal to what the
+     * shader would have computed.
+     *
+     * <p>This is the whole risk of the change. The march no longer derives edge
+     * width or the ownership radii; it reads values the CPU wrote when the
+     * descriptor was built. If either formula drifts on one side only, the
+     * renderer silently draws something else - no crash, no missing arm, just a
+     * different image that nothing would flag.
+     *
+     * <p>Both sides are therefore pinned by text. The GLSL constants are parsed
+     * out of the shader and compared against the Java constants, and every
+     * coefficient the transcription depends on is asserted present in both
+     * sources.
+     */
+    /** The literal value of a {@code const float} declaration in the shader. */
+    private static String shaderConstant(String shader, String name) {
+        String token = "const float " + name + " = ";
+        int start = shader.indexOf(token);
+        require(start >= 0, "shader constant missing: " + name);
+        int end = shader.indexOf(';', start + token.length());
+        require(end >= 0, "shader constant unterminated: " + name);
+        return shader.substring(start + token.length(), end).trim();
+    }
+
+    private static void validateT172PrecomputeEquivalence() {
+        String shader = readWorkspaceSource(
+                "src/main/resources/assets/projectatmosphere/shaders/core/"
+                        + "cloud_atmosphere_volume.fsh");
+        String descriptor = readWorkspaceSource(
+                "src/main/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/"
+                        + "StormLobeDescriptor.java");
+
+        // The two shared constants, parsed from the shader rather than assumed.
+        // between() returns the delimiters too, so the value is carved out here.
+        String minEdge = shaderConstant(shader, "STORM_MIN_EDGE_BLOCKS");
+        String edgeBound = shaderConstant(shader, "STORM_VERTICAL_EDGE_BOUND_FRACTION");
+        require(Float.parseFloat(minEdge.trim())
+                        == StormLobeDescriptor.STORM_MIN_EDGE_BLOCKS,
+                "STORM_MIN_EDGE_BLOCKS drifted: shader " + minEdge.trim() + " vs Java "
+                        + StormLobeDescriptor.STORM_MIN_EDGE_BLOCKS);
+        require(Float.parseFloat(edgeBound.trim())
+                        == StormLobeDescriptor.STORM_VERTICAL_EDGE_BOUND_FRACTION,
+                "STORM_VERTICAL_EDGE_BOUND_FRACTION drifted: shader " + edgeBound.trim()
+                        + " vs Java " + StormLobeDescriptor.STORM_VERTICAL_EDGE_BOUND_FRACTION);
+
+        // Every coefficient the transcription reproduces must still be the one
+        // the shader uses. A change to either side alone fails here.
+        for (String coefficient : new String[] {
+                "0.12", "1.65", "0.06", "0.66", "0.62"}) {
+            require(shader.contains("edgeSoftness * " + coefficient)
+                            || shader.contains("max(" + coefficient + ","),
+                    "the shader's edge-width coefficient " + coefficient + " is gone;"
+                            + " the CPU precompute would now write a different value");
+            require(descriptor.contains(coefficient + "F"),
+                    "the CPU precompute lost edge-width coefficient " + coefficient);
+        }
+        for (String offset : new String[] {"32.0", "28.0", "12.0", "16.0"}) {
+            require(descriptor.contains(offset + "F"),
+                    "the CPU precompute lost role vertical-bound offset " + offset);
+        }
+        require(shader.contains("roleTopY += 32.0;") && shader.contains("roleBaseY -= 28.0;")
+                        && shader.contains("roleBaseY -= 12.0;")
+                        && shader.contains("roleTopY += 16.0;"),
+                "stormDescriptorVerticalBounds changed; the CPU transcription is stale");
+        require(descriptor.contains("1.85F"),
+                "the CPU precompute lost the ownership widening factor");
+        require(shader.contains("* 1.85, vec2(1.0))"),
+                "the shader's ownership widening changed; the precompute is stale");
+
+        // The shader must read the precomputed values from the channels the CPU
+        // writes them to. A transposed channel is silent and catastrophic.
+        require(shader.contains("float lobeSoftness = lifecycleRole.x;"),
+                "the precompute edge-width arm no longer reads texel 3 channel x");
+        require(shader.contains("vec2 ownershipRadii = lifecycleRole.yz;"),
+                "the precompute ownership arm no longer reads texel 3 channels yz");
+
+        require(StormLobeDescriptor.TEXELS_PER_DESCRIPTOR == 5,
+                "the descriptor payload is no longer five texels, so the precompute"
+                        + " channels and the displaced lifecycle fields overlap");
+
+        // Behavioural spot-check: a descriptor built through the real writer
+        // must land its invariants in 12/13/14 and honour the documented floors.
+        float[] texels = new float[StormLobeDescriptor.FLOATS_PER_DESCRIPTOR];
+        texels[2] = 100.0F;
+        texels[3] = 400.0F;
+        texels[4] = 90.0F;
+        texels[5] = 40.0F;
+        texels[6] = 0.6F;
+        texels[7] = 0.8F;
+        texels[11] = 0.25F;
+        texels[15] = 3.0F;
+        StormLobeDescriptor.writePrecomputedInvariants(texels, 0);
+        require(texels[12] >= StormLobeDescriptor.STORM_MIN_EDGE_BLOCKS,
+                "precomputed edge width fell below the documented floor");
+        require(texels[13] >= 1.0F && texels[14] >= 1.0F,
+                "precomputed ownership radii fell below the unit floor the walk applies");
+        require(Float.isFinite(texels[12]) && Float.isFinite(texels[13])
+                        && Float.isFinite(texels[14]),
+                "precomputed invariants are not finite");
+
+        System.out.println("T172_PRECOMPUTE texels=" + StormLobeDescriptor.TEXELS_PER_DESCRIPTOR
+                + "|minEdge=" + minEdge.trim() + "|edgeBound=" + edgeBound.trim()
+                + "|channelsPinned=true");
+    }
+
+    /**
+     * The T172 arms must compile and must stay out of FINAL. The precompute is
+     * a diagnostic arm until a campaign says otherwise; FINAL keeps deriving
+     * both values until the evidence authorises the switch.
+     */
+    private static void validateT172PrecomputeArms() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+        for (String define : new String[] {
+                "PA_ARM_DESC_PRECOMPUTE", "PA_ARM_DESC_PRECOMPUTE_EDGE",
+                "PA_ARM_DESC_PRECOMPUTE_OWNER"}) {
+            require(!finalSource.contains("#define " + define),
+                    "FINAL defines " + define + " before a campaign authorised it");
+        }
+
+        String[][] arms = {
+                {"cloud_atmosphere_volume_t172_pre_edge",
+                        "#define PA_ARM_DESC_PRECOMPUTE_EDGE 1"},
+                {"cloud_atmosphere_volume_t172_pre_owner",
+                        "#define PA_ARM_DESC_PRECOMPUTE_OWNER 1"},
+                {"cloud_atmosphere_volume_t172_pre_both",
+                        "#define PA_ARM_DESC_PRECOMPUTE 1"},
+                {"cloud_atmosphere_volume_t172_stack_pre",
+                        "#define PA_ARM_DESC_PRECOMPUTE 1"}
+        };
+        for (String[] arm : arms) {
+            String path = base + arm[0] + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated T172 arm missing; run generateLeanFinalShader: " + path);
+            }
+            String source = readWorkspaceSource(path);
+            require(source.contains(arm[1]), arm[0] + " is missing " + arm[1]);
+            require(source.contains("#define PA_PRECIPITATION_ABSENT"),
+                    arm[0] + " is not precipitation-specialized");
+            compileFragmentShader(resolveMojImports(source), arm[0]);
+        }
+
+        // The isolated arms must isolate. pre_edge must not also take the
+        // ownership path, or the attribution in the campaign is meaningless.
+        String edgeOnly = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t172_pre_edge.fsh");
+        require(!edgeOnly.contains("#define PA_ARM_DESC_PRECOMPUTE_OWNER")
+                        && !edgeOnly.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "the edge-width arm also enables the ownership precompute");
+        String ownerOnly = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t172_pre_owner.fsh");
+        require(!ownerOnly.contains("#define PA_ARM_DESC_PRECOMPUTE_EDGE")
+                        && !ownerOnly.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "the ownership arm also enables the edge-width precompute");
+
+        // The shippable arm must carry the validated T169 stack unchanged, or it
+        // measures a different configuration than the one it claims to extend.
+        String stack = readWorkspaceSource(
+                base + "cloud_atmosphere_volume_t172_stack_pre.fsh");
+        for (String define : new String[] {
+                "#define PA_ARM_FOOTPRINT 0.75", "#define PA_ARM_FOOTPRINT_MAX 4.0",
+                "#define PA_ARM_EARLY_TERM 0.045", "#define PA_ARM_DETAIL_FOOTPRINT 1.0",
+                "#define PA_ARM_LIGHT_STEPS 4"}) {
+            require(stack.contains(define),
+                    "t172_stack_pre no longer carries the banked T169 stack: missing "
+                            + define);
+        }
+    }
+
     private static void validateT171ProgramIdentityControls() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
@@ -6245,7 +6429,10 @@ public final class StormVolumetricGeometrySandbox {
                         && armSource.contains("vec4 positionHeight = paDescCached0;"),
                 "the fetch oracle's cached-payload path is gone; the arm would"
                         + " measure the anchor and report a fetch ceiling of zero");
-        require(armSource.contains("#if defined(PA_ARM_DESC_CONST_EDGE)"
+        // Guard form, not preprocessor keyword: T172 inserted a higher-priority
+        // branch ahead of this one, which is a legitimate edit. What must not
+        // change is that the T170 ceiling still has a path of its own.
+        require(armSource.contains("defined(PA_ARM_DESC_CONST_EDGE)"
                         + " || defined(PA_ARM_DESC_HOIST)"),
                 "the edge-width hoist path is gone");
         require(armSource.contains("#ifdef PA_ARM_DESC_NO_EXACT_SDF")
