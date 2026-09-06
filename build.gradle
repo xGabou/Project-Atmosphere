@@ -312,21 +312,46 @@ def leanFinalRemovedUniforms = leanFinalConstants.keySet().collect {
 // capture path it normally serves remains dead.
 def leanProgramVariants = [
         // T163: FINAL no longer carries the unreachable precipitation branch.
+        //
+        // T174 productionizes the T172 descriptor-invariant precompute.
+        // PA_ARM_DESC_PRECOMPUTE makes the march read edge width and the
+        // ownership radii out of descriptor texel 3 instead of deriving them
+        // once per descriptor per density sample. The values are written by
+        // StormLobeDescriptor.writePrecomputedInvariants when the descriptor is
+        // built, and T172 proved the substitution bit-identical at both poses -
+        // 0 changed pixels, maxAbsRGBA 0.0 - so this changes cost and nothing
+        // else. T173 measured it at 1.133x on the binding SIDE pose.
+        //
+        // The define also removes the old derivation: the two are #if/#else
+        // branches, so the recomputation is not compiled into FINAL at all
+        // rather than being left live alongside the read.
         [name: leanFinalShaderName,
-         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
         // The T140 oracle family must stay bit-for-bit equivalent to FINAL, so
-        // it takes the same specialization.
+        // it takes the same specialization - including the precompute, because
+        // these programs can render production frames.
         [name: 'cloud_atmosphere_volume_t140_pixel',
-         defines: ['PA_T140_ORACLE 1', 'PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
+         defines: ['PA_T140_ORACLE 1', 'PA_PRECIPITATION_ABSENT 1',
+                   'PA_ARM_DESC_PRECOMPUTE 1'], keepUniforms: []],
         [name: 'cloud_atmosphere_volume_t140_mask',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_MASK 1', 'PA_PRECIPITATION_ABSENT 1'],
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_MASK 1', 'PA_PRECIPITATION_ABSENT 1',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: []],
         [name: 'cloud_atmosphere_volume_t140_tile8',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8', 'PA_PRECIPITATION_ABSENT 1'],
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 8', 'PA_PRECIPITATION_ABSENT 1',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
         [name: 'cloud_atmosphere_volume_t140_tile16',
-         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16', 'PA_PRECIPITATION_ABSENT 1'],
+         defines: ['PA_T140_ORACLE 1', 'PA_T140_TILE 16', 'PA_PRECIPITATION_ABSENT 1',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T174 control: FINAL with the precompute explicitly off. This is the
+        // only way to A/B the productionized path against itself, and it is
+        // what proves FINAL actually consumes the precomputed fields rather
+        // than merely declaring the define.
+        [name: 'cloud_atmosphere_volume_t174_no_precompute',
+         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
         // The pre-T163 FINAL, kept so the optimization can be measured and
         // compared against back to back rather than against a remembered number.
         [name: 'cloud_atmosphere_volume_t163_withrain', defines: [], keepUniforms: []],
@@ -754,10 +779,17 @@ def leanProgramVariants = [
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
+        // These must track FINAL's specialization exactly - including the
+        // T174-productionized precompute - or they stop isolating program
+        // identity and start measuring a shader difference instead. The T171
+        // invariant asserts byte-identity and caught this the moment FINAL
+        // changed.
         [name: 'cloud_atmosphere_volume_t171_dup_a',
-         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
         [name: 'cloud_atmosphere_volume_t171_dup_b',
-         defines: ['PA_PRECIPITATION_ABSENT 1'], keepUniforms: []],
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
 
         [name: 'cloud_atmosphere_volume_t170_stack8',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',

@@ -329,7 +329,18 @@ public enum CoreCostDiagnosticProgram {
     /** T173 D: the tighter bound plus the T172 descriptor precompute. */
     T173_BOX_PRE("t173_boxbound_pre"),
     /** T173 E: the shipping stack plus both. */
-    T173_STACK_BOX_PRE("t173_stack_boxbound_pre");
+    T173_STACK_BOX_PRE("t173_stack_boxbound_pre"),
+
+    /**
+     * T174 control: FINAL with the descriptor precompute explicitly compiled
+     * out.
+     *
+     * <p>Once the precompute is in FINAL there is no other way to measure what
+     * it is worth, and no other way to prove the shipped program actually
+     * consumes the precomputed fields: this arm and FINAL must render the same
+     * image and differ only in speed.
+     */
+    T174_NO_PRECOMPUTE("t174_no_precompute");
 
     private final String serializedName;
 

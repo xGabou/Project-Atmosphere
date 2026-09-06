@@ -6250,12 +6250,42 @@ public final class StormVolumetricGeometrySandbox {
     private static void validateT172PrecomputeArms() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String finalSource = readWorkspaceSource(base + "cloud_atmosphere_volume_final.fsh");
+
+        // T174 productionized the precompute, so this assertion is inverted
+        // from T172's: FINAL must now DEFINE it. T172 proved the substitution
+        // bit-identical and T173 measured it at 1.133x on the binding pose, so
+        // the shipped program is expected to consume the precomputed fields -
+        // and a FINAL that quietly stopped would be a silent 13% regression at
+        // SIDE that nothing else would catch.
+        require(finalSource.contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                "FINAL no longer defines PA_ARM_DESC_PRECOMPUTE; the shipped march would"
+                        + " go back to deriving edge width and the ownership radii once"
+                        + " per descriptor per density sample");
+        // The isolated halves stay diagnostic: FINAL takes the combined define,
+        // never one side of it, or the two paths could disagree.
         for (String define : new String[] {
-                "PA_ARM_DESC_PRECOMPUTE", "PA_ARM_DESC_PRECOMPUTE_EDGE",
-                "PA_ARM_DESC_PRECOMPUTE_OWNER"}) {
+                "PA_ARM_DESC_PRECOMPUTE_EDGE", "PA_ARM_DESC_PRECOMPUTE_OWNER"}) {
             require(!finalSource.contains("#define " + define),
-                    "FINAL defines " + define + " before a campaign authorised it");
+                    "FINAL defines the isolated " + define + " rather than the combined"
+                            + " precompute");
         }
+        // The T140 oracle family renders production frames and is documented as
+        // bit-for-bit equivalent to FINAL, so it must carry the same
+        // specialization.
+        for (String oracle : new String[] {
+                "cloud_atmosphere_volume_t140_pixel", "cloud_atmosphere_volume_t140_mask",
+                "cloud_atmosphere_volume_t140_tile8",
+                "cloud_atmosphere_volume_t140_tile16"}) {
+            require(readWorkspaceSource(base + oracle + ".fsh")
+                            .contains("#define PA_ARM_DESC_PRECOMPUTE 1"),
+                    oracle + " lost the precompute that FINAL carries; the oracle family"
+                            + " is no longer equivalent to the program it guards");
+        }
+        // The A/B control must NOT have it, or the productionized path cannot
+        // be measured against itself.
+        require(!readWorkspaceSource(base + "cloud_atmosphere_volume_t174_no_precompute.fsh")
+                        .contains("#define PA_ARM_DESC_PRECOMPUTE"),
+                "the T174 control carries the precompute, so it can no longer isolate it");
 
         String[][] arms = {
                 {"cloud_atmosphere_volume_t172_pre_edge",
