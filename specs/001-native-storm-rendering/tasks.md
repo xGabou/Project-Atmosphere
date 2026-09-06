@@ -1824,6 +1824,48 @@ implementation, while visual polish remains independently active.
   group resolution, and whether the 3.75 cone marches per pixel can be reduced given T169 showed the
   taps within a march already terminate early. Evidence in
   `validation/performance-density-necessity.md`.
+- [X] T176 [PERFORMANCE] [US3] Attribute the light march and establish what is recoverable from it.
+  **The light march is 26% of SIDE frame time, and two of the three things T175 recommended
+  attacking turned out not to exist.** With T175's instrumentation gate fixed, the counters finally
+  read: `lightConeEarlyOuts=0`, `tapsPerConeMarch=4.0000` exactly at both poses, and
+  `detailFetchLight=0`. **Four taps is a hard cap reached every single march, not an early-out** -
+  `min(steps, 4)` under `cameraStartsInsideSlab`, with the only in-loop `break` requiring T149's
+  graded mode that FINAL bakes off. **This corrects a banked T175 sentence** ("the taps within a
+  march already terminate early"), which was inferred from T169's bit-identical 6/5/4 arms - arms
+  that were identical because the cap clamped all three to the same program. T169's conclusion
+  survives; its stated mechanism does not. Light taps also already skip every detail octave, so
+  **Task 6's cheaper-shadow-density idea was largely pre-spent**. Attribution at SIDE: **3.6155 cone
+  marches/pixel, 4.0000 taps each, 14.4622 light taps/pixel, 1.0000 density evaluation per tap, 1
+  group and exactly 10.00 lobes per tap** (`lobesVisited/groupFieldCalls = 10.0000`), **39.53% of
+  all descriptor group walks** - reproducing T175's 39% independently; per-tap SDF and fetch counts
+  are DERIVED from that share and labelled, since the shader does not split them by consumer.
+  **Ceilings** (campaign A, anchor-relative, 34 cells, `T176_REJECTED count=0`): `nolight` **1.349x**
+  SIDE / 1.203x FAR, `light3` 1.075x, `light2` 1.139x. **Tap reduction captures only 40% of what
+  lighting costs**; the other 60% is the ten-lobe walk, which tap reduction cannot reach. `light2`
+  is rejected on quality (meanAbs 1.83e-02, 3.5x `light3`, flattened self-shadowing, matching T169's
+  worst arm). **Campaign B measured the light arms ON the stack** - the stack bakes
+  `PA_ARM_LIGHT_STEPS 4`, which the inside-slab cap already forces, so it carried no light reduction
+  and anchor ratios could not be multiplied onto it. **`t176_stack_light3` = 9.62 ms p50 at SIDE
+  (9.6348/9.6000, 0.36%, p95 9.98/10.12), the first sub-10 ms SIDE reading in this series**, worth
+  **1.0701x** over the stack's 10.29 ms and corroborated to within 1% by the independent
+  anchor-relative measurement of the same change. Reported as **met in this run, not yet
+  established**: the same stack measured ~12.5 ms in T173/T175 against a ~6% different anchor, so
+  absolute SIDE ms is not stable across sessions. **A methodological finding: two repeats that agree
+  can both be wrong.** The FAR stack family lands in two modes (~4.3-5.0 and ~8.4-8.6 ms) and
+  `stack_nolight` (8.38/4.26) and `stack_light2` (4.63/8.56) each straddle both, proving the same
+  program reaches both - which makes `stack_light3`'s tight 0.13% pair at 8.54 ms **agreement within
+  a sticky mode, not a measurement**, since it would otherwise mean the stack got 70% slower given
+  strictly less work. No FAR stack figure from run B is banked; FAR rests on accepted
+  `t172_stack_pre` (4.96/5.01, and T175's ~5.32 ms). T171's repeat rule is necessary but not
+  sufficient; a cross-arm mode check is the harness follow-up. **Task 3 (primary-to-light group
+  reuse) is NOT MEASURED** - the oracle was not built, and reuse is only bounded above by `nolight`'s
+  1.349x. Verdict **CASE B, qualified**: `light3` is the only accepted light lever, decisive at the
+  margin but not a large ceiling, and it is a flat 4->3, not the adaptive scheme CASE B describes.
+  **Remaining dominant cost: the ten-lobe group walk** - 36.58 walks/pixel at SIDE, all ten lobes
+  visited every time while only 5.03 contribute. Recommended next: close the reuse oracle, prune the
+  lobe walk, and use the **already-written** T149 graded adaptive-tap path (baked off in FINAL),
+  given 73.6% of light taps land after the primary ray passes 50% alpha. Evidence in
+  `validation/performance-light-march.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

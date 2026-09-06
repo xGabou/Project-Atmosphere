@@ -385,7 +385,46 @@ public enum CoreCostDiagnosticProgram {
      * could step over material a suppressed group owns - so this measures the
      * prize without being a candidate.
      */
-    T175_CLEARANCE_FIRST_GROUP("t175_clearance_first_group");
+    T175_CLEARANCE_FIRST_GROUP("t175_clearance_first_group"),
+
+    // -----------------------------------------------------------------------
+    // T176. The light march, measured fresh.
+    //
+    // T175 found views 35/36 dead since T169, so no T169 tap-count conclusion
+    // is reused here. The cap is now understood from the code: steps =
+    // clamp(LightSteps, 2, 8) then min(steps, 4) when the camera starts inside
+    // the slab, and the tap loop has no transmittance early-out in production.
+    // Four taps is a hard cap reached every time, not convergence - which is
+    // also why T169's 6 -> 5 -> 4 arms were bit-identical at SIDE.
+    // -----------------------------------------------------------------------
+
+    /**
+     * T176 absolute ceiling: lighting removed entirely.
+     *
+     * <p>Every other light-march optimisation - tap reduction, primary-group
+     * reuse, a cheaper shadow density - is a strict subset of this. If this does
+     * not clear the gap, none of them can, and the line closes by arithmetic
+     * rather than by building each one.
+     */
+    T176_NO_LIGHT("t176_nolight"),
+    /** T176 tap ceiling: 4 -> 3. */
+    T176_LIGHT3("t176_light3"),
+    /** T176 tap ceiling: 4 -> 2, the floor that still keeps a light direction. */
+    T176_LIGHT2("t176_light2"),
+
+    // T176 Task 8. The validated stack bakes PA_ARM_LIGHT_STEPS 4, and the
+    // inside-slab cap already forces 4, so the stack carries no light
+    // reduction whatsoever. Anchor-relative light ratios cannot be multiplied
+    // onto it; these measure the light march on the stack directly.
+
+    /** T176 stack ceiling: the whole light march removed, on the stack. */
+    T176_STACK_NO_LIGHT("t176_stack_nolight"),
+
+    /** T176 stack, four taps down to three. */
+    T176_STACK_LIGHT3("t176_stack_light3"),
+
+    /** T176 stack, four taps down to two. */
+    T176_STACK_LIGHT2("t176_stack_light2");
 
     private final String serializedName;
 

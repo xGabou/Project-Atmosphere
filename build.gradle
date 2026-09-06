@@ -763,6 +763,25 @@ def leanProgramVariants = [
         // candidate; they exist to decide between empty-space skipping and
         // occupied-space sampling reduction before either is designed.
         // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T176 light-march ceilings, all carrying FINAL's specialization
+        // including the productionized precompute, so they differ from the
+        // shipped program only in the lighting lever each names.
+        // ------------------------------------------------------------------
+        [name: 'cloud_atmosphere_volume_t176_nolight',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: [],
+         overrides: ['uniform int PaDiagnosticLightingMode;':
+                     'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_t176_light3',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_LIGHT_STEPS 3'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t176_light2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_LIGHT_STEPS 2'],
+         keepUniforms: []],
+
         [name: 'cloud_atmosphere_volume_t175_density_every2',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
                    'PA_ARM_DENSITY_EVERY_2 1'],
@@ -810,6 +829,32 @@ def leanProgramVariants = [
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
                    'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
+        // T176 Task 8. The stack bakes PA_ARM_LIGHT_STEPS 4, which the
+        // inside-slab cap already forces, so the validated stack carries no
+        // light reduction at all. These price the light march ON the stack,
+        // because the brief forbids inferring stack speedups by multiplying
+        // anchor-relative ratios.
+        [name: 'cloud_atmosphere_volume_t176_stack_nolight',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize'],
+         overrides: ['uniform int PaDiagnosticLightingMode;':
+                     'const int PaDiagnosticLightingMode = 1;']],
+        [name: 'cloud_atmosphere_volume_t176_stack_light3',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+        [name: 'cloud_atmosphere_volume_t176_stack_light2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 2',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
 
