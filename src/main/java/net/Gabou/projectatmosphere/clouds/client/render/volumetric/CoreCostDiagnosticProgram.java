@@ -313,7 +313,23 @@ public enum CoreCostDiagnosticProgram {
     /** T172 D: both invariants read from the descriptor. */
     T172_PRE_BOTH("t172_pre_both"),
     /** T172 E: the validated T169 stack plus the real precompute. */
-    T172_STACK_PRE("t172_stack_pre");
+    T172_STACK_PRE("t172_stack_pre"),
+
+    // -----------------------------------------------------------------------
+    // T173. The T121 conservative bound. FINAL bakes the diagnostic mode to 0,
+    // so production has always used the vertical-only lower bound and the
+    // tighter box bound T141 built has been dead code in the shipped program.
+    // These arms make it reachable at compile time. It is exact: a valid lower
+    // bound cannot cull a descriptor that could contribute, so the image must
+    // be bit-identical and only the exact-SDF count may fall.
+    // -----------------------------------------------------------------------
+
+    /** T173 B: the tighter T141 box bound, alone. */
+    T173_BOX_BOUND("t173_boxbound"),
+    /** T173 D: the tighter bound plus the T172 descriptor precompute. */
+    T173_BOX_PRE("t173_boxbound_pre"),
+    /** T173 E: the shipping stack plus both. */
+    T173_STACK_BOX_PRE("t173_stack_boxbound_pre");
 
     private final String serializedName;
 

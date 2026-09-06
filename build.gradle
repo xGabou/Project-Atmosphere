@@ -712,6 +712,30 @@ def leanProgramVariants = [
         // descriptor was built, so they must be image-equivalent as well as
         // faster - and the campaign checks both.
         // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T173. The T121 bound. PA_ARM_BOX_BOUND forces paT141BoxBound() true
+        // at compile time, which is the only way to reach it: FINAL bakes
+        // PaDiagnosticOptimizationMode to 0, so the shipped renderer uses the
+        // vertical-only bound and the tighter one is dead code.
+        //
+        // Exact by construction - max() of two valid lower bounds is a valid
+        // lower bound - so these must render bit-identically and differ only in
+        // how many descriptors reach the exact SDF.
+        // ------------------------------------------------------------------
+        [name: 'cloud_atmosphere_volume_t173_boxbound',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t173_boxbound_pre',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t173_stack_boxbound_pre',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_BOX_BOUND 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
         [name: 'cloud_atmosphere_volume_t172_pre_edge',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE_EDGE 1'],
          keepUniforms: []],

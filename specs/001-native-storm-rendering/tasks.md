@@ -1728,6 +1728,41 @@ implementation, while visual polish remains independently active.
   worth ~4x what removing the arithmetic is, so the recommended next work is a **tighter,
   still-conservative lower bound** - image-preserving by construction, as T141's box bound already
   is. Evidence in `validation/performance-descriptor-precompute.md`.
+- [X] T173 [PERFORMANCE] [US3] Explain the SIDE bimodality, then audit and test the T121
+  conservative bound. **SIDE was never unstable - the harness protocol was.** Twenty identical
+  cells with one program and no arm switching agree to **CV 0.57%**, 19/19 consecutive pairs
+  accepted, with the per-cell state byte-constant (`descriptorSignature=08328807b4eb6fed`, camera,
+  targets, scale, governor, history all identical; only `gameTime` advancing) and workload
+  counters varying **<0.02%**. The same descriptor signature appears in T172 and is constant
+  across its transition, so the fixture is deterministic across runs and never evolved. T172's
+  apparent 31% workload drop is explained: its anchor's **timing** moved 6.2% while its reported
+  **counters** moved 31%, which cannot both describe one scene - the counter capture is itself
+  contaminated by arm switching, so neither figure measured what it claimed. GPU state was not
+  re-investigated, deliberately: no GPU execution state can change how many density calls a
+  fragment program makes. **Rule adopted (not a widened floor)**: every arm is bracketed by anchor
+  cells and divided by their mean; an arm whose anchors disagree >3% is `REJECTED_anchor_drift`.
+  Switching still doubles anchor variance (CV 0.57% -> 1.22%) and broke 2 of 10 pairs, so the
+  strict verdict stays `SIDE_NOT_MEASURABLE`, but **both rejections landed on arms whose other
+  repeat was accepted**, so every program carries a trustworthy number and the accepted repeats
+  agree to 0.5-2.6%. **T121 audit**: FINAL bakes `PaDiagnosticOptimizationMode` to 0, so
+  `paT141BoxBound()` is compile-time false and **the shipped renderer has always used the
+  vertical-only bound** - T141's tighter `stormLobeDistanceLowerBound` is dead code in production.
+  Current bound rejects **22.6% of visited lobes** (78.7/pixel) against 302 descriptor
+  evaluations/pixel at SIDE. **The tighter bound is a net loss**: 0.9540 / 0.9287, i.e. **4.6-7.1%
+  slower**, both repeats accepted. Its horizontal term costs a `length()` and a division per
+  descriptor per sample but only binds when a sample lies outside a lobe's horizontal extent, and
+  at SIDE the camera looks through the storm. Correctness holds - **0 changed pixels**,
+  `maxAbsRGBA=1.53e-05`, 32x below the storage epsilon, a float-ordering shift in
+  `groupMinClearance` rather than a false cull (which would give large localised errors, not
+  1.5e-05 everywhere). **First trustworthy SIDE stack numbers**: anchor 23.50, `t169_stack_fast`
+  14.11/14.33, **`t172_stack_pre` 12.59/12.51 (1.878x)**, `t173_stack_boxbound_pre` 13.85/13.70.
+  **The T172 precompute is worth 1.133x at SIDE**, double its 1.065x at FAR, as expected from
+  SIDE's 5.9x density calls. SIDE <=10 ms NOT met (best 12.51, gap 1.25x); FAR <=8 ms met.
+  **Decisions: productionize the T172 precompute (yes, with more confidence than T172 had);
+  productionize the tighter T121 bound (no).** Next lever is groups entered per sample - SIDE
+  visits 348 lobes across 23.8 density calls, 14.6 per call against a group size of 10 - which is
+  a different question from the below-group binning T168 closed. Evidence in
+  `validation/performance-side-stability-and-t121-bound.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

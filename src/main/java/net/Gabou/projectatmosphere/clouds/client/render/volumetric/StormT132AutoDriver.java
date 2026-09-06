@@ -141,6 +141,14 @@ final class StormT132AutoDriver {
      */
     private static final Path T172_MARKER = Path.of("t172-descriptor-precompute.txt");
     /**
+     * T173: the SIDE pose itself. Three campaigns produced SIDE blocks whose
+     * repeats disagreed by up to 56%, and T172's per-cell counters showed why
+     * the timing moved - the rendered workload changed mid-sweep and stayed
+     * changed. This campaign holds everything constant and asks whether that
+     * still happens.
+     */
+    private static final Path T173_MARKER = Path.of("t173-side-stability.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -329,6 +337,10 @@ final class StormT132AutoDriver {
 
     private static boolean precomputeRunRequested() {
         return Files.exists(T172_MARKER);
+    }
+
+    private static boolean sideStabilityRunRequested() {
+        return Files.exists(T173_MARKER);
     }
 
     private static boolean movingCameraRunRequested() {
@@ -971,6 +983,92 @@ final class StormT132AutoDriver {
     /** T172 keeps T171's ordering: SIDE binds the budget. */
     private static final String[] T172_POSES = {"SIDE", "FAR"};
 
+    /**
+     * T173 measures SIDE and nothing else. Adding FAR would double the run for
+     * a pose that is already stable and would put a long gap in the middle of
+     * the sequence under test.
+     */
+    private static final String[] T173_POSES = {"SIDE"};
+
+    private static boolean t173Run;
+    private static boolean t173OriginalHistoryEnabled;
+
+    /**
+     * Twenty identical cells. One program, one pose, one fixture, no arm
+     * switching, no compile-time variant, no descriptor-layout difference -
+     * every cell is the production anchor.
+     *
+     * <p>T172's per-cell counters showed the SIDE workload dropping 31% partway
+     * through a sweep and never recovering, with the storm, camera, descriptor
+     * count, governor, resolution and render target all constant. If that
+     * happens here, it is not caused by anything the campaign varies, because
+     * this campaign varies nothing.
+     */
+    private static final T166Arm[] T173_ARMS = buildT173Arms();
+
+    private static T166Arm[] buildT173Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        // Phase 2. Strict anchor bracketing: every measured arm sits between two
+        // anchor cells, so its ratio is taken against anchors measured seconds
+        // either side of it rather than against a block average.
+        //
+        // Phase 1 established that twenty consecutive anchor cells agree to
+        // CV 0.57% when nothing switches, and T172 established that a
+        // block-then-block layout does not. Bracketing is what turns the first
+        // fact into a usable protocol: an arm whose two anchors disagree is
+        // rejected before its own number is read, so drift is caught rather
+        // than absorbed.
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 2; repeat++) {
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T173_BOX_BOUND,
+                    CoreCostDiagnosticProgram.T173_BOX_PRE,
+                    CoreCostDiagnosticProgram.T169_STACK_FAST,
+                    CoreCostDiagnosticProgram.T172_STACK_PRE,
+                    CoreCostDiagnosticProgram.T173_STACK_BOX_PRE}) {
+                arms.add(new T166Arm(arm, "r" + repeat, 60));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    /** True for a T173 bracketing anchor cell. */
+    private static boolean t173IsAnchor(T166Arm arm) {
+        return arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL
+                && arm.tag().startsWith("a");
+    }
+
+    private static T166Arm t173Arm() {
+        return T173_ARMS[Math.max(0, Math.min(T173_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T173_OPTIMIZATION_ARMS =
+            buildT173OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT173OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T173_ARMS.length];
+        for (int i = 0; i < T173_ARMS.length; i++) {
+            modes[i] = T173_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * The bound arms claim to be exact, so every one of them is captured. A
+     * valid lower bound cannot cull a descriptor that could contribute, so
+     * anything other than zero changed pixels is a proof error, not a tradeoff.
+     */
+    private static final CoreCostDiagnosticProgram[] T173_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T173_BOX_BOUND,
+            CoreCostDiagnosticProgram.T173_BOX_PRE,
+            CoreCostDiagnosticProgram.T173_STACK_BOX_PRE
+    };
+
     private static boolean t172Run;
     private static boolean t172OriginalHistoryEnabled;
 
@@ -1139,7 +1237,8 @@ final class StormT132AutoDriver {
      * them.
      */
     private static boolean programArmCampaign() {
-        return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run || t172Run;
+        return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run || t172Run
+                || t173Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -1397,7 +1496,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t172Run ? t172Arm()
+            T166Arm arm = t173Run ? t173Arm()
+                    : t172Run ? t172Arm()
                     : t171Run ? t171Arm()
                     : t170Run ? t170Arm()
                     : t169Run ? t169Arm()
@@ -1483,6 +1583,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t173Run) {
+            return t173Arm().label();
+        }
         if (t172Run) {
             return t172Arm().label();
         }
@@ -1532,6 +1635,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t173Run) {
+            return T173_OPTIMIZATION_ARMS;
+        }
         if (t172Run) {
             return T172_OPTIMIZATION_ARMS;
         }
@@ -1712,6 +1818,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t173Run) {
+            return T173_POSES;
+        }
         if (t172Run) {
             return T172_POSES;
         }
@@ -2064,6 +2173,8 @@ final class StormT132AutoDriver {
                 t171OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t172Run = precomputeRunRequested();
                 t172OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t173Run = sideStabilityRunRequested();
+                t173OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t168OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t167Run = refinementRunRequested();
                 t167OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
@@ -2103,7 +2214,8 @@ final class StormT132AutoDriver {
                                 || t169Run
                                 || t170Run
                                 || t171Run
-                                || t172Run;
+                                || t172Run
+                                || t173Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -2114,7 +2226,7 @@ final class StormT132AutoDriver {
                 if (t141EvaluationRun) {
                     if (!t153OracleRun && !t161Run && !t140Run && !t162Run && !t163Run
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
-                            && !t171Run && !t172Run) {
+                            && !t171Run && !t172Run && !t173Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -2124,7 +2236,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t172Run ? "T172_DESCRIPTOR_PRECOMPUTE"
+                            t173Run ? "T173_SIDE_STABILITY"
+                                    : t172Run ? "T172_DESCRIPTOR_PRECOMPUTE"
                                     : t171Run ? "T171_HARNESS_STABILITY"
                                     : t170Run ? "T170_PRIMARY_MARCH"
                                     : t169Run ? "T169_LIGHTING_DETAIL"
@@ -2449,7 +2562,8 @@ final class StormT132AutoDriver {
                         || (t169Run && t169Arm().program().fixedWork())
                         || (t170Run && t170Arm().program().fixedWork())
                         || (t171Run && t171Arm().program().fixedWork())
-                        || (t172Run && t172Arm().program().fixedWork())) {
+                        || (t172Run && t172Arm().program().fixedWork())
+                        || (t173Run && t173Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -2593,6 +2707,13 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t173Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT173SideStabilityReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t173OriginalHistoryEnabled);
                 }
                 if (t172Run) {
                     ProjectAtmosphere.LOGGER.info(buildT172PrecomputeReport());
@@ -2963,6 +3084,7 @@ final class StormT132AutoDriver {
             t141ArmIndex++;
             return;
         }
+        logCellState(pose, arm);
         if (!StormT135PerformanceProfile.begin(
                 pose, AtmoCommonConfig.CloudRaymarchQuality.ULTRA, arm)) {
             if (++t141ArmAttempts < T138_MAX_ARM_ATTEMPTS) {
@@ -3362,6 +3484,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t173Run) {
+            return T173_IMAGE_ARMS;
+        }
         if (t172Run) {
             return T172_IMAGE_ARMS;
         }
@@ -3709,6 +3834,155 @@ final class StormT132AutoDriver {
      * averaging a contradictory pair is exactly what made T170's clamp sweep
      * unusable.
      */
+    /**
+     * T173. The renderer and fixture state a cell is about to be measured
+     * under, logged immediately before the timed cell begins.
+     *
+     * <p>Everything here is something a previous campaign either assumed
+     * constant or checked only once. T172 proved that assumption wrong for the
+     * workload counters, so the state that could explain it is now recorded per
+     * cell rather than reconstructed afterwards from status lines that happen to
+     * be logged every five seconds.
+     */
+    private static void logCellState(String pose, String arm) {
+        if (!t173Run) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        com.mojang.blaze3d.pipeline.RenderTarget cloudTarget =
+                VolumetricCloudRenderTargets.currentCloudTarget();
+        com.mojang.blaze3d.pipeline.RenderTarget main = minecraft.getMainRenderTarget();
+        CoreCostDiagnosticProgram override = VolumetricCloudDebugConfig.finalProgramOverride();
+        ProjectAtmosphere.LOGGER.info(
+                "T173_STATE pose={} arm={} descriptorSignature={} lobes={}"
+                        + " camera=({},{},{}) yaw={} pitch={}"
+                        + " cloudTarget={}x{} framebuffer={}x{}"
+                        + " fixedScale={} governorScale={} program={} history={}"
+                        + " descriptorLimit={} gameTime={} dayTime={}",
+                pose, arm,
+                String.format(Locale.ROOT, "%016x",
+                        PuffLobeSpatialIndex.descriptorSignatureForDiagnostics()),
+                StormGeometryBuildCoordinator.lobeCount(),
+                player == null ? "n/a" : fmt((float) player.getX()),
+                player == null ? "n/a" : fmt((float) player.getY()),
+                player == null ? "n/a" : fmt((float) player.getZ()),
+                player == null ? "n/a" : fmt(player.getYRot()),
+                player == null ? "n/a" : fmt(player.getXRot()),
+                cloudTarget == null ? 0 : cloudTarget.width,
+                cloudTarget == null ? 0 : cloudTarget.height,
+                main == null ? 0 : main.width,
+                main == null ? 0 : main.height,
+                fmt(VolumetricCloudDebugConfig.fixedResolutionScale()),
+                fmt(VolumetricCloudRenderer.governorStepScale()),
+                override == null ? "auto" : override.serializedName(),
+                VolumetricCloudDebugConfig.historyEnabled(),
+                VolumetricCloudDebugConfig.descriptorCountLimit(),
+                minecraft.level == null ? -1L : minecraft.level.getGameTime(),
+                minecraft.level == null ? -1L : minecraft.level.getDayTime());
+    }
+
+    /**
+     * T173's report. Every cell is the same arm, so there is no speedup to
+     * state: the report is the sequence itself, in execution order, with the
+     * dispersion that decides whether SIDE is measurable.
+     */
+    private static String buildT173SideStabilityReport() {
+        StringBuilder out = new StringBuilder("T173_SIDE_STABILITY_DECISION");
+        java.util.List<Double> medians = new java.util.ArrayList<>();
+        for (T166Arm arm : T173_ARMS) {
+            StormT135PerformanceProfile.Cell cell = t162Cell("SIDE", arm.label());
+            if (cell == null) {
+                out.append(String.format(Locale.ROOT,
+                        "%nT173_CELL arm=%s evaluated=false", arm.label()));
+                continue;
+            }
+            if (t173IsAnchor(arm)) {
+                medians.add(cell.cloudP50());
+            }
+            out.append(String.format(Locale.ROOT,
+                    "%nT173_CELL arm=%s samples=%d duplicatesRejected=%d cloudP50=%.4f"
+                            + " cloudP95=%.4f cloudMean=%.4f cloudSd=%.4f cloudCv=%.5f"
+                            + " cloudMin=%.4f cloudMax=%.4f",
+                    arm.label(), cell.samples(), cell.duplicateSamplesRejected(),
+                    cell.cloudP50(), cell.cloudP95(), cell.cloudMean(), cell.cloudSd(),
+                    cell.cloudCv(), cell.cloudMin(), cell.cloudMax()));
+        }
+
+        // Anchor-bracketed ratios. Each measured arm is divided by the mean of
+        // the two anchors immediately either side of it, and is rejected if
+        // those two anchors disagree by more than the floor - the arm's own
+        // number is not interpreted when its baseline moved under it.
+        for (int i = 0; i < T173_ARMS.length; i++) {
+            T166Arm arm = T173_ARMS[i];
+            if (t173IsAnchor(arm) || i == 0 || i + 1 >= T173_ARMS.length) {
+                continue;
+            }
+            StormT135PerformanceProfile.Cell before = t162Cell("SIDE", T173_ARMS[i - 1].label());
+            StormT135PerformanceProfile.Cell after = t162Cell("SIDE", T173_ARMS[i + 1].label());
+            StormT135PerformanceProfile.Cell cell = t162Cell("SIDE", arm.label());
+            if (before == null || after == null || cell == null || cell.cloudP50() <= 0.0D) {
+                out.append(String.format(Locale.ROOT,
+                        "%nT173_ARM arm=%s evaluated=false", arm.label()));
+                continue;
+            }
+            double baseline = (before.cloudP50() + after.cloudP50()) * 0.5D;
+            double anchorDrift = Math.abs(before.cloudP50() - after.cloudP50())
+                    / Math.max(1.0e-6D, baseline);
+            boolean accepted = anchorDrift <= T171_REPEAT_TOLERANCE;
+            out.append(String.format(Locale.ROOT,
+                    "%nT173_ARM arm=%s anchorBefore=%.4f anchorAfter=%.4f anchorDrift=%.4f"
+                            + " cloudP50=%.4f cloudP95=%.4f speedup=%s verdict=%s",
+                    arm.label(), before.cloudP50(), after.cloudP50(), anchorDrift,
+                    cell.cloudP50(), cell.cloudP95(),
+                    accepted ? String.format(Locale.ROOT, "%.4f", baseline / cell.cloudP50())
+                            : "n/a",
+                    accepted ? "accepted" : "REJECTED_anchor_drift"));
+        }
+
+        if (medians.size() >= 2) {
+            double min = Double.MAX_VALUE;
+            double max = -Double.MAX_VALUE;
+            double sum = 0.0D;
+            for (double v : medians) {
+                min = Math.min(min, v);
+                max = Math.max(max, v);
+                sum += v;
+            }
+            double mean = sum / medians.size();
+            double variance = 0.0D;
+            for (double v : medians) {
+                variance += (v - mean) * (v - mean);
+            }
+            double sd = Math.sqrt(variance / (medians.size() - 1));
+            // Consecutive-pair agreement is what the acceptance rule is stated
+            // in, so it is computed here rather than left to be eyeballed.
+            int accepted = 0;
+            int rejected = 0;
+            for (int i = 1; i < medians.size(); i++) {
+                double a = medians.get(i - 1);
+                double b = medians.get(i);
+                double disagreement = Math.abs(a - b) / Math.max(1.0e-6D, (a + b) * 0.5D);
+                if (disagreement <= T171_REPEAT_TOLERANCE) {
+                    accepted++;
+                } else {
+                    rejected++;
+                    out.append(String.format(Locale.ROOT,
+                            "%nT173_BREAK between=%d and=%d a=%.4f b=%.4f disagreement=%.4f",
+                            i - 1, i, a, b, disagreement));
+                }
+            }
+            out.append(String.format(Locale.ROOT,
+                    "%nT173_SUMMARY anchors=%d mean=%.4f sd=%.4f cv=%.5f min=%.4f max=%.4f"
+                            + " range=%.4f consecutivePairsAccepted=%d rejected=%d"
+                            + " verdict=%s",
+                    medians.size(), mean, sd, sd / mean, min, max, (max - min) / mean,
+                    accepted, rejected,
+                    rejected == 0 && accepted >= 10 ? "SIDE_MEASURABLE" : "SIDE_NOT_MEASURABLE"));
+        }
+        return out.toString();
+    }
+
     private static String buildT172PrecomputeReport() {
         StringBuilder out = new StringBuilder("T172_PRECOMPUTE_DECISION");
         for (String pose : T172_POSES) {

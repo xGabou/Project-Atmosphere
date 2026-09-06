@@ -253,7 +253,19 @@ bool paT141EvalAmplify() {
 
 /** True when the conservative bound is the full box rather than vertical only. */
 bool paT141BoxBound() {
+#ifdef PA_ARM_BOX_BOUND
+    // T173. The tighter bound, reachable at compile time.
+    //
+    // FINAL bakes PaDiagnosticOptimizationMode to 0, so the shipped renderer
+    // has always used the vertical-only bound and stormLobeDistanceLowerBound
+    // has been unreachable in production. It is a valid lower bound by the same
+    // argument the function documents - max() of two valid lower bounds is a
+    // valid lower bound - so switching to it cannot change the image, only how
+    // many descriptors reach the exact SDF.
+    return true;
+#else
     return (PaDiagnosticOptimizationMode & PA_OPT_T141_BOX_BOUND) != 0;
+#endif
 }
 
 /** True when the hoisted ray-invariant storm reachability bound is active. */
