@@ -475,6 +475,19 @@ int paLightMarchBelowFloor = 0;
  */
 int paDescriptorCandidateRanks = 0;
 int paDescriptorGroupsEntered = 0;
+#ifdef PA_ARM_GROUP2_NO_SDF
+/**
+ * T174 ceiling B only. Which entered group the walk is currently inside, 1 for
+ * the first.
+ *
+ * <p>Deliberately not named with the pa* counter prefix and deliberately behind
+ * the arm's own define: this is control state for one diagnostic ceiling, not a
+ * T123 workload counter, and production must not carry a per-sample increment
+ * for it. The group loop dedupes by slot bitmask and has no notion of ordinal
+ * otherwise, so the ceiling that asks "what do groups 2+ cost" has to add one.
+ */
+int groupEntryOrdinal = 0;
+#endif
 int paDescriptorUnionContributors = 0;
 // T153-only attribution. Distances are world blocks; the remaining values are
 // exact executed-work counts from the timed replay.
@@ -2316,6 +2329,25 @@ void directStormGroupField(
         // every descriptor and still runs the union, but pays no exact
         // evaluation. Bounds the exact-SDF share of a primary density sample.
         float lobeDistance = verticalLowerBound;
+#elif defined(PA_ARM_GROUP2_NO_SDF)
+        // T174 ceiling B. Groups 2+ still get fetched, decoded, bounded and
+        // unioned; only their exact SDF is replaced by the bound. The gap
+        // between this and ceiling A is what group entry itself costs, as
+        // opposed to what the exact SDFs inside those groups cost.
+        //
+        // Also visually invalid, and also not a candidate.
+        float lobeDistance = groupEntryOrdinal >= 2
+            ? verticalLowerBound
+            : (paT122Off()
+                ? directStormLobeDistanceFromData(
+                    p,
+                    stormDescriptorTexel(descriptorIndex, 0),
+                    stormDescriptorTexel(descriptorIndex, 1),
+                    stormDescriptorTexel(descriptorIndex, 2),
+                    groupSlot,
+                    lobeRole)
+                : directStormLobeDistanceFromData(
+                    p, positionHeight, radiusRotation, shearMedia, groupSlot, lobeRole));
 #else
         float lobeDistance = paT122Off()
             ? directStormLobeDistanceFromData(
@@ -2446,6 +2478,9 @@ float directStormShape(
     // genuine lower bound on the distance to any lobe surface - so the march's
     // safe advance stays conservative and cannot step over material. Returning
     // the 1.0e9 sentinel here instead would have been unsafe.
+#ifdef PA_ARM_GROUP2_NO_SDF
+    groupEntryOrdinal = 0;
+#endif
     float paOutsideReach = paStormColumnOutside(p.xz);
     if (paOutsideReach > 0.0) {
         minDescriptorClearance = paOutsideReach;
@@ -2466,6 +2501,9 @@ float directStormShape(
             continue;
         }
         groupVisited |= groupBit;
+#ifdef PA_ARM_GROUP2_NO_SDF
+        groupEntryOrdinal++;
+#endif
         if (paWorkloadCaptureActive()) {
             paDescriptorGroupsEntered++;
         }
@@ -2505,6 +2543,16 @@ float directStormShape(
             stormSoftness = mix(groupSoftness, stormSoftness, mixFactor);
         }
         previousGroupRadius = groupMinimumRadius;
+#ifdef PA_ARM_FIRST_GROUP_ONLY
+        // T174 ceiling A. Process only the first entered group, so every cost
+        // of groups 2+ disappears: the candidate scan, the ten-descriptor walk,
+        // the bounds, the exact SDFs and the group-level smooth union.
+        //
+        // Visually invalid by construction - a sample genuinely owned by two
+        // groups loses one of them. This bounds the entire group-entry prize
+        // and is never a production candidate.
+        break;
+#endif
     }
     if (!started) {
         return 0.0;

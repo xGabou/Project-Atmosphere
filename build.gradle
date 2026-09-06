@@ -747,6 +747,24 @@ def leanProgramVariants = [
         // lower bound - so these must render bit-identically and differ only in
         // how many descriptors reach the exact SDF.
         // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // T174 group-entry ceilings. Both carry FINAL's specialization,
+        // including the now-productionized precompute, so they differ from the
+        // shipped program only in what they do at group level.
+        //
+        // Both are visually invalid by construction and neither is a candidate.
+        // They exist to price the group-entry line before any group metadata is
+        // designed, because there is currently none to reject on.
+        // ------------------------------------------------------------------
+        [name: 'cloud_atmosphere_volume_t174_first_group_only',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_FIRST_GROUP_ONLY 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t174_group2_no_sdf',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_GROUP2_NO_SDF 1'],
+         keepUniforms: []],
+
         [name: 'cloud_atmosphere_volume_t173_boxbound',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_BOX_BOUND 1'],
          keepUniforms: []],

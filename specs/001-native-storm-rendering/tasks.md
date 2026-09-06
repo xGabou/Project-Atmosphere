@@ -1763,6 +1763,37 @@ implementation, while visual polish remains independently active.
   visits 348 lobes across 23.8 density calls, 14.6 per call against a group size of 10 - which is
   a different question from the below-group binning T168 closed. Evidence in
   `validation/performance-side-stability-and-t121-bound.md`.
+- [X] T174 [PERFORMANCE] [US3] Productionize the T172 precompute, then price the group-entry
+  line. **Productionization banked separately as `4b34b12`**: FINAL and the four T140 oracle
+  variants now define `PA_ARM_DESC_PRECOMPUTE`, and because the precompute and the old derivation
+  are `#if`/`#else` branches the recomputation is **not compiled into FINAL** rather than left
+  live beside it. The T172 gate is inverted rather than deleted - FINAL must now define it, must
+  not define either isolated half, and every oracle variant must carry it. **Proof of consumption
+  is runtime, not a define check**: `t174_no_precompute` is FINAL minus the precompute, renders
+  **bit-identically** (`maxAbsRGBA=0.0`, 0 changed pixels, both poses) and is measurably slower -
+  **1.079-1.104x SIDE, 1.090-1.096x FAR**. Anchors moved SIDE 23.50 -> ~20.6 and FAR 13.09 ->
+  ~12.4. **Group entry passes its gate and still cannot close SIDE.** `first_group_only` -
+  skipping the candidate scan, ten-descriptor walk, bounds, exact SDFs and union for every group
+  beyond the first - is worth **1.136x SIDE / 1.125x FAR**, above the 1.10x gate but below the
+  1.255x the 10 ms target needs. **It is exact**: bit-identical to the anchor, because on this
+  fixture groups beyond the first are entered ~44% of the time and never change the result.
+  **`group2_no_sdf` returns 0.99x** - the exact SDFs inside groups 2+ cost nothing, T121 already
+  culls them, so the 1.136x is pure walk overhead on ~4.4 lobes per density call that contribute
+  nothing. **Task 3 audit: there is no group metadata to reject on** - before the descriptor loop
+  the shader has only a witness index, a group slot and a 2D XZ candidate tile, so every candidate
+  bound would have to be invented and maintained. Counters: SIDE 1.443 groups and 14.43 lobes per
+  density call, **10.000 lobes per group entered** (T168 holds), 18.5% T121-rejected, 25.37 density
+  calls/pixel against FAR's 4.16 on nearly equal step counts (30.83 vs 28.61) - SIDE evaluates
+  density on **82% of primary steps**, FAR on 15%. The 1/2/3+ histogram was **not obtained** and is
+  reported as a gap; the ceiling answers the decision without it. **Stack REJECTED**: repeats
+  disagreed 15.56% SIDE and 51.96% FAR, so no stack number is banked, and r2 was not cherry-picked
+  despite matching T173/T172 to within 0.2%. **Verdict: the group-entry line is real, exact and
+  insufficient** - a perfect filter takes 12.5 -> ~11.0 ms and still misses 10 ms. Closed for the
+  target; recorded as a 1.136x ceiling. **Remaining dominant cost is the number of density calls at
+  SIDE, not per-call cost**, which T170/T172/T173/T174 have now bounded from every side. Next
+  recommended line is empty-space skipping / clearance quality, possibly at group granularity where
+  the missing group metadata would actually pay. Evidence in
+  `validation/performance-group-entry.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

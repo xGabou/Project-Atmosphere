@@ -1,0 +1,76 @@
+T174 group entry - 06Sep2026, anchor-bracketed, SIDE then FAR
+Productionized FINAL (4b34b12) is the anchor.
+
+T174_GROUP_ENTRY_BEGIN poses=2 arms=17 mode=ULTRA steps=96 resolutionScale=NaN target=1920x1080
+
+--- decision block ---
+T174_CELL pose=SIDE arm=lean_final#a01 cloudP50=20.6162 cloudP95=21.9750 cloudCv=0.03696
+T174_CELL pose=SIDE arm=t174_no_precompute#r1 cloudP50=22.6191 cloudP95=24.4828 cloudCv=0.04486
+T174_CELL pose=SIDE arm=lean_final#a02 cloudP50=20.3745 cloudP95=21.4354 cloudCv=0.03482
+T174_CELL pose=SIDE arm=t174_first_group_only#r1 cloudP50=18.0357 cloudP95=19.0249 cloudCv=0.03053
+T174_CELL pose=SIDE arm=lean_final#a03 cloudP50=20.7073 cloudP95=22.5577 cloudCv=0.03874
+T174_CELL pose=SIDE arm=t174_group2_no_sdf#r1 cloudP50=20.9961 cloudP95=22.7717 cloudCv=0.04138
+T174_CELL pose=SIDE arm=lean_final#a04 cloudP50=20.5978 cloudP95=22.2116 cloudCv=0.03710
+T174_CELL pose=SIDE arm=t172_stack_pre#r1 cloudP50=10.6967 cloudP95=11.1770 cloudCv=0.02567
+T174_CELL pose=SIDE arm=lean_final#a05 cloudP50=20.6408 cloudP95=22.7799 cloudCv=0.05612
+T174_CELL pose=SIDE arm=t174_no_precompute#r2 cloudP50=22.2781 cloudP95=23.9319 cloudCv=0.03727
+T174_CELL pose=SIDE arm=lean_final#a06 cloudP50=20.6602 cloudP95=23.1270 cloudCv=0.04914
+T174_CELL pose=SIDE arm=t174_first_group_only#r2 cloudP50=18.2712 cloudP95=19.5133 cloudCv=0.04173
+T174_CELL pose=SIDE arm=lean_final#a07 cloudP50=20.7800 cloudP95=22.7727 cloudCv=0.04417
+T174_CELL pose=SIDE arm=t174_group2_no_sdf#r2 cloudP50=20.6858 cloudP95=22.7645 cloudCv=0.05058
+T174_CELL pose=SIDE arm=lean_final#a08 cloudP50=20.4636 cloudP95=22.3130 cloudCv=0.03435
+T174_CELL pose=SIDE arm=t172_stack_pre#r2 cloudP50=12.5020 cloudP95=13.5690 cloudCv=0.05359
+T174_CELL pose=SIDE arm=lean_final#a09 cloudP50=20.6981 cloudP95=22.3744 cloudCv=0.04388
+T174_ARM pose=SIDE arm=t174_no_precompute#r1 anchorBefore=20.6162 anchorAfter=20.3745 anchorDrift=0.0118 cloudP50=22.6191 cloudP95=24.4828 speedup=0.9061 verdict=accepted
+T174_ARM pose=SIDE arm=t174_first_group_only#r1 anchorBefore=20.3745 anchorAfter=20.7073 anchorDrift=0.0162 cloudP50=18.0357 cloudP95=19.0249 speedup=1.1389 verdict=accepted
+T174_ARM pose=SIDE arm=t174_group2_no_sdf#r1 anchorBefore=20.7073 anchorAfter=20.5978 anchorDrift=0.0053 cloudP50=20.9961 cloudP95=22.7717 speedup=0.9836 verdict=accepted
+T174_ARM pose=SIDE arm=t172_stack_pre#r1 anchorBefore=20.5978 anchorAfter=20.6408 anchorDrift=0.0021 cloudP50=10.6967 cloudP95=11.1770 speedup=1.9276 verdict=accepted
+T174_ARM pose=SIDE arm=t174_no_precompute#r2 anchorBefore=20.6408 anchorAfter=20.6602 anchorDrift=0.0009 cloudP50=22.2781 cloudP95=23.9319 speedup=0.9269 verdict=accepted
+T174_ARM pose=SIDE arm=t174_first_group_only#r2 anchorBefore=20.6602 anchorAfter=20.7800 anchorDrift=0.0058 cloudP50=18.2712 cloudP95=19.5133 speedup=1.1340 verdict=accepted
+T174_ARM pose=SIDE arm=t174_group2_no_sdf#r2 anchorBefore=20.7800 anchorAfter=20.4636 anchorDrift=0.0153 cloudP50=20.6858 cloudP95=22.7645 speedup=0.9969 verdict=accepted
+T174_ARM pose=SIDE arm=t172_stack_pre#r2 anchorBefore=20.4636 anchorAfter=20.6981 anchorDrift=0.0114 cloudP50=12.5020 cloudP95=13.5690 speedup=1.6462 verdict=accepted
+T174_CELL pose=FAR arm=lean_final#a01 cloudP50=12.4580 cloudP95=14.1302 cloudCv=0.07299
+T174_CELL pose=FAR arm=t174_no_precompute#r1 cloudP50=13.5127 cloudP95=15.1941 cloudCv=0.06270
+T174_CELL pose=FAR arm=lean_final#a02 cloudP50=12.3351 cloudP95=13.6858 cloudCv=0.05808
+T174_CELL pose=FAR arm=t174_first_group_only#r1 cloudP50=10.9691 cloudP95=12.1682 cloudCv=0.06433
+T174_CELL pose=FAR arm=lean_final#a03 cloudP50=12.2388 cloudP95=13.6694 cloudCv=0.05820
+T174_CELL pose=FAR arm=t174_group2_no_sdf#r1 cloudP50=12.4959 cloudP95=13.6223 cloudCv=0.06391
+T174_CELL pose=FAR arm=lean_final#a04 cloudP50=12.2767 cloudP95=13.5977 cloudCv=0.07009
+T174_CELL pose=FAR arm=t172_stack_pre#r1 cloudP50=8.1316 cloudP95=8.2227 cloudCv=0.00907
+T174_CELL pose=FAR arm=lean_final#a05 cloudP50=12.5768 cloudP95=13.4554 cloudCv=0.05533
+T174_CELL pose=FAR arm=t174_no_precompute#r2 cloudP50=13.6059 cloudP95=15.0098 cloudCv=0.06951
+T174_CELL pose=FAR arm=lean_final#a06 cloudP50=12.2593 cloudP95=13.9581 cloudCv=0.06650
+T174_CELL pose=FAR arm=t174_first_group_only#r2 cloudP50=10.9476 cloudP95=12.3228 cloudCv=0.06858
+T174_CELL pose=FAR arm=lean_final#a07 cloudP50=12.4733 cloudP95=14.0257 cloudCv=0.06915
+T174_CELL pose=FAR arm=t174_group2_no_sdf#r2 cloudP50=12.4150 cloudP95=14.1015 cloudCv=0.06863
+T174_CELL pose=FAR arm=lean_final#a08 cloudP50=12.4191 cloudP95=13.7902 cloudCv=0.06788
+T174_CELL pose=FAR arm=t172_stack_pre#r2 cloudP50=4.7780 cloudP95=5.1640 cloudCv=0.04844
+T174_CELL pose=FAR arm=lean_final#a09 cloudP50=12.7171 cloudP95=13.9223 cloudCv=0.07460
+T174_ARM pose=FAR arm=t174_no_precompute#r1 anchorBefore=12.4580 anchorAfter=12.3351 anchorDrift=0.0099 cloudP50=13.5127 cloudP95=15.1941 speedup=0.9174 verdict=accepted
+T174_ARM pose=FAR arm=t174_first_group_only#r1 anchorBefore=12.3351 anchorAfter=12.2388 anchorDrift=0.0078 cloudP50=10.9691 cloudP95=12.1682 speedup=1.1201 verdict=accepted
+T174_ARM pose=FAR arm=t174_group2_no_sdf#r1 anchorBefore=12.2388 anchorAfter=12.2767 anchorDrift=0.0031 cloudP50=12.4959 cloudP95=13.6223 speedup=0.9809 verdict=accepted
+T174_ARM pose=FAR arm=t172_stack_pre#r1 anchorBefore=12.2767 anchorAfter=12.5768 anchorDrift=0.0241 cloudP50=8.1316 cloudP95=8.2227 speedup=1.5282 verdict=accepted
+T174_ARM pose=FAR arm=t174_no_precompute#r2 anchorBefore=12.5768 anchorAfter=12.2593 anchorDrift=0.0256 cloudP50=13.6059 cloudP95=15.0098 speedup=0.9127 verdict=accepted
+T174_ARM pose=FAR arm=t174_first_group_only#r2 anchorBefore=12.2593 anchorAfter=12.4733 anchorDrift=0.0173 cloudP50=10.9476 cloudP95=12.3228 speedup=1.1296 verdict=accepted
+T174_ARM pose=FAR arm=t174_group2_no_sdf#r2 anchorBefore=12.4733 anchorAfter=12.4191 anchorDrift=0.0044 cloudP50=12.4150 cloudP95=14.1015 speedup=1.0025 verdict=accepted
+T174_ARM pose=FAR arm=t172_stack_pre#r2 anchorBefore=12.4191 anchorAfter=12.7171 anchorDrift=0.0237 cloudP50=4.7780 cloudP95=5.1640 speedup=2.6304 verdict=accepted
+T174_FLOOR repeatTolerance=0.030
+T174_REJECTED count=0 none
+
+--- image equality (all three arms bit-identical to anchor) ---
+T166_IMAGE_AB pose=SIDE arm=t174_no_precompute a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=0.000000e+00 meanAbsRGBA=0.000000e+00 rmsRGBA=0.000000e+00 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.902344e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=db37816a55045ca9 informationalDigestB=db37816a55045ca9 armQuality evaluated=true comparedPixels=27214 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=true
+T166_IMAGE_AB pose=SIDE arm=t174_first_group_only a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=0.000000e+00 meanAbsRGBA=0.000000e+00 rmsRGBA=0.000000e+00 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.902344e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=db37816a55045ca9 informationalDigestB=db37816a55045ca9 armQuality evaluated=true comparedPixels=27214 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=true
+T166_IMAGE_AB pose=SIDE arm=t174_group2_no_sdf a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=0.000000e+00 meanAbsRGBA=0.000000e+00 rmsRGBA=0.000000e+00 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.902344e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=db37816a55045ca9 informationalDigestB=db37816a55045ca9 armQuality evaluated=true comparedPixels=27214 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=true
+T166_IMAGE_AB pose=FAR arm=t174_no_precompute a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=0.000000e+00 meanAbsRGBA=0.000000e+00 rmsRGBA=0.000000e+00 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.902344e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=578faf9b010de00e informationalDigestB=578faf9b010de00e armQuality evaluated=true comparedPixels=4202 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=true
+T166_IMAGE_AB pose=FAR arm=t174_first_group_only a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=0.000000e+00 meanAbsRGBA=0.000000e+00 rmsRGBA=0.000000e+00 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.902344e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=578faf9b010de00e informationalDigestB=578faf9b010de00e armQuality evaluated=true comparedPixels=4202 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=true
+T166_IMAGE_AB pose=FAR arm=t174_group2_no_sdf a=lean_final referenceImageComparison evaluated=true passed=true maxAbsRGBA=0.000000e+00 meanAbsRGBA=0.000000e+00 rmsRGBA=0.000000e+00 changedPixelCountAboveEpsilon=0 totalComparedPixels=129600 epsilon=4.882813e-04 maxComparedMagnitude=9.902344e-01 epsilonBasis=rgba16f_storage_ulp informationalDigestA=578faf9b010de00e informationalDigestB=578faf9b010de00e armQuality evaluated=true comparedPixels=4202 silhouetteIoU=1.0000 cloudRegionSSIM=1.0000 edgeBandSSIM=1.0000 thinRetention=1.0000 holeRetention=1.0000 alphaMassRatio=1.0000 seamIndex=0.00000 digestsEqual=true
+
+--- repeat-agreement rule applied post hoc (T171 rule) ---
+SIDE no_precompute      22.6191 22.2781   1.52%  accepted
+SIDE first_group_only   18.0357 18.2712   1.30%  accepted
+SIDE group2_no_sdf      20.9961 20.6858   1.49%  accepted
+SIDE stack_pre          10.6967 12.5020  15.56%  REJECTED_repeat
+FAR  no_precompute      13.5127 13.6059   0.69%  accepted
+FAR  first_group_only   10.9691 10.9476   0.20%  accepted
+FAR  group2_no_sdf      12.4959 12.4150   0.65%  accepted
+FAR  stack_pre           8.1316  4.7780  51.96%  REJECTED_repeat

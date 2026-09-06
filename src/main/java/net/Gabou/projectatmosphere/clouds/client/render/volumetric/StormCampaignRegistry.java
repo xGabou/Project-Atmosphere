@@ -131,7 +131,9 @@ public final class StormCampaignRegistry {
             new Campaign("T172", "t172-descriptor-precompute.txt", "precomputeRunRequested",
                     "t172Run", "T172_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T173", "t173-side-stability.txt", "sideStabilityRunRequested",
-                    "t173Run", "T173_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "t173Run", "T173_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T174", "t174-group-entry.txt", "groupEntryRunRequested",
+                    "t174Run", "T174_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

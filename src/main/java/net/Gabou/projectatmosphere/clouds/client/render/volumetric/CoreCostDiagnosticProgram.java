@@ -340,7 +340,23 @@ public enum CoreCostDiagnosticProgram {
      * consumes the precomputed fields: this arm and FINAL must render the same
      * image and differ only in speed.
      */
-    T174_NO_PRECOMPUTE("t174_no_precompute");
+    T174_NO_PRECOMPUTE("t174_no_precompute"),
+
+    /**
+     * T174 ceiling A: only the first entered descriptor group is processed.
+     *
+     * <p>Removes every cost of groups 2+ at once - candidate scan, ten-descriptor
+     * walk, bounds, exact SDFs and the group union. This is the whole
+     * group-entry prize, and Task 4's gate: below ~1.10x at SIDE the line closes
+     * without a structure being designed.
+     */
+    T174_FIRST_GROUP_ONLY("t174_first_group_only"),
+    /**
+     * T174 ceiling B: groups 2+ are entered and unioned, but their exact SDF is
+     * replaced by the bound. The gap to ceiling A separates what entering a
+     * group costs from what the exact SDFs inside it cost.
+     */
+    T174_GROUP2_NO_SDF("t174_group2_no_sdf");
 
     private final String serializedName;
 

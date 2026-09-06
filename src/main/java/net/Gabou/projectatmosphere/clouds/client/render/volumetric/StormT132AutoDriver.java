@@ -149,6 +149,12 @@ final class StormT132AutoDriver {
      */
     private static final Path T173_MARKER = Path.of("t173-side-stability.txt");
     /**
+     * T174: whether a whole descriptor group can be skipped before its walk.
+     * T168 closed selection inside an entered group; this asks about entry
+     * itself, which the group loop currently does with no metadata to reject on.
+     */
+    private static final Path T174_MARKER = Path.of("t174-group-entry.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -341,6 +347,10 @@ final class StormT132AutoDriver {
 
     private static boolean sideStabilityRunRequested() {
         return Files.exists(T173_MARKER);
+    }
+
+    private static boolean groupEntryRunRequested() {
+        return Files.exists(T174_MARKER);
     }
 
     private static boolean movingCameraRunRequested() {
@@ -1036,6 +1046,76 @@ final class StormT132AutoDriver {
         return arms.toArray(new T166Arm[0]);
     }
 
+    /** SIDE binds the budget; FAR must not regress. */
+    private static final String[] T174_POSES = {"SIDE", "FAR"};
+
+    private static boolean t174Run;
+    private static boolean t174OriginalHistoryEnabled;
+
+    /**
+     * The T174 matrix, anchor-bracketed exactly as T173 phase 2 was.
+     *
+     * <p>The anchor is now the productionized FINAL, so `t174_no_precompute` is
+     * the control that proves the shipped program consumes the precomputed
+     * fields: the two must render the same image and differ only in speed.
+     *
+     * <p>The two ceilings price the group-entry line before any group metadata
+     * is designed, because the group loop currently has none to reject on.
+     */
+    private static final T166Arm[] T174_ARMS = buildT174Arms();
+
+    private static T166Arm[] buildT174Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 2; repeat++) {
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T174_NO_PRECOMPUTE,
+                    CoreCostDiagnosticProgram.T174_FIRST_GROUP_ONLY,
+                    CoreCostDiagnosticProgram.T174_GROUP2_NO_SDF,
+                    CoreCostDiagnosticProgram.T172_STACK_PRE}) {
+                arms.add(new T166Arm(arm, "r" + repeat, 60));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t174Arm() {
+        return T174_ARMS[Math.max(0, Math.min(T174_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T174_OPTIMIZATION_ARMS =
+            buildT174OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT174OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T174_ARMS.length];
+        for (int i = 0; i < T174_ARMS.length; i++) {
+            modes[i] = T174_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * The control must be image-identical to the anchor - that is the proof of
+     * consumption. The ceilings are captured too, so how invalid they are is
+     * measured rather than asserted.
+     */
+    private static final CoreCostDiagnosticProgram[] T174_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T174_NO_PRECOMPUTE,
+            CoreCostDiagnosticProgram.T174_FIRST_GROUP_ONLY,
+            CoreCostDiagnosticProgram.T174_GROUP2_NO_SDF
+    };
+
+    /** True for a T174 bracketing anchor cell. */
+    private static boolean t174IsAnchor(T166Arm arm) {
+        return arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL
+                && arm.tag().startsWith("a");
+    }
+
     /** True for a T173 bracketing anchor cell. */
     private static boolean t173IsAnchor(T166Arm arm) {
         return arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL
@@ -1238,7 +1318,7 @@ final class StormT132AutoDriver {
      */
     private static boolean programArmCampaign() {
         return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run || t172Run
-                || t173Run;
+                || t173Run || t174Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -1496,7 +1576,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t173Run ? t173Arm()
+            T166Arm arm = t174Run ? t174Arm()
+                    : t173Run ? t173Arm()
                     : t172Run ? t172Arm()
                     : t171Run ? t171Arm()
                     : t170Run ? t170Arm()
@@ -1583,6 +1664,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t174Run) {
+            return t174Arm().label();
+        }
         if (t173Run) {
             return t173Arm().label();
         }
@@ -1635,6 +1719,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t174Run) {
+            return T174_OPTIMIZATION_ARMS;
+        }
         if (t173Run) {
             return T173_OPTIMIZATION_ARMS;
         }
@@ -1818,6 +1905,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t174Run) {
+            return T174_POSES;
+        }
         if (t173Run) {
             return T173_POSES;
         }
@@ -2175,6 +2265,8 @@ final class StormT132AutoDriver {
                 t172OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t173Run = sideStabilityRunRequested();
                 t173OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t174Run = groupEntryRunRequested();
+                t174OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t168OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t167Run = refinementRunRequested();
                 t167OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
@@ -2215,7 +2307,8 @@ final class StormT132AutoDriver {
                                 || t170Run
                                 || t171Run
                                 || t172Run
-                                || t173Run;
+                                || t173Run
+                                || t174Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -2226,7 +2319,7 @@ final class StormT132AutoDriver {
                 if (t141EvaluationRun) {
                     if (!t153OracleRun && !t161Run && !t140Run && !t162Run && !t163Run
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
-                            && !t171Run && !t172Run && !t173Run) {
+                            && !t171Run && !t172Run && !t173Run && !t174Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -2236,7 +2329,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t173Run ? "T173_SIDE_STABILITY"
+                            t174Run ? "T174_GROUP_ENTRY"
+                                    : t173Run ? "T173_SIDE_STABILITY"
                                     : t172Run ? "T172_DESCRIPTOR_PRECOMPUTE"
                                     : t171Run ? "T171_HARNESS_STABILITY"
                                     : t170Run ? "T170_PRIMARY_MARCH"
@@ -2563,7 +2657,8 @@ final class StormT132AutoDriver {
                         || (t170Run && t170Arm().program().fixedWork())
                         || (t171Run && t171Arm().program().fixedWork())
                         || (t172Run && t172Arm().program().fixedWork())
-                        || (t173Run && t173Arm().program().fixedWork())) {
+                        || (t173Run && t173Arm().program().fixedWork())
+                        || (t174Run && t174Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -2707,6 +2802,13 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t174Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT174GroupEntryReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t174OriginalHistoryEnabled);
                 }
                 if (t173Run) {
                     ProjectAtmosphere.LOGGER.info(buildT173SideStabilityReport());
@@ -3484,6 +3586,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t174Run) {
+            return T174_IMAGE_ARMS;
+        }
         if (t173Run) {
             return T173_IMAGE_ARMS;
         }
@@ -3887,6 +3992,68 @@ final class StormT132AutoDriver {
      * state: the report is the sequence itself, in execution order, with the
      * dispersion that decides whether SIDE is measurable.
      */
+    /**
+     * T174's report. Anchor-bracketed like T173's: each arm is divided by the
+     * mean of the two anchors either side of it, and rejected outright if those
+     * two disagree by more than the floor.
+     */
+    private static String buildT174GroupEntryReport() {
+        StringBuilder out = new StringBuilder("T174_GROUP_ENTRY_DECISION");
+        for (String pose : T174_POSES) {
+            for (int i = 0; i < T174_ARMS.length; i++) {
+                T166Arm arm = T174_ARMS[i];
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (cell == null) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT174_CELL pose=%s arm=%s evaluated=false", pose, arm.label()));
+                    continue;
+                }
+                out.append(String.format(Locale.ROOT,
+                        "%nT174_CELL pose=%s arm=%s cloudP50=%.4f cloudP95=%.4f"
+                                + " cloudCv=%.5f",
+                        pose, arm.label(), cell.cloudP50(), cell.cloudP95(), cell.cloudCv()));
+            }
+            for (int i = 0; i < T174_ARMS.length; i++) {
+                T166Arm arm = T174_ARMS[i];
+                if (t174IsAnchor(arm) || i == 0 || i + 1 >= T174_ARMS.length) {
+                    continue;
+                }
+                StormT135PerformanceProfile.Cell before =
+                        t162Cell(pose, T174_ARMS[i - 1].label());
+                StormT135PerformanceProfile.Cell after =
+                        t162Cell(pose, T174_ARMS[i + 1].label());
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (before == null || after == null || cell == null
+                        || cell.cloudP50() <= 0.0D) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT174_ARM pose=%s arm=%s evaluated=false", pose, arm.label()));
+                    continue;
+                }
+                double baseline = (before.cloudP50() + after.cloudP50()) * 0.5D;
+                double drift = Math.abs(before.cloudP50() - after.cloudP50())
+                        / Math.max(1.0e-6D, baseline);
+                boolean accepted = drift <= T171_REPEAT_TOLERANCE;
+                out.append(String.format(Locale.ROOT,
+                        "%nT174_ARM pose=%s arm=%s anchorBefore=%.4f anchorAfter=%.4f"
+                                + " anchorDrift=%.4f cloudP50=%.4f cloudP95=%.4f"
+                                + " speedup=%s verdict=%s",
+                        pose, arm.label(), before.cloudP50(), after.cloudP50(), drift,
+                        cell.cloudP50(), cell.cloudP95(),
+                        accepted
+                                ? String.format(Locale.ROOT, "%.4f",
+                                        baseline / cell.cloudP50())
+                                : "n/a",
+                        accepted ? "accepted" : "REJECTED_anchor_drift"));
+            }
+        }
+        out.append(String.format(Locale.ROOT, "%nT174_FLOOR repeatTolerance=%.3f",
+                T171_REPEAT_TOLERANCE));
+        out.append(String.format(Locale.ROOT, "%nT174_REJECTED count=%d %s",
+                T162_REJECTED.size(),
+                T162_REJECTED.isEmpty() ? "none" : String.join(",", T162_REJECTED)));
+        return out.toString();
+    }
+
     private static String buildT173SideStabilityReport() {
         StringBuilder out = new StringBuilder("T173_SIDE_STABILITY_DECISION");
         java.util.List<Double> medians = new java.util.ArrayList<>();
