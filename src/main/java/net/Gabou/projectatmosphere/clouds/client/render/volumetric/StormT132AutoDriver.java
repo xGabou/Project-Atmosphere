@@ -1223,11 +1223,8 @@ final class StormT132AutoDriver {
                 String.format(Locale.ROOT, "a%02d", ++anchor), 60));
         for (int repeat = 1; repeat <= 3; repeat++) {
             for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
-                    CoreCostDiagnosticProgram.T178_SUPPORT,
-                    CoreCostDiagnosticProgram.T178_NO_SDF,
                     CoreCostDiagnosticProgram.T176_LIGHT3,
-                    CoreCostDiagnosticProgram.T172_STACK_PRE,
-                    CoreCostDiagnosticProgram.T178_STACK_SUPPORT}) {
+                    CoreCostDiagnosticProgram.T172_STACK_PRE}) {
                 arms.add(new T166Arm(arm, "r" + repeat, 60));
                 arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
                         String.format(Locale.ROOT, "a%02d", ++anchor), 60));
@@ -1258,9 +1255,7 @@ final class StormT132AutoDriver {
      * because a conservative bound must be shown image-exact, not assumed.
      */
     private static final CoreCostDiagnosticProgram[] T178_IMAGE_ARMS = {
-            CoreCostDiagnosticProgram.T178_SUPPORT,
-            CoreCostDiagnosticProgram.T176_LIGHT3,
-            CoreCostDiagnosticProgram.T178_STACK_SUPPORT
+            CoreCostDiagnosticProgram.T176_LIGHT3
     };
 
     /** True for a T178 bracketing anchor cell. */
@@ -4438,7 +4433,7 @@ final class StormT132AutoDriver {
                 if (t178IsAnchor(arm) || i == 0 || i + 1 >= T178_ARMS.length) {
                     continue;
                 }
-                if (arm.program() == CoreCostDiagnosticProgram.T178_SUPPORT) {
+                if (arm.program() == CoreCostDiagnosticProgram.T176_LIGHT3) {
                     block++;
                 }
                 StormT135PerformanceProfile.Cell before =
@@ -4509,7 +4504,7 @@ final class StormT132AutoDriver {
             // block. T177 showed this is the only ratio that survives a mode
             // swing, because the swing moves control and arm together.
             String control = CoreCostDiagnosticProgram.T172_STACK_PRE.serializedName();
-            String target = CoreCostDiagnosticProgram.T178_STACK_SUPPORT.serializedName();
+            String target = CoreCostDiagnosticProgram.T172_STACK_PRE.serializedName();
             java.util.List<Double> paired = new java.util.ArrayList<>();
             for (java.util.Map<String, Double> cells : byBlock.values()) {
                 Double base = cells.get(control);

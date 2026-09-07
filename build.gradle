@@ -851,28 +851,6 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
-        // T178. The T141 lower bound with its invariant half precomputed into
-        // texel 5, which is the difference from T173: same bound, same proven
-        // image safety, but no role-profile branch, no scaled-radius pair, no
-        // second length() and no division inside the lobe loop.
-        [name: 'cloud_atmosphere_volume_t178_support',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_LOBE_SUPPORT 1'],
-         keepUniforms: []],
-        // The exact-SDF ceiling, re-measured paired: every exact SDF replaced by
-        // the bound. A support test can only ever remove the non-contributing
-        // fraction of this.
-        [name: 'cloud_atmosphere_volume_t178_nosdf',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
-                   'PA_ARM_DESC_NO_EXACT_SDF 1'],
-         keepUniforms: []],
-        [name: 'cloud_atmosphere_volume_t178_stack_support',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
-                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
-                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
-                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_LOBE_SUPPORT 1'],
-         keepUniforms: ['PaOracleBaseSize']],
-
         // T177. Hard primary-to-light group reuse, alone and on the stack.
         [name: 'cloud_atmosphere_volume_t177_reuse_hard',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',

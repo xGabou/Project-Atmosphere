@@ -43,12 +43,7 @@ public record StormLobeDescriptor(
      * unchanged: it already fetched texel 3 for the role, so the precomputed
      * values arrive for free. Texel 4 is never fetched by the shader.
      */
-    /**
-     * T178 raised this from 5 to 6. Texel 5 carries the invariant half of the
-     * T141 lower bound, which T173 proved image-safe but measured 4.6-7.1%
-     * slower because it recomputed those invariants inside the lobe loop.
-     */
-    public static final int TEXELS_PER_DESCRIPTOR = 6;
+    public static final int TEXELS_PER_DESCRIPTOR = 5;
     public static final int FLOATS_PER_DESCRIPTOR = TEXELS_PER_DESCRIPTOR * 4;
 
     /**
@@ -253,7 +248,6 @@ public record StormLobeDescriptor(
         destination[offset + 18] = verticalDevelopment;
         destination[offset + 19] = 0.0F;
         writePrecomputedInvariants(destination, offset);
-        writeSupportInvariants(destination, offset);
     }
 
     /** Writes a live cell directly into reusable upload storage without allocating a descriptor. */
@@ -298,60 +292,6 @@ public record StormLobeDescriptor(
         destination[offset + 18] = clamp01(cell.verticalDevelopment());
         destination[offset + 19] = 0.0F;
         writePrecomputedInvariants(destination, offset);
-        writeSupportInvariants(destination, offset);
-    }
-
-    /**
-     * T178. Fills texel 5 with the invariant half of the T141 conservative
-     * lower bound.
-     *
-     * <p>T173 measured that bound as image-safe but 4.6-7.1% slower, because
-     * {@code stormLobeDistanceLowerBound} recomputes, at every density sample
-     * and for every one of the group's ten lobes, three things that depend only
-     * on the descriptor: the role's radial profile range, the widest and
-     * narrowest scaled radii, and the shear magnitude. It then divides by the
-     * widest radius. None of that involves the sample position.
-     *
-     * <p>These are the same quantities, computed once when the descriptor is
-     * built. The reciprocal is stored rather than the radius so the hot loop
-     * multiplies instead of dividing. Mirror any change here with
-     * {@code stormLobeDistanceLowerBound} in cloud_atmosphere_volume.fsh.
-     */
-    static void writeSupportInvariants(float[] destination, int offset) {
-        int topology = Math.round(destination[offset + 15]);
-        int role = topology - (topology / 8) * 8;
-        float majorRadius = destination[offset + 4];
-        float minorRadius = destination[offset + 5];
-
-        // Mirrors stormRoleRadialProfileRange.
-        float profileMin;
-        float profileMax;
-        if (role == 0) {
-            profileMin = 0.58F;
-            profileMax = 1.06F;
-        } else if (role == 1) {
-            profileMin = 0.56F;
-            profileMax = 1.02F;
-        } else if (role == 2) {
-            profileMin = 0.60F;
-            profileMax = 1.43F;
-        } else {
-            profileMin = 0.70F;
-            profileMax = 2.18F;
-        }
-        float anvilWiden = role == 3 ? 1.56F : 1.0F;
-        float widestX = Math.max(majorRadius * profileMax, 1.0F);
-        float widestZ = Math.max(minorRadius * anvilWiden * profileMax, 1.0F);
-        float narrowestX = Math.max(majorRadius * profileMin, 1.0F);
-        float narrowestZ = Math.max(minorRadius * profileMin, 1.0F);
-        float maxRadius = Math.max(widestX, widestZ);
-        float minRadius = Math.min(narrowestX, narrowestZ);
-
-        destination[offset + 20] = 1.0F / Math.max(maxRadius, 1.0e-6F);
-        destination[offset + 21] = minRadius;
-        destination[offset + 22] = floatLength(
-                destination[offset + 8], destination[offset + 9]);
-        destination[offset + 23] = 0.0F;
     }
 
     /**

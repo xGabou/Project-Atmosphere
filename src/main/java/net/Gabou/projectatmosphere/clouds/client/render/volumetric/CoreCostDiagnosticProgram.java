@@ -442,22 +442,8 @@ public enum CoreCostDiagnosticProgram {
     T177_REUSE_HARD("t177_reuse_hard"),
 
     /** T177 Task 7: the validated stack, flat light3, and hard reuse. */
-    T177_STACK_REUSE_HARD("t177_stack_reuse_hard"),
+    T177_STACK_REUSE_HARD("t177_stack_reuse_hard");
 
-    // -----------------------------------------------------------------------
-    // T178. Precomputed lobe support. The T141 bound T173 rejected on cost,
-    // with its descriptor-invariant half moved to texel 5 so the hot loop keeps
-    // the rejection power and loses the arithmetic.
-    // -----------------------------------------------------------------------
-
-    /** T178: the precomputed support bound. */
-    T178_SUPPORT("t178_support"),
-
-    /** T178: every exact SDF replaced by the bound - the removable ceiling. */
-    T178_NO_SDF("t178_nosdf"),
-
-    /** T178: the validated stack, light3 and the support bound. */
-    T178_STACK_SUPPORT("t178_stack_support");
 
     private final String serializedName;
 

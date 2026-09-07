@@ -494,8 +494,11 @@ int paLobeExactSdfNoChange = 0;
 int paLobeVisitsLight = 0;
 int paLobeExactSdfLight = 0;
 int paLobeCheapRejectLight = 0;
-/** Lobes rejected by the T178 precomputed support bound before the exact SDF. */
-int paLobeSupportRejects = 0;
+/**
+ * T179 replaces T178's support rejects with dominance rejects: lobes proven
+ * unable to move the smooth union before their exact SDF is paid.
+ */
+int paLobeDominanceRejects = 0;
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -2341,41 +2344,10 @@ void directStormGroupField(
         // T141 arm: the same comparison against a strictly tighter lower
         // bound. max() of two valid lower bounds is a valid lower bound, so
         // the arm can only reject more, never differently.
-#ifdef PA_ARM_LOBE_SUPPORT
-        // T178. The SAME bound T141 defines and T173 proved image-safe, with
-        // its invariant half read from texel 5 instead of recomputed here.
-        //
-        // This is the whole distinction from T173. That campaign re-enabled
-        // stormLobeDistanceLowerBound as written and measured 4.6-7.1% SLOWER,
-        // because per lobe per sample it branched through the role profile
-        // range, formed the widest and narrowest scaled radii, took a second
-        // length() for the shear, and divided by the widest radius. None of
-        // that depends on the sample position. Here the reciprocal radius, the
-        // narrowest radius and the shear magnitude arrive precomputed, so what
-        // remains in the loop is one length, one multiply and one compare -
-        // strictly less arithmetic than the vertical-only bound plus a
-        // multiply, and no division at all.
-        vec4 supportData = stormDescriptorTexel(descriptorIndex, 5);
-        float paSupportOriented = max(
-            length(p.xz - positionHeight.xy) - supportData.z, 0.0);
-        float paSupportNormalized = paSupportOriented * supportData.x - 0.08;
-        float paSupportHorizontal = paSupportNormalized > 1.0
-            ? (paSupportNormalized - 1.0) * supportData.y - STORM_MIN_EDGE_BLOCKS
-            : -1.0e9;
-        float verticalLowerBound = max(
-            stormVerticalDistanceLowerBound(p, positionHeight, lobeRole),
-            paSupportHorizontal);
-        if (paWorkloadCaptureActive()) {
-            paLobeSupportRejects += paSupportHorizontal
-                > stormVerticalDistanceLowerBound(p, positionHeight, lobeRole)
-                ? 1 : 0;
-        }
-#else
         float verticalLowerBound = paT141BoxBound()
             ? stormLobeDistanceLowerBound(
                 p, positionHeight, radiusRotation, shearMedia, lobeRole)
             : stormVerticalDistanceLowerBound(p, positionHeight, lobeRole);
-#endif
         // A smooth minimum is exactly unchanged once the incoming distance is
         // more than its blend radius beyond the current union.  The global
         // maximum is used here instead of a guessed local value.  Requiring
@@ -8001,7 +7973,7 @@ void main() {
         gl_FragDepth = 1.0;
         fragColor = vec4(
             float(paLobeCheapRejectLight),
-            float(paLobeSupportRejects),
+            float(paLobeDominanceRejects),
             0.0,
             0.0
         );
