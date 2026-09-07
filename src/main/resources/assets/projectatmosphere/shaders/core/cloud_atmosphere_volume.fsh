@@ -450,6 +450,35 @@ int paPrimaryDensityHigh = 0;
 /** Transitions along a ray, so run lengths can be derived rather than assumed. */
 int paPrimaryMaterialRuns = 0;
 int paPrimaryZeroRuns = 0;
+
+/**
+ * T177. Primary-to-light group reuse validity.
+ *
+ * <p>The question is whether a light tap, which samples along LightDir from a
+ * point whose descriptor group was just resolved, needs its own group
+ * resolution at all. These record, per light tap, the groups the tap actually
+ * needed against the groups the originating primary sample had already
+ * resolved.
+ *
+ * <p>Diagnostic only: every write is behind paWorkloadCaptureActive() and the
+ * classification runs after the walk, so it cannot change what the walk does.
+ */
+int paPrimaryGroupMask = 0;
+int paPrimaryWitnessIndex = -1;
+bool paCapturePrimaryGroups = false;
+/** 0 when not inside a light tap, otherwise the 1-based tap ordinal. */
+int paLightTapOrdinal = 0;
+int paReuseTapsClassified = 0;
+int paReuseTapsEmpty = 0;
+int paReuseSufficient = 0;
+int paReusePartial = 0;
+int paReuseWrong = 0;
+int paReuseSuffOrd1 = 0;
+int paReuseSuffOrd2 = 0;
+int paReuseSuffOrd3 = 0;
+int paReuseSuffOrd4 = 0;
+/** Groups entered while inside a light tap - the size of the reuse prize. */
+int paReuseGroupsEnteredInTaps = 0;
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -549,7 +578,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 38);
+        || (DebugView >= 28 && DebugView <= 41);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -2533,6 +2562,39 @@ float directStormShape(
     if (paWorkloadCaptureActive()) {
         paDirectStormShapeCalls++;
     }
+    int paT177GroupContributed = 0;
+    int paT177FirstWitness = -1;
+#ifdef PA_ARM_LIGHT_REUSE_HARD
+    // T177 Task 3, hard ceiling. A light tap skips its own candidate
+    // resolution entirely and walks only the group the originating primary
+    // sample resolved. Visually invalid by construction whenever the tap has
+    // moved into a different group - which is exactly what Task 1 measures -
+    // so this is a bound, never a candidate.
+    if (paLightTapOrdinal > 0 && paPrimaryWitnessIndex >= 0) {
+        float rgDistance;
+        float rgMinimumRadius;
+        float rgStrength;
+        float rgSoftness;
+        float rgHeight01;
+        int rgActiveRoleMask;
+        bool rgOwns;
+        float rgMinClearance;
+        directStormGroupField(
+            p, paPrimaryWitnessIndex,
+            stormDescriptorGroupSlot(paPrimaryWitnessIndex),
+            rgDistance, rgMinimumRadius, rgStrength, rgSoftness,
+            rgHeight01, rgActiveRoleMask, rgOwns, rgMinClearance
+        );
+        minDescriptorClearance = min(minDescriptorClearance, rgMinClearance);
+        activeRoleMask |= rgActiveRoleMask;
+        ownsDescriptorGroup = ownsDescriptorGroup || rgOwns;
+        if (rgDistance > 1.0e8) {
+            return 0.0;
+        }
+        envelopeStrength = rgStrength;
+        return stormEnvelopeFromDistance(rgDistance, rgSoftness, rgStrength);
+    }
+#endif
     vec4 candidates = stormCandidatesAt(p.xz);
     for (int rank = 0; rank < STORM_CANDIDATES_PER_TILE; rank++) {
         int witnessIndex = decodeStormCandidate(candidates, rank);
@@ -2545,11 +2607,16 @@ float directStormShape(
             continue;
         }
         groupVisited |= groupBit;
+        paT177FirstWitness = paT177FirstWitness < 0 ? witnessIndex
+                                                    : paT177FirstWitness;
 #ifdef PA_ARM_GROUP2_NO_SDF
         groupEntryOrdinal++;
 #endif
         if (paWorkloadCaptureActive()) {
             paDescriptorGroupsEntered++;
+        }
+        if (paWorkloadCaptureActive()) {
+            paReuseGroupsEnteredInTaps += paLightTapOrdinal > 0 ? 1 : 0;
         }
         float groupDistance;
         float groupMinimumRadius;
@@ -2586,6 +2653,11 @@ float directStormShape(
         if (groupDistance > 1.0e8) {
             continue;
         }
+        // T177. Groups that reach here are the ones that actually enter the
+        // union, which is the set a reusing light tap would have to reproduce.
+        if (paWorkloadCaptureActive()) {
+            paT177GroupContributed |= groupBit;
+        }
         if (groupDistance < nearestGroupDistance) {
             nearestGroupDistance = groupDistance;
             dominantHeight01 = groupHeight01;
@@ -2613,6 +2685,45 @@ float directStormShape(
         // and is never a production candidate.
         break;
 #endif
+    }
+    // T177 Task 1. Classify this walk against the originating primary
+    // sample's resolution. Runs after the walk and writes only counters, so
+    // the walk itself is untouched.
+    if (paCapturePrimaryGroups) {
+        paPrimaryGroupMask = paT177GroupContributed;
+        paPrimaryWitnessIndex = paT177FirstWitness;
+    }
+    bool paT177Tap = paLightTapOrdinal > 0;
+    bool paT177Suff = paT177GroupContributed != 0
+        && (paT177GroupContributed & ~paPrimaryGroupMask) == 0;
+    bool paT177Over = (paT177GroupContributed & paPrimaryGroupMask) != 0;
+    if (paWorkloadCaptureActive()) {
+        paReuseTapsEmpty += (paT177Tap && paT177GroupContributed == 0) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseTapsClassified += (paT177Tap && paT177GroupContributed != 0) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSufficient += (paT177Tap && paT177Suff) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReusePartial += (paT177Tap && !paT177Suff && paT177Over) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseWrong += (paT177Tap && paT177GroupContributed != 0 && !paT177Over)
+            ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd1 += (paT177Suff && paLightTapOrdinal == 1) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd2 += (paT177Suff && paLightTapOrdinal == 2) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd3 += (paT177Suff && paLightTapOrdinal == 3) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paReuseSuffOrd4 += (paT177Suff && paLightTapOrdinal == 4) ? 1 : 0;
     }
     if (!started) {
         return 0.0;
@@ -5030,7 +5141,9 @@ float lightMarchOpticalDepth(
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = true;
 #endif
+        paLightTapOrdinal = i + 1;
         float density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+        paLightTapOrdinal = 0;
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = false;
 #endif
@@ -6818,6 +6931,9 @@ void main() {
         // separate deterministic segment integral and can never force the
         // body marcher into a fine-step curtain below the cloud.
         paTraceCapture = paCap;
+        // T177. Everything the primary body call resolves is what a light tap
+        // spawned from this sample could reuse.
+        paCapturePrimaryGroups = true;
 #ifdef PA_ARM_DENSITY_EVERY_2
         // T175 ceiling. Every second primary step reuses the previous body
         // density instead of evaluating it. Halves primary density calls while
@@ -6837,6 +6953,7 @@ void main() {
 #else
         float bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
 #endif
+        paCapturePrimaryGroups = false;
         paTraceCapture = false;
         // Each bin is incremented under its own guard rather than inside an
         // else-if chain, so every increment is provably unreachable in a
@@ -7798,6 +7915,36 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 39) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paReuseTapsClassified),
+            float(paReuseTapsEmpty),
+            float(paReuseSufficient),
+            float(paReusePartial)
+        );
+        return;
+    }
+    if (DebugView == 40) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paReuseWrong),
+            float(paReuseGroupsEnteredInTaps),
+            float(paReuseSuffOrd1),
+            float(paReuseSuffOrd2)
+        );
+        return;
+    }
+    if (DebugView == 41) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paReuseSuffOrd3),
+            float(paReuseSuffOrd4),
+            0.0,
+            0.0
         );
         return;
     }

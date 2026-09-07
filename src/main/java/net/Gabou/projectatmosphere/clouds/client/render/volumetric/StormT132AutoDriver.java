@@ -167,6 +167,13 @@ final class StormT132AutoDriver {
      */
     private static final Path T176_MARKER = Path.of("t176-light-march.txt");
     /**
+     * T177 marker. Measures whether a light tap can reuse the descriptor group
+     * its originating primary sample already resolved, and re-measures the
+     * tap-count arms under a paired-ratio protocol rather than the absolute-p50
+     * comparison T176 showed can agree inside a wrong timing mode.
+     */
+    private static final Path T177_MARKER = Path.of("t177-light-reuse.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -1185,6 +1192,84 @@ final class StormT132AutoDriver {
     private static boolean t176Run;
     private static boolean t176OriginalHistoryEnabled;
 
+    /** SIDE binds the budget; FAR must not regress. */
+    private static final String[] T177_POSES = {"SIDE", "FAR"};
+
+    private static boolean t177Run;
+    private static boolean t177OriginalHistoryEnabled;
+
+    /**
+     * The T177 matrix, built as three short paired blocks per arm rather than
+     * one long run.
+     *
+     * <p>T176 showed two repeats can agree to 0.13% while both sit in a timing
+     * mode that is 70% wrong, so absolute agreement is not a sufficient
+     * acceptance test. Acceptance here is agreement between the three LOCAL
+     * RATIOS instead: a ratio is taken against an anchor measured seconds away,
+     * so a mode change that moves the whole machine moves anchor and arm
+     * together and leaves the ratio intact.
+     */
+    private static final T166Arm[] T177_ARMS = buildT177Arms();
+
+    private static T166Arm[] buildT177Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T177_REUSE_HARD,
+                    CoreCostDiagnosticProgram.T176_LIGHT3,
+                    CoreCostDiagnosticProgram.T176_LIGHT2,
+                    CoreCostDiagnosticProgram.T172_STACK_PRE,
+                    CoreCostDiagnosticProgram.T176_STACK_LIGHT3,
+                    CoreCostDiagnosticProgram.T177_STACK_REUSE_HARD}) {
+                arms.add(new T166Arm(arm, "r" + repeat, 60));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t177Arm() {
+        return T177_ARMS[Math.max(0, Math.min(T177_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T177_OPTIMIZATION_ARMS =
+            buildT177OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT177OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T177_ARMS.length];
+        for (int i = 0; i < T177_ARMS.length; i++) {
+            modes[i] = T177_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * Quality is the whole question for the tap arms and the damage bound for
+     * the reuse arms, so every non-anchor program is captured.
+     */
+    private static final CoreCostDiagnosticProgram[] T177_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T177_REUSE_HARD,
+            CoreCostDiagnosticProgram.T176_LIGHT3,
+            CoreCostDiagnosticProgram.T176_LIGHT2,
+            CoreCostDiagnosticProgram.T176_STACK_LIGHT3,
+            CoreCostDiagnosticProgram.T177_STACK_REUSE_HARD
+    };
+
+    /** True for a T177 bracketing anchor cell. */
+    private static boolean t177IsAnchor(T166Arm arm) {
+        return arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL;
+    }
+
+    /** T177 marker predicate. */
+    private static boolean lightReuseRunRequested() {
+        return Files.exists(T177_MARKER);
+    }
+
     /**
      * The T176 matrix. `nolight` leads because it bounds every other arm here:
      * tap reduction, group reuse and a cheaper shadow density are all subsets of
@@ -1460,7 +1545,7 @@ final class StormT132AutoDriver {
      */
     private static boolean programArmCampaign() {
         return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run || t172Run
-                || t173Run || t174Run || t175Run || t176Run;
+                || t173Run || t174Run || t175Run || t176Run || t177Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -1718,7 +1803,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t176Run ? t176Arm()
+            T166Arm arm = t177Run ? t177Arm()
+                    : t176Run ? t176Arm()
                     : t175Run ? t175Arm()
                     : t174Run ? t174Arm()
                     : t173Run ? t173Arm()
@@ -1808,6 +1894,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t177Run) {
+            return t177Arm().label();
+        }
         if (t176Run) {
             return t176Arm().label();
         }
@@ -1869,6 +1958,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t177Run) {
+            return T177_OPTIMIZATION_ARMS;
+        }
         if (t176Run) {
             return T176_OPTIMIZATION_ARMS;
         }
@@ -2061,6 +2153,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t177Run) {
+            return T177_POSES;
+        }
         if (t176Run) {
             return T176_POSES;
         }
@@ -2433,6 +2528,8 @@ final class StormT132AutoDriver {
                 t175OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t176Run = lightMarchRunRequested();
                 t176OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t177Run = lightReuseRunRequested();
+                t177OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t168OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t167Run = refinementRunRequested();
                 t167OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
@@ -2476,7 +2573,8 @@ final class StormT132AutoDriver {
                                 || t173Run
                                 || t174Run
                                 || t175Run
-                                || t176Run;
+                                || t176Run
+                                || t177Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -2488,7 +2586,7 @@ final class StormT132AutoDriver {
                     if (!t153OracleRun && !t161Run && !t140Run && !t162Run && !t163Run
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
-                            && !t175Run && !t176Run) {
+                            && !t175Run && !t176Run && !t177Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -2498,7 +2596,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t176Run ? "T176_LIGHT_MARCH"
+                            t177Run ? "T177_LIGHT_REUSE"
+                                    : t176Run ? "T176_LIGHT_MARCH"
                                     : t175Run ? "T175_DENSITY_NECESSITY"
                                     : t174Run ? "T174_GROUP_ENTRY"
                                     : t173Run ? "T173_SIDE_STABILITY"
@@ -2831,7 +2930,8 @@ final class StormT132AutoDriver {
                         || (t173Run && t173Arm().program().fixedWork())
                         || (t174Run && t174Arm().program().fixedWork())
                         || (t175Run && t175Arm().program().fixedWork())
-                        || (t176Run && t176Arm().program().fixedWork())) {
+                        || (t176Run && t176Arm().program().fixedWork())
+                        || (t177Run && t177Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -2975,6 +3075,13 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t177Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT177LightReuseReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t177OriginalHistoryEnabled);
                 }
                 if (t176Run) {
                     ProjectAtmosphere.LOGGER.info(buildT176LightMarchReport());
@@ -3773,6 +3880,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t177Run) {
+            return T177_IMAGE_ARMS;
+        }
         if (t176Run) {
             return T176_IMAGE_ARMS;
         }
@@ -4192,6 +4302,103 @@ final class StormT132AutoDriver {
      */
     /** T175's report: anchor-bracketed, same rule as T173/T174. */
     /** T176's report: anchor-bracketed, same rule as T173/T174/T175. */
+    /**
+     * T177. The paired-ratio protocol.
+     *
+     * <p>T176 accepted a FAR arm whose two repeats agreed to 0.13% at 8.54 ms
+     * while sibling arms of the same family straddled 4.3 and 8.5 ms, meaning
+     * both repeats sat in the same wrong mode. Absolute agreement cannot detect
+     * that; it is precisely what a sticky mode produces.
+     *
+     * <p>Acceptance here is therefore agreement between the LOCAL RATIOS. Each
+     * repeat contributes anchor/arm measured seconds apart, so a mode change
+     * that moves the whole machine moves the anchor with the arm and leaves the
+     * ratio intact, while one that affects only the arm shows up as ratio
+     * spread. Absolute p50/p95 are still reported and labelled session-local,
+     * because the target is stated in milliseconds - but they do not decide
+     * acceptance.
+     */
+    private static String buildT177LightReuseReport() {
+        StringBuilder out = new StringBuilder("T177_LIGHT_REUSE_DECISION");
+        for (String pose : T177_POSES) {
+            java.util.Map<String, java.util.List<double[]>> byProgram =
+                    new java.util.LinkedHashMap<>();
+            for (int i = 0; i < T177_ARMS.length; i++) {
+                T166Arm arm = T177_ARMS[i];
+                if (t177IsAnchor(arm) || i == 0 || i + 1 >= T177_ARMS.length) {
+                    continue;
+                }
+                StormT135PerformanceProfile.Cell before =
+                        t162Cell(pose, T177_ARMS[i - 1].label());
+                StormT135PerformanceProfile.Cell after =
+                        t162Cell(pose, T177_ARMS[i + 1].label());
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (before == null || after == null || cell == null
+                        || cell.cloudP50() <= 0.0D) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT177_BLOCK pose=%s arm=%s evaluated=false", pose,
+                            arm.label()));
+                    continue;
+                }
+                double baseline = (before.cloudP50() + after.cloudP50()) * 0.5D;
+                double drift = Math.abs(before.cloudP50() - after.cloudP50())
+                        / Math.max(1.0e-6D, baseline);
+                double ratio = baseline / cell.cloudP50();
+                out.append(String.format(Locale.ROOT,
+                        "%nT177_BLOCK pose=%s arm=%s anchorBefore=%.4f anchorAfter=%.4f"
+                                + " anchorDrift=%.4f cloudP50=%.4f cloudP95=%.4f"
+                                + " localRatio=%.4f blockVerdict=%s",
+                        pose, arm.label(), before.cloudP50(), after.cloudP50(), drift,
+                        cell.cloudP50(), cell.cloudP95(), ratio,
+                        drift <= T171_REPEAT_TOLERANCE ? "accepted"
+                                : "REJECTED_anchor_drift"));
+                if (drift > T171_REPEAT_TOLERANCE) {
+                    continue;
+                }
+                byProgram.computeIfAbsent(arm.program().serializedName(),
+                        key -> new java.util.ArrayList<>())
+                        .add(new double[] {ratio, cell.cloudP50(), cell.cloudP95()});
+            }
+            for (java.util.Map.Entry<String, java.util.List<double[]>> entry
+                    : byProgram.entrySet()) {
+                java.util.List<double[]> blocks = entry.getValue();
+                double minRatio = Double.MAX_VALUE;
+                double maxRatio = 0.0D;
+                double sumRatio = 0.0D;
+                double sumP50 = 0.0D;
+                double maxP95 = 0.0D;
+                for (double[] block : blocks) {
+                    minRatio = Math.min(minRatio, block[0]);
+                    maxRatio = Math.max(maxRatio, block[0]);
+                    sumRatio += block[0];
+                    sumP50 += block[1];
+                    maxP95 = Math.max(maxP95, block[2]);
+                }
+                double meanRatio = sumRatio / blocks.size();
+                double spread = blocks.size() < 2 ? 1.0D
+                        : (maxRatio - minRatio) / Math.max(1.0e-6D, meanRatio);
+                boolean accepted = blocks.size() >= 2
+                        && spread <= T171_REPEAT_TOLERANCE;
+                out.append(String.format(Locale.ROOT,
+                        "%nT177_ARM pose=%s arm=%s blocks=%d ratioMin=%.4f"
+                                + " ratioMax=%.4f ratioMean=%.4f ratioSpread=%.4f"
+                                + " sessionLocalP50=%.4f sessionLocalP95=%.4f"
+                                + " verdict=%s",
+                        pose, entry.getKey(), blocks.size(), minRatio, maxRatio,
+                        meanRatio, spread, sumP50 / blocks.size(), maxP95,
+                        accepted ? "accepted"
+                                : blocks.size() < 2 ? "REJECTED_insufficient_blocks"
+                                : "REJECTED_ratio_spread"));
+            }
+        }
+        out.append(String.format(Locale.ROOT, "%nT177_FLOOR ratioTolerance=%.3f",
+                T171_REPEAT_TOLERANCE));
+        out.append(String.format(Locale.ROOT, "%nT177_REJECTED count=%d %s",
+                T162_REJECTED.size(),
+                T162_REJECTED.isEmpty() ? "none" : String.join(",", T162_REJECTED)));
+        return out.toString();
+    }
+
     private static String buildT176LightMarchReport() {
         StringBuilder out = new StringBuilder("T176_LIGHT_MARCH_DECISION");
         for (String pose : T176_POSES) {

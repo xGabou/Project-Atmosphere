@@ -424,7 +424,25 @@ public enum CoreCostDiagnosticProgram {
     T176_STACK_LIGHT3("t176_stack_light3"),
 
     /** T176 stack, four taps down to two. */
-    T176_STACK_LIGHT2("t176_stack_light2");
+    T176_STACK_LIGHT2("t176_stack_light2"),
+
+    // -----------------------------------------------------------------------
+    // T177. Primary-to-light group reuse. A light tap samples 28 units along
+    // LightDir from a point whose descriptor group the primary sample just
+    // resolved. These arms price skipping the tap's own candidate resolution
+    // and walking that group directly.
+    //
+    // Reuse cannot remove the ten-lobe group field evaluation itself - only the
+    // candidate texel fetch, the four-rank scan and any second group - so the
+    // hard arm bounds the whole idea. Whether it is ALSO correct is a separate
+    // question the reuse-validity counters answer.
+    // -----------------------------------------------------------------------
+
+    /** T177 Task 3: every light tap forced to reuse the primary group. */
+    T177_REUSE_HARD("t177_reuse_hard"),
+
+    /** T177 Task 7: the validated stack, flat light3, and hard reuse. */
+    T177_STACK_REUSE_HARD("t177_stack_reuse_hard");
 
     private final String serializedName;
 

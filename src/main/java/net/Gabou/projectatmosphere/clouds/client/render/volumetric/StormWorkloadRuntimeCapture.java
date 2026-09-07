@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 16;
+    private static final int STAGES = 19;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -106,6 +106,9 @@ final class StormWorkloadRuntimeCapture {
             case 13 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DETAIL_ATTRIBUTION;
             case 14 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_A;
             case 15 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY_DENSITY_B;
+            case 16 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_A;
+            case 17 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_B;
+            case 18 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_C;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -206,7 +209,10 @@ final class StormWorkloadRuntimeCapture {
                     values[12][0], values[12][1], values[12][2], values[12][3],
                     values[13][0], values[13][1], values[13][2], values[13][3],
                     values[14][0], values[14][1], values[14][2], values[14][3],
-                    values[15][0], values[15][1], values[15][2], values[15][3]);
+                    values[15][0], values[15][1], values[15][2], values[15][3],
+                    values[16][0], values[16][1], values[16][2], values[16][3],
+                    values[17][0], values[17][1], values[17][2], values[17][3],
+                    values[18][0], values[18][1]);
         }
     }
 
@@ -242,7 +248,12 @@ final class StormWorkloadRuntimeCapture {
             double primaryDensityCalls, double primaryDensityZero,
             double primaryDensityNegligible, double primaryDensityLow,
             double primaryDensityMedium, double primaryDensityHigh,
-            double primaryMaterialRuns, double primaryZeroRuns
+            double primaryMaterialRuns, double primaryZeroRuns,
+            double reuseTapsClassified, double reuseTapsEmpty,
+            double reuseSufficient, double reusePartial,
+            double reuseWrong, double reuseGroupsEnteredInTaps,
+            double reuseSuffOrd1, double reuseSuffOrd2,
+            double reuseSuffOrd3, double reuseSuffOrd4
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -269,7 +280,9 @@ final class StormWorkloadRuntimeCapture {
                     ThresholdWork.ZERO, ThresholdWork.ZERO,
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T175 primary density histogram, absent from the legacy shape.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T177 reuse validity, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -358,7 +371,31 @@ final class StormWorkloadRuntimeCapture {
                     + ratio(primaryDensityZero + primaryDensityNegligible, primaryZeroRuns)
                     + " detailFetchSecondOctave=" + fmt(detailFetchSecondOctave)
                     + " detailFetchLightShare=" + ratio(detailFetchLight,
-                            detailFetchPrimary + detailFetchLight);
+                            detailFetchPrimary + detailFetchLight)
+                    // T177. Reuse validity, derived here for the same reason
+                    // the primary ratios are: so a report cannot restate them
+                    // wrongly. "Classified" counts only taps that reached the
+                    // candidate walk and resolved at least one contributing
+                    // group; taps that resolved none are counted separately
+                    // rather than being scored as trivially reusable.
+                    + " reuseTapsClassified=" + fmt(reuseTapsClassified)
+                    + " reuseTapsEmpty=" + fmt(reuseTapsEmpty)
+                    + " reuseSufficient=" + fmt(reuseSufficient)
+                    + " reusePartial=" + fmt(reusePartial)
+                    + " reuseWrong=" + fmt(reuseWrong)
+                    + " reuseGroupsEnteredInTaps=" + fmt(reuseGroupsEnteredInTaps)
+                    + " reuseSuffOrd1=" + fmt(reuseSuffOrd1)
+                    + " reuseSuffOrd2=" + fmt(reuseSuffOrd2)
+                    + " reuseSuffOrd3=" + fmt(reuseSuffOrd3)
+                    + " reuseSuffOrd4=" + fmt(reuseSuffOrd4)
+                    + " reuseValidFraction="
+                    + ratio(reuseSufficient, reuseTapsClassified)
+                    + " reusePartialFraction="
+                    + ratio(reusePartial, reuseTapsClassified)
+                    + " reuseWrongFraction="
+                    + ratio(reuseWrong, reuseTapsClassified)
+                    + " groupsPerLightTap="
+                    + ratio(reuseGroupsEnteredInTaps, lightConeTaps);
         }
 
         double oraclePostOpacityDistance() {

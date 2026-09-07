@@ -64,7 +64,20 @@ public enum VolumetricCloudRaymarchDebugView {
      */
     STORM_WORKLOAD_PRIMARY_DENSITY_A(37, "storm_workload_primary_density_a"),
     /** T175 primary density histogram, part 2: medium, high, material runs, zero runs. */
-    STORM_WORKLOAD_PRIMARY_DENSITY_B(38, "storm_workload_primary_density_b");
+    STORM_WORKLOAD_PRIMARY_DENSITY_B(38, "storm_workload_primary_density_b"),
+
+    /**
+     * T177. Primary-to-light group reuse validity: how often the group a light
+     * tap actually needs was already resolved by the primary sample that
+     * spawned the cone march.
+     */
+    STORM_WORKLOAD_REUSE_A(39, "storm_workload_reuse_a"),
+
+    /** T177. Reuse misses, groups entered inside taps, and ordinals 1-2. */
+    STORM_WORKLOAD_REUSE_B(40, "storm_workload_reuse_b"),
+
+    /** T177. Reuse validity for tap ordinals 3-4. */
+    STORM_WORKLOAD_REUSE_C(41, "storm_workload_reuse_c");
 
     private final int shaderId;
     private final String serializedName;

@@ -1866,6 +1866,49 @@ implementation, while visual polish remains independently active.
   lobe walk, and use the **already-written** T149 graded adaptive-tap path (baked off in FINAL),
   given 73.6% of light taps land after the primary ray passes 50% alpha. Evidence in
   `validation/performance-light-march.md`.
+- [X] T177 [PERFORMANCE] [US3] Measure primary-to-light group reuse and re-measure the tap arms
+  under a paired-ratio protocol.
+  **Group reuse is closed, and the reason is that there is nothing to reuse.** The hard ceiling -
+  every light tap forced onto the primary sample's group - measures **0.6873x SIDE / 0.6708x FAR**,
+  i.e. 45% *slower*, both stable (ratio spread 1.24% / 0.85% over three blocks). The load-bearing
+  number is not the regression but **0.00 group walks avoided per pixel**: production already
+  performs **0.9997 group walks per light tap**, which is the floor, so reuse can only remove one
+  `stormCandidatesAt` texelFetch and a four-rank scan - and T170 already priced fetches at ~1.0x.
+  Part of the 45% is an artifact of the arm adding a second inlined `directStormGroupField` call
+  site, so it is reported as such rather than as the cost of reuse. Task 4 (reuse predicate) is moot
+  and was not built. **Reuse validity measured 100.00%** (1,458,641/1,458,641 taps SIDE;
+  215,205/215,205 FAR), zero partial, zero wrong, flat across all four tap ordinals - **but the
+  measurement is not usable**: `lobesVisited/groupFieldCalls = 10.0000` against `StormLobeCount=10`
+  means **this fixture contains exactly one descriptor group**, so every sample resolves the same
+  group and validity is true by construction. The interesting case - a tap crossing into a
+  neighbouring storm - does not occur on this fixture and was not tested. Reported as measured and
+  as unable to carry its conclusion. **Paired-ratio protocol** (three anchor-bracketed blocks per
+  arm; acceptance on local-ratio agreement, not absolute p50): **local anchor variance is small -
+  SIDE CV 0.84% over 36 anchor cells, FAR 2.97% - while the stack arms swing 11-14%, so the sticky
+  mode is program-specific, not machine-wide**, which refines rather than confirms T176's reading.
+  Anchor-relative pairing did not rescue the stack arms, it **rejected all of them**; but comparing
+  an arm against `t172_stack_pre` **within the same block** cancels the drift and yields
+  **light3-on-stack = 1.0634x, spread 0.48%** across three blocks, corroborating T176's 1.0701x.
+  That works at SIDE, where both arms move together (block 2 is slow for both by nearly the same
+  factor), and fails at FAR, where switching is per-cell and the two arms land in opposite modes
+  inside one block. **Within-block pairing cancels slow drift, not per-cell mode switching;
+  bimodality is still not solved.** **light3** is now measured three ways within 1.1% (1.0588
+  anchor-relative, 1.0634 within-block, 1.0701 in T176) with meanAbs 3.19e-03 - but **the quality
+  metrics the brief named (cloud/edge SSIM, silhouette IoU, thin and hole retention, self-shadow
+  contrast, dark-interior retention, shadow pockets, puff separation) do not exist in this harness
+  and were NOT measured**, so performance qualifies and quality is unproven; not productionized.
+  **light2** reproduces at 1.1402x SIDE (0.54%) but costs 3.9x light3's error for 7.7% more speed,
+  and is REJECTED at FAR (14.03%) - not a candidate. **Stack: every anchor-relative stack figure
+  this session is REJECTED on ratio spread**, so T176's 9.62 ms does not survive the stricter
+  protocol; session-local `stack_light3` reads 9.71/10.85/9.68 across blocks, reaching <=10 ms in
+  two of three and missing in the third. **SIDE <=10 ms is not established**, SIDE <=8 ms not met,
+  FAR not measurable this session (stack arms straddle 4.9 and 8.3 ms). The only session-independent
+  claim: light3 adds 1.0634x on the validated stack. **Remaining dominant workload: the ten-lobe
+  group walk** - 32.88 walks/pixel at SIDE, all ten lobes visited, ~5 contributing. Recommended
+  next: since the fixture's storm *is* one group of ten lobes, ask whether the group representation
+  can carry precomputed spatial information in the spare T172 texel channels to skip provably
+  non-contributing lobes without ranking in the hot loop - explicitly not nearest-K, which T168
+  closed. Evidence in `validation/performance-light-reuse.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
