@@ -179,6 +179,12 @@ final class StormT132AutoDriver {
      */
     private static final Path T178_MARKER = Path.of("t178-lobe-support.txt");
     /**
+     * T179 marker. Dominance pruning: rejecting a lobe before its exact SDF
+     * because the ordered smooth union provably cannot move, rather than
+     * because the lobe is spatially distant.
+     */
+    private static final Path T179_MARKER = Path.of("t179-dominance.txt");
+    /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
      * silhouette stability per frame. It shares the T135 fixture resolution but
@@ -1209,6 +1215,75 @@ final class StormT132AutoDriver {
     private static boolean t178Run;
     private static boolean t178OriginalHistoryEnabled;
 
+    /** SIDE binds the budget; FAR must not regress. */
+    private static final String[] T179_POSES = {"SIDE", "FAR"};
+
+    private static boolean t179Run;
+    private static boolean t179OriginalHistoryEnabled;
+
+    /**
+     * The T179 matrix. Three paired blocks per arm, with the stack control
+     * adjacent to the stack arm so the within-block ratio T177 validated is
+     * available for the composition question.
+     */
+    private static final T166Arm[] T179_ARMS = buildT179Arms();
+
+    private static T166Arm[] buildT179Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T179_DOM_EXACT,
+                    CoreCostDiagnosticProgram.T179_DOM_AGGRESSIVE,
+                    CoreCostDiagnosticProgram.T172_STACK_PRE,
+                    CoreCostDiagnosticProgram.T179_STACK_DOM}) {
+                arms.add(new T166Arm(arm, "r" + repeat, 60));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t179Arm() {
+        return T179_ARMS[Math.max(0, Math.min(T179_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T179_OPTIMIZATION_ARMS =
+            buildT179OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT179OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T179_ARMS.length];
+        for (int i = 0; i < T179_ARMS.length; i++) {
+            modes[i] = T179_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * The exact arm must be bit-identical - its extra rejections are lobes the
+     * union provably could not have used - and the aggressive arm must not be,
+     * or the ceiling it claims to bound is not real.
+     */
+    private static final CoreCostDiagnosticProgram[] T179_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T179_DOM_EXACT,
+            CoreCostDiagnosticProgram.T179_DOM_AGGRESSIVE,
+            CoreCostDiagnosticProgram.T179_STACK_DOM
+    };
+
+    /** True for a T179 bracketing anchor cell. */
+    private static boolean t179IsAnchor(T166Arm arm) {
+        return arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL;
+    }
+
+    /** T179 marker predicate. */
+    private static boolean dominancePruningRunRequested() {
+        return Files.exists(T179_MARKER);
+    }
+
     /**
      * The T178 matrix. Same three-block paired structure T177 established, with
      * the stack control adjacent to every stack arm so the within-block ratio
@@ -1616,7 +1691,7 @@ final class StormT132AutoDriver {
     private static boolean programArmCampaign() {
         return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run || t172Run
                 || t173Run || t174Run || t175Run || t176Run || t177Run
-                || t178Run;
+                || t178Run || t179Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -1874,7 +1949,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t178Run ? t178Arm()
+            T166Arm arm = t179Run ? t179Arm()
+                    : t178Run ? t178Arm()
                     : t177Run ? t177Arm()
                     : t176Run ? t176Arm()
                     : t175Run ? t175Arm()
@@ -1966,6 +2042,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t179Run) {
+            return t179Arm().label();
+        }
         if (t178Run) {
             return t178Arm().label();
         }
@@ -2033,6 +2112,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t179Run) {
+            return T179_OPTIMIZATION_ARMS;
+        }
         if (t178Run) {
             return T178_OPTIMIZATION_ARMS;
         }
@@ -2231,6 +2313,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t179Run) {
+            return T179_POSES;
+        }
         if (t178Run) {
             return T178_POSES;
         }
@@ -2613,6 +2698,8 @@ final class StormT132AutoDriver {
                 t177OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t178Run = lobeSupportRunRequested();
                 t178OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t179Run = dominancePruningRunRequested();
+                t179OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t168OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t167Run = refinementRunRequested();
                 t167OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
@@ -2658,7 +2745,8 @@ final class StormT132AutoDriver {
                                 || t175Run
                                 || t176Run
                                 || t177Run
-                                || t178Run;
+                                || t178Run
+                                || t179Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -2670,7 +2758,8 @@ final class StormT132AutoDriver {
                     if (!t153OracleRun && !t161Run && !t140Run && !t162Run && !t163Run
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
-                            && !t175Run && !t176Run && !t177Run && !t178Run) {
+                            && !t175Run && !t176Run && !t177Run && !t178Run
+                            && !t179Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -2680,7 +2769,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t178Run ? "T178_LOBE_SUPPORT"
+                            t179Run ? "T179_DOMINANCE"
+                                    : t178Run ? "T178_LOBE_SUPPORT"
                                     : t177Run ? "T177_LIGHT_REUSE"
                                     : t176Run ? "T176_LIGHT_MARCH"
                                     : t175Run ? "T175_DENSITY_NECESSITY"
@@ -3017,7 +3107,8 @@ final class StormT132AutoDriver {
                         || (t175Run && t175Arm().program().fixedWork())
                         || (t176Run && t176Arm().program().fixedWork())
                         || (t177Run && t177Arm().program().fixedWork())
-                        || (t178Run && t178Arm().program().fixedWork())) {
+                        || (t178Run && t178Arm().program().fixedWork())
+                        || (t179Run && t179Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -3161,6 +3252,13 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t179Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT179DominanceReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(t179OriginalHistoryEnabled);
                 }
                 if (t178Run) {
                     ProjectAtmosphere.LOGGER.info(buildT178LobeSupportReport());
@@ -3973,6 +4071,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t179Run) {
+            return T179_IMAGE_ARMS;
+        }
         if (t178Run) {
             return T178_IMAGE_ARMS;
         }
@@ -4420,6 +4521,125 @@ final class StormT132AutoDriver {
      * swing: comparing an arm against the stack control measured seconds away
      * in the same block held to 0.48% while each arm's absolute value moved 11%.
      */
+    /** T179. The paired-ratio protocol, with the within-block stack control. */
+    private static String buildT179DominanceReport() {
+        StringBuilder out = new StringBuilder("T179_DOMINANCE_DECISION");
+        for (String pose : T179_POSES) {
+            java.util.Map<String, java.util.List<double[]>> byProgram =
+                    new java.util.LinkedHashMap<>();
+            java.util.Map<Integer, java.util.Map<String, Double>> byBlock =
+                    new java.util.LinkedHashMap<>();
+            int block = 0;
+            for (int i = 0; i < T179_ARMS.length; i++) {
+                T166Arm arm = T179_ARMS[i];
+                if (t179IsAnchor(arm) || i == 0 || i + 1 >= T179_ARMS.length) {
+                    continue;
+                }
+                if (arm.program() == CoreCostDiagnosticProgram.T179_DOM_EXACT) {
+                    block++;
+                }
+                StormT135PerformanceProfile.Cell before =
+                        t162Cell(pose, T179_ARMS[i - 1].label());
+                StormT135PerformanceProfile.Cell after =
+                        t162Cell(pose, T179_ARMS[i + 1].label());
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (before == null || after == null || cell == null
+                        || cell.cloudP50() <= 0.0D) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT179_BLOCK pose=%s arm=%s evaluated=false", pose,
+                            arm.label()));
+                    continue;
+                }
+                double baseline = (before.cloudP50() + after.cloudP50()) * 0.5D;
+                double drift = Math.abs(before.cloudP50() - after.cloudP50())
+                        / Math.max(1.0e-6D, baseline);
+                double ratio = baseline / cell.cloudP50();
+                out.append(String.format(Locale.ROOT,
+                        "%nT179_BLOCK pose=%s block=%d arm=%s anchorBefore=%.4f"
+                                + " anchorAfter=%.4f anchorDrift=%.4f cloudP50=%.4f"
+                                + " cloudP95=%.4f localRatio=%.4f blockVerdict=%s",
+                        pose, block, arm.label(), before.cloudP50(), after.cloudP50(),
+                        drift, cell.cloudP50(), cell.cloudP95(), ratio,
+                        drift <= T171_REPEAT_TOLERANCE ? "accepted"
+                                : "REJECTED_anchor_drift"));
+                byBlock.computeIfAbsent(block, k -> new java.util.LinkedHashMap<>())
+                        .put(arm.program().serializedName(), cell.cloudP50());
+                if (drift > T171_REPEAT_TOLERANCE) {
+                    continue;
+                }
+                byProgram.computeIfAbsent(arm.program().serializedName(),
+                        key -> new java.util.ArrayList<>())
+                        .add(new double[] {ratio, cell.cloudP50(), cell.cloudP95()});
+            }
+            for (java.util.Map.Entry<String, java.util.List<double[]>> entry
+                    : byProgram.entrySet()) {
+                java.util.List<double[]> blocks = entry.getValue();
+                double minRatio = Double.MAX_VALUE;
+                double maxRatio = 0.0D;
+                double sumRatio = 0.0D;
+                double sumP50 = 0.0D;
+                double maxP95 = 0.0D;
+                for (double[] b : blocks) {
+                    minRatio = Math.min(minRatio, b[0]);
+                    maxRatio = Math.max(maxRatio, b[0]);
+                    sumRatio += b[0];
+                    sumP50 += b[1];
+                    maxP95 = Math.max(maxP95, b[2]);
+                }
+                double meanRatio = sumRatio / blocks.size();
+                double spread = blocks.size() < 2 ? 1.0D
+                        : (maxRatio - minRatio) / Math.max(1.0e-6D, meanRatio);
+                boolean accepted = blocks.size() >= 2
+                        && spread <= T171_REPEAT_TOLERANCE;
+                out.append(String.format(Locale.ROOT,
+                        "%nT179_ARM pose=%s arm=%s blocks=%d ratioMin=%.4f"
+                                + " ratioMax=%.4f ratioMean=%.4f ratioSpread=%.4f"
+                                + " sessionLocalP50=%.4f sessionLocalP95=%.4f"
+                                + " verdict=%s",
+                        pose, entry.getKey(), blocks.size(), minRatio, maxRatio,
+                        meanRatio, spread, sumP50 / blocks.size(), maxP95,
+                        accepted ? "accepted"
+                                : blocks.size() < 2 ? "REJECTED_insufficient_blocks"
+                                : "REJECTED_ratio_spread"));
+            }
+            String control = CoreCostDiagnosticProgram.T172_STACK_PRE.serializedName();
+            String target = CoreCostDiagnosticProgram.T179_STACK_DOM.serializedName();
+            java.util.List<Double> paired = new java.util.ArrayList<>();
+            for (java.util.Map<String, Double> cells : byBlock.values()) {
+                Double base = cells.get(control);
+                Double arm = cells.get(target);
+                if (base != null && arm != null && arm > 0.0D) {
+                    paired.add(base / arm);
+                }
+            }
+            if (paired.size() >= 2) {
+                double min = Double.MAX_VALUE;
+                double max = 0.0D;
+                double sum = 0.0D;
+                for (double v : paired) {
+                    min = Math.min(min, v);
+                    max = Math.max(max, v);
+                    sum += v;
+                }
+                double mean = sum / paired.size();
+                double spread = (max - min) / Math.max(1.0e-6D, mean);
+                out.append(String.format(Locale.ROOT,
+                        "%nT179_WITHIN_BLOCK pose=%s arm=%s vsControl=%s blocks=%d"
+                                + " ratioMin=%.4f ratioMax=%.4f ratioMean=%.4f"
+                                + " ratioSpread=%.4f verdict=%s",
+                        pose, target, control, paired.size(), min, max, mean, spread,
+                        spread <= T171_REPEAT_TOLERANCE ? "accepted"
+                                : "REJECTED_ratio_spread"));
+            }
+        }
+        out.append(String.format(Locale.ROOT, "%nT179_FLOOR ratioTolerance=%.3f",
+                T171_REPEAT_TOLERANCE));
+        out.append(String.format(Locale.ROOT, "%nT179_REJECTED count=%d %s",
+                T162_REJECTED.size(),
+                T162_REJECTED.isEmpty() ? "none" : String.join(",", T162_REJECTED)));
+        return out.toString();
+    }
+
     private static String buildT178LobeSupportReport() {
         StringBuilder out = new StringBuilder("T178_LOBE_SUPPORT_DECISION");
         for (String pose : T178_POSES) {

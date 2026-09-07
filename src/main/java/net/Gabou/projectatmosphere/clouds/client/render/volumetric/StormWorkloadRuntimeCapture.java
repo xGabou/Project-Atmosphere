@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 21;
+    private static final int STAGES = 23;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -111,6 +111,8 @@ final class StormWorkloadRuntimeCapture {
             case 18 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_C;
             case 19 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_A;
             case 20 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_B;
+            case 21 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_A;
+            case 22 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_B;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -216,7 +218,9 @@ final class StormWorkloadRuntimeCapture {
                     values[17][0], values[17][1], values[17][2], values[17][3],
                     values[18][0], values[18][1],
                     values[19][0], values[19][1], values[19][2], values[19][3],
-                    values[20][0], values[20][1]);
+                    values[20][0], values[20][1],
+                    values[21][0], values[21][1], values[21][2], values[21][3],
+                    values[22][0], values[22][1], values[22][2]);
         }
     }
 
@@ -260,7 +264,11 @@ final class StormWorkloadRuntimeCapture {
             double reuseSuffOrd3, double reuseSuffOrd4,
             double lobeExactSdf, double lobeExactSdfNoChange,
             double lobeVisitsLight, double lobeExactSdfLight,
-            double lobeCheapRejectLight, double lobeSupportRejects
+            double lobeCheapRejectLight, double lobeDominanceRejects,
+            double domChangeZero, double domChangeBelowEpsilon,
+            double domChangeTiny, double domChangeMeaningful,
+            double domZeroLight, double domZeroPrimary,
+            double domWouldRejectWithExactBlend
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -291,7 +299,9 @@ final class StormWorkloadRuntimeCapture {
                     // T177 reuse validity, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T178 lobe attribution, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T179 dominance histogram, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -414,7 +424,22 @@ final class StormWorkloadRuntimeCapture {
                     + " lobeVisitsLight=" + fmt(lobeVisitsLight)
                     + " lobeExactSdfLight=" + fmt(lobeExactSdfLight)
                     + " lobeCheapRejectLight=" + fmt(lobeCheapRejectLight)
-                    + " lobeSupportRejects=" + fmt(lobeSupportRejects)
+                    + " lobeDominanceRejects=" + fmt(lobeDominanceRejects)
+                    // T179. What each exact SDF did to the union. "Zero" is the
+                    // strict ceiling: those lobes could have been skipped with
+                    // no image consequence at all.
+                    + " domChangeZero=" + fmt(domChangeZero)
+                    + " domChangeBelowEpsilon=" + fmt(domChangeBelowEpsilon)
+                    + " domChangeTiny=" + fmt(domChangeTiny)
+                    + " domChangeMeaningful=" + fmt(domChangeMeaningful)
+                    + " domZeroLight=" + fmt(domZeroLight)
+                    + " domZeroPrimary=" + fmt(domZeroPrimary)
+                    + " domWouldRejectWithExactBlend="
+                    + fmt(domWouldRejectWithExactBlend)
+                    + " domZeroFraction=" + ratio(domChangeZero, lobeExactSdf)
+                    + " domZeroPerGroupWalk=" + ratio(domChangeZero, groupFieldCalls)
+                    + " domExactBlendGainPerGroupWalk="
+                    + ratio(domWouldRejectWithExactBlend, groupFieldCalls)
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
                     + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
                     + " cheapRejectPerGroupWalk="

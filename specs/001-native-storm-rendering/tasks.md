@@ -1956,6 +1956,44 @@ implementation, while visual polish remains independently active.
   has treated as its own problem. **Texel 5 is dead weight while this line stays closed and should
   return TEXELS_PER_DESCRIPTOR to 5 before any merge.** Evidence in
   `validation/performance-lobe-support.md`.
+- [X] T179 [PERFORMANCE] [US3] Test whether a lobe can be proven unable to move the smooth union
+  before its exact SDF is paid.
+  **Closed: the candidate is exact, free, and worth nothing.** From `stormSmoothMinimum` itself,
+  `h = saturate(0.5 + 0.5*(d_new - d_cur)/blend)` reaches 1 exactly when `d_new >= d_cur + blend`,
+  and there the result is `d_cur` with the polynomial term vanishing and `stormBlendFactor`'s mix
+  an identity - so **a lobe at or beyond `d_cur + blend` cannot alter any component of the union**.
+  Production already tests that, against the 48-block global cap while the pair's real blend is
+  `clamp(0.25*smaller radius, 4, 48)`, typically 8-20. `t179_dom_exact` substitutes the exact value,
+  hoisted from the union below and reused there, and is **bit-identical** (0 changed pixels, maxAbs
+  exactly 0.000000, both poses) - **but measures 0.9999x SIDE / 0.9955x FAR.** **My slack hypothesis
+  was wrong**: the tightening rejects only **0.076%** more lobes (25,109 of 32,941,121), because
+  the lobes surviving T121 are far closer than the 8-48 block band - **the bound is the binding
+  constraint, not the threshold.** **Strict ceiling 1.0159x SIDE** (`t179_dom_aggressive`, no blend
+  margin, accepted at 1.34% spread) against Task 8's 1.10x gate; it genuinely discards contributors
+  (424 changed pixels), so the ceiling is real work skipped rather than T178's accidental no-op.
+  **Histogram** (non-first exact SDFs, 28.67M at SIDE): **46.75% change exactly zero**, 1.80% below
+  storage epsilon, 0.39% tiny, 51.05% meaningful - 3.14 zero-change SDFs per group walk. **By
+  consumer, dominance pruning is half as effective on light taps** (25.0% zero-change) as on primary
+  (52.8%), answering T178's question the other way round: a light tap marches from *inside* the
+  cloud, where the vertical lower bound returns ~0 and cannot exceed `groupDistance` under any
+  margin, and where several lobes genuinely are near. **The structural finding: removing 46.75% of
+  exact SDFs is worth 1.6%, while T170's compile-time `desc_nosdf` removing 100% of them uniformly
+  was worth 1.53x.** Those cannot be reconciled by work-removed arithmetic; the consistent
+  explanation is execution shape - the ten-lobe loop is warp-wide, so a lobe skipped by one lane is
+  still evaluated whenever any other lane needs it. Labelled an **inference from two measurements**,
+  not instrumented, but it fits the whole series: T167 nearest-K slower, T174 group entry 1.136x and
+  insufficient, T178 support bound 0.941x. **Every per-lane pruning scheme has underdelivered
+  against its own arithmetic; both shipped wins (T168 footprint LOD, T172 precompute) were uniform
+  compile-time reductions.** Task 6's ordering oracle **NOT MEASURED** - a better order changes how
+  many lobes are rejected, not what a rejection is worth, and the union is order-sensitive so
+  best-first is not image-neutral. Stack: every figure rejected on ratio spread including the
+  control (SIDE 10.90%, FAR 54.48%); nothing to compose at 0.9999x. SIDE <=10 ms **no**, <=8 ms
+  **no**. **Recommended T180: branch B - fresh-profile the segment/probe/quadrature workload**,
+  ~48% of descriptor walks per T175 and never attributed since; representation redesign is not
+  indicated because the flat walk already identifies dominated lobes correctly and finding them is
+  what fails to pay. Weight uniform reductions over selective ones. The T123 invariant caught this
+  campaign's counter below a multi-line guard, the same class it caught in T174 and T175. Evidence
+  in `validation/performance-dominance.md`; texel cleanup banked separately as `42e655d`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

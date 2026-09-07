@@ -87,7 +87,16 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_LOBE_A(42, "storm_workload_lobe_a"),
 
     /** T178. Light-attributed cheap rejects and support-bound rejects. */
-    STORM_WORKLOAD_LOBE_B(43, "storm_workload_lobe_b");
+    STORM_WORKLOAD_LOBE_B(43, "storm_workload_lobe_b"),
+
+    /**
+     * T179. The dominance histogram: what each exact SDF actually did to the
+     * accumulated union, binned by magnitude of change.
+     */
+    STORM_WORKLOAD_DOMINANCE_A(44, "storm_workload_dominance_a"),
+
+    /** T179. Zero-change SDFs by consumer, and the slack in the T121 bound. */
+    STORM_WORKLOAD_DOMINANCE_B(45, "storm_workload_dominance_b");
 
     private final int shaderId;
     private final String serializedName;

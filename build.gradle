@@ -851,6 +851,30 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T179. Dominance pruning. The rejection threshold drops from the
+        // global blend cap (48 blocks) to the exact blend radius the ordered
+        // union will use for this pair, which is what stormSmoothMinimum's
+        // h == 1 condition actually requires. No new payload, no division, no
+        // ranking - the blend is hoisted from the union below and reused.
+        [name: 'cloud_atmosphere_volume_t179_dom_exact',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_DOMINANCE_EXACT 1'],
+         keepUniforms: []],
+        // The family ceiling: no blend margin at all. Rejects lobes that do move
+        // the union through the blend band, so it is image-invalid by
+        // construction and bounds the idea rather than implementing it.
+        [name: 'cloud_atmosphere_volume_t179_dom_aggressive',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_DOMINANCE_AGGRESSIVE 1'],
+         keepUniforms: []],
+        // Task 9's fresh stack: the validated components, no light3.
+        [name: 'cloud_atmosphere_volume_t179_stack_dom',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_DOMINANCE_EXACT 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
         // T177. Hard primary-to-light group reuse, alone and on the stack.
         [name: 'cloud_atmosphere_volume_t177_reuse_hard',
          defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',

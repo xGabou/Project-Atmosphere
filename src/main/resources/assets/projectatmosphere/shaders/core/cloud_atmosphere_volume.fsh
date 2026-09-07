@@ -499,6 +499,24 @@ int paLobeCheapRejectLight = 0;
  * unable to move the smooth union before their exact SDF is paid.
  */
 int paLobeDominanceRejects = 0;
+
+/**
+ * T179 Task 2. The post-hoc dominance histogram.
+ *
+ * <p>Binned on what the lobe actually did to the accumulated union distance,
+ * measured after the fact, so the bins describe the population a pre-SDF test
+ * would have to identify rather than the population any particular test finds.
+ * "Exactly zero" is the strict ceiling: those lobes provably could have been
+ * skipped with no image consequence whatsoever.
+ */
+int paDomChangeZero = 0;
+int paDomChangeBelowEpsilon = 0;
+int paDomChangeTiny = 0;
+int paDomChangeMeaningful = 0;
+int paDomZeroLight = 0;
+int paDomZeroPrimary = 0;
+/** Slack the production threshold carries over the exact dominance threshold. */
+int paDomWouldRejectWithExactBlend = 0;
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -598,7 +616,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 43);
+        || (DebugView >= 28 && DebugView <= 45);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -2341,6 +2359,30 @@ void directStormGroupField(
         }
         groupMinimumRadius = min(groupMinimumRadius, lobeRadius);
 
+        // T179. The blend radius the ordered union will use for THIS pair,
+        // hoisted above the rejection test so the test can use the exact value
+        // instead of the global cap, and so the union below can reuse it rather
+        // than recompute it.
+        //
+        // The dominance condition is exact, from stormSmoothMinimum itself:
+        //
+        //     h      = saturate(0.5 + 0.5 * (d_new - d_cur) / blend)
+        //     result = mix(d_new, d_cur, h) - blend * h * (1 - h)
+        //
+        // h reaches 1 exactly when d_new >= d_cur + blend, and at h == 1 the
+        // result is d_cur and the polynomial term vanishes. stormBlendFactor is
+        // the same saturate, so groupStrength and groupSoftness are likewise
+        // unchanged. A lobe at or beyond d_cur + blend therefore cannot alter
+        // the union at all.
+        //
+        // Production tests against groupDistance + STORM_MAX_BLEND_BLOCKS, and
+        // that constant is 48 while this pair's blend is
+        // clamp(0.25 * smaller radius, 4, 48) - typically 8 to 20. The test was
+        // carrying up to 40 blocks of slack it did not need, which is why 3.78
+        // lobes per group walk survived it and then failed to move the union.
+        float paLobeBlend = stormLobeBlendRadius(
+            previousRadius, lobeRadius, previousRole, lobeRole);
+
         // T141 arm: the same comparison against a strictly tighter lower
         // bound. max() of two valid lower bounds is a valid lower bound, so
         // the arm can only reject more, never differently.
@@ -2378,9 +2420,41 @@ void directStormGroupField(
             continue;
         }
 #endif
+#ifdef PA_ARM_DOMINANCE_AGGRESSIVE
+        // T179 Task 3 ceiling. Drops the blend margin entirely, so it rejects
+        // every lobe the union's own minimum already dominates without allowing
+        // for the smooth blend that actually happens. NOT conservative: lobes
+        // inside the blend band do move the union. Bounds the family; never a
+        // candidate.
+        float paDominanceThreshold = groupDistance;
+#elif defined(PA_ARM_DOMINANCE_EXACT)
+        // T179 Task 5 candidate. The exact threshold proved above. Strictly
+        // smaller than the production constant, so it rejects a superset, and
+        // every additional rejection is a lobe that provably could not have
+        // changed the union.
+        float paDominanceThreshold = groupDistance + paLobeBlend;
+#else
+        float paDominanceThreshold = groupDistance + STORM_MAX_BLEND_BLOCKS;
+#endif
+        // Diagnostic only: how many lobes the exact threshold would reject that
+        // the production constant lets through. Measured on the production
+        // path, so it prices the candidate before the candidate is built.
+        bool paDomSlack = false;
+        if (paWorkloadCaptureActive()) {
+            paDomSlack = started && !paT121Off()
+                && verticalLowerBound > max(
+                    lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
+                    groupDistance + paLobeBlend)
+                && verticalLowerBound <= max(
+                    lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
+                    groupDistance + STORM_MAX_BLEND_BLOCKS);
+        }
+        if (paWorkloadCaptureActive()) {
+            paDomWouldRejectWithExactBlend += paDomSlack ? 1 : 0;
+        }
         if (started && !paT121Off() && verticalLowerBound > max(
                 lobeSoftness + STORM_T121_SOFTNESS_MARGIN_BLOCKS,
-                groupDistance + STORM_MAX_BLEND_BLOCKS)) {
+                paDominanceThreshold)) {
             // T121: this is the sole conservative vertical-cap branch.  It
             // skips the exact descriptor SDF only after its lower bound proves
             // that the lobe cannot contribute to the ordered smooth union.
@@ -2389,6 +2463,9 @@ void directStormGroupField(
             }
             if (paWorkloadCaptureActive()) {
                 paLobeCheapRejectLight += paLightTapOrdinal > 0 ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paLobeDominanceRejects++;
             }
             // Rejected by the horizontal term alone: the vertical-only bound
             // that ships today would have evaluated this lobe exactly. Counting
@@ -2510,7 +2587,8 @@ void directStormGroupField(
             groupStrength = mix(lobeStrength, groupStrength, mixFactor);
             groupSoftness = mix(lobeSoftness, groupSoftness, mixFactor);
 #else
-            float blend = stormLobeBlendRadius(previousRadius, lobeRadius, previousRole, lobeRole);
+            // T179: the same value hoisted above the rejection test.
+            float blend = paLobeBlend;
             float mixFactor = stormBlendFactor(groupDistance, lobeDistance, blend);
             groupDistance = stormSmoothMinimum(groupDistance, lobeDistance, blend);
             groupStrength = mix(lobeStrength, groupStrength, mixFactor);
@@ -2532,6 +2610,33 @@ void directStormGroupField(
                     && abs(groupDistance - paGroupDistanceBefore) <= 0.01
                     && groupActiveRoleMask == paRoleMaskBefore) {
                 paLobeExactSdfNoChange++;
+            }
+            // T179 Task 2. Bins on the magnitude of the change this lobe made.
+            // Each bin is guarded on its own so every increment is provably
+            // unreachable in a production frame.
+            float paDomDelta = abs(groupDistance - paGroupDistanceBefore);
+            bool paDomRoleSame = groupActiveRoleMask == paRoleMaskBefore;
+            if (paWorkloadCaptureActive()) {
+                paDomChangeZero += (paDomDelta == 0.0 && paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomChangeBelowEpsilon += (paDomDelta > 0.0 && paDomDelta <= 0.0009765625
+                    && paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomChangeTiny += (paDomDelta > 0.0009765625 && paDomDelta <= 0.01
+                    && paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomChangeMeaningful += (paDomDelta > 0.01 || !paDomRoleSame) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomZeroLight += (paDomDelta == 0.0 && paDomRoleSame
+                    && paLightTapOrdinal > 0) ? 1 : 0;
+            }
+            if (paWorkloadCaptureActive()) {
+                paDomZeroPrimary += (paDomDelta == 0.0 && paDomRoleSame
+                    && paLightTapOrdinal == 0) ? 1 : 0;
             }
         }
         previousRadius = lobeRadius;
@@ -7956,6 +8061,26 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 44) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDomChangeZero),
+            float(paDomChangeBelowEpsilon),
+            float(paDomChangeTiny),
+            float(paDomChangeMeaningful)
+        );
+        return;
+    }
+    if (DebugView == 45) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paDomZeroLight),
+            float(paDomZeroPrimary),
+            float(paDomWouldRejectWithExactBlend),
+            0.0
         );
         return;
     }

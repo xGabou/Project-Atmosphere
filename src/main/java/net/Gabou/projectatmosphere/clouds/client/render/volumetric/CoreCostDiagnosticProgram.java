@@ -442,7 +442,23 @@ public enum CoreCostDiagnosticProgram {
     T177_REUSE_HARD("t177_reuse_hard"),
 
     /** T177 Task 7: the validated stack, flat light3, and hard reuse. */
-    T177_STACK_REUSE_HARD("t177_stack_reuse_hard");
+    T177_STACK_REUSE_HARD("t177_stack_reuse_hard"),
+
+    // -----------------------------------------------------------------------
+    // T179. Dominance pruning. stormSmoothMinimum is exactly unchanged once the
+    // incoming distance reaches d_cur + blend, and production has been testing
+    // that condition against the 48-block global cap instead of this pair's
+    // actual blend radius. Tightening it costs no new data and no division.
+    // -----------------------------------------------------------------------
+
+    /** T179 candidate: the exact per-pair dominance threshold. */
+    T179_DOM_EXACT("t179_dom_exact"),
+
+    /** T179 ceiling: no blend margin, image-invalid, bounds the family. */
+    T179_DOM_AGGRESSIVE("t179_dom_aggressive"),
+
+    /** T179 Task 9: the fresh stack with dominance pruning, no light3. */
+    T179_STACK_DOM("t179_stack_dom");
 
 
     private final String serializedName;
