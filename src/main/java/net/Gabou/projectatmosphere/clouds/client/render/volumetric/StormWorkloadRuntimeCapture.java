@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 23;
+    private static final int STAGES = 26;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -113,6 +113,9 @@ final class StormWorkloadRuntimeCapture {
             case 20 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_B;
             case 21 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_A;
             case 22 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_DOMINANCE_B;
+            case 23 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_A;
+            case 24 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_B;
+            case 25 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_C;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -220,7 +223,10 @@ final class StormWorkloadRuntimeCapture {
                     values[19][0], values[19][1], values[19][2], values[19][3],
                     values[20][0], values[20][1],
                     values[21][0], values[21][1], values[21][2], values[21][3],
-                    values[22][0], values[22][1], values[22][2]);
+                    values[22][0], values[22][1], values[22][2],
+                    values[23][0], values[23][1], values[23][2], values[23][3],
+                    values[24][0], values[24][1], values[24][2], values[24][3],
+                    values[25][0]);
         }
     }
 
@@ -268,7 +274,10 @@ final class StormWorkloadRuntimeCapture {
             double domChangeZero, double domChangeBelowEpsilon,
             double domChangeTiny, double domChangeMeaningful,
             double domZeroLight, double domZeroPrimary,
-            double domWouldRejectWithExactBlend
+            double domWouldRejectWithExactBlend,
+            double probeCalls, double probeGroupWalks, double probeExactSdf,
+            double bracketCalls, double bracketGroupWalks, double bracketExactSdf,
+            double otherCalls, double otherGroupWalks, double otherExactSdf
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -301,7 +310,9 @@ final class StormWorkloadRuntimeCapture {
                     // T178 lobe attribution, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T179 dominance histogram, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T180 consumer attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -440,6 +451,24 @@ final class StormWorkloadRuntimeCapture {
                     + " domZeroPerGroupWalk=" + ratio(domChangeZero, groupFieldCalls)
                     + " domExactBlendGainPerGroupWalk="
                     + ratio(domWouldRejectWithExactBlend, groupFieldCalls)
+                    // T180. Direct consumer attribution. T175 derived the
+                    // "48% segment/probe/quadrature" class by subtraction;
+                    // these are tagged at the real call sites instead, so the
+                    // buckets are disjoint and sum back to the total.
+                    + " probeCalls=" + fmt(probeCalls)
+                    + " probeGroupWalks=" + fmt(probeGroupWalks)
+                    + " probeExactSdf=" + fmt(probeExactSdf)
+                    + " bracketCalls=" + fmt(bracketCalls)
+                    + " bracketGroupWalks=" + fmt(bracketGroupWalks)
+                    + " bracketExactSdf=" + fmt(bracketExactSdf)
+                    + " otherCalls=" + fmt(otherCalls)
+                    + " otherGroupWalks=" + fmt(otherGroupWalks)
+                    + " otherExactSdf=" + fmt(otherExactSdf)
+                    + " probeWalkShare=" + ratio(probeGroupWalks, groupFieldCalls)
+                    + " bracketWalkShare=" + ratio(bracketGroupWalks, groupFieldCalls)
+                    + " otherWalkShare=" + ratio(otherGroupWalks, groupFieldCalls)
+                    + " probeSdfShare=" + ratio(probeExactSdf, lobeExactSdf)
+                    + " bracketSdfShare=" + ratio(bracketExactSdf, lobeExactSdf)
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
                     + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
                     + " cheapRejectPerGroupWalk="

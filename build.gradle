@@ -851,6 +851,33 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T180. The empty-span probe scan and the bracket bisection are the
+        // two production consumers T175's "48%" was actually made of. Both ask
+        // only whether density exceeds 0.0008, and both are removed here
+        // uniformly at compile time - the shape T179 showed is the only one that
+        // pays - to bound what each class is worth.
+        [name: 'cloud_atmosphere_volume_t180_noprobe',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_PROBE 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t180_nobracket',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_BRACKET 1'],
+         keepUniforms: []],
+        // The cheaper-query candidate: probes keep running but drop the
+        // subtractive detail erosion, which can only raise the value they test
+        // and so can never let the scan advance over material.
+        [name: 'cloud_atmosphere_volume_t180_probe_nodetail',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PROBE_NO_DETAIL 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t180_stack_probe',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_NO_DETAIL 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
         // T179. Dominance pruning. The rejection threshold drops from the
         // global blend cap (48 blocks) to the exact blend radius the ordered
         // union will use for this pair, which is what stormSmoothMinimum's

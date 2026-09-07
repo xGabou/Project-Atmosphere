@@ -96,7 +96,19 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_DOMINANCE_A(44, "storm_workload_dominance_a"),
 
     /** T179. Zero-change SDFs by consumer, and the slack in the T121 bound. */
-    STORM_WORKLOAD_DOMINANCE_B(45, "storm_workload_dominance_b");
+    STORM_WORKLOAD_DOMINANCE_B(45, "storm_workload_dominance_b"),
+
+    /**
+     * T180. Direct attribution of the descriptor walk to its real production
+     * consumers, replacing T175's estimate by subtraction.
+     */
+    STORM_WORKLOAD_CONSUMER_A(46, "storm_workload_consumer_a"),
+
+    /** T180. Bracket bisection and unattributed consumers. */
+    STORM_WORKLOAD_CONSUMER_B(47, "storm_workload_consumer_b"),
+
+    /** T180. Exact SDFs charged to unattributed consumers. */
+    STORM_WORKLOAD_CONSUMER_C(48, "storm_workload_consumer_c");
 
     private final int shaderId;
     private final String serializedName;

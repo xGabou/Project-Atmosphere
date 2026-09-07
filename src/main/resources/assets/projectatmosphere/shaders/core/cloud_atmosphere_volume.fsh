@@ -517,6 +517,29 @@ int paDomZeroLight = 0;
 int paDomZeroPrimary = 0;
 /** Slack the production threshold carries over the exact dominance threshold. */
 int paDomWouldRejectWithExactBlend = 0;
+
+/**
+ * T180. Which consumer is currently inside cloudDensity().
+ *
+ * <p>T175 attributed 48% of descriptor walks to "segment tests, clearance
+ * probes and quadrature" by subtraction, and no campaign has decomposed it
+ * since. This tag replaces the subtraction with a direct attribution: it is set
+ * around the real production call sites and read where the group walk and the
+ * exact SDF are counted, so every walk lands in exactly one bucket.
+ *
+ * <p>0 other, 1 primary body, 2 light tap, 3 empty-span probe,
+ * 4 bracket bisection.
+ */
+int paDensityConsumer = 0;
+int paProbeCalls = 0;
+int paProbeGroupWalks = 0;
+int paProbeExactSdf = 0;
+int paBracketCalls = 0;
+int paBracketGroupWalks = 0;
+int paBracketExactSdf = 0;
+int paOtherCalls = 0;
+int paOtherGroupWalks = 0;
+int paOtherExactSdf = 0;
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -616,7 +639,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 45);
+        || (DebugView >= 28 && DebugView <= 48);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -2501,6 +2524,15 @@ void directStormGroupField(
         if (paWorkloadCaptureActive()) {
             paLobeExactSdfLight += paLightTapOrdinal > 0 ? 1 : 0;
         }
+        if (paWorkloadCaptureActive()) {
+            paProbeExactSdf += paDensityConsumer == 3 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paBracketExactSdf += paDensityConsumer == 4 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paOtherExactSdf += paDensityConsumer == 0 ? 1 : 0;
+        }
         // T122 OFF refetches the three texels the exact SDF consumes and
         // passes the refetched values into the same equation, in the same
         // order, with the same groupSlot and role already decoded above.
@@ -2763,6 +2795,15 @@ float directStormShape(
         }
         if (paWorkloadCaptureActive()) {
             paReuseGroupsEnteredInTaps += paLightTapOrdinal > 0 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paProbeGroupWalks += paDensityConsumer == 3 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paBracketGroupWalks += paDensityConsumer == 4 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paOtherGroupWalks += paDensityConsumer == 0 ? 1 : 0;
         }
         float groupDistance;
         float groupMinimumRadius;
@@ -4503,6 +4544,15 @@ float cloudDensity(
     if (paWorkloadCaptureActive()) {
         paCloudDensityCalls++;
     }
+    if (paWorkloadCaptureActive()) {
+        paProbeCalls += paDensityConsumer == 3 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paBracketCalls += paDensityConsumer == 4 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paOtherCalls += paDensityConsumer == 0 ? 1 : 0;
+    }
 #ifdef PA_ARM_NO_DETAIL
     // T166 attribution arm. The detail-octave lookups and the erosion they
     // drive are one fused stage here, so suppressing useDetail removes exactly
@@ -5288,7 +5338,9 @@ float lightMarchOpticalDepth(
         paArmLightingSample = true;
 #endif
         paLightTapOrdinal = i + 1;
+        paDensityConsumer = 2;
         float density = cloudDensity(pos + offset, float(i) * 0.6, detailTap, false, false);
+        paDensityConsumer = 0;
         paLightTapOrdinal = 0;
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = false;
@@ -6961,20 +7013,42 @@ void main() {
                 float paLastEmptyOffset = 0.0;
                 float paScanProbeCount = 0.0;
                 bool paScanFoundMaterial = false;
+#ifdef PA_ARM_NO_PROBE
+                // T180 Task 4 ceiling. The whole empty-span probe scan removed
+                // uniformly at compile time, for every lane. The march then
+                // falls back to a single fine step, exactly the pre-scan
+                // behaviour, so this is image-invalid and bounds the class.
+                for (int paProbe = 1; paProbe <= 0; paProbe++) {
+#else
                 for (int paProbe = 1; paProbe <= PA_EMPTY_SPAN_PROBES; paProbe++) {
+#endif
                     float paProbeOffset = float(paProbe) * paScanStep;
                     if (paProbeOffset > paScanSpan) {
                         break;
                     }
                     float paProbeT = t + paProbeOffset;
                     paScanProbeCount = float(paProbe);
+                    paDensityConsumer = 3;
                     float paProbeDensity = cloudDensity(
                         CameraPos + rayDir * paProbeT,
                         0.0,
+#ifdef PA_ARM_PROBE_NO_DETAIL
+                        // T180 Task 5. The probe asks one question:
+                        // "is density here above 0.0008". Detail is subtractive
+                        // erosion - max(body - (1-fbm)*EROSION, 0) - so
+                        // suppressing it can only RAISE the value tested.
+                        // A probe that overestimates density finds material no
+                        // later than production does, so the scan can never
+                        // advance over material it would have found. Cheaper
+                        // and conservative in the safe direction.
+                        false,
+#else
                         DetailQuality > 0,
+#endif
                         paProbeT < 220.0 && !cameraInsideCloud,
                         false
                     );
+                    paDensityConsumer = 0;
                     if (paProbeDensity > 0.0008) {
                         paScanFoundMaterial = true;
                         break;
@@ -7080,6 +7154,7 @@ void main() {
         // T177. Everything the primary body call resolves is what a light tap
         // spawned from this sample could reuse.
         paCapturePrimaryGroups = true;
+        paDensityConsumer = 1;
 #ifdef PA_ARM_DENSITY_EVERY_2
         // T175 ceiling. Every second primary step reuses the previous body
         // density instead of evaluating it. Halves primary density calls while
@@ -7100,6 +7175,7 @@ void main() {
         float bodyDensity = cloudDensity(p, 0.0, DetailQuality > 0, nearCamera, false);
 #endif
         paCapturePrimaryGroups = false;
+        paDensityConsumer = 0;
         paTraceCapture = false;
         // Each bin is incremented under its own guard rather than inside an
         // else-if chain, so every increment is provably unreachable in a
@@ -7291,10 +7367,18 @@ void main() {
                     ? lastClearT
                     : max(t0, t - stepLength);
                 float bracketHigh = t;
+#ifdef PA_ARM_NO_BRACKET
+                // T180 Task 4 ceiling. The four bisections removed uniformly.
+                // The surface is then localized only to the coarse stride, so
+                // this is image-invalid and bounds the class.
+                for (int refinement = 0; refinement < 0; refinement++) {
+#else
                 for (int refinement = 0; refinement < 4; refinement++) {
+#endif
                     float bracketMid = 0.5 * (bracketLow + bracketHigh);
                     vec3 bracketPos = CameraPos + rayDir * bracketMid;
                     bool bracketNearCamera = bracketMid < 220.0 && !cameraInsideCloud;
+                    paDensityConsumer = 4;
                     float bracketDensity = cloudDensity(
                         bracketPos,
                         0.0,
@@ -7302,6 +7386,7 @@ void main() {
                         bracketNearCamera,
                         false
                     );
+                    paDensityConsumer = 0;
                     if (bracketDensity > 0.0008) {
                         bracketHigh = bracketMid;
                     } else {
@@ -8061,6 +8146,36 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 46) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paProbeCalls),
+            float(paProbeGroupWalks),
+            float(paProbeExactSdf),
+            float(paBracketCalls)
+        );
+        return;
+    }
+    if (DebugView == 47) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paBracketGroupWalks),
+            float(paBracketExactSdf),
+            float(paOtherCalls),
+            float(paOtherGroupWalks)
+        );
+        return;
+    }
+    if (DebugView == 48) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paOtherExactSdf),
+            0.0,
+            0.0,
+            0.0
         );
         return;
     }

@@ -458,7 +458,25 @@ public enum CoreCostDiagnosticProgram {
     T179_DOM_AGGRESSIVE("t179_dom_aggressive"),
 
     /** T179 Task 9: the fresh stack with dominance pruning, no light3. */
-    T179_STACK_DOM("t179_stack_dom");
+    T179_STACK_DOM("t179_stack_dom"),
+
+    // -----------------------------------------------------------------------
+    // T180. Decomposing T175's "48% segment/probe/quadrature". The production
+    // consumers turn out to be the empty-span probe scan and the bracket
+    // bisection, both of which only compare density against 0.0008.
+    // -----------------------------------------------------------------------
+
+    /** T180 ceiling: the whole empty-span probe scan removed uniformly. */
+    T180_NO_PROBE("t180_noprobe"),
+
+    /** T180 ceiling: the four bracket bisections removed uniformly. */
+    T180_NO_BRACKET("t180_nobracket"),
+
+    /** T180 candidate: probes keep running without subtractive detail. */
+    T180_PROBE_NO_DETAIL("t180_probe_nodetail"),
+
+    /** T180 Task 9: the quality-approved stack plus the probe candidate. */
+    T180_STACK_PROBE("t180_stack_probe");
 
 
     private final String serializedName;

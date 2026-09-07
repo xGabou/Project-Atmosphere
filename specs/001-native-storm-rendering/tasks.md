@@ -1994,6 +1994,39 @@ implementation, while visual polish remains independently active.
   what fails to pay. Weight uniform reductions over selective ones. The T123 invariant caught this
   campaign's counter below a multi-line guard, the same class it caught in T174 and T175. Evidence
   in `validation/performance-dominance.md`; texel cleanup banked separately as `42e655d`.
+- [X] T180 [PERFORMANCE] [US3] Decompose the segment/probe/quadrature workload class and price its
+  consumers by uniform removal.
+  **The category T175 named does not exist, and the largest ceiling of the series is here.**
+  `t180_noprobe` - the empty-span probe scan removed uniformly at compile time - measures
+  **1.1972x SIDE (1.15% spread) and 1.2918x FAR (2.29%)**, both accepted, clearing the brief's
+  1.20x major-target bar at FAR. **T179's execution inference is now directly supported**: uniform
+  removal of **18.6%** of exact SDFs returns **1.1972x**, while T179's per-lane removal of
+  **46.75%** returned **1.0159x** - 2.5x less work removed for 12x more speedup, same shader,
+  fixture and protocol. **There is no production quadrature**: all four
+  `lightMarchOpticalDepth*` functions are reachable only under `DebugView == 6..9` and are dead in
+  FINAL, so CASE D is excluded before measurement. **`directStormSegmentMayIntersect` returns a
+  bool and never calls `directStormGroupField`** - segment tests were already cheap and are not
+  part of the class. The real decomposition, tagged at call sites rather than derived by
+  subtraction (buckets sum back: 548,439 + 1,560,504 + 951,957 + 20 vs `cloudDensityCalls`
+  3,060,902): **march union-distance refinement 32.0% of group walks and 26.4% of exact SDFs**
+  (11.11 walks/px, never previously named), **empty-span probes 21.1% / 18.6%** (7.35 calls/px),
+  **bracket bisection 0.0%** - 20 calls in an entire frame, 1.0047x, and **bit-identical at FAR**,
+  so it is not a consumer at all. **Semantics**: primary and light need the full field; probe and
+  bracket need only `density > 0.0008`; refinement needs only the union *distance*. **The cheaper
+  query failed and the reason is structural**: `t180_probe_nodetail` drops subtractive detail
+  erosion, which can only raise the tested value and so can never let the scan advance over
+  material (45 changed pixels), yet measures **0.9707x - slower**, because the probe's value feeds
+  a control decision: overestimating density makes the scan advance less and the march take more
+  fine steps. **Any conservative cheap probe biases the same way**, so the route is uniform count
+  reduction, not query substitution. Stack: `t180_stack_probe` 10.538 ms p50 session-local but its
+  within-block ratio vs the control is 1.0830 (rejected, 18.35%) at SIDE and **0.9933** (accepted)
+  at FAR - not a gain. SIDE <=10 ms **no**, <=8 ms **no**, FAR <=8 ms **yes** (~4.95 ms).
+  **Gaps stated rather than inferred**: Task 7 duplication is **NOT MEASURED**, and **no removal
+  ceiling was built for the refinement** - the larger of the two consumers. Verdict **CASE A**,
+  qualified: one consumer has a >=1.20x uniform ceiling and does not need full density, but its
+  obvious cheaper query is slower. **Recommended T181**: sweep `PA_EMPTY_SPAN_PROBES` (16 -> 8 -> 4
+  -> 2) as uniform compile-time arms with damage at each; then build the refinement removal
+  ceiling; do not target the bracket. Evidence in `validation/performance-consumers.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
