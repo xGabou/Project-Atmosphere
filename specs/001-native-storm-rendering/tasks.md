@@ -1909,6 +1909,53 @@ implementation, while visual polish remains independently active.
   can carry precomputed spatial information in the spare T172 texel channels to skip provably
   non-contributing lobes without ranking in the hot loop - explicitly not nearest-K, which T168
   closed. Evidence in `validation/performance-light-reuse.md`.
+- [X] T178 [PERFORMANCE] [US3] Measure light3's visual quality and test a precomputed lobe support
+  bound.
+  **Two decisive negatives.** **light3 must not ship.** With the missing metrics finally in place,
+  flat 4 -> 3 taps returns **cloud SSIM 0.884**, **dark-interior retention 0.0715** and
+  **shadow-pocket retention 0.663** at SIDE, while silhouette IoU, thin retention and hole
+  retention are all a perfect 1.000. **The failure mode is brightening, not the predicted
+  flattening**: interior contrast is preserved (ratio 1.018) and valleys are 21% deeper, yet only
+  7.2% of the darkest interior quartile stays at or below its reference luminance - dropping the
+  fourth tap removes 14 units of optical path from every light march, so extinction falls and the
+  whole interior lifts, keeping relief but losing absolute darkness. Two of Task 7's four criteria
+  fail, and they are the two that describe self-shadowing; the ~1.06x stays unspent.
+  **A correction: five of the twelve requested metrics already existed.** `StormArmQualityMetrics`
+  has provided silhouette IoU, cloud/edge SSIM and thin/hole retention since T167 `a280c10`, and
+  **was printing in the T177 log** (`cloudRegionSSIM=0.9347` for light3) when T176 and T177 both
+  claimed "none of those metrics exist in this harness" - the same read-past that T175 found for
+  T169's dead counters. T178 added the four that genuinely did not exist - self-shadow contrast,
+  dark-interior retention, shadow-pocket retention, valley depth - and those four are exactly what
+  produced the verdict; the five pre-existing ones would have passed light3. Puff separation
+  remains `not_implemented_needs_segmentation` rather than silently proxied.
+  **Lobe support is CLOSED, but not for CASE C's stated reason.** Attribution per group walk at
+  SIDE: **10.0000 visits, 2.0182 cheap pre-SDF rejects, 7.9819 exact SDFs, 4.2033 contributors,
+  3.7784 wasted** - so **47.34% of every exact SDF is discarded by the union**, and most
+  non-contributing lobes are *not* already cheaply rejected (the reverse of CASE C's premise).
+  Per pixel: 341.31 visits, 272.43 exact SDFs, 128.96 wasted. **The light march carries the
+  expensive half**: 46.26% of exact SDFs from 37.66% of visits, because a light tap is cheaply
+  rejected only **1.94%** of the time against **31.20%** for everything else - it marches from
+  inside the cloud where the conservative bound cannot reject. The ceiling is real: `t178_nosdf`
+  measures **1.7428x FAR** (accepted) and 1.5328x SIDE, so exact SDFs are ~34.8% of SIDE frame
+  time and removing just the wasted 47.34% would be worth **~1.197x**, above CASE A's gate. **But
+  the precomputed bound rejected exactly zero lobes** (`lobeSupportRejects=0`, both poses) and
+  measured **0.9410x FAR** (accepted, 2.49% spread) - image-exact (every metric 1.000000, FAR
+  `digestsEqual=true`), so the implementation is right and simply never binding. **That is also the
+  real explanation for T173**: it was slow not because its arithmetic was expensive but because it
+  bought nothing. Payload: texel 5 carries `1/maxRadius, minRadius, shearLength`, +16 bytes and
+  +1 fetch per lobe visit, removing a role-profile branch, two scaled-radius pairs, a `length()`
+  and a division - and it still lost. **The structural reason: the wasted lobes are not far away,
+  they are close but dominated**, so no conservative spatial envelope can identify them, which
+  disqualifies CASE B's remedy too. **I should have caught this before benchmarking** - one counter
+  asking whether T141's horizontal term ever binds would have closed the line without a campaign.
+  Stack: FAR ~5.05 ms accepted (2.5494x) but within-block support gain 1.0033 (rejected); SIDE
+  11.05 rejected. SIDE <=10 ms **no**, <=8 ms **no**, FAR <=8 ms **yes**. **Remaining dominant
+  workload: the exact lobe SDF**, 272.43/pixel at SIDE, 46.3% of it from light taps. Recommended
+  next: a tighter incoming-distance estimate against the running union minimum rather than a
+  spatial envelope; and a bound designed for rays that start *inside* the medium, which no campaign
+  has treated as its own problem. **Texel 5 is dead weight while this line stays closed and should
+  return TEXELS_PER_DESCRIPTOR to 5 before any merge.** Evidence in
+  `validation/performance-lobe-support.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -77,7 +77,17 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_REUSE_B(40, "storm_workload_reuse_b"),
 
     /** T177. Reuse validity for tap ordinals 3-4. */
-    STORM_WORKLOAD_REUSE_C(41, "storm_workload_reuse_c");
+    STORM_WORKLOAD_REUSE_C(41, "storm_workload_reuse_c"),
+
+    /**
+     * T178. Separates a lobe visit from an expensive lobe evaluation: exact
+     * SDFs, exact SDFs that did not move the union, and the light march's share
+     * of both.
+     */
+    STORM_WORKLOAD_LOBE_A(42, "storm_workload_lobe_a"),
+
+    /** T178. Light-attributed cheap rejects and support-bound rejects. */
+    STORM_WORKLOAD_LOBE_B(43, "storm_workload_lobe_b");
 
     private final int shaderId;
     private final String serializedName;

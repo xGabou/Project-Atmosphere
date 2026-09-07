@@ -128,7 +128,12 @@ final class StormReferenceImageComparison {
                 maxMagnitude,
                 first.digest(),
                 second.digest(),
-                ""
+                "",
+                // T178 Task 0. Mean error and changed-pixel counts cannot
+                // see flattened self-shadowing, which is the failure mode
+                // light-tap reduction actually has.
+                StormImageQualityMetrics.evaluate(
+                        a, b, first.width(), first.height())
         );
     }
 
@@ -195,10 +200,12 @@ final class StormReferenceImageComparison {
             double maxComparedMagnitude,
             String referenceDigestA,
             String referenceDigestB,
-            String failureReason
+            String failureReason,
+            String qualityMetrics
     ) {
         static Comparison failed(String reason) {
-            return new Comparison(false, false, 0.0D, 0.0D, 0.0D, 0, 0, 0.0D, 0.0D, "", "", reason);
+            return new Comparison(false, false, 0.0D, 0.0D, 0.0D, 0, 0, 0.0D, 0.0D, "", "",
+                    reason, "t178Quality evaluated=false reason=comparison_failed");
         }
 
         String format() {
@@ -215,7 +222,8 @@ final class StormReferenceImageComparison {
                     + " maxComparedMagnitude=" + sci(maxComparedMagnitude)
                     + " epsilonBasis=rgba16f_storage_ulp"
                     + " informationalDigestA=" + referenceDigestA
-                    + " informationalDigestB=" + referenceDigestB;
+                    + " informationalDigestB=" + referenceDigestB
+                    + ' ' + qualityMetrics;
         }
 
         private static String sci(double value) {

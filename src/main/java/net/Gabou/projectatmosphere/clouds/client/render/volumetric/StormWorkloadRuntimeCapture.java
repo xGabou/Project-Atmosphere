@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 19;
+    private static final int STAGES = 21;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -109,6 +109,8 @@ final class StormWorkloadRuntimeCapture {
             case 16 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_A;
             case 17 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_B;
             case 18 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_REUSE_C;
+            case 19 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_A;
+            case 20 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_LOBE_B;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -212,7 +214,9 @@ final class StormWorkloadRuntimeCapture {
                     values[15][0], values[15][1], values[15][2], values[15][3],
                     values[16][0], values[16][1], values[16][2], values[16][3],
                     values[17][0], values[17][1], values[17][2], values[17][3],
-                    values[18][0], values[18][1]);
+                    values[18][0], values[18][1],
+                    values[19][0], values[19][1], values[19][2], values[19][3],
+                    values[20][0], values[20][1]);
         }
     }
 
@@ -253,7 +257,10 @@ final class StormWorkloadRuntimeCapture {
             double reuseSufficient, double reusePartial,
             double reuseWrong, double reuseGroupsEnteredInTaps,
             double reuseSuffOrd1, double reuseSuffOrd2,
-            double reuseSuffOrd3, double reuseSuffOrd4
+            double reuseSuffOrd3, double reuseSuffOrd4,
+            double lobeExactSdf, double lobeExactSdfNoChange,
+            double lobeVisitsLight, double lobeExactSdfLight,
+            double lobeCheapRejectLight, double lobeSupportRejects
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -282,7 +289,9 @@ final class StormWorkloadRuntimeCapture {
                     // T175 primary density histogram, absent from the legacy shape.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T177 reuse validity, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T178 lobe attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -395,7 +404,27 @@ final class StormWorkloadRuntimeCapture {
                     + " reuseWrongFraction="
                     + ratio(reuseWrong, reuseTapsClassified)
                     + " groupsPerLightTap="
-                    + ratio(reuseGroupsEnteredInTaps, lightConeTaps);
+                    + ratio(reuseGroupsEnteredInTaps, lightConeTaps)
+                    // T178. A lobe VISIT is not an expensive lobe EVALUATION.
+                    // Production already rejects some visits cheaply through
+                    // the T121 bound; only the lobes that pay a full exact SDF
+                    // and then fail to move the union are opportunity.
+                    + " lobeExactSdf=" + fmt(lobeExactSdf)
+                    + " lobeExactSdfNoChange=" + fmt(lobeExactSdfNoChange)
+                    + " lobeVisitsLight=" + fmt(lobeVisitsLight)
+                    + " lobeExactSdfLight=" + fmt(lobeExactSdfLight)
+                    + " lobeCheapRejectLight=" + fmt(lobeCheapRejectLight)
+                    + " lobeSupportRejects=" + fmt(lobeSupportRejects)
+                    + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
+                    + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
+                    + " cheapRejectPerGroupWalk="
+                    + ratio(conservativeDescriptorRejects, groupFieldCalls)
+                    + " contributorsPerGroupWalk="
+                    + ratio(descriptorUnionContributors, groupFieldCalls)
+                    + " wastedSdfPerGroupWalk="
+                    + ratio(lobeExactSdfNoChange, groupFieldCalls)
+                    + " wastedSdfFraction="
+                    + ratio(lobeExactSdfNoChange, lobeExactSdf);
         }
 
         double oraclePostOpacityDistance() {

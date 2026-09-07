@@ -479,6 +479,23 @@ int paReuseSuffOrd3 = 0;
 int paReuseSuffOrd4 = 0;
 /** Groups entered while inside a light tap - the size of the reuse prize. */
 int paReuseGroupsEnteredInTaps = 0;
+
+/**
+ * T178 Task 1. Separating a LOBE VISIT from an EXPENSIVE LOBE EVALUATION.
+ *
+ * <p>Ten lobes are visited per group walk and about five change the union. The
+ * question a support test lives or dies on is where the other five are
+ * rejected: a lobe the T121 bound already skips before the exact SDF is not
+ * opportunity, while one that is fully evaluated and then found not to move the
+ * union is.
+ */
+int paLobeExactSdf = 0;
+int paLobeExactSdfNoChange = 0;
+int paLobeVisitsLight = 0;
+int paLobeExactSdfLight = 0;
+int paLobeCheapRejectLight = 0;
+/** Lobes rejected by the T178 precomputed support bound before the exact SDF. */
+int paLobeSupportRejects = 0;
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -578,7 +595,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 41);
+        || (DebugView >= 28 && DebugView <= 43);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -2234,6 +2251,9 @@ void directStormGroupField(
         if (paWorkloadCaptureActive()) {
             paLobesVisited++;
         }
+        if (paWorkloadCaptureActive()) {
+            paLobeVisitsLight += paLightTapOrdinal > 0 ? 1 : 0;
+        }
 #ifdef PA_ARM_DESC_CONST_FETCH
         vec4 positionHeight = paDescCached0;
         vec4 radiusRotation = paDescCached1;
@@ -2321,10 +2341,41 @@ void directStormGroupField(
         // T141 arm: the same comparison against a strictly tighter lower
         // bound. max() of two valid lower bounds is a valid lower bound, so
         // the arm can only reject more, never differently.
+#ifdef PA_ARM_LOBE_SUPPORT
+        // T178. The SAME bound T141 defines and T173 proved image-safe, with
+        // its invariant half read from texel 5 instead of recomputed here.
+        //
+        // This is the whole distinction from T173. That campaign re-enabled
+        // stormLobeDistanceLowerBound as written and measured 4.6-7.1% SLOWER,
+        // because per lobe per sample it branched through the role profile
+        // range, formed the widest and narrowest scaled radii, took a second
+        // length() for the shear, and divided by the widest radius. None of
+        // that depends on the sample position. Here the reciprocal radius, the
+        // narrowest radius and the shear magnitude arrive precomputed, so what
+        // remains in the loop is one length, one multiply and one compare -
+        // strictly less arithmetic than the vertical-only bound plus a
+        // multiply, and no division at all.
+        vec4 supportData = stormDescriptorTexel(descriptorIndex, 5);
+        float paSupportOriented = max(
+            length(p.xz - positionHeight.xy) - supportData.z, 0.0);
+        float paSupportNormalized = paSupportOriented * supportData.x - 0.08;
+        float paSupportHorizontal = paSupportNormalized > 1.0
+            ? (paSupportNormalized - 1.0) * supportData.y - STORM_MIN_EDGE_BLOCKS
+            : -1.0e9;
+        float verticalLowerBound = max(
+            stormVerticalDistanceLowerBound(p, positionHeight, lobeRole),
+            paSupportHorizontal);
+        if (paWorkloadCaptureActive()) {
+            paLobeSupportRejects += paSupportHorizontal
+                > stormVerticalDistanceLowerBound(p, positionHeight, lobeRole)
+                ? 1 : 0;
+        }
+#else
         float verticalLowerBound = paT141BoxBound()
             ? stormLobeDistanceLowerBound(
                 p, positionHeight, radiusRotation, shearMedia, lobeRole)
             : stormVerticalDistanceLowerBound(p, positionHeight, lobeRole);
+#endif
         // A smooth minimum is exactly unchanged once the incoming distance is
         // more than its blend radius beyond the current union.  The global
         // maximum is used here instead of a guessed local value.  Requiring
@@ -2364,6 +2415,9 @@ void directStormGroupField(
             if (paWorkloadCaptureActive()) {
                 paConservativeDescriptorRejects++;
             }
+            if (paWorkloadCaptureActive()) {
+                paLobeCheapRejectLight += paLightTapOrdinal > 0 ? 1 : 0;
+            }
             // Rejected by the horizontal term alone: the vertical-only bound
             // that ships today would have evaluated this lobe exactly. Counting
             // it separates what the tighter bound adds from what T121 already
@@ -2389,6 +2443,14 @@ void directStormGroupField(
         // in registers rather than invoking its fetch wrapper again.
         if (paWorkloadCaptureActive() && !paT122Off()) {
             paAvoidedDescriptorTextureFetches += 4;
+        }
+        // T178. Reaching here is the expensive path: every lobe counted below
+        // pays a full exact SDF, whatever the union later does with it.
+        if (paWorkloadCaptureActive()) {
+            paLobeExactSdf++;
+        }
+        if (paWorkloadCaptureActive()) {
+            paLobeExactSdfLight += paLightTapOrdinal > 0 ? 1 : 0;
         }
         // T122 OFF refetches the three texels the exact SDF consumes and
         // passes the refetched values into the same equation, in the same
@@ -2491,6 +2553,13 @@ void directStormGroupField(
                     && (abs(groupDistance - paGroupDistanceBefore) > 0.01
                         || groupActiveRoleMask != paRoleMaskBefore)) {
                 paDescriptorUnionContributors++;
+            }
+            // T178. The complement: fully evaluated, then found not to move the
+            // union. This is the only population a support test can remove.
+            if (paWorkloadCaptureActive()
+                    && abs(groupDistance - paGroupDistanceBefore) <= 0.01
+                    && groupActiveRoleMask == paRoleMaskBefore) {
+                paLobeExactSdfNoChange++;
             }
         }
         previousRadius = lobeRadius;
@@ -7915,6 +7984,26 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 42) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paLobeExactSdf),
+            float(paLobeExactSdfNoChange),
+            float(paLobeVisitsLight),
+            float(paLobeExactSdfLight)
+        );
+        return;
+    }
+    if (DebugView == 43) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paLobeCheapRejectLight),
+            float(paLobeSupportRejects),
+            0.0,
+            0.0
         );
         return;
     }

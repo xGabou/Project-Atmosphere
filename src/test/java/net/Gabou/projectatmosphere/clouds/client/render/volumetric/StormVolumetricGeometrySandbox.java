@@ -6277,9 +6277,10 @@ public final class StormVolumetricGeometrySandbox {
         require(shader.contains("vec2 ownershipRadii = lifecycleRole.yz;"),
                 "the precompute ownership arm no longer reads texel 3 channels yz");
 
-        require(StormLobeDescriptor.TEXELS_PER_DESCRIPTOR == 5,
-                "the descriptor payload is no longer five texels, so the precompute"
-                        + " channels and the displaced lifecycle fields overlap");
+        require(StormLobeDescriptor.TEXELS_PER_DESCRIPTOR == 6,
+                "the descriptor payload is not six texels; T172 owns texel 3's spare"
+                        + " channels and T178 owns texel 5, and a change here"
+                        + " silently overlaps them with the lifecycle fields");
 
         // Behavioural spot-check: a descriptor built through the real writer
         // must land its invariants in 12/13/14 and honour the documented floors.
