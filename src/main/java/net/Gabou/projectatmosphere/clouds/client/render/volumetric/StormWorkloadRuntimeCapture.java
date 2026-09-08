@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 40;
+    private static final int STAGES = 42;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -130,6 +130,8 @@ final class StormWorkloadRuntimeCapture {
             case 37 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_F;
             case 38 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_A;
             case 39 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_B;
+            case 40 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_C;
+            case 41 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_D;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -254,7 +256,8 @@ final class StormWorkloadRuntimeCapture {
                     values[36][0], values[36][1], values[36][2], values[36][3],
                     values[37][0], values[37][1],
                     values[38][0], values[38][1],
-                    values[39][0], values[39][1], values[39][2], values[39][3]);
+                    values[39][0], values[39][1], values[39][2], values[39][3],
+                    FieldProbe.of(values[40], values[41]));
         }
     }
 
@@ -262,6 +265,37 @@ final class StormWorkloadRuntimeCapture {
     record CaptureRequest(String status, long token) {
         boolean accepted() {
             return token != NO_TOKEN && status.startsWith("acquiring");
+        }
+    }
+
+    /**
+     * T189. The rain field measured against the exact function, and the test of
+     * whether the field texture is filtered at all.
+     *
+     * <p>The filter test exists because T188 attributed its false rain to
+     * bilinear interpolation of a boolean channel. That explanation requires
+     * the texture to actually interpolate, and RGBA32F linear filtering is not
+     * universally honoured; a driver that declines it returns the nearest texel
+     * and the diagnosis is simply wrong. Zero fractional samples over a grid of
+     * sub-texel-offset columns settles it either way.
+     */
+    record FieldProbe(
+            double supportErrorSum,
+            double attachErrorSum,
+            double ownershipDisagreements,
+            double bothOwnSamples,
+            double fractionalOwnSamples,
+            double ownFilterDeltaSum,
+            double supportFilterDeltaSum,
+            double filterSamples
+    ) {
+        static final FieldProbe ZERO =
+                new FieldProbe(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+
+        static FieldProbe of(double[] error, double[] filter) {
+            return new FieldProbe(
+                    error[0], error[1], error[2], error[3],
+                    filter[0], filter[1], filter[2], filter[3]);
         }
     }
 
@@ -328,7 +362,11 @@ final class StormWorkloadRuntimeCapture {
             // T188. Ray-side field use, then the per-cell build cost.
             double rainFieldFetches, double rainFieldFallbacks,
             double fieldCellShapeCalls, double fieldCellGroupWalks,
-            double fieldCellLobeVisits, double fieldCellExactSdf
+            double fieldCellLobeVisits, double fieldCellExactSdf,
+            // T189. The field measured against the function it replaces, and
+            // whether the texture is filtered at all. Grouped because the
+            // record sits at the JVM's 255-parameter ceiling.
+            FieldProbe fieldProbe
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -375,7 +413,9 @@ final class StormWorkloadRuntimeCapture {
                     // T186 segment-sample split, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T188 rain-field use and per-cell build cost, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T189 field probe, likewise absent.
+                    FieldProbe.ZERO);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -677,7 +717,39 @@ final class StormWorkloadRuntimeCapture {
                     + " fieldCellGroupWalksPerPixel="
                     + perPixel(fieldCellGroupWalks)
                     + " fieldCellExactSdfPerPixel="
-                    + perPixel(fieldCellExactSdf);
+                    + perPixel(fieldCellExactSdf)
+                    // T189. Ownership is the channel that failed, so its
+                    // disagreement rate is reported over every sampled column,
+                    // while the two continuous errors are means over the
+                    // columns where a comparison is meaningful at all.
+                    + " fieldOwnershipDisagreements="
+                    + fmt(fieldProbe.ownershipDisagreements())
+                    + " fieldOwnershipDisagreementFraction="
+                    + ratio(fieldProbe.ownershipDisagreements(),
+                            Math.max(1.0D, (double) width * (double) height))
+                    + " fieldBothOwnSamples=" + fmt(fieldProbe.bothOwnSamples())
+                    + " fieldSupportErrorSum=" + fmt(fieldProbe.supportErrorSum())
+                    + " fieldMeanSupportError="
+                    + ratio(fieldProbe.supportErrorSum(),
+                            Math.max(1.0D, (double) width * (double) height))
+                    + " fieldAttachErrorSum=" + fmt(fieldProbe.attachErrorSum())
+                    + " fieldMeanAttachError="
+                    + ratio(fieldProbe.attachErrorSum(),
+                            Math.max(1.0D, fieldProbe.bothOwnSamples()))
+                    // T189. The premise test. Zero fractional samples over a
+                    // grid of sub-texel-offset columns means the texture is not
+                    // being filtered, whatever GL_LINEAR was asked for - and
+                    // then interpolation cannot be the cause of anything.
+                    + " fieldFractionalOwnSamples=" + fmt(fieldProbe.fractionalOwnSamples())
+                    + " fieldFilterSamples=" + fmt(fieldProbe.filterSamples())
+                    + " fieldFractionalOwnFraction="
+                    + ratio(fieldProbe.fractionalOwnSamples(),
+                            Math.max(1.0D, fieldProbe.filterSamples()))
+                    + " fieldOwnFilterDeltaSum=" + fmt(fieldProbe.ownFilterDeltaSum())
+                    + " fieldSupportFilterDeltaSum=" + fmt(fieldProbe.supportFilterDeltaSum())
+                    + " fieldTextureIsFiltered="
+                    + (fieldProbe.ownFilterDeltaSum()
+                            + fieldProbe.supportFilterDeltaSum() > 0.0D);
         }
 
         double oraclePostOpacityDistance() {

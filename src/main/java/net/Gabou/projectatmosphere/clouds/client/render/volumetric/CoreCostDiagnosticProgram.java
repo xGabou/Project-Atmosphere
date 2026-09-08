@@ -598,7 +598,25 @@ public enum CoreCostDiagnosticProgram {
     T188_RAIN_MASK_REF("t188_rain_mask_ref"),
 
     /** T188 Task 0 candidate: the same rain-only capture, read from the field. */
-    T188_RAIN_MASK_FIELD("t188_rain_mask_field");
+    T188_RAIN_MASK_FIELD("t188_rain_mask_field"),
+
+    // -----------------------------------------------------------------------
+    // T189. Ownership is discrete, so it is fetched discretely. The T188 arms
+    // above keep the bilinear ownership that produced 10.6-15.6% false rain,
+    // because a fix needs the defect it is measured against.
+    // -----------------------------------------------------------------------
+
+    /** T189: the field with texelFetch ownership. The candidate. */
+    T189_FIELD_NEAREST("t189_field_nearest"),
+
+    /** T189: the quality-approved stack with the corrected field. */
+    T189_STACK_NEAREST("t189_stack_nearest"),
+
+    /** T189: rain-only capture with discrete ownership. */
+    T189_RAIN_MASK_NEAREST("t189_rain_mask_nearest"),
+
+    /** T189 Task 5 diagnostic: the erosion side, a strict bilinear threshold. */
+    T189_RAIN_MASK_STRICT("t189_rain_mask_strict");
 
 
     private final String serializedName;
@@ -657,7 +675,10 @@ public enum CoreCostDiagnosticProgram {
      */
     public boolean rainFieldGeneration() {
         return this == T188_FIELD_REAL || this == T188_FIELD_GENERATE_ONLY
-                || this == T188_STACK_FIELD || this == T188_RAIN_MASK_FIELD;
+                || this == T188_STACK_FIELD || this == T188_RAIN_MASK_FIELD
+                || this == T189_FIELD_NEAREST || this == T189_STACK_NEAREST
+                || this == T189_RAIN_MASK_NEAREST
+                || this == T189_RAIN_MASK_STRICT;
     }
 
     /**
@@ -667,7 +688,10 @@ public enum CoreCostDiagnosticProgram {
      */
     public boolean rainFieldLookup() {
         return this == T188_FIELD_REAL || this == T188_STACK_FIELD
-                || this == T188_RAIN_MASK_FIELD;
+                || this == T188_RAIN_MASK_FIELD
+                || this == T189_FIELD_NEAREST || this == T189_STACK_NEAREST
+                || this == T189_RAIN_MASK_NEAREST
+                || this == T189_RAIN_MASK_STRICT;
     }
 
     /**
@@ -677,7 +701,9 @@ public enum CoreCostDiagnosticProgram {
      * anchor every other arm uses.
      */
     public boolean rainMaskCapture() {
-        return this == T188_RAIN_MASK_REF || this == T188_RAIN_MASK_FIELD;
+        return this == T188_RAIN_MASK_REF || this == T188_RAIN_MASK_FIELD
+                || this == T189_RAIN_MASK_NEAREST
+                || this == T189_RAIN_MASK_STRICT;
     }
 
     public String resourceName() {

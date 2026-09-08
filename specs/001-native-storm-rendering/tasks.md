@@ -2321,6 +2321,49 @@ implementation, while visual polish remains independently active.
   is compiled into it. Variants **128 -> 133**, all five campaign-scoped; the T187 report's "127" was
   one short, and the prune it recommended is still outstanding. Evidence in
   `validation/performance-rain-field-real.md`.
+- [X] T189 [PERFORMANCE] [US3] Make rain-field ownership sampling discrete, and find out whether
+  interpolation was the quality failure.
+  **It was not, and this entry corrects T188.** T188 concluded that bilinear interpolation of a
+  boolean ownership channel dilated the union and caused its false rain, and stated that mechanism
+  as identified. Three arms - bilinear at 0.5, `texelFetch`, and bilinear at 0.99 - render
+  **byte-identical rain masks, same digest, at both poses** (SIDE `1321e341dd510683`, FAR
+  `9dc3104c50ba6ab7`), with `captureFresh=true` on every row. **Changing how ownership is resolved
+  changes the rendered rain by exactly zero pixels.** **The premise was measured rather than
+  assumed this time**: the texture *is* filtered (`fieldTextureIsFiltered=true`, filtered-minus-
+  texelFetch delta 42-92 on ownership and 249-306 on support), but **fractional ownership occurs on
+  only 0.19-0.32% of columns** - far too few to produce a 12% error. **The field is nearly exact**:
+  ownership disagrees with `directStormRainSupportAt` on **32 of 129,600 columns (0.02%)**, mean
+  support error 0.0014, **mean attach-height error 0.0275 blocks**. **The real mechanism is an OR
+  over ~60 column samples per ray**, and it is verified numerically rather than fitted: rain
+  presence is an existence test, T186/T188 measured ~30 segment tests x 2 Gauss nodes and 15.39
+  surviving support calls per pixel, and `1-(1-0.00224)^60 = 12.6%` against a **measured 12.36%**
+  false rain at SIDE. It also explains the asymmetry T188 misattributed - under an OR a wrongly
+  owned column propagates to the whole ray while a wrongly unowned one is masked by the other 59,
+  so false rain is amplified (12.36%) and missed rain suppressed (0.45%). **Resolution cannot fix
+  it**: 1% ray-level error needs ~13x lower per-column error, so ~169x the cells (44M vs 262,144),
+  which inverts the build ratio from 8.0:1 in the field's favour to about 1:21 against - Task 9's
+  sweep stays withheld, now for a firmer reason than T188 had. **Performance: the fix is free.**
+  `T189_OWNERSHIP_COST` measures nearest against bilinear in the same blocks at **0.9981 and 1.0030
+  (both accepted)** - zero within noise - and net SIDE holds at **1.1228 accepted at 0.15% spread**
+  (1.1368 in run 1), FAR 1.1341 accepted, all above the 1.10 band; field build 0.2350-0.2468 ms
+  unchanged. **Verdict: keep the discrete fetch, do not approve the field.** Ownership is a boolean
+  and asking a filter for it is a type error whatever it currently costs; the fetch is free and
+  removes a class of future error. But 8.5-12.4% false rain stands and the brief's bar excludes it.
+  **Recommended next: conservative ownership (Task 6 option C)** - store per cell whether it is
+  entirely owned, entirely unowned, or mixed, and fall back to the exact traversal on mixed cells
+  only. Mixed cells are the 0.2-0.3% measured here, so false rain goes to zero **by construction
+  rather than by tuning**, the 8:1 build ratio is preserved, no resolution change is needed, and the
+  fallback path already exists and is already exercised. Option B (signed ownership margin) is the
+  approximate alternative; **options A and D are ruled out** by the arithmetic above. **Not
+  measured**: the direction of the 32 disagreements is summed into one figure - splitting it is two
+  lines and belongs with the conservative-ownership work, where it sizes the mixed-cell fallback.
+  **Harness**: capture freshness is now checked against the request that produced it, because three
+  back-to-back mask captures made a stale read indistinguishable from the genuine result;
+  `WorkloadResult` hit the JVM's 255-parameter ceiling so T189's counters travel as a nested
+  `FieldProbe`; the coordinate mapping is asserted rather than assumed, with the build failing if a
+  half-texel term appears on either side of it. Stack **not banked** - SIDE composition rejected in
+  both runs on a control that spread 4.62-12.13%. Variants **133 -> 137**. Evidence in
+  `validation/performance-rain-field-ownership.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

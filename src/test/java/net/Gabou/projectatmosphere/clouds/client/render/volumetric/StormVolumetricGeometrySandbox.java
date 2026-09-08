@@ -630,6 +630,81 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT188FinalIsUnaffected);
         runCorrected("T188 rain quality is measured on a rain-only capture",
                 StormVolumetricGeometrySandbox::validateT188RainMaskHarness);
+        runCorrected("T189 rain-field ownership is sampled discretely",
+                StormVolumetricGeometrySandbox::validateT189DiscreteOwnership);
+    }
+
+    /**
+     * T189. Ownership is a boolean, and T188 asked a bilinear filter for it.
+     * Thresholding the interpolated value dilated the union outward by up to
+     * half a texel - four world blocks at 512 - and produced 10.6-15.6% false
+     * rain against 0.75-1.02% missed.
+     *
+     * <p>This pins the fix in place. The default path must fetch ownership with
+     * exact integer texel coordinates, the two continuous channels must keep
+     * their filtering, and the texel rule must be the inverse of the one the
+     * generation pass writes with - a half-texel "correction" here would move
+     * the lookup to a neighbouring cell rather than fix an offset.
+     */
+    private static void validateT189DiscreteOwnership() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String lookup = functionBlock(shader, "float paRainFieldSupportAt(");
+
+        require(lookup.contains("texelFetch(RainFieldSampler, paOwnTexel, 0).b"),
+                "T189 ownership is not point-sampled; a bilinear boolean dilates the"
+                        + " ownership union and invents rain around every shaft");
+        require(lookup.contains("ivec2(floor(uv * vec2(paFieldSize)))"),
+                "T189 ownership texel is not the cell containing the column");
+        require(lookup.contains("clamp(")
+                        && lookup.contains("paFieldSize - ivec2(1)"),
+                "T189 ownership texel is not clamped to the field, so a column at the"
+                        + " domain edge reads out of bounds");
+        // The generation pass writes cell (i,j) from texCoord (i+0.5)/N, so
+        // floor(uv*N) is its exact inverse. Anything adding half a texel here
+        // would select a neighbouring cell.
+        require(!lookup.contains("uv * vec2(paFieldSize) - 0.5")
+                        && !lookup.contains("uv * vec2(paFieldSize) + 0.5"),
+                "T189 ownership lookup applies a half-texel offset, which selects a"
+                        + " different cell than the generation pass wrote");
+        require(shader.contains("WeatherOrigin + texCoord * WeatherExtent"),
+                "T189 generation pass no longer uses the mapping the lookup inverts");
+
+        // Support and attach height stay filtered. Point-sampling them would
+        // put an eight-block staircase on every rain edge, which is a different
+        // defect rather than a stricter fix.
+        require(lookup.contains("vec4 cell = texture(RainFieldSampler, uv);")
+                        && lookup.contains("attachY = cell.g;")
+                        && lookup.contains("return cell.r;"),
+                "T189 made the continuous channels discrete too, which trades"
+                        + " ownership dilation for a quantised rain edge");
+
+        // The defect has to stay reachable, or the fix has no baseline.
+        require(shader.contains("#if defined(PA_ARM_RAIN_OWN_BILINEAR)"),
+                "T189 removed the bilinear-ownership arm, so the fix cannot be"
+                        + " measured against the behaviour it replaces");
+
+        String gradle = readWorkspaceSource("build.gradle");
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t188_field_real",
+                "cloud_atmosphere_volume_t188_rain_mask_field"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T189 baseline " + variant);
+            require(block.contains("'PA_ARM_RAIN_OWN_BILINEAR 1'"),
+                    "T189 baseline arm " + variant + " no longer carries the bilinear"
+                            + " ownership it exists to represent");
+        }
+        for (String variant : new String[] {
+                "cloud_atmosphere_volume_t189_field_nearest",
+                "cloud_atmosphere_volume_t189_rain_mask_nearest"}) {
+            String block = between(gradle, "[name: '" + variant + "'", "]],",
+                    "T189 candidate " + variant);
+            require(!block.contains("PA_ARM_RAIN_OWN_BILINEAR")
+                            && !block.contains("PA_ARM_RAIN_OWN_STRICT"),
+                    "T189 candidate " + variant + " does not use the discrete default");
+        }
+        System.out.println("T189_DISCRETE_OWNERSHIP texelFetch=true|continuousFiltered=true"
+                + "|halfTexelOffset=false|clamped=true|baselineRetained=true");
     }
 
     /**

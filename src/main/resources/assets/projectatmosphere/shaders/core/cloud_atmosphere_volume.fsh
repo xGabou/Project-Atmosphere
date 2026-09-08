@@ -793,7 +793,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 62);
+        || (DebugView >= 28 && DebugView <= 64);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -4482,12 +4482,48 @@ float paRainFieldSupportAt(
     if (paWorkloadCaptureActive()) {
         paRainFieldFetches++;
     }
+    // Support and attach height are continuous, so they keep the filtering
+    // the neighbouring weather maps use: without it every rain edge shows the
+    // eight-block staircase of the underlying grid.
     vec4 cell = texture(RainFieldSampler, uv);
     attachY = cell.g;
-    // Ownership is a boolean the bilinear filter returns as a fraction across
-    // a cell boundary. Half a cell is the only threshold that does not bias
-    // the union either way.
+#if defined(PA_ARM_RAIN_OWN_BILINEAR)
+    // T188's behaviour, kept only so the defect stays measurable. Ownership is
+    // a boolean, and asking a bilinear filter for it returns a fraction across
+    // every cell boundary; thresholding that fraction at half a cell dilates
+    // the union outward by up to half a texel in every direction, which is
+    // four world blocks at 512 - measured as 10.6-15.6% false rain against
+    // 0.75-1.02% missed.
     ownsDescriptorGroup = cell.b >= 0.5;
+#elif defined(PA_ARM_RAIN_OWN_STRICT)
+    // T189 Task 5 diagnostic, and the other side of the same trade: a strict
+    // threshold on the interpolated value erodes the union instead of dilating
+    // it. Included to price dilation against erosion, never as the answer -
+    // a threshold is a tuning knob standing in for a type error.
+    ownsDescriptorGroup = cell.b >= 0.99;
+#else
+    // T189. Ownership is discrete, so it is fetched discretely.
+    //
+    // The generation pass wrote cell (i,j) from the fragment whose texCoord was
+    // (i+0.5)/N, so cell (i,j) owns world XZ over [i/N, (i+1)/N) of the domain
+    // and floor(uv * N) is exactly the cell that contains this column - which
+    // is also the cell whose centre is nearest it. That identity is why no
+    // half-texel correction belongs here: adding one would move the lookup to
+    // a neighbouring cell rather than fixing an offset.
+    //
+    // texelFetch takes integer texel coordinates and ignores the sampler's
+    // filter and wrap state entirely, so this is exact regardless of how the
+    // texture is configured for the two continuous channels above. The stored
+    // value is exactly 0.0 or 1.0, so the comparison is not a threshold.
+    ivec2 paFieldSize = textureSize(RainFieldSampler, 0);
+    ivec2 paOwnTexel = clamp(
+        ivec2(floor(uv * vec2(paFieldSize))),
+        ivec2(0),
+        paFieldSize - ivec2(1)
+    );
+    ownsDescriptorGroup =
+        texelFetch(RainFieldSampler, paOwnTexel, 0).b >= 0.5;
+#endif
     return cell.r;
 }
 
@@ -8767,6 +8803,70 @@ void main() {
             float(paRainFieldFallbacks),
             0.0,
             0.0
+        );
+        return;
+    }
+    // T189. Is the field texture filtered at all?
+    //
+    // T188 attributed its false rain to bilinear interpolation of a boolean.
+    // That explanation requires texture() to actually interpolate, and RGBA32F
+    // linear filtering is not universally honoured - a driver that declines it
+    // returns the nearest texel and the whole diagnosis collapses. Measuring
+    // the premise is cheaper than assuming it twice.
+    //
+    // Columns are the capture grid spread over the whole domain, so they land
+    // at arbitrary sub-texel offsets. If any interpolation happens at all, a
+    // filtered fetch of a 0/1 channel MUST return fractions near cell borders.
+    if (DebugView == 64) {
+        gl_FragDepth = 1.0;
+        vec2 paFilterWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        vec2 paFilterUv = (paFilterWorldXZ - WeatherOrigin) / WeatherExtent;
+        ivec2 paFilterSize = textureSize(RainFieldSampler, 0);
+        ivec2 paFilterTexel = clamp(
+            ivec2(floor(paFilterUv * vec2(paFilterSize))),
+            ivec2(0),
+            paFilterSize - ivec2(1)
+        );
+        vec4 paFiltered = texture(RainFieldSampler, paFilterUv);
+        vec4 paExactTexel = texelFetch(RainFieldSampler, paFilterTexel, 0);
+        // A fraction in a channel that only ever stores 0.0 or 1.0 is proof of
+        // interpolation; its absence over the whole grid is proof of none.
+        bool paOwnFractional = paFiltered.b > 0.01 && paFiltered.b < 0.99;
+        fragColor = vec4(
+            paOwnFractional ? 1.0 : 0.0,
+            abs(paFiltered.b - paExactTexel.b),
+            abs(paFiltered.r - paExactTexel.r),
+            1.0
+        );
+        return;
+    }
+    // T189 Task 3. The field's error against the function it stands in for,
+    // measured at the same column by both paths in the same invocation.
+    //
+    // The sample positions are the capture grid mapped across the whole weather
+    // domain. 480x270 does not divide 512x512, so the columns land at arbitrary
+    // sub-texel offsets rather than on cell centres - which is the only place
+    // an interpolation or quantisation error can show up at all.
+    if (DebugView == 63) {
+        gl_FragDepth = 1.0;
+        vec2 paErrWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        float paExactAttachY;
+        bool paExactOwns;
+        float paExactSupport = directStormRainSupportAt(
+            paErrWorldXZ, paExactAttachY, paExactOwns);
+        float paFieldAttachY;
+        bool paFieldOwns;
+        float paFieldSupport = paRainFieldSupportAt(
+            paErrWorldXZ, paFieldAttachY, paFieldOwns);
+        // Height is only comparable where both paths agree a storm owns the
+        // column; an unowned column has no attach height to be wrong about,
+        // and counting its fallback would report the ownership error twice.
+        bool paBothOwn = paExactOwns && paFieldOwns;
+        fragColor = vec4(
+            abs(paExactSupport - paFieldSupport),
+            paBothOwn ? abs(paExactAttachY - paFieldAttachY) : 0.0,
+            paExactOwns == paFieldOwns ? 0.0 : 1.0,
+            paBothOwn ? 1.0 : 0.0
         );
         return;
     }

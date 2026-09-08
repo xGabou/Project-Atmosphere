@@ -871,7 +871,34 @@ def leanProgramVariants = [
          defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
          keepUniforms: []],
         [name: 'cloud_atmosphere_volume_t188_rain_mask_field',
+         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                   'PA_ARM_RAIN_OWN_BILINEAR 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+
+        // T189. Ownership fetched discretely with texelFetch while support and
+        // attach height keep their filtering. This is the candidate; the two
+        // T188 arms above are the same field with the bilinear ownership that
+        // produced 10.6-15.6% false rain, kept so the fix has a baseline.
+        [name: 'cloud_atmosphere_volume_t189_field_nearest',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        [name: 'cloud_atmosphere_volume_t189_stack_nearest',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
+                        'PaRainFieldEnabled']],
+        [name: 'cloud_atmosphere_volume_t189_rain_mask_nearest',
          defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        // Task 5 diagnostic: the erosion side of the same trade, so dilation
+        // and erosion are priced against each other rather than one being
+        // assumed worse. Never a production candidate - a threshold is a tuning
+        // knob standing in for a type error.
+        [name: 'cloud_atmosphere_volume_t189_rain_mask_strict',
+         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
+                   'PA_ARM_RAIN_OWN_STRICT 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
 
         // T188. The REAL rain-support field. The generation pass and the
@@ -882,7 +909,8 @@ def leanProgramVariants = [
         // Both are campaign variants, not production programs: FINAL bakes
         // PaRainFieldPass and PaRainFieldEnabled to 0 and is unchanged.
         [name: 'cloud_atmosphere_volume_t188_field_real',
-         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_RAIN_OWN_BILINEAR 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
         // The exactness arm. It generates the field and still marches the exact
         // descriptor path, so one frame carries both the ground truth and the

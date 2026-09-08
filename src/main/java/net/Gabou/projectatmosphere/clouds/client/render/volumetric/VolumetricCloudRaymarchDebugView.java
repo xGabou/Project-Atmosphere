@@ -153,7 +153,21 @@ public enum VolumetricCloudRaymarchDebugView {
      * T188. The descriptor work ONE field cell costs to build, so the
      * generation pass can be priced with the same counters the ray uses.
      */
-    STORM_WORKLOAD_RAIN_FIELD_B(62, "storm_workload_rain_field_b");
+    STORM_WORKLOAD_RAIN_FIELD_B(62, "storm_workload_rain_field_b"),
+
+    /**
+     * T189. The field's error against the exact function: support delta,
+     * attach-height delta where both paths agree on ownership, ownership
+     * disagreements, and the count of columns both own.
+     */
+    STORM_WORKLOAD_RAIN_FIELD_C(63, "storm_workload_rain_field_c"),
+
+    /**
+     * T189. Whether the field texture is filtered at all: fractional ownership
+     * samples, and the filtered-minus-exact delta on the ownership and support
+     * channels. Tests the premise T188's diagnosis rested on.
+     */
+    STORM_WORKLOAD_RAIN_FIELD_D(64, "storm_workload_rain_field_d");
 
     private final int shaderId;
     private final String serializedName;
