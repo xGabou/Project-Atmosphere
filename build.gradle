@@ -851,6 +851,21 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T187. The rain-field architectural ceiling: the descriptor traversal
+        // inside localRainSupportAt becomes free, which is the most any
+        // precomputed field could achieve since a real lookup costs more than
+        // nothing. Image-invalid by construction; a bound, not a candidate.
+        [name: 'cloud_atmosphere_volume_t187_field_oracle',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_RAIN_FIELD_ORACLE 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t187_stack_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_FIELD_ORACLE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
         // T186. One rain-support sample per coarse segment instead of two.
         // The rule is an existence test, so dropping a sample can only turn
         // true into false - it can miss rain, never invent it. The midpoint is

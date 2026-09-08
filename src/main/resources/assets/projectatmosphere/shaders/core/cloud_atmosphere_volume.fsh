@@ -4502,9 +4502,23 @@ float localRainSupportAt(
         }
         return 0.0;
     }
+#ifdef PA_ARM_RAIN_FIELD_ORACLE
+    // T187 Task 7 ceiling. A precomputed rain field would replace exactly this
+    // call - directStormLocalBaseAt's descriptor walk plus
+    // directStormFinalDensity's full candidate/group union - with one texture
+    // fetch. Everything else in this function is already two cheap samples and
+    // scalar arithmetic, so making this free is an UPPER bound on what any
+    // field can return: a real lookup costs more than nothing.
+    //
+    // Image-invalid by construction: descriptor-owned rain loses its support
+    // and its base height. This is a bound, never a candidate.
+    float directSupport = 0.0;
+    directStormOwned = false;
+#else
     float directSupport = directStormRainSupportAt(
         worldXZ, stormBaseY, directStormOwned
     );
+#endif
     // Descriptor-owned storm splats are intentionally absent from the raster
     // map. Their separate precipitation intensity therefore comes from the
     // frame maximum while the exact body union alone defines shaft support.

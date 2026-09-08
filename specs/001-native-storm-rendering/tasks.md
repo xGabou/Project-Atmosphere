@@ -2229,6 +2229,51 @@ implementation, while visual polish remains independently active.
   only shape that has paid here, applied to the largest remaining consumer. Open questions are field
   resolution against the 184-block attach band, conservative tile quantisation, and per-frame build
   cost. Evidence in `validation/performance-rain-samples.md`.
+- [X] T187 [PERFORMANCE] [US3] Establish whether a precomputed 2D rain-support field is worth
+  building, before building one.
+  **Feasibility pass, not an implementation - no field was built.** **The ceiling clears the gate:
+  `t187_field_oracle` measures 1.1756x SIDE** (accepted, 2.28% spread) and **1.1129x FAR**
+  (accepted, 2.93%), against the brief's 1.10x stop condition, by making
+  `directStormRainSupportAt` cost nothing while every other part of `localRainSupportAt` computes
+  exactly as production does. That removes **1,994,647 rain-segment traversals per frame** (15.39
+  per pixel, 44.12% of `directStormShape` calls). **The build arithmetic is the enabling number**:
+  ULTRA's existing weather domain is **512x512 = 262,144 cells**, so the field costs **1 evaluation
+  per 7.61 traversals removed** - about 13.1% of the work it eliminates, leaving ~86.9% of the
+  ceiling before lookup cost. **Realistic estimate 1.13-1.15x SIDE, DERIVED and labelled as such**,
+  not measured: a strong candidate, not the 1.2-1.3x structural win the target needs, so it should
+  not be treated as the thing that closes the 10 ms gap by itself. **Semantics (Task 1)**: the field
+  is exactly **three values** - `directSupport`, `stormBaseY`, `ownsDescriptorGroup` - because
+  everything else in `localRainSupportAt` is two texture fetches plus scalar arithmetic that costs
+  less than storing it. **One field serves both Gauss positions with no approximation** (they differ
+  only in XZ, and T184 proved the function is exactly XZ-invariant); **spatial quantisation is the
+  only approximation a field introduces**. **Domain (Task 2)**: reuse `WeatherOrigin`/`WeatherExtent`,
+  already shared by `sampleWeather` and `stormCandidatesAt` - **no scrolling, recentering or edge
+  policy to invent**, all inherited - at **1-2 MB**, which is not a constraint at any useful
+  resolution. **Generation (Task 6): GPU**, because `VolumetricCloudRenderTargets.prepare*Target`
+  already builds weather, morphology and cumulus-stage maps per frame over the *identical* domain,
+  so this is one more target in an existing pass rather than a new architecture; CPU generation is
+  rejected on evidence - the field must reproduce `directStormFinalDensity`'s union bit-exactly, and
+  T172 exists precisely because a CPU precompute had to be proven identical to the shader. **Stack
+  at the ceiling: `t187_stack_field` reads 7.7483 ms / 8.4357 ms session-local at SIDE** with its own
+  ratio accepted at an unusually tight **0.26%** spread - clearing both the 10 ms target and the 8 ms
+  stretch - **but the composition against the control is rejected** (within-block 1.3988 at 15.41%,
+  control itself 15.08%), the same instability that has blocked every stack comparison since T181;
+  and this is a ceiling, so a real field lands above 7.75 ms. **Tasks 3, 4, 8, 9 and 10 are
+  deliberately not done**: the brief gates everything on the ceiling clearing 1.10x, so building a
+  rain-metrics harness and a rain-heavy fixture for an architecture that might be dead on cost would
+  have been wasted - both are now justified work, and the metrics need a **rain-only capture path**
+  (rain and cloud are composited in the reference frames) that cannot be retrofitted after
+  acceptance. **Verdict: proceed - build the GPU rain-support field**, in order: rain-only view plus
+  rain IoU / missed / false / onset / termination / continuity metrics and a rain-heavy fixture
+  first, then the 512x512 field target, then measure against the derived 1.13-1.15x, then sweep
+  resolution downward while the metrics hold; update frequency and scrolling are optimisations of a
+  field that must first be shown to pay. **If it were rejected**, the next targets are light tap
+  (26.45%) and empty-span probe (15.69%), 42% together. **Infrastructure note**: the first campaign
+  launch hard-crashed the client during shader-variant loading (exit -805306369) after six minutes
+  of compilation with **127 declared variants**; a clean relaunch completed all 38 cells, so it was
+  transient - but compiling 127 full-size fragment programs at every startup is close enough to a
+  cliff to prune before it becomes a recurring blocker, and roughly 90 are referenced by invariants,
+  so that prune is its own task. Evidence in `validation/performance-rain-field.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

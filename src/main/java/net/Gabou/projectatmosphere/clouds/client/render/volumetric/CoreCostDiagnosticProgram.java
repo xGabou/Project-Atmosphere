@@ -557,7 +557,19 @@ public enum CoreCostDiagnosticProgram {
     T186_ONE_B("t186_one_b"),
 
     /** T186: the quality-approved stack with the midpoint sample. */
-    T186_STACK_ONE_MID("t186_stack_one_mid");
+    T186_STACK_ONE_MID("t186_stack_one_mid"),
+
+    // -----------------------------------------------------------------------
+    // T187. The precomputed rain-support field. This arm prices the ceiling
+    // before any field is built: it makes the descriptor traversal free, which
+    // no real lookup can beat.
+    // -----------------------------------------------------------------------
+
+    /** T187 ceiling: the rain-support descriptor traversal costs nothing. */
+    T187_FIELD_ORACLE("t187_field_oracle"),
+
+    /** T187: the quality-approved stack with the same ceiling applied. */
+    T187_STACK_FIELD("t187_stack_field");
 
 
     private final String serializedName;
