@@ -528,11 +528,33 @@ final class StormWorkloadRuntimeCapture {
                     + " shapeTagged=" + fmt(shapePrimary + shapeLight + shapeProbe
                             + shapeBracket + shapeRefine + shapeRainSegment
                             + shapeRainShaft + shapeCamera + shapeLightForward)
-                    + " shapeAccountingClosed="
-                    + (Math.abs(shapePrimary + shapeLight + shapeProbe + shapeBracket
+                    // T183. The tolerance was half a call, which is stricter than
+                    // the capture can be: each debug view is a separately rendered
+                    // frame, so the totals are sampled from different frames and
+                    // disagree by a fraction of a percent. 0.5% is two orders of
+                    // magnitude above that variance and two orders below the
+                    // smallest consumer ever found (rain shaft, 0.77% at SIDE), so
+                    // it still fails if a real consumer goes missing.
+                    // shapeUntagged stays a strict zero - that is the structural
+                    // check, and this is only the arithmetic one.
+                    + " shapeAccountingResidual="
+                    + fmt(shapePrimary + shapeLight + shapeProbe + shapeBracket
                             + shapeRefine + shapeRainSegment + shapeRainShaft
                             + shapeCamera + shapeLightForward + shapeUntagged
-                            - directStormShapeCalls) < 0.5D)
+                            - directStormShapeCalls)
+                    + " shapeAccountingResidualFraction="
+                    + ratio(Math.abs(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward
+                            + shapeUntagged - directStormShapeCalls),
+                            directStormShapeCalls)
+                    + " shapeAccountingClosed="
+                    + (shapeUntagged == 0.0D
+                        && Math.abs(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward
+                            + shapeUntagged - directStormShapeCalls)
+                                <= 0.005D * Math.max(1.0D, directStormShapeCalls))
                     + " shapeRainSegmentShare="
                     + ratio(shapeRainSegment, directStormShapeCalls)
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)

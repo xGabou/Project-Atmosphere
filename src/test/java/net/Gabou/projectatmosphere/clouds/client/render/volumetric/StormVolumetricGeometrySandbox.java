@@ -621,6 +621,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateConsumerTagsAreCounted);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
+        runCorrected("T183 rain rendering survives the precipitation specialization",
+                StormVolumetricGeometrySandbox::validateRainRenderSurvivesPrecipitationSpecialization);
     }
 
     private static void validateFixedStormSilhouette() {
@@ -6729,6 +6731,57 @@ public final class StormVolumetricGeometrySandbox {
      * genuinely need precipitation-capable cloudDensity must NOT be specialized,
      * or the T162 ladder would stop measuring what it claims to.
      */
+    /**
+     * T183. Rain rendering must NOT be gated on {@code PA_PRECIPITATION_ABSENT}.
+     *
+     * <p>T182 measured the rain-segment reachability test at 36% of
+     * directStormShape calls at SIDE and 57% at FAR, and the obvious reading -
+     * that FINAL already declares precipitation absent, so the test is dead
+     * work - is wrong. {@code PA_PRECIPITATION_ABSENT} removes precipitation
+     * from {@code cloudDensity}'s internal term only. Rain still renders,
+     * through {@code rainShaftDensityOverSegment}, which the march calls
+     * directly and gates on {@code localRainSegment} - the flag
+     * {@code rainSegmentMayContribute} exists to compute. T163's own comment
+     * says this in the source: "Rain itself is unaffected: it renders through
+     * rainShaftDensityOverSegment, which the march calls directly."
+     *
+     * <p>So compiling the reachability test out under that define would set
+     * {@code localRainSegment} permanently false and delete rain from the
+     * shipped program. This invariant fails the build if that is attempted.
+     */
+    private static void validateRainRenderSurvivesPrecipitationSpecialization() {
+        String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
+        String[] specialized = {
+                "cloud_atmosphere_volume_final",
+                "cloud_atmosphere_volume_t140_pixel",
+                "cloud_atmosphere_volume_t140_mask"
+        };
+        List<String> violations = new ArrayList<>();
+        for (String program : specialized) {
+            String path = base + program + ".fsh";
+            if (!Files.exists(workspacePath(path))) {
+                throw new IllegalStateException(
+                        "generated program missing; run generateLeanFinalShader: " + path);
+            }
+            String generated = readWorkspaceSource(path);
+            if (!generated.contains("rainShaftDensityOverSegment(p, segmentEnd")) {
+                violations.add(program + " no longer renders rain: the march's"
+                        + " rainShaftDensityOverSegment call is gone, so precipitation"
+                        + " cannot reach the frame");
+            }
+            if (!generated.contains("rainSegmentMayContribute(")) {
+                violations.add(program + " lost rainSegmentMayContribute, which"
+                        + " computes the localRainSegment flag that gates rain"
+                        + " rendering - removing it disables rain, it does not"
+                        + " remove dead work");
+            }
+        }
+        require(violations.isEmpty(),
+                "rain rendering was specialized away: " + String.join("; ", violations));
+        System.out.println("T183_RAIN_RENDER programs=" + specialized.length
+                + "|rainReachablePostSpecialization=true");
+    }
+
     private static void validateT163PrecipitationSpecialization() {
         String base = "build/generated/leanFinalResources/assets/projectatmosphere/shaders/core/";
         String marker = "#define PA_PRECIPITATION_ABSENT";

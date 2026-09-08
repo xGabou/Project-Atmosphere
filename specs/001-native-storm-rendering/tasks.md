@@ -2092,6 +2092,39 @@ implementation, while visual polish remains independently active.
   break a precipitation build - and check whether the runtime `MaxPrecipitation` gate can be hoisted
   out of the per-step call for builds that do render rain. Evidence in
   `validation/performance-accounting.md`.
+- [X] T183 [PERFORMANCE] [US3] Specialize rain reachability for the precipitation-absent program.
+  **Not implemented - the change is a functional regression, and this is established from source and
+  from T182's own counters, not from a timing run. No GPU campaign was spent.** The premise was that
+  because FINAL bakes `PA_PRECIPITATION_ABSENT`, the rain-segment reachability test is dead work.
+  **It is not.** That define removes precipitation from `cloudDensity`'s internal term only; **rain
+  still renders in FINAL** through `rainShaftDensityOverSegment`, which the march calls directly and
+  gates on `localRainSegment` - the flag `rainSegmentMayContribute` computes. Gating the test on the
+  define would pin that flag false, set `rainDensity = 0.0` unconditionally and **delete rain from
+  the shipped program**, which the brief's own Task 3 forbids. **Three proofs**: (a) T163's comment
+  at the define says "Rain itself is unaffected: it renders through `rainShaftDensityOverSegment`,
+  which the march calls directly"; (b) the **generated** FINAL still contains that call, gated only
+  by `localRainSegment`; (c) consumer tag 7 is reachable only inside `rainShaftDensityAt`, whose
+  `cloudDensity` route is compiled out, yet T182 measured `shapeRainShaft=43958` SIDE / 43133 FAR -
+  rain rendering ran tens of thousands of times per frame. **This corrects T182**, which claimed
+  `t182_norainseg`'s 105 changed pixels were a perturbed step pattern and that "the rain it gates
+  cannot render in this build"; those pixels are rain being deleted, and the 1.2139x is the cost of
+  a shipped feature rather than a ceiling on dead work. Three inline corrections added to
+  `performance-accounting.md`. **Task 0 done**: `shapeAccountingClosed` compared against half a call,
+  stricter than cross-frame capture variance (each debug view is a separate rendered frame), so it
+  printed `false` on a correct 0.058% residual; replaced with a documented **0.5% fractional
+  tolerance** plus `shapeAccountingResidual` and `shapeAccountingResidualFraction`, and it now
+  **requires `shapeUntagged == 0` as well** - the strict structural check is unweakened, and the
+  static consumer-tag invariant is untouched. **Tasks 2/3 inverted**:
+  `validateRainRenderSurvivesPrecipitationSpecialization` reads the **generated** FINAL and T140
+  variants and fails the build if `rainShaftDensityOverSegment` or `rainSegmentMayContribute`
+  disappears - an invariant blocking the requested change rather than proving it
+  (`T183_RAIN_RENDER programs=3|rainReachablePostSpecialization=true`). Items 9-20 and 21-33 are
+  **not reported**: they describe a build that should not exist. **Recommended T184: reduce the
+  frequency and cost of the rain reachability query while preserving rain** - it answers a boolean
+  with two full descriptor traversals per coarse step, and the attach height is a property of the
+  *column*, not the segment, so a per-ray or weather-tile-keyed bound would answer it far less often;
+  T145's existing height prune is the model. Evidence in
+  `validation/performance-rain-reachability.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

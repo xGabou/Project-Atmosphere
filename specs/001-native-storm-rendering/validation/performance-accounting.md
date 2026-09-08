@@ -19,9 +19,15 @@ storm traversals**. The shader's own file header says so and has since T098; no
 campaign had ever measured it.
 
 **Removing it uniformly measures 1.2139x at FAR** (accepted, 2.64% spread) with
-**105 changed pixels and meanAbs 1.05e-05**. That is the largest clean ceiling of
-this phase and it is nearly free of image cost, because `PA_PRECIPITATION_ABSENT`
-already removes the rain this test exists to find.
+**105 changed pixels and meanAbs 1.05e-05**.
+
+> **CORRECTION (T183).** This section originally called that a "clean ceiling...
+> nearly free of image cost, because `PA_PRECIPITATION_ABSENT` already removes
+> the rain this test exists to find." That reasoning was wrong.
+> `PA_PRECIPITATION_ABSENT` removes precipitation from `cloudDensity` only; rain
+> still renders through `rainShaftDensityOverSegment`. `t182_norainseg` deletes
+> rain, so its 1.2139x is the cost of a shipped feature and not a ceiling on dead
+> work. See `performance-rain-reachability.md`.
 
 **And cap 4 does not survive composition.** On the stack it measures **0.9900x**
 at FAR (accepted, 0.46% spread). T181's standalone 1.1056x is not a stack gain.
@@ -120,9 +126,12 @@ could attach there - via `localRainSupportAt`, which walks every descriptor in
 **Semantics: occupancy.** The function returns a `bool`. It needs "could rain
 contribute in this segment", never a density. Its own gate is
 `MaxPrecipitation <= 0.02` - a **runtime uniform**, not the compile-time
-`PA_PRECIPITATION_ABSENT` that FINAL bakes. So on a storm fixture with
-precipitation configured but rain rendering compiled out, **the test runs at full
-cost for a feature that cannot contribute to the frame.**
+`PA_PRECIPITATION_ABSENT` that FINAL bakes.
+
+> **CORRECTION (T183).** The conclusion drawn here - that the test "runs at full
+> cost for a feature that cannot contribute to the frame" - was wrong. Rain does
+> contribute: the march calls `rainShaftDensityOverSegment` directly, gated on
+> the very flag this test computes. The runtime gate is correct as written.
 
 **Execution shape: uniform and compile-time removable.** It is a fixed
 two-sample loop on every coarse step, not data-dependent per lane in the way
@@ -146,9 +155,16 @@ rejected because *the anchor* moved, not the arm. They centre on 1.198 and match
 FAR's accepted 1.2139. Corroborating, not accepted.
 
 **Image damage is near zero:** SIDE meanAbs 5.322e-05 with 369 changed pixels,
-FAR 1.046e-05 with 105. Non-zero because `localRainSegment` still feeds the
-fine/coarse promotion, so removing it perturbs the step pattern - but the rain it
-gates cannot render in this build.
+FAR 1.046e-05 with 105.
+
+> **CORRECTION (T183).** The sentence that stood here - that "the rain it gates
+> cannot render in this build" - was wrong. `PA_PRECIPITATION_ABSENT` removes
+> precipitation from `cloudDensity`'s internal term only; rain still renders
+> through `rainShaftDensityOverSegment`, which the march calls directly and
+> gates on `localRainSegment`. Those changed pixels are rain being deleted, not
+> a perturbed step pattern. `t182_norainseg` is therefore not a ceiling on dead
+> work - it removes a shipped feature, and its 1.2139x is not available without
+> losing rain. See `performance-rain-reachability.md`.
 
 **At >=1.20x this clears the brief's major-architecture-target bar.**
 
