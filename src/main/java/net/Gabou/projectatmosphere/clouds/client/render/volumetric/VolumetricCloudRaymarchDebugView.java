@@ -108,7 +108,16 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_CONSUMER_B(47, "storm_workload_consumer_b"),
 
     /** T180. Exact SDFs charged to unattributed consumers. */
-    STORM_WORKLOAD_CONSUMER_C(48, "storm_workload_consumer_c");
+    STORM_WORKLOAD_CONSUMER_C(48, "storm_workload_consumer_c"),
+
+    /** T181. Refinement events, scan events, material hits and cap hits. */
+    STORM_WORKLOAD_SCAN_A(49, "storm_workload_scan_a"),
+
+    /** T181. How many probes each scan actually consumed. */
+    STORM_WORKLOAD_SCAN_B(50, "storm_workload_scan_b"),
+
+    /** T181. Probes spent in scans that then re-marched the same lattice. */
+    STORM_WORKLOAD_SCAN_C(51, "storm_workload_scan_c");
 
     private final int shaderId;
     private final String serializedName;

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 26;
+    private static final int STAGES = 29;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -116,6 +116,9 @@ final class StormWorkloadRuntimeCapture {
             case 23 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_A;
             case 24 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_B;
             case 25 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_CONSUMER_C;
+            case 26 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_A;
+            case 27 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_B;
+            case 28 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_C;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -226,7 +229,10 @@ final class StormWorkloadRuntimeCapture {
                     values[22][0], values[22][1], values[22][2],
                     values[23][0], values[23][1], values[23][2], values[23][3],
                     values[24][0], values[24][1], values[24][2], values[24][3],
-                    values[25][0]);
+                    values[25][0],
+                    values[26][0], values[26][1], values[26][2], values[26][3],
+                    values[27][0], values[27][1], values[27][2], values[27][3],
+                    values[28][0]);
         }
     }
 
@@ -277,7 +283,12 @@ final class StormWorkloadRuntimeCapture {
             double domWouldRejectWithExactBlend,
             double probeCalls, double probeGroupWalks, double probeExactSdf,
             double bracketCalls, double bracketGroupWalks, double bracketExactSdf,
-            double otherCalls, double otherGroupWalks, double otherExactSdf
+            double otherCalls, double otherGroupWalks, double otherExactSdf,
+            double refineEvents, double scanEvents, double scanFoundMaterial,
+            double scanCapReached,
+            double scanProbes1To2, double scanProbes3To4,
+            double scanProbes5To8, double scanProbes9To16,
+            double scanWastedProbes
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -312,6 +323,8 @@ final class StormWorkloadRuntimeCapture {
                     // T179 dominance histogram, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T180 consumer attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T181 scan distribution, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
@@ -469,6 +482,22 @@ final class StormWorkloadRuntimeCapture {
                     + " otherWalkShare=" + ratio(otherGroupWalks, groupFieldCalls)
                     + " probeSdfShare=" + ratio(probeExactSdf, lobeExactSdf)
                     + " bracketSdfShare=" + ratio(bracketExactSdf, lobeExactSdf)
+                    // T181. The probe cap is 16 but the loop exits early, so
+                    // these say whether 16 ever binds - and how much of the
+                    // scan is duplicated by the fine march that follows it.
+                    + " refineEvents=" + fmt(refineEvents)
+                    + " scanEvents=" + fmt(scanEvents)
+                    + " scanFoundMaterial=" + fmt(scanFoundMaterial)
+                    + " scanCapReached=" + fmt(scanCapReached)
+                    + " scanProbes1To2=" + fmt(scanProbes1To2)
+                    + " scanProbes3To4=" + fmt(scanProbes3To4)
+                    + " scanProbes5To8=" + fmt(scanProbes5To8)
+                    + " scanProbes9To16=" + fmt(scanProbes9To16)
+                    + " scanWastedProbes=" + fmt(scanWastedProbes)
+                    + " probesPerScan=" + ratio(probeCalls, scanEvents)
+                    + " scanCapBindFraction=" + ratio(scanCapReached, scanEvents)
+                    + " scanMaterialFraction=" + ratio(scanFoundMaterial, scanEvents)
+                    + " wastedProbeFraction=" + ratio(scanWastedProbes, probeCalls)
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
                     + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
                     + " cheapRejectPerGroupWalk="

@@ -851,6 +851,34 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T181. Uniform compile-time caps on the empty-span scan. The loop
+        // already exits on material or span end, so these only bind on scans
+        // that would have run longer - which is the thing being measured.
+        [name: 'cloud_atmosphere_volume_t181_probe8',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PROBE_CAP 8'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t181_probe4',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PROBE_CAP 4'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t181_probe2',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_PROBE_CAP 2'],
+         keepUniforms: []],
+        // Mandatory: the refinement is 32% of group walks and has never been
+        // priced. Removing it leaves no clearance to advance on.
+        [name: 'cloud_atmosphere_volume_t181_norefine',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_NO_REFINE 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t181_stack_probe8',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_PROBE_CAP 8'],
+         keepUniforms: ['PaOracleBaseSize']],
+
         // T180. The empty-span probe scan and the bracket bisection are the
         // two production consumers T175's "48%" was actually made of. Both ask
         // only whether density exceeds 0.0008, and both are removed here

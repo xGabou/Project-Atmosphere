@@ -476,7 +476,28 @@ public enum CoreCostDiagnosticProgram {
     T180_PROBE_NO_DETAIL("t180_probe_nodetail"),
 
     /** T180 Task 9: the quality-approved stack plus the probe candidate. */
-    T180_STACK_PROBE("t180_stack_probe");
+    T180_STACK_PROBE("t180_stack_probe"),
+
+    // -----------------------------------------------------------------------
+    // T181. Uniform caps on the empty-span scan, and the first price on the
+    // march's union-distance refinement - the larger consumer, unmeasured
+    // until now.
+    // -----------------------------------------------------------------------
+
+    /** T181: empty-span scan capped at 8 probes. */
+    T181_PROBE8("t181_probe8"),
+
+    /** T181: capped at 4. */
+    T181_PROBE4("t181_probe4"),
+
+    /** T181: capped at 2. */
+    T181_PROBE2("t181_probe2"),
+
+    /** T181 ceiling: the union-distance refinement removed uniformly. */
+    T181_NO_REFINE("t181_norefine"),
+
+    /** T181 Task 10: the quality-safe stack with the scan capped at 8. */
+    T181_STACK_PROBE8("t181_stack_probe8");
 
 
     private final String serializedName;

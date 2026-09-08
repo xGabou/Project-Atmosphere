@@ -540,6 +540,32 @@ int paBracketExactSdf = 0;
 int paOtherCalls = 0;
 int paOtherGroupWalks = 0;
 int paOtherExactSdf = 0;
+
+/**
+ * T181. The empty-span scan's probe cap is 16, but the loop breaks as soon as a
+ * probe finds material or the offset leaves the span, so 16 is a CAP and not a
+ * count. Whether it ever binds decides whether lowering it can do anything at
+ * all, so the distribution is measured rather than assumed.
+ *
+ * <p>The refinement is one directStormShape call per event, not an iterative
+ * solve - there is no iteration count to sweep, which is why T181 prices its
+ * removal instead.
+ */
+int paRefineEvents = 0;
+int paScanEvents = 0;
+int paScanFoundMaterialCount = 0;
+int paScanCapReached = 0;
+int paScanProbes1To2 = 0;
+int paScanProbes3To4 = 0;
+int paScanProbes5To8 = 0;
+int paScanProbes9To16 = 0;
+/**
+ * T181 Task 8. Probes spent inside a scan that then found material. The scan
+ * samples "exactly the lattice the fine march would have sampled", so when it
+ * hits material the march enters fine mode and re-evaluates that same lattice.
+ * These probes are duplicated work by construction, not by coincidence.
+ */
+int paScanWastedProbes = 0;
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -639,7 +665,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 48);
+        || (DebugView >= 28 && DebugView <= 51);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -6910,9 +6936,28 @@ void main() {
             int paProbeRoleMask;
             float paUnionDistance;
             float paMinClearance;
+#ifdef PA_ARM_NO_REFINE
+            // T181 Task 5 ceiling, mandatory. The union-distance refinement is
+            // the largest descriptor consumer at 32% of group walks, and it had
+            // never been priced. Removing it uniformly leaves no clearance to
+            // advance on, so the ray falls through to the empty-span scan every
+            // time. Image-invalid by construction and a bound only.
+            paProbeOwned = false;
+            paProbeHeight01 = 0.0;
+            paProbeStrength = 0.0;
+            paProbeRoleMask = 0;
+            paUnionDistance = 0.0;
+            paMinClearance = 0.0;
+#else
+            paDensityConsumer = 5;
             directStormShape(
                 p, paProbeOwned, paProbeHeight01, paProbeStrength, paProbeRoleMask,
                 paUnionDistance, paMinClearance);
+            paDensityConsumer = 0;
+#endif
+            if (paWorkloadCaptureActive()) {
+                paRefineEvents++;
+            }
             // Per descriptor, not per group and not global. Every descriptor in
             // this fixture - BASE, CORE, TOWER and ANVIL - belongs to one
             // group, so a per-group bound would take the group's widest
@@ -7013,12 +7058,21 @@ void main() {
                 float paLastEmptyOffset = 0.0;
                 float paScanProbeCount = 0.0;
                 bool paScanFoundMaterial = false;
+                if (paWorkloadCaptureActive()) {
+                    paScanEvents++;
+                }
 #ifdef PA_ARM_NO_PROBE
                 // T180 Task 4 ceiling. The whole empty-span probe scan removed
                 // uniformly at compile time, for every lane. The march then
                 // falls back to a single fine step, exactly the pre-scan
                 // behaviour, so this is image-invalid and bounds the class.
                 for (int paProbe = 1; paProbe <= 0; paProbe++) {
+#elif defined(PA_ARM_PROBE_CAP)
+                // T181 Task 1. A uniform compile-time cap. The loop already
+                // exits early on material or span end, so this only binds on
+                // the scans that would have run past the new cap - which is
+                // precisely what the distribution counters measure.
+                for (int paProbe = 1; paProbe <= PA_ARM_PROBE_CAP; paProbe++) {
 #else
                 for (int paProbe = 1; paProbe <= PA_EMPTY_SPAN_PROBES; paProbe++) {
 #endif
@@ -7060,6 +7114,29 @@ void main() {
                     paMrScanAdvance = paLastEmptyOffset;
                     paMrScanHitMaterial = paScanFoundMaterial ? 1.0 : 0.0;
                     paMrScanSpan = paScanSpan;
+                }
+                int paScanUsed = int(paScanProbeCount);
+                if (paWorkloadCaptureActive()) {
+                    paScanFoundMaterialCount += paScanFoundMaterial ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanWastedProbes += paScanFoundMaterial ? paScanUsed : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanCapReached += (!paScanFoundMaterial
+                        && paScanUsed >= PA_EMPTY_SPAN_PROBES) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes1To2 += (paScanUsed >= 1 && paScanUsed <= 2) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes3To4 += (paScanUsed >= 3 && paScanUsed <= 4) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes5To8 += (paScanUsed >= 5 && paScanUsed <= 8) ? 1 : 0;
+                }
+                if (paWorkloadCaptureActive()) {
+                    paScanProbes9To16 += paScanUsed >= 9 ? 1 : 0;
                 }
                 if (paLastEmptyOffset > paScanStep) {
                     // Crossed in one iteration, having sampled every fine-lattice
@@ -8146,6 +8223,36 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 49) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRefineEvents),
+            float(paScanEvents),
+            float(paScanFoundMaterialCount),
+            float(paScanCapReached)
+        );
+        return;
+    }
+    if (DebugView == 50) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paScanProbes1To2),
+            float(paScanProbes3To4),
+            float(paScanProbes5To8),
+            float(paScanProbes9To16)
+        );
+        return;
+    }
+    if (DebugView == 51) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paScanWastedProbes),
+            0.0,
+            0.0,
+            0.0
         );
         return;
     }

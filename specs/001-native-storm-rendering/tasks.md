@@ -2027,6 +2027,38 @@ implementation, while visual polish remains independently active.
   obvious cheaper query is slower. **Recommended T181**: sweep `PA_EMPTY_SPAN_PROBES` (16 -> 8 -> 4
   -> 2) as uniform compile-time arms with damage at each; then build the refinement removal
   ceiling; do not target the bracket. Evidence in `validation/performance-consumers.md`.
+- [X] T181 [PERFORMANCE] [US3] Sweep the empty-span probe cap and price the march's union-distance
+  refinement.
+  **T180's refinement attribution was wrong, and this campaign corrects it.** T180 identified the
+  refinement's call site by elimination and assigned it the entire untagged residual - 32.0% of
+  group walks. Direct tagging shows **1.50 events/pixel and ~1.62 group walks/pixel, about 4.7%**.
+  **It is also not removable**: `t181_norefine` measures **0.9454x SIDE** (accepted, 2.36% spread)
+  with 7,607 changed pixels - removing 4.7% of walks costs 5.5% of frame time, because the
+  clearance it computes is what permits the coarse stride at all. Semantically it is a **single**
+  `directStormShape` call per event, not an iterative solve, so **Task 6's iteration sweep has no
+  premise**; it is a clearance correction needing a conservative distance, never a density.
+  **The probe cap does bind, contrary to my stated prediction**: 10.91 probes per scan at SIDE,
+  **53.1% of scans reach the cap without finding material**, and **64.8% land in the 9-16 bucket**
+  (FAR: 12.38, 61.9%, 75.7%). **The sweep is non-monotonic and peaks at 4 at both poses** - 16->8
+  gives 1.0605, **16->4 gives 1.0850 SIDE / 1.1056 FAR**, 16->2 falls back to 1.0704 - because
+  fewer probes is less work but a shorter scan advances the ray less and costs march iterations.
+  **Capping captures at most 43% of T180's 1.1972x no-probe ceiling**; the rest is probes that
+  genuinely earn their advance. **Quality does not collapse**: cap 4 holds cloud SSIM **0.9969**,
+  edge SSIM 0.9843, silhouette IoU 0.9978, hole retention 0.9937, thin 0.9355, 454 changed pixels -
+  against light3's rejected 0.884 cloud SSIM. **Duplication measured** (T180 left it open): the scan
+  samples the same lattice the fine march then re-walks, so probes in scans that find material are
+  duplicated by construction - **20.4% of probe work at SIDE**, which is only ~3.8% of exact SDFs,
+  so **caching is closed**. Stack: `t181_stack_probe8` reads 10.097 ms p50 session-local but its
+  within-block gain of 1.1913x is **rejected on 5.31% spread** with the control itself spreading
+  4.65% SIDE and 60.31% FAR; the stack arm was fixed at cap 8 before the sweep ran, so **the best
+  cap was never composed with the stack**. SIDE <=10 ms **marginal and unsound**, <=8 ms **no**,
+  FAR <=8 ms **yes** (4.982). **Verdict: cap 4 is a minor stackable candidate** (1.03-1.10x band),
+  refinement **closed**. **Remaining dominant workload is unattributed**: after tagging primary,
+  light, probe, bracket and refinement, **27.7% of group walks still carry no tag** and
+  `directStormShapeCalls` exceeds `cloudDensityCalls` by 2.30M. **Recommended T182: close the
+  buckets against `directStormShapeCalls`, tagging every remaining entry including the conditional
+  path inside `cloudDensity` - and do not infer a call site by elimination again.** Evidence in
+  `validation/performance-probe-refine.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.
