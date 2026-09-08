@@ -132,7 +132,13 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_RAIN_A(55, "storm_workload_rain_a"),
 
     /** T184. Rain-support reuse at weather-tile granularity. */
-    STORM_WORKLOAD_RAIN_B(56, "storm_workload_rain_b");
+    STORM_WORKLOAD_RAIN_B(56, "storm_workload_rain_b"),
+
+    /** T185. Each half of the T145 conjunct, plus tighter-box and exact tests. */
+    STORM_WORKLOAD_RAIN_C(57, "storm_workload_rain_c"),
+
+    /** T185. Columns the prune accepted that carried no support anyway. */
+    STORM_WORKLOAD_RAIN_D(58, "storm_workload_rain_d");
 
     private final int shaderId;
     private final String serializedName;

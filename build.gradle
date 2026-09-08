@@ -851,6 +851,26 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T185. The rain ownership prune. The shipped envelope stacks three
+        // conservative steps - ellipse to square, squares to AABB, AABB to
+        // circumcircle - and the tight arm removes the last two while keeping
+        // the same guarantee. The exact arm bounds what any geometric prune
+        // could return.
+        [name: 'cloud_atmosphere_volume_t185_tight_prune',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_RAIN_TIGHT_PRUNE 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t185_exact_prune',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_RAIN_EXACT_PRUNE 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t185_stack_tight',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_TIGHT_PRUNE 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
         // T184. A one-entry cache on localRainSupportAt keyed on exact XZ
         // equality. Exact by construction: the function is a pure function of
         // worldXZ within a frame, so an identical XZ must yield an identical

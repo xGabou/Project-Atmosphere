@@ -2156,6 +2156,42 @@ implementation, while visual polish remains independently active.
   ellipse. Both preserve rain exactly, per T183. Rain-render invariant passes throughout
   (`T183_RAIN_RENDER programs=3`). SIDE <=10 ms **no** (10.920 session-local, composition
   rejected), FAR <=8 ms **yes** (4.815). Evidence in `validation/performance-rain-reuse.md`.
+- [X] T185 [PERFORMANCE] [US3] Test whether the rain ownership envelope is too coarse.
+  **The envelope really was too coarse - by a lot - and it does not matter.** At SIDE the shipped
+  circle rejects **14.47%** of rain-support queries, a tightened box **49.36%**, and the exact
+  per-ellipse test **71.50%**. Tripling the rejection rate is worth **1.0135x**; the exact ceiling,
+  rejecting five times as many columns as production, is worth **1.0155x** - so Task 3's own gate
+  (close below 1.05x) is met by the *ceiling*. **CLOSED.** Both prunes are **bit-identical: 0
+  changed pixels, meanAbs 0.000000, both poses**, verifying conservativeness rather than assuming
+  it. **The envelope diagnosis (Task 1) was correct**: `paBuildRainLocality` stacks three
+  conservative steps - each ownership ellipse becomes a **square** of side `2*max(semi-axis)`, the
+  squares become one **AABB**, and the AABB becomes its **circumscribed circle** (root two on the
+  diagonal) - and accumulates over **every role**, so wide ANVIL lobes inflate a bound whose purpose
+  is set by BASE attachment. That is why SIDE, close to the storm, sits inside the inflated disc.
+  **Task 6's proposed safe form is unsound and was not implemented**: `localRainSupportAt` returns
+  `weatherCoverage`-based support for a column outside all descriptor ownership when raster
+  `precipitation > 0.02`, so "outside all rain-owning support => rain impossible regardless of
+  precipitation" is false; the conjunct is load-bearing and was kept. **The conjunct diagnostic
+  decided the campaign**: `rainPrecipLowFraction` is exactly **1.0000** at both poses, so the
+  precipitation half never fails and the geometry is the entire binding constraint - which is what
+  justified testing the tightening instead of assuming it. False positives: 27.08% SIDE / 22.91%
+  FAR of accepted columns carry no support. **Task 7 explains the outcome**: the prune decides per
+  **column**, so rejection is per-lane inside a warp-wide traversal - the shape T179/T180 showed
+  does not pay. **T185 is the strongest per-lane experiment yet run** (largest logical fraction
+  removed, exactly correct, at *negative* arithmetic cost - a box test replacing a `distance()`,
+  using only T172's precomputed radii) and it returns 1.6%, a fourth independent confirmation.
+  Secondary: the prune sits *after* `sampleWeather`/`sampleMorphology`, so rejected columns still
+  pay two fetches. **No usable stack figure** - the control itself spread 15.19% SIDE / 52.82% FAR;
+  the SIDE within-block ratio of 1.2336 missed the 3% rule at 3.50% and is **not banked**. SIDE
+  <=10 ms **no** (10.2315 session-local, rejected), FAR <=8 ms yes. **Recommended T186**: per the
+  brief's own failure branch, `rainSegmentMayContribute` samples **two** points per coarse step - a
+  uniform compile-time reduction to one is the shape that has paid twice in this series, gated on
+  rain-coverage metrics rather than timing alone; **if that fails, stop optimising rain** and pick
+  the next target on measured share. **The transferable lesson**: this prune should have been worth
+  ~20% of the rain-support traversal on arithmetic and returned 1.4% - price per-lane proposals
+  against that, not against the fraction of work removed. The T145 invariant caught a real defect in
+  the first patch (preprocessor branches each opening a brace left the source unbalanced for
+  `functionBlock`). Evidence in `validation/performance-rain-prune.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

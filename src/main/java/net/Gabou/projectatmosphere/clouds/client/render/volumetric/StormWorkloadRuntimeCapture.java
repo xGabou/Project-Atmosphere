@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 34;
+    private static final int STAGES = 36;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -124,6 +124,8 @@ final class StormWorkloadRuntimeCapture {
             case 31 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_C;
             case 32 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_A;
             case 33 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_B;
+            case 34 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_C;
+            case 35 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_D;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -242,7 +244,9 @@ final class StormWorkloadRuntimeCapture {
                     values[30][0], values[30][1], values[30][2], values[30][3],
                     values[31][0], values[31][1],
                     values[32][0], values[32][1], values[32][2], values[32][3],
-                    values[33][0]);
+                    values[33][0],
+                    values[34][0], values[34][1], values[34][2], values[34][3],
+                    values[35][0]);
         }
     }
 
@@ -306,7 +310,10 @@ final class StormWorkloadRuntimeCapture {
             double shapeLightForward, double shapeUntagged,
             double rainSupportCalls, double rainSupportPruned,
             double rainSameExactXZ, double rainSameBlock,
-            double rainSameTile8
+            double rainSameTile8,
+            double rainPrecipLow, double rainOutsideCircle,
+            double rainOutsideAabb, double rainOutsideExact,
+            double rainAcceptedZeroSupport
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -347,6 +354,8 @@ final class StormWorkloadRuntimeCapture {
                     // T182 shape attribution, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T184 rain-support reuse, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T185 ownership prune diagnostics, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
@@ -582,6 +591,24 @@ final class StormWorkloadRuntimeCapture {
                     + ratio(rainSameBlock, rainSupportCalls)
                     + " rainTileReuseFraction="
                     + ratio(rainSameTile8, rainSupportCalls)
+                    // T185. The prune is a conjunct, so each half is counted
+                    // separately: if the precipitation half fails, tightening
+                    // the geometry cannot help no matter how loose it is.
+                    + " rainPrecipLow=" + fmt(rainPrecipLow)
+                    + " rainOutsideCircle=" + fmt(rainOutsideCircle)
+                    + " rainOutsideAabb=" + fmt(rainOutsideAabb)
+                    + " rainOutsideExact=" + fmt(rainOutsideExact)
+                    + " rainAcceptedZeroSupport=" + fmt(rainAcceptedZeroSupport)
+                    + " rainPrecipLowFraction=" + ratio(rainPrecipLow, rainSupportCalls)
+                    + " rainOutsideCircleFraction="
+                    + ratio(rainOutsideCircle, rainSupportCalls)
+                    + " rainOutsideAabbFraction="
+                    + ratio(rainOutsideAabb, rainSupportCalls)
+                    + " rainOutsideExactFraction="
+                    + ratio(rainOutsideExact, rainSupportCalls)
+                    + " rainFalsePositiveFraction="
+                    + ratio(rainAcceptedZeroSupport,
+                            Math.max(1.0D, rainSupportCalls - rainSupportPruned))
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
                     + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
                     + " cheapRejectPerGroupWalk="

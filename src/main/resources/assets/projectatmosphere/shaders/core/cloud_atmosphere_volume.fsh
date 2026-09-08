@@ -392,6 +392,32 @@ bool paT145RainLocality() {
 float paRainAttachTop = -1.0e9;
 vec2 paRainOwnCentre = vec2(0.0);
 float paRainOwnRadius = -1.0;
+/**
+ * T185. The same union, kept as an axis-aligned box instead of collapsed to a
+ * circumscribed circle, and accumulated from each ellipse's true per-axis
+ * extent instead of a square built from its larger semi-axis.
+ *
+ * <p>The existing bound stacks three conservative steps: each ownership ellipse
+ * becomes a square of side 2*max(semi-axis), the squares become one AABB, and
+ * the AABB becomes its circumcircle - which alone costs a factor of root two on
+ * the diagonal. This keeps the same guarantee with none of the last two.
+ */
+vec2 paRainOwnMin = vec2(0.0);
+vec2 paRainOwnMax = vec2(0.0);
+
+/**
+ * T185. Which half of the T145 conjunct actually rejects a column.
+ *
+ * <p>The prune requires BOTH "raster precipitation is negligible" AND "outside
+ * the ownership envelope". If the first fails at SIDE, tightening the geometry
+ * cannot help, and no arm should be built. These count each half separately,
+ * plus what a tighter box and an exact per-ellipse test would reject.
+ */
+int paRainPrecipLow = 0;
+int paRainOutsideCircle = 0;
+int paRainOutsideAabb = 0;
+int paRainOutsideExact = 0;
+int paRainAcceptedZeroSupport = 0;
 
 /**
  * Ray-invariant horizontal bound on every resident descriptor's reach, in
@@ -709,7 +735,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 56);
+        || (DebugView >= 28 && DebugView <= 58);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -1871,6 +1897,9 @@ void paBuildRainLocality() {
     }
     vec2 minimum = vec2(1.0e18);
     vec2 maximum = vec2(-1.0e18);
+    // T185: the same union without the per-descriptor squaring.
+    vec2 paRainTightMin = vec2(1.0e18);
+    vec2 paRainTightMax = vec2(-1.0e18);
     bool any = false;
     for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
         if (descriptorIndex >= StormLobeCount) {
@@ -1902,6 +1931,10 @@ void paBuildRainLocality() {
         vec2 centre = positionHeight.xy + shearMedia.xy * 0.5;
         minimum = min(minimum, centre - vec2(ownershipReach));
         maximum = max(maximum, centre + vec2(ownershipReach));
+        // T185: per-axis, so a lobe twice as long as it is wide no longer
+        // inflates its short axis to match its long one.
+        paRainTightMin = min(paRainTightMin, centre - ownershipRadii);
+        paRainTightMax = max(paRainTightMax, centre + ownershipRadii);
         any = true;
     }
     if (!any) {
@@ -1909,6 +1942,8 @@ void paBuildRainLocality() {
     }
     paRainOwnCentre = (minimum + maximum) * 0.5;
     paRainOwnRadius = length(maximum - paRainOwnCentre);
+    paRainOwnMin = paRainTightMin;
+    paRainOwnMax = paRainTightMax;
 }
 
 void paBuildStormReachability() {
@@ -4339,6 +4374,32 @@ float directStormRainSupportAt(
     return hasLocalBase ? bodySupport : 0.0;
 }
 
+/**
+ * T185. The exact question the envelope approximates: is this column inside any
+ * descriptor's ownership ellipse? This is the same test directStormGroupField
+ * applies, on the radii T172 precomputed into texel 3, so it is exact rather
+ * than a bound - which makes it the ceiling for any geometric prune.
+ */
+bool paRainColumnOwnedExact(vec2 worldXZ) {
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        vec2 centre = positionHeight.xy + shearMedia.xy * 0.5;
+        vec2 scaled = (worldXZ - centre) / max(lifecycleRole.yz, vec2(1.0e-6));
+        if (dot(scaled, scaled) <= 1.0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 float localRainSupportAt(
         vec2 worldXZ,
         out float attachY,
@@ -4380,10 +4441,45 @@ float localRainSupportAt(
     // precipitation below. A column outside every ownership ellipse cannot be
     // owned, so when the raster precipitation is also absent the function's own
     // early-out below is already decided and the traversal is pure waste.
-    if (paT145RainLocality()
-            && precipitation <= 0.02
-            && paRainOwnRadius >= 0.0
-            && distance(worldXZ, paRainOwnCentre) > paRainOwnRadius) {
+    // T185 diagnostics. Each half of the conjunct, and what a tighter box or
+    // an exact per-ellipse test would reject, all measured on the production
+    // path so the arms below are priced before they are trusted.
+    bool paRainLow = precipitation <= 0.02;
+    bool paRainOutCircle = paRainOwnRadius >= 0.0
+        && distance(worldXZ, paRainOwnCentre) > paRainOwnRadius;
+    bool paRainOutBox = paRainOwnRadius >= 0.0
+        && (any(lessThan(worldXZ, paRainOwnMin))
+            || any(greaterThan(worldXZ, paRainOwnMax)));
+    if (paWorkloadCaptureActive()) {
+        paRainPrecipLow += paRainLow ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainOutsideCircle += paRainOutCircle ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainOutsideAabb += paRainOutBox ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainOutsideExact += paRainColumnOwnedExact(worldXZ) ? 0 : 1;
+    }
+    // The arm selects only the predicate, never the block, so the source text
+    // stays brace-balanced for the parsers that read this function.
+#ifdef PA_ARM_RAIN_TIGHT_PRUNE
+    // T185 Task 5. Same guarantee, two inflations removed: per-axis extents and
+    // a box test instead of the circumcircle. Strictly a superset of the
+    // ownership union, so it can only reject columns the circle also could
+    // have, plus more - and the test is cheaper than the distance it replaces.
+    bool paRainPrune = paT145RainLocality() && paRainLow && paRainOutBox;
+#elif defined(PA_ARM_RAIN_EXACT_PRUNE)
+    // T185 Task 3 ceiling. The exact per-ellipse ownership test as the prune.
+    // Correct, but it walks every descriptor, so it is a bound on what any
+    // geometric prune could return rather than a candidate.
+    bool paRainPrune = paT145RainLocality() && paRainLow
+        && !paRainColumnOwnedExact(worldXZ);
+#else
+    bool paRainPrune = paT145RainLocality() && paRainLow && paRainOutCircle;
+#endif
+    if (paRainPrune) {
         if (paWorkloadCaptureActive()) {
             paRainSupportPruned++;
         }
@@ -4405,6 +4501,11 @@ float localRainSupportAt(
     attachY = directStormOwned ? stormBaseY : weatherBaseY;
     if ((!hasMorphologyCategory(morphology.r) && directSupport <= 0.01)
             || localSupport <= 0.01) {
+        // T185. Accepted by the prune, then found to carry no support anyway -
+        // the false-positive rate the tighter geometry would have to beat.
+        if (paWorkloadCaptureActive()) {
+            paRainAcceptedZeroSupport++;
+        }
         return 0.0;
     }
     return localSupport * smoothstep(0.02, 0.12, precipitation);
@@ -8391,6 +8492,26 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 57) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainPrecipLow),
+            float(paRainOutsideCircle),
+            float(paRainOutsideAabb),
+            float(paRainOutsideExact)
+        );
+        return;
+    }
+    if (DebugView == 58) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainAcceptedZeroSupport),
+            0.0,
+            0.0,
+            0.0
         );
         return;
     }

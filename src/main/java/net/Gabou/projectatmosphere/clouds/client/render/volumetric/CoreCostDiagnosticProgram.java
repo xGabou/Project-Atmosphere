@@ -524,7 +524,22 @@ public enum CoreCostDiagnosticProgram {
     T184_REUSE_EXACT("t184_reuse_exact"),
 
     /** T184: the quality-approved stack with exact rain-support reuse. */
-    T184_STACK_REUSE("t184_stack_reuse");
+    T184_STACK_REUSE("t184_stack_reuse"),
+
+    // -----------------------------------------------------------------------
+    // T185. Rain ownership pruning. The question is whether the shipped
+    // envelope is too coarse - and, first, whether its geometric half is even
+    // the half that fails.
+    // -----------------------------------------------------------------------
+
+    /** T185 candidate: per-axis extents and a box test, both inflations removed. */
+    T185_TIGHT_PRUNE("t185_tight_prune"),
+
+    /** T185 ceiling: the exact per-ellipse ownership test as the prune. */
+    T185_EXACT_PRUNE("t185_exact_prune"),
+
+    /** T185 Task 10: the quality-approved stack with the tightened prune. */
+    T185_STACK_TIGHT("t185_stack_tight");
 
 
     private final String serializedName;
