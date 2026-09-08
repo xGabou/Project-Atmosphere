@@ -539,7 +539,25 @@ public enum CoreCostDiagnosticProgram {
     T185_EXACT_PRUNE("t185_exact_prune"),
 
     /** T185 Task 10: the quality-approved stack with the tightened prune. */
-    T185_STACK_TIGHT("t185_stack_tight");
+    T185_STACK_TIGHT("t185_stack_tight"),
+
+    // -----------------------------------------------------------------------
+    // T186. One rain-support sample per coarse segment instead of two. This is
+    // the last rain experiment: a uniform trip-count reduction rather than
+    // another conditional skip.
+    // -----------------------------------------------------------------------
+
+    /** T186: single sample at the segment midpoint. */
+    T186_ONE_MID("t186_one_mid"),
+
+    /** T186: single sample at the first Gauss node. */
+    T186_ONE_A("t186_one_a"),
+
+    /** T186: single sample at the second Gauss node. */
+    T186_ONE_B("t186_one_b"),
+
+    /** T186: the quality-approved stack with the midpoint sample. */
+    T186_STACK_ONE_MID("t186_stack_one_mid");
 
 
     private final String serializedName;

@@ -2192,6 +2192,43 @@ implementation, while visual polish remains independently active.
   against that, not against the fraction of work removed. The T145 invariant caught a real defect in
   the first patch (preprocessor branches each opening a brace left the source unbalanced for
   `functionBlock`). Evidence in `validation/performance-rain-prune.md`.
+- [X] T186 [PERFORMANCE] [US3] Reduce rain reachability from two samples per segment to one, and
+  decide whether the micro-optimization series continues.
+  **Best arm `t186_one_mid`: 1.0668x SIDE** (accepted, 0.88% spread) with **cloud SSIM 0.999983**
+  and **120 changed pixels** - real, trivially implementable, and the largest quality-safe
+  single-arm gain since T180. **It is not enough, and per the brief's own rule the series stops
+  here**: the strong-candidate bar was 1.10x, the strategic requirement is 1.2-1.3x, the stack
+  composition was **rejected** (within-block 0.9833 at 13.27% spread, control itself 15.98%), and
+  the rain-specific quality gate is **unmeasured**. **Premise correction**: the two-sample rule
+  costs **0.59 support evaluations per segment test, not 2**, because the T145 height prune already
+  rejects **70.4%** of sample opportunities (5,478,395 of 7,784,958) before any traversal. "Halves
+  the work" is false per call and true per traversal - sample 1 is 1,151,877 of 2,296,819 support
+  evaluations, so removing it removes **49.2%** of them. **Semantics (Task 1)**: the rule is an
+  **OR with early return** - existence, not max or integrated - so dropping a sample can only turn
+  true into false, making **"falsely added rain" structurally zero** and "missed rain" the only
+  failure mode. The early return is nearly irrelevant: the test returns true on just **0.28%** of
+  calls, so both samples run almost equally often. The second sample is the deciding one for
+  **11.50%** of rain-positive segments. **All three positions accepted within 1.1% of each other**
+  (mid 1.0668, one_b 1.0598, one_a 1.0557 at SIDE); quality is essentially untouched - hole
+  retention exactly 1.0, IoU 0.999 - with **thin retention** the only metric that moves
+  (0.896-0.969), consistent with losing thin rain wisps rather than cloud body. **Not measured and
+  not implied**: missed-rain pixels, rain-region overlap, shaft continuity, onset/termination
+  height - none exist in this harness, and with 11,028 rain-positive segments per frame this
+  fixture is too rain-sparse for them to mean much; that is a fixture problem, not a metrics one.
+  **Verdict: hold `one_mid` as a banked minor candidate** pending a composition re-test on a stable
+  control and a rain-heavy fixture - do not ship it off this run - and **close rain optimization**
+  after five campaigns (T182 attribution, T183 specialization, T184 reuse, T185 prune, T186
+  sampling). **Fresh post-everything SIDE attribution**, `shapeAccountingClosed=true` with residual
+  0.0001 and `shapeUntagged` 0: rain segment **44.12%**, light tap 26.45%, empty-span probe 15.69%,
+  primary body 9.48%, refinement 3.34%, rain shaft 0.93% - 34.88 shape calls, 28.40 group walks,
+  284.0 lobe visits, 220.0 exact SDFs per pixel. **Recommended architecture task: bake the
+  rain-attach field once per frame.** T184 already proved `localRainSupportAt` is *exactly*
+  column-invariant within a frame, and showed per-ray caching fails only because a ray never
+  revisits a column (0.40%) - **a precomputed field does not need revisiting**. It converts 30.03
+  segment tests per pixel from descriptor traversals into texture fetches: uniform work removal, the
+  only shape that has paid here, applied to the largest remaining consumer. Open questions are field
+  resolution against the 184-block attach band, conservative tile quantisation, and per-frame build
+  cost. Evidence in `validation/performance-rain-samples.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

@@ -851,6 +851,30 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T186. One rain-support sample per coarse segment instead of two.
+        // The rule is an existence test, so dropping a sample can only turn
+        // true into false - it can miss rain, never invent it. The midpoint is
+        // the least biased single probe; the two Gauss nodes bound the bias
+        // either way.
+        [name: 'cloud_atmosphere_volume_t186_one_mid',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_RAIN_ONE_MID 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t186_one_a',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_RAIN_ONE_A 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t186_one_b',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1',
+                   'PA_ARM_RAIN_ONE_B 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t186_stack_one_mid',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1', 'PA_ARM_RAIN_ONE_MID 1'],
+         keepUniforms: ['PaOracleBaseSize']],
+
         // T185. The rain ownership prune. The shipped envelope stacks three
         // conservative steps - ellipse to square, squares to AABB, AABB to
         // circumcircle - and the tight arm removes the last two while keeping

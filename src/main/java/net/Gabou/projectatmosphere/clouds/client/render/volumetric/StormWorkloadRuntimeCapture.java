@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 36;
+    private static final int STAGES = 38;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -126,6 +126,8 @@ final class StormWorkloadRuntimeCapture {
             case 33 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_B;
             case 34 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_C;
             case 35 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_D;
+            case 36 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_E;
+            case 37 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_F;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -246,7 +248,9 @@ final class StormWorkloadRuntimeCapture {
                     values[32][0], values[32][1], values[32][2], values[32][3],
                     values[33][0],
                     values[34][0], values[34][1], values[34][2], values[34][3],
-                    values[35][0]);
+                    values[35][0],
+                    values[36][0], values[36][1], values[36][2], values[36][3],
+                    values[37][0], values[37][1]);
         }
     }
 
@@ -313,7 +317,10 @@ final class StormWorkloadRuntimeCapture {
             double rainSameTile8,
             double rainPrecipLow, double rainOutsideCircle,
             double rainOutsideAabb, double rainOutsideExact,
-            double rainAcceptedZeroSupport
+            double rainAcceptedZeroSupport,
+            double rainSegCalls, double rainSegSupport0, double rainSegSupport1,
+            double rainSegHeightSkip,
+            double rainSegTrueAt0, double rainSegTrueAt1
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -356,7 +363,9 @@ final class StormWorkloadRuntimeCapture {
                     // T184 rain-support reuse, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T185 ownership prune diagnostics, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T186 segment-sample split, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -609,6 +618,24 @@ final class StormWorkloadRuntimeCapture {
                     + " rainFalsePositiveFraction="
                     + ratio(rainAcceptedZeroSupport,
                             Math.max(1.0D, rainSupportCalls - rainSupportPruned))
+                    // T186. The two-sample rule is an OR with an early return,
+                    // so the second sample is already conditional. These say
+                    // how often it runs at all and how often it is the one
+                    // that finds the rain - which is what a one-sample arm
+                    // would actually remove, and lose.
+                    + " rainSegCalls=" + fmt(rainSegCalls)
+                    + " rainSegSupport0=" + fmt(rainSegSupport0)
+                    + " rainSegSupport1=" + fmt(rainSegSupport1)
+                    + " rainSegHeightSkip=" + fmt(rainSegHeightSkip)
+                    + " rainSegTrueAt0=" + fmt(rainSegTrueAt0)
+                    + " rainSegTrueAt1=" + fmt(rainSegTrueAt1)
+                    + " rainSupportPerSegCall="
+                    + ratio(rainSegSupport0 + rainSegSupport1, rainSegCalls)
+                    + " rainSecondSampleRunFraction="
+                    + ratio(rainSegSupport1, rainSegCalls)
+                    + " rainSecondSampleDecidesFraction="
+                    + ratio(rainSegTrueAt1,
+                            Math.max(1.0D, rainSegTrueAt0 + rainSegTrueAt1))
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
                     + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
                     + " cheapRejectPerGroupWalk="

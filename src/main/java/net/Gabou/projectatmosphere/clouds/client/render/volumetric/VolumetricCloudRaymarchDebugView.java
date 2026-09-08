@@ -138,7 +138,13 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_RAIN_C(57, "storm_workload_rain_c"),
 
     /** T185. Columns the prune accepted that carried no support anyway. */
-    STORM_WORKLOAD_RAIN_D(58, "storm_workload_rain_d");
+    STORM_WORKLOAD_RAIN_D(58, "storm_workload_rain_d"),
+
+    /** T186. Segment-test invocations and the per-sample support split. */
+    STORM_WORKLOAD_RAIN_E(59, "storm_workload_rain_e"),
+
+    /** T186. Which sample actually found the rain. */
+    STORM_WORKLOAD_RAIN_F(60, "storm_workload_rain_f");
 
     private final int shaderId;
     private final String serializedName;

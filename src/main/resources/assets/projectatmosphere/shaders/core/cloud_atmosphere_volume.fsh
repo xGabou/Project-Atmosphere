@@ -420,6 +420,23 @@ int paRainOutsideExact = 0;
 int paRainAcceptedZeroSupport = 0;
 
 /**
+ * T186. What the two-sample rule actually costs.
+ *
+ * <p>rainSegmentMayContribute is an OR over two Gauss nodes with an early
+ * return, and each sample can also be skipped by the T145 height prune. So the
+ * second sample is already conditional, and "one sample halves the work" is an
+ * assumption rather than a fact. These measure the real split before any arm is
+ * trusted: how often the second sample runs at all, and how often it is the one
+ * that finds the rain.
+ */
+int paRainSegCalls = 0;
+int paRainSegSupport0 = 0;
+int paRainSegSupport1 = 0;
+int paRainSegTrueAt0 = 0;
+int paRainSegTrueAt1 = 0;
+int paRainSegHeightSkip = 0;
+
+/**
  * Ray-invariant horizontal bound on every resident descriptor's reach, in
  * world XZ. Computed once per fragment before the march; a negative radius
  * means "not computed, gate disabled", which is the state every consumer sees
@@ -735,7 +752,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 58);
+        || (DebugView >= 28 && DebugView <= 60);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -4567,8 +4584,31 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
     }
     const float FIRST_SAMPLE = 0.2113248654;
     const float SECOND_SAMPLE = 0.7886751346;
-    for (int sampleIndex = 0; sampleIndex < 2; sampleIndex++) {
+    if (paWorkloadCaptureActive()) {
+        paRainSegCalls++;
+    }
+    // T186. The arms change only the trip count and the position - both
+    // expressions, never a brace - so the source stays balanced for the
+    // parsers that read this function. T185 learned that the hard way.
+#if defined(PA_ARM_RAIN_ONE_MID) || defined(PA_ARM_RAIN_ONE_A) \
+        || defined(PA_ARM_RAIN_ONE_B)
+    const int paRainSampleCount = 1;
+#else
+    const int paRainSampleCount = 2;
+#endif
+    for (int sampleIndex = 0; sampleIndex < paRainSampleCount; sampleIndex++) {
+#if defined(PA_ARM_RAIN_ONE_MID)
+        // The segment midpoint minimises the greatest distance to any point in
+        // the segment, so for a property that varies continuously along it this
+        // is the least biased single probe.
+        float along = 0.5;
+#elif defined(PA_ARM_RAIN_ONE_A)
+        float along = FIRST_SAMPLE;
+#elif defined(PA_ARM_RAIN_ONE_B)
+        float along = SECOND_SAMPLE;
+#else
         float along = sampleIndex == 0 ? FIRST_SAMPLE : SECOND_SAMPLE;
+#endif
         vec3 p = mix(segmentStart, segmentEnd, along);
         // T145. Rain contributes only strictly below the attachment height, and
         // that height is either the raster cloud base for this column or, when
@@ -4581,6 +4621,9 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
             float paSlabSpan = max(SlabTopY - SlabBaseY, 1.0);
             float paWeatherBaseY = SlabBaseY + sampleWeather(p.xz).g * paSlabSpan;
             if (p.y >= max(paWeatherBaseY, paRainAttachTop)) {
+                if (paWorkloadCaptureActive()) {
+                    paRainSegHeightSkip++;
+                }
                 continue;
             }
         }
@@ -4589,6 +4632,12 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
         float familyStrength;
         vec4 weather;
         vec4 morphology;
+        if (paWorkloadCaptureActive()) {
+            paRainSegSupport0 += sampleIndex == 0 ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegSupport1 += sampleIndex == 1 ? 1 : 0;
+        }
         paDensityConsumer = 6;
 #ifdef PA_ARM_RAIN_REUSE_EXACT
         float support = localRainSupportCached(
@@ -4600,7 +4649,15 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
         );
 #endif
         paDensityConsumer = 0;
-        if (support > 0.01 && p.y < attachY && p.y > attachY - 184.0) {
+        bool paRainHit = support > 0.01 && p.y < attachY
+            && p.y > attachY - 184.0;
+        if (paWorkloadCaptureActive()) {
+            paRainSegTrueAt0 += (paRainHit && sampleIndex == 0) ? 1 : 0;
+        }
+        if (paWorkloadCaptureActive()) {
+            paRainSegTrueAt1 += (paRainHit && sampleIndex == 1) ? 1 : 0;
+        }
+        if (paRainHit) {
             return true;
         }
     }
@@ -8492,6 +8549,26 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 59) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSegCalls),
+            float(paRainSegSupport0),
+            float(paRainSegSupport1),
+            float(paRainSegHeightSkip)
+        );
+        return;
+    }
+    if (DebugView == 60) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSegTrueAt0),
+            float(paRainSegTrueAt1),
+            0.0,
+            0.0
         );
         return;
     }
