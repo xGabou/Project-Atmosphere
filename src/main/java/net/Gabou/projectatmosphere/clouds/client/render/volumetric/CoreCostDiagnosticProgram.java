@@ -497,7 +497,22 @@ public enum CoreCostDiagnosticProgram {
     T181_NO_REFINE("t181_norefine"),
 
     /** T181 Task 10: the quality-safe stack with the scan capped at 8. */
-    T181_STACK_PROBE8("t181_stack_probe8");
+    T181_STACK_PROBE8("t181_stack_probe8"),
+
+    // -----------------------------------------------------------------------
+    // T182. Closing the attribution. The residual T180 mis-assigned and T181
+    // could not name is the rain-segment reachability test, which runs every
+    // coarse step regardless of whether any rain is rendered.
+    // -----------------------------------------------------------------------
+
+    /** T182 ceiling: the rain-segment reachability test removed uniformly. */
+    T182_NO_RAIN_SEGMENT("t182_norainseg"),
+
+    /** T182 Task 8: the stack with T181's best probe cap. */
+    T182_STACK_PROBE4("t182_stack_probe4"),
+
+    /** T182: the stack with cap 4 and the rain-segment test removed. */
+    T182_STACK_PROBE4_NORAINSEG("t182_stack_probe4_norainseg");
 
 
     private final String serializedName;

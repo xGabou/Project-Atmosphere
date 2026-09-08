@@ -2059,6 +2059,39 @@ implementation, while visual polish remains independently active.
   buckets against `directStormShapeCalls`, tagging every remaining entry including the conditional
   path inside `cloudDensity` - and do not infer a call site by elimination again.** Evidence in
   `validation/performance-probe-refine.md`.
+- [X] T182 [PERFORMANCE] [US3] Close the descriptor-walk accounting and name the residual.
+  **The accounting closes - `shapeUntagged = 0` at both poses - and the residual T180 mis-named and
+  T181 could not identify is the rain-segment reachability test**, which is **the largest single
+  consumer of descriptor work in the shader: 36.26% of `directStormShape` calls at SIDE and 56.67%
+  at FAR**, more than the light march. `main` runs `rainSegmentMayContribute` on **every coarse
+  step**; past its gate it evaluates `localRainSupportAt` twice, each walking every descriptor and
+  then performing a full candidate/group union - two complete storm traversals per step. The
+  shader's own header has documented this since T098 and no campaign had measured it. Its gate is
+  `MaxPrecipitation <= 0.02`, a **runtime uniform**, not the compile-time `PA_PRECIPITATION_ABSENT`
+  FINAL bakes, so it runs at full cost for a feature this build cannot render. **Uniform removal
+  measures 1.2139x FAR** (accepted, 2.64% spread) with **105 changed pixels, meanAbs 1.05e-05** -
+  the largest clean ceiling of this phase and nearly free of image cost. SIDE was **not measurable**:
+  the anchor swung 20.34-22.01 and drifted 4.3-7.2% in eleven of twelve blocks, rejecting nearly
+  every arm; `norainseg`'s three SIDE ratios nonetheless agree to 1.9% (1.1848/1.2074/1.1988,
+  centring 1.198) while each was rejected because the *anchor* moved - recorded as corroborating,
+  **not banked**. **Count reconciliation**: `directStormShapeCalls` 5,739,705 exceeds
+  `cloudDensityCalls` 3,370,120 by 2,369,585 because tags 5, 6 and 7 reach `directStormShape`
+  without passing through `cloudDensity`; their sum is 2,368,447. The 0.058% gap between tagged sum
+  and total is **cross-frame capture variance** (each debug view is a separate rendered frame), not
+  an unattributed consumer. **SIDE/FAR contrast**: every rendering consumer shrinks with distance
+  (light 33.8%->16.6%, primary 11.0%->7.1%) while rain reachability **grows to 57%**, because it is
+  paid per coarse step at any distance. **Cap 4 does NOT survive composition: 0.9900x on the stack
+  at FAR** (accepted, 0.46% spread) - a null result, not an inconclusive one - so it fails Task 9's
+  >=3% bar and **must not be productionized**, despite T181's standalone 1.0850x/1.1056x and cloud
+  SSIM 0.9969. **New invariant `validateConsumerTagsAreCounted`** fails the build if a tag is
+  assigned with no counter reading it, if nothing reads tag 0, or if `paShapeUntagged` is removed -
+  the structural answer to two campaigns of attribution by elimination
+  (`assigned=9|counted=9|untaggedCounterPresent=true`). **Recommended T183: gate
+  `rainSegmentMayContribute` on the same compile-time condition that already removes precipitation**
+  - exact for the shipping build, unlike `t182_norainseg` which removes it unconditionally and would
+  break a precipitation build - and check whether the runtime `MaxPrecipitation` gate can be hoisted
+  out of the per-step call for builds that do render rain. Evidence in
+  `validation/performance-accounting.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

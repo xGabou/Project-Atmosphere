@@ -566,6 +566,30 @@ int paScanProbes9To16 = 0;
  * These probes are duplicated work by construction, not by coincidence.
  */
 int paScanWastedProbes = 0;
+
+/**
+ * T182. Complete attribution of directStormShape by consumer.
+ *
+ * <p>T180 assigned an untagged residual to a call site by elimination and was
+ * wrong; T181 found the residual was still 27.7% after correcting it. These
+ * counters exist so the question is closed by arithmetic instead: every
+ * production-reachable entry sets a tag, and paShapeUntagged must read exactly
+ * zero. The tagged counters must sum to paDirectStormShapeCalls.
+ *
+ * <p>Tags: 1 primary body, 2 light tap, 3 empty-span probe, 4 bracket
+ * bisection, 5 march refinement, 6 rain segment reachability, 7 rain shaft
+ * density, 8 camera-inside test, 9 light cheap forward probe.
+ */
+int paShapePrimary = 0;
+int paShapeLight = 0;
+int paShapeProbe = 0;
+int paShapeBracket = 0;
+int paShapeRefine = 0;
+int paShapeRainSegment = 0;
+int paShapeRainShaft = 0;
+int paShapeCamera = 0;
+int paShapeLightForward = 0;
+int paShapeUntagged = 0;
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -665,7 +689,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 51);
+        || (DebugView >= 28 && DebugView <= 54);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -2766,6 +2790,36 @@ float directStormShape(
     if (paWorkloadCaptureActive()) {
         paDirectStormShapeCalls++;
     }
+    if (paWorkloadCaptureActive()) {
+        paShapePrimary += paDensityConsumer == 1 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeLight += paDensityConsumer == 2 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeProbe += paDensityConsumer == 3 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeBracket += paDensityConsumer == 4 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeRefine += paDensityConsumer == 5 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeRainSegment += paDensityConsumer == 6 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeRainShaft += paDensityConsumer == 7 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeCamera += paDensityConsumer == 8 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeLightForward += paDensityConsumer == 9 ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paShapeUntagged += paDensityConsumer == 0 ? 1 : 0;
+    }
     int paT177GroupContributed = 0;
     int paT177FirstWitness = -1;
 #ifdef PA_ARM_LIGHT_REUSE_HARD
@@ -4345,9 +4399,11 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
         float familyStrength;
         vec4 weather;
         vec4 morphology;
+        paDensityConsumer = 6;
         float support = localRainSupportAt(
             p.xz, attachY, precipitation, familyStrength, weather, morphology
         );
+        paDensityConsumer = 0;
         if (support > 0.01 && p.y < attachY && p.y > attachY - 184.0) {
             return true;
         }
@@ -4365,6 +4421,7 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
     float localFamilyStrength;
     vec4 localWeather;
     vec4 localMorphology;
+    paDensityConsumer = 7;
     float preliminarySupport = localRainSupportAt(
         p.xz,
         localBaseY,
@@ -4374,6 +4431,7 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
         localMorphology
     );
     if (preliminarySupport <= 0.01 || p.y >= localBaseY) {
+        paDensityConsumer = 0;
         return 0.0;
     }
 
@@ -4388,6 +4446,7 @@ float rainShaftDensityAt(vec3 p, float mipBias) {
     float localSupport = localRainSupportAt(
         sourceXZ, baseY, precipitation, familyStrength, weather, morphology
     );
+    paDensityConsumer = 0;
     if (localSupport <= 0.01 || precipitation <= 0.02 || p.y >= baseY) {
         return 0.0;
     }
@@ -5234,6 +5293,7 @@ float lightMarchOpticalDepth(
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = true;
 #endif
+        paDensityConsumer = 9;
         float forwardDensity = cloudDensity(
             p + LightDir * 28.0,
             1.2,
@@ -5244,6 +5304,7 @@ float lightMarchOpticalDepth(
 #ifdef PA_ARM_LIGHT_CHEAP
         paArmLightingSample = false;
 #endif
+        paDensityConsumer = 0;
         return localDensity * 18.0 + forwardDensity * 82.0;
     }
     int steps = clamp(LightSteps, 2, MAX_LIGHT_STEPS);
@@ -5821,7 +5882,9 @@ vec4 stormMaterialTraceAt(vec3 p, int stage) {
         * (1.0 + 0.68 * (1.0 - saturate(height01)) * 0.32);
     float density = owned ? bodyEroded * materialFactor * 0.73 * DensityMul : 0.0;
     bool cameraStartsInsideSlab = CameraPos.y >= SlabBaseY && CameraPos.y <= SlabTopY;
+    paDensityConsumer = 8;
     bool cameraInsideCloud = cloudDensity(CameraPos, 0.0, false, true, false) > 0.12;
+    paDensityConsumer = 0;
     vec3 traceViewDirection = normalize(p - CameraPos);
     float lightOd = lightMarchOpticalDepth(
         p, density, cameraStartsInsideSlab, cameraInsideCloud
@@ -7163,8 +7226,18 @@ void main() {
             }
         }
         vec3 segmentEnd = CameraPos + rayDir * (t + stepLength);
+#ifdef PA_ARM_NO_RAIN_SEGMENT
+        // T182 Task 7 ceiling. rainSegmentMayContribute runs on every coarse
+        // step and, when MaxPrecipitation clears its gate, evaluates
+        // localRainSupportAt twice - each a full descriptor walk plus a
+        // complete candidate/group union in directStormShape. Removing it
+        // uniformly prices the whole class. Image-invalid wherever rain
+        // actually contributes, so a bound only.
+        bool localRainSegment = false;
+#else
         bool localRainSegment = PuffDensityStage == 0
             && rainSegmentMayContribute(p, segmentEnd);
+#endif
         if (paCap) {
             paMrStepLength = stepLength;
             paMrFlags |= (fine ? PA_MR_FINE_FINAL : 0)
@@ -8223,6 +8296,36 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 52) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paShapePrimary),
+            float(paShapeLight),
+            float(paShapeProbe),
+            float(paShapeBracket)
+        );
+        return;
+    }
+    if (DebugView == 53) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paShapeRefine),
+            float(paShapeRainSegment),
+            float(paShapeRainShaft),
+            float(paShapeCamera)
+        );
+        return;
+    }
+    if (DebugView == 54) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paShapeLightForward),
+            float(paShapeUntagged),
+            0.0,
+            0.0
         );
         return;
     }

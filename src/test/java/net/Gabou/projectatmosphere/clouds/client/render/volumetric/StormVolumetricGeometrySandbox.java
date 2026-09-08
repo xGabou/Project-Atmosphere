@@ -617,6 +617,8 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT172PrecomputeEquivalence);
         runCorrected("T175 every workload debug view is actually enabled",
                 StormVolumetricGeometrySandbox::validateWorkloadViewsAreEnabled);
+        runCorrected("T182 every consumer tag has a counter that reads it",
+                StormVolumetricGeometrySandbox::validateConsumerTagsAreCounted);
         runCorrected("T163 FINAL is specialized against the dead precipitation path",
                 StormVolumetricGeometrySandbox::validateT163PrecipitationSpecialization);
     }
@@ -6179,6 +6181,64 @@ public final class StormVolumetricGeometrySandbox {
      * and dead at one gate. Adding a view without enabling it now fails the
      * build.
      */
+    /**
+     * T182. Every consumer tag the shader assigns must have a counter that
+     * reads it, and the untagged counter must exist so the accounting can be
+     * shown to close.
+     *
+     * <p>This exists because attribution by elimination failed twice. T180
+     * assigned an untagged residual of 32% to a call site it had identified by
+     * ruling others out, and T181 showed the real figure was 4.7% and that
+     * 27.7% was still unaccounted for. A residual bucket invites that mistake;
+     * an invariant that every declared tag is counted, and that a
+     * deliberately-untagged counter exists, makes the gap visible in the log
+     * instead of inferable from a subtraction.
+     */
+    private static void validateConsumerTagsAreCounted() {
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+
+        java.util.regex.Matcher assigned = java.util.regex.Pattern
+                .compile("paDensityConsumer = (\\d+);").matcher(shader);
+        Set<Integer> tags = new HashSet<>();
+        while (assigned.find()) {
+            int tag = Integer.parseInt(assigned.group(1));
+            if (tag != 0) {
+                tags.add(tag);
+            }
+        }
+        require(!tags.isEmpty(), "no consumer tags are assigned anywhere");
+
+        java.util.regex.Matcher counted = java.util.regex.Pattern
+                .compile("paDensityConsumer == (\\d+) \\? 1 : 0").matcher(shader);
+        Set<Integer> read = new HashSet<>();
+        while (counted.find()) {
+            read.add(Integer.parseInt(counted.group(1)));
+        }
+
+        List<String> missing = new ArrayList<>();
+        for (Integer tag : tags) {
+            if (!read.contains(tag)) {
+                missing.add("tag " + tag);
+            }
+        }
+        require(missing.isEmpty(),
+                "consumer tags are assigned but no counter reads them, so their work"
+                        + " would land in an untagged residual exactly as it did in"
+                        + " T180: " + String.join(", ", missing));
+
+        require(read.contains(0),
+                "no counter reads consumer tag 0, so an untagged call site could not"
+                        + " be detected - that counter is what proves the accounting"
+                        + " closes rather than being assumed to");
+        require(shader.contains("int paShapeUntagged = 0;"),
+                "paShapeUntagged is gone; without it the shape-call accounting has no"
+                        + " residual term to show is zero");
+
+        System.out.println("T182_CONSUMER_TAGS assigned=" + tags.size()
+                + "|counted=" + (read.size() - 1) + "|untaggedCounterPresent=true");
+    }
+
     private static void validateWorkloadViewsAreEnabled() {
         String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
                 + "shaders/core/cloud_atmosphere_volume.fsh");

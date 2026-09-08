@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 29;
+    private static final int STAGES = 32;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -119,6 +119,9 @@ final class StormWorkloadRuntimeCapture {
             case 26 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_A;
             case 27 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_B;
             case 28 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SCAN_C;
+            case 29 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_A;
+            case 30 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_B;
+            case 31 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_C;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -232,7 +235,10 @@ final class StormWorkloadRuntimeCapture {
                     values[25][0],
                     values[26][0], values[26][1], values[26][2], values[26][3],
                     values[27][0], values[27][1], values[27][2], values[27][3],
-                    values[28][0]);
+                    values[28][0],
+                    values[29][0], values[29][1], values[29][2], values[29][3],
+                    values[30][0], values[30][1], values[30][2], values[30][3],
+                    values[31][0], values[31][1]);
         }
     }
 
@@ -288,7 +294,12 @@ final class StormWorkloadRuntimeCapture {
             double scanCapReached,
             double scanProbes1To2, double scanProbes3To4,
             double scanProbes5To8, double scanProbes9To16,
-            double scanWastedProbes
+            double scanWastedProbes,
+            double shapePrimary, double shapeLight, double shapeProbe,
+            double shapeBracket,
+            double shapeRefine, double shapeRainSegment, double shapeRainShaft,
+            double shapeCamera,
+            double shapeLightForward, double shapeUntagged
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -325,7 +336,9 @@ final class StormWorkloadRuntimeCapture {
                     // T180 consumer attribution, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T181 scan distribution, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T182 shape attribution, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -498,6 +511,30 @@ final class StormWorkloadRuntimeCapture {
                     + " scanCapBindFraction=" + ratio(scanCapReached, scanEvents)
                     + " scanMaterialFraction=" + ratio(scanFoundMaterial, scanEvents)
                     + " wastedProbeFraction=" + ratio(scanWastedProbes, probeCalls)
+                    // T182. directStormShape by consumer. shapeUntagged must be
+                    // zero and shapeTagged must equal directStormShapeCalls, or
+                    // the attribution is incomplete and no share derived from it
+                    // can be trusted - which is exactly how T180 went wrong.
+                    + " shapePrimary=" + fmt(shapePrimary)
+                    + " shapeLight=" + fmt(shapeLight)
+                    + " shapeProbe=" + fmt(shapeProbe)
+                    + " shapeBracket=" + fmt(shapeBracket)
+                    + " shapeRefine=" + fmt(shapeRefine)
+                    + " shapeRainSegment=" + fmt(shapeRainSegment)
+                    + " shapeRainShaft=" + fmt(shapeRainShaft)
+                    + " shapeCamera=" + fmt(shapeCamera)
+                    + " shapeLightForward=" + fmt(shapeLightForward)
+                    + " shapeUntagged=" + fmt(shapeUntagged)
+                    + " shapeTagged=" + fmt(shapePrimary + shapeLight + shapeProbe
+                            + shapeBracket + shapeRefine + shapeRainSegment
+                            + shapeRainShaft + shapeCamera + shapeLightForward)
+                    + " shapeAccountingClosed="
+                    + (Math.abs(shapePrimary + shapeLight + shapeProbe + shapeBracket
+                            + shapeRefine + shapeRainSegment + shapeRainShaft
+                            + shapeCamera + shapeLightForward + shapeUntagged
+                            - directStormShapeCalls) < 0.5D)
+                    + " shapeRainSegmentShare="
+                    + ratio(shapeRainSegment, directStormShapeCalls)
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
                     + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
                     + " cheapRejectPerGroupWalk="

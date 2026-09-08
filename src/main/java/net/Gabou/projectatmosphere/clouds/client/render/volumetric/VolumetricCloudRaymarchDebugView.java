@@ -117,7 +117,16 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_SCAN_B(50, "storm_workload_scan_b"),
 
     /** T181. Probes spent in scans that then re-marched the same lattice. */
-    STORM_WORKLOAD_SCAN_C(51, "storm_workload_scan_c");
+    STORM_WORKLOAD_SCAN_C(51, "storm_workload_scan_c"),
+
+    /** T182. directStormShape calls by consumer: primary, light, probe, bracket. */
+    STORM_WORKLOAD_SHAPE_A(52, "storm_workload_shape_a"),
+
+    /** T182. Refinement, rain segment, rain shaft and camera-inside. */
+    STORM_WORKLOAD_SHAPE_B(53, "storm_workload_shape_b"),
+
+    /** T182. Light forward probe, and the untagged residual that must be zero. */
+    STORM_WORKLOAD_SHAPE_C(54, "storm_workload_shape_c");
 
     private final int shaderId;
     private final String serializedName;
