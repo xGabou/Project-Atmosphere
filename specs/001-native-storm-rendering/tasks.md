@@ -2125,6 +2125,37 @@ implementation, while visual polish remains independently active.
   *column*, not the segment, so a per-ray or weather-tile-keyed bound would answer it far less often;
   T145's existing height prune is the model. Evidence in
   `validation/performance-rain-reachability.md`.
+- [X] T184 [PERFORMANCE] [US3] Measure rain-support recomputation and price exact column reuse.
+  **The hypothesis is exactly right about the function and exactly wrong about the ray.**
+  `localRainSupportAt` is **provably column-invariant within a frame** - every input is
+  `sampleWeather(worldXZ)`, `sampleMorphology(worldXZ)`, `directStormRainSupportAt(worldXZ, ...)`
+  or a frame uniform; **no Y, no segment endpoints, no camera, no jitter** - so reuse keyed on XZ
+  equality is exact, not approximate. The one-entry cache built on that proof is **bit-identical:
+  0 changed pixels, meanAbs 0.000000, at both poses**, which is empirical confirmation of the
+  dependency audit across 2.3M calls. **And it is worth nothing**: exact reuse fires **0.40% SIDE /
+  0.17% FAR**, so the arm measures **0.9973x SIDE / 0.9911x FAR** (both accepted) and the stack
+  composition is **0.9983x FAR** (accepted). Task 3's own gate - close below 1.05x - is met with
+  room to spare. **CLOSED.** **Task 7's premise also fails, determinable from source without a
+  campaign**: both `rainSegmentMayContribute` and `rainShaftDensityOverSegment` sample at the
+  two-point **Gauss-Legendre nodes 0.2113/0.7887** - interior points, not endpoints - so
+  consecutive segments share **no** sample position and the hoped-for `support(B)` carry-forward
+  never occurs; exact shared-endpoint rate is **0%, structurally**. **Reuse distance is the whole
+  answer**: even at an 8-block tile (already an approximation) only 7.16% SIDE / 3.00% FAR repeat;
+  at exact XZ it is four tenths of one percent, because the ray advances a coarse step between
+  calls and the two Gauss points sit 57% of a segment apart. **The observation that matters for
+  next time**: support calls barely change with distance (18.06/px SIDE vs 17.54/px FAR - the test
+  runs once per coarse step regardless) while the **T145 prune rate does: 12.12% SIDE vs 76.74%
+  FAR**. At FAR most columns fall outside the rain ownership circle and are rejected on a weather
+  fetch; at SIDE the camera sits near the storm, almost every column is inside it, and the full
+  descriptor traversal is paid. **T145 is a rejection test, not a reusable representation** - it
+  can prove absence but never produce `attachY`/`localSupport`, so it is not semantically
+  sufficient to share, and that is stated rather than forced. **Recommended T185: widen the prune,
+  do not cache the result** - ask whether one bounding circle over all rain-owning descriptors is
+  too coarse (T172 already precomputed per-descriptor ownership radii into texel 3), and whether
+  the `precipitation <= 0.02` conjunct can be relaxed for columns provably outside every ownership
+  ellipse. Both preserve rain exactly, per T183. Rain-render invariant passes throughout
+  (`T183_RAIN_RENDER programs=3`). SIDE <=10 ms **no** (10.920 session-local, composition
+  rejected), FAR <=8 ms **yes** (4.815). Evidence in `validation/performance-rain-reuse.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

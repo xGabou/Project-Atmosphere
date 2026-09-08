@@ -590,6 +590,26 @@ int paShapeRainShaft = 0;
 int paShapeCamera = 0;
 int paShapeLightForward = 0;
 int paShapeUntagged = 0;
+
+/**
+ * T184. Rain-support recomputation.
+ *
+ * <p>localRainSupportAt is exactly column-invariant within a frame - every
+ * input is a function of worldXZ plus frame uniforms, with no Y, no segment
+ * endpoint and no jitter - so any two queries at the same XZ in one frame must
+ * return the same answer. These counters measure how often that actually
+ * happens, at three granularities, before any cache is built.
+ *
+ * <p>The reuse distances are measured against the immediately preceding query,
+ * because a single carried value is the only cache shape worth having here: a
+ * general table would cost more than the walk it avoids.
+ */
+int paRainSupportCalls = 0;
+int paRainSupportPruned = 0;
+int paRainSameExactXZ = 0;
+int paRainSameBlock = 0;
+int paRainSameTile8 = 0;
+vec2 paRainPrevXZ = vec2(1.0e30);
 /** Per-fragment march state for the histogram's run-length transitions. */
 bool paPrimaryPrevMaterial = false;
 #ifdef PA_ARM_DENSITY_EVERY_2
@@ -689,7 +709,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 54);
+        || (DebugView >= 28 && DebugView <= 56);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -4326,6 +4346,22 @@ float localRainSupportAt(
         out float familyStrength,
         out vec4 weather,
         out vec4 morphology) {
+    if (paWorkloadCaptureActive()) {
+        paRainSupportCalls++;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainSameExactXZ += worldXZ == paRainPrevXZ ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainSameBlock += floor(worldXZ) == floor(paRainPrevXZ) ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainSameTile8 += floor(worldXZ * 0.125) == floor(paRainPrevXZ * 0.125)
+            ? 1 : 0;
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainPrevXZ = worldXZ;
+    }
     weather = sampleWeather(worldXZ);
     morphology = sampleMorphology(worldXZ);
     precipitation = saturate(morphology.a);
@@ -4348,6 +4384,9 @@ float localRainSupportAt(
             && precipitation <= 0.02
             && paRainOwnRadius >= 0.0
             && distance(worldXZ, paRainOwnCentre) > paRainOwnRadius) {
+        if (paWorkloadCaptureActive()) {
+            paRainSupportPruned++;
+        }
         return 0.0;
     }
     float directSupport = directStormRainSupportAt(
@@ -4370,6 +4409,56 @@ float localRainSupportAt(
     }
     return localSupport * smoothstep(0.02, 0.12, precipitation);
 }
+
+#ifdef PA_ARM_RAIN_REUSE_EXACT
+/**
+ * T184 Task 3 oracle, and a real candidate if it pays: a one-entry cache keyed
+ * on exact XZ equality.
+ *
+ * <p>Exact by construction. localRainSupportAt is a pure function of worldXZ
+ * within a frame, so returning a stored result for an identical XZ returns the
+ * value the function would have computed. Image equality is therefore the
+ * test of that claim, not of an approximation.
+ */
+vec2 paRainReuseXZ = vec2(1.0e30);
+float paRainReuseSupport = 0.0;
+float paRainReuseAttachY = 0.0;
+float paRainReusePrecip = 0.0;
+float paRainReuseFamily = 0.0;
+vec4 paRainReuseWeather = vec4(0.0);
+vec4 paRainReuseMorphology = vec4(0.0);
+int paRainReuseHits = 0;
+
+float localRainSupportCached(
+        vec2 worldXZ,
+        out float attachY,
+        out float precipitation,
+        out float familyStrength,
+        out vec4 weather,
+        out vec4 morphology) {
+    if (worldXZ == paRainReuseXZ) {
+        attachY = paRainReuseAttachY;
+        precipitation = paRainReusePrecip;
+        familyStrength = paRainReuseFamily;
+        weather = paRainReuseWeather;
+        morphology = paRainReuseMorphology;
+        if (paWorkloadCaptureActive()) {
+            paRainReuseHits++;
+        }
+        return paRainReuseSupport;
+    }
+    float support = localRainSupportAt(
+        worldXZ, attachY, precipitation, familyStrength, weather, morphology);
+    paRainReuseXZ = worldXZ;
+    paRainReuseSupport = support;
+    paRainReuseAttachY = attachY;
+    paRainReusePrecip = precipitation;
+    paRainReuseFamily = familyStrength;
+    paRainReuseWeather = weather;
+    paRainReuseMorphology = morphology;
+    return support;
+}
+#endif
 
 bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
     if (MaxPrecipitation <= 0.02) {
@@ -4400,9 +4489,15 @@ bool rainSegmentMayContribute(vec3 segmentStart, vec3 segmentEnd) {
         vec4 weather;
         vec4 morphology;
         paDensityConsumer = 6;
+#ifdef PA_ARM_RAIN_REUSE_EXACT
+        float support = localRainSupportCached(
+            p.xz, attachY, precipitation, familyStrength, weather, morphology
+        );
+#else
         float support = localRainSupportAt(
             p.xz, attachY, precipitation, familyStrength, weather, morphology
         );
+#endif
         paDensityConsumer = 0;
         if (support > 0.01 && p.y < attachY && p.y > attachY - 184.0) {
             return true;
@@ -8296,6 +8391,26 @@ void main() {
             float(paPrimaryDensityHigh),
             float(paPrimaryMaterialRuns),
             float(paPrimaryZeroRuns)
+        );
+        return;
+    }
+    if (DebugView == 55) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSupportCalls),
+            float(paRainSupportPruned),
+            float(paRainSameExactXZ),
+            float(paRainSameBlock)
+        );
+        return;
+    }
+    if (DebugView == 56) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainSameTile8),
+            0.0,
+            0.0,
+            0.0
         );
         return;
     }

@@ -512,7 +512,19 @@ public enum CoreCostDiagnosticProgram {
     T182_STACK_PROBE4("t182_stack_probe4"),
 
     /** T182: the stack with cap 4 and the rain-segment test removed. */
-    T182_STACK_PROBE4_NORAINSEG("t182_stack_probe4_norainseg");
+    T182_STACK_PROBE4_NORAINSEG("t182_stack_probe4_norainseg"),
+
+    // -----------------------------------------------------------------------
+    // T184. Rain-support recomputation. localRainSupportAt is exactly
+    // column-invariant within a frame, so an identical XZ can reuse the
+    // previous result without approximating anything. Rain still renders.
+    // -----------------------------------------------------------------------
+
+    /** T184: one-entry exact-XZ reuse on the rain support query. */
+    T184_REUSE_EXACT("t184_reuse_exact"),
+
+    /** T184: the quality-approved stack with exact rain-support reuse. */
+    T184_STACK_REUSE("t184_stack_reuse");
 
 
     private final String serializedName;

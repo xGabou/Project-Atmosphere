@@ -126,7 +126,13 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_SHAPE_B(53, "storm_workload_shape_b"),
 
     /** T182. Light forward probe, and the untagged residual that must be zero. */
-    STORM_WORKLOAD_SHAPE_C(54, "storm_workload_shape_c");
+    STORM_WORKLOAD_SHAPE_C(54, "storm_workload_shape_c"),
+
+    /** T184. Rain-support calls, T145 prunes, and exact/block reuse hits. */
+    STORM_WORKLOAD_RAIN_A(55, "storm_workload_rain_a"),
+
+    /** T184. Rain-support reuse at weather-tile granularity. */
+    STORM_WORKLOAD_RAIN_B(56, "storm_workload_rain_b");
 
     private final int shaderId;
     private final String serializedName;

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 32;
+    private static final int STAGES = 34;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -122,6 +122,8 @@ final class StormWorkloadRuntimeCapture {
             case 29 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_A;
             case 30 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_B;
             case 31 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_SHAPE_C;
+            case 32 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_A;
+            case 33 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_B;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -238,7 +240,9 @@ final class StormWorkloadRuntimeCapture {
                     values[28][0],
                     values[29][0], values[29][1], values[29][2], values[29][3],
                     values[30][0], values[30][1], values[30][2], values[30][3],
-                    values[31][0], values[31][1]);
+                    values[31][0], values[31][1],
+                    values[32][0], values[32][1], values[32][2], values[32][3],
+                    values[33][0]);
         }
     }
 
@@ -299,7 +303,10 @@ final class StormWorkloadRuntimeCapture {
             double shapeBracket,
             double shapeRefine, double shapeRainSegment, double shapeRainShaft,
             double shapeCamera,
-            double shapeLightForward, double shapeUntagged
+            double shapeLightForward, double shapeUntagged,
+            double rainSupportCalls, double rainSupportPruned,
+            double rainSameExactXZ, double rainSameBlock,
+            double rainSameTile8
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -338,7 +345,9 @@ final class StormWorkloadRuntimeCapture {
                     // T181 scan distribution, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T182 shape attribution, likewise absent.
-                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T184 rain-support reuse, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
         private static String ratio(double numerator, double denominator) {
@@ -557,6 +566,22 @@ final class StormWorkloadRuntimeCapture {
                                 <= 0.005D * Math.max(1.0D, directStormShapeCalls))
                     + " shapeRainSegmentShare="
                     + ratio(shapeRainSegment, directStormShapeCalls)
+                    // T184. localRainSupportAt is a pure function of worldXZ
+                    // within a frame, so these say how much of it is literally
+                    // recomputed - measured against the immediately preceding
+                    // query, which is the only cache shape worth building.
+                    + " rainSupportCalls=" + fmt(rainSupportCalls)
+                    + " rainSupportPruned=" + fmt(rainSupportPruned)
+                    + " rainSameExactXZ=" + fmt(rainSameExactXZ)
+                    + " rainSameBlock=" + fmt(rainSameBlock)
+                    + " rainSameTile8=" + fmt(rainSameTile8)
+                    + " rainPrunedFraction=" + ratio(rainSupportPruned, rainSupportCalls)
+                    + " rainExactReuseFraction="
+                    + ratio(rainSameExactXZ, rainSupportCalls)
+                    + " rainBlockReuseFraction="
+                    + ratio(rainSameBlock, rainSupportCalls)
+                    + " rainTileReuseFraction="
+                    + ratio(rainSameTile8, rainSupportCalls)
                     + " lobeVisitsPerGroupWalk=" + ratio(lobesVisited, groupFieldCalls)
                     + " exactSdfPerGroupWalk=" + ratio(lobeExactSdf, groupFieldCalls)
                     + " cheapRejectPerGroupWalk="
