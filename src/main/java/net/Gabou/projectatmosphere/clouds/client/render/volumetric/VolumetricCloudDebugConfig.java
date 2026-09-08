@@ -46,7 +46,28 @@ public final class VolumetricCloudDebugConfig {
      */
     private static volatile int descriptorCountLimit = -1;
     private static volatile CoreCostDiagnosticProgram finalProgramOverride;
+    /**
+     * T188. Enables the rain-support field on the DIAGNOSTIC_MONOLITH.
+     *
+     * <p>Workload counters can only be read from the monolith, because every
+     * lean program bakes DebugView to a constant. The monolith is not a field
+     * program, so without this the ray-side fetch count and the post-field
+     * attribution both read zero - not because the field did nothing, but
+     * because the only program that can count was not using it.
+     *
+     * <p>Scoped to the monolith deliberately. Applying it to the timed arms
+     * would make an anchor pay for a generation pass it does not run.
+     */
+    private static volatile boolean rainFieldForcedOnMonolith;
     private static volatile boolean depthCompositeEnabled = true;
+
+    public static boolean rainFieldForcedOnMonolith() {
+        return rainFieldForcedOnMonolith;
+    }
+
+    public static void setRainFieldForcedOnMonolith(boolean forced) {
+        rainFieldForcedOnMonolith = forced;
+    }
     private static volatile boolean sceneRayLimitEnabled = true;
     // Uniform ray probes can miss narrow world-space cloud footprints and cut
     // complete horizontal bands from an otherwise valid volume. Keep the A/B

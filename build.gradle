@@ -282,7 +282,13 @@ def leanFinalConstants = [
         'uniform int PaDiagnosticLightingMode;'    : 'const int PaDiagnosticLightingMode = 0;',
         'uniform int PaRayTraceMode;'              : 'const int PaRayTraceMode = 0;',
         'uniform vec2 PaRayTraceNdc;'              : 'const vec2 PaRayTraceNdc = vec2(0.0);',
-        'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);'
+        'uniform vec2 PaRayTraceFragCoord;'        : 'const vec2 PaRayTraceFragCoord = vec2(0.0);',
+        // T188. Every program that does not generate or read the rain
+        // field bakes both to 0, so neither the generation pass above
+        // main's march nor the lookup branch inside localRainSupportAt
+        // is compiled into it. FINAL is therefore unchanged by T188.
+        'uniform int PaRainFieldPass;'             : 'const int PaRainFieldPass = 0;',
+        'uniform int PaRainFieldEnabled;'          : 'const int PaRainFieldEnabled = 0;'
 ]
 
 // The oracle interval texture is read only by the T153 ground-truth replay,
@@ -851,6 +857,47 @@ def leanProgramVariants = [
                    'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 3',
                    'PA_ARM_DESC_PRECOMPUTE 1'],
          keepUniforms: ['PaOracleBaseSize']],
+        // T188 Task 0. The rain-only capture pair. These render the rain
+        // contribution alone - optical mass, onset and termination height, and
+        // the run count that exposes a broken shaft - instead of the composited
+        // frame, because rain and cloud cannot be separated after compositing.
+        //
+        // Diagnostic and temporary: they exist to gate the field on rain
+        // quality and should be removed with the campaign. The mask output is
+        // behind a define rather than a DebugView because every lean program
+        // bakes DebugView to 0, so a runtime view could only ever be rendered
+        // by the monolith - and the arms are exactly what has to be measured.
+        [name: 'cloud_atmosphere_volume_t188_rain_mask_ref',
+         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: []],
+        [name: 'cloud_atmosphere_volume_t188_rain_mask_field',
+         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+
+        // T188. The REAL rain-support field. The generation pass and the
+        // lookup are the same program, so both uniforms stay live; the field
+        // itself is written by the untimed generation draw the renderer issues
+        // before the march, exactly as T153's ground-truth pass does.
+        //
+        // Both are campaign variants, not production programs: FINAL bakes
+        // PaRainFieldPass and PaRainFieldEnabled to 0 and is unchanged.
+        [name: 'cloud_atmosphere_volume_t188_field_real',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+        // The exactness arm. It generates the field and still marches the exact
+        // descriptor path, so one frame carries both the ground truth and the
+        // field that has to reproduce it.
+        [name: 'cloud_atmosphere_volume_t188_field_generate_only',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass']],
+        [name: 'cloud_atmosphere_volume_t188_stack_field',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
+                        'PaRainFieldEnabled']],
+
         // T187. The rain-field architectural ceiling: the descriptor traversal
         // inside localRainSupportAt becomes free, which is the most any
         // precomputed field could achieve since a real lookup costs more than

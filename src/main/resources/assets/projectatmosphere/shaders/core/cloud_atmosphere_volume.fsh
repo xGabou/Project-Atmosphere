@@ -23,6 +23,12 @@ uniform sampler2D SceneDepthSampler;
 uniform sampler2D HistorySampler;
 uniform sampler2D HistoryDepthSampler;
 uniform sampler2D OracleIntervalSampler;
+/**
+ * T188. The precomputed rain-support field, RGBA32F on the existing weather
+ * domain: R = descriptor body support, G = attach height in world blocks,
+ * B = descriptor ownership as 0/1, A = 1 where a cell was written.
+ */
+uniform sampler2D RainFieldSampler;
 uniform sampler3D BaseNoiseSampler;   // bound manually (3D)
 uniform sampler3D DetailNoiseSampler; // bound manually (3D)
 
@@ -230,6 +236,22 @@ uniform int PaDiagnosticOptimizationMode;
 uniform int PaOraclePass;
 uniform vec2 PaOracleBaseSize;
 /**
+ * T188. 1 while this draw is generating the rain-support field rather than
+ * marching the view ray. The generation pass runs the SAME
+ * directStormRainSupportAt the ray used to call per sample, so the field is
+ * bit-exact by construction rather than by a separate proof - which is the
+ * whole reason generation lives in this program instead of a second one that
+ * would have to duplicate the descriptor union.
+ */
+uniform int PaRainFieldPass;
+/**
+ * T188. 1 when localRainSupportAt reads the field instead of walking the
+ * descriptors. Separate from the generation flag so a campaign can generate
+ * the field and still march the exact path, which is how the exactness arm
+ * measures quantisation error against ground truth in one frame.
+ */
+uniform int PaRainFieldEnabled;
+/**
  * Uploaded as exactly zero. The amplification arm perturbs its extra
  * evaluation by this, so the compiler cannot prove the second call redundant
  * and fold it away, while the result stays bit-identical to the first.
@@ -418,6 +440,25 @@ int paRainOutsideCircle = 0;
 int paRainOutsideAabb = 0;
 int paRainOutsideExact = 0;
 int paRainAcceptedZeroSupport = 0;
+// T188 structural proof: field fetches that replaced a descriptor traversal,
+// and the columns outside the field domain that still have to traverse.
+int paRainFieldFetches = 0;
+int paRainFieldFallbacks = 0;
+#ifdef PA_RAIN_MASK_OUTPUT
+// T188 Task 0. The rain-only capture. Rain and cloud are composited in the
+// rendered frame, so no mask can be recovered from it after the fact; these
+// accumulate the rain contribution alone, along the same ray, in the same
+// march, with the same steps.
+//
+// Guarded by a define rather than a DebugView, because every lean program
+// bakes DebugView to 0 - a runtime view could only ever be rendered by the
+// monolith, and the arms are exactly what has to be measured.
+float paRainMassAccum = 0.0;
+float paRainOnsetY = -1.0;
+float paRainTerminationY = -1.0;
+float paRainRuns = 0.0;
+bool paRainPrevActive = false;
+#endif
 
 /**
  * T186. What the two-sample rule actually costs.
@@ -752,7 +793,7 @@ bool paWorkloadCaptureActive() {
     // without enabling it fails the build instead of silently reporting zeros.
     return DebugView == 22 || DebugView == 23 || DebugView == 24
         || DebugView == 25 || DebugView == 26
-        || (DebugView >= 28 && DebugView <= 60);
+        || (DebugView >= 28 && DebugView <= 62);
 }
 
 /** Temporary capture encoding: two 12-bit normalized interval endpoints. */
@@ -4417,6 +4458,39 @@ bool paRainColumnOwnedExact(vec2 worldXZ) {
     return false;
 }
 
+/**
+ * T188. One texture fetch in place of directStormRainSupportAt's descriptor
+ * walk plus the full candidate/group union.
+ *
+ * <p>The domain is the one sampleWeather and stormCandidatesAt already share,
+ * so there is no second coordinate system and no scrolling rule to invent. A
+ * column outside it falls back to the exact traversal rather than to a
+ * fabricated value: the field is an acceleration structure, never a change of
+ * answer, and the edge is where that distinction has to hold.
+ */
+float paRainFieldSupportAt(
+        vec2 worldXZ,
+        out float attachY,
+        out bool ownsDescriptorGroup) {
+    vec2 uv = (worldXZ - WeatherOrigin) / WeatherExtent;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        if (paWorkloadCaptureActive()) {
+            paRainFieldFallbacks++;
+        }
+        return directStormRainSupportAt(worldXZ, attachY, ownsDescriptorGroup);
+    }
+    if (paWorkloadCaptureActive()) {
+        paRainFieldFetches++;
+    }
+    vec4 cell = texture(RainFieldSampler, uv);
+    attachY = cell.g;
+    // Ownership is a boolean the bilinear filter returns as a fraction across
+    // a cell boundary. Half a cell is the only threshold that does not bias
+    // the union either way.
+    ownsDescriptorGroup = cell.b >= 0.5;
+    return cell.r;
+}
+
 float localRainSupportAt(
         vec2 worldXZ,
         out float attachY,
@@ -4515,9 +4589,13 @@ float localRainSupportAt(
     float directSupport = 0.0;
     directStormOwned = false;
 #else
-    float directSupport = directStormRainSupportAt(
-        worldXZ, stormBaseY, directStormOwned
-    );
+    // T188. The field replaces exactly the descriptor-derived column values
+    // and nothing else: weather coverage, morphology, precipitation, the
+    // family term and the shaft rendering below all still run as production
+    // computes them.
+    float directSupport = PaRainFieldEnabled == 1
+        ? paRainFieldSupportAt(worldXZ, stormBaseY, directStormOwned)
+        : directStormRainSupportAt(worldXZ, stormBaseY, directStormOwned);
 #endif
     // Descriptor-owned storm splats are intentionally absent from the raster
     // map. Their separate precipitation intensity therefore comes from the
@@ -6666,6 +6744,26 @@ void main() {
     // march step, rain probe or density sample can ask about reachability.
     paBuildStormReachability();
     paBuildRainLocality();
+    // T188. The rain-support field generation pass. Each fragment of the
+    // 512x512 target is one column of the existing weather domain, and it runs
+    // the production function rather than a reimplementation of it, so the
+    // stored triple is what the ray would have computed at that column.
+    //
+    // This sits above every march path and returns, so no generation branch
+    // survives inside the loop; and PaRainFieldPass is baked to 0 in every
+    // program that does not generate, so the branch is not compiled into them
+    // at all.
+    if (PaRainFieldPass == 1) {
+        vec2 fieldWorldXZ = WeatherOrigin + texCoord * WeatherExtent;
+        float fieldAttachY;
+        bool fieldOwnsGroup;
+        float fieldSupport = directStormRainSupportAt(
+            fieldWorldXZ, fieldAttachY, fieldOwnsGroup);
+        fragColor = vec4(
+            fieldSupport, fieldAttachY, fieldOwnsGroup ? 1.0 : 0.0, 1.0);
+        gl_FragDepth = 0.0;
+        return;
+    }
     if (paRayTraceActive()) {
         paTraceIteration = int(gl_FragCoord.x);
         paTraceStage = int(gl_FragCoord.y);
@@ -7632,6 +7730,27 @@ void main() {
             ? rainShaftDensityOverSegment(p, segmentEnd, 0.0) * DensityMul
             : 0.0;
         float density = bodyDensity + rainDensity;
+#ifdef PA_RAIN_MASK_OUTPUT
+        {
+            // Optical mass, not raw density: what the frame would actually show
+            // is the rain that survives the transmittance in front of it, and
+            // thin-rain retention is meaningless measured on occluded shafts.
+            paRainMassAccum += rainDensity * stepLength * transmittance;
+            bool paRainActiveNow = rainDensity > 0.0008;
+            if (paRainActiveNow) {
+                if (paRainOnsetY < 0.0) {
+                    paRainOnsetY = p.y;
+                }
+                paRainTerminationY = p.y;
+                // A second run on one ray is a gap in the shaft, which is the
+                // failure a coarse field would produce and a mean error hides.
+                if (!paRainPrevActive) {
+                    paRainRuns += 1.0;
+                }
+            }
+            paRainPrevActive = paRainActiveNow;
+        }
+#endif
         if (paOracleCapture && density <= 0.0008) {
             paOracleCloseCapturedInterval(
                 paOraclePublished,
@@ -8493,6 +8612,19 @@ void main() {
     }
     float resultDepthDerivative = currentCloudHit ? fwidth(resultDepth) : 0.0;
 
+#ifdef PA_RAIN_MASK_OUTPUT
+    // T188 Task 0. R = rain optical mass, G = onset height, B = termination
+    // height, A = contiguous rain runs. Zero mass is "no rain here", which is
+    // what makes the pair of masks comparable as sets rather than as images.
+    gl_FragDepth = 1.0;
+    fragColor = vec4(
+        paRainMassAccum,
+        max(paRainOnsetY, 0.0),
+        max(paRainTerminationY, 0.0),
+        paRainRuns
+    );
+    return;
+#endif
     // Counter channels are unpremultiplied floating-point integers. The
     // on-demand readback sums them across the target, so this path is never
     // composited or used as temporal history.
@@ -8623,6 +8755,50 @@ void main() {
             0.0,
             0.0,
             0.0
+        );
+        return;
+    }
+    // T188 Task 3. What the ray still pays for rain support: the field fetches
+    // that replaced a traversal, and the out-of-domain columns that did not.
+    if (DebugView == 61) {
+        gl_FragDepth = 1.0;
+        fragColor = vec4(
+            float(paRainFieldFetches),
+            float(paRainFieldFallbacks),
+            0.0,
+            0.0
+        );
+        return;
+    }
+    // T188 Task 4. What ONE field cell costs to build, measured with the same
+    // counters the ray path uses. The march above already moved them, so the
+    // delta around a single generation-equivalent call is the per-cell figure;
+    // multiplying by the cell count gives the build's descriptor work without
+    // instrumenting a pass whose output is a texture rather than a capture.
+    //
+    // Each capture pixel takes the cell its own texCoord lands in, so the
+    // sample is stratified across the grid rather than clustered.
+    if (DebugView == 62) {
+        gl_FragDepth = 1.0;
+        int paFieldShapeBefore = paDirectStormShapeCalls;
+        int paFieldGroupBefore = paDescriptorGroupsEntered;
+        int paFieldLobeBefore = paLobesVisited;
+        int paFieldSdfBefore = paLobeExactSdf;
+        ivec2 paFieldSize = textureSize(WeatherMapSampler, 0);
+        vec2 paFieldCellUv =
+            (floor(texCoord * vec2(paFieldSize)) + 0.5) / vec2(paFieldSize);
+        float paFieldAttachY;
+        bool paFieldOwns;
+        directStormRainSupportAt(
+            WeatherOrigin + paFieldCellUv * WeatherExtent,
+            paFieldAttachY,
+            paFieldOwns
+        );
+        fragColor = vec4(
+            float(paDirectStormShapeCalls - paFieldShapeBefore),
+            float(paDescriptorGroupsEntered - paFieldGroupBefore),
+            float(paLobesVisited - paFieldLobeBefore),
+            float(paLobeExactSdf - paFieldSdfBefore)
         );
         return;
     }

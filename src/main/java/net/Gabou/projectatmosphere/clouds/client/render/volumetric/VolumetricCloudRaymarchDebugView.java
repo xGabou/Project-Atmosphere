@@ -144,7 +144,16 @@ public enum VolumetricCloudRaymarchDebugView {
     STORM_WORKLOAD_RAIN_E(59, "storm_workload_rain_e"),
 
     /** T186. Which sample actually found the rain. */
-    STORM_WORKLOAD_RAIN_F(60, "storm_workload_rain_f");
+    STORM_WORKLOAD_RAIN_F(60, "storm_workload_rain_f"),
+
+    /** T188. Rain-field fetches, and the out-of-domain columns that still walk. */
+    STORM_WORKLOAD_RAIN_FIELD_A(61, "storm_workload_rain_field_a"),
+
+    /**
+     * T188. The descriptor work ONE field cell costs to build, so the
+     * generation pass can be priced with the same counters the ray uses.
+     */
+    STORM_WORKLOAD_RAIN_FIELD_B(62, "storm_workload_rain_field_b");
 
     private final int shaderId;
     private final String serializedName;

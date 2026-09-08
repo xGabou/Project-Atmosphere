@@ -118,6 +118,8 @@ public final class StormT135PerformanceProfile {
      * measured separately instead of folded into the cloud time.
      */
     private static final float[] compositeMilliseconds = new float[SAMPLE_FRAMES];
+    /** T188. The rain-support field build, sampled alongside the march. */
+    private static final float[] rainFieldMilliseconds = new float[SAMPLE_FRAMES];
     private static float effectiveResolutionScale = Float.NaN;
     private static final List<Cell> results = new ArrayList<>();
 
@@ -151,8 +153,22 @@ public final class StormT135PerformanceProfile {
             double remainderP50,
             double compositeP50,
             double compositeP95,
-            float effectiveResolutionScale
+            float effectiveResolutionScale,
+            // T188. The rain-support field's own GPU pass, timed separately
+            // from the march. The architecture is only worth having if build
+            // plus lookup beats the traversal it replaced, and a cloud-ray
+            // number alone reports exactly one half of that trade.
+            double rainFieldP50,
+            double rainFieldP95
     ) {
+        /**
+         * T188. What the renderer actually spends on clouds: the march plus the
+         * field pass that fed it. Zero for every program that builds no field,
+         * so this is the march time unchanged wherever T188 is not in play.
+         */
+        public double cloudPlusFieldP50() {
+            return cloudP50 + Math.max(0.0D, rainFieldP50);
+        }
     }
 
     /** Begins sampling one (pose, mode) cell. Returns false when already busy. */
@@ -307,9 +323,14 @@ public final class StormT135PerformanceProfile {
         effectiveResolutionScale = VolumetricCloudRenderer.lastResolutionScale();
         float frameMs = (now - previous) / 1_000_000.0F;
         float compositeMs = CloudFieldCompositeRenderer.lastGpuMilliseconds();
+        float rainFieldMs = VolumetricCloudRenderer.lastRainFieldGpuMilliseconds();
         if (sampled < sampleTarget) {
             cloudMilliseconds[sampled] = cloudMs;
             frameMilliseconds[sampled] = frameMs;
+            // A program that builds no field leaves the timer at -1. Recording
+            // zero there keeps the combined figure equal to the march time
+            // instead of poisoning it with a sentinel.
+            rainFieldMilliseconds[sampled] = Math.max(0.0F, rainFieldMs);
             // A pending composite query records as zero rather than as a
             // fabricated cost. The percentile then understates it, which is the
             // safe direction for a term used to argue a cost floor.
@@ -326,9 +347,11 @@ public final class StormT135PerformanceProfile {
             float[] cloud = Arrays.copyOf(cloudMilliseconds, sampled);
             float[] frame = Arrays.copyOf(frameMilliseconds, sampled);
             float[] composite = Arrays.copyOf(compositeMilliseconds, sampled);
+            float[] rainField = Arrays.copyOf(rainFieldMilliseconds, sampled);
             Arrays.sort(cloud);
             Arrays.sort(frame);
             Arrays.sort(composite);
+            Arrays.sort(rainField);
             results.add(new Cell(
                     poseName,
                     armLabel,
@@ -355,7 +378,9 @@ public final class StormT135PerformanceProfile {
                     percentile(frame, 0.50D) - percentile(cloud, 0.50D),
                     percentile(composite, 0.50D),
                     percentile(composite, 0.95D),
-                    effectiveResolutionScale
+                    effectiveResolutionScale,
+                    percentile(rainField, 0.50D),
+                    percentile(rainField, 0.95D)
             ));
             Cell recorded = results.get(results.size() - 1);
             ProjectAtmosphere.LOGGER.info(
@@ -367,7 +392,9 @@ public final class StormT135PerformanceProfile {
                             + " cloudCv={} cloudMin={} cloudMax={}"
                             + " frameP50={} frameP95={} frameMean={} remainderP50={}"
                             + " effectiveResolutionScale={}"
-                            + " compositeP50={} compositeP95={}",
+                            + " compositeP50={} compositeP95={}"
+                            + " rainFieldP50={} rainFieldP95={}"
+                            + " cloudPlusFieldP50={}",
                     recorded.pose(), recorded.arm(), recorded.descriptors(),
                     recorded.mode(), recorded.raymarchSteps(),
                     fmt(recorded.resolutionScale()), recorded.frameWidth(),
@@ -380,7 +407,9 @@ public final class StormT135PerformanceProfile {
                     fmt(recorded.frameP50()), fmt(recorded.frameP95()), fmt(recorded.frameMean()),
                     fmt(recorded.remainderP50()),
                     fmt(recorded.effectiveResolutionScale()),
-                    fmt(recorded.compositeP50()), fmt(recorded.compositeP95()));
+                    fmt(recorded.compositeP50()), fmt(recorded.compositeP95()),
+                    fmt(recorded.rainFieldP50()), fmt(recorded.rainFieldP95()),
+                    fmt(recorded.cloudPlusFieldP50()));
         } else {
             ProjectAtmosphere.LOGGER.warn(
                     "T135_PROFILE pose={} mode={} produced only {} samples; discarded",

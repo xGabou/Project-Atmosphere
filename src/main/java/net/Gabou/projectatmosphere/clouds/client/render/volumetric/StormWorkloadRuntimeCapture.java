@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * class or pays a readback.
  */
 final class StormWorkloadRuntimeCapture {
-    private static final int STAGES = 38;
+    private static final int STAGES = 40;
     /** Token value that never identifies an accepted capture. */
     static final long NO_TOKEN = 0L;
     /**
@@ -128,6 +128,8 @@ final class StormWorkloadRuntimeCapture {
             case 35 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_D;
             case 36 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_E;
             case 37 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_F;
+            case 38 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_A;
+            case 39 -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_RAIN_FIELD_B;
             default -> VolumetricCloudRaymarchDebugView.STORM_WORKLOAD_PRIMARY;
         };
     }
@@ -250,7 +252,9 @@ final class StormWorkloadRuntimeCapture {
                     values[34][0], values[34][1], values[34][2], values[34][3],
                     values[35][0],
                     values[36][0], values[36][1], values[36][2], values[36][3],
-                    values[37][0], values[37][1]);
+                    values[37][0], values[37][1],
+                    values[38][0], values[38][1],
+                    values[39][0], values[39][1], values[39][2], values[39][3]);
         }
     }
 
@@ -320,7 +324,11 @@ final class StormWorkloadRuntimeCapture {
             double rainAcceptedZeroSupport,
             double rainSegCalls, double rainSegSupport0, double rainSegSupport1,
             double rainSegHeightSkip,
-            double rainSegTrueAt0, double rainSegTrueAt1
+            double rainSegTrueAt0, double rainSegTrueAt1,
+            // T188. Ray-side field use, then the per-cell build cost.
+            double rainFieldFetches, double rainFieldFallbacks,
+            double fieldCellShapeCalls, double fieldCellGroupWalks,
+            double fieldCellLobeVisits, double fieldCellExactSdf
     ) {
         /** Keeps the pre-T153 deterministic freshness sandbox source-compatible. */
         WorkloadResult(
@@ -365,6 +373,8 @@ final class StormWorkloadRuntimeCapture {
                     // T185 ownership prune diagnostics, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
                     // T186 segment-sample split, likewise absent.
+                    0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D,
+                    // T188 rain-field use and per-cell build cost, likewise absent.
                     0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
         }
 
@@ -645,7 +655,29 @@ final class StormWorkloadRuntimeCapture {
                     + " wastedSdfPerGroupWalk="
                     + ratio(lobeExactSdfNoChange, groupFieldCalls)
                     + " wastedSdfFraction="
-                    + ratio(lobeExactSdfNoChange, lobeExactSdf);
+                    + ratio(lobeExactSdfNoChange, lobeExactSdf)
+                    // T188. The structural proof. Fetches are the traversals the
+                    // field removed from the ray; fallbacks are the columns
+                    // outside the field domain that still have to walk, and are
+                    // the honest cost of keeping the answer exact at the edge.
+                    + " rainFieldFetches=" + fmt(rainFieldFetches)
+                    + " rainFieldFallbacks=" + fmt(rainFieldFallbacks)
+                    + " rainFieldFallbackFraction="
+                    + ratio(rainFieldFallbacks,
+                            Math.max(1.0D, rainFieldFetches + rainFieldFallbacks))
+                    // The build side, per cell. Multiplying by the cell count
+                    // gives the generation pass's descriptor work, which is the
+                    // half of the trade a cloud-ray saving alone hides.
+                    + " fieldCellShapeCalls=" + fmt(fieldCellShapeCalls)
+                    + " fieldCellGroupWalks=" + fmt(fieldCellGroupWalks)
+                    + " fieldCellLobeVisits=" + fmt(fieldCellLobeVisits)
+                    + " fieldCellExactSdf=" + fmt(fieldCellExactSdf)
+                    + " fieldCellShapeCallsPerPixel="
+                    + perPixel(fieldCellShapeCalls)
+                    + " fieldCellGroupWalksPerPixel="
+                    + perPixel(fieldCellGroupWalks)
+                    + " fieldCellExactSdfPerPixel="
+                    + perPixel(fieldCellExactSdf);
         }
 
         double oraclePostOpacityDistance() {

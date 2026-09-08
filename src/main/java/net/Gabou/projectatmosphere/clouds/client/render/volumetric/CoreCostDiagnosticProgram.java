@@ -569,7 +569,36 @@ public enum CoreCostDiagnosticProgram {
     T187_FIELD_ORACLE("t187_field_oracle"),
 
     /** T187: the quality-approved stack with the same ceiling applied. */
-    T187_STACK_FIELD("t187_stack_field");
+    T187_STACK_FIELD("t187_stack_field"),
+
+    // -----------------------------------------------------------------------
+    // T188. The REAL rain-support field. Generation and lookup are the same
+    // program, so the stored triple is what the ray would have computed rather
+    // than a reimplementation that has to be proven equal to it.
+    // -----------------------------------------------------------------------
+
+    /** T188: the field generated every frame and read by the march. */
+    T188_FIELD_REAL("t188_field_real"),
+
+    /**
+     * T188 exactness arm: generates the field and still marches the exact
+     * descriptor path, so one frame carries both the ground truth and the
+     * field that has to reproduce it.
+     */
+    T188_FIELD_GENERATE_ONLY("t188_field_generate_only"),
+
+    /** T188: the quality-approved stack with the real field composed in. */
+    T188_STACK_FIELD("t188_stack_field"),
+
+    /**
+     * T188 Task 0 reference: the rain-only capture from the exact descriptor
+     * path. Renders rain optical mass, onset and termination height and the
+     * run count instead of the composited frame.
+     */
+    T188_RAIN_MASK_REF("t188_rain_mask_ref"),
+
+    /** T188 Task 0 candidate: the same rain-only capture, read from the field. */
+    T188_RAIN_MASK_FIELD("t188_rain_mask_field");
 
 
     private final String serializedName;
@@ -620,6 +649,37 @@ public enum CoreCostDiagnosticProgram {
      * except the monolith itself and the lean FINAL program, whose resource
      * name predates the serialized labels.
      */
+    /**
+     * True for the arms whose program keeps {@code PaRainFieldPass} live. The
+     * renderer issues the untimed generation draw only for these; every other
+     * program bakes the uniform to 0 and has no generation branch compiled in,
+     * so the extra pass would render into a target nothing reads.
+     */
+    public boolean rainFieldGeneration() {
+        return this == T188_FIELD_REAL || this == T188_FIELD_GENERATE_ONLY
+                || this == T188_STACK_FIELD || this == T188_RAIN_MASK_FIELD;
+    }
+
+    /**
+     * True for the arms that also READ the field. GENERATE_ONLY deliberately
+     * does not: it pays the build and still walks the descriptors, which is
+     * what makes it the ground truth the field is measured against.
+     */
+    public boolean rainFieldLookup() {
+        return this == T188_FIELD_REAL || this == T188_STACK_FIELD
+                || this == T188_RAIN_MASK_FIELD;
+    }
+
+    /**
+     * True for the arms whose fragment output is the rain-only capture rather
+     * than a rendered frame. Their images are comparable to each other and to
+     * nothing else, so the harness must not measure them against the RGB
+     * anchor every other arm uses.
+     */
+    public boolean rainMaskCapture() {
+        return this == T188_RAIN_MASK_REF || this == T188_RAIN_MASK_FIELD;
+    }
+
     public String resourceName() {
         return switch (this) {
             case DIAGNOSTIC_MONOLITH -> "cloud_atmosphere_volume";

@@ -25,6 +25,7 @@ public final class VolumetricCloudRenderTargets {
     private static RenderTarget stormDescriptorTarget;
     private static RenderTarget puffCandidateTarget;
     private static RenderTarget shadowTarget;
+    private static RenderTarget rainFieldTarget;
     /** T153-only ground-truth interval map; never sampled by production. */
     private static RenderTarget visibleVolumeOracleTarget;
     private static final RenderTarget[] cloudTargets = new RenderTarget[2];
@@ -150,6 +151,34 @@ public final class VolumetricCloudRenderTargets {
             cumulusStageTopTarget = createHalfFloatMap(size);
         }
         return cumulusStageTopTarget;
+    }
+
+    /**
+     * T188. The precomputed rain-support field, on the same domain and at the
+     * same resolution as the weather and morphology maps it sits beside.
+     *
+     * <p>RGBA32F rather than the RGBA16F those maps use, because channel G is
+     * an attach height in world blocks. Half float carries an ulp of 0.5 near
+     * a 1000-block storm top, which would put a quantisation error into the
+     * stored value on top of the spatial one this field is measured for, and
+     * confound the two.
+     *
+     * <p>Filtered LINEAR to match the maps it joins: the field is a smooth
+     * scalar sampled at arbitrary XZ, so the alternative is a visible
+     * eight-block staircase at every rain edge.
+     */
+    public static RenderTarget prepareRainFieldTarget(int size) {
+        if (rainFieldTarget == null || rainFieldTarget.width != size) {
+            if (rainFieldTarget != null) {
+                rainFieldTarget.destroyBuffers();
+            }
+            rainFieldTarget = createFloatMap(size, size, GL11.GL_LINEAR);
+        }
+        return rainFieldTarget;
+    }
+
+    public static RenderTarget rainFieldTargetOrNull() {
+        return rainFieldTarget;
     }
 
     public static RenderTarget weatherTargetOrNull() {
@@ -330,6 +359,10 @@ public final class VolumetricCloudRenderTargets {
         if (shadowTarget != null) {
             shadowTarget.destroyBuffers();
             shadowTarget = null;
+        }
+        if (rainFieldTarget != null) {
+            rainFieldTarget.destroyBuffers();
+            rainFieldTarget = null;
         }
         if (visibleVolumeOracleTarget != null) {
             visibleVolumeOracleTarget.destroyBuffers();

@@ -27,9 +27,23 @@ public final class VolumetricCloudRenderer {
             CloudTextureUnitContract.PUFF_CANDIDATE_UNIT;
     private static final int BASE_NOISE_TEXTURE_UNIT = CloudTextureUnitContract.BASE_NOISE_UNIT;
     private static final int DETAIL_NOISE_TEXTURE_UNIT = CloudTextureUnitContract.DETAIL_NOISE_UNIT;
+    private static final int RAIN_FIELD_TEXTURE_UNIT = CloudTextureUnitContract.RAIN_FIELD_UNIT;
+    /**
+     * T188. The field texture for the frame being drawn, or 0. Held here
+     * because the manual bind has to happen after every shader.apply(),
+     * which resets the sampler uniforms Minecraft knows about.
+     */
+    private static int rainFieldTextureId;
     private static final int REQUIRED_FRAGMENT_TEXTURE_UNITS =
             CloudTextureUnitContract.REQUIRED_FRAGMENT_TEXTURE_UNITS;
     private static final CloudGpuTimer GPU_TIMER = new CloudGpuTimer();
+    /**
+     * T188. The rain-field generation pass is timed separately from the march,
+     * because the decision the field has to win is build + lookup against the
+     * old repeated traversal - and a cloud-ray saving on its own would hide
+     * exactly the half of that trade the field pays for.
+     */
+    private static final CloudGpuTimer RAIN_FIELD_TIMER = new CloudGpuTimer();
     private static final CloudFrameTimeGovernor GOVERNOR = new CloudFrameTimeGovernor();
 
     private static final Matrix4f prevProj = new Matrix4f();
@@ -39,6 +53,7 @@ public final class VolumetricCloudRenderer {
     private static boolean hasPrevFrame;
     private static long frameIndex;
     private static volatile float lastGpuMilliseconds = -1.0F;
+    private static volatile float lastRainFieldGpuMilliseconds = -1.0F;
     private static volatile boolean lastHistoryValid;
     private static volatile float lastHistoryConfidence;
     private static volatile float lastResolutionScale = 1.0F;
@@ -66,6 +81,14 @@ public final class VolumetricCloudRenderer {
 
     public static float lastGpuMilliseconds() {
         return lastGpuMilliseconds;
+    }
+
+    /**
+     * T188. Milliseconds the rain-support field generation pass cost on the
+     * GPU, or -1 when no program generated one this frame.
+     */
+    public static float lastRainFieldGpuMilliseconds() {
+        return lastRainFieldGpuMilliseconds;
     }
 
     /** Identifies a fresh completed GPU timestamp result without using a frame-time proxy. */
@@ -133,6 +156,7 @@ public final class VolumetricCloudRenderer {
         invalidateHistory();
         GOVERNOR.reset();
         GPU_TIMER.close();
+        RAIN_FIELD_TIMER.close();
         lastGpuMilliseconds = -1.0F;
         lastHistoryValid = false;
         lastHistoryConfidence = 0.0F;
@@ -332,6 +356,15 @@ public final class VolumetricCloudRenderer {
 
         GPU_TIMER.poll();
         lastGpuMilliseconds = GPU_TIMER.getLastMilliseconds();
+        RAIN_FIELD_TIMER.poll();
+        // The timer holds its last resolved result, so a frame that builds no
+        // field would otherwise report the previous arm's build cost and charge
+        // a control for a pass it never ran. Zero unless this frame generated.
+        lastRainFieldGpuMilliseconds = program.rainFieldGeneration()
+                || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                    && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
+                ? RAIN_FIELD_TIMER.getLastMilliseconds()
+                : 0.0F;
         float stepScale = GOVERNOR.update(lastGpuMilliseconds);
 
         // Camera cuts and rapid turns poison reprojection. Gentle movement
@@ -425,6 +458,8 @@ public final class VolumetricCloudRenderer {
         shader.setSampler("HistorySampler", historyValid ? historyTarget.getColorTextureId() : 0);
         shader.setSampler("HistoryDepthSampler", historyValid ? historyTarget.getDepthTextureId() : 0);
         shader.setSampler("OracleIntervalSampler", 0);
+        // T188. Not a JSON sampler; see bindManualTextures.
+        rainFieldTextureId = 0;
 
         lastCloudProjection.set(projection);
         lastViewRotation.set(viewRotation);
@@ -441,7 +476,24 @@ public final class VolumetricCloudRenderer {
         shader.safeGetUniform("WeatherExtent").set(CloudWeatherMapRenderer.WEATHER_EXTENT);
         shader.safeGetUniform("SlabBaseY").set(weather.slabBaseY());
         shader.safeGetUniform("SlabTopY").set(weather.slabTopY());
-        shader.safeGetUniform("MaxPrecipitation").set(weather.maxPrecipitation());
+        // T188 Task 0. The rain-heavy fixture, as a precipitation forcing on
+        // the existing deterministic storm rather than a second world.
+        //
+        // Descriptor-owned columns take their intensity from MaxPrecipitation,
+        // so raising it makes every column the storm owns rain-bearing while
+        // leaving raster-precipitation columns exactly as they were. That is
+        // precisely the population the rain field governs, and T186 could not
+        // measure missed rain because the ordinary fixture leaves it almost
+        // empty - 11,028 rain-positive segments in a frame is too sparse for
+        // continuity or onset statistics to mean anything.
+        //
+        // Applied only to the rain-only capture pair, and identically to both
+        // sides of it, so it changes what is visible and not what is compared.
+        float paMaxPrecipitation = weather.maxPrecipitation();
+        if (program.rainMaskCapture()) {
+            paMaxPrecipitation = Math.max(paMaxPrecipitation, 0.85F);
+        }
+        shader.safeGetUniform("MaxPrecipitation").set(paMaxPrecipitation);
         shader.safeGetUniform("PuffLobeCount").set(PuffLobeSpatialIndex.lobeCount());
         // T162 scaling arm: a positive cap tells the shader about fewer
         // descriptors than are resident. Diagnostic only; the default is no cap.
@@ -590,6 +642,51 @@ public final class VolumetricCloudRenderer {
             shader.setSampler("OracleIntervalSampler", oracleTarget.getColorTextureId());
             shader.safeGetUniform("DebugView").set(debugView.shaderId());
             shader.safeGetUniform("PaOraclePass").set(0);
+        }
+
+        // T188. The monolith is the only program that can read workload
+        // counters, so the campaign forces the field onto it to measure the
+        // ray-side fetch count and the post-field attribution. Never applied to
+        // a timed arm: an anchor would then pay for a pass it does not run.
+        boolean paFieldProgram = program.rainFieldGeneration()
+                || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                    && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith());
+        if (paFieldProgram) {
+            // T188. One untimed-by-GPU_TIMER draw over the 512x512 weather
+            // domain, writing the descriptor-derived rain triple per column.
+            // It runs the same directStormRainSupportAt the ray used to call
+            // per sample, so nothing here can drift from what the march would
+            // have computed - the two are one function in one program.
+            //
+            // Timed on its own clock instead, because the architecture is only
+            // worth having if build + lookup beats the traversal it replaced.
+            RenderTarget rainFieldTarget =
+                    VolumetricCloudRenderTargets.prepareRainFieldTarget(
+                            profile.weatherMapSize());
+            if (rainFieldTarget != null) {
+                VolumetricCloudRenderTargets.clearAndBind(rainFieldTarget);
+                shader.safeGetUniform("PaRainFieldPass").set(1);
+                shader.safeGetUniform("PaRainFieldEnabled").set(0);
+                shader.apply();
+                PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
+                bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
+                RAIN_FIELD_TIMER.begin();
+                try {
+                    FullscreenQuad.draw(shader);
+                } finally {
+                    RAIN_FIELD_TIMER.end();
+                    unbindManualTextures();
+                    shader.clear();
+                }
+
+                VolumetricCloudRenderTargets.clearAndBind(cloudTarget);
+                rainFieldTextureId = rainFieldTarget.getColorTextureId();
+                shader.safeGetUniform("PaRainFieldPass").set(0);
+                shader.safeGetUniform("PaRainFieldEnabled").set(
+                        program.rainFieldLookup()
+                                || program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                                ? 1 : 0);
+            }
         }
 
         lastProgram = program;
@@ -772,6 +869,17 @@ public final class VolumetricCloudRenderer {
                 PUFF_CANDIDATE_TEXTURE_UNIT,
                 puffCandidateTextureId
         );
+        // T188. Bound here rather than through the shader JSON: Minecraft
+        // assigns JSON samplers to consecutive units from 0 and tracks only
+        // twelve, so a thirteenth throws inside ShaderInstance.apply. A
+        // PA-owned unit is the same mechanism the puff candidate map and both
+        // noise volumes already use.
+        bind2dSampler(
+                program,
+                "RainFieldSampler",
+                RAIN_FIELD_TEXTURE_UNIT,
+                rainFieldTextureId
+        );
         bind3dSampler(
                 program,
                 "BaseNoiseSampler",
@@ -818,6 +926,8 @@ public final class VolumetricCloudRenderer {
 
     private static void unbindManualTextures() {
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + PUFF_CANDIDATE_TEXTURE_UNIT);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        GlStateManager._activeTexture(GL13.GL_TEXTURE0 + RAIN_FIELD_TEXTURE_UNIT);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         GlStateManager._activeTexture(GL13.GL_TEXTURE0 + BASE_NOISE_TEXTURE_UNIT);
         GL11.glBindTexture(GL12.GL_TEXTURE_3D, 0);

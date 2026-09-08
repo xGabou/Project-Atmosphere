@@ -227,6 +227,13 @@ final class StormT132AutoDriver {
      * which no real lookup can beat.
      */
     private static final Path T187_MARKER = Path.of("t187-rain-field.txt");
+
+    /**
+     * T188. The REAL field, not the ceiling: generation plus lookup, timed
+     * on two clocks, because build cost is the half of the trade T187 could
+     * only derive.
+     */
+    private static final Path T188_MARKER = Path.of("t188-rain-field-real.txt");
     /**
      * T152 marker. The run drives the deterministic moving-camera route twice -
      * once without temporal accumulation and once with it - and measures
@@ -1313,6 +1320,86 @@ final class StormT132AutoDriver {
      */
     private static final T166Arm[] T187_ARMS = buildT187Arms();
 
+    /** SIDE binds the budget; FAR must not regress. */
+    private static final String[] T188_POSES = {"SIDE", "FAR"};
+
+    private static boolean t188Run;
+    private static boolean t188OriginalHistoryEnabled;
+
+    /**
+     * The T188 matrix. The real field, the stack composition, and the
+     * generate-only arm that pays the build and still marches the exact
+     * descriptor path - which is what makes one frame carry both the ground
+     * truth and the field that has to reproduce it.
+     */
+    private static final T166Arm[] T188_ARMS = buildT188Arms();
+
+    private static T166Arm[] buildT188Arms() {
+        java.util.List<T166Arm> arms = new java.util.ArrayList<>();
+        int anchor = 0;
+        arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+        for (int repeat = 1; repeat <= 3; repeat++) {
+            for (CoreCostDiagnosticProgram arm : new CoreCostDiagnosticProgram[] {
+                    CoreCostDiagnosticProgram.T188_FIELD_REAL,
+                    CoreCostDiagnosticProgram.T188_FIELD_GENERATE_ONLY,
+                    CoreCostDiagnosticProgram.T172_STACK_PRE,
+                    CoreCostDiagnosticProgram.T188_STACK_FIELD}) {
+                arms.add(new T166Arm(arm, "r" + repeat, 60));
+                arms.add(new T166Arm(CoreCostDiagnosticProgram.LEAN_FINAL,
+                        String.format(Locale.ROOT, "a%02d", ++anchor), 60));
+            }
+        }
+        return arms.toArray(new T166Arm[0]);
+    }
+
+    private static T166Arm t188Arm() {
+        return T188_ARMS[Math.max(0, Math.min(T188_ARMS.length - 1, t141ArmIndex))];
+    }
+
+    private static final StormOptimizationDiagnosticMode[] T188_OPTIMIZATION_ARMS =
+            buildT188OptimizationArms();
+
+    private static StormOptimizationDiagnosticMode[] buildT188OptimizationArms() {
+        StormOptimizationDiagnosticMode[] modes =
+                new StormOptimizationDiagnosticMode[T188_ARMS.length];
+        for (int i = 0; i < T188_ARMS.length; i++) {
+            modes[i] = T188_ARMS[i].mode();
+        }
+        return modes;
+    }
+
+    /**
+     * The field arms are image-VALID by intent, so their captures are the
+     * quality result rather than a record of what is at stake. The
+     * generate-only arm marches the exact path, so it must reproduce the
+     * reference exactly; any difference there is a harness defect, not a
+     * quantisation error.
+     */
+    private static final CoreCostDiagnosticProgram[] T188_IMAGE_ARMS = {
+            CoreCostDiagnosticProgram.T188_FIELD_REAL,
+            CoreCostDiagnosticProgram.T188_FIELD_GENERATE_ONLY,
+            CoreCostDiagnosticProgram.T188_STACK_FIELD,
+            // The rain-only pair, in this order: the reference is captured
+            // first and becomes the anchor the field candidate is measured
+            // against. They are never compared to the RGB anchor.
+            CoreCostDiagnosticProgram.T188_RAIN_MASK_REF,
+            CoreCostDiagnosticProgram.T188_RAIN_MASK_FIELD
+    };
+
+    /** The rain-only reference capture the T188 field candidate is measured against. */
+    private static StormReferenceImageComparison.Reference t188RainMaskAnchor;
+
+    /** True for a T188 bracketing anchor cell. */
+    private static boolean t188IsAnchor(T166Arm arm) {
+        return arm.program() == CoreCostDiagnosticProgram.LEAN_FINAL;
+    }
+
+    /** T188 marker predicate. */
+    private static boolean realRainFieldRunRequested() {
+        return Files.exists(T188_MARKER);
+    }
+
     private static T166Arm[] buildT187Arms() {
         java.util.List<T166Arm> arms = new java.util.ArrayList<>();
         int anchor = 0;
@@ -2205,7 +2292,7 @@ final class StormT132AutoDriver {
         return t166Run || t167Run || t168Run || t169Run || t170Run || t171Run || t172Run
                 || t173Run || t174Run || t175Run || t176Run || t177Run
                 || t178Run || t179Run || t180Run || t181Run || t182Run
-                || t184Run || t185Run || t186Run || t187Run;
+                || t184Run || t185Run || t186Run || t187Run || t188Run;
     }
 
     private static final StormOptimizationDiagnosticMode[] T169_OPTIMIZATION_ARMS =
@@ -2463,7 +2550,8 @@ final class StormT132AutoDriver {
     private static void applyT141Arm() {
         VolumetricCloudDebugConfig.setFixedResolutionScale(T141_RESOLUTION_SCALE);
         if (programArmCampaign()) {
-            T166Arm arm = t187Run ? t187Arm()
+            T166Arm arm = t188Run ? t188Arm()
+                    : t187Run ? t187Arm()
                     : t186Run ? t186Arm()
                     : t185Run ? t185Arm()
                     : t184Run ? t184Arm()
@@ -2563,6 +2651,9 @@ final class StormT132AutoDriver {
     }
 
     private static String t141ArmName() {
+        if (t188Run) {
+            return t188Arm().label();
+        }
         if (t187Run) {
             return t187Arm().label();
         }
@@ -2654,6 +2745,9 @@ final class StormT132AutoDriver {
     }
 
     private static StormOptimizationDiagnosticMode[] activeEvaluationArms() {
+        if (t188Run) {
+            return T188_OPTIMIZATION_ARMS;
+        }
         if (t187Run) {
             return T187_OPTIMIZATION_ARMS;
         }
@@ -2876,6 +2970,9 @@ final class StormT132AutoDriver {
 
     /** The pose list in force, which differs between the T136 and T138 sweeps. */
     private static String[] sweepPoses() {
+        if (t188Run) {
+            return T188_POSES;
+        }
         if (t187Run) {
             return T187_POSES;
         }
@@ -3298,6 +3395,12 @@ final class StormT132AutoDriver {
                 t186OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t187Run = rainFieldRunRequested();
                 t187OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                t188Run = realRainFieldRunRequested();
+                t188OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
+                // T188 Task 3 and Task 11. Counters come from the monolith, so
+                // the monolith has to be using the field for them to describe
+                // the post-field workload rather than the one it replaced.
+                VolumetricCloudDebugConfig.setRainFieldForcedOnMonolith(t188Run);
                 t168OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
                 t167Run = refinementRunRequested();
                 t167OriginalHistoryEnabled = VolumetricCloudDebugConfig.historyEnabled();
@@ -3351,7 +3454,8 @@ final class StormT132AutoDriver {
                                 || t184Run
                                 || t185Run
                                 || t186Run
-                                || t187Run;
+                                || t187Run
+                                || t188Run;
                 t141ArmIndex = 0;
                 t141ArmAttempts = 0;
                 t141CellPending = false;
@@ -3364,7 +3468,7 @@ final class StormT132AutoDriver {
                             && !t166Run && !t167Run && !t168Run && !t169Run && !t170Run
                             && !t171Run && !t172Run && !t173Run && !t174Run
                             && !t175Run && !t176Run && !t177Run && !t178Run
-                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run) {
+                            && !t179Run && !t180Run && !t181Run && !t182Run && !t184Run && !t185Run && !t186Run && !t187Run && !t188Run) {
                         resolveT141Poses();
                     }
                     StormT135PerformanceProfile.setCellBudget(30, 60);
@@ -3374,7 +3478,8 @@ final class StormT132AutoDriver {
                     ProjectAtmosphere.LOGGER.info(
                             "{}_BEGIN poses={} arms={} mode=ULTRA steps=96"
                                     + " resolutionScale={} target={}x{}",
-                            t187Run ? "T187_RAIN_FIELD"
+                            t188Run ? "T188_RAIN_FIELD_REAL"
+                                    : t187Run ? "T187_RAIN_FIELD"
                                     : t186Run ? "T186_RAIN_SAMPLES"
                                     : t185Run ? "T185_RAIN_PRUNE"
                                     : t184Run ? "T184_RAIN_REUSE"
@@ -3727,7 +3832,8 @@ final class StormT132AutoDriver {
                         || (t184Run && t184Arm().program().fixedWork())
                         || (t185Run && t185Arm().program().fixedWork())
                         || (t186Run && t186Arm().program().fixedWork())
-                        || (t187Run && t187Arm().program().fixedWork())) {
+                        || (t187Run && t187Arm().program().fixedWork())
+                        || (t188Run && t188Arm().program().fixedWork())) {
                     // A fixed-work arm renders a checksum, not the production
                     // scene, so production workload counters captured beside it
                     // would describe a different program. The production-context
@@ -3871,6 +3977,15 @@ final class StormT132AutoDriver {
                     VolumetricCloudDebugConfig.setOptimizationDiagnosticMode(
                             StormOptimizationDiagnosticMode.NORMAL_PRODUCTION);
                     StormT135PerformanceProfile.setCellBudget(45, 120);
+                }
+                if (t188Run) {
+                    ProjectAtmosphere.LOGGER.info(buildT188RealRainFieldReport());
+                    VolumetricCloudDebugConfig.setFinalProgramOverride(null);
+                    VolumetricCloudDebugConfig.setFixedResolutionScale(Float.NaN);
+                    VolumetricCloudDebugConfig.setDescriptorCountLimit(-1);
+                    VolumetricCloudDebugConfig.setHistoryEnabled(
+                            t188OriginalHistoryEnabled);
+                    VolumetricCloudDebugConfig.setRainFieldForcedOnMonolith(false);
                 }
                 if (t187Run) {
                     ProjectAtmosphere.LOGGER.info(buildT187RainFieldReport());
@@ -4739,6 +4854,9 @@ final class StormT132AutoDriver {
      */
     /** The image set in force: T166's arms, or T167's. */
     private static CoreCostDiagnosticProgram[] t166ImageArms() {
+        if (t188Run) {
+            return T188_IMAGE_ARMS;
+        }
         if (t187Run) {
             return T187_IMAGE_ARMS;
         }
@@ -4851,6 +4969,21 @@ final class StormT132AutoDriver {
             ProjectAtmosphere.LOGGER.warn(
                     "T166_IMAGE_AB pose={} arm={} evaluated=false reason=missing_capture",
                     pose, arm.serializedName());
+        } else if (arm == CoreCostDiagnosticProgram.T188_RAIN_MASK_REF) {
+            // Not a comparison. This capture IS the rain ground truth, and the
+            // cloud anchor it would otherwise be measured against is a
+            // different quantity entirely.
+            t188RainMaskAnchor = captured;
+            ProjectAtmosphere.LOGGER.info(
+                    "T188_RAIN_MASK pose={} reference {}", pose, captured.format());
+        } else if (arm.rainMaskCapture()) {
+            ProjectAtmosphere.LOGGER.info(
+                    "T188_RAIN_MASK_AB pose={} arm={} a=t188_rain_mask_ref {}"
+                            + " digestsEqual={}",
+                    pose, arm.serializedName(),
+                    StormRainMaskMetrics.compare(t188RainMaskAnchor, captured).format(),
+                    t188RainMaskAnchor != null
+                            && t188RainMaskAnchor.digest().equals(captured.digest()));
         } else {
             ProjectAtmosphere.LOGGER.info(
                     "T166_IMAGE_AB pose={} arm={} a=lean_final {} {} digestsEqual={}",
@@ -5220,6 +5353,170 @@ final class StormT132AutoDriver {
     /** T184. The paired-ratio protocol with the within-block stack control. */
     /** T185. The paired-ratio protocol with the within-block stack control. */
     /** T186. The paired-ratio protocol with the within-block stack control. */
+    /**
+     * T188. The paired-ratio protocol, reported on TWO clocks.
+     *
+     * <p>The march ratio is what every campaign since T177 has measured. The
+     * net ratio divides by the march plus the field-generation pass, which is
+     * the only number that answers the question this architecture was proposed
+     * to answer: build once and look up many times has to beat traversing per
+     * sample, and a cloud-ray saving on its own reports one half of that trade
+     * while the field quietly pays the other.
+     */
+    private static String buildT188RealRainFieldReport() {
+        StringBuilder out = new StringBuilder("T188_RAIN_FIELD_REAL_DECISION");
+        String control = CoreCostDiagnosticProgram.T172_STACK_PRE.serializedName();
+        String target = CoreCostDiagnosticProgram.T188_STACK_FIELD.serializedName();
+        for (String pose : T188_POSES) {
+            java.util.Map<String, java.util.List<double[]>> byProgram =
+                    new java.util.LinkedHashMap<>();
+            java.util.Map<Integer, java.util.Map<String, Double>> byBlock =
+                    new java.util.LinkedHashMap<>();
+            int block = 0;
+            for (int i = 0; i < T188_ARMS.length; i++) {
+                T166Arm arm = T188_ARMS[i];
+                if (t188IsAnchor(arm) || i == 0 || i + 1 >= T188_ARMS.length) {
+                    continue;
+                }
+                if (arm.program() == CoreCostDiagnosticProgram.T188_FIELD_REAL) {
+                    block++;
+                }
+                StormT135PerformanceProfile.Cell before =
+                        t162Cell(pose, T188_ARMS[i - 1].label());
+                StormT135PerformanceProfile.Cell after =
+                        t162Cell(pose, T188_ARMS[i + 1].label());
+                StormT135PerformanceProfile.Cell cell = t162Cell(pose, arm.label());
+                if (before == null || after == null || cell == null
+                        || cell.cloudP50() <= 0.0D) {
+                    out.append(String.format(Locale.ROOT,
+                            "%nT188_BLOCK pose=%s arm=%s evaluated=false", pose,
+                            arm.label()));
+                    continue;
+                }
+                // The anchors build no field, so their cloudP50 already IS
+                // their whole renderer cost. Comparing it against the arm's
+                // march alone would credit the field with a saving it did not
+                // make; comparing it against march plus build is the trade.
+                double baseline = (before.cloudP50() + after.cloudP50()) * 0.5D;
+                double drift = Math.abs(before.cloudP50() - after.cloudP50())
+                        / Math.max(1.0e-6D, baseline);
+                double ratio = baseline / cell.cloudP50();
+                double netRatio = baseline
+                        / Math.max(1.0e-6D, cell.cloudPlusFieldP50());
+                out.append(String.format(Locale.ROOT,
+                        "%nT188_BLOCK pose=%s block=%d arm=%s anchorBefore=%.4f"
+                                + " anchorAfter=%.4f anchorDrift=%.4f cloudP50=%.4f"
+                                + " cloudP95=%.4f fieldP50=%.4f fieldP95=%.4f"
+                                + " cloudPlusFieldP50=%.4f localRatio=%.4f"
+                                + " localNetRatio=%.4f blockVerdict=%s",
+                        pose, block, arm.label(), before.cloudP50(), after.cloudP50(),
+                        drift, cell.cloudP50(), cell.cloudP95(),
+                        cell.rainFieldP50(), cell.rainFieldP95(),
+                        cell.cloudPlusFieldP50(), ratio, netRatio,
+                        drift <= T171_REPEAT_TOLERANCE ? "accepted"
+                                : "REJECTED_anchor_drift"));
+                byBlock.computeIfAbsent(block, k -> new java.util.LinkedHashMap<>())
+                        .put(arm.program().serializedName(), cell.cloudPlusFieldP50());
+                if (drift > T171_REPEAT_TOLERANCE) {
+                    continue;
+                }
+                byProgram.computeIfAbsent(arm.program().serializedName(),
+                        key -> new java.util.ArrayList<>())
+                        .add(new double[] {ratio, cell.cloudP50(), cell.cloudP95(),
+                                netRatio, cell.rainFieldP50(),
+                                cell.cloudPlusFieldP50()});
+            }
+            for (java.util.Map.Entry<String, java.util.List<double[]>> entry
+                    : byProgram.entrySet()) {
+                java.util.List<double[]> blocks = entry.getValue();
+                double minRatio = Double.MAX_VALUE;
+                double maxRatio = 0.0D;
+                double sumRatio = 0.0D;
+                double minNet = Double.MAX_VALUE;
+                double maxNet = 0.0D;
+                double sumNet = 0.0D;
+                double sumP50 = 0.0D;
+                double maxP95 = 0.0D;
+                double sumFieldP50 = 0.0D;
+                double sumNetP50 = 0.0D;
+                for (double[] b : blocks) {
+                    minRatio = Math.min(minRatio, b[0]);
+                    maxRatio = Math.max(maxRatio, b[0]);
+                    sumRatio += b[0];
+                    sumP50 += b[1];
+                    maxP95 = Math.max(maxP95, b[2]);
+                    minNet = Math.min(minNet, b[3]);
+                    maxNet = Math.max(maxNet, b[3]);
+                    sumNet += b[3];
+                    sumFieldP50 += b[4];
+                    sumNetP50 += b[5];
+                }
+                double meanRatio = sumRatio / blocks.size();
+                double spread = blocks.size() < 2 ? 1.0D
+                        : (maxRatio - minRatio) / Math.max(1.0e-6D, meanRatio);
+                double meanNet = sumNet / blocks.size();
+                double netSpread = blocks.size() < 2 ? 1.0D
+                        : (maxNet - minNet) / Math.max(1.0e-6D, meanNet);
+                boolean accepted = blocks.size() >= 2
+                        && spread <= T171_REPEAT_TOLERANCE;
+                boolean netAccepted = blocks.size() >= 2
+                        && netSpread <= T171_REPEAT_TOLERANCE;
+                out.append(String.format(Locale.ROOT,
+                        "%nT188_ARM pose=%s arm=%s blocks=%d ratioMin=%.4f"
+                                + " ratioMax=%.4f ratioMean=%.4f ratioSpread=%.4f"
+                                + " netRatioMin=%.4f netRatioMax=%.4f"
+                                + " netRatioMean=%.4f netRatioSpread=%.4f"
+                                + " sessionLocalP50=%.4f sessionLocalP95=%.4f"
+                                + " sessionLocalFieldP50=%.4f"
+                                + " sessionLocalCloudPlusFieldP50=%.4f"
+                                + " verdict=%s netVerdict=%s",
+                        pose, entry.getKey(), blocks.size(), minRatio, maxRatio,
+                        meanRatio, spread, minNet, maxNet, meanNet, netSpread,
+                        sumP50 / blocks.size(), maxP95,
+                        sumFieldP50 / blocks.size(), sumNetP50 / blocks.size(),
+                        accepted ? "accepted"
+                                : blocks.size() < 2 ? "REJECTED_insufficient_blocks"
+                                : "REJECTED_ratio_spread",
+                        netAccepted ? "accepted"
+                                : blocks.size() < 2 ? "REJECTED_insufficient_blocks"
+                                : "REJECTED_ratio_spread"));
+            }
+            java.util.List<Double> paired = new java.util.ArrayList<>();
+            for (java.util.Map<String, Double> cells : byBlock.values()) {
+                Double base = cells.get(control);
+                Double arm = cells.get(target);
+                if (base != null && arm != null && arm > 0.0D) {
+                    paired.add(base / arm);
+                }
+            }
+            if (paired.size() >= 2) {
+                double min = Double.MAX_VALUE;
+                double max = 0.0D;
+                double sum = 0.0D;
+                for (double v : paired) {
+                    min = Math.min(min, v);
+                    max = Math.max(max, v);
+                    sum += v;
+                }
+                double mean = sum / paired.size();
+                double spread = (max - min) / Math.max(1.0e-6D, mean);
+                out.append(String.format(Locale.ROOT,
+                        "%nT188_WITHIN_BLOCK pose=%s arm=%s vsControl=%s blocks=%d"
+                                + " ratioMin=%.4f ratioMax=%.4f ratioMean=%.4f"
+                                + " ratioSpread=%.4f basis=cloudPlusField verdict=%s",
+                        pose, target, control, paired.size(), min, max, mean, spread,
+                        spread <= T171_REPEAT_TOLERANCE ? "accepted"
+                                : "REJECTED_ratio_spread"));
+            }
+        }
+        out.append(String.format(Locale.ROOT, "%nT188_FLOOR ratioTolerance=%.3f",
+                T171_REPEAT_TOLERANCE));
+        out.append(String.format(Locale.ROOT, "%nT188_REJECTED count=%d %s",
+                T162_REJECTED.size(),
+                T162_REJECTED.isEmpty() ? "none" : String.join(",", T162_REJECTED)));
+        return out.toString();
+    }
+
     /** T187. The paired-ratio protocol with the within-block stack control. */
     private static String buildT187RainFieldReport() {
         StringBuilder out = new StringBuilder("T187_RAIN_FIELD_DECISION");
