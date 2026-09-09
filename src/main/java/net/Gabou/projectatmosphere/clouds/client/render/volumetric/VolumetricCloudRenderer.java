@@ -677,6 +677,15 @@ public final class VolumetricCloudRenderer {
                             && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
                         ? 1 : 0;
                 shader.safeGetUniform("PaRainFieldConservative").set(paConservative);
+                // T192. The closed-form triage, on the same rule: the
+                // monolith gets it too when the campaign forces the field
+                // onto it, or the census counters would describe a
+                // classifier the run never used.
+                int paClosedForm = program.rainFieldClosedForm()
+                        || (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
+                            && VolumetricCloudDebugConfig.rainFieldForcedOnMonolith())
+                        ? 1 : 0;
+                shader.safeGetUniform("PaRainFieldClosedForm").set(paClosedForm);
                 shader.apply();
                 PuffLobeSpatialIndex.uploadDescriptors(shader.getId());
                 bindManualTextures(shader, puffCandidateTarget.getColorTextureId());
@@ -693,6 +702,7 @@ public final class VolumetricCloudRenderer {
                 rainFieldTextureId = rainFieldTarget.getColorTextureId();
                 shader.safeGetUniform("PaRainFieldPass").set(0);
                 shader.safeGetUniform("PaRainFieldConservative").set(paConservative);
+                shader.safeGetUniform("PaRainFieldClosedForm").set(paClosedForm);
                 shader.safeGetUniform("PaRainFieldEnabled").set(
                         program.rainFieldLookup()
                                 || program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH

@@ -95,13 +95,20 @@ public final class VolumetricCloudShaders {
             // the tree; only the ShaderInstance is conditional.
             java.util.Set<String> activeCampaigns =
                     StormCampaignRegistry.activeCampaignIds();
+            // A campaign's arms are not confined to its own prefix: matrices
+            // reuse earlier campaigns' programs as controls. Registering only
+            // the prefix match leaves those controls unloaded, which the
+            // renderer can only report as a missing program mid-sweep.
+            java.util.Set<CoreCostDiagnosticProgram> selectable =
+                    StormCampaignRegistry.programsSelectableByActiveCampaigns();
             int registered = 0;
             int skipped = 0;
             for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
                 if (program.isProductionProgram()) {
                     continue;
                 }
-                if (!activeCampaigns.contains(program.campaignId())) {
+                if (!activeCampaigns.contains(program.campaignId())
+                        && !selectable.contains(program)) {
                     skipped++;
                     continue;
                 }
@@ -110,10 +117,11 @@ public final class VolumetricCloudShaders {
             }
             ProjectAtmosphere.LOGGER.info(
                     "T191_VARIANT_SCOPE declared={} activeCampaigns={} registered={}"
-                            + " skipped={} productionAlwaysLoaded=2",
+                            + " skipped={} crossCampaignControls={}"
+                            + " productionAlwaysLoaded=2",
                     CoreCostDiagnosticProgram.values().length - 2,
                     activeCampaigns.isEmpty() ? "none" : String.join(",", activeCampaigns),
-                    registered, skipped);
+                    registered, skipped, selectable.size());
         } catch (IOException | RuntimeException failure) {
             leanFinalVolumeShader = null;
             ProjectAtmosphere.LOGGER.error(

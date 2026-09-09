@@ -292,7 +292,8 @@ def leanFinalConstants = [
         // T190. The certainty flag and its fallback are compiled out of
         // every program that does not opt in, so the mixed-cell branch
         // is absent rather than merely unentered.
-        'uniform int PaRainFieldConservative;'     : 'const int PaRainFieldConservative = 0;'
+        'uniform int PaRainFieldConservative;'     : 'const int PaRainFieldConservative = 0;',
+        'uniform int PaRainFieldClosedForm;'       : 'const int PaRainFieldClosedForm = 0;'
 ]
 
 // The oracle interval texture is read only by the T153 ground-truth replay,
@@ -878,6 +879,26 @@ def leanProgramVariants = [
          defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1',
                    'PA_ARM_RAIN_OWN_BILINEAR 1'],
          keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled']],
+
+        // T192. The closed-form ownership bound as classification triage.
+        // Three arms only, and the campaign-scoped loading T191 added means
+        // they cost nothing on an ordinary startup.
+        [name: 'cloud_atmosphere_volume_t192_field_bound',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
+                        'PaRainFieldConservative', 'PaRainFieldClosedForm']],
+        [name: 'cloud_atmosphere_volume_t192_stack_bound',
+         defines: ['PA_PRECIPITATION_ABSENT 1', 'PA_ARM_FOOTPRINT 0.75',
+                   'PA_ARM_FOOTPRINT_MAX 4.0', 'PA_ARM_EARLY_TERM 0.045',
+                   'PA_ARM_DETAIL_FOOTPRINT 1.0', 'PA_ARM_LIGHT_STEPS 4',
+                   'PA_ARM_DESC_PRECOMPUTE 1'],
+         keepUniforms: ['PaOracleBaseSize', 'PaRainFieldPass',
+                        'PaRainFieldEnabled', 'PaRainFieldConservative',
+                        'PaRainFieldClosedForm']],
+        [name: 'cloud_atmosphere_volume_t192_rain_mask_bound',
+         defines: ['PA_ARM_DESC_PRECOMPUTE 1', 'PA_RAIN_MASK_OUTPUT 1'],
+         keepUniforms: ['PaRainFieldPass', 'PaRainFieldEnabled',
+                        'PaRainFieldConservative', 'PaRainFieldClosedForm']],
 
         // T190. The conservative field: the build marks every cell whose
         // rain-existence decision it cannot prove uniform across the cell, and

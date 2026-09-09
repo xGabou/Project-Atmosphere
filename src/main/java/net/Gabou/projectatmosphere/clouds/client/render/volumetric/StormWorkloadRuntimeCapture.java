@@ -298,7 +298,7 @@ final class StormWorkloadRuntimeCapture {
             double attributionSamples,
             double mixedCells,
             double ownedCells,
-            double supportedCells,
+            double provablyDryCells,
             double censusSamples
     ) {
         static final FieldCertainty ZERO =
@@ -807,7 +807,10 @@ final class StormWorkloadRuntimeCapture {
                     // FRACTION rather than an exact count.
                     + " censusMixedCells=" + fmt(fieldCertainty.mixedCells())
                     + " censusOwnedCells=" + fmt(fieldCertainty.ownedCells())
-                    + " censusSupportedCells=" + fmt(fieldCertainty.supportedCells())
+                    + " censusProvablyDryCells=" + fmt(fieldCertainty.provablyDryCells())
+                    + " closedFormTriageFraction="
+                    + ratio(fieldCertainty.provablyDryCells(),
+                            Math.max(1.0D, fieldCertainty.censusSamples()))
                     + " censusSamples=" + fmt(fieldCertainty.censusSamples())
                     + " mixedCellFraction="
                     + ratio(fieldCertainty.mixedCells(),

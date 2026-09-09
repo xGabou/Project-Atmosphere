@@ -2436,6 +2436,65 @@ implementation, while visual polish remains independently active.
   if an arm ever becomes unreachable, if a production program acquires a campaign id, if the loop
   stops filtering, or if a campaign's marker name drifts from the one the driver looks for.
   Evidence in `validation/startup-variant-scope.md`.
+- [X] T192 [PERFORMANCE] [US3] Final rain-field attempt: the closed-form ownership bound, under a
+  hard stop.
+  **HARD GATE: FAIL. The rain-field line is CLOSED.** Quality passes - false rain 4.32-5.30%, well
+  clear of T188's 10-16% failure class - but **net SIDE is 1.0792 against a required 1.10x**, so by
+  the brief's own rule rain-field optimization closes completely and there is no sixth campaign.
+  **A correction that framed the task**: T190's report was headed "what killed it was the
+  classification", while its own body gave fallbacks at +2.52 ms against classification at +0.62 ms
+  - **the fallback is 4x the classification**, and this brief inherited the error. That set the
+  budget before any code was written: SIDE anchor ~32.7 ms, net 1.10x needs <=29.7 ms, T189's
+  field-only total was 28.25 ms, so classification **plus** fallback had ~1.47 ms to fit into and
+  T190 spent 3.14 - **eliminating classification entirely still leaves 2.52 ms, i.e. ~1.063**. The
+  bound attacks the 0.62 and could never reach 1.10 alone. **The derivation**: ownership is
+  `dot((worldXZ-centre)/radii, itself) <= 1`; the scaling is per-axis and strictly positive, so an
+  axis-aligned cell stays an axis-aligned box after scaling and the minimum of `u2+v2` over it is
+  closed form - zero per axis if the interval spans zero, the nearer endpoint squared otherwise. So
+  `min > 1` for every descriptor **proves** the cell unowned in one squared inequality per lobe: no
+  sampling, no exact SDF, no noise, no sqrt. **Only the dry direction is used** - "inside the
+  ellipse" is a *superset* of owned, since ownership also needs group coverage, so claiming SAFE
+  OWNED would be unsound in precisely the direction that invents rain. **Proven, not inspected**:
+  40,000 random ellipse/cell pairs straddling the boundary against a 25x25 grid - **12,699 proven
+  dry, 27,301 not provable, falseSafe=0**, both directions asserted non-vacuous, obtained *before*
+  any timing. In the campaign the bound proves **82.97-87.58%** of cells dry. **It is genuinely
+  cheaper and not enough**: field build **0.8684 -> 0.6021 ms (-31%)**, `T192_CLASSIFIER_COST`
+  **1.0313 accepted at 2.45%** - the field is 3.1% cheaper overall - but the fallback rate is
+  unchanged (3.67% vs 2.91%), because **the bound changes what classification costs, not what it
+  decides**, which is what it was designed to do and why it cannot reach the gate. The triage clears
+  ~85% of cells yet cuts the build only 31%, because the bound itself costs about one evaluation
+  pass: ten lobes at three texel fetches each over 262,144 cells. **Quality is byte-identical to
+  T190 at both poses** (IoU 0.942487 / 0.955959, same false and missed rain, ownership disagreement
+  0) - a direct confirmation of the design claim. **Stack recorded, not banked**: SIDE 1.1802
+  accepted at 2.50%, the cleanest stack number of the series, but the brief gates the stack on the
+  hard gate. **A T191 defect this campaign found**: two 57-minute runs died as
+  `world_entry_lost_during_T135_SAMPLE` with zero cells, and I first blamed memory. T191 scoped
+  shader registration by each program's *own* name prefix, assuming a campaign only selects its own
+  arms - false when written, since arm matrices reuse earlier campaigns' programs as controls (T190's
+  own matrix used `T172_STACK_PRE`). T192 selects `T190_FIELD_SAFE` and `T172_STACK_PRE`; neither
+  campaign was armed, so neither loaded, `volumeShader` returned null and the renderer
+  session-disabled. T190 ran before scoping existed, so **T192 was the first campaign under it and
+  broke immediately** - loudly and totally rather than as a silent wrong number. Registration now
+  takes the **union** with the active campaign's arm tables, resolved by reflection rather than a
+  hand-maintained map, and the invariant fails the build if it returns to prefix-only
+  (`crossCampaignControls=8`). **Why the line closes**: across five campaigns - T188 1.1158 at
+  12.36% false rain, T189 1.1228 unchanged, T190 1.0437 at 2.99%, T192 1.0792 at 5.30% - the problem
+  is no single classifier. **The field is cheap where it does not matter and expensive where it
+  does**: away from storms it is free and provably exact, but on owned columns its support value is
+  the one quantity with no cheap bound, because the union is eroded by noise - so correctness there
+  costs a fallback and fallbacks there are frequent enough to consume the gain. The closed form
+  removed the last avoidable cost; the remainder is intrinsic. **Variants removed from active
+  campaign use**: the marker is cleared and T191 scoping makes every rain-field arm inert on an
+  ordinary startup (`registered=0 of 142`) without deleting declarations or evidence. **Next task's
+  first action is a fresh production-path SIDE attribution** - every counter capture here ran with
+  the field forced onto the monolith, so all of them are post-field by construction, and spending
+  another 40 minutes on a closing line was the wrong trade. The most recent production-path capture
+  is T190 run C, one task ago on the same fixture: rain segment 55.26%, light tap 17.10%, empty-span
+  probe 15.77%, primary body 7.30%, refinement 3.29%, rain shaft 1.27%. **Rain stays the largest
+  single consumer and is now out of scope** - both the micro-optimization line (T186) and the field
+  line close here - so the next architecture target is the largest non-rain uniform consumer: light
+  tap plus empty-span probe, together about a third of the descriptor work. Evidence in
+  `validation/performance-rain-field-bound.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

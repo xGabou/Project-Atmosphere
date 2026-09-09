@@ -96,6 +96,67 @@ public final class StormCampaignRegistry {
         return active;
     }
 
+    /**
+     * T191 correction. Every program an armed campaign can actually select.
+     *
+     * <p>T191 scoped shader registration by the program's own name prefix, on
+     * the assumption that a campaign only selects its own arms. That is false
+     * and was false when it was written: arm matrices deliberately reuse
+     * earlier campaigns' programs as controls - T192's matrix selects
+     * T190_FIELD_SAFE as the classifier it must beat and T172_STACK_PRE as its
+     * shared control. Neither campaign is armed, so under prefix scoping
+     * neither program was registered, volumeShader returned null, and the
+     * renderer session-disabled into a lost world connection twice before the
+     * cause was found.
+     *
+     * <p>Resolved by reflection over the driver's own arm tables rather than a
+     * hand-maintained map, because a map would be one more thing to forget when
+     * the next campaign borrows a control.
+     */
+    public static java.util.Set<CoreCostDiagnosticProgram>
+            programsSelectableByActiveCampaigns() {
+        java.util.Set<CoreCostDiagnosticProgram> selectable =
+                new java.util.LinkedHashSet<>();
+        for (String id : StormCampaignRegistry.activeCampaignIds()) {
+            collectSelectablePrograms(selectable, id + "_ARMS");
+            collectSelectablePrograms(selectable, id + "_IMAGE_ARMS");
+        }
+        return selectable;
+    }
+
+    private static void collectSelectablePrograms(
+            java.util.Set<CoreCostDiagnosticProgram> out, String fieldName) {
+        try {
+            java.lang.reflect.Field field =
+                    StormT132AutoDriver.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            Object value = field.get(null);
+            if (value instanceof CoreCostDiagnosticProgram[] programs) {
+                out.addAll(java.util.Arrays.asList(programs));
+            } else if (value != null && value.getClass().isArray()) {
+                // The arm record is private to the driver, so its program is
+                // read generically rather than by type.
+                int length = java.lang.reflect.Array.getLength(value);
+                for (int index = 0; index < length; index++) {
+                    Object element = java.lang.reflect.Array.get(value, index);
+                    if (element == null) {
+                        continue;
+                    }
+                    java.lang.reflect.Method program =
+                            element.getClass().getDeclaredMethod("program");
+                    program.setAccessible(true);
+                    Object resolved = program.invoke(element);
+                    if (resolved instanceof CoreCostDiagnosticProgram armProgram) {
+                        out.add(armProgram);
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException absent) {
+            // A campaign without that table simply contributes nothing. Failing
+            // shader registration here would cost the whole cloud renderer.
+        }
+    }
+
     public record Campaign(
             String id,
             String markerFileName,
@@ -190,7 +251,10 @@ public final class StormCampaignRegistry {
                     "T189_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
             new Campaign("T190", "t190-rain-field-conservative.txt",
                     "conservativeRainFieldRunRequested", "t190Run",
-                    "T190_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
+                    "T190_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP),
+            new Campaign("T192", "t192-rain-field-bound.txt",
+                    "closedFormRainFieldRunRequested", "t192Run",
+                    "T192_OPTIMIZATION_ARMS", Routing.EVALUATION_SWEEP));
 
     /**
      * Markers that arm the harness itself rather than selecting a campaign.

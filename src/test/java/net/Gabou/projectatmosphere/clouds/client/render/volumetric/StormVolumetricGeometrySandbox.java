@@ -636,6 +636,131 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT190ConservativeFallback);
         runCorrected("T191 every campaign arm is reachable and scoped to its campaign",
                 StormVolumetricGeometrySandbox::validateT191VariantScope);
+        runCorrected("T192 the closed-form ownership bound never claims a cell falsely",
+                StormVolumetricGeometrySandbox::validateT192OwnershipBound);
+    }
+
+    /**
+     * T192. The closed-form ownership bound, proven rather than inspected.
+     *
+     * <p>The bound claims that when every descriptor's scaled cell box has a
+     * nearest-point squared distance above 1, no point in the cell is owned. A
+     * false claim there would invent rain, which is the exact failure mode this
+     * whole line of campaigns has been chasing - so the claim is tested
+     * numerically against dense sampling, not just read for plausibility.
+     *
+     * <p>Only the DRY direction is asserted, because only the DRY direction is
+     * used. "Entirely inside an ellipse" would not prove ownership:
+     * ownsDescriptorGroup also requires the group union to carry coverage, so
+     * the ellipse test is a superset of ownership rather than an equivalence.
+     */
+    private static void validateT192OwnershipBound() {
+        java.util.Random random = new java.util.Random(0x7192L);
+        int provablyDry = 0;
+        int notProvable = 0;
+        int falseSafe = 0;
+        final int trials = 40000;
+        final int samplesPerAxis = 24;
+
+        for (int trial = 0; trial < trials; trial++) {
+            // One ellipse and one cell, on the scale the field actually uses:
+            // eight world blocks per cell against lobe radii in the tens to
+            // low hundreds, with the cell placed near the boundary often
+            // enough that the interesting case dominates.
+            double centreX = random.nextDouble() * 400.0 - 200.0;
+            double centreZ = random.nextDouble() * 400.0 - 200.0;
+            double radiusX = 8.0 + random.nextDouble() * 180.0;
+            double radiusZ = 8.0 + random.nextDouble() * 180.0;
+            double cellSize = 2.0 + random.nextDouble() * 14.0;
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            double reach = random.nextDouble() * 1.6;
+            double cellCentreX = centreX + Math.cos(angle) * radiusX * reach;
+            double cellCentreZ = centreZ + Math.sin(angle) * radiusZ * reach;
+            double minX = cellCentreX - cellSize * 0.5;
+            double maxX = cellCentreX + cellSize * 0.5;
+            double minZ = cellCentreZ - cellSize * 0.5;
+            double maxZ = cellCentreZ + cellSize * 0.5;
+
+            // The bound, transcribed from the shader.
+            double lowX = (minX - centreX) / radiusX;
+            double highX = (maxX - centreX) / radiusX;
+            double lowZ = (minZ - centreZ) / radiusZ;
+            double highZ = (maxZ - centreZ) / radiusZ;
+            double nearestX = (lowX <= 0.0 && 0.0 <= highX)
+                    ? 0.0 : Math.min(Math.abs(lowX), Math.abs(highX));
+            double nearestZ = (lowZ <= 0.0 && 0.0 <= highZ)
+                    ? 0.0 : Math.min(Math.abs(lowZ), Math.abs(highZ));
+            boolean claimsDry = nearestX * nearestX + nearestZ * nearestZ > 1.0;
+
+            // The reference: is any point of the cell actually owned?
+            boolean sampledOwned = false;
+            for (int ix = 0; ix <= samplesPerAxis && !sampledOwned; ix++) {
+                double x = minX + (maxX - minX) * ix / (double) samplesPerAxis;
+                for (int iz = 0; iz <= samplesPerAxis; iz++) {
+                    double z = minZ + (maxZ - minZ) * iz / (double) samplesPerAxis;
+                    double u = (x - centreX) / radiusX;
+                    double v = (z - centreZ) / radiusZ;
+                    if (u * u + v * v <= 1.0) {
+                        sampledOwned = true;
+                        break;
+                    }
+                }
+            }
+
+            if (claimsDry) {
+                provablyDry++;
+                if (sampledOwned) {
+                    falseSafe++;
+                }
+            } else {
+                notProvable++;
+            }
+        }
+
+        require(falseSafe == 0,
+                "T192 closed-form bound claimed " + falseSafe + " cells provably dry"
+                        + " that contain owned points; a false-safe claim invents rain");
+        // A bound that never proves anything would also report zero false-safe.
+        require(provablyDry > trials / 10,
+                "T192 closed-form bound proves almost nothing dry (" + provablyDry
+                        + " of " + trials + "), so it cannot be triaging anything");
+        require(notProvable > trials / 20,
+                "T192 closed-form bound proves everything dry, which means the test"
+                        + " space no longer contains the boundary case");
+
+        // The shader must use only the direction that is a proof, and must not
+        // reach for a square root where a squared inequality suffices.
+        String shader = readWorkspaceSource("src/main/resources/assets/projectatmosphere/"
+                + "shaders/core/cloud_atmosphere_volume.fsh");
+        String boundBlock = functionBlock(shader, "bool paCellProvablyUnowned(");
+        require(boundBlock.contains("dot(nearest, nearest) <= 1.0"),
+                "T192 bound no longer tests the nearest point of the scaled cell box");
+        require(!boundBlock.contains("sqrt(") && !boundBlock.contains("length("),
+                "T192 bound takes a square root where a squared inequality suffices");
+        require(!boundBlock.contains("farthest") && !boundBlock.contains("SAFE_OWNED"),
+                "T192 bound claims the owned direction, which the ellipse test does"
+                        + " not prove - ownership also needs group coverage");
+        // Derived from the same descriptor geometry as the exact predicate.
+        String exact = functionBlock(shader, "bool paRainColumnOwnedExact(");
+        for (String shared : new String[] {
+                "positionHeight.xy + shearMedia.xy * 0.5",
+                "max(lifecycleRole.yz, vec2(1.0e-6))"}) {
+            require(boundBlock.contains(shared) && exact.contains(shared),
+                    "T192 bound and the exact ownership test no longer share their"
+                            + " geometry: " + shared);
+        }
+        // Triage stays in the build.
+        String generation = between(shader, "if (PaRainFieldPass == 1) {",
+                "if (paRayTraceActive()) {", "T192 generation pass");
+        require(generation.contains("paCellProvablyUnowned("),
+                "T192 triage is not applied during field generation");
+        String lookup = functionBlock(shader, "float paRainFieldSupportAt(");
+        require(!lookup.contains("paCellProvablyUnowned("),
+                "T192 moved the bound into the hot lookup");
+
+        System.out.println("T192_OWNERSHIP_BOUND trials=" + trials
+                + "|provablyDry=" + provablyDry + "|notProvable=" + notProvable
+                + "|falseSafe=" + falseSafe + "|sqrtFree=true|dryDirectionOnly=true");
     }
 
     /**
@@ -655,6 +780,39 @@ public final class StormVolumetricGeometrySandbox {
      *       back to loading everything.</li>
      * </ul>
      */
+    /**
+     * The programs a campaign's arm tables can select, resolved the same way
+     * registration resolves them so the invariant and the runtime cannot
+     * disagree about what "selectable" means.
+     */
+    private static List<CoreCostDiagnosticProgram> campaignSelectablePrograms(
+            String campaignId) {
+        List<CoreCostDiagnosticProgram> programs = new ArrayList<>();
+        for (String suffix : new String[] {"_ARMS", "_IMAGE_ARMS"}) {
+            try {
+                java.lang.reflect.Field field = StormT132AutoDriver.class
+                        .getDeclaredField(campaignId + suffix);
+                field.setAccessible(true);
+                Object value = field.get(null);
+                if (value instanceof CoreCostDiagnosticProgram[] direct) {
+                    programs.addAll(java.util.Arrays.asList(direct));
+                } else if (value != null && value.getClass().isArray()) {
+                    int length = java.lang.reflect.Array.getLength(value);
+                    for (int index = 0; index < length; index++) {
+                        Object element = java.lang.reflect.Array.get(value, index);
+                        java.lang.reflect.Method program =
+                                element.getClass().getDeclaredMethod("program");
+                        program.setAccessible(true);
+                        programs.add((CoreCostDiagnosticProgram) program.invoke(element));
+                    }
+                }
+            } catch (ReflectiveOperationException | RuntimeException absent) {
+                // Campaigns without that table contribute nothing.
+            }
+        }
+        return programs;
+    }
+
     private static void validateT191VariantScope() {
         List<String> unreachable = new ArrayList<>();
         int production = 0;
@@ -691,9 +849,37 @@ public final class StormVolumetricGeometrySandbox {
                         + " would be dead programs rather than scoped ones: "
                         + String.join(", ", unreachable));
 
+        // T192 correction. Prefix scoping alone is wrong: arm matrices reuse
+        // earlier campaigns' programs as controls, and a control that is not
+        // registered can only surface as a missing program in the middle of a
+        // sweep. Every program any campaign's arms can select must therefore be
+        // registered when that campaign is armed.
+        List<String> unregisterableControls = new ArrayList<>();
+        for (StormCampaignRegistry.Campaign campaign : StormCampaignRegistry.CAMPAIGNS) {
+            for (CoreCostDiagnosticProgram program
+                    : campaignSelectablePrograms(campaign.id())) {
+                if (program.isProductionProgram()) {
+                    continue;
+                }
+                if (!campaign.id().equals(program.campaignId())) {
+                    // A cross-campaign control. It is only loadable because the
+                    // registration takes the union with the arm tables.
+                    unregisterableControls.add(
+                            campaign.id() + " selects " + program.serializedName()
+                                    + " (campaign " + program.campaignId() + ")");
+                }
+            }
+        }
+
         String shaders = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
                 + "client/render/shader/VolumetricCloudShaders.java");
-        require(shaders.contains("if (!activeCampaigns.contains(program.campaignId())) {"),
+        require(shaders.contains("programsSelectableByActiveCampaigns()")
+                        && shaders.contains("!selectable.contains(program)"),
+                "T191 registration scopes by name prefix alone, which leaves every"
+                        + " cross-campaign control unloaded: "
+                        + String.join("; ", unregisterableControls));
+        require(shaders.contains("if (!activeCampaigns.contains(program.campaignId())")
+                        && shaders.contains("&& !selectable.contains(program)) {"),
                 "T191 shader registration is no longer scoped to the active campaign,"
                         + " so every historical arm compiles at startup again");
         require(shaders.contains("if (program.isProductionProgram()) {"),
@@ -713,7 +899,9 @@ public final class StormVolumetricGeometrySandbox {
                             + " is not the one the driver looks for, so arming it"
                             + " would register programs the run never selects");
         }
-        System.out.println("T191_VARIANT_SCOPE productionAlwaysLoaded=" + production
+        System.out.println("T191_VARIANT_SCOPE crossCampaignControls="
+                + unregisterableControls.size()
+                + "|productionAlwaysLoaded=" + production
                 + "|campaignScoped=" + scoped + "|unreachable=0"
                 + "|ordinaryStartupPrograms=" + production);
     }
@@ -758,14 +946,22 @@ public final class StormVolumetricGeometrySandbox {
         // the cost back in the loop the field exists to empty.
         String generation = between(shader, "if (PaRainFieldPass == 1) {",
                 "if (paRayTraceActive()) {", "T190 generation pass");
-        require(generation.contains("for (int paCorner = 0; paCorner < 4; paCorner++)"),
+        require(generation.contains("paClassifyCellByCorners("),
                 "T190 classification is not performed during field generation");
-        require(generation.contains("paMixedOwn")
-                        && generation.contains("paMixedSupport")
-                        && generation.contains("PA_FIELD_ATTACH_TOLERANCE"),
+        // T192 extracted the corner loop into a helper so the closed-form
+        // triage could reach it; the loop and what it decides on must still be
+        // there, wherever it lives.
+        String cornerClassifier = functionBlock(shader, "float paClassifyCellByCorners(");
+        require(cornerClassifier.contains(
+                        "for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++)"),
+                "T190 corner classification no longer samples the four cell corners");
+        require(cornerClassifier.contains("mixedOwn")
+                        && cornerClassifier.contains("mixedSupport")
+                        && cornerClassifier.contains("PA_FIELD_ATTACH_TOLERANCE"),
                 "T190 classification does not cover all three quantities the ray"
                         + " decides on: ownership, the support cutoff, and attach height");
-        require(!lookup.contains("paCorner"),
+        require(!lookup.contains("paClassifyCellByCorners(")
+                        && !lookup.contains("cornerIndex"),
                 "T190 moved classification into the hot lookup");
 
         // The certainty flag rides in alpha, which T188 wrote as a constant

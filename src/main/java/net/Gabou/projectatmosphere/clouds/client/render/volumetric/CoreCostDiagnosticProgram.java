@@ -632,7 +632,22 @@ public enum CoreCostDiagnosticProgram {
     T190_STACK_SAFE("t190_stack_safe"),
 
     /** T190: rain-only capture through the conservative field. */
-    T190_RAIN_MASK_SAFE("t190_rain_mask_safe");
+    T190_RAIN_MASK_SAFE("t190_rain_mask_safe"),
+
+    // -----------------------------------------------------------------------
+    // T192. The closed-form ownership bound triages classification: cells
+    // provably outside every ownership ellipse are proven dry by one squared
+    // inequality per lobe instead of four exact evaluations.
+    // -----------------------------------------------------------------------
+
+    /** T192: the conservative field with closed-form triage. */
+    T192_FIELD_BOUND("t192_field_bound"),
+
+    /** T192: the quality-approved stack with the triaged field. */
+    T192_STACK_BOUND("t192_stack_bound"),
+
+    /** T192: rain-only capture through the triaged field. */
+    T192_RAIN_MASK_BOUND("t192_rain_mask_bound");
 
 
     private final String serializedName;
@@ -696,7 +711,9 @@ public enum CoreCostDiagnosticProgram {
                 || this == T189_RAIN_MASK_NEAREST
                 || this == T189_RAIN_MASK_STRICT
                 || this == T190_FIELD_SAFE || this == T190_STACK_SAFE
-                || this == T190_RAIN_MASK_SAFE;
+                || this == T190_RAIN_MASK_SAFE
+                || this == T192_FIELD_BOUND || this == T192_STACK_BOUND
+                || this == T192_RAIN_MASK_BOUND;
     }
 
     /**
@@ -711,7 +728,9 @@ public enum CoreCostDiagnosticProgram {
                 || this == T189_RAIN_MASK_NEAREST
                 || this == T189_RAIN_MASK_STRICT
                 || this == T190_FIELD_SAFE || this == T190_STACK_SAFE
-                || this == T190_RAIN_MASK_SAFE;
+                || this == T190_RAIN_MASK_SAFE
+                || this == T192_FIELD_BOUND || this == T192_STACK_BOUND
+                || this == T192_RAIN_MASK_BOUND;
     }
 
     /**
@@ -721,7 +740,18 @@ public enum CoreCostDiagnosticProgram {
      */
     public boolean rainFieldConservative() {
         return this == T190_FIELD_SAFE || this == T190_STACK_SAFE
-                || this == T190_RAIN_MASK_SAFE;
+                || this == T190_RAIN_MASK_SAFE
+                || this == T192_FIELD_BOUND || this == T192_STACK_BOUND
+                || this == T192_RAIN_MASK_BOUND;
+    }
+
+    /**
+     * True for the arms that triage classification with the closed-form
+     * ownership bound before falling back to corner sampling.
+     */
+    public boolean rainFieldClosedForm() {
+        return this == T192_FIELD_BOUND || this == T192_STACK_BOUND
+                || this == T192_RAIN_MASK_BOUND;
     }
 
     /**
@@ -734,7 +764,8 @@ public enum CoreCostDiagnosticProgram {
         return this == T188_RAIN_MASK_REF || this == T188_RAIN_MASK_FIELD
                 || this == T189_RAIN_MASK_NEAREST
                 || this == T189_RAIN_MASK_STRICT
-                || this == T190_RAIN_MASK_SAFE;
+                || this == T190_RAIN_MASK_SAFE
+                || this == T192_RAIN_MASK_BOUND;
     }
 
     public String resourceName() {

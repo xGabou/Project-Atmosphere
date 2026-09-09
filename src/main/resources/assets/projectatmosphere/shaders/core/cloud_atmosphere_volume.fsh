@@ -263,6 +263,13 @@ uniform int PaRainFieldEnabled;
  */
 uniform int PaRainFieldConservative;
 /**
+ * T192. 1 when cell classification triages with the closed-form ownership
+ * bound before falling back to corner sampling. Separate from
+ * PaRainFieldConservative so the two classifiers can be measured in the same
+ * session against the same anchors.
+ */
+uniform int PaRainFieldClosedForm;
+/**
  * T190. The support level below which localRainSupportAt returns no rain, so
  * the side of it a column falls on is a decision rather than a magnitude.
  * Matches the cutoff that function applies to localSupport.
@@ -4590,6 +4597,99 @@ float paRainFieldSupportAt(
     return cell.r;
 }
 
+/**
+ * T192. Is this whole cell provably outside every descriptor's ownership
+ * ellipse?
+ *
+ * <p>Derived from paRainColumnOwnedExact, which owns a column when
+ * dot((worldXZ - centre) / radii, itself) <= 1 for any descriptor. The scaling
+ * is per-axis and strictly positive, so an axis-aligned cell stays an
+ * axis-aligned box after scaling - and the minimum of u*u + v*v over such a box
+ * is closed form: per axis, zero if the interval spans zero, and the nearer
+ * endpoint squared otherwise.
+ *
+ * <p>So min > 1 for every descriptor proves the entire cell unowned. One
+ * squared inequality per lobe: no sampling, no exact SDF, no noise, no square
+ * roots, no per-cell division that could not be hoisted.
+ *
+ * <p>Only the DRY direction is used, and that is deliberate. The converse - a
+ * cell entirely inside an ellipse - would prove the cell owned only if the
+ * ellipse test were equivalent to ownsDescriptorGroup, and it is not:
+ * ownership also requires the group union to carry coverage there, so "inside
+ * the ellipse" is a superset of "owned". Treating it as SAFE OWNED would be
+ * unsound in exactly the direction that invents rain. The complement is a
+ * proof; the implication is not.
+ *
+ * <p>A provably dry cell needs nothing else checked, because its stored triple
+ * is exactly right everywhere in it: ownership is false throughout, the union
+ * carries no coverage so directSupport is zero throughout, and
+ * localRainSupportAt discards stormBaseY entirely for an unowned column,
+ * taking weatherBaseY - which never came from the field.
+ */
+bool paCellProvablyUnowned(vec2 cellMin, vec2 cellMax) {
+    for (int descriptorIndex = 0; descriptorIndex < MAX_STORM_LOBES; descriptorIndex++) {
+        if (descriptorIndex >= StormLobeCount) {
+            break;
+        }
+        vec4 lifecycleRole = stormDescriptorTexel(descriptorIndex, 3);
+        if (lifecycleRole.w < -0.5) {
+            continue;
+        }
+        vec4 positionHeight = stormDescriptorTexel(descriptorIndex, 0);
+        vec4 shearMedia = stormDescriptorTexel(descriptorIndex, 2);
+        vec2 centre = positionHeight.xy + shearMedia.xy * 0.5;
+        vec2 radii = max(lifecycleRole.yz, vec2(1.0e-6));
+        vec2 lowScaled = (cellMin - centre) / radii;
+        vec2 highScaled = (cellMax - centre) / radii;
+        vec2 spansOrigin = step(lowScaled, vec2(0.0)) * step(vec2(0.0), highScaled);
+        vec2 nearest = mix(
+            min(abs(lowScaled), abs(highScaled)), vec2(0.0), spansOrigin);
+        if (dot(nearest, nearest) <= 1.0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * T190's classifier, extracted so T192 can reach it after its own triage.
+ *
+ * <p>Samples the four cell corners and reports whether the three quantities the
+ * ray decides on stay uniform: ownership, the side of the support cutoff, and
+ * attach height. Sampling is not a proof - T190 measured 0.114% of columns
+ * still disagreeing - but support crossing its cutoff inside a cell has no
+ * cheap closed form, because the union is eroded by noise.
+ */
+float paClassifyCellByCorners(
+        vec2 cellCentreXZ,
+        vec2 cellHalf,
+        float centreSupport,
+        float centreAttachY,
+        bool centreOwns) {
+    bool mixedOwn = false;
+    bool mixedSupport = false;
+    bool centreSupported = centreSupport > PA_FIELD_SUPPORT_CUTOFF;
+    float minAttach = centreAttachY;
+    float maxAttach = centreAttachY;
+    for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++) {
+        vec2 cornerOffset = vec2(
+            (cornerIndex == 0 || cornerIndex == 3) ? -cellHalf.x : cellHalf.x,
+            cornerIndex < 2 ? -cellHalf.y : cellHalf.y
+        );
+        float cornerAttachY;
+        bool cornerOwns;
+        float cornerSupport = directStormRainSupportAt(
+            cellCentreXZ + cornerOffset, cornerAttachY, cornerOwns);
+        mixedOwn = mixedOwn || (cornerOwns != centreOwns);
+        mixedSupport = mixedSupport
+            || ((cornerSupport > PA_FIELD_SUPPORT_CUTOFF) != centreSupported);
+        minAttach = min(minAttach, cornerAttachY);
+        maxAttach = max(maxAttach, cornerAttachY);
+    }
+    return (mixedOwn || mixedSupport
+        || (maxAttach - minAttach) > PA_FIELD_ATTACH_TOLERANCE) ? 1.0 : 0.0;
+}
+
 float localRainSupportAt(
         vec2 worldXZ,
         out float attachY,
@@ -6879,30 +6979,20 @@ void main() {
             // construction, which the sandbox asserts.
             ivec2 paCellGrid = textureSize(WeatherMapSampler, 0);
             vec2 paCellHalf = (WeatherExtent / vec2(paCellGrid)) * 0.5;
-            bool paMixedOwn = false;
-            bool paMixedSupport = false;
-            bool paCentreSupported = fieldSupport > PA_FIELD_SUPPORT_CUTOFF;
-            float paMinAttach = fieldAttachY;
-            float paMaxAttach = fieldAttachY;
-            for (int paCorner = 0; paCorner < 4; paCorner++) {
-                vec2 paCornerOffset = vec2(
-                    (paCorner == 0 || paCorner == 3) ? -paCellHalf.x : paCellHalf.x,
-                    paCorner < 2 ? -paCellHalf.y : paCellHalf.y
-                );
-                float paCornerAttachY;
-                bool paCornerOwns;
-                float paCornerSupport = directStormRainSupportAt(
-                    fieldWorldXZ + paCornerOffset, paCornerAttachY, paCornerOwns);
-                paMixedOwn = paMixedOwn || (paCornerOwns != fieldOwnsGroup);
-                paMixedSupport = paMixedSupport
-                    || ((paCornerSupport > PA_FIELD_SUPPORT_CUTOFF)
-                        != paCentreSupported);
-                paMinAttach = min(paMinAttach, paCornerAttachY);
-                paMaxAttach = max(paMaxAttach, paCornerAttachY);
+            if (PaRainFieldClosedForm == 1
+                    && paCellProvablyUnowned(
+                        fieldWorldXZ - paCellHalf,
+                        fieldWorldXZ + paCellHalf)) {
+                // T192. Proven dry by one squared inequality per lobe.
+                // T190 paid four extra directStormRainSupportAt calls on
+                // every cell to reach this by sampling; the great
+                // majority of cells are nowhere near a storm.
+                fieldMixed = 0.0;
+            } else {
+                fieldMixed = paClassifyCellByCorners(
+                    fieldWorldXZ, paCellHalf, fieldSupport, fieldAttachY,
+                    fieldOwnsGroup);
             }
-            fieldMixed = (paMixedOwn || paMixedSupport
-                || (paMaxAttach - paMinAttach) > PA_FIELD_ATTACH_TOLERANCE)
-                ? 1.0 : 0.0;
         }
         fragColor = vec4(
             fieldSupport, fieldAttachY, fieldOwnsGroup ? 1.0 : 0.0, fieldMixed);
@@ -8964,10 +9054,20 @@ void main() {
             paCensusSize - ivec2(1)
         );
         vec4 paCensusCell = texelFetch(RainFieldSampler, paCensusTexel, 0);
+        // T192. Channel B now carries the closed-form triage rate instead of
+        // the supported-cell count, which no decision read. The bound is
+        // re-evaluated here rather than stored, so the census measures the
+        // classifier itself rather than what some build happened to write.
+        vec2 paCensusCellSize = WeatherExtent / vec2(paCensusSize);
+        vec2 paCensusCentre = WeatherOrigin
+            + (vec2(paCensusTexel) + 0.5) * paCensusCellSize;
+        bool paCensusProvenDry = paCellProvablyUnowned(
+            paCensusCentre - paCensusCellSize * 0.5,
+            paCensusCentre + paCensusCellSize * 0.5);
         fragColor = vec4(
             paCensusCell.a >= 0.5 ? 1.0 : 0.0,
             paCensusCell.b >= 0.5 ? 1.0 : 0.0,
-            paCensusCell.r > PA_FIELD_SUPPORT_CUTOFF ? 1.0 : 0.0,
+            paCensusProvenDry ? 1.0 : 0.0,
             1.0
         );
         return;
