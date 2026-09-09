@@ -749,6 +749,46 @@ public enum CoreCostDiagnosticProgram {
         };
     }
 
+    /**
+     * T191. The campaign this program belongs to, or null for the two
+     * production programs.
+     *
+     * <p>Derived from the serialized name's {@code tNNN_} prefix and resolved
+     * against {@link StormCampaignRegistry}, so a new arm inherits its campaign
+     * from its own name and there is no second table to keep in step. A program
+     * whose prefix matches no registered campaign returns the prefix itself,
+     * which the sandbox rejects - an arm no campaign can activate is an arm
+     * that would never load.
+     */
+    public String campaignId() {
+        int underscore = serializedName.indexOf('_');
+        if (underscore <= 1 || serializedName.charAt(0) != 't') {
+            return null;
+        }
+        String prefix = serializedName.substring(0, underscore);
+        for (int index = 1; index < prefix.length(); index++) {
+            if (!Character.isDigit(prefix.charAt(index))) {
+                return null;
+            }
+        }
+        for (StormCampaignRegistry.Campaign campaign
+                : StormCampaignRegistry.CAMPAIGNS) {
+            String id = campaign.id().toLowerCase(java.util.Locale.ROOT);
+            if (id.equals(prefix) || id.startsWith(prefix + "_")) {
+                return campaign.id();
+            }
+        }
+        return prefix;
+    }
+
+    /**
+     * True for the two programs ordinary rendering needs. Everything else is a
+     * campaign arm and is loaded only while its campaign is active.
+     */
+    public boolean isProductionProgram() {
+        return this == DIAGNOSTIC_MONOLITH || this == LEAN_FINAL;
+    }
+
     public static CoreCostDiagnosticProgram parse(String value) {
         if (value == null) {
             return null;

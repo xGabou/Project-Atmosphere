@@ -3,6 +3,7 @@ package net.Gabou.projectatmosphere.client.render.shader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.Gabou.projectatmosphere.ProjectAtmosphere;
 import net.Gabou.projectatmosphere.clouds.client.render.volumetric.CoreCostDiagnosticProgram;
+import net.Gabou.projectatmosphere.clouds.client.render.volumetric.StormCampaignRegistry;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
@@ -82,13 +83,37 @@ public final class VolumetricCloudShaders {
                             DefaultVertexFormat.POSITION_TEX),
                     loaded -> leanFinalVolumeShader = loaded);
             diagnosticVolumeShaders.clear();
+            // T191. Campaign arms are loaded only while their campaign is
+            // armed. Every arm ever measured used to be compiled and linked on
+            // every startup - 139 full-size fragment programs by T190 - which
+            // is minutes of compilation and enough memory pressure that one
+            // launch died in the middle of it. Nothing about a historical
+            // experiment requires it to be a live program on a run that cannot
+            // select it.
+            //
+            // The source, the generated variants and the evidence all stay in
+            // the tree; only the ShaderInstance is conditional.
+            java.util.Set<String> activeCampaigns =
+                    StormCampaignRegistry.activeCampaignIds();
+            int registered = 0;
+            int skipped = 0;
             for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
-                if (program == CoreCostDiagnosticProgram.DIAGNOSTIC_MONOLITH
-                        || program == CoreCostDiagnosticProgram.LEAN_FINAL) {
+                if (program.isProductionProgram()) {
+                    continue;
+                }
+                if (!activeCampaigns.contains(program.campaignId())) {
+                    skipped++;
                     continue;
                 }
                 registerDiagnosticVolumeProgram(event, program);
+                registered++;
             }
+            ProjectAtmosphere.LOGGER.info(
+                    "T191_VARIANT_SCOPE declared={} activeCampaigns={} registered={}"
+                            + " skipped={} productionAlwaysLoaded=2",
+                    CoreCostDiagnosticProgram.values().length - 2,
+                    activeCampaigns.isEmpty() ? "none" : String.join(",", activeCampaigns),
+                    registered, skipped);
         } catch (IOException | RuntimeException failure) {
             leanFinalVolumeShader = null;
             ProjectAtmosphere.LOGGER.error(
@@ -134,6 +159,25 @@ public final class VolumetricCloudShaders {
             case LEAN_FINAL -> leanFinalVolumeShader;
             default -> diagnosticVolumeShaders.get(program);
         };
+    }
+
+    /**
+     * T191. Why a diagnostic program is unavailable, for the renderer's status
+     * line. A campaign arm selected without its marker is a setup mistake with
+     * an obvious fix, and it must not read as a compile failure.
+     */
+    public static String missingProgramReason(CoreCostDiagnosticProgram program) {
+        if (program == null || volumeShader(program) != null) {
+            return "loaded";
+        }
+        if (program.isProductionProgram()) {
+            return "production_program_failed_to_load";
+        }
+        String campaign = program.campaignId();
+        return StormCampaignRegistry.activeCampaignIds().contains(campaign)
+                ? "campaign_" + campaign + "_active_but_program_failed_to_load"
+                : "campaign_" + campaign + "_not_armed:"
+                        + " create its marker file and restart the client";
     }
 
     /**

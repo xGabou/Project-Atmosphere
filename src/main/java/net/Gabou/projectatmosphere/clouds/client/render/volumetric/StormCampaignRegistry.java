@@ -72,6 +72,30 @@ public final class StormCampaignRegistry {
      *                        campaign declares no arm matrix
      * @param routing         how the campaign participates in routing
      */
+    /**
+     * T191. The campaigns whose marker file is present, by id.
+     *
+     * <p>Read from disk on demand rather than cached, and never from a static
+     * initializer: the sandbox loads this class headless, and campaign markers
+     * are created and removed between runs of the same client.
+     */
+    public static java.util.Set<String> activeCampaignIds() {
+        java.util.Set<String> active = new java.util.LinkedHashSet<>();
+        for (Campaign campaign : CAMPAIGNS) {
+            try {
+                if (java.nio.file.Files.exists(
+                        java.nio.file.Path.of(campaign.markerFileName()))) {
+                    active.add(campaign.id());
+                }
+            } catch (RuntimeException ignored) {
+                // A marker that cannot be probed is treated as absent. Failing
+                // shader registration over a filesystem hiccup would cost the
+                // whole cloud renderer to save a diagnostic program.
+            }
+        }
+        return active;
+    }
+
     public record Campaign(
             String id,
             String markerFileName,

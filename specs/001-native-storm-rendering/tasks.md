@@ -2406,6 +2406,36 @@ implementation, while visual polish remains independently active.
   quality-correct and it is not. **Task 12 not re-run**: the field is not accepted, so T188's light
   38.41% / probe 37.96% stands as the last valid attribution. Variants **137 -> 140**; the prune is
   overdue. Evidence in `validation/performance-rain-field-conservative.md`.
+- [X] T191 [INFRASTRUCTURE] Stop compiling every historical campaign arm at every startup.
+  **Shader registration fell from 6m 46s to 5s, and from 140 live fragment programs to 2.** The
+  before figure is measured, not estimated: the T190 log registers shaders 20:58:08 -> 21:04:54 and
+  T189 19:01:41 -> 19:08:13, **6m 46s and 6m 32s** - and that window is exactly where the T187
+  launch died, six minutes into shader loading. **Inventory**: all 141 enum programs classify
+  without a remainder - **2 production** and **139 campaign arms** across 26 prefixes (T166 alone
+  has 22, T170 15, T167 14) - with **zero orphans**, which is what makes scoping a complete answer
+  rather than a partial one. None of the 139 is referenced at runtime outside its campaign:
+  `setFinalProgramOverride` is called only by the driver and `CoreCostDiagnosticProgram.parse` has
+  no caller at all. **No invariant needed a live program** - every one validates generated source,
+  define tables, enum declarations or registry entries, and the sandbox has never had a GL context,
+  so **nothing was weakened**; the compile and link work was serving only the possibility that a
+  campaign might later select an arm. **Scoped rather than pruned**: registration filters on the
+  active campaign marker, and `campaignId()` derives from the arm's own `tNNN_` prefix resolved
+  against `StormCampaignRegistry`, so **a new arm inherits its campaign from its own name** - no
+  second table to keep in step and no way for the count to creep back as it did through T186-T190.
+  Nothing was deleted: every variant is still declared, still generated, and every validation
+  document still stands - only the `ShaderInstance` is conditional. **Three launches, both code
+  paths**: ordinary 5s and 4s with `registered=0 skipped=139`, and **T190 armed with
+  `registered=3 skipped=136` in 5s and no failed loads** - that second one is the counter-test that
+  matters, because a cleanup that quietly stopped campaigns working would look identical to a
+  successful one on an ordinary launch. **Peak shader-load memory is not separately instrumented
+  and is not claimed**; what is claimed is 2 programs instead of 140 over 5 seconds instead of 406.
+  **Production equality**: `git diff 1deb75f` over `shaders/` and `build.gradle` is **empty**,
+  `leanFinalConstants` and `leanProgramVariants` byte-identical, so no image or performance campaign
+  was required and none was run. Production programs register unconditionally ahead of the filter,
+  and `T191_VARIANT_SCOPE productionAlwaysLoaded=2|campaignScoped=139|unreachable=0` fails the build
+  if an arm ever becomes unreachable, if a production program acquires a campaign id, if the loop
+  stops filtering, or if a campaign's marker name drifts from the one the driver looks for.
+  Evidence in `validation/startup-variant-scope.md`.
 - [ ] T042 [PERFORMANCE] [US3] Add failing preset-table, monotonic detail, target/floor, EWMA,
   30-frame downgrade, 180-frame recovery, 30-second cooldown, adaptive-disable, and reset
   assertions in `src/test/java/net/Gabou/projectatmosphere/clouds/client/render/volumetric/StormVolumetricGeometrySandbox.java`.

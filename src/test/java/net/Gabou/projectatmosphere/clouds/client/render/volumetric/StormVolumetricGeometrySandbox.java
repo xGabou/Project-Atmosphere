@@ -634,6 +634,88 @@ public final class StormVolumetricGeometrySandbox {
                 StormVolumetricGeometrySandbox::validateT189DiscreteOwnership);
         runCorrected("T190 uncertain field cells fall back to the exact evaluation",
                 StormVolumetricGeometrySandbox::validateT190ConservativeFallback);
+        runCorrected("T191 every campaign arm is reachable and scoped to its campaign",
+                StormVolumetricGeometrySandbox::validateT191VariantScope);
+    }
+
+    /**
+     * T191. Campaign arms are loaded only while their campaign is armed.
+     *
+     * <p>Every arm ever measured used to be compiled and linked on every
+     * startup - 139 full-size fragment programs by T190 - which is minutes of
+     * compilation and enough memory pressure that one launch died in the middle
+     * of it. This keeps the accumulation from coming back:
+     *
+     * <ul>
+     *   <li>every non-production program must resolve to a registered campaign,
+     *       so a new arm cannot become one no marker can activate;</li>
+     *   <li>the two production programs must stay unconditional, so ordinary
+     *       rendering never depends on a marker file;</li>
+     *   <li>registration must remain filtered, so the loop cannot quietly go
+     *       back to loading everything.</li>
+     * </ul>
+     */
+    private static void validateT191VariantScope() {
+        List<String> unreachable = new ArrayList<>();
+        int production = 0;
+        int scoped = 0;
+        for (CoreCostDiagnosticProgram program : CoreCostDiagnosticProgram.values()) {
+            if (program.isProductionProgram()) {
+                production++;
+                require(program.campaignId() == null,
+                        "T191 production program " + program.serializedName()
+                                + " claims a campaign, so it would stop loading"
+                                + " whenever that campaign is not armed");
+                continue;
+            }
+            String campaign = program.campaignId();
+            boolean registeredCampaign = false;
+            for (StormCampaignRegistry.Campaign known
+                    : StormCampaignRegistry.CAMPAIGNS) {
+                if (known.id().equals(campaign)) {
+                    registeredCampaign = true;
+                    break;
+                }
+            }
+            if (campaign == null || !registeredCampaign) {
+                unreachable.add(program.serializedName() + " -> " + campaign);
+            } else {
+                scoped++;
+            }
+        }
+        require(production == 2,
+                "T191 expects exactly two unconditional production programs, found "
+                        + production);
+        require(unreachable.isEmpty(),
+                "T191 campaign arms that no registered campaign can load, so they"
+                        + " would be dead programs rather than scoped ones: "
+                        + String.join(", ", unreachable));
+
+        String shaders = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "client/render/shader/VolumetricCloudShaders.java");
+        require(shaders.contains("if (!activeCampaigns.contains(program.campaignId())) {"),
+                "T191 shader registration is no longer scoped to the active campaign,"
+                        + " so every historical arm compiles at startup again");
+        require(shaders.contains("if (program.isProductionProgram()) {"),
+                "T191 production programs are no longer registered unconditionally");
+        require(shaders.contains("T191_VARIANT_SCOPE declared={}"),
+                "T191 startup no longer reports how many programs it loaded, so a"
+                        + " regression would be invisible");
+
+        // Marker names have to agree with the driver, or arming a campaign would
+        // load nothing and the arms would report as failed compiles.
+        String driver = readWorkspaceSource("src/main/java/net/Gabou/projectatmosphere/"
+                + "clouds/client/render/volumetric/StormT132AutoDriver.java");
+        for (StormCampaignRegistry.Campaign campaign : StormCampaignRegistry.CAMPAIGNS) {
+            require(driver.contains("\"" + campaign.markerFileName() + "\""),
+                    "T191 campaign " + campaign.id() + " marker "
+                            + campaign.markerFileName()
+                            + " is not the one the driver looks for, so arming it"
+                            + " would register programs the run never selects");
+        }
+        System.out.println("T191_VARIANT_SCOPE productionAlwaysLoaded=" + production
+                + "|campaignScoped=" + scoped + "|unreachable=0"
+                + "|ordinaryStartupPrograms=" + production);
     }
 
     /**
